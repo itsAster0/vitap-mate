@@ -1,0 +1,40 @@
+{
+  "name": "vitap-pal",
+  "version": "0.1.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
+    "tauri": "tauri"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@tailwindcss/vite": "^4.0.9",
+    "@tauri-apps/api": "^2.3.0",
+    "@tauri-apps/plugin-http": "^2.3.0",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-store": "^2.2.0",
+    "lucide-svelte": "^0.477.0",
+    "tailwindcss": "^4.0.9"
+  },
+  "devDependencies": {
+    "@skeletonlabs/skeleton": "^3.0.0-next.12",
+    "@skeletonlabs/skeleton-svelte": "^1.0.0-next.21",
+    "@sveltejs/adapter-static": "^3.0.6",
+    "@sveltejs/kit": "^2.9.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tauri-apps/cli": "^2.3.1",
+    "daisyui": "^5.0.0",
+    "prettier": "^3.5.3",
+    "prettier-plugin-svelte": "^3.3.3",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
+}
