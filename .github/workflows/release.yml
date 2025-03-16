@@ -57,7 +57,7 @@ jobs:
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
           echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
           base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/upload-keystore.jks
-          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
+          echo "storeFile=$RUNNER_TEMP/upload-keystore.jks" >> keystore.properties
 
       - name: Build Tauri Android app (split per ABI)
         run: |
@@ -85,4 +85,4 @@ jobs:
 
 
       - name: Cleanup keystore
-        run: rm $RUNNER_TEMP/keystore.jks
+        run: rm $RUNNER_TEMP/upload-keystore.jks
