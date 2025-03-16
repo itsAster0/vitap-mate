@@ -83,7 +83,7 @@ jobs:
           cd src-tauri/gen/android
           echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
           echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
-          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/keystore.jks
+          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/upload-keystore.jks
           echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
 
       - name: Build Tauri Android app (split per ABI)
@@ -101,12 +101,10 @@ jobs:
           path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
 
       - name: Upload APKs to Release
-        if: ${{ github.event_name == 'release' }} # Add this condition
+        if: ${{ github.event_name == 'release' }} 
         run: |
           for apk in src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk; do
-            asset_name=$(basename "$apk")
-            echo "Uploading $asset_name"
-            gh release upload ${{ github.event.release.tag_name }} "$apk" --name "$asset_name" --clobber
+            gh release upload ${{ github.event.release.tag_name }} $apk
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
