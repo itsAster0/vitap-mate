@@ -26,14 +26,13 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install latest Android NDK
+      - name: Install Android NDK
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build zip unzip
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;latest"
-          NDK_VERSION=$(${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list | grep "ndk;" | tail -n 1 | awk '{print $3}')
-          echo "ndk.dir=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
-          echo "NDK_VERSION=${NDK_VERSION}" >> $GITHUB_ENV
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.0.13004108"
+          echo "ndk.dir=${ANDROID_HOME}/ndk/28.0.13004108" >> $GITHUB_ENV 
+
 
       - name: Install Tauri dependencies
         run: |
