@@ -56,7 +56,7 @@
         store.set("timetable_semid", temp);
         let time = unixTimestamp();
         await store.set("timetable_semid_lastupdate", time);
-        console.log("updating timetable semids tie");
+        // console.log("updating timetable semids tie");
         if (temp != semid) {
           semid = temp;
         }
@@ -99,7 +99,7 @@
   $effect(() => {
     if (reload.status | errors.code) {
     }
-    console.log("running effect from timetable semid");
+    //console.log("running effect from timetable semid");
     untrack(() => {
       loadfromstorage().then(() => getsemids());
     });

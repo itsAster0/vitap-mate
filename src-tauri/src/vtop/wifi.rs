@@ -1,7 +1,7 @@
 use scraper::{Html, Selector};
 use tauri_plugin_http::reqwest;
 
-pub async fn wifi_login_logout(i: i32,username: String, password : String) -> (bool, String) {
+pub async fn wifi_login_logout(i: i32, username: String, password: String) -> (bool, String) {
     let client = reqwest::Client::new();
     if i == 0 {
         let res = client.get("http://172.18.10.10:1000/login?").send().await;

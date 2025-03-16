@@ -100,7 +100,7 @@
     errors.code;
     if (reload.status) {
     }
-    console.log("running effect from attendance semid");
+    // console.log("running effect from attendance semid");
     untrack(() => {
       loadfromstorage().then(() => getsemids());
     });

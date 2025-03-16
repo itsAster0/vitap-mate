@@ -7,7 +7,7 @@
   let group = $state("TUE");
 
   $effect(() => {
-    console.log("running effect days");
+    //console.log("running effect days");
     try {
       let timetable = JSON.parse(full_timetable_list);
       for (let i = 0; i < timetable.length; i++) {

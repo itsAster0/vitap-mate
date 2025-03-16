@@ -10,6 +10,7 @@
   }
 
   let errors: datasate = getContext("errors");
+  let relaod = getContext("reload");
 
   //settings password to PC incidates password change
 
@@ -37,11 +38,13 @@
     goto("/timetable");
     for (let i = 0; i < 3; i++) {
       errors.code = "stop";
+      relaod.status = true;
       //@ts-ignore
       const [status, kt] = await invoke("onstart_runcode", {
         username: creds.username,
         password: creds.password,
       });
+      relaod.status = false;
       const k = String(kt);
       //console.log(k=="Invalid LoginId/Password",k == "Invalid Username/Password",k)
       if (

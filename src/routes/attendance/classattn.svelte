@@ -80,7 +80,12 @@
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
-  loadData();
+
+  $effect(() => {
+    // console.log("effect from class attn");
+    errors.code;
+    loadData();
+  });
 </script>
 
 {#if data != ""}

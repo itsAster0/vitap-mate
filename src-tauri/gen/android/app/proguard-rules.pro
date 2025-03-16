@@ -12,6 +12,9 @@
 #   public *;
 #}
 
+-keep class com.vitap_pal.app.RustWebViewClient {
+    public <methods>;
+}
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable

@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-linux-android
+          override: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install latest Android NDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build zip unzip
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;latest"
+          NDK_VERSION=$(${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list | grep "ndk;" | tail -n 1 | awk '{print $3}')
+          echo "ndk.dir=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+          echo "NDK_VERSION=${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Install Tauri dependencies
+        run: |
+          npm install
+          npm install -g @tauri-apps/cli
+
+      - name: Configure Android environment variables
+        run: |
+          echo "JAVA_HOME=$(/usr/lib/jvm/default-java)" >> $GITHUB_ENV
+          echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_HOME/ndk/${NDK_VERSION}:$PATH" >> $GITHUB_ENV
+          echo "PATH=$JAVA_HOME/bin:$PATH" >> $GITHUB_ENV
+
+      - name: setup Android signing
+        run: |
+          cd src-tauri/gen/android
+          echo "keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}" > keystore.properties
+          echo "password=${{ secrets.ANDROID_KEY_PASSWORD }}" >> keystore.properties
+          base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/keystore.jks
+          echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
+
+      - name: Build Tauri Android app (split per ABI)
+        run: |
+          npm run tauri android build -- --apk --split-per-abi
+
+      - name: Build Universal APK
+        run: |
+          npm run tauri android build 
+
+      - name: Upload ABI-Specific APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-android-abi-apks
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+
+      - name: Upload Universal APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-android-universal-apk
+          path: src-tauri/target/apk/release/*.apk
+
+
+      - name: Cleanup keystore
+        run: rm $RUNNER_TEMP/keystore.jks

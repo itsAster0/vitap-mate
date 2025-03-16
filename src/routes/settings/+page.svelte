@@ -113,7 +113,7 @@
     </div>
 
     <div class="card w-full max-w-md bg-base-100 p-6">
-      <h2 class="text-center text-2xl font-semibold mb-6">Vtop credentials</h2>
+      <h2 class="text-center text-2xl font-semibold mb-6">Vtop Credentials</h2>
       <form>
         <div class="form-control mb-4">
           <label for="username" class="label">

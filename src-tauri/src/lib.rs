@@ -207,8 +207,8 @@ async fn full_attendance(
 }
 
 #[tauri::command]
-async fn wifi(i: i32,username: String,password: String) -> Result<(bool, String), tauri::Error> {
-    let k = wifi::wifi_login_logout(i,username,password).await;
+async fn wifi(i: i32, username: String, password: String) -> Result<(bool, String), tauri::Error> {
+    let k = wifi::wifi_login_logout(i, username, password).await;
     Ok(k)
     //Ok(k)
 }
