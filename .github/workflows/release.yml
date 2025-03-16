@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build zip unzip
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.0.13004108"
-          echo "ndk.dir=${ANDROID_HOME}/ndk/28.0.13004108" >> $GITHUB_ENV 
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/28.0.13004108" >> $GITHUB_ENV 
 
 
       - name: Install Tauri dependencies
