@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1 
         with:
           toolchain: stable
           target: aarch64-linux-android
@@ -38,6 +38,7 @@ jobs:
         run: |
           npm install
           npm install -g @tauri-apps/cli
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
 
       - name: Configure Android environment variables
         run: |
