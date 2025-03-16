@@ -6,11 +6,11 @@ Eliminate the hassle of repeatedly entering credentials. Simply log in once, and
 
 Access your timetable and attendance information anytime, even without an internet connection.
 
-<div style="display: flex; justify-content: space-around;">
-  <img src="/imgs/tt.jpeg" alt="timetable" style="max-width: 30%;">
-  <img src="/imgs/att.jpeg" alt="attendance" style="max-width: 30%;">
-  <img src="/imgs/attcl.jpeg" alt="attendance class" style="max-width: 30%;">
-</div>
+<p align="center">
+  <img src="imgs/tt.jpeg" alt="timetable" width="30%">
+  <img src="imgs/att.jpeg" alt="attendance" width="30%">
+  <img src="imgs/attcl.jpeg" alt="attendance class" width="30%">
+</p>
 
 
 ## Contributions are Welcome
