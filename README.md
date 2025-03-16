@@ -1,6 +1,23 @@
-# Tauri + SvelteKit
+# Vitap Pal
 
-This project use Tauri(src-tauri) and sveletkit(src) 
+An app designed to enhance the convenience of VIT-AP student life.
+
+Eliminate the hassle of repeatedly entering credentials. Simply log in once, and the app will maintain up-to-date timetables and attendance records. Offline viewing is also supported.
+
+Access your timetable and attendance information anytime, even without an internet connection.
+
+![timetable](/imgs/tt.jpeg)
+![att](/imgs/att.jpeg)
+![attclass](/imgs/attcl.jpeg)
+
+
+
+## Contributions are Welcome
+
+Feel free to contribute if you're interested.
+
+This project utilizes Tauri (src-tauri) and SvelteKit (src).
+
 
 ## Recommended IDE Setup
 
