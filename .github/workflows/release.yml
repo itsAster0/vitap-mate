@@ -99,13 +99,8 @@ jobs:
         with:
           name: tauri-android-abi-apks
           path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
+          archive: false 
 
-
-      - name: Upload Universal APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: tauri-android-universal-apk
-          path: src-tauri/target/apk/release/*.apk
 
 
       - name: Cleanup keystore
