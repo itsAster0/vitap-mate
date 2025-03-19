@@ -142,8 +142,11 @@ impl Iclient {
                 Ok(x) => {
                     self.current_page = x;
                     if let Some(p) = self.get_captcha_data() {
+                        if p=="".to_string(){
+                            continue;
+                        }
                         self.captcha = p;
-                        break;
+                        return (true, "SS".to_string());
                     }
                 }
                 Err(_e) => {
@@ -151,7 +154,7 @@ impl Iclient {
                 }
             }
         }
-        return (true, "SS".to_string());
+        return (false, "".to_string());
     }
 
     async fn get_regno(&mut self) -> (bool, String) {
@@ -312,6 +315,9 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
                 let t = k.text().await;
                 match t {
                     Ok(k) => {
@@ -336,6 +342,9 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
                 let t = k.text().await;
                 match t {
                     Ok(k) => {
@@ -365,6 +374,9 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
                 let t = k.text().await;
                 match t {
                     Ok(k) => {
@@ -389,6 +401,9 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
                 let t = k.text().await;
                 match t {
                     Ok(k) => {
@@ -413,6 +428,9 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
                 let t = k.text().await;
                 match t {
                     Ok(k) => {
@@ -428,4 +446,121 @@ impl Iclient {
             }
         }
     }
+
+    pub async fn get_course_page(&self) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/academics/common/StudentCoursePage";
+        let body = format!(
+            "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
+            self.username, self.csrf
+        );
+        let res = self.client.post(url).body(body).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
+        }
+    }
+
+    pub async fn get_course_courses(&self,semid: String) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/getCourseForCoursePage";
+        let body = format!(
+            "_csrf={}&paramReturnId=getCourseForCoursePage&semSubId={}&authorizedID={}",
+            self.csrf,semid,self.username
+        );
+        println!("{}",body);
+        let res = self.client.post(url).body(body).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success(){
+                    return (false, "VE".to_string());
+                }
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
+        }
+    }
+
+
+pub async fn get_course_classes(&self,semid: String,classid : String) -> (bool, String) {
+    let url = "https://vtop.vitap.ac.in/vtop/getSlotIdForCoursePage";
+    let body = format!(
+        "_csrf={}&classId={}&praType=source&paramReturnId=getSlotIdForCoursePage&semSubId={}&authorizedID={}",
+        self.csrf,classid,semid,self.username
+    );
+    println!("{}",body);
+    let res = self.client.post(url).body(body).send().await;
+    match res {
+        Ok(k) => {
+            if !k.status().is_success(){
+                return (false, "VE".to_string());
+            }
+            let t = k.text().await;
+            match t {
+                Ok(k) => {
+                    return (true, k);
+                }
+                Err(_) => {
+                    return (false, "VE".to_string());
+                }
+            };
+        }
+        Err(_) => {
+            return (false, "NE".to_string());
+        }
+    }
+}
+
+pub async fn get_course_dlist(&self,semid: String,classid : String,erp_id:String) -> (bool, String) {
+    let url = "https://vtop.vitap.ac.in/vtop/processViewStudentCourseDetail";
+    let body = format!(
+        "_csrf={}&semSubId={}&erpId={}&classId={}&authorizedID={}",
+        self.csrf,semid,erp_id,classid,self.username
+    );
+    println!("{}",body);
+    let res = self.client.post(url).body(body).send().await;
+    match res {
+        Ok(k) => {
+            if !k.status().is_success(){
+                return (false, "VE".to_string());
+            }
+            let t = k.text().await;
+            match t {
+                Ok(k) => {
+                    return (true, k);
+                }
+                Err(_) => {
+                    return (false, "VE".to_string());
+                }
+            };
+        }
+        Err(_) => {
+            return (false, "NE".to_string());
+        }
+    }
+}
+
 }

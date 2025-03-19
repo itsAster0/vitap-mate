@@ -7,6 +7,7 @@ use vtop::client::Iclient;
 use vtop::parseattn;
 use vtop::parsett;
 use vtop::wifi;
+use vtop::parsecoursepg;
 
 // (true or false, "msg")
 // msg:
@@ -91,8 +92,12 @@ async fn timetable(
     if m {
         let res = client.get_timetable(semid).await;
         if res.0 {
-            let np = parsett::parse_timetable(res.1);
-            result = (true, np);
+            let k = parsett::parse_timetable(res.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
         } else {
             result = res;
         }
@@ -116,7 +121,13 @@ async fn timetable_semid(
     if m {
         let html = client.get_timetable_page().await;
         if html.0 {
-            result = (true, parsett::parse_semid_timetable(html.1));
+            let k = parsett::parse_semid_timetable(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
+            
         } else {
             result = html;
         }
@@ -141,7 +152,12 @@ async fn attendance_semid(
     if m {
         let html = client.get_attendance_page().await;
         if html.0 {
-            result = (true, parseattn::parse_semid_attendance(html.1));
+            let k=parseattn::parse_semid_attendance(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
         } else {
             result = html;
         }
@@ -167,7 +183,12 @@ async fn attendance(
     if m {
         let html = client.get_attendance(semid).await;
         if html.0 {
-            result = (true, parseattn::parse_attendance(html.1));
+            let k= parseattn::parse_attendance(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
         } else {
             result = html;
         }
@@ -197,7 +218,12 @@ async fn full_attendance(
             .get_full_attendance(course_id, semid, course_type)
             .await;
         if html.0 {
-            result = (true, parseattn::parse_full_attendance(html.1));
+            let k = parseattn::parse_full_attendance(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
         } else {
             result = html;
         }
@@ -210,7 +236,125 @@ async fn full_attendance(
 async fn wifi(i: i32, username: String, password: String) -> Result<(bool, String), tauri::Error> {
     let k = wifi::wifi_login_logout(i, username, password).await;
     Ok(k)
-    //Ok(k)
+}
+
+#[tauri::command]
+async fn coursepage(
+    state: tauri::State<'_, Mutex<Iclient>>
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_course_page().await;
+        if html.0 {
+            let k = parsecoursepg::parse_semid(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
+
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
+
+#[tauri::command]
+async fn coursepage_courses(
+    state: tauri::State<'_, Mutex<Iclient>>,semid:String
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_course_courses(semid).await;
+        if html.0 {
+            let k = parsecoursepg::parse_courses(html.1);
+                if k.is_empty(){
+                    result = (false,k);
+                }else {
+                    result=(true,k)
+                }
+
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn coursepage_classes(
+    state: tauri::State<'_, Mutex<Iclient>>,semid:String,classid:String
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_course_classes(semid,classid).await;
+        if html.0 {
+            
+            //let k = parsecoursepg::parse_classes(html.1);  todo!()
+            println!("{:?}",html.1);
+
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn coursepage_slist(
+    state: tauri::State<'_, Mutex<Iclient>>,semid:String,classid:String,erp_id:String
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_course_dlist(semid,classid,erp_id).await;
+        if html.0 {
+            
+            //let k = parsecoursepg::parse_classes(html.1);  todo!()
+            println!("{:?}",html.1);
+
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -229,7 +373,10 @@ pub fn run() {
             onstart_runcode,
             try_login,
             update_credtials_to,
-            wifi
+            wifi,
+            coursepage,
+            coursepage_courses,
+            coursepage_classes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

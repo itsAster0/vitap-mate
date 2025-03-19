@@ -14,7 +14,7 @@
   let reload: relaod = getContext("reload");
   let errors: datasate = getContext("errors");
 
-  const time_diff_relaod = 3600;
+  const time_diff_relaod = 60;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -27,6 +27,7 @@
     let selsem: string | undefined = await store.get("sel_attendance_semid");
     semid = await store.get("attendance_semid");
     selsemid.value = selsem;
+    await store.save()
     //console.log("from semid loadfrom storage",selsemid.value)
   }
 
@@ -56,8 +57,9 @@
         store.set("attendance_semid", temp);
         let time = unixTimestamp();
         await store.set("attendance_semid_lastupdate", time);
-        console.log("updating attendance semids set");
-        if (temp != semid) {
+        await store.save()
+        //console.log("updating attendance semids set");
+        if (temp != semid&&temp!="") {
           semid = temp;
         }
       }
@@ -72,6 +74,7 @@
     const store = await Store.load("attendance.json");
     if (selectedValue != "" && selectedValue != undefined) {
       await store.set("sel_attendance_semid", selectedValue);
+      await store.save()
       selsemid.value = selectedValue;
       //console.log("from semid",selsemid.value)
     }

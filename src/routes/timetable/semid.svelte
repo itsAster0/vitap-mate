@@ -14,7 +14,7 @@
   let reload: relaod = getContext("reload");
   let errors: datasate = getContext("errors");
 
-  const time_diff_relaod = 3600;
+  const time_diff_relaod = 60;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -51,13 +51,15 @@
       if (check) {
         reload.status = false;
       }
+    
       if (status) {
         let temp = JSON.parse(semid_rs);
         store.set("timetable_semid", temp);
         let time = unixTimestamp();
         await store.set("timetable_semid_lastupdate", time);
+        await store.save()
         // console.log("updating timetable semids tie");
-        if (temp != semid) {
+        if (temp != semid && temp!="") {
           semid = temp;
         }
       }
@@ -72,6 +74,7 @@
     const store = await Store.load("timetable.json");
     if (selectedValue != "" && selectedValue != undefined) {
       await store.set("sel_timetable_semid", selectedValue);
+      await store.save()
       selsemid.value = selectedValue;
       //console.log("from semid",selsemid.value)
     }

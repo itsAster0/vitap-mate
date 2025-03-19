@@ -28,7 +28,7 @@
       //console.log("sem id from storage",selsemid.value)
     }
   }
-  const time_diff_relaod = 1200;
+  const time_diff_relaod = 60;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -65,6 +65,7 @@
             `full_attendance_${selsemid.value}`,
             full_attendance_fetched,
           );
+          await store.save()
           attendance_before = full_attendance_fetched;
         }
       } else {

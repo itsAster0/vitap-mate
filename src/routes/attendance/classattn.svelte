@@ -5,7 +5,7 @@
   import { selsemid } from "./store.svelte";
   let { courseid, coursetype } = $props();
 
-  const time_diff_relaod = 1200;
+  const time_diff_relaod = 60;
   let full_attendance = $state(undefined);
   let details = $state(undefined);
   let privateload = $state(false);
@@ -61,6 +61,7 @@
               `full_attendance_${courseid}_${coursetype}`,
               full_attendance_cl,
             );
+            await store.save()
             full_attendance = full_attendance_cl;
           }
         } else {

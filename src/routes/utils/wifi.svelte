@@ -55,6 +55,7 @@
     let store = await Store.load("utils.json");
     await store.set("wifiusername", wifiusername);
     await store.set("wifipassword", wifipassword);
+    await store.save()
   }
   async function login() {
     let check = usernamepass();

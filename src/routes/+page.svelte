@@ -82,15 +82,14 @@
         //add toast
         break;
       } else {
-        errors.code = undefined;
-        if (status) break;
+        if (status) {
+          errors.code = undefined;
+          break;
+        }
       }
     }
+    await store.save()
   }
-
-  (async () => {
-    await loadCreds(), await validateAndMove();
-  })();
 
   onMount(() => {
     (async () => {

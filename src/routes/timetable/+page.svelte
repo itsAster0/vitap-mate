@@ -28,7 +28,7 @@
       //console.log("sem id from storage",selsemid.value)
     }
   }
-  const time_diff_relaod = 3600;
+  const time_diff_relaod = 60;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -65,6 +65,7 @@
             `full_timetable_${selsemid.value}`,
             full_timetable_fetched,
           );
+          await store.save()
           timetable_before = full_timetable_fetched;
         }
       } else {
