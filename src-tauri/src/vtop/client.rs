@@ -5,6 +5,7 @@ use tauri_plugin_http::reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     Client, Error,
 };
+use dirs::download_dir;
 
 // (true or false, "msg")
 // msg:
@@ -20,8 +21,8 @@ pub struct Iclient {
     online: bool,
     vtop_online: bool,
     current_page: String,
-    csrf: String,
-    username: String,
+    pub csrf: String,
+    pub username: String,
     password: String,
     pub loginactive: bool,
     pub captcha: String,
@@ -142,7 +143,7 @@ impl Iclient {
                 Ok(x) => {
                     self.current_page = x;
                     if let Some(p) = self.get_captcha_data() {
-                        if p=="".to_string(){
+                        if p == "".to_string() {
                             continue;
                         }
                         self.captcha = p;
@@ -315,7 +316,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -342,7 +343,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -374,7 +375,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -401,7 +402,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -428,7 +429,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -456,7 +457,7 @@ impl Iclient {
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -475,17 +476,16 @@ impl Iclient {
         }
     }
 
-    pub async fn get_course_courses(&self,semid: String) -> (bool, String) {
+    pub async fn get_course_courses(&self, semid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/getCourseForCoursePage";
         let body = format!(
             "_csrf={}&paramReturnId=getCourseForCoursePage&semSubId={}&authorizedID={}",
-            self.csrf,semid,self.username
+            self.csrf, semid, self.username
         );
-        println!("{}",body);
         let res = self.client.post(url).body(body).send().await;
         match res {
             Ok(k) => {
-                if !k.status().is_success(){
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -504,63 +504,83 @@ impl Iclient {
         }
     }
 
-
-pub async fn get_course_classes(&self,semid: String,classid : String) -> (bool, String) {
-    let url = "https://vtop.vitap.ac.in/vtop/getSlotIdForCoursePage";
-    let body = format!(
+    pub async fn get_course_classes(&self, semid: String, classid: String) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/getSlotIdForCoursePage";
+        let body = format!(
         "_csrf={}&classId={}&praType=source&paramReturnId=getSlotIdForCoursePage&semSubId={}&authorizedID={}",
         self.csrf,classid,semid,self.username
     );
-    println!("{}",body);
-    let res = self.client.post(url).body(body).send().await;
-    match res {
-        Ok(k) => {
-            if !k.status().is_success(){
-                return (false, "VE".to_string());
-            }
-            let t = k.text().await;
-            match t {
-                Ok(k) => {
-                    return (true, k);
-                }
-                Err(_) => {
+        let res = self.client.post(url).body(body).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
-            };
-        }
-        Err(_) => {
-            return (false, "NE".to_string());
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
         }
     }
-}
 
-pub async fn get_course_dlist(&self,semid: String,classid : String,erp_id:String) -> (bool, String) {
-    let url = "https://vtop.vitap.ac.in/vtop/processViewStudentCourseDetail";
-    let body = format!(
-        "_csrf={}&semSubId={}&erpId={}&classId={}&authorizedID={}",
-        self.csrf,semid,erp_id,classid,self.username
-    );
-    println!("{}",body);
-    let res = self.client.post(url).body(body).send().await;
-    match res {
-        Ok(k) => {
-            if !k.status().is_success(){
-                return (false, "VE".to_string());
-            }
-            let t = k.text().await;
-            match t {
-                Ok(k) => {
-                    return (true, k);
-                }
-                Err(_) => {
+    pub async fn get_course_dlist(
+        &self,
+        semid: String,
+        classid: String,
+        erp_id: String,
+    ) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/processViewStudentCourseDetail";
+        let body = format!(
+            "_csrf={}&semSubId={}&erpId={}&classId={}&authorizedID={}",
+            self.csrf, semid, erp_id, classid, self.username
+        );
+        let res = self.client.post(url).body(body).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success() {
                     return (false, "VE".to_string());
                 }
-            };
-        }
-        Err(_) => {
-            return (false, "NE".to_string());
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
         }
     }
-}
+    pub async  fn vtop_download(&self,url : String){
+        let mut file = "file.zip".to_string();
+        let u = format!("https://vtop.vitap.ac.in/vtop/{}?authorizedID={}&_csrf={}",url,self.username.clone(),self.csrf.clone());
+        let k = self.client.get(u).send().await.unwrap();
+        if let Some(name) = k.headers().get(reqwest::header::CONTENT_DISPOSITION) {
 
+            file = name.to_str().unwrap().to_string().split("filename=").skip(1).next().unwrap().to_string();
+            
+        }else {
+            for (key, value) in k.headers() {
+                println!("{}: {:?}", key, value);
+            }
+        }
+        let downloads_path = download_dir().ok_or("Could not find Downloads directory").unwrap();
+    let file_path = downloads_path.join(&file.replace(r#"""#,""));
+        let k = k.bytes().await.unwrap();
+        let mut file = std::fs::File::create(file_path).unwrap();
+        std::io::copy(&mut k.as_ref(), &mut file).unwrap();
+    }
 }

@@ -65,7 +65,7 @@
             `full_attendance_${selsemid.value}`,
             full_attendance_fetched,
           );
-          await store.save()
+          await store.save();
           attendance_before = full_attendance_fetched;
         }
       } else {

@@ -48,7 +48,7 @@
         (await Store.load("attendance.json")).clear();
         await store.set("username", username);
         await store.set("password", password);
-        await store.save()
+        await store.save();
         errors.code = undefined;
         creds.username = username;
         goto("/");

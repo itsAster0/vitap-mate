@@ -4651,6 +4651,7 @@ version = "0.1.0"
 dependencies = [
  "base",
  "base64 0.22.1",
+ "dirs",
  "scraper",
  "serde",
  "serde_json",

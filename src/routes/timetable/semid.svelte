@@ -51,15 +51,15 @@
       if (check) {
         reload.status = false;
       }
-    
+
       if (status) {
         let temp = JSON.parse(semid_rs);
         store.set("timetable_semid", temp);
         let time = unixTimestamp();
         await store.set("timetable_semid_lastupdate", time);
-        await store.save()
+        await store.save();
         // console.log("updating timetable semids tie");
-        if (temp != semid && temp!="") {
+        if (temp != semid && temp != "") {
           semid = temp;
         }
       }
@@ -74,7 +74,7 @@
     const store = await Store.load("timetable.json");
     if (selectedValue != "" && selectedValue != undefined) {
       await store.set("sel_timetable_semid", selectedValue);
-      await store.save()
+      await store.save();
       selsemid.value = selectedValue;
       //console.log("from semid",selsemid.value)
     }
@@ -82,6 +82,10 @@
 
   let semname = $derived.by(() => {
     if (selsemid.value) {
+    }
+    if (semid == undefined) {
+      getsemids();
+      return "Loading";
     }
     if (selsemid.value == undefined) {
       return "Pick a semester";

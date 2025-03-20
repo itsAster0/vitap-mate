@@ -25,8 +25,14 @@
   //NC : useranme or password set code to stop
   //PC : password cahnged
 
-  function capitalizeFirstLetter(val) {
-    return String(val).charAt(0).toUpperCase() + String(val).slice(1);
+  function tag(val) {
+    let k = String(val).charAt(0).toUpperCase() + String(val).slice(1);
+    let p = k.split("/");
+    if (p.length > 2) {
+      return p[0] + "/" + p[1];
+    } else {
+      return k;
+    }
   }
 </script>
 
@@ -47,9 +53,7 @@
     </div>
     <div class="navbar-center btn btn-ghost text-xl">VitapPal</div>
   </div>
-  <a href="/timetable" class=""
-    >{capitalizeFirstLetter(currentPage().replace("/", ""))}
-  </a>
+  <a href="/timetable" class="">{tag(currentPage().replace("/", ""))} </a>
   <div class="navbar-end">
     <button
       aria-label="settings"

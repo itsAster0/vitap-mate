@@ -65,7 +65,7 @@
             `full_timetable_${selsemid.value}`,
             full_timetable_fetched,
           );
-          await store.save()
+          await store.save();
           timetable_before = full_timetable_fetched;
         }
       } else {

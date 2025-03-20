@@ -55,7 +55,7 @@
     let store = await Store.load("utils.json");
     await store.set("wifiusername", wifiusername);
     await store.set("wifipassword", wifipassword);
-    await store.save()
+    await store.save();
   }
   async function login() {
     let check = usernamepass();
@@ -117,6 +117,7 @@
     <div class="card w-full max-w-md bg-base-100 p-6 shadow-sm">
       <div class="flex">
         <span><Wifi /></span>
+
         <h2 class="text-center text-2xl font-semibold grow">Wi-Fi Utils</h2>
         <button class="" onclick={() => showDialogClick()}><Pencil /></button>
       </div>

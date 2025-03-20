@@ -61,7 +61,7 @@
               `full_attendance_${courseid}_${coursetype}`,
               full_attendance_cl,
             );
-            await store.save()
+            await store.save();
             full_attendance = full_attendance_cl;
           }
         } else {
@@ -99,7 +99,7 @@
           <!-- head -->
           <thead>
             <tr>
-              <th>Si.No</th>
+              <th></th>
               <th>Date</th>
               <th>Slot</th>
               <th>Time</th>

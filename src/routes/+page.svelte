@@ -88,7 +88,7 @@
         }
       }
     }
-    await store.save()
+    await store.save();
   }
 
   onMount(() => {

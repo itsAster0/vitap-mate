@@ -5,9 +5,10 @@
 
 <div class="flex flex-col">
   <div>
-    <Wifi />
+    <Coursepage />
   </div>
+  <div class="divider">-</div>
   <div>
-    <!-- <Coursepage/> -->
+    <Wifi />
   </div>
 </div>
