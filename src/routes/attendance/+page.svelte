@@ -50,7 +50,7 @@
       let sel_sem = selsemid.value;
       //@ts-ignore
       const [status, full_attendance_fetched] = await invoke("attendance", {
-        semid: selsemid.value,
+        semid: sel_sem,
       });
       reload.status = false;
       if (status && full_attendance_fetched != "") {
@@ -67,7 +67,9 @@
             full_attendance_fetched,
           );
           await store.save();
-          attendance_before = full_attendance_fetched;
+          if (sel_sem == selsemid.value) {
+            attendance_before = full_attendance_fetched;
+          }
         }
       } else {
         if (full_attendance_fetched == "NE") {

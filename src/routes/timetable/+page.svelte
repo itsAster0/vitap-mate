@@ -50,7 +50,7 @@
       let sel_sem = selsemid.value;
       //@ts-ignore
       const [status, full_timetable_fetched] = await invoke("timetable", {
-        semid: selsemid.value,
+        semid: sel_sem,
       });
       reload.status = false;
       if (status && full_timetable_fetched != "") {
@@ -62,12 +62,11 @@
           full_timetable_fetched != undefined &&
           full_timetable_fetched != timetable_before
         ) {
-          await store.set(
-            `full_timetable_${sel_sem}`,
-            full_timetable_fetched,
-          );
+          await store.set(`full_timetable_${sel_sem}`, full_timetable_fetched);
           await store.save();
-          timetable_before = full_timetable_fetched;
+          if (sel_sem == selsemid.value) {
+            timetable_before = full_timetable_fetched;
+          }
         }
       } else {
         if (full_timetable_fetched == "NE") {

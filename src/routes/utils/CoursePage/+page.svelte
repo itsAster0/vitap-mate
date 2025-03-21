@@ -1,4 +1,4 @@
-<script >
+<script>
   import { invoke } from "@tauri-apps/api/core";
   import { getContext } from "svelte";
   import { selsemid, selclass, classes, classids } from "./store.svelte";
