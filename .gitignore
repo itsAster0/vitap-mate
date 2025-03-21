@@ -10,4 +10,4 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 **/keystore.properties
 **/upload-keystore.jks
-
+.idea
