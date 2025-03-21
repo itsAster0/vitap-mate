@@ -2,12 +2,12 @@
   import Semid from "./semid.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { Store } from "@tauri-apps/plugin-store";
-  import { selsemid } from "./store.svelte";
-  import { getContext, untrack } from "svelte";
+  import { selsemid, loading } from "./store.svelte";
+  import { getContext } from "svelte";
   import Days from "./days.svelte";
 
   let timetable_before: string | undefined = $state(undefined);
-  let lastUpdate: number | undefined = $state(undefined);
+
 
   interface relaod {
     [key: string]: boolean;
@@ -21,9 +21,6 @@
   async function loadfromstorage() {
     const store = await Store.load("timetable.json");
     if (selsemid.value != undefined) {
-      lastUpdate = await store.get(
-        `full_timetable_${selsemid.value}_lastupdate`,
-      );
       timetable_before = await store.get(`full_timetable_${selsemid.value}`);
       //console.log("sem id from storage",selsemid.value)
     }
@@ -35,15 +32,19 @@
 
   async function gettimetable() {
     // console.log("in get timetable")
-    
+
     if (selsemid.value == undefined) {
       return;
     }
-    const store = await Store.load("attendance.json");
     let sel_sem = selsemid.value;
-    let last_update : undefined | number = await store.get(
-        `full_attendance_${sel_sem}_lastupdate`,
-      );
+    if (loading.value.includes(sel_sem)) {
+      return;
+    }
+    loading.value.push(sel_sem);
+    const store = await Store.load("timetable.json");
+    let last_update: undefined | number = await store.get(
+      `full_timetable_${sel_sem}_lastupdate`,
+    );
     if (
       (timetable_before == undefined ||
         last_update == undefined ||
@@ -60,16 +61,12 @@
       if (status && full_timetable_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_timetable_${sel_sem}_lastupdate`, time);
-        if (sel_sem == selsemid.value) {
-          lastUpdate = time;
-          }
         if (
           full_timetable_fetched != "" &&
           full_timetable_fetched != undefined &&
           full_timetable_fetched != timetable_before
         ) {
           await store.set(`full_timetable_${sel_sem}`, full_timetable_fetched);
-          await store.save();
           if (sel_sem == selsemid.value) {
             timetable_before = full_timetable_fetched;
           }
@@ -82,12 +79,21 @@
         }
       }
     }
+    try {
+      let index = loading.value.indexOf(sel_sem);
+      if (index > -1) {
+        loading.value.splice(index, 1);
+      }
+    } catch {}
   }
   $effect(() => {
-    reload.status;
     errors.code;
+    $inspect(loading.value)
     if (selsemid.value != undefined) {
-      loadfromstorage().then(() => gettimetable());
+      (async () => {
+        await loadfromstorage();
+        await gettimetable();
+      })();
     }
   });
 </script>

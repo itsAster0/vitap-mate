@@ -2,12 +2,12 @@
   import Semid from "./semid.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { Store } from "@tauri-apps/plugin-store";
-  import { selsemid } from "./store.svelte";
-  import { getContext, untrack } from "svelte";
+  import { selsemid, loading } from "./store.svelte";
+  import { getContext } from "svelte";
   import Smallatten from "./smallatten.svelte";
 
   let attendance_before: string | undefined = $state(undefined);
-  let lastUpdate: number | undefined = $state(undefined);
+
 
   interface relaod {
     [key: string]: boolean;
@@ -21,9 +21,6 @@
   async function loadfromstorage() {
     const store = await Store.load("attendance.json");
     if (selsemid.value != undefined) {
-      lastUpdate = await store.get(
-        `full_attendance_${selsemid.value}_lastupdate`,
-      );
       attendance_before = await store.get(`full_attendance_${selsemid.value}`);
       //console.log("sem id from storage",selsemid.value)
     }
@@ -38,21 +35,24 @@
     if (selsemid.value == undefined) {
       return;
     }
-    const store = await Store.load("attendance.json");
     let sel_sem = selsemid.value;
-    let last_update : undefined | number = await store.get(
-        `full_attendance_${sel_sem}_lastupdate`,
-      );
+    if (loading.value.includes(sel_sem)) {
+      return;
+    }
+    loading.value.push(sel_sem);
+    const store = await Store.load("attendance.json");
+    let last_update: undefined | number = await store.get(
+      `full_attendance_${sel_sem}_lastupdate`,
+    );
     if (
       (attendance_before == undefined ||
-      last_update == undefined ||
+        last_update == undefined ||
         Math.abs(unixTimestamp() - last_update) > time_diff_relaod ||
         reload.status) &&
       errors.code != "stop"
     ) {
-      
       reload.status = true;
-      
+
       //@ts-ignore
       const [status, full_attendance_fetched] = await invoke("attendance", {
         semid: sel_sem,
@@ -61,9 +61,6 @@
       if (status && full_attendance_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_attendance_${sel_sem}_lastupdate`, time);
-        if (sel_sem == selsemid.value) {
-          lastUpdate = time;
-          }
         if (
           full_attendance_fetched != "" &&
           full_attendance_fetched != undefined &&
@@ -86,12 +83,21 @@
         }
       }
     }
+    try {
+      let index = loading.value.indexOf(sel_sem);
+      if (index > -1) {
+        loading.value.splice(index, 1);
+      }
+    } catch {}
   }
   $effect(() => {
-    reload.status;
     errors.code;
+    $inspect("att",loading.value)
     if (selsemid.value != undefined) {
-      loadfromstorage().then(() => getattendance());
+      (async () => {
+        await loadfromstorage();
+        await getattendance();
+      })();
     }
   });
 </script>

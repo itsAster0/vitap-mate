@@ -143,7 +143,10 @@
           <div>
             {#if result == "ND"}
               <div class="flex gap-2">
-                Add your Wi-Fi details by clicking  <button class="" onclick={() => showDialogClick()}><Pencil /></button>
+                Add your Wi-Fi details by clicking <button
+                  class=""
+                  onclick={() => showDialogClick()}><Pencil /></button
+                >
               </div>
             {:else}
               {parseResult(result)}
