@@ -38,10 +38,11 @@
     if (selsemid.value == undefined) {
       return;
     }
+    let last_update = lastUpdate;
     if (
       (attendance_before == undefined ||
-        lastUpdate == undefined ||
-        Math.abs(unixTimestamp() - lastUpdate) > time_diff_relaod ||
+      last_update == undefined ||
+        Math.abs(unixTimestamp() - last_update) > time_diff_relaod ||
         reload.status) &&
       errors.code != "stop"
     ) {
@@ -56,7 +57,9 @@
       if (status && full_attendance_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_attendance_${sel_sem}_lastupdate`, time);
-        lastUpdate = time;
+        if (sel_sem == selsemid.value) {
+          lastUpdate = time;
+          }
         if (
           full_attendance_fetched != "" &&
           full_attendance_fetched != undefined &&

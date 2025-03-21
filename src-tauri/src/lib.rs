@@ -9,7 +9,6 @@ use vtop::parsecoursepg;
 use vtop::parsett;
 use vtop::wifi;
 
-
 // (true or false, "msg")
 // msg:
 // (true)
@@ -365,7 +364,10 @@ async fn coursepage_dlist(
 }
 
 #[tauri::command]
-async fn download_coursepage(state: tauri::State<'_, Mutex<Iclient>>,url:String) -> Result<String, tauri::Error> {
+async fn download_coursepage(
+    state: tauri::State<'_, Mutex<Iclient>>,
+    url: String,
+) -> Result<String, tauri::Error> {
     let mut client = state.lock().await;
     let mut n = "NE".to_string();
     let m = client.loginactive;
@@ -375,15 +377,16 @@ async fn download_coursepage(state: tauri::State<'_, Mutex<Iclient>>,url:String)
     }
     let m = client.loginactive;
     if m {
-    
-client.vtop_download(url).await;}
-    
-Ok(n)
+        client.vtop_download(url).await;
+    }
+
+    Ok(n)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
