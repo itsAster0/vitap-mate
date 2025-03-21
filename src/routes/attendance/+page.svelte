@@ -40,7 +40,7 @@
     }
     const store = await Store.load("attendance.json");
     let sel_sem = selsemid.value;
-    let last_update = lastUpdate = await store.get(
+    let last_update : undefined | number = await store.get(
         `full_attendance_${sel_sem}_lastupdate`,
       );
     if (
