@@ -38,7 +38,11 @@
     if (selsemid.value == undefined) {
       return;
     }
-    let last_update = lastUpdate;
+    const store = await Store.load("attendance.json");
+    let sel_sem = selsemid.value;
+    let last_update = lastUpdate = await store.get(
+        `full_attendance_${sel_sem}_lastupdate`,
+      );
     if (
       (attendance_before == undefined ||
       last_update == undefined ||
@@ -46,9 +50,9 @@
         reload.status) &&
       errors.code != "stop"
     ) {
-      const store = await Store.load("attendance.json");
+      
       reload.status = true;
-      let sel_sem = selsemid.value;
+      
       //@ts-ignore
       const [status, full_attendance_fetched] = await invoke("attendance", {
         semid: sel_sem,
