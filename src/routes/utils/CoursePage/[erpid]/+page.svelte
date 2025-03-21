@@ -63,7 +63,7 @@
 </div>
 <div>
   <div class="overflow-x-auto border border-base-content/5 bg-base-100">
-    <table class="table overflow-x-auto whitespace-nowrap table-pin-cols">
+    <table class="table overflow-x-auto whitespace-nowrap">
       <thead>
         <tr>
           <th></th>

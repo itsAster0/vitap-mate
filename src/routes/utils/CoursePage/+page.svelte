@@ -127,7 +127,7 @@
       {capitalizeFirstLetter(semname)}
     </div>
     <div class="collapse-content text-sm">
-      <div class="flex flex-col gap-1 overflow-auto">
+      <div class="flex flex-col gap-1">
         {#each semid as value}
           <div>
             <input
@@ -163,7 +163,7 @@
           {formateClass(classname)}
         </div>
         <div class="collapse-content text-sm">
-          <div class="flex flex-col gap-1 overflow-auto">
+          <div class="flex flex-col gap-1">
             {#each classids.value as value}
               <div class="flex gap-1">
                 <input
@@ -177,7 +177,7 @@
                   }}
                   bind:group={selclass.value}
                 />
-                <label class=" whitespace-pre-wrap" for={value.split(":")[1]}
+                <label class=" " for={value.split(":")[1]}
                   >{formateClass(value.split(":")[0])}</label
                 >
               </div>

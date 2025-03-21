@@ -8,7 +8,6 @@
 
   let timetable_before: string | undefined = $state(undefined);
 
-
   interface relaod {
     [key: string]: boolean;
   }
@@ -88,7 +87,7 @@
   }
   $effect(() => {
     errors.code;
-    $inspect(loading.value)
+    //$inspect("tt",loading.value);
     if (selsemid.value != undefined) {
       (async () => {
         await loadfromstorage();

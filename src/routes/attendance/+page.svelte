@@ -8,7 +8,6 @@
 
   let attendance_before: string | undefined = $state(undefined);
 
-
   interface relaod {
     [key: string]: boolean;
   }
@@ -92,7 +91,7 @@
   }
   $effect(() => {
     errors.code;
-    $inspect("att",loading.value)
+    //$inspect("att", loading.value);
     if (selsemid.value != undefined) {
       (async () => {
         await loadfromstorage();
