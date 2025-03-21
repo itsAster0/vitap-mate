@@ -47,6 +47,7 @@
     ) {
       const store = await Store.load("timetable.json");
       reload.status = true;
+      let sel_sem = selsemid.value;
       //@ts-ignore
       const [status, full_timetable_fetched] = await invoke("timetable", {
         semid: selsemid.value,
@@ -54,7 +55,7 @@
       reload.status = false;
       if (status && full_timetable_fetched != "") {
         const time = unixTimestamp();
-        await store.set(`full_timetable_${selsemid.value}_lastupdate`, time);
+        await store.set(`full_timetable_${sel_sem}_lastupdate`, time);
         lastUpdate = time;
         if (
           full_timetable_fetched != "" &&
@@ -62,7 +63,7 @@
           full_timetable_fetched != timetable_before
         ) {
           await store.set(
-            `full_timetable_${selsemid.value}`,
+            `full_timetable_${sel_sem}`,
             full_timetable_fetched,
           );
           await store.save();

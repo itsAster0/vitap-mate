@@ -577,8 +577,8 @@ impl Iclient {
                 println!("{}: {:?}", key, value);
             }
         }
-        let downloads_path = download_dir().ok_or("Could not find Downloads directory").unwrap();
-    let file_path = downloads_path.join(&file.replace(r#"""#,""));
+        //let downloads_path = download_dir().ok_or("Could not find Downloads directory").unwrap();
+    let file_path =format!( "/storage/emulated/0/Download/{}",file.replace(r#"""#,""));
         let k = k.bytes().await.unwrap();
         let mut file = std::fs::File::create(file_path).unwrap();
         std::io::copy(&mut k.as_ref(), &mut file).unwrap();

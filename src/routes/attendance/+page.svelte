@@ -47,6 +47,7 @@
     ) {
       const store = await Store.load("attendance.json");
       reload.status = true;
+      let sel_sem = selsemid.value;
       //@ts-ignore
       const [status, full_attendance_fetched] = await invoke("attendance", {
         semid: selsemid.value,
@@ -54,7 +55,7 @@
       reload.status = false;
       if (status && full_attendance_fetched != "") {
         const time = unixTimestamp();
-        await store.set(`full_attendance_${selsemid.value}_lastupdate`, time);
+        await store.set(`full_attendance_${sel_sem}_lastupdate`, time);
         lastUpdate = time;
         if (
           full_attendance_fetched != "" &&
@@ -62,7 +63,7 @@
           full_attendance_fetched != attendance_before
         ) {
           await store.set(
-            `full_attendance_${selsemid.value}`,
+            `full_attendance_${sel_sem}`,
             full_attendance_fetched,
           );
           await store.save();
