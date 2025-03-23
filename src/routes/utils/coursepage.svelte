@@ -1,6 +1,18 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { BookUp2 } from "lucide-svelte";
+  import { BookUp2, DotSquare } from "lucide-svelte";
+  import { getContext } from "svelte";
+
+  let errors = getContext("errors");
+  let disabled = $state(true);
+  $effect(() => {
+    errors.code;
+    if (errors.code != "stop") {
+      if (disabled) {
+        disabled = false;
+      }
+    }
+  });
 
   function click() {
     goto("/utils/CoursePage");
@@ -22,6 +34,8 @@
     </div>
   </div>
   <div class="form-control mt-6 flex justify-evenly">
-    <button class="btn btn-primary" onclick={click}> Open Coursepage </button>
+    <button class="btn btn-primary" onclick={click} {disabled}>
+      Open Coursepage
+    </button>
   </div>
 </div>

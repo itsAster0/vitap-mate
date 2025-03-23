@@ -3,7 +3,7 @@ use tauri_plugin_http::reqwest::{
     self,
     cookie::Jar,
     header::{HeaderMap, HeaderValue, USER_AGENT},
-    Client, Error,multipart,
+    multipart, Client, Error,
 };
 
 // (true or false, "msg")
@@ -593,12 +593,13 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_marks_list(&self,semid: String) -> (bool, String) {
+    pub async fn get_marks_list(&self, semid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/examinations/doStudentMarkView";
-        
-        let form = multipart::Form::new().text("authorizedID", self.username.clone())
-        .text("semesterSubId", semid)
-        .text("_csrf", self.csrf.clone());
+
+        let form = multipart::Form::new()
+            .text("authorizedID", self.username.clone())
+            .text("semesterSubId", semid)
+            .text("_csrf", self.csrf.clone());
         let res = self.client.post(url).multipart(form).send().await;
         match res {
             Ok(k) => {
@@ -620,7 +621,7 @@ impl Iclient {
             }
         }
     }
-    //post 
+    //post
     //https://vtop.vitap.ac.in/vtop/examinations/doStudentMarkView
-    //body = 
+    //body =
 }

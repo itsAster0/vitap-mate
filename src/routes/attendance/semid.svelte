@@ -2,7 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { Store } from "@tauri-apps/plugin-store";
   import { selsemid } from "./store.svelte";
-  import { getContext, onMount } from "svelte";
+  import { getContext } from "svelte";
   import { untrack } from "svelte";
 
   interface relaod {

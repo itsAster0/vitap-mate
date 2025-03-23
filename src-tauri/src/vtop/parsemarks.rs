@@ -22,29 +22,118 @@ pub fn parse_semid_marks(html: String) -> String {
 }
 
 pub fn parse_marks(html: String) -> String {
-    #[derive(serde::Serialize, Deserialize)]
+    #[derive(serde::Serialize, Deserialize, Clone)]
     struct Course {
         serial: String,
-        category: String,
-        course_name: String,
-        course_code: String,
-        course_type: String,
-        faculty_detail: String,
-        classes_attended: String,
-        total_classes: String,
-        attendance_percentage: String,
-        attendence_fat_cat: String,
-        debar_status: String,
-        course_id: String,
+        coursecode: String,
+        coursetitle: String,
+        coursetype: String,
+        faculity: String,
+        slot: String,
+        marks: Vec<String>,
     }
     let document = Html::parse_document(&html);
-    let rows_selector = Selector::parse("tr").unwrap();
     let mut courses: Vec<Course> = Vec::new();
-    let mut marks=false;
-    for row in document.select(&rows_selector).skip(1) {
+
+    let mut course = Course {
+        serial: "".to_string(),
+        coursecode: "".to_string(),
+        coursetitle: "".to_string(),
+        coursetype: "".to_string(),
+        faculity: "".to_string(),
+        slot: "".to_string(),
+        marks: vec![],
+    };
+
+    let mut bmarks = false;
+    for row in document.select(&Selector::parse("tr.tableContent").unwrap()) {
         let cells: Vec<_> = row.select(&Selector::parse("td").unwrap()).collect();
-        
-        marks = !marks
+        if bmarks {
+            let marks_el: Vec<_> = cells[0]
+                .select(&Selector::parse("tr.tableContent-level1").unwrap())
+                .collect();
+            let mut marks_vec = vec![];
+            for i in marks_el {
+                let mut marks: String = "".to_string();
+                let mk: Vec<_> = i.select(&Selector::parse("td").unwrap()).collect();
+                for p in mk {
+                    let c = p
+                        .text()
+                        .collect::<Vec<_>>()
+                        .join("")
+                        .trim()
+                        .replace("\t", "")
+                        .replace("\n", "");
+
+                    if marks.is_empty() {
+                        marks = c;
+                    } else {
+                        marks = marks + ":" + &c;
+                    }
+                }
+                marks_vec.push(marks);
+            }
+            course.marks = marks_vec;
+
+            courses.push(course.clone());
+            course = Course {
+                serial: "".to_string(),
+                coursecode: "".to_string(),
+                coursetitle: "".to_string(),
+                coursetype: "".to_string(),
+                faculity: "".to_string(),
+                slot: "".to_string(),
+                marks: vec![],
+            };
+        } else {
+            course = Course {
+                serial: cells[0]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                coursecode: cells[2]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                coursetitle: cells[3]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                coursetype: cells[4]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                faculity: cells[6]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                slot: cells[7]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                marks: vec![],
+            }
+        }
+
+        bmarks = !bmarks
     }
     let json_data = serde_json::to_string_pretty(&courses).unwrap();
     return json_data;

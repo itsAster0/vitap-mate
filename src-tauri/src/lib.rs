@@ -11,9 +11,9 @@ use tokio::sync::Mutex;
 use vtop::client::Iclient;
 use vtop::parseattn;
 use vtop::parsecoursepg;
+use vtop::parsemarks;
 use vtop::parsett;
 use vtop::wifi;
-use vtop::parsemarks;
 
 // (true or false, "msg")
 // msg:
@@ -427,7 +427,6 @@ async fn download_coursepage(
     Ok(filename)
 }
 
-
 #[tauri::command]
 async fn marks_page(
     state: tauri::State<'_, Mutex<Iclient>>,
@@ -444,8 +443,7 @@ async fn marks_page(
     if m {
         let html = client.get_marks_page().await;
         if html.0 {
-           let  k = parsemarks::parse_semid_marks(html.1);
-            println!("{}",k);
+            let k = parsemarks::parse_semid_marks(html.1);
             if k == "[]" {
                 result = (false, k);
             } else {
@@ -476,8 +474,7 @@ async fn marks_list(
     if m {
         let html = client.get_marks_list(semid).await;
         if html.0 {
-            let k = "[]".to_string();
-            println!("{}",html.1);
+            let k = parsemarks::parse_marks(html.1);
             if k == "[]" {
                 result = (false, k);
             } else {
