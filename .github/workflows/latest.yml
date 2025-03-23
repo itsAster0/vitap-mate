@@ -44,7 +44,7 @@ jobs:
 
       - name: Configure Android environment variables
         run: |
-          echo "JAVA_HOME=$(/usr/lib/jvm/default-java)" >> $GITHUB_ENV
+          echo "JAVA_HOME=$(/usr/lib/jvm/jre/bin/java)" >> $GITHUB_ENV
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
           echo "PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
           echo "PATH=$ANDROID_HOME/ndk/${NDK_VERSION}:$PATH" >> $GITHUB_ENV
