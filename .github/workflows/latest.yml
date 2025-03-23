@@ -32,7 +32,7 @@ jobs:
         
       - name : update path
         run: |
-          echo "ANDROID_HOME=$(/home/synaptic/.android/sdk)" >> $GITHUB_ENV
+          echo "ANDROID_HOME=/home/synaptic/.android/sdk" >> $GITHUB_ENV
 
       - name: Install Android NDK
         run: |
