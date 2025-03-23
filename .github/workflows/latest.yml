@@ -36,7 +36,8 @@ jobs:
 
       - name: Install Android NDK
         run: |
-          ${ANDROID_HOME}/cmdline-tools/$(ls -1)/bin/sdkmanager --install "ndk;28.0.13004108"
+          CMDLINE_TOOLS_DIR=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 1 -type d -name "[0-9]*" | sort -rn | head -n 1)
+          "$CMDLINE_TOOLS_DIR/bin/sdkmanager --install "ndk;28.0.13004108"
           echo "NDK_HOME=${ANDROID_HOME}/ndk/28.0.13004108" >> $GITHUB_ENV 
 
 
