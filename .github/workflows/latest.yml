@@ -53,7 +53,7 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
           CMDLINE_TOOLS_DIR=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 1 -type d -name "[0-9]*" | sort -rn | head -n 1)
           echo "PATH=$ANDROID_HOME/platform-tools:$CMDLINE_TOOLS_DIR/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
-          NDK_VERSION=$(find "$ANDROID_HOME/ndk" -maxdepth 1 -type d -name "[0-9]*" | sort -rn | head -n 1)
+          NDK_VERSION="${ANDROID_HOME}/ndk/28.0.13004108" 
           echo "PATH=$NDK_VERSION:$PATH" >> $GITHUB_ENV
           echo "PATH=$JAVA_HOME/bin:$PATH" >> $GITHUB_ENV
           echo "NDK_HOME=$NDK_VERSION" >> $GITHUB_ENV
