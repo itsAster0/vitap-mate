@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod vtop;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use futures_util::StreamExt;
 use std::cmp::min;
 use std::io::Write;
 use tauri::Emitter;
@@ -12,9 +13,7 @@ use vtop::parseattn;
 use vtop::parsecoursepg;
 use vtop::parsett;
 use vtop::wifi;
-use futures_util::StreamExt;
-
-
+use vtop::parsemarks;
 
 // (true or false, "msg")
 // msg:
@@ -428,6 +427,70 @@ async fn download_coursepage(
     Ok(filename)
 }
 
+
+#[tauri::command]
+async fn marks_page(
+    state: tauri::State<'_, Mutex<Iclient>>,
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_marks_page().await;
+        if html.0 {
+           let  k = parsemarks::parse_semid_marks(html.1);
+            println!("{}",k);
+            if k == "[]" {
+                result = (false, k);
+            } else {
+                result = (true, k)
+            }
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn marks_list(
+    state: tauri::State<'_, Mutex<Iclient>>,
+    semid: String,
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_marks_list(semid).await;
+        if html.0 {
+            let k = "[]".to_string();
+            println!("{}",html.1);
+            if k == "[]" {
+                result = (false, k);
+            } else {
+                result = (true, k)
+            }
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -451,6 +514,8 @@ pub fn run() {
             coursepage_classes,
             coursepage_dlist,
             download_coursepage,
+            marks_page,
+            marks_list,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

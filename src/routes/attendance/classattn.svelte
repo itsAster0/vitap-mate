@@ -15,7 +15,8 @@
 
   async function loadData() {
     const store = await Store.load("attendance.json");
-    if (selsemid.value != undefined) {
+    let sel_sem = selsemid.value;
+    if (sel_sem != undefined) {
       full_attendance = await store.get(
         `full_attendance_${courseid}_${coursetype}`,
       );
@@ -39,7 +40,7 @@
 
         //@ts-ignore
         const [status, full_attendance_cl] = await invoke("full_attendance", {
-          semid: selsemid.value,
+          semid: sel_sem,
           courseId: courseid,
           courseType: coursetype,
         });

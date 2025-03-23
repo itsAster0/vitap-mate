@@ -5,12 +5,10 @@
   import { Download, ArrowDownToLine } from "lucide-svelte";
   import { listen } from "@tauri-apps/api/event";
   import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from '@tauri-apps/plugin-notification';
-
-
+    isPermissionGranted,
+    requestPermission,
+    sendNotification,
+  } from "@tauri-apps/plugin-notification";
 
   let tmp = page.params.erpid;
   let erpid = tmp.split(":")[0];
@@ -24,40 +22,33 @@
     let k = date.split("[");
     return k[0];
   }
-  async function tableClick(p,btn) {
+  async function tableClick(p, btn) {
+    btn.disabled = true;
+    btn.innerText = "0%";
 
-    btn.disabled = true; 
-  btn.innerText = "0%"; 
-  
+    let unlisten = await listen<number>(p, (event) => {
+      btn.innerText = `${event.payload}%`;
+    });
 
-  let unlisten = await listen<number>(p, (event) => {
-    btn.innerText = `${event.payload}%`; 
-  });
-
-
-    let k : string = await invoke("download_coursepage", { url: p });
+    let k: string = await invoke("download_coursepage", { url: p });
     let permissionGranted = await isPermissionGranted();
     unlisten();
-    btn.innerText ="100%"; 
-setTimeout(() => {
-    btn.disabled = false;
-   
-  }, 100);
+    btn.innerText = "100%";
+    setTimeout(() => {
+      btn.disabled = false;
+    }, 100);
 
-if (!permissionGranted) {
-  const permission = await requestPermission();
-  permissionGranted = permission === 'granted';
-}
+    if (!permissionGranted) {
+      const permission = await requestPermission();
+      permissionGranted = permission === "granted";
+    }
 
-if (permissionGranted) {
-  sendNotification({ title: `Downloaded ${k}`, body: k });
-}
-      
+    if (permissionGranted) {
+      sendNotification({ title: `Downloaded ${k}`, body: k });
+    }
   }
 
-  
   async function load_data() {
-
     let [state, k] = await invoke("coursepage_dlist", {
       semid: selsemid.value,
       classid: selclass,
@@ -73,35 +64,38 @@ if (permissionGranted) {
   load_data();
 </script>
 
-
 <div class="flex justify-evenly">
   {#each table1 as t1, i}
     {#if t1 != "0;"}
       {#if i == 0}
-      <div class="flex flex-col items-center">
-        <button
-          class="btn btn-primary btn-sm w-24 items-center"
-          onclick={async (e) => await tableClick(t1,e.currentTarget)}
-          ><ArrowDownToLine /></button
-        >
-        <p class="mt-1 text-center">&nbsp;&nbsp; Download all &nbsp;&nbsp;&nbsp;</p>
-      
-      </div>
+        <div class="flex flex-col items-center">
+          <button
+            class="btn btn-primary btn-sm w-24 items-center"
+            onclick={async (e) => await tableClick(t1, e.currentTarget)}
+            ><ArrowDownToLine /></button
+          >
+          <p class="mt-1 text-center">
+            &nbsp;&nbsp; Download all &nbsp;&nbsp;&nbsp;
+          </p>
+        </div>
       {:else if i == 1}
-      <div class="flex flex-col items-center">
-        <button
-          class="btn btn-primary btn-sm w-24 items-center"
-          onclick={async (e) => await tableClick(t1,e.currentTarget)}
-          ><ArrowDownToLine /></button
-        >
-        <p class="mt-1 text-center"> Download  material</p></div>
+        <div class="flex flex-col items-center">
+          <button
+            class="btn btn-primary btn-sm w-24 items-center"
+            onclick={async (e) => await tableClick(t1, e.currentTarget)}
+            ><ArrowDownToLine /></button
+          >
+          <p class="mt-1 text-center">Download material</p>
+        </div>
       {:else if i == 2}
-      <div class="flex flex-col items-center">
-        <button
-          class="btn btn-primary btn-sm w-24 items-center" 
-          onclick={async (e) => await tableClick(t1,e.currentTarget)}
-          ><ArrowDownToLine /></button
-        ><p class="mt-1 text-center">Download syllabus</p></div>
+        <div class="flex flex-col items-center">
+          <button
+            class="btn btn-primary btn-sm w-24 items-center"
+            onclick={async (e) => await tableClick(t1, e.currentTarget)}
+            ><ArrowDownToLine /></button
+          >
+          <p class="mt-1 text-center">Download syllabus</p>
+        </div>
       {/if}
     {/if}
   {/each}
@@ -127,7 +121,8 @@ if (permissionGranted) {
             <td>{t.topic}</td>
             <th>
               {#each t.links as t2, i}
-                <button onclick={async (e) => await tableClick(t2,e.currentTarget)}
+                <button
+                  onclick={async (e) => await tableClick(t2, e.currentTarget)}
                   ><ArrowDownToLine></ArrowDownToLine></button
                 >
               {/each}
