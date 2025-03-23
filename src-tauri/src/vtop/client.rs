@@ -1,4 +1,3 @@
-use dirs::download_dir;
 use scraper::{Html, Selector};
 use tauri_plugin_http::reqwest::{
     self,
@@ -110,6 +109,9 @@ impl Iclient {
                 Ok(false)
             }
         }
+    }
+    pub async fn get_clone(&mut self) -> Client {
+        self.client.clone()
     }
 
     async fn initial_pageload(&mut self) -> Result<String, Error> {
@@ -563,35 +565,5 @@ impl Iclient {
                 return (false, "NE".to_string());
             }
         }
-    }
-    pub async fn vtop_download(&self, url: String) {
-        let mut file = "file.zip".to_string();
-        let u = format!(
-            "https://vtop.vitap.ac.in/vtop/{}?authorizedID={}&_csrf={}",
-            url,
-            self.username.clone(),
-            self.csrf.clone()
-        );
-        let k = self.client.get(u).send().await.unwrap();
-        if let Some(name) = k.headers().get(reqwest::header::CONTENT_DISPOSITION) {
-            file = name
-                .to_str()
-                .unwrap()
-                .to_string()
-                .split("filename=")
-                .skip(1)
-                .next()
-                .unwrap()
-                .to_string();
-        } else {
-            for (key, value) in k.headers() {
-                println!("{}: {:?}", key, value);
-            }
-        }
-        //let downloads_path = download_dir().ok_or("Could not find Downloads directory").unwrap();
-        let file_path = format!("/storage/emulated/0/Download/{}", file.replace(r#"""#, ""));
-        let k = k.bytes().await.unwrap();
-        let mut file = std::fs::File::create(file_path).unwrap();
-        std::io::copy(&mut k.as_ref(), &mut file).unwrap();
     }
 }

@@ -1,6 +1,10 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod vtop;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use std::cmp::min;
+use std::io::Write;
+use tauri::Emitter;
+use tauri::Window;
 use tauri_plugin_http::reqwest;
 use tokio::sync::Mutex;
 use vtop::client::Iclient;
@@ -8,6 +12,9 @@ use vtop::parseattn;
 use vtop::parsecoursepg;
 use vtop::parsett;
 use vtop::wifi;
+use futures_util::StreamExt;
+
+
 
 // (true or false, "msg")
 // msg:
@@ -367,20 +374,58 @@ async fn coursepage_dlist(
 async fn download_coursepage(
     state: tauri::State<'_, Mutex<Iclient>>,
     url: String,
+    window: Window,
 ) -> Result<String, tauri::Error> {
     let mut client = state.lock().await;
-    let mut n = "NE".to_string();
-    let m = client.loginactive;
-    let _ = client.check();
-    if !m {
-        let _check = login_vtop(&mut client).await;
-    }
-    let m = client.loginactive;
-    if m {
-        client.vtop_download(url).await;
-    }
+    let username = client.username.clone();
+    let csrf = client.csrf.clone();
+    let cl = client.get_clone().await;
+    drop(client);
+    let mut filename = "file.zip".to_string();
+    let u = format!(
+        "https://vtop.vitap.ac.in/vtop/{}?authorizedID={}&_csrf={}",
+        url, username, csrf
+    );
 
-    Ok(n)
+    let k = cl.get(u).send().await.unwrap();
+    if let Some(name) = k.headers().get(reqwest::header::CONTENT_DISPOSITION) {
+        filename = name
+            .to_str()
+            .unwrap()
+            .to_string()
+            .split("filename=")
+            .skip(1)
+            .next()
+            .unwrap()
+            .to_string()
+            .replace(r#"""#, "");
+    } else {
+        for (key, value) in k.headers() {
+            println!("{}: {:?}", key, value);
+        }
+    }
+    let mut per = 0;
+    if let Some(content_length) = k.content_length() {
+        let mut downloaded: u64 = 0;
+        let mut stream = k.bytes_stream();
+        let file_path = format!("/storage/emulated/0/Download/{}", filename);
+        let mut file = std::fs::File::create(file_path).unwrap();
+
+        while let Some(chunks) = stream.next().await {
+            let chunk = chunks
+                .or(Err(format!("Error while downloading file")))
+                .unwrap();
+            file.write_all(&chunk).unwrap();
+            let new = min(downloaded + (chunk.len() as u64), content_length);
+            downloaded = new;
+            let tper = downloaded * 100 / content_length;
+            if per != tper {
+                per = tper;
+                window.emit(&url, per).unwrap();
+            }
+        }
+    }
+    Ok(filename)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
