@@ -66,35 +66,16 @@ jobs:
           base64 -d <<< "${{ secrets.ANDROID_KEY_BASE64 }}" > $RUNNER_TEMP/keystore.jks
           echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
 
-      - name: Build Tauri Android app (split per ABI)
+      - name: Build Tauri Android for aarch64
         run: |
-          npm run tauri android build -- --apk --split-per-abi
+          npm run tauri android build -- --target aarch64
 
-      - name: Build Universal APK
-        run: |
-          npm run tauri android build 
-
-      - name: Find APKs
-        id: find-apks
-        run: |
-          APKS=$(find src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk)
-          echo "apks=$APKS" >> "$GITHUB_OUTPUT"
-
-      - name: Upload APKs 
-        run: |
-          APKS="${{ steps.find-apks.outputs.apks }}"
-          if [[ -n "$APKS" ]]; then
-            IFS=$'\n' read -rd '' -a APK_ARRAY <<< "$APKS"
-            for APK in "${APK_ARRAY[@]}"; do
-              APK_NAME=$(basename "$APK")
-              echo "Uploading $APK_NAME..."
-              gh actions artifact upload "$APK_NAME" "$APK"
-            done
-          else
-            echo "No APKs found."
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+     
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-android-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/release/*.apk
 
 
 
