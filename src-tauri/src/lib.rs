@@ -386,7 +386,6 @@ async fn download_coursepage(
         url, username, csrf
     );
 
-
     let k = cl.get(u).send().await.unwrap();
     if let Some(name) = k.headers().get(reqwest::header::CONTENT_DISPOSITION) {
         filename = name
@@ -399,13 +398,12 @@ async fn download_coursepage(
             .unwrap()
             .to_string()
             .replace(r#"""#, "");
-
     } else {
         for (key, value) in k.headers() {
             println!("{}: {:?}", key, value);
         }
     }
- 
+
     let mut per = 0;
     if let Some(content_length) = k.content_length() {
         let mut downloaded: u64 = 0;
@@ -413,10 +411,9 @@ async fn download_coursepage(
         let file_path = format!("/storage/emulated/0/Download/{}", filename);
         let mut file = std::fs::File::create(file_path).unwrap();
         while let Some(chunks) = stream.next().await {
-            let chunk = chunks
-                .unwrap();
+            let chunk = chunks.unwrap();
             file.write_all(&chunk).unwrap();
-            
+
             let new = min(downloaded + (chunk.len() as u64), content_length);
             downloaded = new;
             let tper = downloaded * 100 / content_length;
@@ -425,13 +422,12 @@ async fn download_coursepage(
                 window.emit(&url, per).unwrap();
             }
         }
-    }else{
+    } else {
         let mut stream = k.bytes_stream();
         let file_path = format!("/storage/emulated/0/Download/{}", filename);
         let mut file = std::fs::File::create(file_path).unwrap();
         while let Some(chunks) = stream.next().await {
-            let chunk = chunks
-                .unwrap();
+            let chunk = chunks.unwrap();
             file.write_all(&chunk).unwrap();
             let tper = 50;
             if per != tper {

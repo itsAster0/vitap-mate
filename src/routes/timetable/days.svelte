@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
+  import { onMount } from "svelte";
   let { full_timetable_list } = $props();
   let render: undefined | string = $state(undefined);
   //@ts-ignore

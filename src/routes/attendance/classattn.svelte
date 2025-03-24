@@ -3,6 +3,7 @@
   import { Store } from "@tauri-apps/plugin-store";
   import { invoke } from "@tauri-apps/api/core";
   import { selsemid } from "./store.svelte";
+  import Analays from "./analysis.svelte";
   let { courseid, coursetype } = $props();
 
   const time_diff_relaod = 60;
@@ -102,9 +103,9 @@
             <tr>
               <th></th>
               <th>Date</th>
-              <th>Slot</th>
-              <th>Time</th>
               <th>Status</th>
+              <th>Time</th>
+              <th>Slot</th>
               <th>Remark</th>
             </tr>
           </thead>
@@ -113,8 +114,6 @@
               <tr>
                 <td>{row.serial}</td>
                 <td>{row.date}</td>
-                <td>{row.slot}</td>
-                <td>{row.day_time.replace("/", "")}</td>
                 <td
                   ><div
                     class=" badge badge-soft {row.status == 'Present'
@@ -126,6 +125,10 @@
                     {row.status}
                   </div></td
                 >
+
+                <td>{row.day_time.replace("/", "")}</td>
+                <td>{row.slot}</td>
+
                 <td>{row.remark}</td>
               </tr>
             {/each}

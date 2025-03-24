@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Analysis from "./analysis.svelte";
   import Classattn from "./classattn.svelte";
 
   let { attendance } = $props();
@@ -90,12 +91,7 @@
                           <ul class="flex flex-col gap-1">
                             <li>
                               <div class="flex flex-col">
-                                <p>Debar Status</p>
-                                <span
-                                  ><div class="">
-                                    {cl.debar_status}
-                                  </div></span
-                                >
+                                <p>{cl.debar_status}</p>
                               </div>
                             </li>
                           </ul>
