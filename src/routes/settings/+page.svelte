@@ -46,6 +46,7 @@
       } else if (k == "SS") {
         (await Store.load("timetable.json")).clear();
         (await Store.load("attendance.json")).clear();
+        (await Store.load("utils.json")).clear();
         await store.set("username", username);
         await store.set("password", password);
         await store.save();
