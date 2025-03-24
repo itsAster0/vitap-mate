@@ -8,7 +8,7 @@
 
   let marks = $state(undefined);
   async function loadfromstorage() {
-    const store = await Store.load("utils.json");
+    const store = await Store.load("marks.json");
     if (selsemid.value != undefined) {
       marks = await store.get(`marks_${selsemid.value}`);
       //console.log("sem id from storage",selsemid.value)
@@ -41,7 +41,7 @@
       return;
     }
     loading.value.push(sel_sem);
-    const store = await Store.load("utils.json");
+    const store = await Store.load("marks.json");
     let last_update: undefined | number = await store.get(
       `marks_${sel_sem}_lastupdate`,
     );

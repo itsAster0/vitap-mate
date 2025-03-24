@@ -23,7 +23,7 @@
   let lastUpdate: number | undefined = $state(undefined);
 
   async function loadfromstorage() {
-    const store = await Store.load("utils.json");
+    const store = await Store.load("marks.json");
     let selsem: string | undefined = await store.get("sel_marks_semid");
     semid = await store.get("marks_semid");
     selsemid.value = selsem;
@@ -32,7 +32,7 @@
   }
 
   async function getsemids() {
-    const store = await Store.load("utils.json");
+    const store = await Store.load("marks.json");
     let semids: string | undefined = await store.get("marks_semid");
     lastUpdate = await store.get("marks_semid_lastupdate");
     let check = semids == undefined ? true : false;
@@ -71,7 +71,7 @@
   async function onClickHandel(id) {
     let selectedValue = id.target.value;
 
-    const store = await Store.load("utils.json");
+    const store = await Store.load("marks.json");
     if (selectedValue != "" && selectedValue != undefined) {
       await store.set("sel_marks_semid", selectedValue);
       await store.save();
