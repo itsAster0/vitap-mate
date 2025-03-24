@@ -177,6 +177,7 @@
     </div>
   {/each}
   <div class="collapse collapse-plus bg-base-100"></div>
+  <div class="divider"></div>
   <div class="w-full translate-y-[-3rem]">
     <footer class=" flex items-center justify-evenly gap-4 p-4">
       <small

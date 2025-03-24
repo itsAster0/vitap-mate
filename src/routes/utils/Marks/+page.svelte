@@ -14,6 +14,7 @@
       //console.log("sem id from storage",selsemid.value)
     }
   }
+  let loaded = $state(false);
 
   interface relaod {
     [key: string]: boolean;
@@ -30,6 +31,7 @@
   }
 
   async function getmarks() {
+    console.log("runing");
     // console.log("in get attendance")
     if (selsemid.value == undefined) {
       return;
@@ -57,6 +59,7 @@
         semid: sel_sem,
       });
       reload.status = false;
+      loaded = true;
       if (status && marks_fetched != "") {
         const time = unixTimestamp();
         await store.set(`marks_${sel_sem}_lastupdate`, time);
@@ -89,7 +92,7 @@
 
   $effect(() => {
     errors.code;
-    //$inspect("att", loading.value);
+    selsemid.value;
     if (selsemid.value != undefined) {
       (async () => {
         await loadfromstorage();
@@ -103,5 +106,11 @@
   <Semid />
 </div>
 <div>
-  <Marks marksList={marks} />
+  {#if marks != undefined}
+    <Marks marksList={marks} />
+  {:else if loaded}
+    <p>No marks to show</p>
+  {:else}
+    <div class="skeleton h-auto w-full"></div>
+  {/if}
 </div>
