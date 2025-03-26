@@ -6,6 +6,53 @@
   let days = $state([]);
   let group = $state("TUE");
 
+  let startX = 0;
+  let startY = 0;
+  let endX = 0;
+  let endY = 0;
+  const swipethreshold = 50;
+
+  function handlpPointerDown(e) {
+    startX = e.clientX;
+    startY = e.clientY;
+  }
+
+  function handelPointerUp(e) {
+    endX = e.clientX;
+    endY = e.clientY;
+    let dx = endX - startX;
+    let dy = endY - startY;
+    if (Math.abs(dx) > swipethreshold || Math.abs(dy) > swipethreshold) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) {
+          //right
+          try {
+            let index = days.indexOf(group);
+            if (days[index + 1] != undefined) {
+              group = days[index + 1];
+            }
+          } catch {}
+        } else {
+          //left
+          try {
+            let index = days.indexOf(group);
+            if (days[index - 1] != undefined) {
+              group = days[index - 1];
+            }
+          } catch {}
+        }
+      } else {
+        if (dy > 0) {
+          //down
+          //console.log("dy greater than 0 ")
+        } else {
+          //up
+          //console.log("dy less than 0 ")
+        }
+      }
+    }
+  }
+
   $effect(() => {
     //console.log("running effect days");
     try {
@@ -115,7 +162,11 @@
   });
 </script>
 
-<div class="flex flex-col gap-4 min-h-[85vh]">
+<div
+  onpointerdown={handlpPointerDown}
+  onpointerup={handelPointerUp}
+  class="flex flex-col gap-4 min-h-[85vh]"
+>
   <div class="grow">
     <div class="">
       {#if render != undefined}

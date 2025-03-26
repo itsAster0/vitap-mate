@@ -17,7 +17,7 @@
             if (group === cl.slot) {
               group = null;
             } else {
-              group = cl.slot
+              group = cl.slot;
             }
           }}
         />
@@ -25,13 +25,15 @@
           <div>
             <div class="card w-full bg-base-100 card-xs">
               <div class="card-body">
-                <div class="flex gap-4 ">
-                  <div >
+                <div class="flex gap-4">
+                  <div>
                     <div class="flex flex-col gap-0">
                       <div class="flex gap-2">
                         <div class="text-4xl font-thin tabular-nums">
                           <div
-                            class="status animate-bounce {!cl.coursetype.endsWith('Lab')
+                            class="status animate-bounce {!cl.coursetype.endsWith(
+                              'Lab',
+                            )
                               ? 'status-primary'
                               : 'status-secondary'}"
                           ></div>
@@ -55,7 +57,9 @@
         </div>
         <div class="collapse-content text-sm overflow-auto">
           <div class=" overflow-x-auto">
-            <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+            <div
+              class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
+            >
               <table class="table overflow-auto">
                 <!-- head -->
                 <thead>
@@ -84,7 +88,8 @@
                     </tr>
                   {/each}
                 </tbody>
-              </table></div>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -105,4 +110,3 @@
     </footer>
   </div>
 </div>
-
