@@ -11,22 +11,30 @@
   let endX = 0;
   let endY = 0;
   const swipethreshold = 50;
+  
+  function handlpTouchStart(e) {
 
-  function handlpPointerDown(e) {
-    startX = e.clientX;
-    startY = e.clientY;
+    startX = e.screenX;
+    startY = e.screenY;
+
   }
 
-  function handelPointerUp(e) {
-    endX = e.clientX;
-    endY = e.clientY;
+
+  function handelTouchEnd(e) {
+    console.log("pointerup called",e.changedTouches[0] );
+    let e1=e.changedTouches[0];
+    endX = e1.screenX;
+    endY = e1.screenY;
     let dx = endX - startX;
     let dy = endY - startY;
+
     if (Math.abs(dx) > swipethreshold || Math.abs(dy) > swipethreshold) {
       if (Math.abs(dx) > Math.abs(dy)) {
         if (dx > 0) {
           //right
+          console.log("right")
           try {
+           
             let index = days.indexOf(group);
             if (days[index + 1] != undefined) {
               group = days[index + 1];
@@ -150,6 +158,7 @@
     group = k;
   }
 
+
   onMount(() => {
     const dayNames = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     let today = new Date();
@@ -160,12 +169,13 @@
       group = days[0] == undefined ? "TUE" : days[0];
     }
   });
+
 </script>
 
 <div
-  onpointerdown={handlpPointerDown}
-  onpointerup={handelPointerUp}
-  class="flex flex-col gap-4 min-h-[85vh]"
+  onpointerdown={handlpTouchStart}
+  ontouchend={handelTouchEnd}
+  class="flex flex-col gap-4 min-h-[85vh] "
 >
   <div class="grow">
     <div class="">
