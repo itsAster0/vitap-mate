@@ -31,16 +31,16 @@
 
           try {
             let index = days.indexOf(group);
-            if (days[index + 1] != undefined) {
-              group = days[index + 1];
+            if (days[index - 1] != undefined) {
+              group = days[index - 1];
             }
           } catch {}
         } else {
           //left
           try {
             let index = days.indexOf(group);
-            if (days[index - 1] != undefined) {
-              group = days[index - 1];
+            if (days[index + 1] != undefined) {
+              group = days[index + 1];
             }
           } catch {}
         }
