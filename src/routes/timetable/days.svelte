@@ -10,7 +10,7 @@
   let startY = 0;
   let endX = 0;
   let endY = 0;
-  const swipethreshold = 70;
+  const swipethreshold = 50;
 
   function handlpTouchStart(e) {
     startX = e.screenX;
