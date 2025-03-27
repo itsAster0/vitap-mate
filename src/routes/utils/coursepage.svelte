@@ -33,7 +33,8 @@
       </div>
     </div>
   </div>
-  <div class="form-control mt-6 flex justify-evenly">
+
+  <div class="justify-end card-actions">
     <button class="btn btn-primary" onclick={click} {disabled}>
       Open Coursepage
     </button>

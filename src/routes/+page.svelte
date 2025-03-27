@@ -12,7 +12,7 @@
   let errors: datasate = getContext("errors");
   let relaod = getContext("reload");
 
-  //settings password to PC incidates password change
+  //settings/Credentials password to PC incidates password change
 
   async function loadCreds() {
     let store = await Store.load("credentials.json");
@@ -23,7 +23,7 @@
   async function validateAndMove() {
     let store = await Store.load("credentials.json");
     if (creds.username == undefined && creds.password == undefined) {
-      goto("/settings");
+      goto("/settings/Credentials");
       errors.code = "stop";
       errors.msg = "NC";
       //add toast : enter your username and password
@@ -31,7 +31,7 @@
     } else if (creds.username != undefined && creds.password == "PC") {
       errors.code = "stop";
       errors.msg = "PC";
-      goto("/settings");
+      goto("/settings/Credentials");
       //add toast : update your password
       return;
     }
@@ -60,7 +60,7 @@
         errors.code = "stop";
         errors.msg = "PC";
         creds.password = "PC";
-        goto("/settings");
+        goto("/settings/Credentials");
         return;
       } else if (k === "Invalid Captcha") {
         continue;

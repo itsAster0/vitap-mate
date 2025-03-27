@@ -21,7 +21,7 @@
       </div>
     </div>
   </div>
-  <div class="form-control mt-6 flex justify-evenly">
+  <div class="justify-end card-actions">
     <button class="btn btn-primary" onclick={click}> Open MarksPage </button>
   </div>
 </div>

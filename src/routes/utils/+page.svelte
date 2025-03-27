@@ -11,7 +11,7 @@
   <div>
     <Marks />
   </div>
-  <div class="divider">-</div>
+  <div class="divider"></div>
   <div>
     <Wifi />
   </div>
