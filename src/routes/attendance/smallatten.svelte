@@ -86,17 +86,23 @@
                           {get_course(cl.course_name)[0]}
                         </h2>
                       </div>
-                      {#if String(cl.debar_status) != "-"}
-                        <div class="">
-                          <ul class="flex flex-col gap-1">
+
+                      <div class="">
+                        <ul class="flex flex-col gap-1">
+                          <li>
+                            <div class="flex flex-col">
+                              <p>{cl.faculty_detail.split("-")[0]}</p>
+                            </div>
+                          </li>
+                          {#if String(cl.debar_status) != "-"}
                             <li>
                               <div class="flex flex-col">
                                 <p>{cl.debar_status}</p>
                               </div>
                             </li>
-                          </ul>
-                        </div>
-                      {/if}
+                          {/if}
+                        </ul>
+                      </div>
                     </div>
                   </div>
 
@@ -141,6 +147,17 @@
         <div class="collapse-content text-sm overflow-auto">
           <div class=" overflow-x-auto">
             {#if cl.course_name == group}
+              <div>
+                <p
+                  class=" text-center {!get_course(cl.course_name)[1].endsWith(
+                    'Lab',
+                  )
+                    ? 'text-primary'
+                    : 'text-secondary'} whitespace-nowrap overflow-auto"
+                >
+                  {cl.course_name.split("-")[1]}
+                </p>
+              </div>
               <Classattn
                 courseid={String(cl.course_id)}
                 coursetype={String(cl.course_type)}
