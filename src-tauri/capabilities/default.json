@@ -12,6 +12,7 @@
     "store:default",
     "notification:default",
     "opener:default",
+    "nativeapi:default",
     {
       "identifier": "opener:allow-open-path",
       "allow": [

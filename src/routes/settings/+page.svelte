@@ -1,6 +1,16 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { creds } from "../globalstate.svelte";
+  import { invoke } from "@tauri-apps/api/core";
+
+
+
+
+async function click(){
+let k = await invoke("plugin:nativeapi|ping",{payload:{}})
+console.log(k.value);
+}
+
 </script>
 
 <div class="min-h-[85vh] flex flex-col">
@@ -24,6 +34,9 @@
       </div>
     </div>
   </div>
+ <!-- <div>
+    <button class="btn btn-accent" onclick={click}>test</button>
+  </div>-->
   <div class="w-full">
     <footer class=" flex items-center justify-between gap-4 p-4">
       <small class="opacity-70"
@@ -49,3 +62,4 @@
     </footer>
   </div>
 </div>
+
