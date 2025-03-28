@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  let { full_timetable_list } = $props();
+  let { full_timetable_list , updatedTime} = $props();
   let render: undefined | string = $state(undefined);
+  let time = $derived(updatedTime);
   //@ts-ignore
   let days = $state([]);
   let group = $state("TUE");
@@ -163,6 +164,19 @@
       group = days[0] == undefined ? "TUE" : days[0];
     }
   });
+
+  function unixToDate(k){
+  let n = k !=undefined?k:0;
+  let date = new Date(n * 1000);
+  return date.toLocaleString( "en-IN",{
+  year: '2-digit',
+  month: 'short',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit'
+});
+}
 </script>
 
 <div
@@ -245,12 +259,14 @@
               {/if}
             {/each}
           </ul>
+          
         </div>
       {:else}
         <p></p>
       {/if}
     </div>
   </div>
+  <div class="divider"><p class=" text-sm">Data updated at {unixToDate(time)} </p></div>
   <div class="w-full translate-y-[-3rem]">
     <footer class=" flex items-center justify-between gap-4 p-4">
       <small

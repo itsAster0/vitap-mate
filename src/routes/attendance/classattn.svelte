@@ -89,11 +89,25 @@
     errors.code;
     loadData();
   });
+
+
+  function unixToDate(k){
+  let n = k !=undefined?k:0;
+  let date = new Date(n * 1000);
+  return date.toLocaleString( "en-IN",{
+  year: '2-digit',
+  month: 'short',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit'
+});
+}
 </script>
 
 {#if data != ""}
   <div>
-    <div class="max-h-[35vh] flex overflow-auto">
+    <div class=" flex flex-col gap-1 max-h-[35vh] overflow-auto">
       <div
         class="overflow-x-auto whitespace-nowrap rounded-box border border-base-content/5 bg-base-100"
       >
@@ -135,7 +149,11 @@
           </tbody>
         </table>
       </div>
+      <div class=" text-center text-accent"><p class="text-sm">
+        Data updated at {unixToDate(lastUpdate)}</p>
+      </div>
     </div>
+
   </div>
 {:else}
   <div class="skeleton h-[30vh] w-full"></div>

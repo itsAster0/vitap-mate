@@ -1,7 +1,19 @@
 <script lang="ts">
-  let { marksList } = $props();
+  let { marksList ,  updatedTime} = $props();
   let render = $derived(JSON.parse(marksList));
   let group = $state("");
+  function unixToDate(k){
+  let n = k !=undefined?k:0;
+  let date = new Date(n * 1000);
+  return date.toLocaleString( "en-IN",{
+  year: '2-digit',
+  month: 'short',
+  day: '2-digit',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit'
+});
+}
 </script>
 
 <div class="flex flex-col gap-4 overflow-auto min-h-[85vh]">
@@ -96,7 +108,7 @@
     </div>
   {/each}
   <div class="collapse collapse-plus bg-base-100"></div>
-  <div class="divider"></div>
+  <div class="divider"> <p class="text-sm">Data updated at {unixToDate(updatedTime)}</p></div>
   <div class="w-full translate-y-[-3rem]">
     <footer class=" flex items-center justify-evenly gap-4 p-4">
       <small

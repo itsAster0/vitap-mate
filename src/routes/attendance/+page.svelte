@@ -7,7 +7,7 @@
   import Smallatten from "./smallatten.svelte";
 
   let attendance_before: string | undefined = $state(undefined);
-
+let distime: undefined | number = $state(0);
   interface relaod {
     [key: string]: boolean;
   }
@@ -43,6 +43,8 @@
     let last_update: undefined | number = await store.get(
       `full_attendance_${sel_sem}_lastupdate`,
     );
+    distime = last_update;
+
     if (
       (attendance_before == undefined ||
         last_update == undefined ||
@@ -60,6 +62,7 @@
       if (status && full_attendance_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_attendance_${sel_sem}_lastupdate`, time);
+        distime = time;
         if (
           full_attendance_fetched != "" &&
           full_attendance_fetched != undefined &&
@@ -107,7 +110,7 @@
       <Semid />
       <div>
         {#if attendance_before != undefined}
-          <Smallatten attendance={attendance_before} />
+          <Smallatten attendance={attendance_before} updatedTime={distime}/>
         {:else}
           <div class="skeleton h-[80vh] w-full"></div>
         {/if}

@@ -7,6 +7,7 @@
   import Days from "./days.svelte";
 
   let timetable_before: string | undefined = $state(undefined);
+  let distime = $state(0);
 
   interface relaod {
     [key: string]: boolean;
@@ -44,6 +45,7 @@
     let last_update: undefined | number = await store.get(
       `full_timetable_${sel_sem}_lastupdate`,
     );
+    distime = last_update;
     if (
       (timetable_before == undefined ||
         last_update == undefined ||
@@ -60,6 +62,7 @@
       if (status && full_timetable_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_timetable_${sel_sem}_lastupdate`, time);
+        distime=time;
         if (
           full_timetable_fetched != "" &&
           full_timetable_fetched != undefined &&
@@ -102,7 +105,7 @@
     <Semid />
     <div>
       {#if timetable_before != undefined}
-        <Days full_timetable_list={timetable_before} />
+        <Days full_timetable_list={timetable_before} updatedTime={distime} />
       {:else}
         <div class="skeleton h-[80vh] w-full"></div>
       {/if}

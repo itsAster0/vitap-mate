@@ -31,12 +31,13 @@
         </h2>
         <span class="translate-x-[-1.5vh]">(beta)</span>
       </div>
+      <div class="form-control mt-6 flex justify-evenly translate-x-[-1.5vh]">
+        <button class="btn btn-primary" onclick={click} {disabled}>
+          Open Coursepage
+        </button>
+      </div>
+      
     </div>
   </div>
 
-  <div class="justify-end card-actions">
-    <button class="btn btn-primary" onclick={click} {disabled}>
-      Open Coursepage
-    </button>
-  </div>
 </div>

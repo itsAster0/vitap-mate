@@ -6,6 +6,8 @@
   import { getContext } from "svelte";
   import Marks from "./marks.svelte";
 
+let distime: undefined| number = $state(0);
+
   let marks = $state(undefined);
   async function loadfromstorage() {
     const store = await Store.load("marks.json");
@@ -45,6 +47,7 @@
     let last_update: undefined | number = await store.get(
       `marks_${sel_sem}_lastupdate`,
     );
+    distime = last_update;
     if (
       (marks == undefined ||
         last_update == undefined ||
@@ -63,6 +66,7 @@
       if (status && marks_fetched != "") {
         const time = unixTimestamp();
         await store.set(`marks_${sel_sem}_lastupdate`, time);
+        distime = time;
         if (
           marks_fetched != "" &&
           marks_fetched != undefined &&
@@ -107,7 +111,7 @@
 </div>
 <div>
   {#if marks != undefined}
-    <Marks marksList={marks} />
+    <Marks marksList={marks} updatedTime={distime} />
   {:else if loaded}
     <p>No marks to show</p>
   {:else}
