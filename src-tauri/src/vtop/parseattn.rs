@@ -146,52 +146,54 @@ pub fn parse_full_attendance(html: String) -> String {
     let mut attendance_lists: Vec<AttendanceList> = Vec::new();
     for row in document.select(&rows_selector).skip(1) {
         let cells: Vec<_> = row.select(&Selector::parse("td").unwrap()).collect();
-        let attendance_list = AttendanceList {
-            serial: cells[0]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-            date: cells[1]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-            slot: cells[2]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-            day_time: cells[3]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-            status: cells[4]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-            remark: cells[5]
-                .text()
-                .collect::<Vec<_>>()
-                .join("")
-                .trim()
-                .replace("\t", "")
-                .replace("\n", ""),
-        };
+        if cells.len() > 5 {
+            let attendance_list = AttendanceList {
+                serial: cells[0]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                date: cells[1]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                slot: cells[2]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                day_time: cells[3]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                status: cells[4]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+                remark: cells[5]
+                    .text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", ""),
+            };
 
-        attendance_lists.push(attendance_list);
+            attendance_lists.push(attendance_list);
+        }
     }
     let json_data = serde_json::to_string_pretty(&attendance_lists).unwrap();
     return json_data;
