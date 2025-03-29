@@ -52,12 +52,10 @@ function unixToDate(k){
   let n = k !=undefined?k:0;
   let date = new Date(n * 1000);
   return date.toLocaleString( "en-IN",{
-  year: '2-digit',
   month: 'short',
   day: '2-digit',
   hour: 'numeric',
-  minute: '2-digit',
-  second: '2-digit'
+  minute: '2-digit'
 });
 }
 
@@ -138,9 +136,9 @@ function unixToDate(k){
                       <strong class=" text-center">Total</strong>
                     </div>
 
-                    <div class="flex flex-col">
-                      <div
-                        class="radial-progress {getRingColor(
+                    <div class="flex flex-col items-center">
+                      <div 
+                        class="radial-progress  {getRingColor(
                           parseval(cl.attendence_fat_cat),
                         )}"
                         style="--value:{parseval(
@@ -151,7 +149,7 @@ function unixToDate(k){
                       >
                         {parseval(cl.attendence_fat_cat)}%
                       </div>
-                      <strong class="text-center">BetweenExams</strong>
+                      <strong class="text-center">Between Exams</strong>
                     </div>
                   </div>
                 </div>
@@ -185,7 +183,7 @@ function unixToDate(k){
         <ul class="flex gap-1 justify-evenly">
           <li>
             <div class="flex text-sm">
-              <p>TotalClasses&nbsp</p>
+              <p>Total Classes&nbsp</p>
               <span>
                 <kbd class="kbd">
                   {padNumbers(cl.total_classes, cl.classes_attended)[0]}
@@ -196,7 +194,7 @@ function unixToDate(k){
 
           <li>
             <div class="flex text-sm">
-              <p>AttendedClasses&nbsp</p>
+              <p>Attended Classes&nbsp</p>
               <span class="">
                 <kbd class="kbd">
                   {padNumbers(cl.total_classes, cl.classes_attended)[1]}
@@ -209,12 +207,12 @@ function unixToDate(k){
     </div>
   {/each}
   <div class="collapse collapse-plus bg-base-100"></div>
-  <div class="divider"><p class=" text-sm">Data updated at {unixToDate(time)} </p></div>
+  <div class="divider"><p class=" text-sm text-info">Data updated on {unixToDate(time)} </p></div>
   <div class="w-full translate-y-[-3rem]">
     <footer class=" flex items-center justify-evenly gap-4 p-4">
       <small
         ><div class="status animate-bounce status-primary"></div>
-        Therory</small
+        Theory</small
       >
       <small>
         <div class="status animate-bounce status-secondary"></div>

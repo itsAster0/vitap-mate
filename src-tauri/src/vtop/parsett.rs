@@ -77,19 +77,25 @@ pub fn parse_timetable(html: String) -> String {
                         .replace("\t", "")
                         .replace("\n", "");
                     if class_name.len() > 5 && index != 0 {
-                        let mut cl = class_name.split("-");
-                        let class = Timetable {
-                            serial: index.to_string(),
-                            day: day.clone(),
-                            slot: cl.next().unwrap_or("").trim().to_string(),
-                            course_code: cl.next().unwrap_or("").trim().to_string(),
-                            course_type: cl.next().unwrap_or("").trim().to_string(),
-                            room_no: cl.next().unwrap_or("").trim().to_string(),
-                            block: cl.take(2).collect::<Vec<_>>().join(" "),
-                            start_time: "".to_string(),
-                            end_time: "".to_string(),
-                        };
-                        timetables.push(class);
+                        let cle = class_name
+                            .split("-")
+                            .filter(|k| !k.is_empty())
+                            .collect::<Vec<_>>();
+                        if cle.len() > 2 {
+                            let mut cl = class_name.split("-");
+                            let class = Timetable {
+                                serial: index.to_string(),
+                                day: day.clone(),
+                                slot: cl.next().unwrap_or("").trim().to_string(),
+                                course_code: cl.next().unwrap_or("").trim().to_string(),
+                                course_type: cl.next().unwrap_or("").trim().to_string(),
+                                room_no: cl.next().unwrap_or("").trim().to_string(),
+                                block: cl.take(2).collect::<Vec<_>>().join(" "),
+                                start_time: "".to_string(),
+                                end_time: "".to_string(),
+                            };
+                            timetables.push(class);
+                        }
                     }
                 }
             }

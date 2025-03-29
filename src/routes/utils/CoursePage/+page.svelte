@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { getContext } from "svelte";
   import { selsemid, selclass, classes, classids } from "./store.svelte";
+  import { Store } from "@tauri-apps/plugin-store";
   import { View } from "lucide-svelte";
   import { goto } from "$app/navigation";
   let semid = $state(undefined);
@@ -12,12 +13,24 @@
     let [status, k] = await invoke("coursepage");
     if (status) {
       semid = JSON.parse(k);
+      let store = await Store.load("utils.json");
+    let p = await store.get("coursepage_selsem");
+    if (p!=undefined){
+      selsemid.value = p;
+      classids.value = undefined;
+      selclass.value = undefined;
+      classes.value = undefined;
+      let [status, c] = await invoke("coursepage_courses", {
+        semid: selsemid.value,
+      });
+      classids.value = JSON.parse(c);
+    }
     }
   }
   async function handelclick(id) {
     if (selsemid.value != id.target.value) {
       selsemid.value = id.target.value;
-      console.log(selsemid.value);
+      //console.log(selsemid.value);
       classids.value = undefined;
       selclass.value = undefined;
       classes.value = undefined;
@@ -26,6 +39,8 @@
       });
       classids.value = JSON.parse(k);
       if (status) {
+        let store = await Store.load("utils.json");
+     store.set("coursepage_selsem",selsemid.value);
         classids.value = JSON.parse(k);
       }
     }
@@ -69,6 +84,7 @@
   let semname = $derived.by(() => {
     if (selsemid.value) {
     }
+    semid;
     if (semid == undefined) {
       return "Loading";
     }
