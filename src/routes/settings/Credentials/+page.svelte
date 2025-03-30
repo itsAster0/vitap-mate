@@ -176,24 +176,17 @@
     <footer class=" flex items-center justify-between gap-4 p-4">
       <small class="opacity-70"
         >Made By <a
-          href="https://discord.com/users/synapticsurge"
-          class=""
+          href="https://discordapp.com/users/1147202428404519013"
+          class="link-primary"
           target="_blank">Synaptic</a
         ></small
       >
       <small class="opacity-70"
-        >Conatct via <a
-          href="https://discord.com/users/synapticsurge"
+        ><a
+          href="https://linktr.ee/synapticsurge"
           class="link-primary"
-          target="_blank">Discord</a
+          target="_blank">Contact me</a
         >
-        or
-        <a
-          href="mailto:synaptic@synapticsurge.in"
-          class=" link-primary"
-          target="_blank">Mail</a
-        ></small
-      >
     </footer>
   </div>
 </div>
