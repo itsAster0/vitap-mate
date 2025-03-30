@@ -9,8 +9,7 @@
   const currentPage = () => {
     let path = page.url.pathname;
     let n = path.split("/");
-    return "/"+n[1]
-
+    return "/" + n[1];
   };
 
   let reload = $state({ status: false });
@@ -32,7 +31,7 @@
     let k = String(val).charAt(0).toUpperCase() + String(val).slice(1);
     let p = k.split("/");
     if (p.length > 2) {
-      return p[0] ;
+      return p[0];
     } else {
       return k;
     }

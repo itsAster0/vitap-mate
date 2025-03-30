@@ -7,7 +7,7 @@
   import Smallatten from "./smallatten.svelte";
 
   let attendance_before: string | undefined = $state(undefined);
-let distime: undefined | number = $state(0);
+  let distime: undefined | number = $state(0);
   interface relaod {
     [key: string]: boolean;
   }
@@ -110,7 +110,7 @@ let distime: undefined | number = $state(0);
       <Semid />
       <div>
         {#if attendance_before != undefined}
-          <Smallatten attendance={attendance_before} updatedTime={distime}/>
+          <Smallatten attendance={attendance_before} updatedTime={distime} />
         {:else}
           <div class="skeleton h-[80vh] w-full"></div>
         {/if}

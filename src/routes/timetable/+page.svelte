@@ -62,7 +62,7 @@
       if (status && full_timetable_fetched != "") {
         const time = unixTimestamp();
         await store.set(`full_timetable_${sel_sem}_lastupdate`, time);
-        distime=time;
+        distime = time;
         if (
           full_timetable_fetched != "" &&
           full_timetable_fetched != undefined &&

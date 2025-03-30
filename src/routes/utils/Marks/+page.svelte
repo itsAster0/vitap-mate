@@ -6,7 +6,7 @@
   import { getContext } from "svelte";
   import Marks from "./marks.svelte";
 
-let distime: undefined| number = $state(0);
+  let distime: undefined | number = $state(0);
 
   let marks = $state(undefined);
   async function loadfromstorage() {

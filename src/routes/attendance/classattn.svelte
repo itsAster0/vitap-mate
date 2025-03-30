@@ -90,17 +90,16 @@
     loadData();
   });
 
-
-  function unixToDate(k){
-  let n = k !=undefined?k:0;
-  let date = new Date(n * 1000);
-  return date.toLocaleString( "en-IN",{
-  month: 'short',
-  day: '2-digit',
-  hour: 'numeric',
-  minute: '2-digit'
-});
-}
+  function unixToDate(k) {
+    let n = k != undefined ? k : 0;
+    let date = new Date(n * 1000);
+    return date.toLocaleString("en-IN", {
+      month: "short",
+      day: "2-digit",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
 </script>
 
 {#if data != ""}
@@ -147,11 +146,12 @@
           </tbody>
         </table>
       </div>
-      <div class=" text-center text-info"><p class="text-sm">
-        Data updated on {unixToDate(lastUpdate)}</p>
+      <div class=" text-center text-info">
+        <p class="text-sm">
+          Data updated on {unixToDate(lastUpdate)}
+        </p>
       </div>
     </div>
-
   </div>
 {:else}
   <div class="skeleton h-[30vh] w-full"></div>

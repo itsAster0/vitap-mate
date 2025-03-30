@@ -18,13 +18,13 @@
           Marks
         </h2>
         <span class="translate-x-[-1.5vh]">
-          <div class="form-control mt-6 flex justify-evenly ">
-            <button class="btn btn-primary" onclick={click}> Open MarksPage </button>
+          <div class="form-control mt-6 flex justify-evenly">
+            <button class="btn btn-primary" onclick={click}>
+              Open MarksPage
+            </button>
           </div>
         </span>
-
       </div>
     </div>
   </div>
- 
 </div>

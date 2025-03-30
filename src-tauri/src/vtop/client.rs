@@ -621,7 +621,59 @@ impl Iclient {
             }
         }
     }
-    //post
-    //https://vtop.vitap.ac.in/vtop/examinations/doStudentMarkView
-    //body =
+    pub async fn get_exam_shedule_sems(&self) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/examinations/StudExamSchedule";
+        let body = format!(
+            "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
+            self.username, self.csrf
+        );
+        let res = self.client.post(url).body(body).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success() {
+                    return (false, "VE".to_string());
+                }
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
+        }
+    }
+    pub async fn get_exam_shedule(&self, semid: String) -> (bool, String) {
+        let url = "https://vtop.vitap.ac.in/vtop/examinations/doSearchExamScheduleForStudent";
+
+        let form = multipart::Form::new()
+            .text("authorizedID", self.username.clone())
+            .text("semesterSubId", semid)
+            .text("_csrf", self.csrf.clone());
+        let res = self.client.post(url).multipart(form).send().await;
+        match res {
+            Ok(k) => {
+                if !k.status().is_success() {
+                    return (false, "VE".to_string());
+                }
+                let t = k.text().await;
+                match t {
+                    Ok(k) => {
+                        return (true, k);
+                    }
+                    Err(_) => {
+                        return (false, "VE".to_string());
+                    }
+                };
+            }
+            Err(_) => {
+                return (false, "NE".to_string());
+            }
+        }
+    }
 }

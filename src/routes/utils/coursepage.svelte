@@ -36,8 +36,6 @@
           Open Coursepage
         </button>
       </div>
-      
     </div>
   </div>
-
 </div>

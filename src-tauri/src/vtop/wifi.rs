@@ -64,7 +64,7 @@ pub async fn wifi_login_logout(i: i32, username: String, password: String) -> (b
         match res {
             Ok(x) => {
                 let text = x.text().await.unwrap_or("notext".to_string());
-                println!("{}", text);
+                //println!("{}", text);
                 let llp = get_em(text, "H3");
                 if llp.0 {
                     return (true, llp.1);

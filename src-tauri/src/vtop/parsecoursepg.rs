@@ -135,8 +135,11 @@ pub fn parse_dlist(html: String) -> String {
     let rows_selector = Selector::parse("tr").unwrap();
     for downlods in document.select(&all_download_selector) {
         let href = downlods.value().attr("href").unwrap().to_string();
-        let href_parse = href.split("(").collect::<Vec<_>>()[1];
-        all_download.push(href_parse.to_string().replace(")", "").replace("'", ""));
+        let cc = href.split("(").collect::<Vec<_>>();
+        if cc.len() > 1 {
+            let href_parse = cc[1];
+            all_download.push(href_parse.to_string().replace(")", "").replace("'", ""));
+        }
     }
     let all_download_table = CourseTable {
         serial: "-1".to_string(),
@@ -175,13 +178,16 @@ pub fn parse_dlist(html: String) -> String {
                     match p {
                         Some(p) => {
                             let href = p.value().attr("href").unwrap().to_string();
-                            let href_parse = href.split("(").collect::<Vec<_>>()[1];
-                            let k = format!(
-                                "{}:{}",
-                                value,
-                                href_parse.to_string().replace(")", "").replace("'", "")
-                            );
-                            table1_links.push(k);
+                            let cc = href.split("(").collect::<Vec<_>>();
+                            if cc.len() > 1 {
+                                let href_parse = cc[1];
+                                let k = format!(
+                                    "{}:{}",
+                                    value,
+                                    href_parse.to_string().replace(")", "").replace("'", "")
+                                );
+                                table1_links.push(k);
+                            }
                         }
                         None => {}
                     }
@@ -190,8 +196,11 @@ pub fn parse_dlist(html: String) -> String {
                 let mut links: Vec<String> = vec![];
                 for link in cells[4].select(&Selector::parse("a").unwrap()) {
                     let href = link.value().attr("href").unwrap().to_string();
-                    let href_parse = href.split("(").collect::<Vec<_>>()[1];
-                    links.push(href_parse.to_string().replace(")", "").replace("'", ""));
+                    let cc = href.split("(").collect::<Vec<_>>();
+                    if cc.len() > 1 {
+                        let href_parse = cc[1];
+                        links.push(href_parse.to_string().replace(")", "").replace("'", ""));
+                    }
                 }
                 let table = CourseTable {
                     serial: cells[0]

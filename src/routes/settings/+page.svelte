@@ -3,14 +3,10 @@
   import { creds } from "../globalstate.svelte";
   import { invoke } from "@tauri-apps/api/core";
 
-
-
-
-async function click(){
-let k = await invoke("plugin:nativeapi|ping",{payload:{}})
-console.log(k.value);
-}
-
+  async function click() {
+    let k = await invoke("plugin:nativeapi|ping", { payload: {} });
+    console.log(k.value);
+  }
 </script>
 
 <div class="min-h-[85vh] flex flex-col">
@@ -34,7 +30,7 @@ console.log(k.value);
       </div>
     </div>
   </div>
- <!-- <div>
+  <!-- <div>
     <button class="btn btn-accent" onclick={click}>test</button>
   </div>-->
   <div class="w-full">
@@ -62,4 +58,3 @@ console.log(k.value);
     </footer>
   </div>
 </div>
-

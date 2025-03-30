@@ -12,6 +12,7 @@ use vtop::client::Iclient;
 use vtop::parseattn;
 use vtop::parsecoursepg;
 use vtop::parsemarks;
+use vtop::parsesched;
 use vtop::parsett;
 use vtop::wifi;
 
@@ -398,10 +399,6 @@ async fn download_coursepage(
             .unwrap()
             .to_string()
             .replace(r#"""#, "");
-    } else {
-        for (key, value) in k.headers() {
-            println!("{}: {:?}", key, value);
-        }
     }
 
     let mut per = 0;
@@ -499,6 +496,67 @@ async fn marks_list(
 
     Ok(result)
 }
+#[tauri::command]
+async fn exam_shedule_sems(
+    state: tauri::State<'_, Mutex<Iclient>>,
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_exam_shedule_sems().await;
+        if html.0 {
+            let k = parsesched::parse_semid_schedule(html.1);
+            //println!("{}",k);
+            if k == "[]" {
+                result = (false, k);
+            } else {
+                result = (true, k)
+            }
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
+
+#[tauri::command]
+async fn exam_shedule(
+    state: tauri::State<'_, Mutex<Iclient>>,
+    semid: String,
+) -> Result<(bool, String), tauri::Error> {
+    let mut client = state.lock().await;
+    let mut result = (false, "".to_string());
+    let _ = client.check();
+    let m = client.loginactive;
+    if !m {
+        let _check = login_vtop(&mut client).await;
+        result = _check;
+    }
+    let m = client.loginactive;
+    if m {
+        let html = client.get_exam_shedule(semid).await;
+        if html.0 {
+            let k = parsesched::parse_schedule(html.1);
+            if k == "[]" {
+                result = (false, k);
+            } else {
+                result = (true, k)
+            }
+        } else {
+            result = html;
+        }
+    }
+
+    Ok(result)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -526,6 +584,8 @@ pub fn run() {
             download_coursepage,
             marks_page,
             marks_list,
+            exam_shedule,
+            exam_shedule_sems,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

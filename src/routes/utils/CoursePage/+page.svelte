@@ -14,17 +14,17 @@
     if (status) {
       semid = JSON.parse(k);
       let store = await Store.load("utils.json");
-    let p = await store.get("coursepage_selsem");
-    if (p!=undefined){
-      selsemid.value = p;
-      classids.value = undefined;
-      selclass.value = undefined;
-      classes.value = undefined;
-      let [status, c] = await invoke("coursepage_courses", {
-        semid: selsemid.value,
-      });
-      classids.value = JSON.parse(c);
-    }
+      let p = await store.get("coursepage_selsem");
+      if (p != undefined) {
+        selsemid.value = p;
+        classids.value = undefined;
+        selclass.value = undefined;
+        classes.value = undefined;
+        let [status, c] = await invoke("coursepage_courses", {
+          semid: selsemid.value,
+        });
+        classids.value = JSON.parse(c);
+      }
     }
   }
   async function handelclick(id) {
@@ -40,7 +40,7 @@
       classids.value = JSON.parse(k);
       if (status) {
         let store = await Store.load("utils.json");
-     store.set("coursepage_selsem",selsemid.value);
+        store.set("coursepage_selsem", selsemid.value);
         classids.value = JSON.parse(k);
       }
     }
