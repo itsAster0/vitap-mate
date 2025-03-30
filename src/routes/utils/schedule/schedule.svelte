@@ -15,7 +15,9 @@
 
 <div class="h-[75vh] w-full overflow-auto">
   {#each render as exam}
-    <h1 class=" text-xl text-accent text-center">{exam.exam_type}</h1>
+    <h1 class=" text-xl text-accent text-center">
+      <strong>{exam.exam_type}</strong>
+    </h1>
     <div
       class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
     >
