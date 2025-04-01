@@ -185,7 +185,7 @@
         ><a
           href="https://linktr.ee/synapticsurge"
           class="link-primary"
-          target="_blank">Contact me</a
+          target="_blank">Talk to Dev</a
         >
     </footer>
   </div>

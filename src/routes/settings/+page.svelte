@@ -46,7 +46,7 @@
         > <a
           href="https://linktr.ee/synapticsurge"
           class="link-primary"
-          target="_blank">Conatct me</a
+          target="_blank">Talk to Dev</a
         >
         </small
       >
