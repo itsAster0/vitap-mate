@@ -13,6 +13,7 @@
   }
   let reload: relaod = getContext("reload");
   let errors: datasate = getContext("errors");
+  let isCollapsed = $state(true);
 
   const time_diff_relaod = 60;
   function unixTimestamp() {
@@ -112,7 +113,9 @@
       loadfromstorage().then(() => getsemids());
     });
   });
-
+  function toogleCollapsed() {
+    isCollapsed = !isCollapsed;
+  }
   function capitalizeFirstLetter(val) {
     try {
       var splitStr = val.toLowerCase().split(" ");
@@ -131,9 +134,11 @@
   <div
     tabindex="0"
     role="button"
-    class="collapse collapse-arrow bg-base-100 border-base-300 border"
+    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed
+      ? 'collapse-close'
+      : 'collapse-open'}"
   >
-    <input type="checkbox" />
+    <input type="checkbox" onclick={toogleCollapsed} />
     <div class="collapse-title font-semibold">
       {capitalizeFirstLetter(semname)}
     </div>
@@ -149,6 +154,7 @@
               value={value.split(":")[1]}
               bind:group={selsemid.value}
               onclick={async (e) => {
+                isCollapsed = !isCollapsed;
                 await onClickHandel(e);
               }}
             />

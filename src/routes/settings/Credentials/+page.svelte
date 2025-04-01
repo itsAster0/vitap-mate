@@ -187,6 +187,7 @@
           class="link-primary"
           target="_blank">Talk to Dev</a
         >
+      </small>
     </footer>
   </div>
 </div>

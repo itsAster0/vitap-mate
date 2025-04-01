@@ -5,7 +5,7 @@
 
   async function click() {
     let k = await invoke("plugin:nativeapi|ping", { payload: {} });
-    console.log(k.value);
+    //console.log(k.value);
   }
 </script>
 
@@ -42,14 +42,13 @@
           target="_blank">Synaptic</a
         ></small
       >
-      <small class="opacity-70"
-        > <a
+      <small class="opacity-70">
+        <a
           href="https://linktr.ee/synapticsurge"
           class="link-primary"
           target="_blank">Talk to Dev</a
         >
-        </small
-      >
+      </small>
     </footer>
   </div>
 </div>

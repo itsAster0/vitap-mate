@@ -127,7 +127,9 @@
                 <td>{row.date}</td>
                 <td
                   ><div
-                    class=" badge badge-soft {(row.status == 'Present' || row.status.toLocaleLowerCase() == "On Duty".toLocaleLowerCase()) 
+                    class=" badge badge-soft {row.status == 'Present' ||
+                    row.status.toLocaleLowerCase() ==
+                      'On Duty'.toLocaleLowerCase()
                       ? 'badge-success'
                       : row.status == 'Absent'
                         ? 'badge-error'

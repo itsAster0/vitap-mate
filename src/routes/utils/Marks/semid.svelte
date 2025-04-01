@@ -21,6 +21,7 @@
 
   let semid: string | undefined = $state(undefined);
   let lastUpdate: number | undefined = $state(undefined);
+  let isCollapsed = $state(true);
 
   async function loadfromstorage() {
     const store = await Store.load("marks.json");
@@ -125,15 +126,21 @@
       return val;
     }
   }
+
+  function toogleCollapsed() {
+    isCollapsed = !isCollapsed;
+  }
 </script>
 
 <div class=" px-1 max-h-[24vh] overflow-auto">
   <div
     tabindex="0"
     role="button"
-    class="collapse collapse-arrow bg-base-100 border-base-300 border"
+    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed
+      ? 'collapse-close'
+      : 'collapse-open'}"
   >
-    <input type="checkbox" />
+    <input type="checkbox" onclick={toogleCollapsed} />
     <div class="collapse-title font-semibold">
       {capitalizeFirstLetter(semname)}
     </div>
@@ -149,6 +156,7 @@
               value={value.split(":")[1]}
               bind:group={selsemid.value}
               onclick={async (e) => {
+                isCollapsed = !isCollapsed;
                 await onClickHandel(e);
               }}
             />

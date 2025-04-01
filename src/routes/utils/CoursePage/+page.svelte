@@ -6,7 +6,8 @@
   import { View } from "lucide-svelte";
   import { goto } from "$app/navigation";
   let semid = $state(undefined);
-
+  let isCollapsed = $state(true);
+  let isCollapsed1 = $state(false);
   let errors = getContext("errors");
 
   async function get_page() {
@@ -105,10 +106,10 @@
     if (classids.value == undefined) {
       return "Loading";
     } else if (classids.value == "") {
-      return "No classes.value this sem";
+      return "No classes  this sem";
     }
     if (selclass.value == undefined) {
-      return "Pick a semester";
+      return "Pick a class";
     } else {
       for (let i = 0; classids.value.length > i; i++) {
         let k = classids.value[i].split(":");
@@ -118,7 +119,9 @@
       }
     }
   });
-
+  function toogleCollapsed() {
+    isCollapsed = !isCollapsed;
+  }
   function formateClass(name) {
     try {
       let k = name.split("-");
@@ -136,9 +139,11 @@
   <div
     tabindex="0"
     role="button"
-    class="collapse collapse-arrow bg-base-100 border-base-300 border"
+    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed
+      ? 'collapse-close'
+      : 'collapse-open'}"
   >
-    <input type="checkbox" />
+    <input type="checkbox" onclick={toogleCollapsed} />
     <div class="collapse-title font-semibold">
       {capitalizeFirstLetter(semname)}
     </div>
@@ -153,6 +158,8 @@
               id={value.split(":")[1]}
               value={value.split(":")[1]}
               onclick={async (e) => {
+                isCollapsed = !isCollapsed;
+
                 await handelclick(e);
               }}
               bind:group={selsemid.value}
@@ -172,9 +179,11 @@
       <div
         tabindex="0"
         role="button"
-        class="collapse collapse-arrow bg-base-100 border-base-300 border"
+        class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed1
+          ? 'collapse-close'
+          : 'collapse-open'}"
       >
-        <input type="checkbox" />
+        <input type="checkbox" onclick={(isCollapsed1 = !isCollapsed1)} />
         <div class="collapse-title font-semibold">
           {formateClass(classname)}
         </div>
@@ -189,6 +198,7 @@
                   id={value.split(":")[1]}
                   value={value.split(":")[1]}
                   onclick={async (e) => {
+                    isCollapsed1 = !isCollapsed1;
                     await classselhandel(e);
                   }}
                   bind:group={selclass.value}

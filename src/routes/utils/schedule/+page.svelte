@@ -60,7 +60,7 @@
       const [status, full_examschedule_fetched] = await invoke("exam_shedule", {
         semid: sel_sem,
       });
-      console.log(full_examschedule_fetched);
+      //console.log(full_examschedule_fetched);
       stat = status;
       reload.status = false;
       if (status && full_examschedule_fetched != "") {
