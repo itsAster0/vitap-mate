@@ -2,6 +2,7 @@
   import { goto } from "$app/navigation";
   import { creds } from "../globalstate.svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { Github } from "lucide-svelte";
 
   async function click() {
     let k = await invoke("plugin:nativeapi|ping", { payload: {} });
@@ -42,6 +43,13 @@
           target="_blank">Synaptic</a
         ></small
       >
+      <small class="opacity-70">
+        <a
+          href="https://github.com/synapticsurge/vitap-pal"
+          class="link-primary"
+          target="_blank"><div class="flex"><Github />source code</div></a
+        >
+      </small>
       <small class="opacity-70">
         <a
           href="https://linktr.ee/synapticsurge"

@@ -5,6 +5,7 @@
   import { goto } from "$app/navigation";
   import { creds } from "../../globalstate.svelte";
   import { getContext } from "svelte";
+  import { Github } from "lucide-svelte";
 
   interface relaod {
     [key: string]: boolean;
@@ -181,6 +182,13 @@
           target="_blank">Synaptic</a
         ></small
       >
+      <small class="opacity-70">
+        <a
+          href="https://github.com/synapticsurge/vitap-pal"
+          class="link-primary"
+          target="_blank"><div class="flex"><Github />source code</div></a
+        >
+      </small>
       <small class="opacity-70"
         ><a
           href="https://linktr.ee/synapticsurge"
