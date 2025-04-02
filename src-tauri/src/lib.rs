@@ -409,7 +409,8 @@ async fn download_coursepage(
         let mut file = std::fs::File::create(file_path).unwrap();
         while let Some(chunks) = stream.next().await {
             let chunk = chunks.unwrap();
-            file.write_all(&chunk).unwrap();
+
+            file.write_all(&chunk).unwrap_or(());
 
             let new = min(downloaded + (chunk.len() as u64), content_length);
             downloaded = new;
