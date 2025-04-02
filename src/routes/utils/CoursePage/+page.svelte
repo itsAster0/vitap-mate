@@ -1,13 +1,18 @@
 <script>
   import { invoke } from "@tauri-apps/api/core";
   import { getContext } from "svelte";
-  import { selsemid, selclass, classes, classids } from "./store.svelte";
+  import {
+    selsemid,
+    selclass,
+    classes,
+    classids,
+    isCollapsed1,
+    isCollapsed,
+  } from "./store.svelte";
   import { Store } from "@tauri-apps/plugin-store";
   import { View } from "lucide-svelte";
   import { goto } from "$app/navigation";
   let semid = $state(undefined);
-  let isCollapsed = $state(true);
-  let isCollapsed1 = $state(false);
   let errors = getContext("errors");
 
   async function get_page() {
@@ -18,9 +23,9 @@
       let p = await store.get("coursepage_selsem");
       if (p != undefined) {
         selsemid.value = p;
-        classids.value = undefined;
-        selclass.value = undefined;
-        classes.value = undefined;
+        ///classids.value = undefined;
+        //selclass.value = undefined;
+        //classes.value = undefined;
         let [status, c] = await invoke("coursepage_courses", {
           semid: selsemid.value,
         });
@@ -52,7 +57,7 @@
       let p = e.target.value;
       selclass.value = p;
       classes.value = undefined;
-      console.log(selclass.value);
+      //console.log(selclass.value);
       let [status, k] = await invoke("coursepage_classes", {
         semid: selsemid.value,
         classid: selclass.value,
@@ -77,9 +82,10 @@
     }
   }
 
-  $effect(async () => {
+  $effect(() => {
     errors.code;
-    await get_page();
+    console.log("inside effect");
+    get_page();
   });
 
   let semname = $derived.by(() => {
@@ -101,8 +107,6 @@
     }
   });
   let classname = $derived.by(() => {
-    selclass.value;
-
     if (classids.value == undefined) {
       return "Loading";
     } else if (classids.value == "") {
@@ -120,7 +124,10 @@
     }
   });
   function toogleCollapsed() {
-    isCollapsed = !isCollapsed;
+    isCollapsed.value = !isCollapsed.value;
+  }
+  function toogleCollapsed1() {
+    isCollapsed1.value = !isCollapsed1.value;
   }
   function formateClass(name) {
     try {
@@ -139,7 +146,7 @@
   <div
     tabindex="0"
     role="button"
-    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed
+    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed.value
       ? 'collapse-close'
       : 'collapse-open'}"
   >
@@ -158,8 +165,7 @@
               id={value.split(":")[1]}
               value={value.split(":")[1]}
               onclick={async (e) => {
-                isCollapsed = !isCollapsed;
-
+                toogleCollapsed();
                 await handelclick(e);
               }}
               bind:group={selsemid.value}
@@ -179,11 +185,11 @@
       <div
         tabindex="0"
         role="button"
-        class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed1
+        class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed1.value
           ? 'collapse-close'
           : 'collapse-open'}"
       >
-        <input type="checkbox" onclick={(isCollapsed1 = !isCollapsed1)} />
+        <input type="checkbox" onclick={toogleCollapsed1} />
         <div class="collapse-title font-semibold">
           {formateClass(classname)}
         </div>
@@ -198,7 +204,8 @@
                   id={value.split(":")[1]}
                   value={value.split(":")[1]}
                   onclick={async (e) => {
-                    isCollapsed1 = !isCollapsed1;
+                    toogleCollapsed1();
+
                     await classselhandel(e);
                   }}
                   bind:group={selclass.value}
