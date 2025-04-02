@@ -286,30 +286,7 @@ impl Iclient {
         self.loginactive = true;
     }
 
-    pub async fn check(&mut self) -> bool {
-        match self
-            .client
-            .get("https://vtop.vitap.ac.in/vtop/content?")
-            .send()
-            .await
-        {
-            Ok(respons) => {
-                if respons.status().is_success() {
-                    self.loginactive = true;
-                    true
-                } else {
-                    self.loginactive = false;
-                    false
-                }
-            }
-            Err(_) => {
-                self.online = false;
-                false
-            }
-        }
-    }
-
-    pub async fn get_attendance_page(&self) -> (bool, String) {
+    pub async fn get_attendance_page(&mut self) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/academics/common/StudentAttendance";
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
@@ -319,6 +296,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -346,6 +324,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -378,6 +357,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -395,7 +375,7 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_timetable_page(&self) -> (bool, String) {
+    pub async fn get_timetable_page(&mut self) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/academics/common/StudentTimeTable";
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
@@ -405,6 +385,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -432,6 +413,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -450,7 +432,7 @@ impl Iclient {
         }
     }
 
-    pub async fn get_course_page(&self) -> (bool, String) {
+    pub async fn get_course_page(&mut self) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/academics/common/StudentCoursePage";
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
@@ -460,6 +442,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -478,7 +461,7 @@ impl Iclient {
         }
     }
 
-    pub async fn get_course_courses(&self, semid: String) -> (bool, String) {
+    pub async fn get_course_courses(&mut self, semid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/getCourseForCoursePage";
         let body = format!(
             "_csrf={}&paramReturnId=getCourseForCoursePage&semSubId={}&authorizedID={}",
@@ -488,6 +471,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -506,7 +490,7 @@ impl Iclient {
         }
     }
 
-    pub async fn get_course_classes(&self, semid: String, classid: String) -> (bool, String) {
+    pub async fn get_course_classes(&mut self, semid: String, classid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/getSlotIdForCoursePage";
         let body = format!(
         "_csrf={}&classId={}&praType=source&paramReturnId=getSlotIdForCoursePage&semSubId={}&authorizedID={}",
@@ -516,6 +500,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -535,7 +520,7 @@ impl Iclient {
     }
 
     pub async fn get_course_dlist(
-        &self,
+        &mut self,
         semid: String,
         classid: String,
         erp_id: String,
@@ -549,6 +534,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -566,7 +552,7 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_marks_page(&self) -> (bool, String) {
+    pub async fn get_marks_page(&mut self) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/examinations/StudentMarkView";
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
@@ -576,6 +562,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -593,7 +580,7 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_marks_list(&self, semid: String) -> (bool, String) {
+    pub async fn get_marks_list(&mut self, semid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/examinations/doStudentMarkView";
 
         let form = multipart::Form::new()
@@ -604,6 +591,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -621,7 +609,7 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_exam_shedule_sems(&self) -> (bool, String) {
+    pub async fn get_exam_shedule_sems(&mut self) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/examinations/StudExamSchedule";
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
@@ -631,6 +619,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;
@@ -648,7 +637,7 @@ impl Iclient {
             }
         }
     }
-    pub async fn get_exam_shedule(&self, semid: String) -> (bool, String) {
+    pub async fn get_exam_shedule(&mut self, semid: String) -> (bool, String) {
         let url = "https://vtop.vitap.ac.in/vtop/examinations/doSearchExamScheduleForStudent";
 
         let form = multipart::Form::new()
@@ -659,6 +648,7 @@ impl Iclient {
         match res {
             Ok(k) => {
                 if !k.status().is_success() {
+                    self.loginactive = false;
                     return (false, "VE".to_string());
                 }
                 let t = k.text().await;

@@ -89,7 +89,7 @@ async fn timetable(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let check = login_vtop(&mut client).await;
@@ -118,7 +118,7 @@ async fn timetable_semid(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -148,7 +148,7 @@ async fn attendance_semid(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -179,7 +179,7 @@ async fn attendance(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -212,7 +212,7 @@ async fn full_attendance(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -250,7 +250,7 @@ async fn coursepage(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -281,7 +281,7 @@ async fn coursepage_courses(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -313,7 +313,7 @@ async fn coursepage_classes(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -346,7 +346,7 @@ async fn coursepage_dlist(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -422,15 +422,20 @@ async fn download_coursepage(
     } else {
         let mut stream = k.bytes_stream();
         let file_path = format!("/storage/emulated/0/Download/{}", filename);
-        let mut file = std::fs::File::create(file_path).unwrap();
-        while let Some(chunks) = stream.next().await {
-            let chunk = chunks.unwrap();
-            file.write_all(&chunk).unwrap();
-            let tper = 50;
-            if per != tper {
-                per = tper;
-                window.emit(&url, per).unwrap();
+        let file = std::fs::File::create(file_path);
+        match file {
+            Ok(mut file) => {
+                while let Some(chunks) = stream.next().await {
+                    let chunk = chunks.unwrap();
+                    file.write_all(&chunk).unwrap();
+                    let tper = 50;
+                    if per != tper {
+                        per = tper;
+                        window.emit(&url, per).unwrap();
+                    }
+                }
             }
+            Err(_e) => (),
         }
     }
     Ok(filename)
@@ -442,7 +447,7 @@ async fn marks_page(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -473,7 +478,7 @@ async fn marks_list(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -502,7 +507,7 @@ async fn exam_shedule_sems(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;
@@ -534,7 +539,7 @@ async fn exam_shedule(
 ) -> Result<(bool, String), tauri::Error> {
     let mut client = state.lock().await;
     let mut result = (false, "".to_string());
-    let _ = client.check();
+
     let m = client.loginactive;
     if !m {
         let _check = login_vtop(&mut client).await;

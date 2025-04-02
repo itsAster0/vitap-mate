@@ -62,7 +62,11 @@ pub fn parse_classes(html: String) -> String {
                 .trim()
                 .replace("\t", "")
                 .replace("\n", "");
-            let mut temp = k.split("-").map(|a| a.trim()).collect::<Vec<_>>().into_iter();
+            let mut temp = k
+                .split("-")
+                .map(|a| a.trim())
+                .collect::<Vec<_>>()
+                .into_iter();
             let erpid = temp.next().unwrap_or("").to_string();
             let faculityname = temp.next().unwrap_or("").to_string();
             let class = Class {
