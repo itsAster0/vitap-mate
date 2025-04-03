@@ -15,19 +15,20 @@
 </script>
 
 <div class="flex flex-col gap-4 overflow-auto min-h-[85vh]">
-  {#each render as cl}
+  {#each render as cl, i}
     <div class="flex flex-col">
       <div class="collapse collapse-plus bg-base-100 grow">
         <input
           type="radio"
-          value={cl.slot}
+          value={cl.slot + i.toString()}
           name="my-accordion-3"
           bind:group
           onclick={() => {
-            if (group === cl.slot) {
+            console.log(cl.slot + i.toString());
+            if (group === cl.slot + i.toString()) {
               group = null;
             } else {
-              group = cl.slot;
+              group = cl.slot + i.toString();
             }
           }}
         />
@@ -71,7 +72,6 @@
               class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100"
             >
               <table class="table overflow-auto">
-                <!-- head -->
                 <thead>
                   <tr>
                     <th></th>
