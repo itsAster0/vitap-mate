@@ -64,6 +64,9 @@
       reload.status = false;
       loaded = true;
       if (status && marks_fetched != "") {
+        if (errors.msg == "NE" ){
+          errors.msg = undefined;
+        }
         const time = unixTimestamp();
         await store.set(`marks_${sel_sem}_lastupdate`, time);
         distime = time;

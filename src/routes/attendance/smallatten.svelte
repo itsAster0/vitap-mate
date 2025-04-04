@@ -148,7 +148,7 @@
                       >
                         {parseval(cl.attendence_fat_cat)}%
                       </div>
-                      <strong class="text-center">Between Exams</strong>
+                      <strong class="text-center">BetweenExams</strong>
                     </div>
                   </div>
                 </div>

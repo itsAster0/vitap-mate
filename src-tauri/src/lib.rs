@@ -406,19 +406,24 @@ async fn download_coursepage(
         let mut downloaded: u64 = 0;
         let mut stream = k.bytes_stream();
         let file_path = format!("/storage/emulated/0/Download/{}", filename);
-        let mut file = std::fs::File::create(file_path).unwrap();
+        let mut file = std::fs::File::create(file_path)?;
         while let Some(chunks) = stream.next().await {
-            let chunk = chunks.unwrap();
+            match chunks {
+                Ok(chunk) =>{
+                    file.write_all(&chunk).unwrap_or(());
 
-            file.write_all(&chunk).unwrap_or(());
-
-            let new = min(downloaded + (chunk.len() as u64), content_length);
-            downloaded = new;
-            let tper = downloaded * 100 / content_length;
-            if per != tper {
-                per = tper;
-                window.emit(&url, per).unwrap();
+                    let new = min(downloaded + (chunk.len() as u64), content_length);
+                    downloaded = new;
+                    let tper = downloaded * 100 / content_length;
+                    if per != tper {
+                        per = tper;
+                        window.emit(&url, per).unwrap();
+                    }
+                },
+                Err(_e)=>()
             }
+
+           
         }
     } else {
         let mut stream = k.bytes_stream();

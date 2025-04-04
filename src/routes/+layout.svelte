@@ -113,7 +113,7 @@
       <Cog
         class="{errors.code == undefined && reload.status != true
           ? 'text-success'
-          : errors.code == 'stop' || errors.msg != 'NE'
+          : errors.code == 'stop' && errors.msg != 'NE'
             ? 'text-error'
             : 'text-warning'}  {reload.status == true
           ? 'animate-spin duration-1000 text-info '

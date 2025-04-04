@@ -64,6 +64,9 @@
       stat = status;
       reload.status = false;
       if (status && full_examschedule_fetched != "") {
+        if (errors.msg == "NE" ){
+          errors.msg = undefined;
+        }
         const time = unixTimestamp();
         await store.set(`full_examschedule_${sel_sem}_lastupdate`, time);
         distime = time;

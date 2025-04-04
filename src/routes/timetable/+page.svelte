@@ -60,6 +60,9 @@
       });
       reload.status = false;
       if (status && full_timetable_fetched != "") {
+        if (errors.msg == "NE" ){
+          errors.msg = undefined;
+        }
         const time = unixTimestamp();
         await store.set(`full_timetable_${sel_sem}_lastupdate`, time);
         distime = time;

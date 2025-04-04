@@ -61,6 +61,9 @@
       });
       reload.status = false;
       if (status && full_attendance_fetched != "") {
+        if (errors.msg == "NE" ){
+          errors.msg = undefined;
+        }
         const time = unixTimestamp();
         await store.set(`full_attendance_${sel_sem}_lastupdate`, time);
         distime = time;
