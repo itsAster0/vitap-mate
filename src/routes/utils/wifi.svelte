@@ -5,7 +5,7 @@
   import { Wifi } from "lucide-svelte";
   import { CircleCheck } from "lucide-svelte";
   import { CircleX } from "lucide-svelte";
-  import { Pencil } from "lucide-svelte";
+  import { Pencil, Info } from "lucide-svelte";
 
   let wifiusername = $state(undefined);
   let wifipassword = $state(undefined);
@@ -76,6 +76,58 @@
       result = "ND";
     }
   }
+
+  //¹²³⁴⁵⁶⁷⁸⁹⁰
+
+  function convertToSuperstring(k: string) {
+    let map = {
+      "1": "¹",
+      "2": "²",
+      "3": "³",
+      "5": "⁵",
+      "6": "⁶",
+      "7": "⁷",
+      "8": "⁸",
+      "9": "⁹",
+      "0": "⁰",
+      "4": "⁴",
+    };
+
+    let n = k.split("");
+    let runs = Math.floor(Math.random() * n.length);
+    while (runs == 0 || runs == 1) {
+      runs = Math.floor(Math.random() * n.length);
+    }
+    for (let i = 0; i <= runs; i++) {
+      let c = Math.floor(Math.random() * n.length);
+      let k = Number(n[c]);
+      if (!isNaN(k)) {
+        n[c] = map[n[c]];
+      }
+    }
+    return n.join("");
+  }
+
+  async function loginBypass() {
+    let check = usernamepass();
+    if (check) {
+      status = undefined;
+      button = true;
+      result = "";
+      let newwifiusername = convertToSuperstring(wifiusername);
+      //@ts-ignore
+      let [stat, k] = await invoke("wifi", {
+        i: 0,
+        username: newwifiusername,
+        password: wifipassword,
+      });
+      result = k;
+      status = stat;
+      button = false;
+    } else {
+      result = "ND";
+    }
+  }
   async function logout() {
     let check = usernamepass();
     if (check) {
@@ -115,10 +167,18 @@
 <div class="flex flex-col">
   <div class=" grow">
     <div class="card w-full max-w-md bg-base-100 p-6 shadow-sm">
-      <div class="flex">
+      <div class="flex gap-4">
         <span><Wifi /></span>
 
-        <h2 class="text-center text-2xl font-semibold grow">Wi-Fi Utils</h2>
+        <h2 class="text-center text-2xl font-semibold grow">
+          Wi-Fi Utils <div class="tooltip tooltip-top">
+            <div class="tooltip-content translate-x-[-4vh]">
+              If login fails, disable mobile data and connect to the college
+              Wi-Fi.
+            </div>
+            <button><Info class=" size-5 translate-y-[0.5vh]" /></button>
+          </div>
+        </h2>
         <button class="" onclick={() => showDialogClick()}><Pencil /></button>
       </div>
       <p class=" text-center">{wifiusername}</p>
@@ -162,6 +222,17 @@
         <button class="btn btn-primary" onclick={logout} disabled={button}>
           Logout
         </button>
+        <div>
+          <button class="btn btn-error" onclick={loginBypass} disabled={button}>
+            Login
+          </button>
+          <div class="tooltip tooltip-top">
+            <div class="tooltip-content translate-x-[-10vh]">
+              Allows login even when over the limit
+            </div>
+            <button><Info class=" size-5 translate-y-[0.5vh]" /></button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -214,7 +285,7 @@
                 class="btn btn-primary"
                 onclick={closeDialog}
               >
-                Save
+                save
               </button>
             </div>
           </form>
