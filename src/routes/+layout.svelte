@@ -3,7 +3,8 @@
   import { University, SquareMenu, Notebook, Menu, Cog } from "lucide-svelte";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { setContext } from "svelte";
+  import { setContext, untrack } from "svelte";
+  import { Info } from "lucide-svelte";
   let { children } = $props();
 
   const currentPage = () => {
@@ -12,10 +13,24 @@
     return "/" + n[1];
   };
 
+  function updatError() {
+    if (errors.code == "stop") {
+      setTimeout(() => {
+        errors.code = undefined;
+      }, 5000);
+    }
+  }
+
   let reload = $state({ status: false });
   let errors = $state({ code: undefined, msg: undefined });
   setContext("reload", reload);
   setContext("errors", errors);
+  $effect(() => {
+    errors.code;
+    untrack(() => {
+      updatError();
+    });
+  });
 
   //errors
   // undefined no errors
@@ -57,6 +72,39 @@
   </div>
   <a href="/timetable" class="">{tag(currentPage().replace("/", ""))} </a>
   <div class="navbar-end">
+    <div class="tooltip tooltip-bottom">
+      <button class=""><Info class=" size-5 translate-y-[0.5vh]" /></button>
+      <div class="tooltip-content translate-x-[-14vh]">
+        <div class="overflow-auto rounded-box">
+          <table class="table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Spin</th>
+                <th>NoSpin</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th><Cog class="size-5 text-info" /></th>
+                <td>logging into vtop</td>
+                <td>-</td>
+              </tr>
+              <tr>
+                <th><Cog class="size-5 text-warning" /></th>
+                <td>Fetching data</td>
+                <td>No Internet</td>
+              </tr>
+              <tr>
+                <th><Cog class="size-5 text-success" /></th>
+                <td>-</td>
+                <td>Everything is upto date</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     <button
       aria-label="settings"
       onclick={() => goto("/settings")}

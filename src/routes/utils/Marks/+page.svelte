@@ -33,7 +33,7 @@
   }
 
   async function getmarks() {
-    console.log("runing");
+    //console.log("runing");
     // console.log("in get attendance")
     if (selsemid.value == undefined) {
       return;
@@ -80,6 +80,10 @@
         }
       } else {
         if (marks_fetched == "NE") {
+          if (errors.code != "stop") {
+            errors.code = "stop";
+            errors.msg = "NE";
+          }
           //triggerInfo("No Internet")
         } else {
           //triggerInfo(full_attendance1)

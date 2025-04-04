@@ -82,6 +82,10 @@
         }
       } else {
         if (full_examschedule_fetched == "NE") {
+          if (errors.code != "stop") {
+            errors.code = "stop";
+            errors.msg = "NE";
+          }
           //triggerInfo("No Internet")
         } else {
           //triggerInfo(full_examschedule1)

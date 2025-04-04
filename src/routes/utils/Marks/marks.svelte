@@ -24,7 +24,6 @@
           name="my-accordion-3"
           bind:group
           onclick={() => {
-            console.log(cl.slot + i.toString());
             if (group === cl.slot + i.toString()) {
               group = null;
             } else {

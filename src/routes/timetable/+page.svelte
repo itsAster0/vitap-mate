@@ -75,6 +75,10 @@
         }
       } else {
         if (full_timetable_fetched == "NE") {
+          if (errors.code != "stop") {
+            errors.code = "stop";
+            errors.msg = "NE";
+          }
           //triggerInfo("No Internet")
         } else {
           //triggerInfo(full_timetable1)

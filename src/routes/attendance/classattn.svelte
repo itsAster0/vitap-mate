@@ -68,6 +68,10 @@
           }
         } else {
           if (full_attendance_cl == "NE") {
+            if (errors.code != stop) {
+              errors.code = "stop";
+              errors.msg = "NE";
+            }
             //triggerInfo("No Internet")
           } else {
             //triggerInfo(full_attendance_cl)
@@ -112,7 +116,11 @@
           <!-- head -->
           <thead>
             <tr>
-              <th></th>
+              <th
+                >{#if privateload}
+                  <span class="loading loading-spinner loading-xs"></span>
+                {/if}
+              </th>
               <th>Date</th>
               <th>Status</th>
               <th>Time</th>

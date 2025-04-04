@@ -5,6 +5,7 @@
   import { selsemid, loading } from "./store.svelte";
   import { getContext } from "svelte";
   import Smallatten from "./smallatten.svelte";
+  import { error } from "@sveltejs/kit";
 
   let attendance_before: string | undefined = $state(undefined);
   let distime: undefined | number = $state(0);
@@ -79,6 +80,10 @@
         }
       } else {
         if (full_attendance_fetched == "NE") {
+          if (errors.code != "stop") {
+            errors.code = "stop";
+            errors.msg = "NE";
+          }
           //triggerInfo("No Internet")
         } else {
           //triggerInfo(full_attendance1)
