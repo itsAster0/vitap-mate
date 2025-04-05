@@ -82,14 +82,14 @@
   <div class="navbar-end">
     <div class="tooltip tooltip-bottom">
       <button class=""><Info class=" size-5 translate-y-[0.5vh]" /></button>
-      <div class="tooltip-content translate-x-[-14vh]">
+      <div class="tooltip-content translate-x-[-16vh]">
         <div class="overflow-auto rounded-box">
           <table class="table">
             <thead>
               <tr>
                 <th></th>
                 <th>Spin</th>
-                <th>NoSpin</th>
+                <th>No Spin</th>
               </tr>
             </thead>
             <tbody>
@@ -119,7 +119,9 @@
       class="btn btn-ghost btn-circle"
     >
       <Cog
-        class="{errors.code == undefined && reload.status != true
+        class="{errors.code == undefined &&
+        reload.status != true &&
+        errors.msg == undefined
           ? 'text-success'
           : errors.code == 'stop' && errors.msg != 'NE'
             ? 'text-error'

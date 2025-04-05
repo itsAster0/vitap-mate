@@ -2,7 +2,7 @@
   import { page } from "$app/state";
   import { invoke } from "@tauri-apps/api/core";
   import { selsemid } from "./../store.svelte";
-  import { Download, ArrowDownToLine } from "lucide-svelte";
+  import { Download, ArrowDownToLine, Info } from "lucide-svelte";
   import { listen } from "@tauri-apps/api/event";
   import {
     isPermissionGranted,
@@ -105,7 +105,15 @@
     <table class="table overflow-x-auto whitespace-nowrap">
       <thead>
         <tr>
-          <th></th>
+          <th>
+            <div class="tooltip tooltip-bottom">
+              <div class="tooltip-content translate-x-[18vh]">
+                You can find downloaded files in the /Downloads folder of your
+                internal storage.
+              </div>
+              <button><Info class=" size-5 translate-y-[0.5vh]" /></button>
+            </div></th
+          >
           <th>Date</th>
           <th>Day</th>
           <th>Topic</th>

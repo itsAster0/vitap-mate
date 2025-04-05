@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { BookUp2, DotSquare } from "lucide-svelte";
+  import { BookUp2 } from "lucide-svelte";
   import { getContext } from "svelte";
 
   let errors = getContext("errors");

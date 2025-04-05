@@ -121,6 +121,13 @@
 </script>
 
 <div class="">
+  {#if errors.msg == "NE"}
+    <div role="alert" class="alert">
+      <span class=" whitespace-nowrap overflow-auto text-sm"
+        >⚠️ No Internet Connection. Data might be outdated</span
+      >
+    </div>
+  {/if}
   <div class="">
     <Semid />
     <div>

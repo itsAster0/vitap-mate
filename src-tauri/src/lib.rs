@@ -387,7 +387,8 @@ async fn download_coursepage(
         url, username, csrf
     );
 
-    let k = cl.get(u).send().await.unwrap();
+    let k = cl.get(u).send().await;
+    if let Ok(k) = k{
     if let Some(name) = k.headers().get(reqwest::header::CONTENT_DISPOSITION) {
         filename = name
             .to_str()
@@ -396,7 +397,7 @@ async fn download_coursepage(
             .split("filename=")
             .skip(1)
             .next()
-            .unwrap()
+            .unwrap_or("")
             .to_string()
             .replace(r#"""#, "");
     }
@@ -443,7 +444,7 @@ async fn download_coursepage(
             }
             Err(_e) => (),
         }
-    }
+    }}
     Ok(filename)
 }
 

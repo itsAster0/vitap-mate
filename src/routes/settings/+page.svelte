@@ -19,7 +19,11 @@
           <p><strong>Useranme :</strong> {(() => creds.username)()}</p>
           <p>
             <strong>password :</strong>
-            {(() => "*".repeat(creds.password?.length))()}
+            {#if creds.password == "PC"}
+              (update your password)
+            {:else}
+              {(() => "*".repeat(creds.password?.length))()}
+            {/if}
           </p>
         </div>
       </div>

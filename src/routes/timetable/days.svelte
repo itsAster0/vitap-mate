@@ -185,24 +185,25 @@
   <div class="grow">
     <div class="">
       {#if render != undefined}
-        <div
-          role="tablist"
-          class="tabs tabs-border flex justify-evenly w-full whitespace-nowrap overflow-auto"
-        >
-          {#each days as i}
-            <input
-              type="radio"
-              name="my_tabs_2"
-              id={i}
-              value={i}
-              onclick={(e) => handeltabclick(e)}
-              class="tab"
-              aria-label={i}
-              bind:group
-            />
-          {/each}
+        <div role="tablist" class="tabs tabs-border">
+          <div
+            class=" flex whitespace-nowrap justify-evenly w-full overflow-auto"
+          >
+            {#each days as i}
+              <input
+                type="radio"
+                name="my_tabs_2"
+                id={i}
+                value={i}
+                onclick={(e) => handeltabclick(e)}
+                class="tab"
+                aria-label={i}
+                bind:group
+              />
+            {/each}
+          </div>
         </div>
-        <div class=" whitespace-nowrap overflow-auto">
+        <div>
           <ul class="list bg-base-100 rounded-box shadow-md p-1">
             {#each render[group] as day}
               {#if day.serial != "-1"}

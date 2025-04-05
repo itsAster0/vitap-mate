@@ -12,6 +12,7 @@
   import { Store } from "@tauri-apps/plugin-store";
   import { View } from "lucide-svelte";
   import { goto } from "$app/navigation";
+
   let semid = $state(undefined);
   let errors = getContext("errors");
 
