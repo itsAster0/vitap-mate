@@ -5,6 +5,7 @@
   import { selsemid, loading } from "./store.svelte";
   import { getContext } from "svelte";
   import Schedule from "./schedule.svelte";
+  import { goto } from "$app/navigation";
 
   let examschedule_before: string | undefined = $state(undefined);
   let distime = $state(0);
@@ -24,10 +25,15 @@
       examschedule_before = await store.get(
         `full_examschedule_${selsemid.value}`,
       );
+      let last_update: undefined | number = await store.get(
+        `full_examschedule_${selsemid.value}_lastupdate`,
+      );
+      distime = last_update;
+
       //console.log("sem id from storage",selsemid.value)
     }
   }
-  const time_diff_relaod = 60;
+  const time_diff_relaod = 10;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -64,7 +70,7 @@
       stat = status;
       reload.status = false;
       if (status && full_examschedule_fetched != "") {
-        if (errors.msg == "NE" ){
+        if (errors.msg == "NE") {
           errors.msg = undefined;
         }
         const time = unixTimestamp();
@@ -122,6 +128,17 @@
         <Schedule examshedule={examschedule_before} updatedtime={distime} />
       {:else if stat == false}
         No schedule this sem
+      {:else if errors.msg == "NE"}
+        <p>Oops! No Internet Connection Detected</p>
+      {:else if errors.msg == "NC"}
+        <p>
+          Please enter your credentials by navigating to the <button
+            class=" link-primary"
+            onclick={() => {
+              goto("/settings/Credentials");
+            }}>settings</button
+          > menu.
+        </p>
       {:else}
         <div class="skeleton h-[80vh] w-full"></div>
       {/if}

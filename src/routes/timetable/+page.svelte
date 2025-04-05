@@ -5,6 +5,7 @@
   import { selsemid, loading } from "./store.svelte";
   import { getContext } from "svelte";
   import Days from "./days.svelte";
+  import { goto } from "$app/navigation";
 
   let timetable_before: string | undefined = $state(undefined);
   let distime = $state(0);
@@ -23,9 +24,13 @@
     if (selsemid.value != undefined) {
       timetable_before = await store.get(`full_timetable_${selsemid.value}`);
       //console.log("sem id from storage",selsemid.value)
+      let last_update: undefined | number = await store.get(
+        `full_timetable_${selsemid.value}_lastupdate`,
+      );
+      distime = last_update;
     }
   }
-  const time_diff_relaod = 60;
+  const time_diff_relaod = 10;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -60,7 +65,7 @@
       });
       reload.status = false;
       if (status && full_timetable_fetched != "") {
-        if (errors.msg == "NE" ){
+        if (errors.msg == "NE") {
           errors.msg = undefined;
         }
         const time = unixTimestamp();
@@ -113,6 +118,17 @@
     <div>
       {#if timetable_before != undefined}
         <Days full_timetable_list={timetable_before} updatedTime={distime} />
+      {:else if errors.msg == "NE"}
+        <p>Oops! No Internet Connection Detected</p>
+      {:else if errors.msg == "NC"}
+        <p>
+          Please enter your credentials by navigating to the <button
+            class=" link-primary"
+            onclick={() => {
+              goto("/settings/Credentials");
+            }}>settings</button
+          > menu.
+        </p>
       {:else}
         <div class="skeleton h-[80vh] w-full"></div>
       {/if}

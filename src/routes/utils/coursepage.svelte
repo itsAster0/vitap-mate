@@ -7,7 +7,7 @@
   let disabled = $state(true);
   $effect(() => {
     errors.code;
-    if (errors.code != "stop" && errors.msg != "NE" ) {
+    if (errors.code != "stop" && errors.msg != "NE") {
       if (disabled) {
         disabled = false;
       }

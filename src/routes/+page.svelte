@@ -38,6 +38,7 @@
     goto("/timetable");
     for (let i = 0; i < 3; i++) {
       errors.code = "stop";
+      errors.msg = "LI";
       relaod.status = true;
       //@ts-ignore
       const [status, kt] = await invoke("onstart_runcode", {

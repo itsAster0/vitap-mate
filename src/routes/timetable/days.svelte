@@ -185,7 +185,10 @@
   <div class="grow">
     <div class="">
       {#if render != undefined}
-        <div role="tablist" class="tabs tabs-border flex justify-evenly w-full whitespace-nowrap overflow-auto">
+        <div
+          role="tablist"
+          class="tabs tabs-border flex justify-evenly w-full whitespace-nowrap overflow-auto"
+        >
           {#each days as i}
             <input
               type="radio"

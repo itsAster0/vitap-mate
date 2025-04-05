@@ -6,7 +6,7 @@
   import Analays from "./analysis.svelte";
   let { courseid, coursetype } = $props();
 
-  const time_diff_relaod = 60;
+  const time_diff_relaod = 10;
   let full_attendance = $state(undefined);
   let details = $state(undefined);
   let privateload = $state(false);

@@ -14,10 +14,17 @@
   };
 
   function updatError() {
+    $inspect(errors);
     if (errors.code == "stop") {
       setTimeout(() => {
-if (errors.code == "stop" && errors.msg != "PC") {
-        errors.code = undefined;}
+        if (
+          errors.code == "stop" &&
+          errors.msg != "PC" &&
+          errors.msg != "LI" &&
+          errors.msg != "NC"
+        ) {
+          errors.code = undefined;
+        }
       }, 5000);
     }
   }

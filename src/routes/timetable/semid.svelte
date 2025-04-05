@@ -14,7 +14,7 @@
   let reload: relaod = getContext("reload");
   let errors: datasate = getContext("errors");
 
-  const time_diff_relaod = 60;
+  const time_diff_relaod = 10;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }

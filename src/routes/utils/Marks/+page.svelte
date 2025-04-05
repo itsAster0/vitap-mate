@@ -5,6 +5,7 @@
   import { selsemid, loading } from "./store.svelte";
   import { getContext } from "svelte";
   import Marks from "./marks.svelte";
+  import { goto } from "$app/navigation";
 
   let distime: undefined | number = $state(0);
 
@@ -13,6 +14,10 @@
     const store = await Store.load("marks.json");
     if (selsemid.value != undefined) {
       marks = await store.get(`marks_${selsemid.value}`);
+      let last_update: undefined | number = await store.get(
+        `marks_${selsemid.value}_lastupdate`,
+      );
+      distime = last_update;
       //console.log("sem id from storage",selsemid.value)
     }
   }
@@ -27,7 +32,7 @@
   let reload: relaod = getContext("reload");
   let errors: datasate = getContext("errors");
 
-  const time_diff_relaod = 60;
+  const time_diff_relaod = 10;
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
@@ -64,7 +69,7 @@
       reload.status = false;
       loaded = true;
       if (status && marks_fetched != "") {
-        if (errors.msg == "NE" ){
+        if (errors.msg == "NE") {
           errors.msg = undefined;
         }
         const time = unixTimestamp();
@@ -121,6 +126,17 @@
     <Marks marksList={marks} updatedTime={distime} />
   {:else if loaded}
     <p>No marks to show</p>
+  {:else if errors.msg == "NE"}
+    <p>Oops! No Internet Connection Detected</p>
+  {:else if errors.msg == "NC"}
+    <p>
+      Please enter your credentials by navigating to the <button
+        class=" link-primary"
+        onclick={() => {
+          goto("/settings/Credentials");
+        }}>settings</button
+      > menu.
+    </p>
   {:else}
     <div class="skeleton h-auto w-full"></div>
   {/if}
