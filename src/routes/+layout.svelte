@@ -16,7 +16,8 @@
   function updatError() {
     if (errors.code == "stop") {
       setTimeout(() => {
-        errors.code = undefined;
+if (errors.code == "stop" && errors.msg != "PC") {
+        errors.code = undefined;}
       }, 5000);
     }
   }
