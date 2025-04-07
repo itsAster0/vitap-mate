@@ -163,6 +163,12 @@
       </div>
     </div>
   </div>
+{:else if errors.msg == "NE" && full_attendance == undefined}
+  <div class=" h-[38vh] w-full">
+    <p class=" text-center py-[15vh]">
+      Internet Unavailable. No Saved Content.
+    </p>
+  </div>
 {:else}
-  <div class="skeleton h-[30vh] w-full"></div>
+  <div class="skeleton h-[38vh] w-full"></div>
 {/if}

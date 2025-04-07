@@ -15,18 +15,16 @@
 
   function updatError() {
     $inspect(errors);
-    if (errors.code == "stop") {
-      setTimeout(() => {
-        if (
-          errors.code == "stop" &&
-          errors.msg != "PC" &&
-          errors.msg != "LI" &&
-          errors.msg != "NC"
-        ) {
-          errors.code = undefined;
-        }
-      }, 5000);
-    }
+    setTimeout(() => {
+      if (
+        errors.code == "stop" &&
+        errors.msg != "PC" &&
+        errors.msg != "LI" &&
+        errors.msg != "NC"
+      ) {
+        errors.code = undefined;
+      }
+    }, 5000);
   }
 
   let reload = $state({ status: false });
@@ -132,7 +130,33 @@
     </button>
   </div>
 </div>
-
+{#if errors.msg == "NE"}
+  <div class="bg-base-100">
+    <span class=" whitespace-nowrap overflow-auto text-xs"
+      ><div class=" text-center {errors.code == 'stop' ? 'text-error' : ''}">
+        ⚠️ No Internet Connection. Data might be outdated
+      </div></span
+    >
+  </div>
+{:else if errors.msg == "LI"}
+  <div class="bg-base-100">
+    <span class=" whitespace-nowrap overflow-auto text-xs"
+      ><div class="text-center">
+        <span class="loading loading-spinner text-info loading-xs"></span>
+        Attempting to log in to VTOP
+      </div></span
+    >
+  </div>
+{:else if reload.status == true}
+  <div class=" bg-base-100">
+    <span class=" whitespace-nowrap overflow-auto text-xs">
+      <div class="text-center">
+        <span class="loading loading-spinner text-warning loading-xs"></span>
+        Updating data...
+      </div></span
+    >
+  </div>
+{/if}
 <div>
   {@render children()}
 </div>
