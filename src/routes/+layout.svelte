@@ -132,7 +132,7 @@
   </div>
 </div>
 
-<div class=" fixed w-full translate-y-[-1vh] z-10">
+<div class=" absolute w-full translate-y-[-1vh] z-10">
   {#if errors.msg == "NE"}
     <div class="bg-base-100">
       <span class=" whitespace-nowrap overflow-auto text-xs"
