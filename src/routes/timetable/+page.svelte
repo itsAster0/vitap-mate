@@ -101,7 +101,7 @@
     } catch {}
   }
   $effect(() => {
-    errors;
+    errors.code;
     //$inspect("tt",loading.value);
     if (selsemid.value != undefined) {
       (async () => {

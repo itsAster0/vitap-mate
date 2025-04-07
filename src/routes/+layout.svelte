@@ -33,6 +33,7 @@
   setContext("errors", errors);
   $effect(() => {
     errors.code;
+    errors.msg;
     untrack(() => {
       updatError();
     });
@@ -133,7 +134,7 @@
 {#if errors.msg == "NE"}
   <div class="bg-base-100">
     <span class=" whitespace-nowrap overflow-auto text-xs"
-      ><div class=" text-center {errors.code == 'stop' ? 'text-error' : ''}">
+      ><div class=" text-center">
         ⚠️ No Internet Connection. Data might be outdated
       </div></span
     >
