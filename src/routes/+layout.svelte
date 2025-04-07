@@ -131,33 +131,36 @@
     </button>
   </div>
 </div>
-{#if errors.msg == "NE"}
-  <div class="bg-base-100">
-    <span class=" whitespace-nowrap overflow-auto text-xs"
-      ><div class=" text-center">
-        ⚠️ No Internet Connection. Data might be outdated
-      </div></span
-    >
-  </div>
-{:else if errors.msg == "LI"}
-  <div class="bg-base-100">
-    <span class=" whitespace-nowrap overflow-auto text-xs"
-      ><div class="text-center">
-        <span class="loading loading-spinner text-info loading-xs"></span>
-        Attempting to log in to VTOP
-      </div></span
-    >
-  </div>
-{:else if reload.status == true}
-  <div class=" bg-base-100">
-    <span class=" whitespace-nowrap overflow-auto text-xs">
-      <div class="text-center">
-        <span class="loading loading-spinner text-warning loading-xs"></span>
-        Updating data...
-      </div></span
-    >
-  </div>
-{/if}
+
+<div class=" fixed w-full translate-y-[-1vh] z-10">
+  {#if errors.msg == "NE"}
+    <div class="bg-base-100">
+      <span class=" whitespace-nowrap overflow-auto text-xs"
+        ><div class=" text-center">
+          ⚠️ No Internet Connection. Data might be outdated
+        </div></span
+      >
+    </div>
+  {:else if errors.msg == "LI"}
+    <div class="bg-base-100">
+      <span class=" whitespace-nowrap overflow-auto text-xs"
+        ><div class="text-center">
+          <span class="loading loading-spinner text-info loading-xs"></span>
+          Attempting to log in to VTOP
+        </div></span
+      >
+    </div>
+  {:else if reload.status == true}
+    <div class=" bg-base-100">
+      <span class=" whitespace-nowrap overflow-auto text-xs">
+        <div class="text-center">
+          <span class="loading loading-spinner text-warning loading-xs"></span>
+          Updating data...
+        </div></span
+      >
+    </div>
+  {/if}
+</div>
 <div>
   {@render children()}
 </div>
