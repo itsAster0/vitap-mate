@@ -22,7 +22,7 @@
   let timeout = () =>
     setTimeout(() => {
       crederror = undefined;
-    }, 4000);
+    }, 3000);
   let password = $state("");
   let username = $state("");
   let running = $state(false);
@@ -45,9 +45,12 @@
       if (k == "Invalid Captcha") {
         continue;
       } else if (k == "SS") {
-        (await Store.load("timetable.json")).clear();
-        (await Store.load("attendance.json")).clear();
-        (await Store.load("marks.json")).clear();
+        if (creds.useranme != username) {
+          (await Store.load("timetable.json")).clear();
+          (await Store.load("attendance.json")).clear();
+          (await Store.load("marks.json")).clear();
+          (await Store.load("/examschedule.json")).clear();
+        }
         await store.set("username", username);
         await store.set("password", password);
         await store.save();
@@ -62,11 +65,12 @@
         timeout();
       } else {
         if (k == "NE") {
-          crederror = "No Internet, connect to Internet and try again.";
+          crederror =
+            "No internet connection. Please connect to the internet and try again";
           timeout();
           running = false;
         } else if (k == "VE") {
-          crederror = "Vtop is Down, try after some time";
+          crederror = "VTOP is currently down. Please try again later.";
           timeout();
           running = false;
         } else {
