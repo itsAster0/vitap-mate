@@ -85,6 +85,7 @@
       } else {
         if (status) {
           errors.code = undefined;
+          errors.msg = undefined;
           break;
         }
       }

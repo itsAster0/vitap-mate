@@ -45,11 +45,11 @@
       if (k == "Invalid Captcha") {
         continue;
       } else if (k == "SS") {
-        if (creds.useranme != username) {
+        if ((() => creds.username)() != username) {
           (await Store.load("timetable.json")).clear();
           (await Store.load("attendance.json")).clear();
           (await Store.load("marks.json")).clear();
-          (await Store.load("/examschedule.json")).clear();
+          (await Store.load("examschedule.json")).clear();
         }
         await store.set("username", username);
         await store.set("password", password);
