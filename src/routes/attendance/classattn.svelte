@@ -68,12 +68,16 @@
           }
         } else {
           if (full_attendance_cl == "NE") {
-            if (errors.code != stop) {
+            if (errors.code != "stop") {
               errors.code = "stop";
               errors.msg = "NE";
             }
             //triggerInfo("No Internet")
           } else {
+            if (errors.code != "stop") {
+              errors.code = "stop";
+            }
+
             //triggerInfo(full_attendance_cl)
           }
         }

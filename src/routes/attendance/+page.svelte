@@ -93,6 +93,9 @@
           }
           //triggerInfo("No Internet")
         } else {
+          if (errors.code != "stop") {
+            errors.code = "stop";
+          }
           //triggerInfo(full_attendance1)
         }
       }
