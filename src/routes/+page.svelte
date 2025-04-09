@@ -46,6 +46,7 @@
         password: creds.password,
       });
       relaod.status = false;
+      errors.msg = undefined;
       const k = String(kt);
       //console.log(k=="Invalid LoginId/Password",k == "Invalid Username/Password",k)
       if (
