@@ -6,6 +6,14 @@
   import { getContext } from "svelte";
   import Schedule from "./schedule.svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
+  function setReloadTime() {
+    setTimeout(() => {
+      if (page.url.pathname == "/utils/schedule") {
+        (async () => await getexamschedule())();
+      }
+    }, 60000);
+  }
 
   let examschedule_before: string | undefined = $state(undefined);
   let distime = $state(0);
@@ -54,6 +62,7 @@
       `full_examschedule_${sel_sem}_lastupdate`,
     );
     distime = last_update;
+    setReloadTime();
     if (
       (examschedule_before == undefined ||
         last_update == undefined ||

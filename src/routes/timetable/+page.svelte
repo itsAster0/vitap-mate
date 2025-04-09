@@ -6,6 +6,7 @@
   import { getContext } from "svelte";
   import Days from "./days.svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
 
   let timetable_before: string | undefined = $state(undefined);
   let distime = $state(0);
@@ -34,10 +35,16 @@
   function unixTimestamp() {
     return Math.floor(Date.now() / 1000);
   }
+  function setReloadTime() {
+    setTimeout(() => {
+      if (page.url.pathname == "/timetable") {
+        (async () => await gettimetable())();
+      }
+    }, 60000);
+  }
 
   async function gettimetable() {
     // console.log("in get timetable")
-
     if (selsemid.value == undefined) {
       return;
     }
@@ -51,6 +58,7 @@
       `full_timetable_${sel_sem}_lastupdate`,
     );
     distime = last_update;
+    setReloadTime();
     if (
       (timetable_before == undefined ||
         last_update == undefined ||

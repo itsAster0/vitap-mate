@@ -24,7 +24,7 @@
       ) {
         errors.code = undefined;
       }
-    }, 5000);
+    }, 2000);
   }
 
   let reload = $state({ status: false });

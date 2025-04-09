@@ -6,6 +6,14 @@
   import { getContext } from "svelte";
   import Smallatten from "./smallatten.svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
+  function setReloadTime() {
+    setTimeout(() => {
+      if (page.url.pathname == "/attendance") {
+        (async () => await getattendance())();
+      }
+    }, 60000);
+  }
 
   let attendance_before: string | undefined = $state(undefined);
   let distime: undefined | number = $state(0);
@@ -49,6 +57,7 @@
       `full_attendance_${sel_sem}_lastupdate`,
     );
     distime = last_update;
+    setReloadTime();
 
     if (
       (attendance_before == undefined ||

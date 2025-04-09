@@ -6,6 +6,14 @@
   import { getContext } from "svelte";
   import Marks from "./marks.svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
+  function setReloadTime() {
+    setTimeout(() => {
+      if (page.url.pathname == "/utils/Marks") {
+        (async () => await getmarks())();
+      }
+    }, 60000);
+  }
 
   let distime: undefined | number = $state(0);
 
@@ -53,6 +61,7 @@
       `marks_${sel_sem}_lastupdate`,
     );
     distime = last_update;
+    setReloadTime();
     if (
       (marks == undefined ||
         last_update == undefined ||
