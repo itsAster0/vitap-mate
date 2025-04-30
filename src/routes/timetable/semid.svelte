@@ -128,7 +128,7 @@
   }
 </script>
 
-<div class=" overflow-auto px-1 max-h-[24vh]">
+<div class=" overflow-auto  max-h-[24vh]">
   <div
     tabindex="0"
     role="button"
