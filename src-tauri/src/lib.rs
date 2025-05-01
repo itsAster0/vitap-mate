@@ -15,6 +15,7 @@ use vtop::parsemarks;
 use vtop::parsesched;
 use vtop::parsett;
 use vtop::wifi;
+use vtop::hostel_wifi;
 
 // (true or false, "msg")
 // msg:
@@ -240,7 +241,17 @@ async fn full_attendance(
 
 #[tauri::command]
 async fn wifi(i: i32, username: String, password: String) -> Result<(bool, String), tauri::Error> {
-    let k = wifi::wifi_login_logout(i, username, password).await;
+    let k: (bool, String) = wifi::wifi_login_logout(i, username, password).await;
+    Ok(k)
+}
+
+#[tauri::command]
+async fn hostel_wifi(
+    i: i32,
+    username: String,
+    password: String,
+) -> Result<(bool, String), tauri::Error> {
+    let k = hostel_wifi::hostel_wifi(i, username, password).await;
     Ok(k)
 }
 
@@ -588,6 +599,7 @@ pub fn run() {
             try_login,
             update_credtials_to,
             wifi,
+            hostel_wifi,
             coursepage,
             coursepage_courses,
             coursepage_classes,

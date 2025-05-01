@@ -185,9 +185,9 @@
   <div class="grow">
     <div class="">
       {#if render != undefined}
-        <div role="tablist" class="tabs tabs-border">
+        <div role="tablist" class="tabs tabs-border bg-base-100 rounded-box p-2 mb-2 mt-2 ">
           <div
-            class=" flex whitespace-nowrap justify-evenly w-full overflow-auto"
+            class="flex whitespace-nowrap justify-around w-full overflow-auto gap-2 px-2"
           >
             {#each days as i}
               <input
@@ -196,7 +196,7 @@
                 id={i}
                 value={i}
                 onclick={(e) => handeltabclick(e)}
-                class="tab"
+                class="tab tab-bordered"
                 aria-label={i}
                 bind:group
               />

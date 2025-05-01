@@ -130,26 +130,27 @@
   }
 </script>
 
-<div class=" px-1 max-h-[24vh] overflow-auto">
+<div class=" mb-3 max-h-[24vh] overflow-auto">
   <div
     tabindex="0"
     role="button"
-    class="collapse collapse-arrow bg-base-100 border-base-300 border {isCollapsed
+    class="collapse collapse-arrow bg-base-100 border-base-300 border rounded-lg shadow-sm {isCollapsed
       ? 'collapse-close'
       : 'collapse-open'}"
   >
     <input type="checkbox" onclick={toogleCollapsed} />
-    <div class="collapse-title font-semibold">
+    <div class="collapse-title font-semibold flex items-center p-4">
+      <span class="mr-2">📋</span>
       {capitalizeFirstLetter(semname)}
     </div>
-    <div class="collapse-content text-sm">
-      <div class="flex flex-col gap-1 overflow-auto">
+    <div class="collapse-content text-sm pb-3">
+      <div class="flex flex-col gap-3 overflow-auto py-2 px-1">
         {#each semid as value}
-          <div>
+          <div class="hover:bg-base-200 rounded-md px-3 py-2 transition-all duration-200">
             <input
               type="radio"
               name="radio-1"
-              class="radio"
+              class="radio radio-sm radio-primary mr-2"
               id={value.split(":")[1]}
               value={value.split(":")[1]}
               bind:group={selsemid.value}
@@ -158,9 +159,9 @@
                 await onClickHandel(e);
               }}
             />
-            <label for={value.split(":")[1]}
-              >{capitalizeFirstLetter(value.split(":")[0])}</label
-            >
+            <label for={value.split(":")[1]} class="cursor-pointer">
+              {capitalizeFirstLetter(value.split(":")[0])}
+            </label>
           </div>
         {/each}
       </div>

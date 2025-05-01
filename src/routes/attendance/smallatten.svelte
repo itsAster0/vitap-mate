@@ -60,7 +60,7 @@
   }
 </script>
 
-<div class="flex flex-col gap-4 overflow-auto min-h-[85vh]">
+<div class="flex flex-col gap-4 overflow-auto min-h-[85vh] ">
   {#each render as cl}
     <div class="flex flex-col">
       <div class="collapse collapse-plus bg-base-100 grow">
@@ -178,7 +178,7 @@
           </div>
         </div>
       </div>
-      <div>
+      <div class="mt-3">
         <ul class="flex gap-1 justify-evenly">
           <li>
             <div class="flex text-sm">

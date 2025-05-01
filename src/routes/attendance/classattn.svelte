@@ -161,7 +161,7 @@
         </table>
       </div>
       <div class=" text-center text-info">
-        <p class="text-sm">
+        <p class="text-sm ">
           Data updated on {unixToDate(lastUpdate)}
         </p>
       </div>
