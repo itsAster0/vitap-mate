@@ -29,10 +29,7 @@ jobs:
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
-        
-      - name : update path
-        run: |
-          echo "ANDROID_HOME=/home/synaptic/.android/sdk" >> $GITHUB_ENV
+   
 
       - name: Install Android NDK
         run: |
