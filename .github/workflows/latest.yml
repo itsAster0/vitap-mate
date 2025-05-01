@@ -36,8 +36,9 @@ jobs:
 
       - name: Install Android NDK
         run: |
-          CMDLINE_TOOLS_DIR=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 1 -type d -name "[0-9]*" | sort -rn | head -n 1)
-          $CMDLINE_TOOLS_DIR/bin/sdkmanager --install "ndk;28.0.13004108"
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build zip unzip
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.0.13004108"
           echo "NDK_HOME=${ANDROID_HOME}/ndk/28.0.13004108" >> $GITHUB_ENV 
 
 
@@ -49,14 +50,11 @@ jobs:
 
       - name: Configure Android environment variables
         run: |
-          echo "JAVA_HOME=$(/usr/lib/jvm/jre/bin/java)" >> $GITHUB_ENV
+          echo "JAVA_HOME=$(/usr/lib/jvm/default-java)" >> $GITHUB_ENV
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
-          CMDLINE_TOOLS_DIR=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 1 -type d -name "[0-9]*" | sort -rn | head -n 1)
-          echo "PATH=$ANDROID_HOME/platform-tools:$CMDLINE_TOOLS_DIR/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
-          NDK_VERSION="${ANDROID_HOME}/ndk/28.0.13004108" 
-          echo "PATH=$NDK_VERSION:$PATH" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_HOME/ndk/${NDK_VERSION}:$PATH" >> $GITHUB_ENV
           echo "PATH=$JAVA_HOME/bin:$PATH" >> $GITHUB_ENV
-          echo "NDK_HOME=$NDK_VERSION" >> $GITHUB_ENV
 
       - name: setup Android signing
         run: |
