@@ -37,6 +37,9 @@ class ExamSchedulePage extends HookConsumerWidget {
           ),
           child: marksData.when(
             data: (data) {
+              if (data.exams.isEmpty) {
+                return Center(child: Text("No Data to show yet"));
+              }
               return Padding(
                 padding: const EdgeInsets.all(6),
                 child: Column(

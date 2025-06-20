@@ -104,7 +104,12 @@ pub fn parse_attendance(html: String, sem: String) -> AttendanceData {
     }
 }
 
-pub fn parse_full_attendance(html: String, sem: String,course_id : String, course_type:String) -> FullAttendanceData {
+pub fn parse_full_attendance(
+    html: String,
+    sem: String,
+    course_id: String,
+    course_type: String,
+) -> FullAttendanceData {
     let document = Html::parse_document(&html);
     let rows_selector = Selector::parse("tr").unwrap();
     let mut attendance_lists: Vec<FullAttendanceRecord> = Vec::new();
@@ -166,7 +171,7 @@ pub fn parse_full_attendance(html: String, sem: String,course_id : String, cours
             .duration_since(UNIX_EPOCH)
             .unwrap_or(Duration::new(1, 0))
             .as_secs(),
-            course_id,
-            course_type,
+        course_id,
+        course_type,
     }
 }

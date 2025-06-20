@@ -29,7 +29,7 @@ class MarksTable extends StatelessWidget {
                   DataColumn(label: Text("")),
                   DataColumn(label: Text("Title")),
                   DataColumn(label: Text("Scored.Mark")),
-                  DataColumn(label: Text("Max.Marsk")),
+                  DataColumn(label: Text("Max.Marks")),
                   DataColumn(label: Text("Weightage.Mark")),
                   DataColumn(label: Text("Weightage%")),
                   DataColumn(label: Text("Status")),

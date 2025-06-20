@@ -34,7 +34,7 @@ class MorePage extends StatelessWidget {
         children: [
           FTile(
             prefixIcon: Icon(FIcons.bookCheck),
-            title: const Text('Faculity Directory'),
+            title: const Text('Faculty Directory'),
             //details: const Text(''),
             suffixIcon: Icon(FIcons.chevronRight),
             onPress: () {
@@ -231,7 +231,7 @@ class WifiCard extends HookConsumerWidget {
                             FIcons.circleCheckBig,
                             color: Color.fromARGB(255, 14, 208, 14),
                           ),
-                          Text(succesMsg.value!),
+                          Text(succesMsg.value!, maxLines: 2),
                         ],
                       ),
                     if (errorMsg.value != null)
@@ -243,7 +243,7 @@ class WifiCard extends HookConsumerWidget {
                             FIcons.circleX,
                             color: Color.fromARGB(255, 208, 14, 14),
                           ),
-                          Text(errorMsg.value!),
+                          Text(errorMsg.value!, maxLines: 2),
                         ],
                       ),
                     !isLoading.value

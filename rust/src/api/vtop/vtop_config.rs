@@ -12,10 +12,9 @@ pub struct VtopConfig {
 impl Default for VtopConfig {
     fn default() -> Self {
         let base_url = "https://vtop.vitap.ac.in".to_string();
-        #[cfg(target_arch = "wasm32")]{
-            
-        }
-       
+        #[cfg(target_arch = "wasm32")]
+        {}
+
         Self {
             base_url: base_url,
             timeout_seconds: 30,

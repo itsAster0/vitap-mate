@@ -19,8 +19,8 @@ pub struct FullAttendanceData {
     pub records: Vec<FullAttendanceRecord>,
     pub semester_id: String,
     pub update_time: u64,
-    pub course_id : String,
-    pub course_type : String,
+    pub course_id: String,
+    pub course_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,8 +98,8 @@ pub struct MarksRecordEach {
     pub weightage: String,
     pub status: String,
     pub scoredmark: String,
-    pub weightagemark : String,
-    pub remark : String,
+    pub weightagemark: String,
+    pub remark: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

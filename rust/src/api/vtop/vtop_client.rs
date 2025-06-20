@@ -15,6 +15,7 @@ use reqwest::{
 };
 
 use scraper::{Html, Selector};
+use serde::Serialize;
 use std::sync::Arc;
 
 pub struct VtopClient {
@@ -171,7 +172,7 @@ impl VtopClient {
             text,
             semester_id.to_string(),
             course_id.into(),
-            course_type.into()
+            course_type.into(),
         ))
     }
 
@@ -396,9 +397,21 @@ impl VtopClient {
     }
     async fn solve_captcha(&self, captcha_data: &str) -> VtopResult<String> {
         let url_safe_encoded = URL_SAFE.encode(captcha_data.as_bytes());
-        let captcha_url = format!("https://cap.va.synaptic.gg/cap/{}", url_safe_encoded);
+        let captcha_url = format!("https://cap.va.synaptic.gg/captcha");
 
-        let response = reqwest::get(&captcha_url)
+        #[derive(Serialize)]
+        struct PostData {
+            imgstring: String,
+        }
+
+        let client_for_post = reqwest::Client::new();
+        let post_data = PostData {
+            imgstring: url_safe_encoded,
+        };
+        let response = client_for_post
+            .post(captcha_url)
+            .json(&post_data)
+            .send()
             .await
             .map_err(|_| VtopError::NetworkError)?;
 
@@ -418,7 +431,6 @@ impl VtopClient {
             .and_then(|element| element.value().attr("value"))
             .ok_or(VtopError::ParseError("CSRF token not found".to_string()))?;
         self.session.set_csrf_token(csrf_token.to_string());
-        //println!("{}", csrf_token);
         Ok(())
     }
     async fn load_initial_page(&mut self) -> VtopResult<()> {
@@ -473,11 +485,14 @@ impl VtopClient {
         #[cfg(target_arch = "wasm32")]
         {
             let mut headers = HeaderMap::new();
-              headers.insert(
-            "Content-Type",
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        );
-            let client = reqwest::Client::builder() .default_headers(headers).build().unwrap();
+            headers.insert(
+                "Content-Type",
+                HeaderValue::from_static("application/x-www-form-urlencoded"),
+            );
+            let client = reqwest::Client::builder()
+                .default_headers(headers)
+                .build()
+                .unwrap();
             Self {
                 client: client,
                 config: config,

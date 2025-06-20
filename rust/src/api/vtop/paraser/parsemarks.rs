@@ -1,6 +1,6 @@
+use super::super::types::*;
 use scraper::{ElementRef, Html, Selector};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use super::super::types::*;
 
 pub fn parse_marks(html: String, sem: String) -> MarksData {
     let document = Html::parse_document(&html);

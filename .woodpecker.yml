@@ -1,0 +1,50 @@
+when:
+  branch:
+    - main
+
+steps:
+  build_flutter:
+    image: instrumentisto/flutter:latest
+    environment:
+      key_store:
+        from_secret: KEY_STORE
+      key_store_props:
+        from_secret: KEY_STORE_PROPS
+    commands:
+      - flutter --version  
+      - flutter pub get 
+      - curl https://sh.rustup.rs -sSf | sh -s -- -y
+      - . $HOME/.cargo/env
+      - rustup show     
+      - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - echo "$key_store" | base64 -d > android/upload-keystore.jks
+      - echo "$key_store_props" | base64 -d > android/keystore.properties 
+      - flutter build apk --release --target-platform android-arm64
+      - |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f1)
+          BUILD_NUMBER=$(date +%s)
+          mkdir -p .out
+          cp build/app/outputs/flutter-apk/app-release.apk .out/
+          cp .out/app-release.apk .out/vitapmate-latest.apk
+          mv .out/app-release.apk .out/vitapmate-$VERSION-$BUILD_NUMBER.apk
+    when:
+      event:
+        - push
+      branch:
+        - main
+
+  upload_to_minio:
+    image: minio/mc
+    environment:
+      MINIO_USER:
+        from_secret: MINIO_USER
+      MINIO_PASS:
+        from_secret: MINIO_PASS
+    commands:
+      - mc alias set minio https://storage.synaptic.gg "$MINIO_USER" "$MINIO_PASS"
+      - mc cp .out/vitapmate-latest.apk minio/vitapmate/public/dev/apks/
+    when:
+      event:
+        - push 
+      branch:
+        - main

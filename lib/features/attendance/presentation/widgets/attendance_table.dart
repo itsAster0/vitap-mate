@@ -34,6 +34,9 @@ class AttendanceTable extends HookConsumerWidget {
       ),
       child: dataAsync.when(
         data: (data) {
+          if (data.records.isEmpty) {
+            return Center(child: Text("No Data to show yet"));
+          }
           return Padding(
             padding: const EdgeInsets.all(8.0),
             child: FFocusedOutline(

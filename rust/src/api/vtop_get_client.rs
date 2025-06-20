@@ -5,8 +5,7 @@ use crate::api::vtop::{
     },
     vtop_client::{VtopClient, VtopError},
     vtop_config::VtopClientBuilder,
-    wifi::*
-
+    wifi::*,
 };
 
 #[flutter_rust_bridge::frb(sync)]
@@ -78,11 +77,6 @@ pub fn fetch_is_auth(client: &mut VtopClient) -> bool {
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_wifi(
-    username: String,
-    password: String,
-    i: i32,
-) -> (bool,String) {
-    wifi_login_logout(i,username,password).await
-   
+pub async fn fetch_wifi(username: String, password: String, i: i32) -> (bool, String) {
+    wifi_login_logout(i, username, password).await
 }

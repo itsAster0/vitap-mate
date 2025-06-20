@@ -139,6 +139,9 @@ Future<void> downloadFile(String url, String cookie) async {
     log("Downloads directory not found");
     return;
   }
+  FileDownloader().configure(
+    androidConfig: (Config.useExternalStorage, Config.always),
+  );
   FileDownloader().configureNotification(
     running: TaskNotification('Downloading', 'file: {filename}'),
     complete: TaskNotification('Download finished', 'file: {filename}'),
@@ -169,6 +172,22 @@ Future<void> downloadFile(String url, String cookie) async {
     allowPause: true,
   );
   final result = await FileDownloader().download(task);
-  await FileDownloader().moveToSharedStorage(task, SharedStorage.downloads);
+  // var path = await FileDownloader().moveToSharedStorage(
+  //   task,
+  //   SharedStorage.downloads,
+  // );
+  // void myNotificationTapCallback(
+  //   Task task,
+  //   NotificationType notificationType,
+  // ) async {
+  //   log('Tapped notification $notificationType for taskId ${task.taskId}');
+  //   final Uri uri = Uri.file(path ?? "");
+  //   await launchUrl(uri);
+  // }
+
+  // FileDownloader().registerCallbacks(
+  //   taskNotificationTapCallback: myNotificationTapCallback,
+  // );
+
   log("Download started with taskId: $result");
 }
