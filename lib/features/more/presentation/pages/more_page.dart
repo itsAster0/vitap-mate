@@ -79,7 +79,7 @@ class VtopCard extends HookConsumerWidget {
       try {
         await ref.read(vClientProvider.notifier).tryLogin();
         var client = await ref.read(vClientProvider.future);
-        if (fetchIsAuth(client: client)) {
+        if (await fetchIsAuth(client: client)) {
           if (context.mounted) {
             GoRouter.of(context).pushNamed(Paths.vtopweb);
           }

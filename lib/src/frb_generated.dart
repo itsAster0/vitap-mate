@@ -203,7 +203,7 @@ abstract class RustLibApi extends BaseApi {
     required String courseType,
   });
 
-  bool crateApiVtopGetClientFetchIsAuth({required VtopClient client});
+  Future<bool> crateApiVtopGetClientFetchIsAuth({required VtopClient client});
 
   Future<MarksData> crateApiVtopGetClientFetchMarks({
     required VtopClient client,
@@ -1299,16 +1299,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  bool crateApiVtopGetClientFetchIsAuth({required VtopClient client}) {
-    return handler.executeSync(
-      SyncTask(
-        callFfi: () {
+  Future<bool> crateApiVtopGetClientFetchIsAuth({required VtopClient client}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_bool,

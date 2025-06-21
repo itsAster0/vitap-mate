@@ -40,7 +40,7 @@ class VClient extends _$VClient {
   Future<void> tryLogin() async {
     VtopClient client = await future;
     VtopUserEntity user = await ref.watch(vtopUserProvider.future);
-    if (fetchIsAuth(client: client)) return;
+    if (await fetchIsAuth(client: client)) return;
     if (!user.isValid) throw VtopError.invalidCredentials();
     var gb = await ref.read(gbProvider.future);
     var feature = gb.feature("try-login");

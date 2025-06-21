@@ -71,7 +71,7 @@ Future<ExamScheduleData> fetchExamShedule({
 Future<Uint8List> fetchCookies({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchCookies(client: client);
 
-bool fetchIsAuth({required VtopClient client}) =>
+Future<bool> fetchIsAuth({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchIsAuth(client: client);
 
 Future<(bool, String)> fetchWifi({

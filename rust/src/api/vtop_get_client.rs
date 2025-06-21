@@ -71,8 +71,8 @@ pub async fn fetch_cookies(client: &mut VtopClient) -> Result<Vec<u8>, VtopError
     client.get_cookie().await
 }
 
-#[flutter_rust_bridge::frb(sync)]
-pub fn fetch_is_auth(client: &mut VtopClient) -> bool {
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_is_auth(client: &mut VtopClient) -> bool {
     client.is_authenticated()
 }
 
