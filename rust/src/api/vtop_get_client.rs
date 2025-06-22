@@ -68,12 +68,12 @@ pub async fn fetch_exam_shedule(
 #[flutter_rust_bridge::frb()]
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn fetch_cookies(client: &mut VtopClient) -> Result<Vec<u8>, VtopError> {
-    client.get_cookie().await
+    client.get_cookie().await.clone()
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_is_auth(client: &mut VtopClient) -> bool {
-    client.is_authenticated()
+    client.is_authenticated().clone()
 }
 
 #[flutter_rust_bridge::frb()]
