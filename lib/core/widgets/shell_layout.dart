@@ -3,7 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
-import 'package:vitapmate/core/widgets/sidebar.dart';
+import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
 
 class ShellLayout extends HookWidget {
   final Widget child;
@@ -17,6 +17,7 @@ class ShellLayout extends HookWidget {
       getSidewidget(context, "Attendance", k),
       getSidewidget(context, "More", k),
       getSidewidget(context, "Social", k),
+      getSidewidget(context, "Settings", k),
     ];
     final selected = useState(0);
     useEffect(() {
@@ -32,6 +33,9 @@ class ShellLayout extends HookWidget {
           break;
         case 3:
           GoRouter.of(context).goNamed(Paths.social);
+          break;
+        case 4:
+          GoRouter.of(context).goNamed(Paths.settings);
           break;
       }
       return null;
@@ -59,8 +63,13 @@ class ShellLayout extends HookWidget {
             icon: Icon(FIcons.atSign),
             label: const Text('social'),
           ),
+          FBottomNavigationBarItem(
+            icon: Icon(FIcons.settings),
+            label: const Text('settings'),
+          ),
         ],
       ),
+
       child: child,
     );
   }
@@ -83,16 +92,7 @@ Widget getSidewidget(BuildContext context, String data, String path) {
   }
   return FHeader.nested(
     title: Text(data),
-    prefixes: [
-      FHeaderAction(
-        icon: Icon(FIcons.menu),
-        onPress:
-            () => showFSheet(
-              context: context,
-              side: FLayout.ltr,
-              builder: (context) => Sidebar(side: FLayout.ltr),
-            ),
-      ),
-    ],
+    prefixes: [],
+    suffixes: [if (path.contains("social")) LogoutButton()],
   );
 }

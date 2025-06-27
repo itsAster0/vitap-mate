@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:forui_hooks/forui_hooks.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
@@ -16,15 +15,7 @@ class UserManagementPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return FScaffold(
-      header: FHeader.nested(
-        title: const Text("Credential Management"),
-        prefixes: [
-          FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
-        ],
-      ),
-      child: UserBox(),
-    );
+    return Padding(padding: const EdgeInsets.all(8.0), child: UserBox());
   }
 }
 

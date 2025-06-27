@@ -11,7 +11,10 @@ import 'package:vitapmate/features/more/presentation/pages/exam_schedule_page.da
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
+import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
+import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -27,11 +30,6 @@ final routerProvider = Provider((ref) {
         path: '/onboarding',
         name: Paths.onbaording,
         builder: (context, state) => OnboardingPage(),
-      ),
-      GoRoute(
-        path: '/vtopUserManagement',
-        name: Paths.vtopUserManagement,
-        builder: (context, state) => UserManagementPage(),
       ),
 
       StatefulShellRoute.indexedStack(
@@ -97,9 +95,33 @@ final routerProvider = Provider((ref) {
             navigatorKey: GlobalKey<NavigatorState>(),
             routes: [
               GoRoute(
+                path: '/settings',
+                name: Paths.settings,
+                builder: (context, state) => SettingsPage(),
+                routes: [
+                  GoRoute(
+                    path: '/vtopUserManagement',
+                    name: Paths.vtopUserManagement,
+                    builder: (context, state) => UserManagementPage(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: GlobalKey<NavigatorState>(),
+            routes: [
+              GoRoute(
                 path: '/social',
                 name: Paths.social,
-                builder: (context, state) => Center(child: Text("soon")),
+                builder: (context, state) => SocialPage(),
+                routes: [
+                  GoRoute(
+                    path: 'messagechat',
+                    name: Paths.messageChat,
+                    builder: (context, state) => MessageChatPage(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -108,8 +130,6 @@ final routerProvider = Provider((ref) {
     ],
   );
 });
-
-class ScaffoldWithNavBar {}
 
 FutureOr<String?> redirect(
   BuildContext context,

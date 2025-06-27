@@ -12,7 +12,6 @@ Future<void> main() async {
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goRouter = ref.watch(routerProvider);
@@ -21,7 +20,6 @@ class MyApp extends ConsumerWidget {
       routeInformationProvider: goRouter.routeInformationProvider,
       routeInformationParser: goRouter.routeInformationParser,
       routerDelegate: goRouter.routerDelegate,
-
       builder: (context, child) => FTheme(data: fTheme, child: child!),
     );
   }

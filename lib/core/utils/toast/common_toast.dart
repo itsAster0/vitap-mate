@@ -189,3 +189,34 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
     );
   }
 }
+
+void dispToast(BuildContext context, String title, String des) {
+  showFToast(
+    context: context,
+    alignment: FToastAlignment.bottomCenter,
+    title: Text(title),
+    //description: const Text('Visit this page for more information.'),
+    description: Text(des),
+    suffixBuilder:
+        (context, entry, _) => IntrinsicHeight(
+          child: FButton(
+            style: context.theme.buttonStyles.primary.copyWith(
+              contentStyle: context.theme.buttonStyles.primary.contentStyle
+                  .copyWith(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7.5,
+                    ),
+                    textStyle: FWidgetStateMap.all(
+                      context.theme.typography.xs.copyWith(
+                        color: context.theme.colors.primaryForeground,
+                      ),
+                    ),
+                  ),
+            ),
+            onPress: entry.dismiss,
+            child: const Text('Aye'),
+          ),
+        ),
+  );
+}

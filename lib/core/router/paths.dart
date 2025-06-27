@@ -6,7 +6,9 @@ class Paths {
   static final social = "social";
   static final onbaording = "onbaording";
   static final vtopUserManagement = "vtopUsermanagement";
+  static final settings = "settings";
   static final marks = "marks";
   static final examSchedule = "examSchedule";
   static final vtopweb = "vtopweb";
+  static final messageChat = "messageChat";
 }
