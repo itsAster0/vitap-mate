@@ -30,6 +30,10 @@ class SocialPage extends HookConsumerWidget {
                   FButton(
                     onPress: () async {
                       if (isloading.value) return;
+                      Future.microtask(() async {
+                        await Future.delayed(Duration(seconds: 10));
+                        isloading.value = false;
+                      });
                       isloading.value = true;
                       try {
                         await pb.collection('users').authWithOAuth2('google', (
@@ -42,7 +46,7 @@ class SocialPage extends HookConsumerWidget {
                         ref.invalidate(pbProvider);
                         log("done login via mail");
                       } catch (e) {
-                        isloading.value = false;
+                        ref.invalidate(pbProvider);
                       } finally {
                         isloading.value = false;
                       }

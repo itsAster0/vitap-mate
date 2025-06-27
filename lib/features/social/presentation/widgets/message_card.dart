@@ -24,7 +24,9 @@ class MessageCard extends HookConsumerWidget {
 
     Future<void> longpress() async {
       var pb = await ref.read(pbProvider.future);
-      if (pb.authStore.record!.id == model.getStringValue("user")) {
+      if (pb.authStore.record!.id == model.getStringValue("user") ||
+          await ref.read(getRoleProvider(pb.authStore.record!.id).future) ==
+              "developer") {
         if (context.mounted) {
           final overlay =
               // ignore: use_build_context_synchronously

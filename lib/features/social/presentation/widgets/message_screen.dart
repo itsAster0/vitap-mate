@@ -93,6 +93,7 @@ class ChatScreen extends HookConsumerWidget {
     final showScrollToBottom = useState(false);
     final previousMessageCount = useRef(0);
     final isUserScrolledUp = useRef(false);
+    final isLoading = useState(false);
 
     useEffect(() {
       void onScroll() {
@@ -100,13 +101,28 @@ class ChatScreen extends HookConsumerWidget {
           final isAtBottom =
               scrollController.position.pixels >=
               scrollController.position.maxScrollExtent - 100;
+          final isAtTop = scrollController.position.pixels <= 100;
 
-          // Only update isUserScrolledUp when user manually scrolls
           if (!isAtBottom && scrollController.position.pixels > 0) {
             isUserScrolledUp.value = true;
           } else if (isAtBottom) {
             isUserScrolledUp.value = false;
             showScrollToBottom.value = false;
+          }
+          if (isAtTop && !isLoading.value) {
+            Future.microtask(() async {
+              try {
+                isLoading.value = true;
+                await Future.wait([
+                  ref.read(messageChatProvider.notifier).next(),
+                  Future.delayed(Duration(seconds: 1)),
+                ]);
+              } catch (e) {
+                ();
+              } finally {
+                isLoading.value = false;
+              }
+            });
           }
         }
       }
@@ -153,19 +169,20 @@ class ChatScreen extends HookConsumerWidget {
 
     return Stack(
       children: [
-        RefreshIndicator.noSpinner(
-          onRefresh: () async {
-            await ref.read(messageChatProvider.notifier).next();
-          },
-          child: ListView.separated(
-            controller: scrollController,
-            padding: const EdgeInsets.all(1),
-            itemCount: data.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              return MessageCard(model: data[index]);
-            },
+        if (isLoading.value)
+          const LinearProgressIndicator(
+            minHeight: 2,
+            backgroundColor: Colors.transparent,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
           ),
+        ListView.separated(
+          controller: scrollController,
+          padding: const EdgeInsets.all(1),
+          itemCount: data.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            return MessageCard(model: data[index]);
+          },
         ),
         if (showScrollToBottom.value)
           Positioned(
