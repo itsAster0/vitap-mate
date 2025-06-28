@@ -46,7 +46,7 @@ class SocialUsernameUpdate extends HookConsumerWidget {
       body: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          GetName(id: pb.authStore.record!.id),
+          UserName(userId: pb.authStore.record!.id),
           FTextField(controller: controller, label: const Text("New Username")),
           SizedBox(height: 8),
           Text(erroMsg.value ?? ""),

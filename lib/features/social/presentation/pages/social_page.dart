@@ -41,7 +41,7 @@ class SocialPage extends HookConsumerWidget {
                         ) async {
                           await launchUrl(url);
                         });
-                        await Future.delayed(Duration(seconds: 2));
+
                         isloading.value = false;
                         ref.invalidate(pbProvider);
                         log("done login via mail");

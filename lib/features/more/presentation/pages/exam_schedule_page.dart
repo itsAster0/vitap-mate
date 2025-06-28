@@ -6,9 +6,11 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/widgets/exam_schedule_card.dart';
+import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 
 class ExamSchedulePage extends HookConsumerWidget {
   const ExamSchedulePage({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> update() async {
@@ -21,24 +23,58 @@ class ExamSchedulePage extends HookConsumerWidget {
       }
     }
 
-    var marksData = ref.watch(examScheduleProvider);
+    var examData = ref.watch(examScheduleProvider);
     return RefreshIndicator(
       onRefresh: () async {
         await update();
       },
-      backgroundColor: Colors.white,
-
-      color: Colors.black,
+      backgroundColor: ExamColors.tableBackground,
+      color: ExamColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
           constraints: BoxConstraints(
             minHeight: MediaQuery.of(context).size.height * 0.8,
           ),
-          child: marksData.when(
+          child: examData.when(
             data: (data) {
               if (data.exams.isEmpty) {
-                return Center(child: Text("No Data to show yet"));
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: ExamColors.tableRowAlternate,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          Icons.event_note_outlined,
+                          size: 48,
+                          color: ExamColors.tertiaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "No exam schedule available",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: ExamColors.secondaryText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Check back later for updates",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: ExamColors.tertiaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
               }
               return Padding(
                 padding: const EdgeInsets.all(6),
@@ -53,7 +89,8 @@ class ExamSchedulePage extends HookConsumerWidget {
                           "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
                           style: TextStyle(
                             fontSize: 14,
-                            color: Colors.grey[600],
+                            color: ExamColors.tertiaryText,
+                            fontStyle: FontStyle.italic,
                           ),
                         ),
                       ),
@@ -63,16 +100,68 @@ class ExamSchedulePage extends HookConsumerWidget {
               );
             },
             error: (e, se) {
-              disCommonToast(context, e);
               String msg = commonErrorMessage(e);
-              return Center(child: Text(msg));
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: ExamColors.completedBackground,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Icon(
+                        Icons.error_outline_rounded,
+                        size: 48,
+                        color: ExamColors.completedText,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Unable to load exam schedule",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: ExamColors.secondaryText,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      msg,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ExamColors.tertiaryText,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
             },
             loading: () {
               return Center(
-                child: SizedBox(
-                  width: 50,
-                  height: 50,
-                  child: CircularProgressIndicator(color: Colors.black),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: CircularProgressIndicator(
+                        color: ExamColors.examIcon,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Loading exam schedule...",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: ExamColors.secondaryText,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               );
             },

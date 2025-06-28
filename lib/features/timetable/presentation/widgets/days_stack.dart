@@ -104,8 +104,8 @@ class DaysStack extends HookWidget {
                         child: CircleAvatar(
                           backgroundColor:
                               selectedDay.value == i
-                                  ? Colors.white
-                                  : Colors.black,
+                                  ? context.theme.colors.secondary
+                                  : context.theme.colors.primary,
                           //minRadius: 5,
                           radius: 4,
                         ),

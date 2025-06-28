@@ -3,133 +3,407 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
+import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
 
 class AttendanceTable extends HookConsumerWidget {
   final String courseId;
   final String courseType;
-
   final bool exp;
+
   const AttendanceTable({
     super.key,
     required this.courseId,
     required this.courseType,
     required this.exp,
   });
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    var dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
+    final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
+
     return Container(
       height: double.infinity,
       width: double.infinity,
       decoration: BoxDecoration(
         color: context.theme.colors.background,
-        border:
-            FLayout.btt.vertical
-                ? Border.symmetric(
-                  horizontal: BorderSide(color: context.theme.colors.border),
-                )
-                : Border.symmetric(
-                  vertical: BorderSide(color: context.theme.colors.border),
-                ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: dataAsync.when(
-        data: (data) {
-          if (data.records.isEmpty) {
-            return Center(child: Text("No Data to show yet"));
-          }
-          return Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: FFocusedOutline(
-              focused: false,
+      child: Column(
+        children: [
+          _buildHeader(context),
+          Expanded(
+            child: dataAsync.when(
+              data: (data) => _buildTableContent(context, data),
+              error: (e, se) => _buildErrorState(e),
+              loading: () => _buildLoadingState(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: context.theme.colors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(bottom: BorderSide(color: context.theme.colors.border)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AttendanceColors.theoryIcon.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.table_chart_rounded,
+              color: AttendanceColors.theoryIcon,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            "Attendance Details",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AttendanceColors.primaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTableContent(BuildContext context, dynamic data) {
+    if (data.records.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AttendanceColors.tableBackground,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+              boxShadow: [
+                BoxShadow(
+                  color: AttendanceColors.cardShadowSecondary,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: Padding(
-                    padding: const EdgeInsets.all(0.0),
-                    child: Column(
-                      children: [
-                        DataTable(
-                          decoration: BoxDecoration(),
-                          dividerThickness: 0,
-                          border: TableBorder.all(
-                            borderRadius: BorderRadius.all(Radius.circular(4)),
-                          ),
-
-                          columns: [
-                            DataColumn(label: Text("")),
-                            DataColumn(label: Text("Date")),
-                            DataColumn(label: Text("Status")),
-                            DataColumn(label: Text("Time")),
-                            DataColumn(label: Text("Slot")),
-                            DataColumn(label: Text("Remark")),
-                          ],
-                          rows: [
-                            for (var i in data.records)
-                              DataRow(
-                                cells: [
-                                  DataCell(Text(i.serial)),
-                                  DataCell(Text(i.date)),
-                                  if (i.status == "Absent" ||
-                                      i.status == "Present")
-                                    DataCell(
-                                      FBadge(
-                                        style:
-                                            i.status == "Absent"
-                                                ? FBadgeStyle.destructive
-                                                : FBadgeStyle.secondary,
-                                        child: Text(i.status),
-                                      ),
-                                    ),
-                                  if (i.status != "Absent" &&
-                                      i.status != "Present")
-                                    DataCell(
-                                      FBadge(
-                                        style: FBadgeStyle.primary,
-                                        child: Text(i.status),
-                                      ),
-                                    ),
-                                  DataCell(Text(i.dayTime)),
-                                  DataCell(Text(i.slot)),
-                                  DataCell(Text(i.remark)),
-                                ],
-                              ),
-                          ],
-                        ),
-
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12.0),
-                            child: Text(
-                              "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                  child: DataTable(
+                    decoration: const BoxDecoration(),
+                    dividerThickness: 1,
+                    headingRowColor: WidgetStateProperty.all(
+                      AttendanceColors.tableHeaderBackground,
                     ),
+                    headingRowHeight: 56,
+                    dataRowMinHeight: 48,
+                    dataRowMaxHeight: 64,
+                    columnSpacing: 24,
+                    horizontalMargin: 16,
+                    columns: [
+                      _buildDataColumn("#", 40),
+                      _buildDataColumn("Date", 100),
+                      _buildDataColumn("Status", 80),
+                      _buildDataColumn("Time", 80),
+                      _buildDataColumn("Slot", 60),
+                      _buildDataColumn("Remark", 120),
+                    ],
+                    rows:
+                        data.records.asMap().entries.map<DataRow>((entry) {
+                          final index = entry.key;
+                          final record = entry.value;
+                          final isEven = index % 2 == 0;
+
+                          return DataRow(
+                            color: WidgetStateProperty.all(
+                              isEven
+                                  ? Colors.transparent
+                                  : AttendanceColors.tableRowAlternate,
+                            ),
+                            cells: [
+                              _buildDataCell(record.serial, isNumeric: true),
+                              _buildDataCell(_formatDate(record.date)),
+                              DataCell(_buildStatusBadge(record.status)),
+                              _buildDataCell(record.dayTime),
+                              _buildDataCell(record.slot),
+                              DataCell(
+                                Container(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 120,
+                                  ),
+                                  child: Tooltip(
+                                    message: record.remark,
+                                    child: Text(
+                                      record.remark,
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: AttendanceColors.secondaryText,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                   ),
                 ),
               ),
             ),
-          );
-        },
-        error: (e, se) {
-          String msg = commonErrorMessage(e);
-          return Center(child: Text(msg));
-        },
-        loading:
-            () => Center(
-              child: SizedBox(
-                width: 50,
-                height: 50,
-                child: CircularProgressIndicator(color: Colors.black),
-              ),
-            ),
+          ),
+        ),
+        Text(
+          "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
+          style: const TextStyle(
+            fontSize: 12,
+            color: AttendanceColors.tertiaryText,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
+
+  DataColumn _buildDataColumn(String label, double width) {
+    return DataColumn(
+      label: SizedBox(
+        width: width,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: AttendanceColors.primaryText,
+          ),
+        ),
       ),
     );
+  }
+
+  DataCell _buildDataCell(String text, {bool isNumeric = false}) {
+    return DataCell(
+      Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: isNumeric ? FontWeight.w600 : FontWeight.w400,
+          color: AttendanceColors.secondaryText,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status) {
+    final statusLower = status.toLowerCase();
+
+    Color backgroundColor;
+    Color textColor;
+    Color borderColor;
+    IconData icon;
+
+    switch (statusLower) {
+      case 'absent':
+        backgroundColor = AttendanceColors.absentBackground;
+        textColor = AttendanceColors.absentText;
+        borderColor = AttendanceColors.absentBorder;
+        icon = Icons.close_rounded;
+        break;
+      case 'present':
+        backgroundColor = AttendanceColors.presentBackground;
+        textColor = AttendanceColors.presentText;
+        borderColor = AttendanceColors.presentBorder;
+        icon = Icons.check_rounded;
+        break;
+      default:
+        backgroundColor = AttendanceColors.unknownBackground;
+        textColor = AttendanceColors.unknownText;
+        borderColor = AttendanceColors.unknownBorder;
+        icon = Icons.help_outline_rounded;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            status,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AttendanceColors.tableRowAlternate,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.event_busy_rounded,
+              size: 48,
+              color: AttendanceColors.tertiaryText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "No attendance data available",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AttendanceColors.secondaryText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "Check back later for updates",
+            style: TextStyle(
+              fontSize: 14,
+              color: AttendanceColors.tertiaryText,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(dynamic error) {
+    final message = commonErrorMessage(error);
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AttendanceColors.criticalBackground,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.error_outline_rounded,
+              size: 48,
+              color: AttendanceColors.criticalText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Unable to load data",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AttendanceColors.secondaryText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AttendanceColors.tertiaryText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              color: AttendanceColors.theoryIcon,
+              strokeWidth: 3,
+            ),
+          ),
+          SizedBox(height: 16),
+          Text(
+            "Loading attendance data...",
+            style: TextStyle(
+              fontSize: 14,
+              color: AttendanceColors.secondaryText,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(String date) {
+    try {
+      final parts = date.split('-');
+      if (parts.length == 3) {
+        final day = parts[0];
+        final month = parts[1];
+        final year = parts[2];
+
+        const months = [
+          '',
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ];
+
+        final monthIndex = int.tryParse(month);
+        if (monthIndex != null && monthIndex >= 1 && monthIndex <= 12) {
+          return '$day ${months[monthIndex]}';
+        }
+      }
+    } catch (e) {
+      ();
+    }
+    return date;
   }
 }

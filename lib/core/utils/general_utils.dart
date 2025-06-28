@@ -20,7 +20,7 @@ String commonErrorMessage(Object e) {
   if (e == VtopError.invalidCredentials()) {
     return 'It looks like you changed your VTOP password. Please update it.';
   } else if (e == VtopError.networkError() || e is ClientException) {
-    return "You're offline. Please check your connection and try again.";
+    return "You're offline. Please check your connection and try again by refreshing.";
   } else if (e is FeatureDisabledException) {
     return 'This feature is currently disabled. Please try again in a while';
   } else {

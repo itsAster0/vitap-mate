@@ -1,10 +1,13 @@
+// lib/features/timetable/presentation/pages/timetable_page.dart
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -17,7 +20,6 @@ class TimetablePage extends HookConsumerWidget {
     final key = useMemoized(() => GlobalKey());
     final selectedDay = useState<int>(DateTime.now().weekday);
     final finalDay = useState<List<int>>([]);
-    final controller = usePageController(initialPage: DateTime.now().weekday);
     final timetableData = ref.watch(timetableProvider);
     final startX = useState<double?>(null);
 
@@ -30,25 +32,23 @@ class TimetablePage extends HookConsumerWidget {
       }
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(0),
+    return Container(
+      decoration: BoxDecoration(),
       child: Column(
-        spacing: 2,
         children: [
           if (timetableData.hasValue)
             DaysStack(
               selectedDay: selectedDay,
               daysList: getDayList(timetableData.value),
             ),
+
           Expanded(
             child: RefreshIndicator(
               key: key,
               backgroundColor: Colors.white,
-              color: Colors.black,
-              onRefresh: () async {
-                //await Future.delayed(Duration(seconds: 10));
-                await update();
-              },
+              color: context.theme.colors.primary,
+              strokeWidth: 2.5,
+              onRefresh: update,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: GestureDetector(
@@ -59,74 +59,114 @@ class TimetablePage extends HookConsumerWidget {
                     final currentX = details.globalPosition.dx;
                     final deltaX = currentX - (startX.value ?? currentX);
 
-                    if (deltaX > 80) {
-                      if (finalDay.value.first < selectedDay.value) {
-                        selectedDay.value -= 1;
-                      }
+                    if (deltaX > 80 &&
+                        finalDay.value.first < selectedDay.value) {
+                      selectedDay.value -= 1;
                       startX.value = currentX;
-                    } else if (deltaX < -80) {
-                      if (finalDay.value.last > selectedDay.value) {
-                        selectedDay.value += 1;
-                      }
+                    } else if (deltaX < -80 &&
+                        finalDay.value.last > selectedDay.value) {
+                      selectedDay.value += 1;
                       startX.value = currentX;
                     }
                   },
-                  onHorizontalDragEnd: (_) {
-                    startX.value = null;
-                  },
+                  onHorizontalDragEnd: (_) => startX.value = null,
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: MediaQuery.of(context).size.height * 0.8,
                     ),
                     child: timetableData.when(
                       data: (data) {
-                        var tempList = getDayList(data);
+                        final tempList = getDayList(data);
                         finalDay.value = tempList;
+
                         if (!tempList.contains(selectedDay.value)) {
                           selectedDay.value = tempList.first;
                         }
+
+                        final daySlots = addFreeSlots(
+                          getDaySlotList(data, selectedDay.value),
+                        );
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            for (final slot in addFreeSlots(
-                              getDaySlotList(data, selectedDay.value),
-                            ))
-                              TimetableCard(slot: slot),
-                            Center(
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  top: 12,
-                                  bottom: 20,
-                                ),
-                                child: Text(
-                                  "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
+                            const SizedBox(height: 8),
+
+                            ...daySlots.map(
+                              (slot) => TimetableCard(slot: slot),
+                            ),
+
+                            Container(
+                              margin: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                "Last updated: ${formatUnixTimestamp(data.updateTime.toInt())}",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
                           ],
                         );
                       },
-                      error: (e, er) {
+                      error: (e, stackTrace) {
                         disCommonToast(context, e);
-                        String msg = commonErrorMessage(e);
-                        return Center(child: Text(msg));
-                      },
-                      loading: () {
-                        //print("loading");
                         return Center(
-                          child: SizedBox(
-                            width: 50,
-                            height: 50,
-                            child: CircularProgressIndicator(
-                              color: Colors.black,
-                            ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                commonErrorMessage(e),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },
+                      loading:
+                          () => const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 3,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      TimetableColors.upcomingBorder,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 16),
+                                Text(
+                                  'Loading timetable...',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                     ),
                   ),
                 ),
@@ -139,6 +179,7 @@ class TimetablePage extends HookConsumerWidget {
   }
 }
 
+// Keep your existing helper functions unchanged
 List<int> getDayList(TimetableData? data) {
   if (data == null) return [];
   Map<String, int> map = {
@@ -173,23 +214,25 @@ List<TimetableSlot> getDaySlotList(TimetableData data, int i) {
   };
   String day = map[i]!;
   List<TimetableSlot> slots = [];
-  for (final i in data.slots) {
-    if (i.day == day) {
-      slots.add(i);
+  for (final slot in data.slots) {
+    if (slot.day == day) {
+      slots.add(slot);
     }
   }
   return slots;
 }
 
 List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
-  List<TimetableSlot> r = [];
+  if (t.isEmpty) return t;
 
+  List<TimetableSlot> r = [];
   for (int i = 0; i < t.length - 1; i++) {
     r.add(t[i]);
     final cClass = t[i].endTime;
     final nClass = t[i + 1].startTime;
     int diff = getdiff(cClass, nClass);
     int mod = (diff / 60).toInt();
+
     if (mod > 0) {
       r.add(
         TimetableSlot(
@@ -211,7 +254,7 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
   return r;
 }
 
-getdiff(a, b) {
+int getdiff(String a, String b) {
   var first = a.split(":");
   var second = b.split(":");
   return (int.parse(second[0]) * 60 + int.parse(second[1])) -

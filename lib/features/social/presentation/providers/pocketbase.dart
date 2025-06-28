@@ -19,10 +19,9 @@ Future<PocketBase> pb(Ref ref) async {
   } catch (e) {
     if (e.toString().toLowerCase().contains(
       "The request requires valid record authorization token".toLowerCase(),
-    )){
-       pb.authStore.clear();
+    )) {
+      pb.authStore.clear();
     }
-     
   }
   return pb;
 }

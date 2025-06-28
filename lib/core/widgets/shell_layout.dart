@@ -65,7 +65,7 @@ class ShellLayout extends HookWidget {
           ),
           FBottomNavigationBarItem(
             icon: Icon(FIcons.settings),
-            label: const Text('settings'),
+            label: const Text('Settings'),
           ),
         ],
       ),
@@ -75,7 +75,7 @@ class ShellLayout extends HookWidget {
   }
 }
 
-Widget getSidewidget(BuildContext context, String data, String path) {
+Widget? getSidewidget(BuildContext context, String data, String path) {
   if (path.split('/').length - 1 > 1) {
     switch (path.split("/")[2]) {
       case "marks":

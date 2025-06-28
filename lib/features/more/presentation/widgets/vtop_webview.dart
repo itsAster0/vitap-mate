@@ -5,7 +5,9 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -21,6 +23,7 @@ class VtopWebview extends HookConsumerWidget {
     final cookieName = useState<String?>(null);
     final cookieValue = useState<String?>(null);
     final webController = useState<InAppWebViewController?>(null);
+
     useEffect(() {
       Future(() async {
         final cookieManager = CookieManager.instance();
@@ -41,6 +44,7 @@ class VtopWebview extends HookConsumerWidget {
         final value = parts[1];
         cookieName.value = name;
         cookieValue.value = value;
+
         if (Platform.isAndroid) {
           await cookieManagerAndroid.setCookie(
             WebViewCookie(
@@ -69,16 +73,50 @@ class VtopWebview extends HookConsumerWidget {
     }, []);
 
     if (envState.value) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.black),
+      return Container(
+        color: MoreColors.tableBackground,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: CircularProgressIndicator(
+                  color: MoreColors.infoBorder,
+                  strokeWidth: 3,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Setting up VTOP...",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: MoreColors.secondaryText,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    return SizedBox(
+    return Container(
       width: MediaQuery.of(context).size.width,
       height: MediaQuery.of(context).size.height * 0.8,
+      decoration: BoxDecoration(
+        color: MoreColors.tableBackground,
+        boxShadow: [
+          BoxShadow(
+            color: MoreColors.cardShadow,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
-        children: <Widget>[
+        children: [
           Expanded(
             child: InAppWebView(
               initialSettings: InAppWebViewSettings(isInspectable: kDebugMode),
@@ -88,7 +126,6 @@ class VtopWebview extends HookConsumerWidget {
               onWebViewCreated: (controller) {
                 webController.value = controller;
               },
-
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final uri = navigationAction.request.url;
                 if (uri.toString().toLowerCase().contains("download")) {
@@ -98,10 +135,40 @@ class VtopWebview extends HookConsumerWidget {
                 }
                 return NavigationActionPolicy.ALLOW;
               },
-              onLoadStart: (controller, url) {},
-              onLoadStop: (controller, url) {},
+              onLoadStart: (controller, url) {
+                loading.value = true;
+              },
+              onLoadStop: (controller, url) {
+                loading.value = false;
+              },
             ),
           ),
+          if (loading.value)
+            Container(
+              padding: const EdgeInsets.all(8),
+              color: MoreColors.infoBackground,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: MoreColors.infoText,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    "Loading...",
+                    style: TextStyle(
+                      color: MoreColors.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

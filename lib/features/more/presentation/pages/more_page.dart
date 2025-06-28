@@ -1,8 +1,6 @@
 import 'dart:developer';
 import 'dart:math' hide log;
-
 import 'package:flutter/material.dart';
-
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +10,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/users/wifi_details.dart';
+import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -34,31 +33,46 @@ class MorePage extends StatelessWidget {
         children: [
           FTile(
             prefixIcon: Icon(FIcons.bookCheck),
-            title: const Text('Faculty Directory'),
-            //details: const Text(''),
-            suffixIcon: Icon(FIcons.chevronRight),
+            title: const Text(
+              'Faculty Directory',
+              style: TextStyle(color: MoreColors.primaryText),
+            ),
+            suffixIcon: Icon(
+              FIcons.chevronRight,
+              color: MoreColors.secondaryText,
+            ),
             onPress: () {
               _launchInBrowser(url);
             },
           ),
           FTile(
             prefixIcon: Icon(FIcons.bookCheck),
-            title: const Text('Marks'),
-            suffixIcon: Icon(FIcons.chevronRight),
+            title: const Text(
+              'Marks',
+              style: TextStyle(color: MoreColors.primaryText),
+            ),
+            suffixIcon: Icon(
+              FIcons.chevronRight,
+              color: MoreColors.secondaryText,
+            ),
             onPress: () {
               GoRouter.of(context).pushNamed(Paths.marks);
             },
           ),
           FTile(
             prefixIcon: Icon(FIcons.school),
-            title: const Text('Exam Schedule'),
-            //details: const Text(''),
-            suffixIcon: Icon(FIcons.chevronRight),
+            title: const Text(
+              'Exam Schedule',
+              style: TextStyle(color: MoreColors.primaryText),
+            ),
+            suffixIcon: Icon(
+              FIcons.chevronRight,
+              color: MoreColors.secondaryText,
+            ),
             onPress: () {
               GoRouter.of(context).pushNamed(Paths.examSchedule);
             },
           ),
-
           VtopCard(),
           WifiCard(),
         ],
@@ -73,9 +87,9 @@ class VtopCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isLoading = useState(false);
+
     void handelclick() async {
       isLoading.value = true;
-
       try {
         await ref.read(vClientProvider.notifier).tryLogin();
         var client = await ref.read(vClientProvider.future);
@@ -96,27 +110,53 @@ class VtopCard extends HookConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FCard(
-          title: Center(child: Text("Vtop")),
-          subtitle: Center(child: Text("No login required")),
-          child:
-              !isLoading.value
-                  ? FButton(
-                    onPress: () async {
-                      handelclick();
-                    },
-                    child: Text("open"),
-                  )
-                  : Center(
-                    child: const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black,
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+
+            boxShadow: [
+              BoxShadow(
+                color: MoreColors.cardShadow,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: FCard(
+            title: Center(
+              child: Text(
+                "Vtop",
+                style: TextStyle(
+                  color: MoreColors.primaryText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            subtitle: Center(
+              child: Text(
+                "No login required",
+                style: TextStyle(color: MoreColors.secondaryText),
+              ),
+            ),
+            child:
+                !isLoading.value
+                    ? FButton(
+                      onPress: () async {
+                        handelclick();
+                      },
+                      child: Text("Open"),
+                    )
+                    : Center(
+                      child: const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: MoreColors.infoBorder,
+                        ),
                       ),
                     ),
-                  ),
+          ),
         ),
       ],
     );
@@ -132,6 +172,7 @@ class WifiCard extends HookConsumerWidget {
     final errorMsg = useState<String?>(null);
     final succesMsg = useState<String?>(null);
     var wifiDeatils = ref.watch(wifiDetailsProvider);
+
     String parseResult(String result) {
       String output = "..";
       if (result == "NE") {
@@ -168,121 +209,166 @@ class WifiCard extends HookConsumerWidget {
       } else {
         succesMsg.value = data.$2;
       }
-
       isLoading.value = false;
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FCard(
-          title: Stack(
-            children: [
-              FTappable(
-                child: Icon(FIcons.rotateCw),
-                onPress: () {
-                  errorMsg.value = null;
-                  succesMsg.value = null;
-                  isLoading.value = false;
-                },
-              ),
-              Center(child: Text("Wi-fi")),
-              Positioned(
-                right: 0,
-                child: FTappable(
-                  child: Icon(FIcons.plus),
-                  onPress:
-                      () => showAdaptiveDialog(
-                        context: context,
-                        builder: (context) => WifiInput(),
-                      ),
-                ),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+
+            boxShadow: [
+              BoxShadow(
+                color: MoreColors.cardShadow,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          subtitle: Center(child: Text("No over limit")),
-          child: wifiDeatils.when(
-            data:
-                (data) => Column(
-                  spacing: 8,
-                  children: [
-                    if (data.$1 == null)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("Add your wifi details by clicking  "),
-                          FTappable(
-                            child: Icon(FIcons.plus),
-                            onPress:
-                                () => showAdaptiveDialog(
-                                  context: context,
-                                  builder: (context) => WifiInput(),
-                                ),
+          child: FCard(
+            title: Stack(
+              children: [
+                FTappable(
+                  child: Icon(FIcons.rotateCw),
+                  onPress: () {
+                    errorMsg.value = null;
+                    succesMsg.value = null;
+                    isLoading.value = false;
+                  },
+                ),
+                Center(
+                  child: Text(
+                    "Wi-fi",
+                    style: TextStyle(
+                      color: MoreColors.primaryText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  child: FTappable(
+                    child: Icon(FIcons.plus),
+                    onPress:
+                        () => showAdaptiveDialog(
+                          context: context,
+                          builder: (context) => WifiInput(),
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Center(
+              child: Text(
+                "No over limit",
+                style: TextStyle(color: MoreColors.secondaryText),
+              ),
+            ),
+            child: wifiDeatils.when(
+              data:
+                  (data) => Column(
+                    spacing: 8,
+                    children: [
+                      if (data.$1 == null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Add your wifi details by clicking  ",
+                              style: TextStyle(color: MoreColors.secondaryText),
+                            ),
+                            FTappable(
+                              child: Icon(FIcons.plus),
+                              onPress:
+                                  () => showAdaptiveDialog(
+                                    context: context,
+                                    builder: (context) => WifiInput(),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      if ((data.$1 != null))
+                        Center(
+                          child: Text(
+                            data.$1 ?? "",
+                            style: TextStyle(color: MoreColors.primaryText),
                           ),
-                        ],
-                      ),
-                    if ((data.$1 != null)) Center(child: Text(data.$1 ?? "")),
-                    if (succesMsg.value != null)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        spacing: 8,
-                        children: [
-                          Icon(
-                            FIcons.circleCheckBig,
-                            color: Color.fromARGB(255, 14, 208, 14),
-                          ),
-                          Text(succesMsg.value!, maxLines: 2),
-                        ],
-                      ),
-                    if (errorMsg.value != null)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        spacing: 8,
-                        children: [
-                          Icon(
-                            FIcons.circleX,
-                            color: Color.fromARGB(255, 208, 14, 14),
-                          ),
-                          Text(errorMsg.value!, maxLines: 2),
-                        ],
-                      ),
-                    !isLoading.value
-                        ? Row(
+                        ),
+                      if (succesMsg.value != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           spacing: 8,
                           children: [
-                            Expanded(
-                              child: FButton(
-                                onPress: () {
-                                  if (data.$1 != null && data.$2 != null) {
-                                    handelLogin(data.$1!, data.$2!);
-                                  }
-                                },
-                                child: Text("login"),
-                              ),
+                            Icon(
+                              FIcons.circleCheckBig,
+                              color: MoreColors.successText,
                             ),
                             Expanded(
-                              child: FButton(
-                                onPress: () {
-                                  handelLogout();
-                                },
-                                child: Text("logout"),
+                              child: Text(
+                                succesMsg.value!,
+                                maxLines: 2,
+                                style: TextStyle(color: MoreColors.successText),
                               ),
                             ),
                           ],
-                        )
-                        : const FProgress(),
-                  ],
-                ),
-            error: (e, stackTrace) => Text("$e"),
-            loading:
-                () => const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.black,
+                        ),
+                      if (errorMsg.value != null)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          spacing: 8,
+                          children: [
+                            Icon(FIcons.circleX, color: MoreColors.errorText),
+                            Expanded(
+                              child: Text(
+                                errorMsg.value!,
+                                maxLines: 2,
+                                style: TextStyle(color: MoreColors.errorText),
+                              ),
+                            ),
+                          ],
+                        ),
+                      !isLoading.value
+                          ? Row(
+                            spacing: 8,
+                            children: [
+                              Expanded(
+                                child: FButton(
+                                  onPress: () {
+                                    if (data.$1 != null && data.$2 != null) {
+                                      handelLogin(data.$1!, data.$2!);
+                                    }
+                                  },
+                                  child: Text("Login"),
+                                ),
+                              ),
+                              Expanded(
+                                child: FButton(
+                                  onPress: () {
+                                    handelLogout();
+                                  },
+                                  child: Text("Logout"),
+                                ),
+                              ),
+                            ],
+                          )
+                          : const FProgress(),
+                    ],
                   ),
-                ),
+              error:
+                  (e, stackTrace) =>
+                      Text("$e", style: TextStyle(color: MoreColors.errorText)),
+              loading:
+                  () => const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: MoreColors.infoBorder,
+                    ),
+                  ),
+            ),
           ),
         ),
       ],
@@ -305,9 +391,7 @@ String convertToSuperstring(String k) {
   };
 
   List<String> n = k.split('');
-
   Random random = Random();
-
   int runs = 0;
 
   do {
@@ -317,7 +401,6 @@ String convertToSuperstring(String k) {
   for (int i = 0; i <= runs; i++) {
     int c = random.nextInt(n.length);
     String charAtIndex = n[c];
-
     int? parsedChar = int.tryParse(charAtIndex);
 
     if (parsedChar != null) {
@@ -338,6 +421,7 @@ class WifiInput extends HookConsumerWidget {
     final isloading = useState(false);
     final username = useTextEditingController();
     final password = useTextEditingController();
+
     Future<void> handelClick() async {
       isloading.value = true;
       await ref.read(vtopusersutilsProvider.notifier).saveWifiDetails((
@@ -349,7 +433,10 @@ class WifiInput extends HookConsumerWidget {
     }
 
     return FDialog(
-      title: Text("wi-fi credentials"),
+      title: Text(
+        "Wi-fi credentials",
+        style: TextStyle(color: MoreColors.primaryText),
+      ),
       body: Form(
         key: formKey,
         child: Column(
@@ -357,7 +444,10 @@ class WifiInput extends HookConsumerWidget {
           children: [
             SizedBox(height: 25),
             FTextFormField(
-              label: Text("Username"),
+              label: Text(
+                "Username",
+                style: TextStyle(color: MoreColors.primaryText),
+              ),
               controller: username,
               hint: 'wi-fi username',
               autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -402,7 +492,7 @@ class WifiInput extends HookConsumerWidget {
             width: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Colors.black,
+              color: MoreColors.infoBorder,
             ),
           ),
         FButton(

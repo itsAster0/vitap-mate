@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -8,9 +9,10 @@ import 'package:vitapmate/features/social/presentation/providers/message_chat.da
 import 'package:vitapmate/features/social/presentation/providers/pocketbase.dart';
 import 'package:vitapmate/features/social/presentation/widgets/message_bar.dart';
 import 'package:vitapmate/features/social/presentation/widgets/message_card.dart';
+import 'dart:async';
 
 class MessageScreen extends StatefulHookConsumerWidget {
-  final ValueNotifier toend;
+  final ValueNotifier<bool> toend;
   const MessageScreen({super.key, required this.toend});
 
   @override
@@ -40,13 +42,15 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
 
   @override
   Widget build(BuildContext context) {
-    var data = ref.watch(messageChatProvider);
+    final messagesAsync = ref.watch(messageChatProvider);
 
-    return data.when(
+    return messagesAsync.when(
       data:
-          (data) => Column(
+          (messages) => Column(
             children: [
-              Expanded(child: ChatScreen(data: data, toend: widget.toend)),
+              Expanded(
+                child: ChatScreen(messages: messages, toend: widget.toend),
+              ),
               MessageBar(toend: widget.toend),
             ],
           ),
@@ -65,17 +69,43 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
               constraints: BoxConstraints(
                 minHeight: MediaQuery.of(context).size.height * 0.8,
               ),
-              child: Center(child: Text(msg)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    msg,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 24),
+                  FButton(
+                    onPress: () => ref.refresh(pbProvider.future),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             ),
           ),
         );
       },
       loading:
           () => const Center(
-            child: SizedBox(
-              width: 50,
-              height: 50,
-              child: CircularProgressIndicator(color: Colors.black),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(color: Colors.black),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Loading messages...',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
             ),
           ),
     );
@@ -83,9 +113,10 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
 }
 
 class ChatScreen extends HookConsumerWidget {
-  final List data;
-  final ValueNotifier toend;
-  const ChatScreen({super.key, required this.data, required this.toend});
+  final List messages;
+  final ValueNotifier<bool> toend;
+
+  const ChatScreen({super.key, required this.messages, required this.toend});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -93,108 +124,228 @@ class ChatScreen extends HookConsumerWidget {
     final showScrollToBottom = useState(false);
     final previousMessageCount = useRef(0);
     final isUserScrolledUp = useRef(false);
-    final isLoading = useState(false);
+    final isLoadingMore = useState(false);
+    final messageChatNotifier = ref.read(messageChatProvider.notifier);
+    final scrollDebouncer = useRef<Timer?>(null);
+
+    final messageKeys = useMemoized(
+      () => Map<String, GlobalKey>.fromEntries(
+        messages.map((msg) => MapEntry(msg.id, GlobalKey())),
+      ),
+      [messages.length],
+    );
 
     useEffect(() {
       void onScroll() {
-        if (scrollController.hasClients) {
-          final isAtBottom =
-              scrollController.position.pixels >=
-              scrollController.position.maxScrollExtent - 100;
-          final isAtTop = scrollController.position.pixels <= 100;
+        if (!scrollController.hasClients) return;
 
-          if (!isAtBottom && scrollController.position.pixels > 0) {
-            isUserScrolledUp.value = true;
-          } else if (isAtBottom) {
-            isUserScrolledUp.value = false;
-            showScrollToBottom.value = false;
-          }
-          if (isAtTop && !isLoading.value) {
-            Future.microtask(() async {
-              try {
-                isLoading.value = true;
-                await Future.wait([
-                  ref.read(messageChatProvider.notifier).next(),
-                  Future.delayed(Duration(seconds: 1)),
-                ]);
-              } catch (e) {
-                ();
-              } finally {
-                isLoading.value = false;
-              }
-            });
-          }
+        final position = scrollController.position;
+        final isAtBottom = position.pixels >= position.maxScrollExtent - 100;
+        final isAtTop = position.pixels <= 100;
+
+        if (!isAtBottom && position.pixels > 0) {
+          isUserScrolledUp.value = true;
+        } else if (isAtBottom) {
+          isUserScrolledUp.value = false;
+          showScrollToBottom.value = false;
         }
+
+        if (isAtTop &&
+            !isLoadingMore.value &&
+            messageChatNotifier.hasMoreMessages) {
+          scrollDebouncer.value?.cancel();
+          scrollDebouncer.value = Timer(const Duration(milliseconds: 300), () {
+            _loadMoreMessages(
+              isLoadingMore,
+              messageChatNotifier,
+              scrollController,
+            );
+          });
+        }
+
+        showScrollToBottom.value =
+            isUserScrolledUp.value &&
+            position.pixels > position.maxScrollExtent * 0.1;
       }
 
       scrollController.addListener(onScroll);
-      return () => scrollController.removeListener(onScroll);
+      return () {
+        scrollController.removeListener(onScroll);
+        scrollDebouncer.value?.cancel();
+      };
     }, [scrollController]);
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (scrollController.hasClients) {
-          final currentMessageCount = data.length;
-          final hasNewMessages =
-              currentMessageCount > previousMessageCount.value;
+        if (!scrollController.hasClients) return;
 
-          if (hasNewMessages) {
-            final isNewMessage = toend.value != previousMessageCount.value;
-            if (isUserScrolledUp.value && isNewMessage) {
-              showScrollToBottom.value = true;
-            } else if (!isUserScrolledUp.value) {
-              scrollController.jumpTo(
-                scrollController.position.maxScrollExtent,
-              );
-            }
+        final currentMessageCount = messages.length;
+        final hasNewMessages = currentMessageCount > previousMessageCount.value;
+
+        if (hasNewMessages) {
+          final shouldAutoScroll =
+              !isUserScrolledUp.value ||
+              (toend.value &&
+                  currentMessageCount != previousMessageCount.value);
+
+          if (shouldAutoScroll) {
+            _scrollToBottom(scrollController, animated: true);
+            showScrollToBottom.value = false;
+          } else if (isUserScrolledUp.value) {
+            showScrollToBottom.value = true;
           }
-
-          previousMessageCount.value = currentMessageCount;
         }
+
+        previousMessageCount.value = currentMessageCount;
       });
       return null;
-    }, [data.length, toend.value]);
+    }, [messages.length, toend.value]);
 
-    void scrollToBottom() {
-      if (scrollController.hasClients) {
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-        showScrollToBottom.value = false;
-        isUserScrolledUp.value = false;
+    useEffect(() {
+      if (messages.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom(scrollController, animated: false);
+        });
       }
-    }
+      return null;
+    }, []);
 
     return Stack(
       children: [
-        if (isLoading.value)
-          const LinearProgressIndicator(
-            minHeight: 2,
-            backgroundColor: Colors.transparent,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
-          ),
-        ListView.separated(
+        CustomScrollView(
           controller: scrollController,
-          padding: const EdgeInsets.all(1),
-          itemCount: data.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            return MessageCard(model: data[index]);
-          },
+          slivers: [
+            if (messageChatNotifier.hasMoreMessages)
+              SliverToBoxAdapter(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child:
+                        isLoadingMore.value
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                            : FButton(
+                              style: FButtonStyle.secondary,
+                              onPress:
+                                  () => _loadMoreMessages(
+                                    isLoadingMore,
+                                    messageChatNotifier,
+                                    scrollController,
+                                  ),
+                              child: const Text('Load more messages'),
+                            ),
+                  ),
+                ),
+              ),
+
+            SliverList(
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final message = messages[index];
+                final messageKey = messageKeys[message.id] ?? GlobalKey();
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 4.0,
+                  ),
+                  child: MessageCard(
+                    key: ValueKey('message_${message.id}'),
+                    model: message,
+                    scrollController: scrollController,
+                  ),
+                );
+              }, childCount: messages.length),
+            ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          ],
         ),
-        if (showScrollToBottom.value)
-          Positioned(
-            bottom: 16,
-            right: 16,
+
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 200),
+          bottom: showScrollToBottom.value ? 16 : -60,
+          right: 16,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(28),
             child: FloatingActionButton.small(
-              onPressed: scrollToBottom,
+              onPressed:
+                  () => _scrollToBottomAndReset(
+                    scrollController,
+                    showScrollToBottom,
+                    isUserScrolledUp,
+                  ),
               backgroundColor: context.theme.colors.primaryForeground,
+              elevation: 0,
               child: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
             ),
           ),
+        ),
       ],
     );
+  }
+
+  Future<void> _loadMoreMessages(
+    ValueNotifier<bool> isLoadingMore,
+    dynamic messageChatNotifier,
+    ScrollController scrollController,
+  ) async {
+    if (isLoadingMore.value) return;
+
+    try {
+      isLoadingMore.value = true;
+      final currentScrollOffset = scrollController.offset;
+
+      final hasMore = await messageChatNotifier.loadMoreMessages();
+
+      if (hasMore && scrollController.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (scrollController.hasClients) {
+            final newMaxExtent = scrollController.position.maxScrollExtent;
+            final targetOffset =
+                newMaxExtent -
+                (scrollController.position.maxScrollExtent -
+                    currentScrollOffset);
+            scrollController.jumpTo(targetOffset.clamp(0.0, newMaxExtent));
+          }
+        });
+      }
+    } catch (e) {
+      log('Error loading more messages: $e');
+    } finally {
+      isLoadingMore.value = false;
+    }
+  }
+
+  void _scrollToBottom(ScrollController controller, {bool animated = true}) {
+    if (!controller.hasClients) return;
+
+    final targetOffset = controller.position.maxScrollExtent;
+
+    if (animated) {
+      controller.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    } else {
+      controller.jumpTo(targetOffset);
+    }
+  }
+
+  void _scrollToBottomAndReset(
+    ScrollController controller,
+    ValueNotifier<bool> showScrollToBottom,
+    ObjectRef<bool> isUserScrolledUp,
+  ) {
+    _scrollToBottom(controller, animated: true);
+    showScrollToBottom.value = false;
+    isUserScrolledUp.value = false;
   }
 }
