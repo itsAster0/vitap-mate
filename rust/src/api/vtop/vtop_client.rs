@@ -313,9 +313,10 @@ impl VtopClient {
             {
                 return Err(VtopError::InvalidCredentials);
             } else {
-                Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
-                    &response_text,
-                )))
+                // Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
+                //     &response_text,
+                // )))
+                 return Err(VtopError::InvalidCredentials);
             }
         } else {
             self.current_page = Some(response_text);
@@ -449,17 +450,17 @@ impl VtopClient {
 
         Ok(())
     }
-    fn get_login_page_error(data: &str) -> String {
-        let ptext = r#"span.text-danger.text-center[role="alert"]"#;
-        let document = Html::parse_document(data);
-        let selector = Selector::parse(&ptext).unwrap();
-        if let Some(element) = document.select(&selector).next() {
-            let error_message = element.text().collect::<Vec<_>>().join(" ");
-            error_message.trim().into()
-        } else {
-            "Unknown login error".into()
-        }
-    }
+    // fn get_login_page_error(data: &str) -> String {
+    //     let ptext = r#"span.text-danger.text-center[role="alert"]"#;
+    //     let document = Html::parse_document(data);
+    //     let selector = Selector::parse(&ptext).unwrap();
+    //     if let Some(element) = document.select(&selector).next() {
+    //         let error_message = element.text().collect::<Vec<_>>().join(" ");
+    //         error_message.trim().into()
+    //     } else {
+    //         "Unknown login error".into()
+    //     }
+    // }
 }
 // for building
 impl VtopClient {

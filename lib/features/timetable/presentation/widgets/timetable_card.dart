@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
-
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum ClassStatus { completed, ongoing, upcoming, nextClass }
