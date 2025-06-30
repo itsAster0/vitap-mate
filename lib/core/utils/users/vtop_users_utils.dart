@@ -48,11 +48,15 @@ class Vtopusersutils extends _$Vtopusersutils {
     String? defaultUser;
     List<VtopUserEntity> users = [];
     for (final i in all.entries) {
-      if (i.key.startsWith("username_")) {
-        final userJson = jsonDecode(i.value);
-        users.add(VtopUserEntity.fromJson(userJson));
-      } else if (i.key == _defaultUserKey) {
-        defaultUser = i.value;
+      try {
+        if (i.key.startsWith("username_")) {
+          final userJson = jsonDecode(i.value);
+          users.add(VtopUserEntity.fromJson(userJson));
+        } else if (i.key == _defaultUserKey) {
+          defaultUser = i.value;
+        }
+      } catch (e) {
+        continue;
       }
     }
     return (users, defaultUser);

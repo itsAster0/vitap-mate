@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_analytics/observer.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -16,15 +18,16 @@ import 'package:vitapmate/features/settings/presentation/pages/user_management.d
 import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
 import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
+import 'package:vitapmate/main.dart';
 
-final _rootNavigatorKey = GlobalKey<NavigatorState>();
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider((ref) {
   return GoRouter(
-    observers: [],
+    observers: [FirebaseAnalyticsObserver(analytics: analytics)],
     redirect: (context, state) => redirect(context, ref, state),
     initialLocation: '/timetable',
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -136,6 +139,7 @@ FutureOr<String?> redirect(
   Ref ref,
   GoRouterState state,
 ) async {
+  String? k;
   try {
     var user = await ref.read(vtopUserProvider.future);
     if (user.username == null) {
@@ -144,5 +148,5 @@ FutureOr<String?> redirect(
   } catch (e) {
     return '/onboarding';
   }
-  return null;
+  return k;
 }

@@ -1,7 +1,10 @@
+import 'dart:developer';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitapmate/main.dart';
 part 'pocketbase.g.dart';
 
 @riverpod
@@ -12,6 +15,7 @@ Future<PocketBase> pb(Ref ref) async {
     initial: prefs.getString('pb_auth'),
   );
   var pb = PocketBase("https://api.va.synaptic.gg", authStore: store);
+
   try {
     if (pb.authStore.isValid) {
       var k = await pb.collection('users').authRefresh();
@@ -24,4 +28,43 @@ Future<PocketBase> pb(Ref ref) async {
     }
   }
   return pb;
+}
+
+Future<void> pbSetNotificationToken(PocketBase pb, String? token) async {
+  if (pb.authStore.isValid && token != null) {
+    final userId = pb.authStore.record!.id;
+
+    try {
+      await pb
+          .collection('notifications_token')
+          .create(body: {'token': token, 'user': userId});
+    } catch (e) {
+      try {
+        final existing = await pb
+            .collection('notifications_token')
+            .getFirstListItem('user="$userId"');
+        await pb
+            .collection('notifications_token')
+            .update(existing.id, body: {'token': token});
+      } catch (inner) {
+        log('Failed to update notification token: $inner');
+      }
+    }
+  }
+}
+
+Future<void> pbSetNtotification({String? tokenNew}) async {
+  final pref = SharedPreferencesAsync();
+  await pref.setBool("chat_notif_toke_send", false);
+  final prefs = await SharedPreferences.getInstance();
+  final store = AsyncAuthStore(
+    save: (String data) async => prefs.setString('pb_auth', data),
+    initial: prefs.getString('pb_auth'),
+  );
+  var pb = PocketBase("https://api.va.synaptic.gg", authStore: store);
+  var token = tokenNew ?? await notifications.getToken();
+  await pbSetNotificationToken(pb, token);
+
+  //for backword compatability
+  await pref.setBool("chat_notif_toke_send", true);
 }

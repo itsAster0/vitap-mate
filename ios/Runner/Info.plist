@@ -51,5 +51,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+<key>FirebaseAppDelegateProxyEnabled</key>
+<false/>
+
+
+<key>NSPushNotificationUsageDescription</key>
+<string>We use notifications to keep you updated about important messages and updates.</string>
+
 </dict>
 </plist>

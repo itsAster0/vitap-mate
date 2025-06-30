@@ -21,31 +21,44 @@ class ShellLayout extends HookWidget {
     ];
     final selected = useState(0);
     useEffect(() {
-      switch (selected.value) {
-        case 0:
-          GoRouter.of(context).goNamed(Paths.timetable);
-          break;
-        case 1:
-          GoRouter.of(context).goNamed(Paths.attendance);
-          break;
-        case 2:
-          GoRouter.of(context).goNamed(Paths.more);
-          break;
-        case 3:
-          GoRouter.of(context).goNamed(Paths.social);
-          break;
-        case 4:
-          GoRouter.of(context).goNamed(Paths.settings);
-          break;
+      if (k.startsWith("/timetable")) {
+        selected.value = 0;
+      } else if (k.startsWith("/attendance")) {
+        selected.value = 1;
+      } else if (k.startsWith("/more")) {
+        selected.value = 2;
+      } else if (k.startsWith("/social")) {
+        selected.value = 3;
+      } else if (k.startsWith("/settings")) {
+        selected.value = 4;
       }
       return null;
-    }, [selected.value]);
+    }, [k]);
 
     return FScaffold(
       header: headers[selected.value],
       footer: FBottomNavigationBar(
         index: selected.value,
-        onChange: (index) => selected.value = index,
+        onChange: (index) {
+          selected.value = index;
+          switch (selected.value) {
+            case 0:
+              GoRouter.of(context).goNamed(Paths.timetable);
+              break;
+            case 1:
+              GoRouter.of(context).goNamed(Paths.attendance);
+              break;
+            case 2:
+              GoRouter.of(context).goNamed(Paths.more);
+              break;
+            case 3:
+              GoRouter.of(context).goNamed(Paths.social);
+              break;
+            case 4:
+              GoRouter.of(context).goNamed(Paths.settings);
+              break;
+          }
+        },
         children: [
           FBottomNavigationBarItem(
             icon: Icon(FIcons.calendarDays),

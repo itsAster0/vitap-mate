@@ -1,3 +1,4 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_avatar_update.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_username_update.dart';
+import 'package:vitapmate/main.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -59,6 +61,17 @@ class SettingsPage extends StatelessWidget {
                             (context) =>
                                 PbHelper(child: (pb) => SocialAvatarUpdate(pb)),
                       ),
+                ),
+                FTile(
+                  prefixIcon: Icon(FIcons.bell),
+                  title: const Text("Notifications"),
+                  suffixIcon: Icon(FIcons.dot),
+                  onPress: () async {
+                    var settings = await notifications.requestPermissions();
+                    AppSettings.openAppSettings(
+                      type: AppSettingsType.notification,
+                    );
+                  },
                 ),
               ],
             ),

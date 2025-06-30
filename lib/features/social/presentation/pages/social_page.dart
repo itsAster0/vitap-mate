@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -16,6 +16,27 @@ class SocialPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     var isloading = useState(false);
     var pbasync = ref.watch(pbProvider);
+    void handleClick(pb) async {
+      if (isloading.value) return;
+      Timer timeoutTimer = Timer(Duration(seconds: 5), () {
+        isloading.value = false;
+      });
+      isloading.value = true;
+      try {
+        await pb.collection('users').authWithOAuth2('google', (url) async {
+          await launchUrl(url);
+        });
+        isloading.value = false;
+        var _ = ref.refresh(pbProvider);
+        await pbSetNtotification();
+      } catch (e) {
+        ref.invalidate(pbProvider);
+      } finally {
+        timeoutTimer.cancel();
+        isloading.value = false;
+      }
+    }
+
     return pbasync.when(
       data: (pb) {
         if (pb.authStore.isValid) {
@@ -28,29 +49,8 @@ class SocialPage extends HookConsumerWidget {
                 spacing: 10,
                 children: [
                   FButton(
-                    onPress: () async {
-                      if (isloading.value) return;
-                      Future.microtask(() async {
-                        await Future.delayed(Duration(seconds: 10));
-                        isloading.value = false;
-                      });
-                      isloading.value = true;
-                      try {
-                        await pb.collection('users').authWithOAuth2('google', (
-                          url,
-                        ) async {
-                          await launchUrl(url);
-                        });
+                    onPress: () => handleClick(pb),
 
-                        isloading.value = false;
-                        ref.invalidate(pbProvider);
-                        log("done login via mail");
-                      } catch (e) {
-                        ref.invalidate(pbProvider);
-                      } finally {
-                        isloading.value = false;
-                      }
-                    },
                     child: Row(
                       spacing: 10,
                       children: [
