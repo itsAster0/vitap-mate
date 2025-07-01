@@ -2,7 +2,7 @@ import 'package:vitapmate/core/database/database.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetableModel {
-  static toEntityFromLocal(List<TimetableTableData> rtimetable) {
+  static TimetableData toEntityFromLocal(List<TimetableTableData> rtimetable) {
     List<TimetableSlot> sub = [];
     for (var i in rtimetable) {
       var temp = TimetableSlot(

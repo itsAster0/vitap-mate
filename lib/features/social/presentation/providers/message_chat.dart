@@ -151,7 +151,7 @@ class MessageChat extends _$MessageChat {
 
       _updateState();
     } catch (e) {
-      state = AsyncError(e, StackTrace.current);
+      ();
     } finally {
       _isLoading = false;
     }
@@ -170,20 +170,17 @@ class MessageChat extends _$MessageChat {
 
     try {
       if (pb.authStore.record != null) {
-        final now = DateTime.now().toIso8601String();
-
         final optimisticData = {
           'id': messageId,
           'text': text.trim(),
           'user': pb.authStore.record!.id,
-          'created': now,
-          'updated': now,
+
           'files': files.map((f) => p.basename(f.path)).toList(),
           'reply_to': replyToMessageId ?? '',
         };
 
         optimisticMessage = RecordModel.fromJson(optimisticData);
-        _messages.insert(0, optimisticMessage); // Insert at beginning
+        _messages.insert(0, optimisticMessage);
         _optimisticMessageIds.add(messageId);
         _updateState();
       }
@@ -316,22 +313,10 @@ class MessageChat extends _$MessageChat {
       final messageToRemove = _messages.firstWhere(
         (msg) => msg.id == messageId,
       );
-      _messages.removeWhere((msg) => msg.id == messageId);
-      _processedMessageIds.remove(messageId);
-      _optimisticMessageIds.remove(messageId);
-      _updateState();
 
       try {
         await pb.collection('chat_messages').delete(messageId);
       } catch (e) {
-        // Restore message on error
-        final originalIndex = _messages.length;
-        _messages.insert(
-          originalIndex > 0 ? originalIndex - 1 : 0,
-          messageToRemove,
-        );
-        _processedMessageIds.add(messageId);
-        _updateState();
         rethrow;
       }
     } catch (e) {

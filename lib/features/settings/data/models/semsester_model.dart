@@ -2,7 +2,7 @@ import 'package:vitapmate/core/database/database.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class SemidsModel {
-  static fromLocalToEntity(List<SemesterTableData> data) {
+  static SemesterData fromLocalToEntity(List<SemesterTableData> data) {
     List<SemesterInfo> semids = [];
     for (var i in data) {
       semids.add(SemesterInfo(name: i.semName, id: i.semid));

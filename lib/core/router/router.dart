@@ -63,6 +63,7 @@ final routerProvider = Provider((ref) {
               GoRoute(
                 path: '/attendance',
                 name: Paths.attendance,
+
                 builder: (context, state) => AttendancePage(),
               ),
             ],

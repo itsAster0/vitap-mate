@@ -42,14 +42,6 @@ class MessageCard extends HookConsumerWidget {
     final userRole = ref.watch(getRoleProvider(currentUserId ?? ''));
     final editingMessage = ref.watch(editingMessageProvider);
     final isMounted = useIsMounted();
-
-    final canModify = useMemoized(
-      () =>
-          currentUserId == model.getStringValue("user") ||
-          userRole.value == "developer",
-      [currentUserId, userRole.value],
-    );
-
     final isBeingEdited = useMemoized(() => editingMessage?.id == model.id, [
       editingMessage?.id,
       model.id,
@@ -68,16 +60,6 @@ class MessageCard extends HookConsumerWidget {
     );
 
     final isEdited = messageData['createdTime'] != messageData['updatedTime'];
-
-    void showSnackBarSafely(BuildContext context, SnackBar snackBar) {
-      try {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(snackBar);
-        }
-      } catch (e) {
-        log('Could not show SnackBar: ${snackBar.content}');
-      }
-    }
 
     Future<void> editMessage() async {
       if (!context.mounted) return;
@@ -99,28 +81,8 @@ class MessageCard extends HookConsumerWidget {
         HapticFeedback.mediumImpact();
 
         await ref.read(messageChatProvider.notifier).deleteMessage(model.id);
-
-        if (context.mounted && isMounted()) {
-          showSnackBarSafely(
-            context,
-            const SnackBar(
-              content: Text('Message deleted'),
-              duration: Duration(seconds: 2),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
       } catch (e) {
-        if (context.mounted && isMounted()) {
-          showSnackBarSafely(
-            context,
-            SnackBar(
-              content: Text('Failed to delete message: $e'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
+        ();
       } finally {
         if (isMounted()) {
           isDeleting.value = false;
@@ -153,8 +115,9 @@ class MessageCard extends HookConsumerWidget {
           ),
         ),
       ];
-
-      if (canModify) {
+      var userCheck = ref.read(pbProvider).value?.authStore.record;
+      if (userCheck?.id == model.getStringValue("user") ||
+          userCheck!.getStringValue("roles").isNotEmpty) {
         menuItems.addAll([
           const PopupMenuItem(
             value: 'edit',
@@ -902,7 +865,7 @@ class MessageAttachments extends ConsumerWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: files.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
           final filename = files[index];
           final fileUrl = pb.files.getUrl(model, filename).toString();
@@ -1277,7 +1240,7 @@ class UserAvatar extends HookConsumerWidget {
         );
       },
       error:
-          (_, __) => FAvatar(
+          (_, _) => FAvatar(
             image: NetworkImage(""),
             size: 40,
             fallback: Icon(Icons.person, color: Colors.grey),
@@ -1321,7 +1284,7 @@ class UserName extends HookConsumerWidget {
         );
       },
       error:
-          (_, __) => const Text(
+          (_, _) => const Text(
             'Error',
             style: TextStyle(
               fontWeight: FontWeight.w600,
@@ -1360,7 +1323,7 @@ class UserRole extends HookConsumerWidget {
           child: Text(role, style: const TextStyle(fontSize: 11)),
         );
       },
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       loading: () => const SizedBox.shrink(),
     );
   }
