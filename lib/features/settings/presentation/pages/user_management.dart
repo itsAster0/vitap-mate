@@ -1,3 +1,4 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -43,7 +44,21 @@ class UserBox extends HookConsumerWidget {
           );
         },
         error: (e, se) {
-          return Center(child: Text("$e"));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text("Something went worng"),
+                FButton(
+                  onPress: () {
+                    AppSettings.openAppSettings(type: AppSettingsType.settings);
+                  },
+                  child: Text("Fix it "),
+                ),
+                Text("Click the above button and clear the data"),
+              ],
+            ),
+          );
         },
         loading: () {
           return Center(

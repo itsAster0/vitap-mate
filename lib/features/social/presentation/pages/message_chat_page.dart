@@ -9,9 +9,8 @@ class MessageChatPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    var toend = useState(false);
     notifCheck();
-    return MessageScreen(toend: toend);
+    return MessageScreen();
   }
 }
 

@@ -10,6 +10,11 @@ steps:
         from_secret: KEY_STORE
       key_store_props:
         from_secret: KEY_STORE_PROPS
+      firebase:
+        from_secret: FIREBASE
+        
+      GOOGLE_SERVICES:
+        from_secret: GOOGLE_SERVICES
     commands:
       - flutter --version  
       - flutter pub get 
@@ -19,6 +24,9 @@ steps:
       - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
       - echo "$key_store" | base64 -d > android/upload-keystore.jks
       - echo "$key_store_props" | base64 -d > android/keystore.properties 
+      - echo "$firebase" | base64 -d > lib/firebase_options.dart
+      - echo "$GOOGLE_SERVICES" | base64 -d > android/app/google-services.json
+
       - flutter build apk --release --target-platform android-arm64
       - |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d '+' -f1)

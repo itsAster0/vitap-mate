@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pocketbase/pocketbase.dart';
+import 'package:scroll_to_index/scroll_to_index.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/social/presentation/providers/message_chat.dart';
@@ -30,24 +31,43 @@ final replyingMessageProvider = StateProvider<RecordModel?>((ref) => null);
 
 class MessageCard extends HookConsumerWidget {
   final RecordModel model;
-  final ScrollController? scrollController;
+  final AutoScrollController? scrollController;
 
   const MessageCard({super.key, required this.model, this.scrollController});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDeleting = useState(false);
-    final showActions = useState(false);
     final currentUserId = ref.watch(pbProvider).value?.authStore.record?.id;
     final userRole = ref.watch(getRoleProvider(currentUserId ?? ''));
     final editingMessage = ref.watch(editingMessageProvider);
     final isMounted = useIsMounted();
 
-    final canModify =
-        currentUserId == model.getStringValue("user") ||
-        userRole.value == "developer";
+    final canModify = useMemoized(
+      () =>
+          currentUserId == model.getStringValue("user") ||
+          userRole.value == "developer",
+      [currentUserId, userRole.value],
+    );
 
-    final isBeingEdited = editingMessage?.id == model.id;
+    final isBeingEdited = useMemoized(() => editingMessage?.id == model.id, [
+      editingMessage?.id,
+      model.id,
+    ]);
+
+    final messageData = useMemoized(
+      () => ({
+        'text': model.getStringValue("text"),
+        'files': model.getListValue("files"),
+        'createdTime': model.getStringValue("created"),
+        'updatedTime': model.getStringValue("updated"),
+        'userId': model.getStringValue("user"),
+        'replyToId': model.getStringValue("reply_to"),
+      }),
+      [model.data],
+    );
+
+    final isEdited = messageData['createdTime'] != messageData['updatedTime'];
 
     void showSnackBarSafely(BuildContext context, SnackBar snackBar) {
       try {
@@ -61,14 +81,12 @@ class MessageCard extends HookConsumerWidget {
 
     Future<void> editMessage() async {
       if (!context.mounted) return;
-
       HapticFeedback.lightImpact();
       ref.read(editingMessageProvider.notifier).state = model;
     }
 
     Future<void> replyToMessage() async {
       if (!context.mounted) return;
-
       HapticFeedback.lightImpact();
       ref.read(replyingMessageProvider.notifier).state = model;
     }
@@ -186,14 +204,6 @@ class MessageCard extends HookConsumerWidget {
       }
     }
 
-    final messageText = model.getStringValue("text");
-    final files = model.getListValue("files");
-    final createdTime = model.getStringValue("created");
-    final updatedTime = model.getStringValue("updated");
-    final userId = model.getStringValue("user");
-    final replyToId = model.getStringValue("reply_to");
-    final isEdited = createdTime != updatedTime;
-
     return AnimatedContainer(
       key: ValueKey('message_${model.id}'),
       duration: const Duration(milliseconds: 200),
@@ -221,15 +231,16 @@ class MessageCard extends HookConsumerWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            UserAvatar(userId: userId),
+            UserAvatar(userId: messageData['userId'] as String),
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MessageHeader(userId: userId, timestamp: createdTime),
-
+                  MessageHeader(
+                    userId: messageData['userId'] as String,
+                    timestamp: messageData['createdTime'] as String,
+                  ),
                   const SizedBox(height: 6),
 
                   if (isBeingEdited) ...[
@@ -264,15 +275,16 @@ class MessageCard extends HookConsumerWidget {
                     const SizedBox(height: 8),
                   ],
 
-                  if (replyToId.isNotEmpty) ...[
+                  if ((messageData['replyToId'] as String).isNotEmpty) ...[
                     ReplyPreview(
-                      replyToId: replyToId,
+                      replyToId: messageData['replyToId'] as String,
                       scrollController: scrollController,
                     ),
                     const SizedBox(height: 8),
                   ],
 
-                  if (messageText.isNotEmpty) MessageBubble(text: messageText),
+                  if ((messageData['text'] as String).isNotEmpty)
+                    MessageBubble(text: messageData['text'] as String),
 
                   if (isEdited)
                     Padding(
@@ -294,28 +306,15 @@ class MessageCard extends HookConsumerWidget {
                       ),
                     ),
 
-                  if (files.isNotEmpty) ...[
+                  if ((messageData['files'] as List).isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    MessageAttachments(model: model, files: files),
+                    MessageAttachments(
+                      model: model,
+                      files: messageData['files'] as List,
+                    ),
                   ],
 
-                  // Message Actions Row
                   const SizedBox(height: 8),
-
-                  // MessageActions(
-                  //   onReply: replyToMessage,
-                  //   onEdit: canModify ? editMessage : null,
-                  //   onDelete:
-                  //       canModify
-                  //           ? () async {
-
-                  //             if (context.mounted) {
-                  //               await deleteMessage();
-                  //             }
-                  //           }
-                  //           : null,
-                  //   showActions: showActions.value,
-                  // ),
                   if (isDeleting.value)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
@@ -351,111 +350,9 @@ class MessageCard extends HookConsumerWidget {
   }
 }
 
-class MessageActions extends StatelessWidget {
-  final VoidCallback onReply;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
-  final bool showActions;
-
-  const MessageActions({
-    super.key,
-    required this.onReply,
-    this.onEdit,
-    this.onDelete,
-    required this.showActions,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 200),
-      opacity: showActions ? 1.0 : 0.3,
-      child: Row(
-        children: [
-          // Reply button (always visible)
-          MessageActionButton(
-            icon: Icons.reply,
-            label: 'Reply',
-            onTap: onReply,
-            color: Colors.blue,
-          ),
-
-          if (onEdit != null) ...[
-            const SizedBox(width: 8),
-            MessageActionButton(
-              icon: Icons.edit,
-              label: 'Edit',
-              onTap: onEdit!,
-              color: Colors.orange,
-            ),
-          ],
-
-          if (onDelete != null) ...[
-            const SizedBox(width: 8),
-            MessageActionButton(
-              icon: Icons.delete,
-              label: 'Delete',
-              onTap: onDelete!,
-              color: Colors.red,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class MessageActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color color;
-
-  const MessageActionButton({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FTappable(
-      onPress: () {
-        HapticFeedback.lightImpact();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: .3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: color,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class ReplyPreview extends HookConsumerWidget {
   final String replyToId;
-  final ScrollController? scrollController;
+  final AutoScrollController? scrollController;
 
   const ReplyPreview({
     super.key,
@@ -491,49 +388,17 @@ class ReplyPreview extends HookConsumerWidget {
       return null;
     }, [replyToId]);
 
-    void showSnackBarSafely(BuildContext context, SnackBar snackBar) {
-      try {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(snackBar);
-        }
-      } catch (e) {
-        log('Could not show SnackBar: ${snackBar.content}');
-      }
-    }
-
     void scrollToMessage(
       String messageId,
       WidgetRef ref,
       BuildContext context,
     ) async {
       if (scrollController == null || !scrollController!.hasClients) return;
-
       if (!context.mounted) return;
 
       HapticFeedback.lightImpact();
 
       try {
-        showSnackBarSafely(
-          context,
-          const SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text('Finding message...'),
-              ],
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
-
         final messageChatNotifier = ref.read(messageChatProvider.notifier);
         final messageIndex = await messageChatNotifier.findMessageIndex(
           messageId,
@@ -542,56 +407,24 @@ class ReplyPreview extends HookConsumerWidget {
         if (!context.mounted) return;
 
         if (messageIndex == null) {
-          showSnackBarSafely(
-            context,
-            const SnackBar(
-              content: Text('Message not found or too old'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
           return;
         }
 
         const double estimatedMessageHeight = 120.0;
-        const double headerHeight = 60.0;
-
-        final targetOffset =
-            headerHeight + (messageIndex * estimatedMessageHeight);
-
-        await scrollController!.animateTo(
-          targetOffset.clamp(0.0, scrollController!.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeInOut,
+        final targetOffset = messageIndex * estimatedMessageHeight;
+        await scrollController!.scrollToIndex(
+          messageIndex,
+          preferPosition: AutoScrollPosition.middle,
         );
 
         if (!context.mounted) return;
-
         HapticFeedback.selectionClick();
-        showSnackBarSafely(
-          context,
-          const SnackBar(
-            content: Text('Message found!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 1),
-          ),
-        );
 
         log(
           'Scrolled to message $messageId at index $messageIndex, offset: $targetOffset',
         );
       } catch (e) {
         log('Error scrolling to message: $e');
-        if (context.mounted) {
-          showSnackBarSafely(
-            context,
-            const SnackBar(
-              content: Text('Failed to find message'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
       }
     }
 
@@ -909,11 +742,6 @@ class MessageBubble extends StatelessWidget {
           color: Colors.black87,
           height: 1.4,
         ),
-        // contextMenuBuilder: (context, editableTextState) {
-        //   return AdaptiveTextSelectionToolbar.editableText(
-        //     editableTextState: editableTextState,
-        //   );
-        // },
       ),
     );
   }
@@ -1179,7 +1007,6 @@ class AttachmentThumbnail extends StatelessWidget {
                 )
               else
                 _buildFilePreview(),
-
               Positioned(
                 top: 4,
                 right: 4,
@@ -1285,7 +1112,6 @@ class AttachmentThumbnail extends StatelessWidget {
                       ],
                     ),
                   ),
-
                   Flexible(
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -1375,7 +1201,6 @@ class AttachmentThumbnail extends StatelessWidget {
                               ),
                     ),
                   ),
-
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(

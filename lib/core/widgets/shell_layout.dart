@@ -105,7 +105,39 @@ Widget? getSidewidget(BuildContext context, String data, String path) {
   }
   return FHeader.nested(
     title: Text(data),
-    prefixes: [],
+    prefixes: [if (path.contains("social")) InfoSocial()],
     suffixes: [if (path.contains("social")) LogoutButton()],
   );
+}
+
+class InfoSocial extends StatelessWidget {
+  const InfoSocial({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: FTappable(
+        onPress:
+            () => showAdaptiveDialog(
+              context: context,
+              builder:
+                  (context) => FDialog(
+                    direction: Axis.horizontal,
+                    title: const Text('What information is shown?'),
+                    body: const Text(
+                      'Only your name and avatar are visible to others. You can change both anytime in Settings. '
+                      'Your email remains private and is never shared.',
+                    ),
+                    actions: [
+                      FButton(
+                        onPress: () => Navigator.of(context).pop(),
+                        child: const Text('Ok'),
+                      ),
+                    ],
+                  ),
+            ),
+        child: const Icon(FIcons.info),
+      ),
+    );
+  }
 }

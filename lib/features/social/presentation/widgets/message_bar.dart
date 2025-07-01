@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:growthbook_sdk_flutter/growthbook_sdk_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,8 +10,7 @@ import 'package:vitapmate/features/social/presentation/providers/message_chat.da
 import 'package:vitapmate/features/social/presentation/widgets/message_card.dart';
 
 class MessageBar extends HookConsumerWidget {
-  final ValueNotifier toend;
-  const MessageBar({super.key, required this.toend});
+  const MessageBar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,19 +19,20 @@ class MessageBar extends HookConsumerWidget {
     final files = useState<List<File>>([]);
     final picker = ImagePicker();
     final errorMsg = useState<String?>(null);
-    final focusNode = useFocusNode();
 
     final replyingMessage = ref.watch(replyingMessageProvider);
     final editingMessage = ref.watch(editingMessageProvider);
     final isReplying = replyingMessage != null;
     final isEditing = editingMessage != null;
 
+    final fileOperations = useMemoized(() => _FileOperations(), []);
+
     useEffect(() {
       if (isEditing) {
         controller.text = editingMessage.getStringValue("text");
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          focusNode.requestFocus();
-        });
+        // WidgetsBinding.instance.addPostFrameCallback((_) {
+
+        // });
       } else if (!isReplying) {
         controller.clear();
         files.value = [];
@@ -72,20 +71,7 @@ class MessageBar extends HookConsumerWidget {
         );
 
         if (result != null) {
-          final newFiles = <File>[];
-
-          for (final platformFile in result.files) {
-            if (platformFile.path != null) {
-              final file = File(platformFile.path!);
-              final fileSize = await file.length();
-
-              if (fileSize <= 10 * 1024 * 1024) {
-                if (!files.value.any((f) => f.path == file.path)) {
-                  newFiles.add(file);
-                }
-              }
-            }
-          }
+          final newFiles = await fileOperations.processFiles(result.files);
 
           if (newFiles.isNotEmpty) {
             files.value = [...files.value, ...newFiles];
@@ -101,36 +87,6 @@ class MessageBar extends HookConsumerWidget {
       }
     }
 
-    Future<void> pickImage() async {
-      try {
-        HapticFeedback.lightImpact();
-
-        final picked = await picker.pickImage(
-          source: ImageSource.gallery,
-          imageQuality: 80,
-          maxWidth: 1920,
-          maxHeight: 1920,
-        );
-
-        if (picked != null) {
-          final file = File(picked.path);
-
-          final fileSize = await file.length();
-          if (fileSize > 10 * 1024 * 1024) {
-            errorMsg.value = "File too large (max 10MB)";
-            return;
-          }
-
-          if (!files.value.any((f) => f.path == file.path)) {
-            files.value = [...files.value, file];
-            HapticFeedback.selectionClick();
-          }
-        }
-      } catch (e) {
-        errorMsg.value = "Failed to pick image";
-      }
-    }
-
     Future<void> pickMultipleImages() async {
       try {
         HapticFeedback.lightImpact();
@@ -142,18 +98,7 @@ class MessageBar extends HookConsumerWidget {
         );
 
         if (picked.isNotEmpty) {
-          final newFiles = <File>[];
-
-          for (final xFile in picked) {
-            final file = File(xFile.path);
-            final fileSize = await file.length();
-
-            if (fileSize <= 10 * 1024 * 1024) {
-              if (!files.value.any((f) => f.path == file.path)) {
-                newFiles.add(file);
-              }
-            }
-          }
+          final newFiles = await fileOperations.processXFiles(picked);
 
           if (newFiles.isNotEmpty) {
             files.value = [...files.value, ...newFiles];
@@ -176,65 +121,6 @@ class MessageBar extends HookConsumerWidget {
       files.value = newFiles;
     }
 
-    String getFileExtension(String filename) {
-      return filename.toLowerCase().split('.').last;
-    }
-
-    bool isImage0(String filename) {
-      final ext = getFileExtension(filename);
-      return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext);
-    }
-
-    IconData getFileIcon(String filename) {
-      final ext = getFileExtension(filename);
-
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext)) {
-        return Icons.image;
-      } else if ([
-        'mp4',
-        'avi',
-        'mov',
-        'wmv',
-        'flv',
-        'webm',
-        'mkv',
-      ].contains(ext)) {
-        return Icons.video_file;
-      } else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].contains(ext)) {
-        return Icons.audio_file;
-      } else if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].contains(ext)) {
-        return Icons.description;
-      } else if (['zip', 'rar', '7z', 'tar', 'gz'].contains(ext)) {
-        return Icons.archive;
-      }
-      return Icons.insert_drive_file;
-    }
-
-    Color getFileColor(String filename) {
-      final ext = getFileExtension(filename);
-
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext)) {
-        return Colors.green;
-      } else if ([
-        'mp4',
-        'avi',
-        'mov',
-        'wmv',
-        'flv',
-        'webm',
-        'mkv',
-      ].contains(ext)) {
-        return Colors.red;
-      } else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].contains(ext)) {
-        return Colors.purple;
-      } else if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].contains(ext)) {
-        return Colors.blue;
-      } else if (['zip', 'rar', '7z', 'tar', 'gz'].contains(ext)) {
-        return Colors.orange;
-      }
-      return Colors.grey;
-    }
-
     Future<void> sendMessage() async {
       try {
         errorMsg.value = null;
@@ -244,7 +130,6 @@ class MessageBar extends HookConsumerWidget {
         if (value.isEmpty) {
           errorMsg.value = "Enter some text or add a file";
           HapticFeedback.lightImpact();
-          focusNode.requestFocus();
           return;
         }
 
@@ -275,8 +160,6 @@ class MessageBar extends HookConsumerWidget {
                 files: files.value,
                 replyToMessageId: replyingMessage?.id,
               );
-
-          toend.value = !toend.value;
 
           if (isReplying) {
             ref.read(replyingMessageProvider.notifier).state = null;
@@ -361,91 +244,11 @@ class MessageBar extends HookConsumerWidget {
                         itemBuilder: (context, index) {
                           final file = files.value[index];
                           final filename = file.path.split('/').last;
-                          final isImage = isImage0(filename);
 
-                          return Stack(
-                            children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.grey.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child:
-                                      isImage
-                                          ? Image.file(
-                                            file,
-                                            height: 80,
-                                            width: 80,
-                                            fit: BoxFit.cover,
-                                          )
-                                          : Container(
-                                            color: getFileColor(
-                                              filename,
-                                            ).withValues(alpha: 0.1),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  getFileIcon(filename),
-                                                  size: 24,
-                                                  color: getFileColor(filename),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 4,
-                                                      ),
-                                                  child: Text(
-                                                    filename.length > 10
-                                                        ? '${filename.substring(0, 7)}...'
-                                                        : filename,
-                                                    style: TextStyle(
-                                                      fontSize: 8,
-                                                      color: getFileColor(
-                                                        filename,
-                                                      ),
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                ),
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: FTappable(
-                                  onPress: () => removeFile(index),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      size: 12,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                          return _FilePreview(
+                            file: file,
+                            filename: filename,
+                            onRemove: () => removeFile(index),
                           );
                         },
                       ),
@@ -476,10 +279,7 @@ class MessageBar extends HookConsumerWidget {
                         case 'files':
                           pickFiles();
                           break;
-                        case 'single':
-                          pickImage();
-                          break;
-                        case 'multiple':
+                        case 'Images':
                           pickMultipleImages();
                           break;
                       }
@@ -492,27 +292,17 @@ class MessageBar extends HookConsumerWidget {
                               children: [
                                 Icon(Icons.attach_file, size: 18),
                                 SizedBox(width: 8),
-                                Text('Any Files'),
+                                Text('Files'),
                               ],
                             ),
                           ),
                           const PopupMenuItem(
-                            value: 'single',
-                            child: Row(
-                              children: [
-                                Icon(Icons.image, size: 18),
-                                SizedBox(width: 8),
-                                Text('Single Image'),
-                              ],
-                            ),
-                          ),
-                          const PopupMenuItem(
-                            value: 'multiple',
+                            value: 'Images',
                             child: Row(
                               children: [
                                 Icon(Icons.photo_library, size: 18),
                                 SizedBox(width: 8),
-                                Text('Multiple Images'),
+                                Text('Images'),
                               ],
                             ),
                           ),
@@ -522,31 +312,26 @@ class MessageBar extends HookConsumerWidget {
                 if (!isEditing) const SizedBox(width: 8),
 
                 Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    child: FTextField.multiline(
-                      controller: controller,
-                      focusNode: focusNode,
-                      hint:
-                          isEditing
-                              ? "Edit message..."
-                              : isReplying
-                              ? "Reply to message..."
-                              : "Type a message...",
-                      maxLines: 6,
-                      minLines: 1,
-                      enabled: !isLoading.value,
-                      onSubmit: (value) {
-                        if (!HardwareKeyboard.instance.isShiftPressed) {
-                          sendMessage();
-                        }
-                      },
-                    ),
+                  child: FTextField.multiline(
+                    controller: controller,
+                    hint:
+                        isEditing
+                            ? "Edit message..."
+                            : isReplying
+                            ? "Reply to message..."
+                            : "Type a message...",
+                    maxLines: 6,
+                    minLines: 1,
+                    enabled: !isLoading.value,
+                    onSubmit: (value) {
+                      if (!HardwareKeyboard.instance.isShiftPressed) {
+                        sendMessage();
+                      }
+                    },
                   ),
                 ),
 
                 const SizedBox(width: 8),
-
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   child: FTappable(
@@ -636,6 +421,178 @@ class MessageBar extends HookConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _FileOperations {
+  Future<List<File>> processFiles(List<PlatformFile> platformFiles) async {
+    final newFiles = <File>[];
+
+    for (final platformFile in platformFiles) {
+      if (platformFile.path != null) {
+        final file = File(platformFile.path!);
+        final fileSize = await file.length();
+
+        if (fileSize <= 10 * 1024 * 1024) {
+          newFiles.add(file);
+        }
+      }
+    }
+
+    return newFiles;
+  }
+
+  Future<List<File>> processXFiles(List<XFile> xFiles) async {
+    final newFiles = <File>[];
+
+    for (final xFile in xFiles) {
+      final file = File(xFile.path);
+      final fileSize = await file.length();
+
+      if (fileSize <= 10 * 1024 * 1024) {
+        newFiles.add(file);
+      }
+    }
+
+    return newFiles;
+  }
+}
+
+class _FilePreview extends StatelessWidget {
+  final File file;
+  final String filename;
+  final VoidCallback onRemove;
+
+  const _FilePreview({
+    required this.file,
+    required this.filename,
+    required this.onRemove,
+  });
+
+  String getFileExtension(String filename) {
+    return filename.toLowerCase().split('.').last;
+  }
+
+  bool isImage(String filename) {
+    final ext = getFileExtension(filename);
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext);
+  }
+
+  IconData getFileIcon(String filename) {
+    final ext = getFileExtension(filename);
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext)) {
+      return Icons.image;
+    } else if ([
+      'mp4',
+      'avi',
+      'mov',
+      'wmv',
+      'flv',
+      'webm',
+      'mkv',
+    ].contains(ext)) {
+      return Icons.video_file;
+    } else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].contains(ext)) {
+      return Icons.audio_file;
+    } else if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].contains(ext)) {
+      return Icons.description;
+    } else if (['zip', 'rar', '7z', 'tar', 'gz'].contains(ext)) {
+      return Icons.archive;
+    }
+    return Icons.insert_drive_file;
+  }
+
+  Color getFileColor(String filename) {
+    final ext = getFileExtension(filename);
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext)) {
+      return Colors.green;
+    } else if ([
+      'mp4',
+      'avi',
+      'mov',
+      'wmv',
+      'flv',
+      'webm',
+      'mkv',
+    ].contains(ext)) {
+      return Colors.red;
+    } else if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].contains(ext)) {
+      return Colors.purple;
+    } else if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'].contains(ext)) {
+      return Colors.blue;
+    } else if (['zip', 'rar', '7z', 'tar', 'gz'].contains(ext)) {
+      return Colors.orange;
+    }
+    return Colors.grey;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child:
+                isImage(filename)
+                    ? Image.file(file, height: 80, width: 80, fit: BoxFit.cover)
+                    : Container(
+                      color: getFileColor(filename).withValues(alpha: 0.1),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            getFileIcon(filename),
+                            size: 24,
+                            color: getFileColor(filename),
+                          ),
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              filename.length > 10
+                                  ? '${filename.substring(0, 7)}...'
+                                  : filename,
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: getFileColor(filename),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: FTappable(
+            onPress: onRemove,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, size: 12, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -14,7 +14,7 @@ part 'message_chat.g.dart';
 class MessageChat extends _$MessageChat {
   int _page = 1;
   int _totalPages = 0;
-  final int _perpage = 10;
+  final int _perpage = 50;
   List<RecordModel> _messages = [];
   bool _isLoading = false;
   Timer? _debounceTimer;
@@ -37,7 +37,7 @@ class MessageChat extends _$MessageChat {
             expand: 'reply_to',
           );
 
-      _messages = resultList.items.reversed.toList();
+      _messages = resultList.items;
       _totalPages = resultList.totalPages;
       _page = 1;
 
@@ -93,7 +93,7 @@ class MessageChat extends _$MessageChat {
       _messages[optimisticIndex] = record;
       _optimisticMessageIds.remove(record.id);
     } else {
-      _messages.add(record);
+      _messages.insert(0, record);
     }
 
     _processedMessageIds.add(record.id);
@@ -143,13 +143,13 @@ class MessageChat extends _$MessageChat {
 
       _page = 1;
       _totalPages = resultList.totalPages;
-      _messages = resultList.items.reversed.toList();
+      _messages = resultList.items;
 
       _processedMessageIds.clear();
       _optimisticMessageIds.clear();
       _processedMessageIds.addAll(_messages.map((msg) => msg.id));
 
-      state = AsyncData([..._messages]);
+      _updateState();
     } catch (e) {
       state = AsyncError(e, StackTrace.current);
     } finally {
@@ -180,14 +180,12 @@ class MessageChat extends _$MessageChat {
           'updated': now,
           'files': files.map((f) => p.basename(f.path)).toList(),
           'reply_to': replyToMessageId ?? '',
-          'collectionId': 'chat_messages',
-          'collectionName': 'chat_messages',
         };
 
         optimisticMessage = RecordModel.fromJson(optimisticData);
-        _messages.add(optimisticMessage);
+        _messages.insert(0, optimisticMessage); // Insert at beginning
         _optimisticMessageIds.add(messageId);
-        state = AsyncData([..._messages]);
+        _updateState();
       }
 
       final body = <String, dynamic>{
@@ -209,14 +207,12 @@ class MessageChat extends _$MessageChat {
           ),
       ];
 
-      final newRecord = await pb
-          .collection('chat_messages')
-          .create(body: body, files: sfiles);
+      await pb.collection('chat_messages').create(body: body, files: sfiles);
     } catch (e) {
       if (optimisticMessage != null) {
         _messages.removeWhere((msg) => msg.id == messageId);
         _optimisticMessageIds.remove(messageId);
-        state = AsyncData([..._messages]);
+        _updateState();
       }
 
       throw Exception('Failed to send message: $e');
@@ -240,16 +236,16 @@ class MessageChat extends _$MessageChat {
             expand: 'reply_to',
           );
 
-      final olderMessages = resultList.items.reversed.toList();
+      final olderMessages = resultList.items;
 
       for (final msg in olderMessages) {
         _processedMessageIds.add(msg.id);
       }
 
-      _messages = [...olderMessages, ..._messages];
+      _messages.addAll(olderMessages);
       _page = nextPage;
 
-      state = AsyncData([..._messages]);
+      _updateState();
       return true;
     } catch (e) {
       log('Failed to load more messages: $e');
@@ -284,26 +280,23 @@ class MessageChat extends _$MessageChat {
     }
   }
 
-  int? getMessageIndexById(String id) {
-    try {
-      return _messages.indexWhere((msg) => msg.id == id);
-    } catch (e) {
-      return null;
-    }
+  int getMessageIndexById(String id) {
+    var k = _messages.indexWhere((msg) => msg.id == id);
+    return k;
   }
 
   Future<int?> findMessageIndex(String messageId) async {
     int? index = getMessageIndexById(messageId);
-    if (index != null && index != -1) {
+
+    if (index != -1) {
       return index;
     }
-
     while (_page < _totalPages) {
       final hasMore = await loadMoreMessages();
       if (!hasMore) break;
 
       index = getMessageIndexById(messageId);
-      if (index != null && index != -1) {
+      if (index != -1) {
         return index;
       }
     }
@@ -313,7 +306,6 @@ class MessageChat extends _$MessageChat {
 
   // ignore: avoid_public_notifier_properties
   bool get hasMoreMessages => _page < _totalPages;
-
   // ignore: avoid_public_notifier_properties
   bool get isLoadingMore => _isLoading;
 
@@ -327,19 +319,19 @@ class MessageChat extends _$MessageChat {
       _messages.removeWhere((msg) => msg.id == messageId);
       _processedMessageIds.remove(messageId);
       _optimisticMessageIds.remove(messageId);
-      state = AsyncData([..._messages]);
+      _updateState();
 
       try {
         await pb.collection('chat_messages').delete(messageId);
       } catch (e) {
-        _messages.add(messageToRemove);
-        _processedMessageIds.add(messageId);
-        _messages.sort(
-          (a, b) => DateTime.parse(
-            a.getStringValue('created'),
-          ).compareTo(DateTime.parse(b.getStringValue('created'))),
+        // Restore message on error
+        final originalIndex = _messages.length;
+        _messages.insert(
+          originalIndex > 0 ? originalIndex - 1 : 0,
+          messageToRemove,
         );
-        state = AsyncData([..._messages]);
+        _processedMessageIds.add(messageId);
+        _updateState();
         rethrow;
       }
     } catch (e) {
@@ -372,7 +364,7 @@ class MessageChat extends _$MessageChat {
         }
 
         _messages[messageIndex] = RecordModel.fromJson(updatedData);
-        state = AsyncData([..._messages]);
+        _updateState();
       }
 
       try {
@@ -400,12 +392,12 @@ class MessageChat extends _$MessageChat {
 
         if (messageIndex != -1) {
           _messages[messageIndex] = updatedRecord;
-          state = AsyncData([..._messages]);
+          _updateState();
         }
       } catch (e) {
         if (originalMessage != null && messageIndex != -1) {
           _messages[messageIndex] = originalMessage;
-          state = AsyncData([..._messages]);
+          _updateState();
         }
         rethrow;
       }
@@ -418,33 +410,12 @@ class MessageChat extends _$MessageChat {
     return _optimisticMessageIds.contains(message.id);
   }
 
-  // Future<void> retryOptimisticMessage(RecordModel optimisticMessage) async {
-  //   try {
-  //     final text = optimisticMessage.getStringValue('text');
-  //     final replyToId = optimisticMessage.getStringValue('reply_to');
-  //     final files = <File>[];
-
-  //     _messages.removeWhere((msg) => msg.id == optimisticMessage.id);
-  //     _optimisticMessageIds.remove(optimisticMessage.id);
-  //     state = AsyncData([..._messages]);
-
-  //     await create(
-  //       text,
-  //       files: files,
-  //       replyToMessageId: replyToId.isNotEmpty ? replyToId : null,
-  //     );
-  //   } catch (e) {
-  //     log('Failed to retry optimistic message: $e');
-  //     rethrow;
-  //   }
-  // }
-
   void clearOptimisticMessages() {
     final hadOptimistic = _optimisticMessageIds.isNotEmpty;
     if (hadOptimistic) {
       _messages.removeWhere((msg) => _optimisticMessageIds.contains(msg.id));
       _optimisticMessageIds.clear();
-      state = AsyncData([..._messages]);
+      _updateState();
     }
   }
 
