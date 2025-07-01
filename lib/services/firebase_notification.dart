@@ -101,22 +101,6 @@ class NotificationService {
         ();
       }
     });
-    FirebaseMessaging.instance.getInitialMessage().then((
-      RemoteMessage? message,
-    ) {
-      if (message != null) {
-        if (rootNavigatorKey.currentContext == null) return;
-        GoRouter.of(rootNavigatorKey.currentContext!).goNamed(Paths.social);
-      }
-    });
-
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        final context = rootNavigatorKey.currentContext;
-        if (context == null || !context.mounted) return;
-        GoRouter.of(context).goNamed(Paths.social);
-      }
-    });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       log('Notification tapped: ${message.notification?.title}');

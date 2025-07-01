@@ -1,19 +1,15 @@
 // lib/features/timetable/presentation/pages/timetable_page.dart
 import 'dart:developer';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
-import 'package:vitapmate/services/update_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetablePage extends HookConsumerWidget {
@@ -21,20 +17,6 @@ class TimetablePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        Future.microtask(() {
-          UpdateService.checkForFlexibleUpdate();
-        });
-        var value = await FirebaseMessaging.instance.getInitialMessage();
-        if (!context.mounted || value == null) return;
-        if (value.data["type"] == "chat") {
-          GoRouter.of(context).pushNamed(Paths.social);
-        }
-      });
-      return null;
-    }, []);
-
     final key = useMemoized(() => GlobalKey());
     final selectedDay = useState<int>(DateTime.now().weekday);
     final finalDay = useState<List<int>>([]);
