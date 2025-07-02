@@ -39,7 +39,6 @@ class MessageCard extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDeleting = useState(false);
     final currentUserId = ref.watch(pbProvider).value?.authStore.record?.id;
-    final userRole = ref.watch(getRoleProvider(currentUserId ?? ''));
     final editingMessage = ref.watch(editingMessageProvider);
     final isMounted = useIsMounted();
     final isBeingEdited = useMemoized(() => editingMessage?.id == model.id, [
@@ -1270,7 +1269,7 @@ class UserName extends HookConsumerWidget {
     return userDataAsync.when(
       data: (data) {
         final record = data.$1;
-        final name = record.getStringValue('name');
+        final name = record.getStringValue('name').trim();
         return ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.5,
@@ -1311,11 +1310,12 @@ class UserRole extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final roleAsync = ref.watch(getRoleProvider(userId));
+    final roleAsync = ref.watch(getUserrecordProvider(userId));
 
     return roleAsync.when(
-      data: (role) {
-        if (role == null || role == "student") {
+      data: (record) {
+        var role = record.$1.getStringValue("roles");
+        if (role.isEmpty || role == "student") {
           return const SizedBox.shrink();
         }
         return FBadge(

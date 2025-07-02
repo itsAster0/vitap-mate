@@ -26,7 +26,7 @@ final allUsersProviderProvider =
 // ignore: unused_element
 typedef AllUsersProviderRef =
     AutoDisposeFutureProviderRef<(List<VtopUserEntity>, String?)>;
-String _$vtopusersutilsHash() => r'9940ab8666972a948716ef21c8ab60289f275499';
+String _$vtopusersutilsHash() => r'2e69e8dc9885a277a4f909eaef6dcaa1d0daf55c';
 
 /// See also [Vtopusersutils].
 @ProviderFor(Vtopusersutils)

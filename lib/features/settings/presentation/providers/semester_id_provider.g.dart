@@ -6,7 +6,7 @@ part of 'semester_id_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$semesterIdHash() => r'2290e47224bd10c0ccefc34a43a64563a37099ba';
+String _$semesterIdHash() => r'58848ffd590275026b2651024ae7186f5b9756ea';
 
 /// See also [SemesterId].
 @ProviderFor(SemesterId)

@@ -34,14 +34,3 @@ Stream<(RecordModel, PocketBase)> getUserrecord(Ref ref, String id) async* {
 
   yield* controller.stream;
 }
-
-@riverpod
-Future<String?> getRole(Ref ref, String id) async {
-  var pb = await ref.watch(pbProvider.future);
-  try {
-    final record = await pb.collection('roles').getFirstListItem('user="$id"');
-    return record.getStringValue('role');
-  } catch (e) {
-    return null;
-  }
-}

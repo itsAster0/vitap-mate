@@ -6,7 +6,7 @@ part of 'attendance_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$attendanceHash() => r'48f9b0800bac72675377ae8d70d19257d0bef322';
+String _$attendanceHash() => r'14597710a65508b2eda614d41463f3ba2cb0d021';
 
 /// See also [Attendance].
 @ProviderFor(Attendance)
