@@ -339,6 +339,7 @@ class AttendanceCard extends HookConsumerWidget {
             courseId: record.courseId,
             courseType: record.courseType,
             exp: true,
+            facultyName: record.facultyDetail,
           ),
     );
   }

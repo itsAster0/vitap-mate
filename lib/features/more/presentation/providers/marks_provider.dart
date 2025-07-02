@@ -18,14 +18,6 @@ class Marks extends _$Marks {
     if (data.records.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
       data = await _update();
-    } else {
-      Future.microtask(() async {
-        try {
-          await updatemarks();
-        } catch (e) {
-          log("$e", level: 900);
-        }
-      });
     }
     log("timetabel Build done");
     return data;

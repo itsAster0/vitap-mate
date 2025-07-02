@@ -18,14 +18,6 @@ class ExamSchedule extends _$ExamSchedule {
     if (data.semesterId.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
       data = await _update();
-    } else {
-      Future.microtask(() async {
-        try {
-          await updatexamschedule();
-        } catch (e) {
-          log("$e", level: 900);
-        }
-      });
     }
     log("exam schedule Build done");
     return data;

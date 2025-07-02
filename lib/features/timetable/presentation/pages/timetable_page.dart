@@ -22,6 +22,19 @@ class TimetablePage extends HookConsumerWidget {
     final finalDay = useState<List<int>>([]);
     final timetableData = ref.watch(timetableProvider);
     final startX = useState<double?>(null);
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future(() async {
+          try {
+            await ref.read(timetableProvider.notifier).updateTimetable();
+          } catch (e, _) {
+            ();
+          }
+        });
+      });
+
+      return null;
+    }, []);
 
     Future<void> update() async {
       try {

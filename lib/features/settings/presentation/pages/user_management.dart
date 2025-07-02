@@ -25,6 +25,18 @@ class UserBox extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future(() async {
+          try {
+            await ref.read(semesterIdProvider.notifier).updatesemids();
+          } catch (e, _) {
+            ();
+          }
+        });
+      });
+      return null;
+    }, []);
     var users = ref.watch(allUsersProviderProvider);
     return ConstrainedBox(
       constraints: BoxConstraints(

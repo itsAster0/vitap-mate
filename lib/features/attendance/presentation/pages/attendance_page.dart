@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -24,6 +25,19 @@ class AttendancePage extends HookConsumerWidget {
         }
       }
     }
+
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future(() async {
+          try {
+            await ref.read(attendanceProvider.notifier).updateAttendance();
+          } catch (e, _) {
+            ();
+          }
+        });
+      });
+      return null;
+    }, []);
 
     var attendanceData = ref.watch(attendanceProvider);
     return RefreshIndicator(

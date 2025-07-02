@@ -16,19 +16,12 @@ class Timetable extends _$Timetable {
     var timetableRepository = await ref.watch(
       timetableRepositoryProvider.future,
     );
+
     TimetableData timetable =
         await GetTimetableUsecase(timetableRepository).call();
     if (timetable.slots.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
       timetable = await _update();
-    } else {
-      Future.microtask(() async {
-        try {
-          await updateTimetable();
-        } catch (e) {
-          log("$e", level: 900);
-        }
-      });
     }
     log("timetabel Build done");
     return timetable;

@@ -22,14 +22,6 @@ class Attendance extends _$Attendance {
       await ref.read(vClientProvider.notifier).tryLogin();
 
       attendance = await _update();
-    } else {
-      Future.microtask(() async {
-        try {
-          await updateAttendance();
-        } catch (e) {
-          log("$e", level: 900);
-        }
-      });
     }
     log("attendance build done");
     return attendance;

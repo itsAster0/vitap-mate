@@ -39,7 +39,7 @@ class MyApp extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final goRouter = ref.watch(routerProvider);
     useEffect(() {
-      Future.microtask(() async {
+      Future(() async {
         await Future.delayed(Duration(milliseconds: 500));
         UpdateService.checkForFlexibleUpdate();
         var value = await FirebaseMessaging.instance.getInitialMessage();
@@ -51,6 +51,7 @@ class MyApp extends HookConsumerWidget {
       });
       return null;
     }, []);
+
     final fTheme = FThemes.zinc.light;
     return MaterialApp.router(
       routeInformationProvider: goRouter.routeInformationProvider,

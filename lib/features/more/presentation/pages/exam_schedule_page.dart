@@ -1,7 +1,7 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
@@ -15,7 +15,6 @@ class ExamSchedulePage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     Future<void> update() async {
       try {
-        await ref.read(vClientProvider.notifier).tryLogin();
         await ref.read(examScheduleProvider.notifier).updatexamschedule();
       } catch (e) {
         log("$e");
@@ -23,6 +22,18 @@ class ExamSchedulePage extends HookConsumerWidget {
       }
     }
 
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future(() async {
+          try {
+            await ref.read(examScheduleProvider.notifier).updatexamschedule();
+          } catch (e, _) {
+            ();
+          }
+        });
+      });
+      return null;
+    }, []);
     var examData = ref.watch(examScheduleProvider);
     return RefreshIndicator(
       onRefresh: () async {

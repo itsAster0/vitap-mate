@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -9,28 +10,44 @@ class AttendanceTable extends HookConsumerWidget {
   final String courseId;
   final String courseType;
   final bool exp;
+  final String facultyName;
 
   const AttendanceTable({
     super.key,
     required this.courseId,
     required this.courseType,
     required this.exp,
+    required this.facultyName,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future(() async {
+          try {
+            await ref
+                .read(FullAttendanceProvider(courseType, courseId).notifier)
+                .updateAttendance();
+          } catch (e, _) {
+            ();
+          }
+        });
+      });
+      return null;
+    }, []);
 
     return Container(
       height: double.infinity,
       width: double.infinity,
       decoration: BoxDecoration(
         color: context.theme.colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
       ),
       child: Column(
         children: [
-          _buildHeader(context),
+          _buildHeader(context, facultyName),
           Expanded(
             child: dataAsync.when(
               data: (data) => _buildTableContent(context, data),
@@ -43,7 +60,7 @@ class AttendanceTable extends HookConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, String name) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -54,10 +71,8 @@ class AttendanceTable extends HookConsumerWidget {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AttendanceColors.theoryIcon.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.table_chart_rounded,
@@ -66,10 +81,10 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
           const SizedBox(width: 12),
-          const Text(
-            "Attendance Details",
-            style: TextStyle(
-              fontSize: 18,
+          Text(
+            "by $name",
+            style: const TextStyle(
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AttendanceColors.primaryText,
             ),
@@ -88,7 +103,7 @@ class AttendanceTable extends HookConsumerWidget {
       children: [
         Expanded(
           child: Container(
-            margin: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AttendanceColors.tableBackground,
               borderRadius: BorderRadius.circular(12),

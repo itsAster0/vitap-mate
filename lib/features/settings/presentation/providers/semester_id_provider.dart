@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/features/settings/domine/repositories/semids_repo.dart';
@@ -16,14 +15,6 @@ class SemesterId extends _$SemesterId {
     var data = await GetSemidsUsecase(semidRepository).call();
     if (data.semesters.isEmpty) {
       data = await UpdateSemidsUsecsae(semidRepository).call();
-    } else {
-      Future.microtask(() async {
-        try {
-          await updatesemids();
-        } catch (e) {
-          log("$e", level: 900);
-        }
-      });
     }
 
     return data;
