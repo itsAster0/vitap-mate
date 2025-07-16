@@ -348,5 +348,10 @@ class AttendanceCard extends HookConsumerWidget {
 (String, String) formateName(String name) {
   final splitName = name.split("-");
   if (splitName.length < 2) return ("", name);
-  return (splitName[0], splitName[1]);
+  var nName = splitName[1];
+  if (splitName.length > 3) {
+    nName += "-${splitName[2]}";
+  }
+
+  return (splitName[0], nName);
 }

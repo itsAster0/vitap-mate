@@ -23,13 +23,13 @@ class VClient extends _$VClient {
       vtopUserProvider.selectAsync((user) => user.password),
     );
     log("Vtop client build sucessfull");
-    Future.microtask(() async {
-      try {
-        await tryLogin();
-      } catch (e) {
-        log("$e");
-      }
-    });
+    // Future.microtask(() async {
+    //   try {
+    //     await tryLogin();
+    //   } catch (e) {
+    //     log("$e");
+    //   }
+    // });
     return getVtopClient(username: username!, password: password!);
   }
 

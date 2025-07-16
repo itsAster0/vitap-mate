@@ -126,6 +126,7 @@ class TimetableCard extends HookWidget {
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
   ) {
+   
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -195,9 +196,9 @@ class TimetableCard extends HookWidget {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            height: 1.2,
+            //height: 1.2,
           ),
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
