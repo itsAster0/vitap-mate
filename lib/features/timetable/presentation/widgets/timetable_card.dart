@@ -126,7 +126,6 @@ class TimetableCard extends HookWidget {
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
   ) {
-   
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -9,7 +9,6 @@ class UpdateService {
           updateInfo.flexibleUpdateAllowed) {
         await InAppUpdate.startFlexibleUpdate();
         await InAppUpdate.completeFlexibleUpdate();
-        
       }
     } catch (e) {
       log("Flexible update check failed: $e");

@@ -222,34 +222,42 @@ class UserSemChange extends HookConsumerWidget {
                             decoration: BoxDecoration(
                               color: context.theme.colors.primaryForeground,
                             ),
-                            child: FSelectTileGroup(
-                              selectController: controller,
-                              label: const Text('Semesters'),
-                              description: const Text('Select the Semester.'),
-                              onSelect: (value) async {
-                                await ref
-                                    .read(vtopusersutilsProvider.notifier)
-                                    .vtopUserSave(
-                                      user.copyWith(semid: value.$1),
-                                    );
-                                ref.invalidate(vtopUserProvider);
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              validator:
-                                  (values) =>
-                                      values?.isEmpty ?? true
-                                          ? 'Please select a value.'
-                                          : null,
-                              //maxHeight: MediaQuery.of(context).size.height * 075,
-                              children: [
-                                for (final i in data.semesters)
-                                  FSelectTile(
-                                    title: Text(i.name, maxLines: 2),
-                                    value: i.id,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  FSelectTileGroup(
+                                    selectController: controller,
+                                    label: const Text('Semesters'),
+                                    description: const Text(
+                                      'Select the Semester.',
+                                    ),
+                                    onSelect: (value) async {
+                                      await ref
+                                          .read(vtopusersutilsProvider.notifier)
+                                          .vtopUserSave(
+                                            user.copyWith(semid: value.$1),
+                                          );
+                                      ref.invalidate(vtopUserProvider);
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                      }
+                                    },
+                                    validator:
+                                        (values) =>
+                                            values?.isEmpty ?? true
+                                                ? 'Please select a value.'
+                                                : null,
+                                    //maxHeight: MediaQuery.of(context).size.height * 075,
+                                    children: [
+                                      for (final i in data.semesters)
+                                        FSelectTile(
+                                          title: Text(i.name, maxLines: 2),
+                                          value: i.id,
+                                        ),
+                                    ],
                                   ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
