@@ -1,4 +1,5 @@
 use crate::api::vtop::{
+    paraser::wifi_portal::find_captivative_portal,
     types::{
         AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, SemesterData,
         TimetableData,
@@ -78,5 +79,24 @@ pub async fn fetch_is_auth(client: &mut VtopClient) -> bool {
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_wifi(username: String, password: String, i: i32) -> (bool, String) {
-    wifi_login_logout(i, username, password).await
+    if (i != 0) {
+        let k = wifi_login_logout(i, username.clone(), password.clone()).await;
+        if (k.0) {
+            return k;
+        } else {
+            return wifi_login_logout_hostel(i, username, password).await;
+        }
+    }
+    let captive = find_captivative_portal().await;
+
+    if (captive.contains("hfw.vitap.ac.in")) {
+        return wifi_login_logout_hostel(i, username, password).await;
+    } else if (captive == "IE") {
+        return (
+            false,
+            "You are already connected to the internet.".to_string(),
+        );
+    } else {
+        wifi_login_logout(i, username, password).await
+    }
 }

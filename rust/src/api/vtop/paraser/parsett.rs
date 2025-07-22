@@ -35,7 +35,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                     .replace("\t", "")
                     .replace("\n", "");
                 let tep = cname
-                    .splitn(2,"-")
+                    .splitn(2, "-")
                     .filter(|k| !k.is_empty())
                     .collect::<Vec<_>>();
                 if tep.len() > 1 {

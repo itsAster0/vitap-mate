@@ -17,3 +17,13 @@ Future<(bool, String)> wifiLoginLogout({
   username: username,
   password: password,
 );
+
+Future<(bool, String)> wifiLoginLogoutHostel({
+  required int i,
+  required String username,
+  required String password,
+}) => RustLib.instance.api.crateApiVtopWifiWifiLoginLogoutHostel(
+  i: i,
+  username: username,
+  password: password,
+);

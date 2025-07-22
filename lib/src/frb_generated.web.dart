@@ -11,6 +11,7 @@ import 'api/vtop/paraser/parseattn.dart';
 import 'api/vtop/paraser/parsemarks.dart';
 import 'api/vtop/paraser/parsesched.dart';
 import 'api/vtop/paraser/parsett.dart';
+import 'api/vtop/paraser/wifi_portal.dart';
 import 'api/vtop/session_manager.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';

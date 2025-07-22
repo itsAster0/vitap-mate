@@ -1,8 +1,15 @@
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use reqwest;
 use scraper::{Html, Selector};
 
 pub async fn wifi_login_logout(i: i32, username: String, password: String) -> (bool, String) {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
     if i == 0 {
         let res = client.get("http://172.18.10.10:1000/login?").send().await;
         match res {
@@ -49,9 +56,15 @@ pub async fn wifi_login_logout(i: i32, username: String, password: String) -> (b
                                 }
                             }
                         }
-                        Err(_e) => {
-                            return (false, "NE".to_string());
-                        }
+                        Err(_e) => match client.get("https://1.1.1.1").send().await {
+                            Ok(_) => {
+                                return (
+                                    false,
+                                    "You are already connected to the internet.".to_string(),
+                                );
+                            }
+                            Err(_) => return (false, "NE".to_string()),
+                        },
                     }
                 } else {
                     return (iip.0, "".to_string());
@@ -60,11 +73,11 @@ pub async fn wifi_login_logout(i: i32, username: String, password: String) -> (b
             Err(_e) => return (false, "NE".to_string()),
         }
     } else if i == 1 {
-        let res = client.get("http://172.18.10.10:1000/logout?").send().await;
+        let res = client.get("https://172.18.10.10:1000/logout?").send().await;
         match res {
             Ok(x) => {
                 let text = x.text().await.unwrap_or("notext".to_string());
-                //println!("{}", text);
+
                 let llp = get_em(text, "H3");
                 if llp.0 {
                     return (true, llp.1);
@@ -104,4 +117,80 @@ fn get_em(text: String, sel: &str) -> (bool, String) {
         }
         None => return (false, "".to_string()),
     }
+}
+
+pub async fn wifi_login_logout_hostel(
+    i: i32,
+    username: String,
+    password: String,
+) -> (bool, String) {
+    let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .to_string();
+    if i == 0 {
+        let body = format!(
+            "mode=191&username={}&password={}&a={}&producttype=0",
+            username, password, timestamp
+        );
+        let res = client
+            .post("https://hfw.vitap.ac.in:8090/login.xml")
+            .body(body)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .send()
+            .await;
+        match res {
+            Ok(res) => {
+                let text = res.text().await.unwrap_or_default();
+
+                if text.to_lowercase().contains("you are signed in") {
+                    return (true, "You have successfully logged in.".into());
+                } else if text.to_lowercase().contains("limit reached") {
+                    return (false, "Login failed. Limit Reached. ".into());
+                }
+            }
+            Err(_e) => match client.get("https://1.1.1.1").send().await {
+                Ok(_) => {
+                    return (
+                        false,
+                        "You are already connected to the internet.".to_string(),
+                    );
+                }
+                Err(_) => return (false, "NE".to_string()),
+            },
+        }
+    } else {
+        let body = format!(
+            "mode=193&username={}&a={}&producttype=0",
+            username, timestamp
+        );
+        let res = client
+            .post("https://hfw.vitap.ac.in:8090/logout.xml")
+            .body(body)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .send()
+            .await;
+        match res {
+            Ok(res) => {
+                if res
+                    .text()
+                    .await
+                    .unwrap_or_default()
+                    .to_lowercase()
+                    .contains("signed out")
+                {
+                    return (true, "Signed out successfully.".into());
+                }
+            }
+            Err(_e) => return (false, "NE".into()),
+        }
+    }
+
+    (false, "".into())
 }

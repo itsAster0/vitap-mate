@@ -316,7 +316,7 @@ impl VtopClient {
                 // Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
                 //     &response_text,
                 // )))
-                 return Err(VtopError::InvalidCredentials);
+                return Err(VtopError::InvalidCredentials);
             }
         } else {
             self.current_page = Some(response_text);
