@@ -11,6 +11,8 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
+var isLoadingSems = StateProvider<bool>((k) => false);
+
 class UserManagementPage extends HookConsumerWidget {
   const UserManagementPage({super.key});
 
@@ -26,17 +28,21 @@ class UserBox extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future(() async {
-          try {
-            await ref.read(semesterIdProvider.notifier).updatesemids();
-          } catch (e, _) {
-            ();
-          }
-        });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          ref.read(isLoadingSems.notifier).state = true;
+
+          await ref.read(semesterIdProvider.notifier).updatesemids();
+          ref.invalidate(semesterIdProvider);
+        } catch (e, _) {
+          ();
+        } finally {
+          ref.read(isLoadingSems.notifier).state = false;
+        }
       });
       return null;
     }, []);
+
     var users = ref.watch(allUsersProviderProvider);
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -89,6 +95,7 @@ class UserBox extends HookConsumerWidget {
 class UserContainer extends HookConsumerWidget {
   final VtopUserEntity user;
   final bool isDefault;
+
   const UserContainer({super.key, required this.user, required this.isDefault});
 
   @override
@@ -203,7 +210,7 @@ class UserSemChange extends HookConsumerWidget {
     final controller = useFRadioSelectMenuTileGroupController<String>(
       value: user.semid,
     );
-    var semester = ref.watch(semesterIdProvider);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -213,86 +220,112 @@ class UserSemChange extends HookConsumerWidget {
               () => showAdaptiveDialog(
                 context: context,
                 builder: (context) {
-                  return semester.when(
-                    data: (data) {
-                      return FDialog(
-                        body: ConstrainedBox(
-                          constraints: BoxConstraints(maxHeight: 300),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: context.theme.colors.primaryForeground,
-                            ),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  FSelectTileGroup(
-                                    selectController: controller,
-                                    label: const Text('Semesters'),
-                                    description: const Text(
-                                      'Select the Semester.',
-                                    ),
-                                    onSelect: (value) async {
-                                      await ref
-                                          .read(vtopusersutilsProvider.notifier)
-                                          .vtopUserSave(
-                                            user.copyWith(semid: value.$1),
-                                          );
-                                      ref.invalidate(vtopUserProvider);
-                                      if (context.mounted) {
-                                        Navigator.of(context).pop();
-                                      }
-                                    },
-                                    validator:
-                                        (values) =>
-                                            values?.isEmpty ?? true
-                                                ? 'Please select a value.'
-                                                : null,
-                                    //maxHeight: MediaQuery.of(context).size.height * 075,
+                  return Consumer(
+                    builder: (context, ref, child) {
+                      var semester = ref.watch(semesterIdProvider);
+
+                      return semester.when(
+                        data: (data) {
+                          print(data);
+                          return FDialog(
+                            body: ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: 300),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: context.theme.colors.primaryForeground,
+                                ),
+                                child: SingleChildScrollView(
+                                  child: Column(
                                     children: [
-                                      for (final i in data.semesters)
-                                        FSelectTile(
-                                          title: Text(i.name, maxLines: 2),
-                                          value: i.id,
+                                      FSelectTileGroup(
+                                        selectController: controller,
+                                        label: Consumer(
+                                          builder: (context, ref, child) {
+                                            final isLoading = ref.watch(
+                                              isLoadingSems,
+                                            );
+                                            return Row(
+                                              children: [
+                                                if (isLoading)
+                                                  const FProgress.circularIcon(),
+                                                if (isLoading)
+                                                  const SizedBox(width: 10),
+                                                Text('Semesters'),
+                                              ],
+                                            );
+                                          },
                                         ),
+                                        description: const Text(
+                                          'Select the Semester.',
+                                        ),
+                                        onSelect: (value) async {
+                                          await ref
+                                              .read(
+                                                vtopusersutilsProvider.notifier,
+                                              )
+                                              .vtopUserSave(
+                                                user.copyWith(semid: value.$1),
+                                              );
+                                          ref.invalidate(vtopUserProvider);
+                                          if (context.mounted) {
+                                            Navigator.of(context).pop();
+                                          }
+                                        },
+                                        validator:
+                                            (values) =>
+                                                values?.isEmpty ?? true
+                                                    ? 'Please select a value.'
+                                                    : null,
+                                        //maxHeight: MediaQuery.of(context).size.height * 075,
+                                        children: [
+                                          for (final i in data.semesters)
+                                            FSelectTile(
+                                              title: Text(i.name, maxLines: 2),
+                                              value: i.id,
+                                            ),
+                                        ],
+                                      ),
                                     ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                        title: const Text('Semesters'),
-                        actions: [
-                          FButton(
-                            style: FButtonStyle.outline,
-                            onPress: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                          // FButton(onPress: () => Navigator.of(context).pop(), child: const Text('Continue'))
-                        ],
+                            title: const Text('Semesters'),
+                            actions: [
+                              FButton(
+                                style: FButtonStyle.outline,
+                                onPress: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
+                              ),
+                              // FButton(onPress: () => Navigator.of(context).pop(), child: const Text('Continue'))
+                            ],
+                          );
+                        },
+                        error:
+                            (e, et) => FDialog(
+                              body: Container(
+                                decoration: BoxDecoration(
+                                  color: context.theme.colors.primaryForeground,
+                                ),
+                                child: Text("$e"),
+                              ),
+                              actions: [
+                                FButton(
+                                  style: FButtonStyle.outline,
+                                  onPress: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                              ],
+                            ),
+                        loading:
+                            () =>
+                                CircularProgressIndicator(color: Colors.black),
                       );
                     },
-                    error:
-                        (e, et) => FDialog(
-                          body: Container(
-                            decoration: BoxDecoration(
-                              color: context.theme.colors.primaryForeground,
-                            ),
-                            child: Text("$e"),
-                          ),
-                          actions: [
-                            FButton(
-                              style: FButtonStyle.outline,
-                              onPress: () => Navigator.of(context).pop(),
-                              child: const Text('Cancel'),
-                            ),
-                          ],
-                        ),
-                    loading:
-                        () => CircularProgressIndicator(color: Colors.black),
                   );
                 },
               ),
+
           child: const Text("Change Semester"),
         ),
       ],
