@@ -226,7 +226,6 @@ class UserSemChange extends HookConsumerWidget {
 
                       return semester.when(
                         data: (data) {
-                          print(data);
                           return FDialog(
                             body: ConstrainedBox(
                               constraints: BoxConstraints(maxHeight: 300),

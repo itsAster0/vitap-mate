@@ -260,11 +260,14 @@ class WifiCard extends HookConsumerWidget {
                 ),
               ],
             ),
-            subtitle: Center(
-              child: Text(
-                "No over-limit (except Sophos)",
-                style: TextStyle(color: MoreColors.secondaryText),
-              ),
+            subtitle: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "No over-limit on most Wi-Fi networks.",
+                  style: TextStyle(color: MoreColors.secondaryText),
+                ),
+              ],
             ),
             child: wifiDeatils.when(
               data:
