@@ -18,7 +18,7 @@ class ExamsScheduleModel {
           examDate: i.examDate,
           examSession: i.examSession,
           reportingTime: i.reportingTime,
-          examTime: i.examDate,
+          examTime: i.examTime,
           venue: i.venue,
           seatLocation: i.seatLocation,
           seatNo: i.seatNo,
