@@ -43,6 +43,10 @@ Future<void> pbSetNotificationToken(PocketBase pb, String? token) async {
         final existing = await pb
             .collection('notifications_token')
             .getFirstListItem('user="$userId"');
+        if (existing.getStringValue("token") == token) {
+          return;
+        }
+
         await pb
             .collection('notifications_token')
             .update(existing.id, body: {'token': token});
@@ -55,7 +59,6 @@ Future<void> pbSetNotificationToken(PocketBase pb, String? token) async {
 
 Future<void> pbSetNtotification({String? tokenNew}) async {
   final pref = SharedPreferencesAsync();
-  await pref.setBool("chat_notif_toke_send", false);
   final prefs = await SharedPreferences.getInstance();
   final store = AsyncAuthStore(
     save: (String data) async => prefs.setString('pb_auth', data),
@@ -64,7 +67,4 @@ Future<void> pbSetNtotification({String? tokenNew}) async {
   var pb = PocketBase("https://api.va.synaptic.gg", authStore: store);
   var token = tokenNew ?? await notifications.getToken();
   await pbSetNotificationToken(pb, token);
-
-  //for backword compatability
-  await pref.setBool("chat_notif_toke_send", true);
 }

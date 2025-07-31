@@ -64,6 +64,7 @@ class VClient extends _$VClient {
             .vtopUserSave(user.copyWith(isValid: false));
         ref.invalidate(vtopUserProvider);
       }
+
       rethrow;
     }
   }

@@ -27,14 +27,12 @@ class AttendancePage extends HookConsumerWidget {
     }
 
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future(() async {
-          try {
-            await ref.read(attendanceProvider.notifier).updateAttendance();
-          } catch (e, _) {
-            ();
-          }
-        });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await ref.read(attendanceProvider.notifier).updateAttendance();
+        } catch (e, _) {
+          ();
+        }
       });
       return null;
     }, []);

@@ -14,14 +14,12 @@ class MarksPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future(() async {
-          try {
-            await ref.read(marksProvider.notifier).updatemarks();
-          } catch (e, _) {
-            ();
-          }
-        });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await ref.read(marksProvider.notifier).updatemarks();
+        } catch (e, _) {
+          ();
+        }
       });
       return null;
     }, []);

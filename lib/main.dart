@@ -11,6 +11,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/services/firebase_notification.dart';
 import 'package:vitapmate/services/update_service.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -26,6 +27,9 @@ Future<void> main() async {
     FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
   };
   PlatformDispatcher.instance.onError = (error, stack) {
+    if (error is VtopError) {
+      return true;
+    }
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };

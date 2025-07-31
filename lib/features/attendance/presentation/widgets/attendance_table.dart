@@ -24,16 +24,14 @@ class AttendanceTable extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future(() async {
-          try {
-            await ref
-                .read(FullAttendanceProvider(courseType, courseId).notifier)
-                .updateAttendance();
-          } catch (e, _) {
-            ();
-          }
-        });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await ref
+              .read(FullAttendanceProvider(courseType, courseId).notifier)
+              .updateAttendance();
+        } catch (e, _) {
+          ();
+        }
       });
       return null;
     }, []);
