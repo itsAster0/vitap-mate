@@ -16,9 +16,10 @@ base = "0.1.0"
 base64 = "0.22.1"
 tokio = {version="1.43.0",features=["full"]}
 urlencoding = "2"
+futures = "0.3.31"
 
-[patch.crates-io]
-web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", package = "web-sys" }
+# [patch.crates-io]
+# web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", package = "web-sys" }
 
 
 [lints.rust]
