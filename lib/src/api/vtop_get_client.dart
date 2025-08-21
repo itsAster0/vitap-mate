@@ -13,9 +13,11 @@ import 'vtop/vtop_errors.dart';
 VtopClient getVtopClient({
   required String username,
   required String password,
+  String? cookie,
 }) => RustLib.instance.api.crateApiVtopGetClientGetVtopClient(
   username: username,
   password: password,
+  cookie: cookie,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>

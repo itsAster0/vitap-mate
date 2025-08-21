@@ -14,7 +14,7 @@ import 'vtop_config.dart';
 abstract class VtopClient implements RustOpaqueInterface {
   Future<VtopResultAttendanceData> getAttendance({required String semesterId});
 
-  Future<VtopResultVecU8> getCookie();
+  Future<VtopResultVecU8> getCookie({required bool check});
 
   Future<VtopResultExamScheduleData> getExamSchedule({
     required String semesterId,
@@ -28,13 +28,15 @@ abstract class VtopClient implements RustOpaqueInterface {
 
   Future<VtopResultMarksData> getMarks({required String semesterId});
 
-  Future<VtopResultSemesterData> getSemesters();
+  Future<VtopResultSemesterData> getSemesters({required bool check});
 
   Future<VtopResultTimetableData> getTimetable({required String semesterId});
 
   Future<bool> isAuthenticated();
 
   Future<VtopResult> login();
+
+  Future<void> setCookie({required String cookie});
 
   static Future<VtopClient> withConfig({
     required VtopConfig config,

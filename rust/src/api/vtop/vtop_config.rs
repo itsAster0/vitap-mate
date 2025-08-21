@@ -1,7 +1,5 @@
-use serde::{Deserialize, Serialize};
-
 use super::{session_manager::SessionManager, vtop_client::VtopClient};
-
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VtopConfig {
     pub base_url: String,

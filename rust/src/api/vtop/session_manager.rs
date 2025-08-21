@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest::cookie::Jar;
-
+use reqwest::Url;
 #[derive(Debug)]
 
 pub struct SessionManager {
@@ -10,6 +10,7 @@ pub struct SessionManager {
     #[cfg(not(target_arch = "wasm32"))]
     cookie_store: Arc<Jar>,
     is_authenticated: bool,
+    is_cookie_external: bool,
 }
 
 impl SessionManager {
@@ -23,6 +24,7 @@ impl SessionManager {
             #[cfg(not(target_arch = "wasm32"))]
             cookie_store,
             is_authenticated: false,
+            is_cookie_external: false,
         }
     }
 
@@ -46,6 +48,13 @@ impl SessionManager {
         self.is_authenticated
     }
 
+    pub fn is_cookie_external(&self) -> bool {
+        self.is_cookie_external
+    }
+    pub fn set_cookie_external(&mut self, bool: bool) {
+        self.is_cookie_external = bool;
+    }
+
     pub fn clear(&mut self) {
         self.csrf_token = None;
         self.is_authenticated = false;
@@ -54,8 +63,9 @@ impl SessionManager {
     pub fn set_csrf_from_external(&mut self, token: String) {
         self.csrf_token = Some(token);
     }
-    //  pub fn set_cookie_from_external(&mut self, token: String) {
-    //     self.csrf_token = Some(token);
-
-    // }
+    pub fn set_cookie_from_external(&mut self, url: String, cookie: String) {
+        self.cookie_store
+            .add_cookie_str(&cookie, &Url::parse(&url).unwrap());
+        self.is_cookie_external = true;
+    }
 }

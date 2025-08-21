@@ -78,7 +78,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.10.0';
 
   @override
-  int get rustContentHash => 942828689;
+  int get rustContentHash => -977274604;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -105,11 +105,26 @@ abstract class RustLibApi extends BaseApi {
     required SessionManager that,
   });
 
+  Future<bool> crateApiVtopSessionManagerSessionManagerIsCookieExternal({
+    required SessionManager that,
+  });
+
   Future<SessionManager> crateApiVtopSessionManagerSessionManagerNew();
 
   Future<void> crateApiVtopSessionManagerSessionManagerSetAuthenticated({
     required SessionManager that,
     required bool authenticated,
+  });
+
+  Future<void> crateApiVtopSessionManagerSessionManagerSetCookieExternal({
+    required SessionManager that,
+    required bool bool,
+  });
+
+  Future<void> crateApiVtopSessionManagerSessionManagerSetCookieFromExternal({
+    required SessionManager that,
+    required String url,
+    required String cookie,
   });
 
   Future<void> crateApiVtopSessionManagerSessionManagerSetCsrfFromExternal({
@@ -138,6 +153,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<VtopResultVecU8> crateApiVtopVtopClientVtopClientGetCookie({
     required VtopClient that,
+    required bool check,
   });
 
   Future<VtopResultExamScheduleData>
@@ -161,6 +177,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<VtopResultSemesterData> crateApiVtopVtopClientVtopClientGetSemesters({
     required VtopClient that,
+    required bool check,
   });
 
   Future<VtopResultTimetableData> crateApiVtopVtopClientVtopClientGetTimetable({
@@ -174,6 +191,11 @@ abstract class RustLibApi extends BaseApi {
 
   Future<VtopResult> crateApiVtopVtopClientVtopClientLogin({
     required VtopClient that,
+  });
+
+  Future<void> crateApiVtopVtopClientVtopClientSetCookie({
+    required VtopClient that,
+    required String cookie,
   });
 
   Future<VtopClient> crateApiVtopVtopClientVtopClientWithConfig({
@@ -231,6 +253,7 @@ abstract class RustLibApi extends BaseApi {
   VtopClient crateApiVtopGetClientGetVtopClient({
     required String username,
     required String password,
+    String? cookie,
   });
 
   String crateApiSimpleGreet({required String name});
@@ -550,6 +573,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<bool> crateApiVtopSessionManagerSessionManagerIsCookieExternal({
+    required SessionManager that,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSessionManager(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopSessionManagerSessionManagerIsCookieExternalConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopSessionManagerSessionManagerIsCookieExternalConstMeta =>
+      const TaskConstMeta(
+        debugName: "SessionManager_is_cookie_external",
+        argNames: ["that"],
+      );
+
+  @override
   Future<SessionManager> crateApiVtopSessionManagerSessionManagerNew() {
     return handler.executeNormal(
       NormalTask(
@@ -558,7 +619,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -594,7 +655,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -618,6 +679,88 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiVtopSessionManagerSessionManagerSetCookieExternal({
+    required SessionManager that,
+    required bool bool,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSessionManager(
+            that,
+            serializer,
+          );
+          sse_encode_bool(bool, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopSessionManagerSessionManagerSetCookieExternalConstMeta,
+        argValues: [that, bool],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopSessionManagerSessionManagerSetCookieExternalConstMeta =>
+      const TaskConstMeta(
+        debugName: "SessionManager_set_cookie_external",
+        argNames: ["that", "bool"],
+      );
+
+  @override
+  Future<void> crateApiVtopSessionManagerSessionManagerSetCookieFromExternal({
+    required SessionManager that,
+    required String url,
+    required String cookie,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerSessionManager(
+            that,
+            serializer,
+          );
+          sse_encode_String(url, serializer);
+          sse_encode_String(cookie, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 9,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopSessionManagerSessionManagerSetCookieFromExternalConstMeta,
+        argValues: [that, url, cookie],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopSessionManagerSessionManagerSetCookieFromExternalConstMeta =>
+      const TaskConstMeta(
+        debugName: "SessionManager_set_cookie_from_external",
+        argNames: ["that", "url", "cookie"],
+      );
+
+  @override
   Future<void> crateApiVtopSessionManagerSessionManagerSetCsrfFromExternal({
     required SessionManager that,
     required String token,
@@ -634,7 +777,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 10,
             port: port_,
           );
         },
@@ -674,7 +817,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 11,
             port: port_,
           );
         },
@@ -716,7 +859,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 12,
             port: port_,
           );
         },
@@ -747,7 +890,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 13,
             port: port_,
           );
         },
@@ -784,7 +927,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 14,
             port: port_,
           );
         },
@@ -809,6 +952,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<VtopResultVecU8> crateApiVtopVtopClientVtopClientGetCookie({
     required VtopClient that,
+    required bool check,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -818,10 +962,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_bool(check, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 15,
             port: port_,
           );
         },
@@ -831,7 +976,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiVtopVtopClientVtopClientGetCookieConstMeta,
-        argValues: [that],
+        argValues: [that, check],
         apiImpl: this,
       ),
     );
@@ -840,7 +985,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopVtopClientVtopClientGetCookieConstMeta =>
       const TaskConstMeta(
         debugName: "VtopClient_get_cookie",
-        argNames: ["that"],
+        argNames: ["that", "check"],
       );
 
   @override
@@ -861,7 +1006,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 16,
             port: port_,
           );
         },
@@ -905,7 +1050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 17,
             port: port_,
           );
         },
@@ -945,7 +1090,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 18,
             port: port_,
           );
         },
@@ -970,6 +1115,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<VtopResultSemesterData> crateApiVtopVtopClientVtopClientGetSemesters({
     required VtopClient that,
+    required bool check,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -979,10 +1125,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that,
             serializer,
           );
+          sse_encode_bool(check, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 19,
             port: port_,
           );
         },
@@ -992,7 +1139,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiVtopVtopClientVtopClientGetSemestersConstMeta,
-        argValues: [that],
+        argValues: [that, check],
         apiImpl: this,
       ),
     );
@@ -1001,7 +1148,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopVtopClientVtopClientGetSemestersConstMeta =>
       const TaskConstMeta(
         debugName: "VtopClient_get_semesters",
-        argNames: ["that"],
+        argNames: ["that", "check"],
       );
 
   @override
@@ -1021,7 +1168,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 20,
             port: port_,
           );
         },
@@ -1058,7 +1205,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1094,7 +1241,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1112,6 +1259,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiVtopVtopClientVtopClientLoginConstMeta =>
       const TaskConstMeta(debugName: "VtopClient_login", argNames: ["that"]);
+
+  @override
+  Future<void> crateApiVtopVtopClientVtopClientSetCookie({
+    required VtopClient that,
+    required String cookie,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            that,
+            serializer,
+          );
+          sse_encode_String(cookie, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 23,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiVtopVtopClientVtopClientSetCookieConstMeta,
+        argValues: [that, cookie],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopVtopClientVtopClientSetCookieConstMeta =>
+      const TaskConstMeta(
+        debugName: "VtopClient_set_cookie",
+        argNames: ["that", "cookie"],
+      );
 
   @override
   Future<VtopClient> crateApiVtopVtopClientVtopClientWithConfig({
@@ -1134,7 +1319,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1173,7 +1358,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1209,7 +1394,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1244,7 +1429,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1286,7 +1471,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1320,7 +1505,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1355,7 +1540,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1391,7 +1576,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1426,7 +1611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 32,
             port: port_,
           );
         },
@@ -1463,7 +1648,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1493,7 +1678,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1516,6 +1701,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   VtopClient crateApiVtopGetClientGetVtopClient({
     required String username,
     required String password,
+    String? cookie,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -1523,7 +1709,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(username, serializer);
           sse_encode_String(password, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+          sse_encode_opt_String(cookie, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -1531,7 +1718,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiVtopGetClientGetVtopClientConstMeta,
-        argValues: [username, password],
+        argValues: [username, password, cookie],
         apiImpl: this,
       ),
     );
@@ -1540,7 +1727,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientGetVtopClientConstMeta =>
       const TaskConstMeta(
         debugName: "get_vtop_client",
-        argNames: ["username", "password"],
+        argNames: ["username", "password", "cookie"],
       );
 
   @override
@@ -1550,7 +1737,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1575,7 +1762,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1607,7 +1794,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1646,7 +1833,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1681,7 +1868,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1713,7 +1900,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 41,
             port: port_,
           );
         },
@@ -1746,7 +1933,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1781,7 +1968,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1817,7 +2004,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1844,7 +2031,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1878,7 +2065,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 46,
             port: port_,
           );
         },
@@ -1915,7 +2102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 47,
             port: port_,
           );
         },
@@ -4320,12 +4507,31 @@ class SessionManagerImpl extends RustOpaque implements SessionManager {
   Future<bool> isAuthenticated() => RustLib.instance.api
       .crateApiVtopSessionManagerSessionManagerIsAuthenticated(that: this);
 
+  Future<bool> isCookieExternal() => RustLib.instance.api
+      .crateApiVtopSessionManagerSessionManagerIsCookieExternal(that: this);
+
   Future<void> setAuthenticated({required bool authenticated}) => RustLib
       .instance
       .api
       .crateApiVtopSessionManagerSessionManagerSetAuthenticated(
         that: this,
         authenticated: authenticated,
+      );
+
+  Future<void> setCookieExternal({required bool bool}) => RustLib.instance.api
+      .crateApiVtopSessionManagerSessionManagerSetCookieExternal(
+        that: this,
+        bool: bool,
+      );
+
+  Future<void> setCookieFromExternal({
+    required String url,
+    required String cookie,
+  }) => RustLib.instance.api
+      .crateApiVtopSessionManagerSessionManagerSetCookieFromExternal(
+        that: this,
+        url: url,
+        cookie: cookie,
       );
 
   Future<void> setCsrfFromExternal({required String token}) => RustLib
@@ -4403,8 +4609,10 @@ class VtopClientImpl extends RustOpaque implements VtopClient {
     semesterId: semesterId,
   );
 
-  Future<VtopResultVecU8> getCookie() => RustLib.instance.api
-      .crateApiVtopVtopClientVtopClientGetCookie(that: this);
+  Future<VtopResultVecU8> getCookie({required bool check}) => RustLib
+      .instance
+      .api
+      .crateApiVtopVtopClientVtopClientGetCookie(that: this, check: check);
 
   Future<VtopResultExamScheduleData> getExamSchedule({
     required String semesterId,
@@ -4430,8 +4638,10 @@ class VtopClientImpl extends RustOpaque implements VtopClient {
         semesterId: semesterId,
       );
 
-  Future<VtopResultSemesterData> getSemesters() => RustLib.instance.api
-      .crateApiVtopVtopClientVtopClientGetSemesters(that: this);
+  Future<VtopResultSemesterData> getSemesters({required bool check}) => RustLib
+      .instance
+      .api
+      .crateApiVtopVtopClientVtopClientGetSemesters(that: this, check: check);
 
   Future<VtopResultTimetableData> getTimetable({required String semesterId}) =>
       RustLib.instance.api.crateApiVtopVtopClientVtopClientGetTimetable(
@@ -4444,6 +4654,9 @@ class VtopClientImpl extends RustOpaque implements VtopClient {
 
   Future<VtopResult> login() =>
       RustLib.instance.api.crateApiVtopVtopClientVtopClientLogin(that: this);
+
+  Future<void> setCookie({required String cookie}) => RustLib.instance.api
+      .crateApiVtopVtopClientVtopClientSetCookie(that: this, cookie: cookie);
 }
 
 @sealed

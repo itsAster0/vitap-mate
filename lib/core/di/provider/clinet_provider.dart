@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
@@ -14,6 +15,7 @@ part 'clinet_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class VClient extends _$VClient {
+  String? _cookie;
   @override
   Future<VtopClient> build() async {
     String? username = await ref.watch(
@@ -30,7 +32,18 @@ class VClient extends _$VClient {
     //     log("$e");
     //   }
     // });
-    return getVtopClient(username: username!, password: password!);
+    var storage = await SharedPreferences.getInstance();
+    int cookieTime = storage.getInt("cookie_time") ?? 0;
+    if (DateTime.now().toUtc().millisecondsSinceEpoch - cookieTime <
+        30 * 60 * 1000) {
+      _cookie = storage.getString("cookie");
+    }
+
+    return getVtopClient(
+      username: username!,
+      password: password!,
+      cookie: _cookie,
+    );
   }
 
   void replaceVClinet(VtopClient vclinet) {
@@ -48,6 +61,7 @@ class VClient extends _$VClient {
       throw FeatureDisabledException("Login is Disabled");
     }
     log("login try");
+
     try {
       await ref
           .read(globalAsyncQueueProvider.notifier)
@@ -55,7 +69,27 @@ class VClient extends _$VClient {
             "vtop_login_${user.username}",
             () => vtopClientLogin(client: client),
           );
-      //state = AsyncData(client);
+      var newCookie =
+          String.fromCharCodes(
+            await fetchCookies(client: client),
+          ).split(";").first.trim();
+      log("past cookie ${_cookie ?? ""} and new cookie $newCookie");
+      if (_cookie != newCookie) {
+        var storage = await SharedPreferences.getInstance();
+        await storage.setString("cookie", newCookie);
+        // if (newCookie
+        //     .split(";")
+        //     .map((e) => e.trim())
+        //     .toSet()
+        //     .intersection((_cookie??"").split(";").map((e) => e.trim()).toSet())
+        //     .isEmpty) {}
+        await storage.setInt(
+          "cookie_time",
+          DateTime.now().toUtc().millisecondsSinceEpoch,
+        );
+
+        _cookie = newCookie;
+      }
     } catch (e) {
       if (e == VtopError.invalidCredentials()) {
         log("password change");

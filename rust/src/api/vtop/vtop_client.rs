@@ -7,6 +7,7 @@ pub use super::{
     vtop_errors::{VtopError, VtopResult},
 };
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use reqwest::cookie::{CookieStore, Jar};
 use reqwest::{
@@ -30,8 +31,8 @@ pub struct VtopClient {
 
 impl VtopClient {
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn get_cookie(&self) -> VtopResult<Vec<u8>> {
-        if !self.session.is_authenticated() {
+    pub async fn get_cookie(&self, check: bool) -> VtopResult<Vec<u8>> {
+        if !self.session.is_authenticated() && check {
             return Err(VtopError::SessionExpired);
         }
 
@@ -47,8 +48,13 @@ impl VtopClient {
         Ok(data)
     }
 
-    pub async fn get_semesters(&mut self) -> VtopResult<SemesterData> {
-        if !self.session.is_authenticated() {
+    pub fn set_cookie(&mut self, cookie: String) {
+        let url = format!("{}/vtop", self.config.base_url);
+
+        self.session.set_cookie_from_external(url, cookie);
+    }
+    pub async fn get_semesters(&mut self, check: bool) -> VtopResult<SemesterData> {
+        if !self.session.is_authenticated() && check {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -249,6 +255,26 @@ impl VtopClient {
 // for login
 impl VtopClient {
     pub async fn login(&mut self) -> VtopResult<()> {
+        if self.session.is_cookie_external() {
+            let cookie = self.get_cookie(false).await;
+            match cookie {
+                Ok(value_of_cookie) => {
+                    if !value_of_cookie.is_empty() {
+                        if self.get_csrf_for_cookie_set().await.is_ok() {
+                            self.session.set_authenticated(true);
+                            self.session.set_cookie_external(false);
+                            return Ok(());
+                        }
+                        self.session.set_authenticated(false);
+                    }
+                    self.session.set_cookie_external(false);
+                }
+                Err(_e) => {
+                    self.session.set_cookie_external(false);
+                }
+            }
+        }
+
         #[allow(non_snake_case)]
         let MAX_CAP_TRY = 4;
         for i in 0..MAX_CAP_TRY {
@@ -277,6 +303,22 @@ impl VtopClient {
         Err(VtopError::AuthenticationFailed(
             "Max login attempts exceeded".to_string(),
         ))
+    }
+    async fn get_csrf_for_cookie_set(&mut self) -> VtopResult<()> {
+        let url = format!("{}/vtop/open/page", self.config.base_url);
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .await
+            .map_err(|_| VtopError::NetworkError)?;
+
+        if !response.status().is_success() || response.url().to_string().contains("login") {
+            return Err(VtopError::VtopServerError);
+        }
+        self.current_page = Some(response.text().await.map_err(|_| VtopError::NetworkError)?);
+        let _ = self.extract_csrf_token();
+        Ok(())
     }
     async fn perform_login(&mut self, captcha_answer: &str) -> VtopResult<()> {
         let csrf = self

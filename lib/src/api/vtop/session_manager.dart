@@ -19,11 +19,20 @@ abstract class SessionManager implements RustOpaqueInterface {
 
   Future<bool> isAuthenticated();
 
+  Future<bool> isCookieExternal();
+
   // HINT: Make it `#[frb(sync)]` to let it become the default constructor of Dart class.
   static Future<SessionManager> newInstance() =>
       RustLib.instance.api.crateApiVtopSessionManagerSessionManagerNew();
 
   Future<void> setAuthenticated({required bool authenticated});
+
+  Future<void> setCookieExternal({required bool bool});
+
+  Future<void> setCookieFromExternal({
+    required String url,
+    required String cookie,
+  });
 
   Future<void> setCsrfFromExternal({required String token});
 
