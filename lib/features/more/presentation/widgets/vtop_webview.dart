@@ -37,15 +37,16 @@ class VtopWebview extends HookConsumerWidget {
         final raw = await fetchCookies(client: client);
         final cookieString = String.fromCharCodes(raw);
 
-        final parts = cookieString.split('=');
+        final parts = cookieString.split(";").first.trim().split('=');
         if (parts.length < 2) return;
 
-        final name = parts[0];
-        final value = parts[1];
+        final name = parts[0].trim();
+        final value = parts[1].trim();
         cookieName.value = name;
         cookieValue.value = value;
 
         if (Platform.isAndroid) {
+          await cookieManagerAndroid.clearCookies();
           await cookieManagerAndroid.setCookie(
             WebViewCookie(
               name: name,
