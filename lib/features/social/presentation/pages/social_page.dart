@@ -18,7 +18,7 @@ class SocialPage extends HookConsumerWidget {
     var pbasync = ref.watch(pbProvider);
     void handleClick(pb) async {
       if (isloading.value) return;
-      Timer timeoutTimer = Timer(Duration(seconds: 5), () {
+      Timer timeoutTimer = Timer(Duration(seconds: 40), () {
         isloading.value = false;
       });
       isloading.value = true;
@@ -26,7 +26,6 @@ class SocialPage extends HookConsumerWidget {
         await pb.collection('users').authWithOAuth2('google', (url) async {
           await launchUrl(url);
         });
-        isloading.value = false;
         var _ = ref.refresh(pbProvider);
         await pbSetNtotification();
       } catch (e) {

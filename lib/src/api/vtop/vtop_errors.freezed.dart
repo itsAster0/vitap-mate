@@ -1,6 +1,5 @@
-// dart format width=80
-// coverage:ignore-file
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// coverage:ignore-file
 // ignore_for_file: type=lint
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
@@ -41,6 +40,184 @@ class $VtopErrorCopyWith<$Res>  {
 $VtopErrorCopyWith(VtopError _, $Res Function(VtopError) __);
 }
 
+
+/// Adds pattern-matching-related methods to [VtopError].
+extension VtopErrorPatterns on VtopError {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( VtopError_NetworkError value)?  networkError,TResult Function( VtopError_VtopServerError value)?  vtopServerError,TResult Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult Function( VtopError_SessionExpired value)?  sessionExpired,TResult Function( VtopError_ParseError value)?  parseError,TResult Function( VtopError_ConfigurationError value)?  configurationError,TResult Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult Function( VtopError_InvalidResponse value)?  invalidResponse,required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case VtopError_NetworkError() when networkError != null:
+return networkError(_that);case VtopError_VtopServerError() when vtopServerError != null:
+return vtopServerError(_that);case VtopError_AuthenticationFailed() when authenticationFailed != null:
+return authenticationFailed(_that);case VtopError_RegistrationParsingError() when registrationParsingError != null:
+return registrationParsingError(_that);case VtopError_InvalidCredentials() when invalidCredentials != null:
+return invalidCredentials(_that);case VtopError_SessionExpired() when sessionExpired != null:
+return sessionExpired(_that);case VtopError_ParseError() when parseError != null:
+return parseError(_that);case VtopError_ConfigurationError() when configurationError != null:
+return configurationError(_that);case VtopError_CaptchaRequired() when captchaRequired != null:
+return captchaRequired(_that);case VtopError_InvalidResponse() when invalidResponse != null:
+return invalidResponse(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( VtopError_NetworkError value)  networkError,required TResult Function( VtopError_VtopServerError value)  vtopServerError,required TResult Function( VtopError_AuthenticationFailed value)  authenticationFailed,required TResult Function( VtopError_RegistrationParsingError value)  registrationParsingError,required TResult Function( VtopError_InvalidCredentials value)  invalidCredentials,required TResult Function( VtopError_SessionExpired value)  sessionExpired,required TResult Function( VtopError_ParseError value)  parseError,required TResult Function( VtopError_ConfigurationError value)  configurationError,required TResult Function( VtopError_CaptchaRequired value)  captchaRequired,required TResult Function( VtopError_InvalidResponse value)  invalidResponse,}){
+final _that = this;
+switch (_that) {
+case VtopError_NetworkError():
+return networkError(_that);case VtopError_VtopServerError():
+return vtopServerError(_that);case VtopError_AuthenticationFailed():
+return authenticationFailed(_that);case VtopError_RegistrationParsingError():
+return registrationParsingError(_that);case VtopError_InvalidCredentials():
+return invalidCredentials(_that);case VtopError_SessionExpired():
+return sessionExpired(_that);case VtopError_ParseError():
+return parseError(_that);case VtopError_ConfigurationError():
+return configurationError(_that);case VtopError_CaptchaRequired():
+return captchaRequired(_that);case VtopError_InvalidResponse():
+return invalidResponse(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( VtopError_NetworkError value)?  networkError,TResult? Function( VtopError_VtopServerError value)?  vtopServerError,TResult? Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult? Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult? Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult? Function( VtopError_SessionExpired value)?  sessionExpired,TResult? Function( VtopError_ParseError value)?  parseError,TResult? Function( VtopError_ConfigurationError value)?  configurationError,TResult? Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult? Function( VtopError_InvalidResponse value)?  invalidResponse,}){
+final _that = this;
+switch (_that) {
+case VtopError_NetworkError() when networkError != null:
+return networkError(_that);case VtopError_VtopServerError() when vtopServerError != null:
+return vtopServerError(_that);case VtopError_AuthenticationFailed() when authenticationFailed != null:
+return authenticationFailed(_that);case VtopError_RegistrationParsingError() when registrationParsingError != null:
+return registrationParsingError(_that);case VtopError_InvalidCredentials() when invalidCredentials != null:
+return invalidCredentials(_that);case VtopError_SessionExpired() when sessionExpired != null:
+return sessionExpired(_that);case VtopError_ParseError() when parseError != null:
+return parseError(_that);case VtopError_ConfigurationError() when configurationError != null:
+return configurationError(_that);case VtopError_CaptchaRequired() when captchaRequired != null:
+return captchaRequired(_that);case VtopError_InvalidResponse() when invalidResponse != null:
+return invalidResponse(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  networkError,TResult Function()?  vtopServerError,TResult Function( String field0)?  authenticationFailed,TResult Function()?  registrationParsingError,TResult Function()?  invalidCredentials,TResult Function()?  sessionExpired,TResult Function( String field0)?  parseError,TResult Function( String field0)?  configurationError,TResult Function()?  captchaRequired,TResult Function()?  invalidResponse,required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case VtopError_NetworkError() when networkError != null:
+return networkError();case VtopError_VtopServerError() when vtopServerError != null:
+return vtopServerError();case VtopError_AuthenticationFailed() when authenticationFailed != null:
+return authenticationFailed(_that.field0);case VtopError_RegistrationParsingError() when registrationParsingError != null:
+return registrationParsingError();case VtopError_InvalidCredentials() when invalidCredentials != null:
+return invalidCredentials();case VtopError_SessionExpired() when sessionExpired != null:
+return sessionExpired();case VtopError_ParseError() when parseError != null:
+return parseError(_that.field0);case VtopError_ConfigurationError() when configurationError != null:
+return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
+return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
+return invalidResponse();case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  networkError,required TResult Function()  vtopServerError,required TResult Function( String field0)  authenticationFailed,required TResult Function()  registrationParsingError,required TResult Function()  invalidCredentials,required TResult Function()  sessionExpired,required TResult Function( String field0)  parseError,required TResult Function( String field0)  configurationError,required TResult Function()  captchaRequired,required TResult Function()  invalidResponse,}) {final _that = this;
+switch (_that) {
+case VtopError_NetworkError():
+return networkError();case VtopError_VtopServerError():
+return vtopServerError();case VtopError_AuthenticationFailed():
+return authenticationFailed(_that.field0);case VtopError_RegistrationParsingError():
+return registrationParsingError();case VtopError_InvalidCredentials():
+return invalidCredentials();case VtopError_SessionExpired():
+return sessionExpired();case VtopError_ParseError():
+return parseError(_that.field0);case VtopError_ConfigurationError():
+return configurationError(_that.field0);case VtopError_CaptchaRequired():
+return captchaRequired();case VtopError_InvalidResponse():
+return invalidResponse();}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  networkError,TResult? Function()?  vtopServerError,TResult? Function( String field0)?  authenticationFailed,TResult? Function()?  registrationParsingError,TResult? Function()?  invalidCredentials,TResult? Function()?  sessionExpired,TResult? Function( String field0)?  parseError,TResult? Function( String field0)?  configurationError,TResult? Function()?  captchaRequired,TResult? Function()?  invalidResponse,}) {final _that = this;
+switch (_that) {
+case VtopError_NetworkError() when networkError != null:
+return networkError();case VtopError_VtopServerError() when vtopServerError != null:
+return vtopServerError();case VtopError_AuthenticationFailed() when authenticationFailed != null:
+return authenticationFailed(_that.field0);case VtopError_RegistrationParsingError() when registrationParsingError != null:
+return registrationParsingError();case VtopError_InvalidCredentials() when invalidCredentials != null:
+return invalidCredentials();case VtopError_SessionExpired() when sessionExpired != null:
+return sessionExpired();case VtopError_ParseError() when parseError != null:
+return parseError(_that.field0);case VtopError_ConfigurationError() when configurationError != null:
+return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
+return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
+return invalidResponse();case _:
+  return null;
+
+}
+}
+
+}
 
 /// @nodoc
 
