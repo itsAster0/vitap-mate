@@ -1272,10 +1272,10 @@ packages:
     dependency: "direct main"
     description:
       name: pocketbase
-      sha256: "85282448be07e1920742a3272737b08778e5548ada8cd5ada82d0a0228347d0c"
+      sha256: ec5d0058debd60e0e5bf8254edaa60a4ca43a254123ca2a71f5a1c1c406608dd
       url: "https://pub.dev"
     source: hosted
-    version: "0.23.0+1"
+    version: "0.20.0"
   pointycastle:
     dependency: transitive
     description:

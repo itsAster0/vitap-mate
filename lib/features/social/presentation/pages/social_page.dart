@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:pocketbase/pocketbase.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -18,7 +19,7 @@ class SocialPage extends HookConsumerWidget {
     var pbasync = ref.watch(pbProvider);
     void handleClick(pb) async {
       if (isloading.value) return;
-      Timer timeoutTimer = Timer(Duration(seconds: 40), () {
+      Timer timeoutTimer = Timer(Duration(seconds: 5), () {
         isloading.value = false;
       });
       isloading.value = true;
@@ -28,9 +29,16 @@ class SocialPage extends HookConsumerWidget {
         });
         var _ = ref.refresh(pbProvider);
         await pbSetNtotification();
-      } catch (e) {
+      }on ClientException catch(e){
+
+        if(context.mounted){
+          dispToast( context,"Error",e.response["message"]);
+        }
         ref.invalidate(pbProvider);
+      } catch (e) {
+        //ref.invalidate(pbProvider);
       } finally {
+          //var _ = ref.refresh(pbProvider);
         timeoutTimer.cancel();
         isloading.value = false;
       }
