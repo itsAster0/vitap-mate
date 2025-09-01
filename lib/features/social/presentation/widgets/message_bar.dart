@@ -265,12 +265,16 @@ class MessageBar extends HookConsumerWidget {
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: context.theme.colors.primaryForeground,
+                        color: context.theme.colors.primary,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Icon(Icons.add, size: 20),
+                      child: Icon(
+                        Icons.add,
+                        size: 20,
+                        color: context.theme.colors.secondary,
+                      ),
                     ),
-                    color: context.theme.colors.primaryForeground,
+                    color: context.theme.colors.secondary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -286,23 +290,41 @@ class MessageBar extends HookConsumerWidget {
                     },
                     itemBuilder:
                         (context) => [
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'files',
                             child: Row(
                               children: [
-                                Icon(Icons.attach_file, size: 18),
+                                Icon(
+                                  Icons.attach_file,
+                                  size: 18,
+                                  color: context.theme.colors.primary,
+                                ),
                                 SizedBox(width: 8),
-                                Text('Files'),
+                                Text(
+                                  'Files',
+                                  style: TextStyle(
+                                    color: context.theme.colors.primary,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
+                          PopupMenuItem(
                             value: 'Images',
                             child: Row(
                               children: [
-                                Icon(Icons.photo_library, size: 18),
+                                Icon(
+                                  Icons.photo_library,
+                                  size: 18,
+                                  color: context.theme.colors.primary,
+                                ),
                                 SizedBox(width: 8),
-                                Text('Images'),
+                                Text(
+                                  'Images',
+                                  style: TextStyle(
+                                    color: context.theme.colors.primary,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -346,17 +368,17 @@ class MessageBar extends HookConsumerWidget {
                                 ? Colors.orange
                                 : isReplying
                                 ? Colors.blue
-                                : Colors.black,
+                                : context.theme.colors.secondary,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child:
                           isLoading.value
-                              ? const SizedBox(
+                              ? SizedBox(
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: context.theme.colors.primary,
                                 ),
                               )
                               : Icon(
@@ -366,7 +388,7 @@ class MessageBar extends HookConsumerWidget {
                                     ? Icons.reply
                                     : Icons.send,
                                 size: 18,
-                                color: Colors.white,
+                                color: context.theme.colors.primary,
                               ),
                     ),
                   ),
@@ -588,7 +610,11 @@ class _FilePreview extends StatelessWidget {
                 color: Colors.red,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.close, size: 12, color: Colors.white),
+              child: Icon(
+                Icons.close,
+                size: 12,
+                color: context.theme.colors.primary,
+              ),
             ),
           ),
         ),

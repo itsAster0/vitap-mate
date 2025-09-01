@@ -103,13 +103,16 @@ class MessageCard extends HookConsumerWidget {
       final offset = box.localToGlobal(Offset.zero, ancestor: overlay);
 
       final List<PopupMenuEntry<String>> menuItems = [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'reply',
           child: Row(
             children: [
-              Icon(Icons.reply, size: 18, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Reply'),
+              const Icon(Icons.reply, size: 18, color: Colors.blue),
+              const SizedBox(width: 8),
+              Text(
+                'Reply',
+                style: TextStyle(color: context.theme.colors.primary),
+              ),
             ],
           ),
         ),
@@ -118,13 +121,16 @@ class MessageCard extends HookConsumerWidget {
       if (userCheck?.id == model.getStringValue("user") ||
           userCheck!.getStringValue("roles").isNotEmpty) {
         menuItems.addAll([
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'edit',
             child: Row(
               children: [
                 Icon(Icons.edit, size: 18, color: Colors.orange),
                 SizedBox(width: 8),
-                Text('Edit'),
+                Text(
+                  'Edit',
+                  style: TextStyle(color: context.theme.colors.primary),
+                ),
               ],
             ),
           ),
@@ -406,7 +412,7 @@ class ReplyPreview extends HookConsumerWidget {
                   width: 4,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey,
+                    color: context.theme.colors.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -566,7 +572,7 @@ class ReplyPreview extends HookConsumerWidget {
                   width: 4,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey,
+                    color: context.theme.colors.primary,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -699,9 +705,9 @@ class MessageBubble extends StatelessWidget {
       ),
       child: Text.rich(
         _buildTextSpans(text),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 15,
-          color: Colors.black87,
+          color: context.theme.colors.primary,
           height: 1.4,
         ),
       ),
@@ -975,12 +981,12 @@ class AttachmentThumbnail extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
+                    color: context.theme.colors.primary.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     isImage ? Icons.fullscreen : Icons.open_in_new,
-                    color: Colors.white,
+                    color: context.theme.colors.primary,
                     size: 16,
                   ),
                 ),
@@ -1036,7 +1042,7 @@ class AttachmentThumbnail extends StatelessWidget {
                 maxWidth: MediaQuery.of(dialogContext).size.width * 0.9,
               ),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: context.theme.colors.primary,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -1101,7 +1107,7 @@ class AttachmentThumbnail extends StatelessWidget {
                                       );
                                     },
                                     errorBuilder: (context, error, stackTrace) {
-                                      return const SizedBox(
+                                      return SizedBox(
                                         height: 200,
                                         child: Center(
                                           child: Column(
@@ -1111,13 +1117,21 @@ class AttachmentThumbnail extends StatelessWidget {
                                               Icon(
                                                 Icons.broken_image,
                                                 size: 64,
-                                                color: Colors.grey,
+                                                color:
+                                                    context
+                                                        .theme
+                                                        .colors
+                                                        .primary,
                                               ),
-                                              SizedBox(height: 8),
+                                              const SizedBox(height: 8),
                                               Text(
                                                 'Failed to load image',
                                                 style: TextStyle(
-                                                  color: Colors.grey,
+                                                  color:
+                                                      context
+                                                          .theme
+                                                          .colors
+                                                          .primary,
                                                 ),
                                               ),
                                             ],

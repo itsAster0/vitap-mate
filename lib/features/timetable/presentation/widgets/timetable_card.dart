@@ -195,6 +195,7 @@ class TimetableCard extends HookWidget {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
+            color: Color(0xFF374151),
             //height: 1.2,
           ),
           maxLines: 1,

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/router.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/services/firebase_notification.dart';
 import 'package:vitapmate/services/update_service.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -56,7 +57,7 @@ class MyApp extends HookConsumerWidget {
       return null;
     }, []);
 
-    final fTheme = FThemes.zinc.light;
+    final fTheme = ref.watch(fThemeProvider);
     return MaterialApp.router(
       routeInformationProvider: goRouter.routeInformationProvider,
       routeInformationParser: goRouter.routeInformationParser,

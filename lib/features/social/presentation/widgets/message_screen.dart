@@ -56,7 +56,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
         disCommonToast(context, e);
         String msg = commonErrorMessage(e);
         return RefreshIndicator(
-          backgroundColor: Colors.white,
+          backgroundColor: context.theme.colors.primary,
           color: Colors.black,
           onRefresh: () async {
             var _ = await ref.refresh(pbProvider.future);
@@ -167,20 +167,30 @@ class ChatScreen extends HookConsumerWidget {
     }, [scrollController]);
 
     if (messages.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 64,
+              color: context.theme.colors.primaryForeground,
+            ),
+            const SizedBox(height: 16),
             Text(
               'No messages yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 18,
+                color: context.theme.colors.primaryForeground,
+              ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Start a conversation!',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                color: context.theme.colors.primaryForeground,
+              ),
             ),
           ],
         ),
@@ -203,12 +213,12 @@ class ChatScreen extends HookConsumerWidget {
                 child: Center(
                   child:
                       isLoadingMore.value
-                          ? const SizedBox(
+                          ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black,
+                              color: context.theme.colors.secondary,
                             ),
                           )
                           : FButton(
@@ -244,7 +254,9 @@ class ChatScreen extends HookConsumerWidget {
           bottom: showScrollToBottom.value ? 16 : -60,
           right: 16,
           child: Material(
+            color: context.theme.colors.secondary,
             elevation: 4,
+            shadowColor: context.theme.colors.secondary,
             borderRadius: BorderRadius.circular(28),
             child: FloatingActionButton.small(
               onPressed:
@@ -254,12 +266,15 @@ class ChatScreen extends HookConsumerWidget {
                     isAtBottom,
                     hasNewMessage,
                   ),
-              backgroundColor: context.theme.colors.primaryForeground,
+              backgroundColor: context.theme.colors.secondary,
               elevation: 0,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  const Icon(Icons.keyboard_arrow_down, color: Colors.black),
+                  Icon(
+                    Icons.keyboard_arrow_down,
+                    color: context.theme.colors.primary,
+                  ),
                 ],
               ),
             ),

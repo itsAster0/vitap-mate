@@ -33,13 +33,13 @@ class MorePage extends StatelessWidget {
         children: [
           FTile(
             prefixIcon: Icon(FIcons.bookCheck),
-            title: const Text(
+            title: Text(
               'Faculty Directory',
-              style: TextStyle(color: MoreColors.primaryText),
+              style: TextStyle(color: context.theme.colors.primary),
             ),
             suffixIcon: Icon(
               FIcons.chevronRight,
-              color: MoreColors.secondaryText,
+              color: context.theme.colors.primary,
             ),
             onPress: () {
               _launchInBrowser(url);
@@ -47,13 +47,13 @@ class MorePage extends StatelessWidget {
           ),
           FTile(
             prefixIcon: Icon(FIcons.bookCheck),
-            title: const Text(
+            title: Text(
               'Marks',
-              style: TextStyle(color: MoreColors.primaryText),
+              style: TextStyle(color: context.theme.colors.primary),
             ),
             suffixIcon: Icon(
               FIcons.chevronRight,
-              color: MoreColors.secondaryText,
+              color: context.theme.colors.primary,
             ),
             onPress: () {
               GoRouter.of(context).pushNamed(Paths.marks);
@@ -61,13 +61,13 @@ class MorePage extends StatelessWidget {
           ),
           FTile(
             prefixIcon: Icon(FIcons.school),
-            title: const Text(
+            title: Text(
               'Exam Schedule',
-              style: TextStyle(color: MoreColors.primaryText),
+              style: TextStyle(color: context.theme.colors.primary),
             ),
             suffixIcon: Icon(
               FIcons.chevronRight,
-              color: MoreColors.secondaryText,
+              color: context.theme.colors.primary,
             ),
             onPress: () {
               GoRouter.of(context).pushNamed(Paths.examSchedule);
@@ -127,7 +127,7 @@ class VtopCard extends HookConsumerWidget {
               child: Text(
                 "Vtop",
                 style: TextStyle(
-                  color: MoreColors.primaryText,
+                  color: context.theme.colors.primary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -135,7 +135,7 @@ class VtopCard extends HookConsumerWidget {
             subtitle: Center(
               child: Text(
                 "No login required",
-                style: TextStyle(color: MoreColors.secondaryText),
+                style: TextStyle(color: context.theme.colors.primary),
               ),
             ),
             child:
@@ -242,7 +242,7 @@ class WifiCard extends HookConsumerWidget {
                   child: Text(
                     "Wi-fi",
                     style: TextStyle(
-                      color: MoreColors.primaryText,
+                      color: context.theme.colors.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -265,7 +265,7 @@ class WifiCard extends HookConsumerWidget {
               children: [
                 Text(
                   "No over-limit on most Wi-Fi networks.",
-                  style: TextStyle(color: MoreColors.secondaryText),
+                  style: TextStyle(color: context.theme.colors.primary),
                 ),
               ],
             ),
@@ -280,7 +280,9 @@ class WifiCard extends HookConsumerWidget {
                           children: [
                             Text(
                               "Add your wifi details by clicking  ",
-                              style: TextStyle(color: MoreColors.secondaryText),
+                              style: TextStyle(
+                                color: context.theme.colors.primary,
+                              ),
                             ),
                             FTappable(
                               child: Icon(FIcons.plus),
@@ -296,7 +298,9 @@ class WifiCard extends HookConsumerWidget {
                         Center(
                           child: Text(
                             data.$1 ?? "",
-                            style: TextStyle(color: MoreColors.primaryText),
+                            style: TextStyle(
+                              color: context.theme.colors.primary,
+                            ),
                           ),
                         ),
                       if (succesMsg.value != null)
@@ -438,7 +442,7 @@ class WifiInput extends HookConsumerWidget {
     return FDialog(
       title: Text(
         "Wi-fi credentials",
-        style: TextStyle(color: MoreColors.primaryText),
+        style: TextStyle(color: context.theme.colors.primary),
       ),
       body: Form(
         key: formKey,
@@ -449,7 +453,7 @@ class WifiInput extends HookConsumerWidget {
             FTextFormField(
               label: Text(
                 "Username",
-                style: TextStyle(color: MoreColors.primaryText),
+                style: TextStyle(color: context.theme.colors.primary),
               ),
               controller: username,
               hint: 'wi-fi username',

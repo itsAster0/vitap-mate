@@ -29,16 +29,15 @@ class SocialPage extends HookConsumerWidget {
         });
         var _ = ref.refresh(pbProvider);
         await pbSetNtotification();
-      }on ClientException catch(e){
-
-        if(context.mounted){
-          dispToast( context,"Error",e.response["message"]);
+      } on ClientException catch (e) {
+        if (context.mounted) {
+          dispToast(context, "Error", e.response["message"]);
         }
         ref.invalidate(pbProvider);
       } catch (e) {
         //ref.invalidate(pbProvider);
       } finally {
-          //var _ = ref.refresh(pbProvider);
+        //var _ = ref.refresh(pbProvider);
         timeoutTimer.cancel();
         isloading.value = false;
       }

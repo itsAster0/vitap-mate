@@ -2,18 +2,20 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_avatar_update.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_username_update.dart';
 import 'package:vitapmate/main.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context, WidgetRef ref) => Container(
     decoration: BoxDecoration(color: context.theme.colors.background),
     child: Padding(
       padding: const EdgeInsets.all(8.0),
@@ -38,6 +40,7 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ],
                 ),
+
                 FTileGroup(
                   divider: FTileDivider.indented,
                   label: const Text('Social'),
@@ -78,6 +81,23 @@ class SettingsPage extends StatelessWidget {
                           type: AppSettingsType.notification,
                         );
                       },
+                    ),
+                  ],
+                ),
+                FTileGroup(
+                  divider: FTileDivider.indented,
+                  label: const Text('Appearance'),
+                  children: [
+                    FTile(
+                      prefixIcon: Icon(FIcons.moon),
+                      title: const Text('Dark Mode'),
+
+                      suffixIcon: FSwitch(
+                        value: ref.watch(themeProvider) == ThemeMode.dark,
+                        onChange: (value) {
+                          ref.read(themeProvider.notifier).toggleTheme();
+                        },
+                      ),
                     ),
                   ],
                 ),
