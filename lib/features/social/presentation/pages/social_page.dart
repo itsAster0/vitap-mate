@@ -33,7 +33,9 @@ class SocialPage extends HookConsumerWidget {
         if (context.mounted) {
           dispToast(context, "Error", e.response["message"]);
         }
-        ref.invalidate(pbProvider);
+        if (e.response["message"].toString().toLowerCase().contains("vit")) {
+          ref.invalidate(pbProvider);
+        }
       } catch (e) {
         //ref.invalidate(pbProvider);
       } finally {
