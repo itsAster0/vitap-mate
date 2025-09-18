@@ -57,7 +57,7 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
         String msg = commonErrorMessage(e);
         return RefreshIndicator(
           backgroundColor: context.theme.colors.primary,
-          color: Colors.black,
+          color: context.theme.colors.primaryForeground,
           onRefresh: () async {
             var _ = await ref.refresh(pbProvider.future);
           },
@@ -89,14 +89,14 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
         );
       },
       loading:
-          () => const Center(
+          () => Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox(
                   width: 50,
                   height: 50,
-                  child: CircularProgressIndicator(color: Colors.black),
+                  child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
                 ),
                 SizedBox(height: 16),
                 Text(
@@ -222,7 +222,7 @@ class ChatScreen extends HookConsumerWidget {
                             ),
                           )
                           : FButton(
-                            style: FButtonStyle.secondary,
+                            style: FButtonStyle.secondary(),
                             onPress:
                                 () => _loadMoreMessages(
                                   isLoadingMore,

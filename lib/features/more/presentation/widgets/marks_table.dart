@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:forui/theme.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class MarksTable extends StatelessWidget {
+class MarksTable extends HookConsumerWidget {
   final List<MarksRecordEach> marks;
   const MarksTable({super.key, required this.marks});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context,WidgetRef ref) {
+       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height / 2.5,
       ),
       decoration: BoxDecoration(
-        color: MarksColors.tableBackground,
+        color: context.theme.colors.primaryForeground,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: MarksColors.tableBorder),
+     
         boxShadow: [
           BoxShadow(
             color: MarksColors.cardShadow,
@@ -32,28 +37,23 @@ class MarksTable extends StatelessWidget {
             scrollDirection: Axis.vertical,
             child: DataTable(
               decoration: const BoxDecoration(),
-              dividerThickness: 1,
-              headingRowColor: WidgetStateProperty.all(
-                MarksColors.tableHeaderBackground,
-              ),
+              dividerThickness:  darkMode?0:1,
+             
               headingRowHeight: 56,
               dataRowMinHeight: 48,
               dataRowMaxHeight: 64,
               columnSpacing: 16,
               horizontalMargin: 16,
-              border: TableBorder.all(
-                color: MarksColors.tableBorder,
-                borderRadius: const BorderRadius.all(Radius.circular(4)),
-              ),
+          
               columns: [
-                _buildDataColumn(""),
-                _buildDataColumn("Title"),
-                _buildDataColumn("Scored Mark"),
-                _buildDataColumn("Max Marks"),
-                _buildDataColumn("Weightage Mark"),
-                _buildDataColumn("Weightage%"),
-                _buildDataColumn("Status"),
-                _buildDataColumn("Remark"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText, ""),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Title"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Scored Mark"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Max Marks"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Weightage Mark"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Weightage%"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Status"),
+                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Remark"),
               ],
               rows:
                   marks.asMap().entries.map<DataRow>((entry) {
@@ -68,14 +68,14 @@ class MarksTable extends StatelessWidget {
                             : MarksColors.tableRowAlternate,
                       ),
                       cells: [
-                        _buildDataCell(mark.serial, isNumeric: true),
-                        _buildDataCell(mark.markstitle),
-                        _buildDataCell(mark.scoredmark, isNumeric: true),
-                        _buildDataCell(mark.maxmarks, isNumeric: true),
-                        _buildDataCell(mark.weightagemark, isNumeric: true),
-                        _buildDataCell(mark.weightage),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.serial, isNumeric: true),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.markstitle),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.scoredmark, isNumeric: true),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.maxmarks, isNumeric: true),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.weightagemark, isNumeric: true),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.weightage),
                         DataCell(_buildStatusBadge(mark.status)),
-                        _buildDataCell(mark.remark),
+                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.remark),
                       ],
                     );
                   }).toList(),
@@ -86,27 +86,27 @@ class MarksTable extends StatelessWidget {
     );
   }
 
-  DataColumn _buildDataColumn(String label) {
+  DataColumn _buildDataColumn(Color color,String label) {
     return DataColumn(
       label: Text(
         label,
-        style: const TextStyle(
+        style:  TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 14,
-          color: MarksColors.primaryText,
+          color:  color,
         ),
       ),
     );
   }
 
-  DataCell _buildDataCell(String text, {bool isNumeric = false}) {
+  DataCell _buildDataCell(Color color,String text, {bool isNumeric = false}) {
     return DataCell(
       Text(
         text,
         style: TextStyle(
           fontSize: 13,
           fontWeight: isNumeric ? FontWeight.w600 : FontWeight.w400,
-          color: MarksColors.secondaryText,
+          color: color ,
         ),
       ),
     );

@@ -35,6 +35,8 @@ Future<void> main() async {
     return true;
   };
   await RustLib.init();
+
+
   runApp(ProviderScope(child: const MyApp()));
 }
 
@@ -58,6 +60,7 @@ class MyApp extends HookConsumerWidget {
     }, []);
 
     final fTheme = ref.watch(fThemeProvider);
+    
     return MaterialApp.router(
       routeInformationProvider: goRouter.routeInformationProvider,
       routeInformationParser: goRouter.routeInformationParser,

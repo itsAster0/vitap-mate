@@ -697,7 +697,7 @@ class MessageBubble extends StatelessWidget {
         border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: context.theme.colors.primaryForeground.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -942,7 +942,7 @@ class AttachmentThumbnail extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: context.theme.colors.primaryForeground.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -1042,7 +1042,7 @@ class AttachmentThumbnail extends StatelessWidget {
                 maxWidth: MediaQuery.of(dialogContext).size.width * 0.9,
               ),
               decoration: BoxDecoration(
-                color: context.theme.colors.primary,
+                color: context.theme.colors.primaryForeground,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
@@ -1064,9 +1064,10 @@ class AttachmentThumbnail extends StatelessWidget {
                         Expanded(
                           child: Text(
                             filename,
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
+                              color: context.theme.colors.primary 
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1190,7 +1191,7 @@ class AttachmentThumbnail extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         FButton(
-                          style: FButtonStyle.outline,
+                          style: FButtonStyle.outline(),
                           onPress: () => Navigator.of(dialogContext).pop(),
                           child: const Text('Close'),
                         ),
@@ -1333,7 +1334,7 @@ class UserRole extends HookConsumerWidget {
           return const SizedBox.shrink();
         }
         return FBadge(
-          style: FBadgeStyle.outline,
+          style: FBadgeStyle.outline(),
           child: Text(role, style: const TextStyle(fontSize: 11)),
         );
       },

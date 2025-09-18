@@ -83,7 +83,7 @@ class UserBox extends HookConsumerWidget {
             child: SizedBox(
               width: 100,
               height: 100,
-              child: CircularProgressIndicator(color: Colors.black),
+              child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
             ),
           );
         },
@@ -171,7 +171,7 @@ class Useradd extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-          intrinsicWidth: true,
+      
           onPress:
               () => showAdaptiveDialog(
                 context: context,
@@ -185,7 +185,7 @@ class Useradd extends HookConsumerWidget {
                     ),
                     actions: [
                       FButton(
-                        style: FButtonStyle.outline,
+                        style: FButtonStyle.outline(),
                         onPress: () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
                       ),
@@ -215,7 +215,7 @@ class UserSemChange extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-          intrinsicWidth: true,
+  
           onPress:
               () => showAdaptiveDialog(
                 context: context,
@@ -292,7 +292,7 @@ class UserSemChange extends HookConsumerWidget {
                             title: const Text('Semesters'),
                             actions: [
                               FButton(
-                                style: FButtonStyle.outline,
+                                style: FButtonStyle.outline(),
                                 onPress: () => Navigator.of(context).pop(),
                                 child: const Text('Cancel'),
                               ),
@@ -310,7 +310,7 @@ class UserSemChange extends HookConsumerWidget {
                               ),
                               actions: [
                                 FButton(
-                                  style: FButtonStyle.outline,
+                                  style: FButtonStyle.outline(),
                                   onPress: () => Navigator.of(context).pop(),
                                   child: const Text('Cancel'),
                                 ),
@@ -318,7 +318,7 @@ class UserSemChange extends HookConsumerWidget {
                             ),
                         loading:
                             () =>
-                                CircularProgressIndicator(color: Colors.black),
+                                CircularProgressIndicator(color: context.theme.colors.primaryForeground),
                       );
                     },
                   );
@@ -343,7 +343,7 @@ class UserPassChange extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-          intrinsicWidth: true,
+    
           onPress: () {
             showAdaptiveDialog(
               context: outerContext,
@@ -403,16 +403,16 @@ class UserPassChange extends HookConsumerWidget {
                             child: const Text('Update'),
                           )
                         else
-                          const SizedBox(
+                           SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black,
+                              color: context.theme.colors.primaryForeground,
                             ),
                           ),
                         FButton(
-                          style: FButtonStyle.outline,
+                          style: FButtonStyle.outline(),
                           onPress: () => Navigator.of(dialogContext).pop(),
                           child: const Text('Cancel'),
                         ),

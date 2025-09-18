@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_table.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -65,6 +66,7 @@ class MarksCard extends HookConsumerWidget {
         controller.reverse();
       }
     }
+   final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
 
     final isLab = record.coursetype.toLowerCase().endsWith("lab");
 
@@ -77,7 +79,7 @@ class MarksCard extends HookConsumerWidget {
             onPress: toggle,
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: !darkMode? LinearGradient(
                   colors:
                       isLab
                           ? [
@@ -90,8 +92,9 @@ class MarksCard extends HookConsumerWidget {
                           ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                ),
+                ):null,
                 borderRadius: BorderRadius.circular(12),
+                color: darkMode?context.theme.colors.primaryForeground :null,
                 boxShadow: [
                   BoxShadow(
                     color: MarksColors.cardShadow,
@@ -100,7 +103,7 @@ class MarksCard extends HookConsumerWidget {
                   ),
                 ],
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: .8),
+                  color: context.theme.colors.primaryForeground.withValues(alpha: .8),
                   width: 1,
                 ),
               ),
@@ -114,7 +117,7 @@ class MarksCard extends HookConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: context.theme.colors.primaryForeground.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
@@ -129,6 +132,7 @@ class MarksCard extends HookConsumerWidget {
                           ),
                           child: Icon(
                             isLab ? FIcons.flaskConical : FIcons.libraryBig,
+
                             color:
                                 isLab
                                     ? MarksColors.labIcon
@@ -145,20 +149,20 @@ class MarksCard extends HookConsumerWidget {
                                 record.coursetitle,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
+                                style:  TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
-                                  color: MarksColors.primaryText,
+                                  color:  darkMode? context.theme.colors.primary: MarksColors.primaryText,
                                   height: 1.3,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 record.coursecode,
-                                style: const TextStyle(
+                                style:  TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: MarksColors.secondaryText,
+                                  color:  darkMode? context.theme.colors.primary: MarksColors.secondaryText,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -173,7 +177,7 @@ class MarksCard extends HookConsumerWidget {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: context.theme.colors.primaryForeground.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: _getPerformanceColor(
@@ -187,10 +191,10 @@ class MarksCard extends HookConsumerWidget {
                             children: [
                               Text(
                                 "${totals.$1.toStringAsFixed(1)}/${totals.$2.toStringAsFixed(1)}",
-                                style: const TextStyle(
+                                style:  TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color: MarksColors.primaryText,
+                                  color:  darkMode? context.theme.colors.primary: MarksColors.primaryText,
                                 ),
                               ),
                               Text(
@@ -258,15 +262,15 @@ class MarksCard extends HookConsumerWidget {
                         Icon(
                           Icons.person_outline,
                           size: 16,
-                          color: MarksColors.secondaryText,
+                          color:  darkMode? context.theme.colors.primary: MarksColors.secondaryText,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             "by ${record.faculity}",
-                            style: const TextStyle(
+                            style:  TextStyle(
                               fontSize: 14,
-                              color: MarksColors.secondaryText,
+                              color:  darkMode? context.theme.colors.primary:MarksColors.secondaryText,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -275,9 +279,9 @@ class MarksCard extends HookConsumerWidget {
                         const SizedBox(width: 8),
                         Text(
                           "${record.marks.length} items",
-                          style: const TextStyle(
+                          style:  TextStyle(
                             fontSize: 12,
-                            color: MarksColors.tertiaryText,
+                            color:  darkMode? context.theme.colors.primary: MarksColors.tertiaryText,
                             fontWeight: FontWeight.w500,
                           ),
                         ),

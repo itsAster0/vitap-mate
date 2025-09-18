@@ -162,12 +162,12 @@ class Step1 extends HookConsumerWidget {
                   }
                 },
               )
-              : const SizedBox(
+              :  SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.black,
+                  color: context.theme.colors.primaryForeground,
                 ),
               ),
         ],

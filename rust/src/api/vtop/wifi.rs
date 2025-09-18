@@ -140,7 +140,7 @@ pub async fn wifi_login_logout_hostel(
             username, password, timestamp
         );
         let res = client
-            .post("https://hfw.vitap.ac.in:8090/login.xml")
+            .post("https://172.18.8.14:8090/login.xml")
             .body(body)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send()
@@ -171,7 +171,7 @@ pub async fn wifi_login_logout_hostel(
             username, timestamp
         );
         let res = client
-            .post("https://hfw.vitap.ac.in:8090/logout.xml")
+            .post("https://172.18.8.14:8090/logout.xml")
             .body(body)
             .header("Content-Type", "application/x-www-form-urlencoded")
             .send()

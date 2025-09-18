@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -42,8 +43,8 @@ class AttendancePage extends HookConsumerWidget {
       onRefresh: () async {
         await update();
       },
-      backgroundColor: Colors.white,
-      color: Colors.black,
+      backgroundColor: context.theme.colors.primary,
+      color: context.theme.colors.primaryForeground,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
@@ -96,7 +97,7 @@ class AttendancePage extends HookConsumerWidget {
                 child: SizedBox(
                   width: 50,
                   height: 50,
-                  child: CircularProgressIndicator(color: Colors.black),
+                  child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
                 ),
               );
             },

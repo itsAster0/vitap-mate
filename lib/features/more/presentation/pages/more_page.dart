@@ -1,4 +1,4 @@
-import 'dart:developer';
+
 import 'dart:math' hide log;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -12,16 +12,16 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/users/wifi_details.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
-import 'package:url_launcher/url_launcher.dart';
+
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
 
-  Future<void> _launchInBrowser(Uri url) async {
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      log('Could not launch $url');
-    }
-  }
+  // Future<void> _launchInBrowser(Uri url) async {
+  //   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+  //     log('Could not launch $url');
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -31,27 +31,27 @@ class MorePage extends StatelessWidget {
       child: Column(
         spacing: 10,
         children: [
+          // FTile(
+          //   prefixIcon: Icon(FIcons.bookCheck),
+          //   title: Text(
+          //     'Faculty Directory',
+          //     style: TextStyle(color: context.theme.colors.primary),
+          //   ),
+          //   suffixIcon: Icon(
+          //     FIcons.chevronRight,
+          //     color: context.theme.colors.primary,
+          //   ),
+          //   onPress: () {
+          //     _launchInBrowser(url);
+          //   },
+          // ),
           FTile(
-            prefixIcon: Icon(FIcons.bookCheck),
-            title: Text(
-              'Faculty Directory',
-              style: TextStyle(color: context.theme.colors.primary),
-            ),
-            suffixIcon: Icon(
-              FIcons.chevronRight,
-              color: context.theme.colors.primary,
-            ),
-            onPress: () {
-              _launchInBrowser(url);
-            },
-          ),
-          FTile(
-            prefixIcon: Icon(FIcons.bookCheck),
+            prefix: Icon(FIcons.bookCheck),
             title: Text(
               'Marks',
               style: TextStyle(color: context.theme.colors.primary),
             ),
-            suffixIcon: Icon(
+            suffix: Icon(
               FIcons.chevronRight,
               color: context.theme.colors.primary,
             ),
@@ -60,12 +60,12 @@ class MorePage extends StatelessWidget {
             },
           ),
           FTile(
-            prefixIcon: Icon(FIcons.school),
+            prefix: Icon(FIcons.school),
             title: Text(
               'Exam Schedule',
               style: TextStyle(color: context.theme.colors.primary),
             ),
-            suffixIcon: Icon(
+            suffix: Icon(
               FIcons.chevronRight,
               color: context.theme.colors.primary,
             ),
@@ -231,7 +231,7 @@ class WifiCard extends HookConsumerWidget {
             title: Stack(
               children: [
                 FTappable(
-                  child: Icon(FIcons.rotateCw),
+                  child: Icon(FIcons.rotateCw,color: context.theme.colors.primary,),
                   onPress: () {
                     errorMsg.value = null;
                     succesMsg.value = null;
@@ -250,7 +250,7 @@ class WifiCard extends HookConsumerWidget {
                 Positioned(
                   right: 0,
                   child: FTappable(
-                    child: Icon(FIcons.plus),
+                    child: Icon(FIcons.plus,color: context.theme.colors.primary,),
                     onPress:
                         () => showAdaptiveDialog(
                           context: context,
@@ -285,7 +285,7 @@ class WifiCard extends HookConsumerWidget {
                               ),
                             ),
                             FTappable(
-                              child: Icon(FIcons.plus),
+                              child: Icon(FIcons.plus,color :context.theme.colors.primary),
                               onPress:
                                   () => showAdaptiveDialog(
                                     context: context,
@@ -481,7 +481,7 @@ class WifiInput extends HookConsumerWidget {
       actions: [
         if (!isloading.value)
           FButton(
-            style: FButtonStyle.primary,
+            style: FButtonStyle.primary(),
             onPress: () async {
               if (formKey.currentState!.validate()) {
                 await handelClick();
@@ -503,7 +503,7 @@ class WifiInput extends HookConsumerWidget {
             ),
           ),
         FButton(
-          style: FButtonStyle.outline,
+          style: FButtonStyle.outline(),
           onPress: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),

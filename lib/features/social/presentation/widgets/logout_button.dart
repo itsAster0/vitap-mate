@@ -33,7 +33,7 @@ class LogoutButton extends HookConsumerWidget {
         return SizedBox(
           width: 10,
           height: 10,
-          child: CircularProgressIndicator(color: Colors.black),
+          child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
         );
       },
     );

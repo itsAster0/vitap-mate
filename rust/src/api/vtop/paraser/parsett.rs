@@ -17,7 +17,8 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
     let document = Html::parse_document(&html);
     let rows_selector = Selector::parse("tr").unwrap();
     let mut timetables: Vec<TimetableSlot> = Vec::new();
-    let mut timeings_temp: Vec<Timeing> = Vec::new();
+    let mut timeings_temp_th: Vec<Timeing> = Vec::new();
+    let mut timeings_temp_lab: Vec<Timeing> = Vec::new();
     let mut count_for_offset = 0;
     let tabel_selector = Selector::parse("tbody").unwrap();
     let mut table = document.select(&tabel_selector);
@@ -71,7 +72,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                 }
 
                 for (index, val) in cells.iter().enumerate() {
-                    if count_for_offset < 2 {
+                    if count_for_offset < 4 {
                         if count_for_offset == 0 {
                             let timeing = Timeing {
                                 serial: index.to_string(),
@@ -84,9 +85,32 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                     .replace("\n", ""),
                                 end_time: "".to_string(),
                             };
-                            timeings_temp.push(timeing);
+                            timeings_temp_th.push(timeing);
                         } else if count_for_offset == 1 {
-                            if let Some(timeing) = timeings_temp.get_mut(index) {
+                            if let Some(timeing) = timeings_temp_th.get_mut(index) {
+                                timeing.end_time = val
+                                    .text()
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                                    .trim()
+                                    .replace("\t", "")
+                                    .replace("\n", "");
+                            }
+                        } else  if count_for_offset == 2 {
+                            let timeing = Timeing {
+                                serial: index.to_string(),
+                                start_time: val
+                                    .text()
+                                    .collect::<Vec<_>>()
+                                    .join("")
+                                    .trim()
+                                    .replace("\t", "")
+                                    .replace("\n", ""),
+                                end_time: "".to_string(),
+                            };
+                            timeings_temp_lab.push(timeing);
+                        } else if count_for_offset == 3 {
+                            if let Some(timeing) = timeings_temp_lab.get_mut(index) {
                                 timeing.end_time = val
                                     .text()
                                     .collect::<Vec<_>>()
@@ -131,6 +155,8 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                         .get(&code)
                                         .unwrap_or(&"".to_string())
                                         .to_string(),
+                                    is_lab: Some(!count_for_offset % 2 == 0),
+                                
                                 };
                                 timetables.push(class);
                             }
@@ -151,9 +177,21 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
         };
     }
     for timetable in &mut timetables {
-        if let Some(times) = timeings_temp.iter().find(|t| t.serial == timetable.serial) {
-            timetable.start_time = times.start_time.clone();
+        if let Some(times) = timeings_temp_th.iter().find(|t| t.serial == timetable.serial) {
+            if !timetable.is_lab.unwrap(){
+       timetable.start_time = times.start_time.clone();
             timetable.end_time = times.end_time.clone();
+            }
+       
+        }
+    }
+        for timetable in &mut timetables {
+        if let Some(times) = timeings_temp_lab.iter().find(|t| t.serial == timetable.serial) {
+            if timetable.is_lab.unwrap(){
+       timetable.start_time = times.start_time.clone();
+            timetable.end_time = times.end_time.clone();
+            }
+       
         }
     }
 

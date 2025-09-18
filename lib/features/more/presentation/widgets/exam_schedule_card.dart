@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:forui/theme.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class ExamScheduleCard extends StatelessWidget {
+class ExamScheduleCard extends ConsumerWidget {
   final PerExamScheduleRecord record;
   const ExamScheduleCard({super.key, required this.record});
 
@@ -18,37 +21,19 @@ class ExamScheduleCard extends StatelessWidget {
     }).length;
   }
 
-  String _getExamStatus() {
-    final upcomingCount = _getUpcomingExamsCount();
-    final totalCount = record.records.length;
 
-    if (upcomingCount == 0) return "Completed";
-    if (upcomingCount == totalCount) return "Upcoming";
-    return "In Progress";
-  }
-
-  Color _getStatusColor() {
-    final status = _getExamStatus();
-    switch (status) {
-      case "Completed":
-        return ExamColors.completedText;
-      case "Upcoming":
-        return ExamColors.upcomingText;
-      default:
-        return ExamColors.todayText;
-    }
-  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context,WidgetRef ref ) {
     final upcomingCount = _getUpcomingExamsCount();
-    final status = _getExamStatus();
+ 
+       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: darkMode? null : const LinearGradient(
             colors: [
               ExamColors.examCardBackground,
               ExamColors.examCardSecondary,
@@ -56,6 +41,7 @@ class ExamScheduleCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
+          color:  darkMode? context.theme.colors.primaryForeground :null,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -65,7 +51,7 @@ class ExamScheduleCard extends StatelessWidget {
             ),
           ],
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: context.theme.colors.primaryForeground.withValues(alpha: 0.8),
             width: 1,
           ),
         ),
@@ -75,7 +61,7 @@ class ExamScheduleCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: context.theme.colors.primaryForeground.withValues(alpha: 0.9),
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
@@ -93,7 +79,7 @@ class ExamScheduleCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: ExamColors.todayBackground,
+                          color:  darkMode? context.theme.colors.primaryForeground: ExamColors.todayBackground,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: ExamColors.todayBorder.withValues(
@@ -112,35 +98,14 @@ class ExamScheduleCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           record.examType,
-                          style: const TextStyle(
+                          style:  TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 18,
-                            color: ExamColors.primaryText,
+                            color: darkMode? context.theme.colors.primary: ExamColors.primaryText,
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor().withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: _getStatusColor().withValues(alpha: 0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          status,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _getStatusColor(),
-                          ),
-                        ),
-                      ),
+             
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -149,7 +114,7 @@ class ExamScheduleCard extends StatelessWidget {
                       _buildInfoChip(
                         icon: Icons.assignment_outlined,
                         label: "${record.records.length} total",
-                        color: ExamColors.secondaryText,
+                        color:   darkMode? context.theme.colors.primary :ExamColors.secondaryText,
                       ),
                       const SizedBox(width: 8),
                       if (upcomingCount > 0)
@@ -164,17 +129,17 @@ class ExamScheduleCard extends StatelessWidget {
               ),
             ),
             Container(
-              decoration: const BoxDecoration(
-                color: ExamColors.tableBackground,
+              decoration: BoxDecoration(
+                color: darkMode? context.theme.colors.primaryForeground : ExamColors.tableBackground,
               ),
               child: ClipRRect(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     decoration: const BoxDecoration(),
-                    dividerThickness: 1,
+                    dividerThickness: darkMode?0: 1,
                     headingRowColor: WidgetStateProperty.all(
-                      ExamColors.tableHeaderBackground,
+                     darkMode? context.theme.colors.primaryForeground : ExamColors.tableHeaderBackground,
                     ),
                     headingRowHeight: 56,
                     dataRowMinHeight: 48,
@@ -182,19 +147,19 @@ class ExamScheduleCard extends StatelessWidget {
                     columnSpacing: 16,
                     horizontalMargin: 16,
                     columns: [
-                      _buildDataColumn(""),
-                      _buildDataColumn("Course"),
-                      _buildDataColumn("Date"),
-                      _buildDataColumn("Venue"),
-                      _buildDataColumn("Seat"),
-                      _buildDataColumn("Seat No."),
-                      _buildDataColumn("Time"),
-                      _buildDataColumn("Report Time"),
-                      _buildDataColumn("Session"),
-                      _buildDataColumn("Slot"),
-                      _buildDataColumn("Course Type"),
-                      _buildDataColumn("Course Name"),
-                      _buildDataColumn("Class ID"),
+                      _buildDataColumn(context,""),
+                      _buildDataColumn(context,"Course"),
+                      _buildDataColumn(context,"Date"),
+                      _buildDataColumn(context,"Venue"),
+                      _buildDataColumn(context,"Seat"),
+                      _buildDataColumn(context,"Seat No."),
+                      _buildDataColumn(context,"Time"),
+                      _buildDataColumn(context,"Report Time"),
+                      _buildDataColumn(context,"Session"),
+                      _buildDataColumn(context,"Slot"),
+                      _buildDataColumn(context,"Course Type"),
+                      _buildDataColumn(context,"Course Name"),
+                      _buildDataColumn(context,"Class ID"),
                     ],
                     rows:
                         record.records.asMap().entries.map<DataRow>((entry) {
@@ -205,32 +170,31 @@ class ExamScheduleCard extends StatelessWidget {
 
                           return DataRow(
                             color: WidgetStateProperty.all(
-                              isUpcoming
-                                  ? ExamColors.upcomingBackground.withValues(
-                                    alpha: 0.3,
-                                  )
+                              
+                               darkMode? context.theme.colors.primaryForeground 
                                   : isEven
                                   ? Colors.transparent
                                   : ExamColors.tableRowAlternate,
                             ),
                             cells: [
-                              _buildDataCell(exam.serial, isNumeric: true),
-                              _buildDataCell(exam.courseCode),
+                              _buildDataCell( context, exam.serial, isNumeric: true),
+                              _buildDataCell(context,exam.courseCode),
                               _buildDataCell(
+                                context,
                                 exam.examDate,
                                 isDate: true,
                                 isUpcoming: isUpcoming,
                               ),
-                              _buildDataCell(exam.venue),
-                              _buildDataCell(exam.seatLocation),
-                              _buildDataCell(exam.seatNo),
-                              _buildDataCell(exam.examTime),
-                              _buildDataCell(exam.reportingTime),
-                              _buildDataCell(exam.examSession),
-                              _buildDataCell(exam.slot),
-                              _buildDataCell(exam.courseType),
-                              _buildDataCell(exam.courseName),
-                              _buildDataCell(exam.courseId),
+                              _buildDataCell(context,exam.venue),
+                              _buildDataCell(context,exam.seatLocation),
+                              _buildDataCell(context,exam.seatNo),
+                              _buildDataCell(context,exam.examTime),
+                              _buildDataCell(context,exam.reportingTime),
+                              _buildDataCell(context,exam.examSession),
+                              _buildDataCell(context,exam.slot),
+                              _buildDataCell(context,exam.courseType),
+                              _buildDataCell(context,exam.courseName),
+                              _buildDataCell(context,exam.courseId),
                             ],
                           );
                         }).toList(),
@@ -283,20 +247,21 @@ class ExamScheduleCard extends StatelessWidget {
     }
   }
 
-  DataColumn _buildDataColumn(String label) {
+  DataColumn _buildDataColumn(BuildContext context,String label) {
     return DataColumn(
       label: Text(
         label,
-        style: const TextStyle(
+        style:  TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 14,
-          color: ExamColors.primaryText,
+          color: context.theme.colors.primary ,
         ),
       ),
     );
   }
 
   DataCell _buildDataCell(
+    BuildContext context,
     String text, {
     bool isNumeric = false,
     bool isDate = false,
@@ -310,10 +275,8 @@ class ExamScheduleCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: isNumeric ? FontWeight.w600 : FontWeight.w400,
-            color:
-                isUpcoming && isDate
-                    ? ExamColors.upcomingText
-                    : ExamColors.secondaryText,
+            color: context.theme.colors.primary
+                
           ),
           overflow: TextOverflow.ellipsis,
           maxLines: 2,

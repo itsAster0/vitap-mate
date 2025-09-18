@@ -1,7 +1,9 @@
 import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
@@ -31,13 +33,14 @@ class MarksPage extends HookConsumerWidget {
         if (context.mounted) disCommonToast(context, e);
       }
     }
+   final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
 
     var marksData = ref.watch(marksProvider);
 
     return RefreshIndicator(
       onRefresh: update,
       backgroundColor: MarksColors.tableBackground,
-      color: MarksColors.primaryText,
+      color: darkMode? context.theme.colors.primaryForeground : MarksColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
@@ -47,7 +50,7 @@ class MarksPage extends HookConsumerWidget {
           child: marksData.when(
             data: (data) {
               if (data.records.isEmpty) {
-                return _buildEmptyState();
+                return _buildEmptyState(context);
               }
 
               return Padding(
@@ -63,15 +66,15 @@ class MarksPage extends HookConsumerWidget {
                 ),
               );
             },
-            error: (e, se) => _buildErrorState(e),
-            loading: () => _buildLoadingState(),
+            error: (e, se) => _buildErrorState(e,context),
+            loading: () => _buildLoadingState(context),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -79,13 +82,13 @@ class MarksPage extends HookConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: MarksColors.tableRowAlternate,
+              color: context.theme.colors.primaryForeground,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               Icons.assignment_outlined,
               size: 48,
-              color: MarksColors.tertiaryText,
+              color: context.theme.colors.primary,
             ),
           ),
           const SizedBox(height: 16),
@@ -94,20 +97,20 @@ class MarksPage extends HookConsumerWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: MarksColors.secondaryText,
+              color: context.theme.colors.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             "Check back later for updates",
-            style: TextStyle(fontSize: 14, color: MarksColors.tertiaryText),
+            style: TextStyle(fontSize: 14, color: context.theme.colors.primary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState(Object error) {
+  Widget _buildErrorState(Object error,BuildContext context) {
     String msg = commonErrorMessage(error);
     return Center(
       child: Column(
@@ -131,13 +134,13 @@ class MarksPage extends HookConsumerWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: MarksColors.secondaryText,
+              color: context.theme.colors.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             msg,
-            style: TextStyle(fontSize: 14, color: MarksColors.tertiaryText),
+            style: TextStyle(fontSize: 14, color: context.theme.colors.primary),
             textAlign: TextAlign.center,
           ),
         ],
@@ -145,7 +148,7 @@ class MarksPage extends HookConsumerWidget {
     );
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildLoadingState(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -163,7 +166,7 @@ class MarksPage extends HookConsumerWidget {
             "Loading marks data...",
             style: TextStyle(
               fontSize: 14,
-              color: MarksColors.secondaryText,
+              color: context.theme.colors.primary,
               fontWeight: FontWeight.w500,
             ),
           ),

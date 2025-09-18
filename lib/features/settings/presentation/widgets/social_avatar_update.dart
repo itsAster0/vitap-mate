@@ -76,7 +76,7 @@ class SocialAvatarUpdate extends HookConsumerWidget {
       ),
       actions: [
         FButton(
-          style: FButtonStyle.outline,
+          style: FButtonStyle.outline(),
           onPress: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
@@ -85,7 +85,7 @@ class SocialAvatarUpdate extends HookConsumerWidget {
             : SizedBox(
               width: 10,
               height: 10,
-              child: CircularProgressIndicator(color: Colors.black),
+              child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
             ),
       ],
     );

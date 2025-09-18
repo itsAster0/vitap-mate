@@ -64,6 +64,7 @@ pub struct TimetableSlot {
     pub start_time: String,
     pub end_time: String,
     pub name: String,
+    pub is_lab : Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

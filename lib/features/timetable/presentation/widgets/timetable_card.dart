@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-enum ClassStatus { completed, ongoing, upcoming, nextClass }
+enum ClassStatus { completed, ongoing, upcoming, nextClass,notToday }
 
-class TimetableCard extends HookWidget {
+class TimetableCard extends HookConsumerWidget {
   final TimetableSlot slot;
   const TimetableCard({super.key, required this.slot});
 
-  ClassStatus getClassStatus(String startTimeStr, String endTimeStr) {
+  ClassStatus getClassStatus(String startTimeStr, String endTimeStr, String classWeekday) {
     final now = DateTime.now();
     final currentTime = Duration(hours: now.hour, minutes: now.minute);
 
@@ -18,11 +19,24 @@ class TimetableCard extends HookWidget {
       final parts = timeStr.split(':').map(int.parse).toList();
       return Duration(hours: parts[0], minutes: parts[1]);
     }
+    const weekdayMap = {
+  'MON': DateTime.monday,    
+  'TUE': DateTime.tuesday,   
+  'WED': DateTime.wednesday, 
+  'THU': DateTime.thursday,  
+  'FRI': DateTime.friday,    
+  'SAT': DateTime.saturday,  
+  'SUN': DateTime.sunday,    
+};
+
+  
 
     final startTime = parseTime(startTimeStr);
     final endTime = parseTime(endTimeStr);
     final nextClassThreshold = currentTime + const Duration(minutes: 50);
-
+  if (now.weekday != weekdayMap[classWeekday]) {
+    return ClassStatus.notToday; 
+  }
     if (currentTime >= startTime && currentTime <= endTime) {
       return ClassStatus.ongoing;
     } else if (currentTime > endTime) {
@@ -35,8 +49,10 @@ class TimetableCard extends HookWidget {
     }
   }
 
-  Color getCardBackgroundColor() {
+  Color getCardBackgroundColor(bool isDark , BuildContext context) {
+        if(isDark) return context.theme.colors.primaryForeground;
     if (slot.serial == "-1") return TimetableColors.freeTimeBackground;
+
     return slot.courseType.endsWith("LA")
         ? TimetableColors.labBackground
         : TimetableColors.lectureBackground;
@@ -74,14 +90,23 @@ class TimetableCard extends HookWidget {
           TimetableColors.upcomingText,
           'UPCOMING',
         );
+       case ClassStatus.notToday:
+        return (
+          const Color.fromARGB(255, 86, 25, 183),
+          TimetableColors.upcomingBackground,
+          const Color.fromARGB(255, 99, 25, 210),
+          'NOT TODAY',
+        );
     }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context,WidgetRef ref) {
+       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+
     final status =
         slot.serial != "-1"
-            ? getClassStatus(slot.startTime, slot.endTime)
+            ? getClassStatus(slot.startTime, slot.endTime,slot.day)
             : null;
 
     final statusStyle = status != null ? getStatusStyle(status) : null;
@@ -93,13 +118,13 @@ class TimetableCard extends HookWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
-          color: getCardBackgroundColor(),
+          color: getCardBackgroundColor(darkMode,context),
           borderRadius: BorderRadius.circular(12),
           border:
               statusStyle != null && isHighlighted
                   ? Border.all(color: statusStyle.$1, width: 2)
                   : null,
-          boxShadow: [
+          boxShadow: darkMode ? null:[
             BoxShadow(
               color:
                   isHighlighted
@@ -115,14 +140,15 @@ class TimetableCard extends HookWidget {
           padding: const EdgeInsets.all(12),
           child:
               slot.serial != "-1"
-                  ? _buildClassCard(context, statusStyle)
-                  : _buildFreeTimeCard(context),
+                  ? _buildClassCard(darkMode,context, statusStyle)
+                  : _buildFreeTimeCard(darkMode,context),
         ),
       ),
     );
   }
 
   Widget _buildClassCard(
+    bool isDark,
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
   ) {
@@ -192,10 +218,10 @@ class TimetableCard extends HookWidget {
 
         Text(
           slot.name,
-          style: const TextStyle(
+          style:  TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF374151),
+            color: isDark ? context.theme.colors.primary :Color(0xFF374151),
             //height: 1.2,
           ),
           maxLines: 1,
@@ -207,16 +233,20 @@ class TimetableCard extends HookWidget {
           children: [
             Expanded(
               child: _buildDetailChip(
+                isDark,
+                context,
                 icon: FIcons.mapPin,
                 text: "${slot.block} - ${slot.roomNo}",
-                color: const Color(0xFF6B7280),
+                color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
+                isDark,
+                context,
               icon: FIcons.hash,
               text: slot.courseCode,
-              color: const Color(0xFF6B7280),
+              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -226,17 +256,21 @@ class TimetableCard extends HookWidget {
           children: [
             Expanded(
               child: _buildDetailChip(
+                  isDark,
+                context,
                 icon: FIcons.clock,
                 text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
-                color: const Color(0xFF374151),
+                color:isDark ? context.theme.colors.primary : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
+                isDark,
+                context,
               icon: FIcons.calendar,
               text: slot.slot,
-              color: const Color(0xFF6B7280),
+              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -244,7 +278,7 @@ class TimetableCard extends HookWidget {
     );
   }
 
-  Widget _buildFreeTimeCard(BuildContext context) {
+  Widget _buildFreeTimeCard(bool isDark,BuildContext context) {
     return Column(
       children: [
         Row(
@@ -279,18 +313,22 @@ class TimetableCard extends HookWidget {
           children: [
             Expanded(
               child: _buildDetailChip(
+                  isDark,
+                context,
                 icon: FIcons.clock,
                 text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
-                color: const Color(0xFF374151),
+                color: isDark ? context.theme.colors.primary : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
+                isDark,
+                context,
               icon: FIcons.timer,
               text:
                   slot.slot == "1" ? "${slot.slot} hour" : "${slot.slot} hours",
-              color: const Color(0xFF6B7280),
+              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -298,7 +336,7 @@ class TimetableCard extends HookWidget {
     );
   }
 
-  Widget _buildDetailChip({
+  Widget _buildDetailChip(bool isDark,BuildContext context,{
     required IconData icon,
     required String text,
     required Color color,
@@ -307,7 +345,7 @@ class TimetableCard extends HookWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.7),
+        color: (isDark ? Colors.black :context.theme.colors.primaryForeground).withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

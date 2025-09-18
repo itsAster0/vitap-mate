@@ -1,7 +1,9 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
@@ -21,6 +23,8 @@ class ExamSchedulePage extends HookConsumerWidget {
         if (context.mounted) disCommonToast(context, e);
       }
     }
+       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -38,8 +42,8 @@ class ExamSchedulePage extends HookConsumerWidget {
       onRefresh: () async {
         await update();
       },
-      backgroundColor: ExamColors.tableBackground,
-      color: ExamColors.primaryText,
+      backgroundColor: darkMode? context.theme.colors.primaryForeground : ExamColors.tableBackground,
+      color: darkMode? context.theme.colors.primary : ExamColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
@@ -62,7 +66,7 @@ class ExamSchedulePage extends HookConsumerWidget {
                         child: Icon(
                           Icons.event_note_outlined,
                           size: 48,
-                          color: ExamColors.tertiaryText,
+                          color: darkMode? context.theme.colors.primary : ExamColors.tertiaryText,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -71,7 +75,7 @@ class ExamSchedulePage extends HookConsumerWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: ExamColors.secondaryText,
+                          color:  darkMode? context.theme.colors.primary : ExamColors.secondaryText,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -79,7 +83,7 @@ class ExamSchedulePage extends HookConsumerWidget {
                         "Check back later for updates",
                         style: TextStyle(
                           fontSize: 14,
-                          color: ExamColors.tertiaryText,
+                          color:  darkMode? context.theme.colors.primary : ExamColors.tertiaryText,
                         ),
                       ),
                     ],
@@ -133,7 +137,7 @@ class ExamSchedulePage extends HookConsumerWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: ExamColors.secondaryText,
+                        color:  darkMode? context.theme.colors.primary : ExamColors.secondaryText,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -141,7 +145,7 @@ class ExamSchedulePage extends HookConsumerWidget {
                       msg,
                       style: TextStyle(
                         fontSize: 14,
-                        color: ExamColors.tertiaryText,
+                        color:  darkMode? context.theme.colors.primary : ExamColors.tertiaryText,
                       ),
                       textAlign: TextAlign.center,
                     ),

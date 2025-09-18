@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +37,9 @@ class ShellLayout extends HookWidget {
     }, [k]);
 
     return FScaffold(
+   
+ 
+
       header: headers[selected.value],
       footer: FBottomNavigationBar(
         index: selected.value,

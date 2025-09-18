@@ -111,7 +111,7 @@ class TimetablePage extends HookConsumerWidget {
                               margin: const EdgeInsets.all(16),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.grey[50],
+                                color: context.theme.colors.primaryForeground,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -119,7 +119,7 @@ class TimetablePage extends HookConsumerWidget {
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey[600],
+                                  color: context.theme.colors.primary,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

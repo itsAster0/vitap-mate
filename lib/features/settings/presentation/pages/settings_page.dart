@@ -29,9 +29,9 @@ class SettingsPage extends HookConsumerWidget {
                   label: const Text('Vtop'),
                   children: [
                     FTile(
-                      prefixIcon: Icon(FIcons.user),
+                      prefix: Icon(FIcons.user),
                       title: const Text('Vtop Details'),
-                      suffixIcon: Icon(FIcons.chevronRight),
+                      suffix: Icon(FIcons.chevronRight),
                       onPress: () {
                         GoRouter.of(
                           context,
@@ -42,13 +42,13 @@ class SettingsPage extends HookConsumerWidget {
                 ),
 
                 FTileGroup(
-                  divider: FTileDivider.indented,
+                  divider: FItemDivider.indented,
                   label: const Text('Social'),
                   children: [
                     FTile(
-                      prefixIcon: Icon(FIcons.atSign),
+                      prefix: Icon(FIcons.atSign),
                       title: const Text('Username'),
-                      suffixIcon: Icon(FIcons.chevronRight),
+                      suffix: Icon(FIcons.chevronRight),
                       onPress:
                           () => showAdaptiveDialog(
                             context: context,
@@ -59,9 +59,9 @@ class SettingsPage extends HookConsumerWidget {
                           ),
                     ),
                     FTile(
-                      prefixIcon: Icon(FIcons.image),
+                      prefix: Icon(FIcons.image),
                       title: const Text('Avatar'),
-                      suffixIcon: Icon(FIcons.chevronRight),
+                      suffix: Icon(FIcons.chevronRight),
                       onPress:
                           () => showAdaptiveDialog(
                             context: context,
@@ -72,9 +72,9 @@ class SettingsPage extends HookConsumerWidget {
                           ),
                     ),
                     FTile(
-                      prefixIcon: Icon(FIcons.bell),
+                      prefix: Icon(FIcons.bell),
                       title: const Text("Notifications"),
-                      suffixIcon: Icon(FIcons.dot),
+                      suffix: Icon(FIcons.dot),
                       onPress: () async {
                         var settings = await notifications.requestPermissions();
                         AppSettings.openAppSettings(
@@ -85,14 +85,14 @@ class SettingsPage extends HookConsumerWidget {
                   ],
                 ),
                 FTileGroup(
-                  divider: FTileDivider.indented,
+                  divider: FItemDivider.indented,
                   label: const Text('Appearance'),
                   children: [
                     FTile(
-                      prefixIcon: Icon(FIcons.moon),
+                      prefix: Icon(FIcons.moon),
                       title: const Text('Dark Mode'),
 
-                      suffixIcon: FSwitch(
+                      suffix: FSwitch(
                         value: ref.watch(themeProvider) == ThemeMode.dark,
                         onChange: (value) {
                           ref.read(themeProvider.notifier).toggleTheme();
