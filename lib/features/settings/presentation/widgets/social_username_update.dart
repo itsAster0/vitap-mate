@@ -63,7 +63,9 @@ class SocialUsernameUpdate extends HookConsumerWidget {
             : SizedBox(
               width: 10,
               height: 10,
-              child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+              child: CircularProgressIndicator(
+                color: context.theme.colors.primary,
+              ),
             ),
       ],
     );

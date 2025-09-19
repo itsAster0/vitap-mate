@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
 
@@ -24,8 +25,8 @@ class AttendanceTable extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
-       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
-
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final isLoading = useState(false);
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
@@ -39,6 +40,19 @@ class AttendanceTable extends HookConsumerWidget {
       return null;
     }, []);
 
+    void handelClick() async {
+      isLoading.value = true;
+      try {
+        await ref
+            .read(FullAttendanceProvider(courseType, courseId).notifier)
+            .updateAttendance();
+      } catch (e, _) {
+        if (context.mounted) disCommonToast(context, e);
+      } finally {
+        isLoading.value = false;
+      }
+    }
+
     return Container(
       height: double.infinity,
       width: double.infinity,
@@ -48,10 +62,10 @@ class AttendanceTable extends HookConsumerWidget {
       ),
       child: Column(
         children: [
-          _buildHeader(darkMode,context, facultyName),
+          _buildHeader(darkMode, context, facultyName, isLoading, handelClick),
           Expanded(
             child: dataAsync.when(
-              data: (data) => _buildTableContent(darkMode,context, data),
+              data: (data) => _buildTableContent(darkMode, context, data),
               error: (e, se) => _buildErrorState(e),
               loading: () => _buildLoadingState(),
             ),
@@ -61,7 +75,13 @@ class AttendanceTable extends HookConsumerWidget {
     );
   }
 
-  Widget _buildHeader(bool isDark,BuildContext context, String name) {
+  Widget _buildHeader(
+    bool isDark,
+    BuildContext context,
+    String name,
+    ValueNotifier<bool> isLoading,
+    VoidCallback callback,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -82,20 +102,28 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Text(
-            "by $name",
-            style:  TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: isDark? context.theme.colors.primary : AttendanceColors.primaryText,
+          Expanded(
+            child: Text(
+              "by $name",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : AttendanceColors.primaryText,
+              ),
             ),
           ),
+          if (!isLoading.value)
+            FButton.icon(onPress: callback, child: Icon(FIcons.rotateCcw)),
+          if (isLoading.value) FProgress.circularIcon(),
         ],
       ),
     );
   }
 
-  Widget _buildTableContent(bool isDark ,BuildContext context, dynamic data) {
+  Widget _buildTableContent(bool isDark, BuildContext context, dynamic data) {
     if (data.records.isEmpty) {
       return _buildEmptyState();
     }
@@ -106,9 +134,12 @@ class AttendanceTable extends HookConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isDark?  context.theme.colors.primaryForeground :AttendanceColors.tableBackground,
+              color:
+                  isDark
+                      ? context.theme.colors.primaryForeground
+                      : AttendanceColors.tableBackground,
               borderRadius: BorderRadius.circular(12),
-             
+
               boxShadow: [
                 BoxShadow(
                   color: AttendanceColors.cardShadowSecondary,
@@ -124,9 +155,11 @@ class AttendanceTable extends HookConsumerWidget {
                 child: SingleChildScrollView(
                   child: DataTable(
                     decoration: const BoxDecoration(),
-                    dividerThickness: isDark?0:1,
+                    dividerThickness: isDark ? 0 : 1,
                     headingRowColor: WidgetStateProperty.all(
-                       isDark?  context.theme.colors.primaryForeground :AttendanceColors.tableHeaderBackground,
+                      isDark
+                          ? context.theme.colors.primaryForeground
+                          : AttendanceColors.tableHeaderBackground,
                     ),
                     headingRowHeight: 56,
                     dataRowMinHeight: 48,
@@ -134,12 +167,48 @@ class AttendanceTable extends HookConsumerWidget {
                     columnSpacing: 24,
                     horizontalMargin: 16,
                     columns: [
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"#", 40),
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"Date", 100),
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"Status", 80),
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"Time", 80),
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"Slot", 60),
-                      _buildDataColumn(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,"Remark", 120),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "#",
+                        40,
+                      ),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "Date",
+                        100,
+                      ),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "Status",
+                        80,
+                      ),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "Time",
+                        80,
+                      ),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "Slot",
+                        60,
+                      ),
+                      _buildDataColumn(
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                        "Remark",
+                        120,
+                      ),
                     ],
                     rows:
                         data.records.asMap().entries.map<DataRow>((entry) {
@@ -151,14 +220,37 @@ class AttendanceTable extends HookConsumerWidget {
                             color: WidgetStateProperty.all(
                               isEven
                                   ? Colors.transparent
-                                  : isDark?  context.theme.colors.primaryForeground : AttendanceColors.tableRowAlternate,
+                                  : isDark
+                                  ? context.theme.colors.primaryForeground
+                                  : AttendanceColors.tableRowAlternate,
                             ),
                             cells: [
-                              _buildDataCell(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,record.serial, isNumeric: true),
-                              _buildDataCell(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,_formatDate(record.date)),
+                              _buildDataCell(
+                                isDark
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.secondaryText,
+                                record.serial,
+                                isNumeric: true,
+                              ),
+                              _buildDataCell(
+                                isDark
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.secondaryText,
+                                _formatDate(record.date),
+                              ),
                               DataCell(_buildStatusBadge(record.status)),
-                              _buildDataCell(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,record.dayTime),
-                              _buildDataCell(isDark?context.theme.colors.primary:AttendanceColors.secondaryText,record.slot),
+                              _buildDataCell(
+                                isDark
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.secondaryText,
+                                record.dayTime,
+                              ),
+                              _buildDataCell(
+                                isDark
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.secondaryText,
+                                record.slot,
+                              ),
                               DataCell(
                                 Container(
                                   constraints: const BoxConstraints(
@@ -170,9 +262,13 @@ class AttendanceTable extends HookConsumerWidget {
                                       record.remark,
                                       overflow: TextOverflow.ellipsis,
                                       maxLines: 2,
-                                      style:  TextStyle(
+                                      style: TextStyle(
                                         fontSize: 13,
-                                        color: isDark?context.theme.colors.primary:AttendanceColors.secondaryText,
+                                        color:
+                                            isDark
+                                                ? context.theme.colors.primary
+                                                : AttendanceColors
+                                                    .secondaryText,
                                       ),
                                     ),
                                   ),
@@ -199,23 +295,23 @@ class AttendanceTable extends HookConsumerWidget {
     );
   }
 
-  DataColumn _buildDataColumn(Color color,String label, double width) {
+  DataColumn _buildDataColumn(Color color, String label, double width) {
     return DataColumn(
       label: SizedBox(
         width: width,
         child: Text(
           label,
-          style:  TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 14,
-            color: color
+            color: color,
           ),
         ),
       ),
     );
   }
 
-  DataCell _buildDataCell(Color color,String text, {bool isNumeric = false}) {
+  DataCell _buildDataCell(Color color, String text, {bool isNumeric = false}) {
     return DataCell(
       Text(
         text,

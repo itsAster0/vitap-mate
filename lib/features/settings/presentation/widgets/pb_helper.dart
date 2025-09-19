@@ -42,7 +42,9 @@ class PbHelper extends ConsumerWidget {
           child: SizedBox(
             width: 50,
             height: 50,
-            child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+            child: CircularProgressIndicator(
+              color: context.theme.colors.primary,
+            ),
           ),
         );
       },

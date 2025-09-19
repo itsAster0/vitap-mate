@@ -33,14 +33,18 @@ class MarksPage extends HookConsumerWidget {
         if (context.mounted) disCommonToast(context, e);
       }
     }
-   final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     var marksData = ref.watch(marksProvider);
 
     return RefreshIndicator(
       onRefresh: update,
       backgroundColor: MarksColors.tableBackground,
-      color: darkMode? context.theme.colors.primaryForeground : MarksColors.primaryText,
+      color:
+          darkMode
+              ? context.theme.colors.primaryForeground
+              : MarksColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: ConstrainedBox(
@@ -66,7 +70,7 @@ class MarksPage extends HookConsumerWidget {
                 ),
               );
             },
-            error: (e, se) => _buildErrorState(e,context),
+            error: (e, se) => _buildErrorState(e, context),
             loading: () => _buildLoadingState(context),
           ),
         ),
@@ -110,7 +114,7 @@ class MarksPage extends HookConsumerWidget {
     );
   }
 
-  Widget _buildErrorState(Object error,BuildContext context) {
+  Widget _buildErrorState(Object error, BuildContext context) {
     String msg = commonErrorMessage(error);
     return Center(
       child: Column(

@@ -83,7 +83,9 @@ class UserBox extends HookConsumerWidget {
             child: SizedBox(
               width: 100,
               height: 100,
-              child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+              child: CircularProgressIndicator(
+                color: context.theme.colors.primary,
+              ),
             ),
           );
         },
@@ -171,7 +173,6 @@ class Useradd extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-      
           onPress:
               () => showAdaptiveDialog(
                 context: context,
@@ -215,7 +216,6 @@ class UserSemChange extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-  
           onPress:
               () => showAdaptiveDialog(
                 context: context,
@@ -243,6 +243,7 @@ class UserSemChange extends HookConsumerWidget {
                                             final isLoading = ref.watch(
                                               isLoadingSems,
                                             );
+
                                             return Row(
                                               children: [
                                                 if (isLoading)
@@ -317,8 +318,9 @@ class UserSemChange extends HookConsumerWidget {
                               ],
                             ),
                         loading:
-                            () =>
-                                CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+                            () => CircularProgressIndicator(
+                              color: context.theme.colors.primary,
+                            ),
                       );
                     },
                   );
@@ -343,7 +345,6 @@ class UserPassChange extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-    
           onPress: () {
             showAdaptiveDialog(
               context: outerContext,
@@ -403,12 +404,12 @@ class UserPassChange extends HookConsumerWidget {
                             child: const Text('Update'),
                           )
                         else
-                           SizedBox(
+                          SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: context.theme.colors.primaryForeground,
+                              color: context.theme.colors.primary,
                             ),
                           ),
                         FButton(

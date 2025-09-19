@@ -21,27 +21,28 @@ class ExamScheduleCard extends ConsumerWidget {
     }).length;
   }
 
-
-
   @override
-  Widget build(BuildContext context,WidgetRef ref ) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final upcomingCount = _getUpcomingExamsCount();
- 
-       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
         decoration: BoxDecoration(
-          gradient: darkMode? null : const LinearGradient(
-            colors: [
-              ExamColors.examCardBackground,
-              ExamColors.examCardSecondary,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          color:  darkMode? context.theme.colors.primaryForeground :null,
+          gradient:
+              darkMode
+                  ? null
+                  : const LinearGradient(
+                    colors: [
+                      ExamColors.examCardBackground,
+                      ExamColors.examCardSecondary,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+          color: darkMode ? context.theme.colors.primaryForeground : null,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
@@ -51,7 +52,9 @@ class ExamScheduleCard extends ConsumerWidget {
             ),
           ],
           border: Border.all(
-            color: context.theme.colors.primaryForeground.withValues(alpha: 0.8),
+            color: context.theme.colors.primaryForeground.withValues(
+              alpha: 0.8,
+            ),
             width: 1,
           ),
         ),
@@ -61,7 +64,9 @@ class ExamScheduleCard extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: context.theme.colors.primaryForeground.withValues(alpha: 0.9),
+                color: context.theme.colors.primaryForeground.withValues(
+                  alpha: 0.9,
+                ),
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
@@ -79,7 +84,10 @@ class ExamScheduleCard extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color:  darkMode? context.theme.colors.primaryForeground: ExamColors.todayBackground,
+                          color:
+                              darkMode
+                                  ? context.theme.colors.primaryForeground
+                                  : ExamColors.todayBackground,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: ExamColors.todayBorder.withValues(
@@ -98,14 +106,16 @@ class ExamScheduleCard extends ConsumerWidget {
                       Expanded(
                         child: Text(
                           record.examType,
-                          style:  TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 18,
-                            color: darkMode? context.theme.colors.primary: ExamColors.primaryText,
+                            color:
+                                darkMode
+                                    ? context.theme.colors.primary
+                                    : ExamColors.primaryText,
                           ),
                         ),
                       ),
-             
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -114,7 +124,10 @@ class ExamScheduleCard extends ConsumerWidget {
                       _buildInfoChip(
                         icon: Icons.assignment_outlined,
                         label: "${record.records.length} total",
-                        color:   darkMode? context.theme.colors.primary :ExamColors.secondaryText,
+                        color:
+                            darkMode
+                                ? context.theme.colors.primary
+                                : ExamColors.secondaryText,
                       ),
                       const SizedBox(width: 8),
                       if (upcomingCount > 0)
@@ -130,16 +143,21 @@ class ExamScheduleCard extends ConsumerWidget {
             ),
             Container(
               decoration: BoxDecoration(
-                color: darkMode? context.theme.colors.primaryForeground : ExamColors.tableBackground,
+                color:
+                    darkMode
+                        ? context.theme.colors.primaryForeground
+                        : ExamColors.tableBackground,
               ),
               child: ClipRRect(
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: DataTable(
                     decoration: const BoxDecoration(),
-                    dividerThickness: darkMode?0: 1,
+                    dividerThickness: darkMode ? 0 : 1,
                     headingRowColor: WidgetStateProperty.all(
-                     darkMode? context.theme.colors.primaryForeground : ExamColors.tableHeaderBackground,
+                      darkMode
+                          ? context.theme.colors.primaryForeground
+                          : ExamColors.tableHeaderBackground,
                     ),
                     headingRowHeight: 56,
                     dataRowMinHeight: 48,
@@ -147,19 +165,19 @@ class ExamScheduleCard extends ConsumerWidget {
                     columnSpacing: 16,
                     horizontalMargin: 16,
                     columns: [
-                      _buildDataColumn(context,""),
-                      _buildDataColumn(context,"Course"),
-                      _buildDataColumn(context,"Date"),
-                      _buildDataColumn(context,"Venue"),
-                      _buildDataColumn(context,"Seat"),
-                      _buildDataColumn(context,"Seat No."),
-                      _buildDataColumn(context,"Time"),
-                      _buildDataColumn(context,"Report Time"),
-                      _buildDataColumn(context,"Session"),
-                      _buildDataColumn(context,"Slot"),
-                      _buildDataColumn(context,"Course Type"),
-                      _buildDataColumn(context,"Course Name"),
-                      _buildDataColumn(context,"Class ID"),
+                      _buildDataColumn(context, ""),
+                      _buildDataColumn(context, "Course"),
+                      _buildDataColumn(context, "Date"),
+                      _buildDataColumn(context, "Venue"),
+                      _buildDataColumn(context, "Seat"),
+                      _buildDataColumn(context, "Seat No."),
+                      _buildDataColumn(context, "Time"),
+                      _buildDataColumn(context, "Report Time"),
+                      _buildDataColumn(context, "Session"),
+                      _buildDataColumn(context, "Slot"),
+                      _buildDataColumn(context, "Course Type"),
+                      _buildDataColumn(context, "Course Name"),
+                      _buildDataColumn(context, "Class ID"),
                     ],
                     rows:
                         record.records.asMap().entries.map<DataRow>((entry) {
@@ -170,31 +188,35 @@ class ExamScheduleCard extends ConsumerWidget {
 
                           return DataRow(
                             color: WidgetStateProperty.all(
-                              
-                               darkMode? context.theme.colors.primaryForeground 
+                              darkMode
+                                  ? context.theme.colors.primaryForeground
                                   : isEven
                                   ? Colors.transparent
                                   : ExamColors.tableRowAlternate,
                             ),
                             cells: [
-                              _buildDataCell( context, exam.serial, isNumeric: true),
-                              _buildDataCell(context,exam.courseCode),
+                              _buildDataCell(
+                                context,
+                                exam.serial,
+                                isNumeric: true,
+                              ),
+                              _buildDataCell(context, exam.courseCode),
                               _buildDataCell(
                                 context,
                                 exam.examDate,
                                 isDate: true,
                                 isUpcoming: isUpcoming,
                               ),
-                              _buildDataCell(context,exam.venue),
-                              _buildDataCell(context,exam.seatLocation),
-                              _buildDataCell(context,exam.seatNo),
-                              _buildDataCell(context,exam.examTime),
-                              _buildDataCell(context,exam.reportingTime),
-                              _buildDataCell(context,exam.examSession),
-                              _buildDataCell(context,exam.slot),
-                              _buildDataCell(context,exam.courseType),
-                              _buildDataCell(context,exam.courseName),
-                              _buildDataCell(context,exam.courseId),
+                              _buildDataCell(context, exam.venue),
+                              _buildDataCell(context, exam.seatLocation),
+                              _buildDataCell(context, exam.seatNo),
+                              _buildDataCell(context, exam.examTime),
+                              _buildDataCell(context, exam.reportingTime),
+                              _buildDataCell(context, exam.examSession),
+                              _buildDataCell(context, exam.slot),
+                              _buildDataCell(context, exam.courseType),
+                              _buildDataCell(context, exam.courseName),
+                              _buildDataCell(context, exam.courseId),
                             ],
                           );
                         }).toList(),
@@ -247,14 +269,14 @@ class ExamScheduleCard extends ConsumerWidget {
     }
   }
 
-  DataColumn _buildDataColumn(BuildContext context,String label) {
+  DataColumn _buildDataColumn(BuildContext context, String label) {
     return DataColumn(
       label: Text(
         label,
-        style:  TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 14,
-          color: context.theme.colors.primary ,
+          color: context.theme.colors.primary,
         ),
       ),
     );
@@ -275,8 +297,7 @@ class ExamScheduleCard extends ConsumerWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: isNumeric ? FontWeight.w600 : FontWeight.w400,
-            color: context.theme.colors.primary
-                
+            color: context.theme.colors.primary,
           ),
           overflow: TextOverflow.ellipsis,
           maxLines: 2,

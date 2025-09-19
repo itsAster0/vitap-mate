@@ -697,7 +697,9 @@ class MessageBubble extends StatelessWidget {
         border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
         boxShadow: [
           BoxShadow(
-            color: context.theme.colors.primaryForeground.withValues(alpha: 0.05),
+            color: context.theme.colors.primaryForeground.withValues(
+              alpha: 0.05,
+            ),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -942,7 +944,9 @@ class AttachmentThumbnail extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: context.theme.colors.primaryForeground.withValues(alpha: 0.05),
+              color: context.theme.colors.primaryForeground.withValues(
+                alpha: 0.05,
+              ),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -1064,10 +1068,10 @@ class AttachmentThumbnail extends StatelessWidget {
                         Expanded(
                           child: Text(
                             filename,
-                            style:  TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: context.theme.colors.primary 
+                              color: context.theme.colors.primary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),

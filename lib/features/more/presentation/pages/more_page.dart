@@ -1,4 +1,3 @@
-
 import 'dart:math' hide log;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -12,7 +11,6 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/users/wifi_details.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
-
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -231,7 +229,10 @@ class WifiCard extends HookConsumerWidget {
             title: Stack(
               children: [
                 FTappable(
-                  child: Icon(FIcons.rotateCw,color: context.theme.colors.primary,),
+                  child: Icon(
+                    FIcons.rotateCw,
+                    color: context.theme.colors.primary,
+                  ),
                   onPress: () {
                     errorMsg.value = null;
                     succesMsg.value = null;
@@ -250,7 +251,10 @@ class WifiCard extends HookConsumerWidget {
                 Positioned(
                   right: 0,
                   child: FTappable(
-                    child: Icon(FIcons.plus,color: context.theme.colors.primary,),
+                    child: Icon(
+                      FIcons.plus,
+                      color: context.theme.colors.primary,
+                    ),
                     onPress:
                         () => showAdaptiveDialog(
                           context: context,
@@ -285,7 +289,10 @@ class WifiCard extends HookConsumerWidget {
                               ),
                             ),
                             FTappable(
-                              child: Icon(FIcons.plus,color :context.theme.colors.primary),
+                              child: Icon(
+                                FIcons.plus,
+                                color: context.theme.colors.primary,
+                              ),
                               onPress:
                                   () => showAdaptiveDialog(
                                     context: context,
@@ -384,39 +391,40 @@ class WifiCard extends HookConsumerWidget {
 }
 
 String convertToSuperstring(String k) {
-  final Map<String, String> map = {
-    "1": "¹",
-    "2": "²",
-    "3": "³",
-    "4": "⁴",
-    "5": "⁵",
-    "6": "⁶",
-    "7": "⁷",
-    "8": "⁸",
-    "9": "⁹",
-    "0": "⁰",
+  Random random = Random();
+  final Map<String, List<String>> map = {
+    "1": ["1️⃣", "¹"],
+    "2": ["2️⃣", "²"],
+    "3": ["3️⃣", "³"],
+    "4": ["4️⃣", "⁴"],
+    "5": ["5️⃣", "⁵"],
+    "6": ["6️⃣", "⁶"],
+    "7": ["7️⃣", "⁷"],
+    "8": ["8️⃣", "⁸"],
+    "9": ["9️⃣", "⁹"],
+    "0": ["0️⃣", "⁰"],
   };
 
-  List<String> n = k.split('');
-  Random random = Random();
-  int runs = 0;
-
-  do {
-    runs = random.nextInt(n.length + 1);
-  } while (runs == 0 || runs == 1);
-
-  for (int i = 0; i <= runs; i++) {
-    int c = random.nextInt(n.length);
-    String charAtIndex = n[c];
-    int? parsedChar = int.tryParse(charAtIndex);
-
-    if (parsedChar != null) {
-      if (map.containsKey(charAtIndex)) {
-        n[c] = map[charAtIndex]!;
-      }
-    }
+  List<String> list = k.split('');
+  var out = k;
+  while (out == k) {
+    out = list
+        .map((val) {
+          if (map.containsKey(val)) {
+            final options = [0, 2, 2, 2, 1, 1, 1, 1];
+            int choice = options[random.nextInt(options.length)];
+            if (choice == 0 || choice == 1) {
+              return map[val]![choice];
+            } else {
+              return val;
+            }
+          }
+          return val;
+        })
+        .join("");
   }
-  return n.join('');
+
+  return out;
 }
 
 class WifiInput extends HookConsumerWidget {

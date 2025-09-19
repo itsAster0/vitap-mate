@@ -14,22 +14,31 @@ void disCommonToast(BuildContext context, Object e) {
       ),
 
       suffixBuilder:
-          (context, entry,) => IntrinsicHeight(
+          (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -44,22 +53,31 @@ void disCommonToast(BuildContext context, Object e) {
         "You're offline. Please check your connection and try again",
       ),
       suffixBuilder:
-          (context, entry,) => IntrinsicHeight(
+          (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -73,22 +91,31 @@ void disCommonToast(BuildContext context, Object e) {
       //description: const Text('Visit this page for more information.'),
       description: const Text('Please try again in a while'),
       suffixBuilder:
-          (context, entry,) => IntrinsicHeight(
+          (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -107,22 +134,31 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
         'The username or password you entered is incorrect.',
       ),
       suffixBuilder:
-          (context, entry,) => IntrinsicHeight(
+          (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -139,20 +175,29 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       suffixBuilder:
           (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -166,22 +211,31 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       //description: const Text('Visit this page for more information.'),
       description: const Text('Please try again in a while'),
       suffixBuilder:
-          (context, entry,)  => IntrinsicHeight(
+          (context, entry) => IntrinsicHeight(
             child: FButton(
-              style: context.theme.buttonStyles.primary.copyWith(
-                contentStyle: context.theme.buttonStyles.primary.contentStyle
-                    .copyWith(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7.5,
-                      ),
-                      textStyle: FWidgetStateMap.all(
-                        context.theme.typography.xs.copyWith(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                      ),
-                    ).call,
-              ).call,
+              style:
+                  context.theme.buttonStyles.primary
+                      .copyWith(
+                        contentStyle:
+                            context.theme.buttonStyles.primary.contentStyle
+                                .copyWith(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7.5,
+                                  ),
+                                  textStyle: FWidgetStateMap.all(
+                                    context.theme.typography.xs.copyWith(
+                                      color:
+                                          context
+                                              .theme
+                                              .colors
+                                              .primaryForeground,
+                                    ),
+                                  ),
+                                )
+                                .call,
+                      )
+                      .call,
               onPress: entry.dismiss,
               child: const Text('Aye'),
             ),
@@ -198,22 +252,28 @@ void dispToast(BuildContext context, String title, String des) {
     //description: const Text('Visit this page for more information.'),
     description: Text(des),
     suffixBuilder:
-        (context, entry,) => IntrinsicHeight(
+        (context, entry) => IntrinsicHeight(
           child: FButton(
-            style: context.theme.buttonStyles.primary.copyWith(
-              contentStyle: context.theme.buttonStyles.primary.contentStyle
-                  .copyWith(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7.5,
-                    ),
-                    textStyle: FWidgetStateMap.all(
-                      context.theme.typography.xs.copyWith(
-                        color: context.theme.colors.primaryForeground,
-                      ),
-                    ),
-                  ).call,
-            ).call,
+            style:
+                context.theme.buttonStyles.primary
+                    .copyWith(
+                      contentStyle:
+                          context.theme.buttonStyles.primary.contentStyle
+                              .copyWith(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7.5,
+                                ),
+                                textStyle: FWidgetStateMap.all(
+                                  context.theme.typography.xs.copyWith(
+                                    color:
+                                        context.theme.colors.primaryForeground,
+                                  ),
+                                ),
+                              )
+                              .call,
+                    )
+                    .call,
             onPress: entry.dismiss,
             child: const Text('Aye'),
           ),

@@ -31,26 +31,25 @@ class SocialPage extends HookConsumerWidget {
       final sub = appLinks.uriLinkStream.listen((uri) async {
         final data = uri.queryParameters;
         final code = data["code"] ?? "";
-        try{
-        await pbH.value!
-            .collection(collectionsName)
-            .authWithOAuth2Code(
-              googleProvider.value!.name,
-              code,
-              googleProvider.value!.codeVerifier,
-              redirectURL.toString(),
-            );
-
-        }on ClientException catch (e) {
+        try {
+          await pbH.value!
+              .collection(collectionsName)
+              .authWithOAuth2Code(
+                googleProvider.value!.name,
+                code,
+                googleProvider.value!.codeVerifier,
+                redirectURL.toString(),
+              );
+        } on ClientException catch (e) {
           if (context.mounted) {
             dispToast(context, "Error", e.response["message"]);
           }
           if (e.response["message"].toString().toLowerCase().contains("vit")) {
             ref.invalidate(pbProvider);
           }
-        }finally{
+        } finally {
           isloading.value = false;
-        var _ = ref.refresh(pbProvider); 
+          var _ = ref.refresh(pbProvider);
         }
       });
 
@@ -150,7 +149,9 @@ class SocialPage extends HookConsumerWidget {
               child: SizedBox(
                 width: 30,
                 height: 30,
-                child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+                child: CircularProgressIndicator(
+                  color: context.theme.colors.primary,
+                ),
               ),
             );
       },
@@ -164,7 +165,9 @@ class SocialPage extends HookConsumerWidget {
           child: SizedBox(
             width: 50,
             height: 50,
-            child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+            child: CircularProgressIndicator(
+              color: context.theme.colors.primary,
+            ),
           ),
         );
       },

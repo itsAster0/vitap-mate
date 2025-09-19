@@ -96,7 +96,9 @@ class _MessageScreenState extends ConsumerState<MessageScreen>
                 SizedBox(
                   width: 50,
                   height: 50,
-                  child: CircularProgressIndicator(color: context.theme.colors.primaryForeground),
+                  child: CircularProgressIndicator(
+                    color: context.theme.colors.primaryForeground,
+                  ),
                 ),
                 SizedBox(height: 16),
                 Text(

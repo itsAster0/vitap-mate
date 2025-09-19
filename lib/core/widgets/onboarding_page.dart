@@ -162,7 +162,7 @@ class Step1 extends HookConsumerWidget {
                   }
                 },
               )
-              :  SizedBox(
+              : SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(

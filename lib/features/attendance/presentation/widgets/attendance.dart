@@ -24,7 +24,7 @@ class AttendanceCard extends HookConsumerWidget {
     final scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: animationController, curve: Curves.easeInOut),
     );
-    final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -48,15 +48,15 @@ class AttendanceCard extends HookConsumerWidget {
                 },
                 onTap: () => _showAttendanceDetails(context),
                 child: Container(
-                  decoration: _buildCardDecoration(darkMode,context),
+                  decoration: _buildCardDecoration(darkMode, context),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(darkMode,context),
+                        _buildHeader(darkMode, context),
                         const SizedBox(height: 16),
-                        _buildStatsRow(darkMode,context),
+                        _buildStatsRow(darkMode, context),
                       ],
                     ),
                   ),
@@ -67,50 +67,59 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 
-  BoxDecoration _buildCardDecoration(bool isDark,BuildContext context) {
+  BoxDecoration _buildCardDecoration(bool isDark, BuildContext context) {
     final isLab = record.courseType.endsWith("LA");
     return BoxDecoration(
-      gradient: !isDark?LinearGradient(
-        colors: 
-            isLab
-                ? [
-                  AttendanceColors.labCardBackground,
-                  AttendanceColors.labCardSecondary,
-                ]
-                : [
-                  AttendanceColors.theoryCardBackground,
-                  AttendanceColors.theoryCardSecondary,
-                ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ):null,
-      color: isDark?context.theme.colors.primaryForeground:null,
+      gradient:
+          !isDark
+              ? LinearGradient(
+                colors:
+                    isLab
+                        ? [
+                          AttendanceColors.labCardBackground,
+                          AttendanceColors.labCardSecondary,
+                        ]
+                        : [
+                          AttendanceColors.theoryCardBackground,
+                          AttendanceColors.theoryCardSecondary,
+                        ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+              : null,
+      color: isDark ? context.theme.colors.primaryForeground : null,
       borderRadius: BorderRadius.circular(16),
-      boxShadow: !isDark?[
-        BoxShadow(
-          color: AttendanceColors.cardShadow,
-          blurRadius: 16,
-          offset: const Offset(0, 4),
-          spreadRadius: 0,
-        ),
-        BoxShadow(
-          color: AttendanceColors.cardShadowSecondary,
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-          spreadRadius: 0,
-        ),
-      ]:[],
-      border: Border.all(color: context.theme.colors.primaryForeground.withValues(alpha: 0.8), width: 1),
+      boxShadow:
+          !isDark
+              ? [
+                BoxShadow(
+                  color: AttendanceColors.cardShadow,
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: AttendanceColors.cardShadowSecondary,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                  spreadRadius: 0,
+                ),
+              ]
+              : [],
+      border: Border.all(
+        color: context.theme.colors.primaryForeground.withValues(alpha: 0.8),
+        width: 1,
+      ),
     );
   }
 
-  Widget _buildHeader(bool isDark,BuildContext context) {
+  Widget _buildHeader(bool isDark, BuildContext context) {
     final (courseCode, courseName) = formateName(record.courseName);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCourseIcon(isDark,context),
+        _buildCourseIcon(isDark, context),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -122,7 +131,10 @@ class AttendanceCard extends HookConsumerWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark? context.theme.colors.primary :AttendanceColors.secondaryText,
+                    color:
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -132,23 +144,26 @@ class AttendanceCard extends HookConsumerWidget {
                 courseName.isNotEmpty ? courseName : record.courseName,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style:  TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                   height: 1.3,
-                  color:isDark? context.theme.colors.primary : AttendanceColors.primaryText,
+                  color:
+                      isDark
+                          ? context.theme.colors.primary
+                          : AttendanceColors.primaryText,
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(width: 8),
-        _buildAttendanceIndicator(isDark,context),
+        _buildAttendanceIndicator(isDark, context),
       ],
     );
   }
 
-  Widget _buildCourseIcon(bool isDark,BuildContext conntext) {
+  Widget _buildCourseIcon(bool isDark, BuildContext conntext) {
     final isLab = record.courseType.endsWith("LA");
     final iconColor =
         isLab ? AttendanceColors.labIcon : AttendanceColors.theoryIcon;
@@ -174,7 +189,7 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 
-  Widget _buildAttendanceIndicator(bool isDark,BuildContext context) {
+  Widget _buildAttendanceIndicator(bool isDark, BuildContext context) {
     if (record.attendancePercentage == "-") {
       return _buildIndicatorChip("N/A", AttendanceColors.unknownText);
     }
@@ -222,9 +237,9 @@ class AttendanceCard extends HookConsumerWidget {
         AttendanceColors.excellentBackground,
       );
     } else if (percentage >= 70) {
-      return (AttendanceColors.goodText, AttendanceColors.goodBackground );
+      return (AttendanceColors.goodText, AttendanceColors.goodBackground);
     } else if (percentage >= 60) {
-      return (AttendanceColors.warningText, AttendanceColors.warningBackground );
+      return (AttendanceColors.warningText, AttendanceColors.warningBackground);
     } else {
       return (
         AttendanceColors.criticalText,
@@ -233,7 +248,7 @@ class AttendanceCard extends HookConsumerWidget {
     }
   }
 
-  Widget _buildStatsRow(bool isDark,BuildContext context) {
+  Widget _buildStatsRow(bool isDark, BuildContext context) {
     final stats = <Widget>[
       _buildStatItem(
         isDark,
@@ -248,9 +263,9 @@ class AttendanceCard extends HookConsumerWidget {
     if (record.attendancePercentage != "-") {
       stats.add(
         _buildStatItem(
-           isDark,
-        context,
-          "Btw.Exams",
+          isDark,
+          context,
+          "b/w exams",
           record.attendenceFatCat,
           FIcons.calendar,
           AttendanceColors.examStatColor,
@@ -260,7 +275,7 @@ class AttendanceCard extends HookConsumerWidget {
 
     stats.add(
       _buildStatItem(
-         isDark,
+        isDark,
         context,
         "Present",
         "${record.classesAttended}/${record.totalClasses}",
@@ -285,7 +300,8 @@ class AttendanceCard extends HookConsumerWidget {
   }
 
   Widget _buildStatItem(
-    bool isDark,BuildContext context,
+    bool isDark,
+    BuildContext context,
     String label,
     String value,
     IconData icon,
@@ -294,7 +310,7 @@ class AttendanceCard extends HookConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark? Colors.black : AttendanceColors.statItemBackground,
+        color: isDark ? Colors.black : AttendanceColors.statItemBackground,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: accentColor.withValues(alpha: 0.1), width: 1),
       ),
@@ -312,11 +328,14 @@ class AttendanceCard extends HookConsumerWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style:  TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
               height: 1.2,
-              color:isDark? context.theme.colors.primary :AttendanceColors.primaryText,
+              color:
+                  isDark
+                      ? context.theme.colors.primary
+                      : AttendanceColors.primaryText,
             ),
             textAlign: TextAlign.center,
             maxLines: 1,
@@ -325,10 +344,13 @@ class AttendanceCard extends HookConsumerWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style:  TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color:isDark? context.theme.colors.primary : AttendanceColors.secondaryText,
+              color:
+                  isDark
+                      ? context.theme.colors.primary
+                      : AttendanceColors.secondaryText,
               height: 1.2,
             ),
             textAlign: TextAlign.center,
@@ -342,6 +364,7 @@ class AttendanceCard extends HookConsumerWidget {
 
   void _showAttendanceDetails(BuildContext context) {
     showFSheet(
+      mainAxisMaxRatio: 2 / 3,
       context: context,
       side: FLayout.btt,
       builder:
@@ -354,8 +377,6 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 }
-
-
 
 (String, String) formateName(String name) {
   final splitName = name.split("-");

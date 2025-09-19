@@ -37,9 +37,6 @@ class ShellLayout extends HookWidget {
     }, [k]);
 
     return FScaffold(
-   
- 
-
       header: headers[selected.value],
       footer: FBottomNavigationBar(
         index: selected.value,

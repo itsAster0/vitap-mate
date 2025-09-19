@@ -5,13 +5,17 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-enum ClassStatus { completed, ongoing, upcoming, nextClass,notToday }
+enum ClassStatus { completed, ongoing, upcoming, nextClass, notToday }
 
 class TimetableCard extends HookConsumerWidget {
   final TimetableSlot slot;
   const TimetableCard({super.key, required this.slot});
 
-  ClassStatus getClassStatus(String startTimeStr, String endTimeStr, String classWeekday) {
+  ClassStatus getClassStatus(
+    String startTimeStr,
+    String endTimeStr,
+    String classWeekday,
+  ) {
     final now = DateTime.now();
     final currentTime = Duration(hours: now.hour, minutes: now.minute);
 
@@ -19,24 +23,23 @@ class TimetableCard extends HookConsumerWidget {
       final parts = timeStr.split(':').map(int.parse).toList();
       return Duration(hours: parts[0], minutes: parts[1]);
     }
-    const weekdayMap = {
-  'MON': DateTime.monday,    
-  'TUE': DateTime.tuesday,   
-  'WED': DateTime.wednesday, 
-  'THU': DateTime.thursday,  
-  'FRI': DateTime.friday,    
-  'SAT': DateTime.saturday,  
-  'SUN': DateTime.sunday,    
-};
 
-  
+    const weekdayMap = {
+      'MON': DateTime.monday,
+      'TUE': DateTime.tuesday,
+      'WED': DateTime.wednesday,
+      'THU': DateTime.thursday,
+      'FRI': DateTime.friday,
+      'SAT': DateTime.saturday,
+      'SUN': DateTime.sunday,
+    };
 
     final startTime = parseTime(startTimeStr);
     final endTime = parseTime(endTimeStr);
     final nextClassThreshold = currentTime + const Duration(minutes: 50);
-  if (now.weekday != weekdayMap[classWeekday]) {
-    return ClassStatus.notToday; 
-  }
+    if (now.weekday != weekdayMap[classWeekday]) {
+      return ClassStatus.notToday;
+    }
     if (currentTime >= startTime && currentTime <= endTime) {
       return ClassStatus.ongoing;
     } else if (currentTime > endTime) {
@@ -49,8 +52,8 @@ class TimetableCard extends HookConsumerWidget {
     }
   }
 
-  Color getCardBackgroundColor(bool isDark , BuildContext context) {
-        if(isDark) return context.theme.colors.primaryForeground;
+  Color getCardBackgroundColor(bool isDark, BuildContext context) {
+    if (isDark) return context.theme.colors.primaryForeground;
     if (slot.serial == "-1") return TimetableColors.freeTimeBackground;
 
     return slot.courseType.endsWith("LA")
@@ -90,7 +93,7 @@ class TimetableCard extends HookConsumerWidget {
           TimetableColors.upcomingText,
           'UPCOMING',
         );
-       case ClassStatus.notToday:
+      case ClassStatus.notToday:
         return (
           const Color.fromARGB(255, 86, 25, 183),
           TimetableColors.upcomingBackground,
@@ -101,12 +104,12 @@ class TimetableCard extends HookConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context,WidgetRef ref) {
-       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     final status =
         slot.serial != "-1"
-            ? getClassStatus(slot.startTime, slot.endTime,slot.day)
+            ? getClassStatus(slot.startTime, slot.endTime, slot.day)
             : null;
 
     final statusStyle = status != null ? getStatusStyle(status) : null;
@@ -118,30 +121,33 @@ class TimetableCard extends HookConsumerWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
-          color: getCardBackgroundColor(darkMode,context),
+          color: getCardBackgroundColor(darkMode, context),
           borderRadius: BorderRadius.circular(12),
           border:
               statusStyle != null && isHighlighted
                   ? Border.all(color: statusStyle.$1, width: 2)
                   : null,
-          boxShadow: darkMode ? null:[
-            BoxShadow(
-              color:
-                  isHighlighted
-                      ? TimetableColors.statusShadow
-                      : TimetableColors.cardShadow,
-              blurRadius: isHighlighted ? 8 : 6,
-              offset: const Offset(0, 2),
-              spreadRadius: isHighlighted ? 1 : 0,
-            ),
-          ],
+          boxShadow:
+              darkMode
+                  ? null
+                  : [
+                    BoxShadow(
+                      color:
+                          isHighlighted
+                              ? TimetableColors.statusShadow
+                              : TimetableColors.cardShadow,
+                      blurRadius: isHighlighted ? 8 : 6,
+                      offset: const Offset(0, 2),
+                      spreadRadius: isHighlighted ? 1 : 0,
+                    ),
+                  ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child:
               slot.serial != "-1"
-                  ? _buildClassCard(darkMode,context, statusStyle)
-                  : _buildFreeTimeCard(darkMode,context),
+                  ? _buildClassCard(darkMode, context, statusStyle)
+                  : _buildFreeTimeCard(darkMode, context),
         ),
       ),
     );
@@ -218,10 +224,10 @@ class TimetableCard extends HookConsumerWidget {
 
         Text(
           slot.name,
-          style:  TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: isDark ? context.theme.colors.primary :Color(0xFF374151),
+            color: isDark ? context.theme.colors.primary : Color(0xFF374151),
             //height: 1.2,
           ),
           maxLines: 1,
@@ -237,16 +243,22 @@ class TimetableCard extends HookConsumerWidget {
                 context,
                 icon: FIcons.mapPin,
                 text: "${slot.block} - ${slot.roomNo}",
-                color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : const Color(0xFF6B7280),
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
-                isDark,
-                context,
+              isDark,
+              context,
               icon: FIcons.hash,
               text: slot.courseCode,
-              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
+              color:
+                  isDark
+                      ? context.theme.colors.primary
+                      : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -256,21 +268,27 @@ class TimetableCard extends HookConsumerWidget {
           children: [
             Expanded(
               child: _buildDetailChip(
-                  isDark,
+                isDark,
                 context,
                 icon: FIcons.clock,
                 text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
-                color:isDark ? context.theme.colors.primary : const Color(0xFF374151),
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
-                isDark,
-                context,
+              isDark,
+              context,
               icon: FIcons.calendar,
               text: slot.slot,
-              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
+              color:
+                  isDark
+                      ? context.theme.colors.primary
+                      : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -278,7 +296,7 @@ class TimetableCard extends HookConsumerWidget {
     );
   }
 
-  Widget _buildFreeTimeCard(bool isDark,BuildContext context) {
+  Widget _buildFreeTimeCard(bool isDark, BuildContext context) {
     return Column(
       children: [
         Row(
@@ -313,22 +331,28 @@ class TimetableCard extends HookConsumerWidget {
           children: [
             Expanded(
               child: _buildDetailChip(
-                  isDark,
+                isDark,
                 context,
                 icon: FIcons.clock,
                 text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
-                color: isDark ? context.theme.colors.primary : const Color(0xFF374151),
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
             const SizedBox(width: 8),
             _buildDetailChip(
-                isDark,
-                context,
+              isDark,
+              context,
               icon: FIcons.timer,
               text:
                   slot.slot == "1" ? "${slot.slot} hour" : "${slot.slot} hours",
-              color: isDark ? context.theme.colors.primary : const Color(0xFF6B7280),
+              color:
+                  isDark
+                      ? context.theme.colors.primary
+                      : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -336,7 +360,9 @@ class TimetableCard extends HookConsumerWidget {
     );
   }
 
-  Widget _buildDetailChip(bool isDark,BuildContext context,{
+  Widget _buildDetailChip(
+    bool isDark,
+    BuildContext context, {
     required IconData icon,
     required String text,
     required Color color,
@@ -345,7 +371,8 @@ class TimetableCard extends HookConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: (isDark ? Colors.black :context.theme.colors.primaryForeground).withValues(alpha: 0.7),
+        color: (isDark ? Colors.black : context.theme.colors.primaryForeground)
+            .withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

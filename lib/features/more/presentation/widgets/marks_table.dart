@@ -10,8 +10,8 @@ class MarksTable extends HookConsumerWidget {
   const MarksTable({super.key, required this.marks});
 
   @override
-  Widget build(BuildContext context,WidgetRef ref) {
-       final darkMode = ref.watch(themeProvider)==ThemeMode.dark;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     return Container(
       constraints: BoxConstraints(
@@ -20,7 +20,7 @@ class MarksTable extends HookConsumerWidget {
       decoration: BoxDecoration(
         color: context.theme.colors.primaryForeground,
         borderRadius: BorderRadius.circular(12),
-     
+
         boxShadow: [
           BoxShadow(
             color: MarksColors.cardShadow,
@@ -37,23 +37,63 @@ class MarksTable extends HookConsumerWidget {
             scrollDirection: Axis.vertical,
             child: DataTable(
               decoration: const BoxDecoration(),
-              dividerThickness:  darkMode?0:1,
-             
+              dividerThickness: darkMode ? 0 : 1,
+
               headingRowHeight: 56,
               dataRowMinHeight: 48,
               dataRowMaxHeight: 64,
               columnSpacing: 16,
               horizontalMargin: 16,
-          
+
               columns: [
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText, ""),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Title"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Scored Mark"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Max Marks"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Weightage Mark"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Weightage%"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Status"),
-                _buildDataColumn(darkMode?context.theme.colors.primary:MarksColors.primaryText,"Remark"),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Title",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Scored Mark",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Max Marks",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Weightage Mark",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Weightage%",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Status",
+                ),
+                _buildDataColumn(
+                  darkMode
+                      ? context.theme.colors.primary
+                      : MarksColors.primaryText,
+                  "Remark",
+                ),
               ],
               rows:
                   marks.asMap().entries.map<DataRow>((entry) {
@@ -68,14 +108,53 @@ class MarksTable extends HookConsumerWidget {
                             : MarksColors.tableRowAlternate,
                       ),
                       cells: [
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.serial, isNumeric: true),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.markstitle),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.scoredmark, isNumeric: true),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.maxmarks, isNumeric: true),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.weightagemark, isNumeric: true),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.weightage),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.serial,
+                          isNumeric: true,
+                        ),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.markstitle,
+                        ),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.scoredmark,
+                          isNumeric: true,
+                        ),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.maxmarks,
+                          isNumeric: true,
+                        ),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.weightagemark,
+                          isNumeric: true,
+                        ),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.weightage,
+                        ),
                         DataCell(_buildStatusBadge(mark.status)),
-                        _buildDataCell(darkMode?context.theme.colors.primary:MarksColors.primaryText,mark.remark),
+                        _buildDataCell(
+                          darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.primaryText,
+                          mark.remark,
+                        ),
                       ],
                     );
                   }).toList(),
@@ -86,27 +165,27 @@ class MarksTable extends HookConsumerWidget {
     );
   }
 
-  DataColumn _buildDataColumn(Color color,String label) {
+  DataColumn _buildDataColumn(Color color, String label) {
     return DataColumn(
       label: Text(
         label,
-        style:  TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 14,
-          color:  color,
+          color: color,
         ),
       ),
     );
   }
 
-  DataCell _buildDataCell(Color color,String text, {bool isNumeric = false}) {
+  DataCell _buildDataCell(Color color, String text, {bool isNumeric = false}) {
     return DataCell(
       Text(
         text,
         style: TextStyle(
           fontSize: 13,
           fontWeight: isNumeric ? FontWeight.w600 : FontWeight.w400,
-          color: color ,
+          color: color,
         ),
       ),
     );
