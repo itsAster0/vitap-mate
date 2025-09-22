@@ -103,7 +103,9 @@ class MarksTable extends HookConsumerWidget {
 
                     return DataRow(
                       color: WidgetStateProperty.all(
-                        isEven
+                        darkMode
+                            ? context.theme.colors.primaryForeground
+                            : isEven
                             ? Colors.transparent
                             : MarksColors.tableRowAlternate,
                       ),
