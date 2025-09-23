@@ -1,0 +1,58 @@
+name: Build or Release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1 
+        with:
+          toolchain: stable
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Fastlane
+        uses: actions/checkout@v2
+
+      - name: setup Android signing
+        run: |
+          cd ./android
+          base64 -d <<< "${{ secrets.KEY_STORE }}" > keystore.properties
+          base64 -d <<< "${{ secrets.UPLOAD_RELEASE }}" > upload-keystore.jks
+          base64 -d <<< "${{ secrets.UPLOAD_KEY }}" > fastlane/key.json
+          base64 -d <<< "${{ secrets.GS }}" > app/google-services.json
+          cd ../lib
+          base64 -d <<< "${{ secrets.FIREBASE_OPTIONS }}" >  firebase_options.dart
+          cd ..
+   
+      - name: Set Up Flutter
+        uses: subosito/flutter-action@v2
+    
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Android app 
+        run: flutter build appbundle --release
+
+
+      - name: Upload to playstore   
+        run: |
+          cd ./android
+          fastlane android deploy_actions
+
+      - name: Cleanup keystore
+        run: |
+         rm ./keystore.jks
+         rm ./upload-keystore.jks
+         rm ./fastlane/key.json

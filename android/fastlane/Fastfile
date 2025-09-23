@@ -1,0 +1,58 @@
+default_platform(:android)
+
+platform :android do
+  desc "Deploy a new version to the Internal track only"
+  lane :deploy_internal do
+    #sh "flutter build appbundle --release"
+    upload_to_play_store(
+      track: "internal",
+      aab: "../build/app/outputs/bundle/release/app-release.aab",
+      skip_upload_changelogs: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true
+    )
+  end
+
+  desc "Promote latest internal build to closed, open and production"
+  lane :promote_all do
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to:"alpha",
+      skip_upload_changelogs: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true
+    )
+
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to:"beta", 
+      skip_upload_changelogs: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true
+    )
+
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to:"production",
+      skip_upload_changelogs: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true
+    )
+  end
+
+  desc "Build & upload to internal, then promote through all tracks"
+  lane :deploy_all do
+    deploy_internal
+    promote_all
+  end
+
+  desc "Build & upload for actions"
+  lane :deploy_actions do
+    deploy_internal
+    promote_all
+  end
+end

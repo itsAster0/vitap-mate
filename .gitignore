@@ -47,6 +47,6 @@ keystore.properties
 /android/app/debug
 /android/app/profile
 /android/app/release
-/android/fastlane/*
+/android/fastlane/key.json
 /android/app/google-services.json
 /lib/firebase_options.dart

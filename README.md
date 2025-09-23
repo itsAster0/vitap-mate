@@ -6,7 +6,7 @@
 - View your **attendance**, **marks**, and **exam schedules**  
 - Open **VTOP instantly** inside the app  
 - Say goodbye to **Wi-Fi login limits**  
-- Fast and offline-friendly — **no servers required**  
+- Fast and offline-friendly
 - Clean, responsive UI with **native performance**
 
 ## 🛠️ Tech Stack
@@ -18,7 +18,7 @@
 ## 🔐 Privacy First
 
 We take your privacy seriously:
-
+- The app is compiled in GitHub Actions and uploaded to the Play Store within the action itself for transparency.
 - **No data leaves your device**  
 - All scraping is done locally — even your login credentials stay on your phone  
 - We do **not** collect or store your user ID or password — not now, not ever  

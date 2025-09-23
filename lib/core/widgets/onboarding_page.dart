@@ -167,7 +167,7 @@ class Step1 extends HookConsumerWidget {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: context.theme.colors.primaryForeground,
+                  color: Colors.black,
                 ),
               ),
         ],

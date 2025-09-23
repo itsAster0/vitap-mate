@@ -1,0 +1,15 @@
+Consolidate your academic information in one secure app. View your schedule, attendance, and marks, even offline. Utilize online features for Wi-Fi management and course material downloads.
+
+🔸 This app is not affiliated with VIT-AP University — it’s an independent project made by a student  for students.
+
+Comprehensive Features:
+
+Automated Timetable & Attendance: Real-time schedule and attendance updates.
+Instant Marks & Grade Access: Easy access to your academic performance.
+Offline Data Access: View schedules, attendance, and marks without internet.
+ Wi-Fi Management: Securely login/logout from VITAP Wi-Fi (requires internet).
+Course Material Downloads: Download course files for study (requires internet).
+Enhanced Data Security: On-device processing ensures privacy.
+User-Friendly Interface: Intuitive navigation for a seamless experience.
+Optimized Performance: Lightweight and efficient.
+Simplify your VITAP experience. Download VITAP-PAL today!

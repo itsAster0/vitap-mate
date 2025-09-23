@@ -11,6 +11,7 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/users/wifi_details.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -184,6 +185,38 @@ class WifiCard extends HookConsumerWidget {
     }
 
     void handelLogin(String username, String password) async {
+      try {
+        isLoading.value = true;
+        final List<ConnectivityResult> connectivityResult =
+            await (Connectivity().checkConnectivity());
+        if (connectivityResult.contains(ConnectivityResult.mobile) || !connectivityResult.contains(ConnectivityResult.wifi)) {
+          if (context.mounted) {
+            showFDialog(
+              context: context,
+              builder:
+                  (context, style, animation) => FDialog(
+                    animation: animation,
+                    direction: Axis.horizontal,
+                    title: const Text("Not connected to Wi-Fi."),
+                    body: const Text(
+                      'Please disable mobile data and connect to college Wi-Fi.',
+                    ),
+                    actions: [
+                      FButton(
+                        onPress: () => Navigator.of(context).pop(),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        ();
+      } finally {
+        isLoading.value = false;
+      }
       errorMsg.value = null;
       succesMsg.value = null;
       isLoading.value = true;
@@ -241,7 +274,7 @@ class WifiCard extends HookConsumerWidget {
                 ),
                 Center(
                   child: Text(
-                    "Wi-fi",
+                    "Wi-Fi",
                     style: TextStyle(
                       color: context.theme.colors.primary,
                       fontWeight: FontWeight.w600,
