@@ -53,6 +53,6 @@ jobs:
 
       - name: Cleanup keystore
         run: |
-         rm ./keystore.jks
+         cd ./android
          rm ./upload-keystore.jks
          rm ./fastlane/key.json
