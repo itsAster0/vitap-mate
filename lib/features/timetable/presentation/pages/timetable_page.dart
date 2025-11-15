@@ -56,8 +56,8 @@ class TimetablePage extends HookConsumerWidget {
           Expanded(
             child: RefreshIndicator(
               key: key,
-              backgroundColor: Colors.white,
-              color: context.theme.colors.primary,
+              backgroundColor: context.theme.colors.primary,
+              color: context.theme.colors.primaryForeground,
               strokeWidth: 2.5,
               onRefresh: update,
               child: SingleChildScrollView(

@@ -189,7 +189,8 @@ class WifiCard extends HookConsumerWidget {
         isLoading.value = true;
         final List<ConnectivityResult> connectivityResult =
             await (Connectivity().checkConnectivity());
-        if (connectivityResult.contains(ConnectivityResult.mobile) || !connectivityResult.contains(ConnectivityResult.wifi)) {
+        if (connectivityResult.contains(ConnectivityResult.mobile) ||
+            !connectivityResult.contains(ConnectivityResult.wifi)) {
           if (context.mounted) {
             showFDialog(
               context: context,

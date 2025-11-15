@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -129,12 +130,30 @@ class VtopWebview extends HookConsumerWidget {
               },
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final uri = navigationAction.request.url;
+                print(uri.toString());
                 if (uri.toString().toLowerCase().contains("download")) {
                   String cookie = "${cookieName.value}=${cookieValue.value};";
                   downloadFile(uri.toString(), cookie);
                   return NavigationActionPolicy.CANCEL;
+                } else if (uri.toString().toLowerCase().startsWith(
+                  "https://vtop.vitap.ac.in",
+                )) {
+                  return NavigationActionPolicy.ALLOW;
                 }
-                return NavigationActionPolicy.ALLOW;
+
+                return NavigationActionPolicy.CANCEL;
+              },
+              onUpdateVisitedHistory: (controller, url, androidIsReload) {
+                final u = url.toString().toLowerCase();
+                if (!u.startsWith("https://vtop.vitap.ac.in")) {
+                  controller.stopLoading();
+                  controller.goBack();
+                  dispToast(
+                    context,
+                    "Open in Chrome",
+                    "Please continue in Chrome.",
+                  );
+                }
               },
               onLoadStart: (controller, url) {
                 loading.value = true;
