@@ -16,7 +16,7 @@ plugins {
 android {
     namespace = "com.vitap_pal.app"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = "28.2.13676358"
 
    compileOptions {
         // Flag to enable support for the new language APIs

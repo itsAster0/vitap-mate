@@ -483,12 +483,13 @@ class WifiInput extends HookConsumerWidget {
 
     return FDialog(
       title: Text(
-        "Wi-fi credentials",
+        "Wi-Fi credentials",
         style: TextStyle(color: context.theme.colors.primary),
       ),
       body: Form(
         key: formKey,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
             SizedBox(height: 25),

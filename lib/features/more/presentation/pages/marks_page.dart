@@ -47,31 +47,34 @@ class MarksPage extends HookConsumerWidget {
               : MarksColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height * 0.8,
-          ),
-          child: marksData.when(
-            data: (data) {
-              if (data.records.isEmpty) {
-                return _buildEmptyState(context);
-              }
+        child: Container(
+          color: context.theme.colors.background,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: marksData.when(
+              data: (data) {
+                if (data.records.isEmpty) {
+                  return _buildEmptyState(context);
+                }
 
-              return Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  spacing: 4,
-                  children: [
-                    for (final record in data.records)
-                      MarksCard(record: record),
+                return Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Column(
+                    spacing: 4,
+                    children: [
+                      for (final record in data.records)
+                        MarksCard(record: record),
 
-                    _buildFooter(data.updateTime.toInt()),
-                  ],
-                ),
-              );
-            },
-            error: (e, se) => _buildErrorState(e, context),
-            loading: () => _buildLoadingState(context),
+                      _buildFooter(data.updateTime.toInt()),
+                    ],
+                  ),
+                );
+              },
+              error: (e, se) => _buildErrorState(e, context),
+              loading: () => _buildLoadingState(context),
+            ),
           ),
         ),
       ),

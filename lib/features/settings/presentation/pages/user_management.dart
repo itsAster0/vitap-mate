@@ -18,7 +18,10 @@ class UserManagementPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(padding: const EdgeInsets.all(8.0), child: UserBox());
+    return Container(
+      color: context.theme.colors.background,
+      child: Padding(padding: const EdgeInsets.all(8.0), child: UserBox()),
+    );
   }
 }
 
@@ -247,7 +250,7 @@ class UserSemChange extends HookConsumerWidget {
                                             return Row(
                                               children: [
                                                 if (isLoading)
-                                                  const FProgress.circularIcon(),
+                                                  const FProgress(),
                                                 if (isLoading)
                                                   const SizedBox(width: 10),
                                                 Text('Semesters'),

@@ -79,17 +79,35 @@ final routerProvider = Provider((ref) {
                   GoRoute(
                     path: 'marks',
                     name: Paths.marks,
-                    builder: (context, state) => MarksPage(),
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: MarksPage(),
+                      );
+                    },
                   ),
                   GoRoute(
                     path: 'exam_schedule',
                     name: Paths.examSchedule,
-                    builder: (context, state) => ExamSchedulePage(),
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: ExamSchedulePage(),
+                      );
+                    },
                   ),
                   GoRoute(
                     path: 'vtopweb',
                     name: Paths.vtopweb,
-                    builder: (context, state) => VtopWebview(),
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: VtopWebview(),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -106,7 +124,13 @@ final routerProvider = Provider((ref) {
                   GoRoute(
                     path: '/vtopUserManagement',
                     name: Paths.vtopUserManagement,
-                    builder: (context, state) => UserManagementPage(),
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: UserManagementPage(),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -123,7 +147,13 @@ final routerProvider = Provider((ref) {
                   GoRoute(
                     path: 'messagechat',
                     name: Paths.messageChat,
-                    builder: (context, state) => MessageChatPage(),
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: MessageChatPage(),
+                      );
+                    },
                   ),
                 ],
               ),

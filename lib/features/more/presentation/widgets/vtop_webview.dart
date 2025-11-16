@@ -130,7 +130,7 @@ class VtopWebview extends HookConsumerWidget {
               },
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final uri = navigationAction.request.url;
-                print(uri.toString());
+
                 if (uri.toString().toLowerCase().contains("download")) {
                   String cookie = "${cookieName.value}=${cookieValue.value};";
                   downloadFile(uri.toString(), cookie);

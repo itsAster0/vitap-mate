@@ -6,7 +6,7 @@ import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:flutter/foundation.dart';
 part 'feature_flags.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class Gb extends _$Gb {
   @override
   Future<GrowthBookSDK> build() async {
