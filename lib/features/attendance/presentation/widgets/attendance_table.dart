@@ -117,7 +117,7 @@ class AttendanceTable extends HookConsumerWidget {
           ),
           if (!isLoading.value)
             FButton.icon(onPress: callback, child: Icon(FIcons.rotateCcw)),
-          if (isLoading.value) FProgress(),
+          if (isLoading.value) FCircularProgress.pinwheel(),
         ],
       ),
     );

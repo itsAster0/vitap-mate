@@ -250,7 +250,7 @@ class UserSemChange extends HookConsumerWidget {
                                             return Row(
                                               children: [
                                                 if (isLoading)
-                                                  const FProgress(),
+                                                  const FCircularProgress.pinwheel(),
                                                 if (isLoading)
                                                   const SizedBox(width: 10),
                                                 Text('Semesters'),

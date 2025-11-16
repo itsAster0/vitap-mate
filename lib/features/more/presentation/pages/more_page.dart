@@ -401,7 +401,7 @@ class WifiCard extends HookConsumerWidget {
                               ),
                             ],
                           )
-                          : const FProgress(),
+                          : const FCircularProgress.pinwheel(),
                     ],
                   ),
               error:
