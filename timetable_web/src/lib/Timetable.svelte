@@ -37,7 +37,18 @@
     function sortByTime(list) {
         return list.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
+    function to12Hour(time24: any) {
+        let [hour, minute, second] = time24.split(":");
 
+        hour = parseInt(hour);
+
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const hour12 = hour % 12 || 12;
+
+        return second
+            ? `${hour12}:${minute}:${second} ${ampm}`
+            : `${hour12}:${minute} ${ampm}`;
+    }
     const updateTime = new Date(
         data?.timetable?.updateTime * 1000,
     ).toLocaleString();
@@ -69,12 +80,12 @@
         <CardContent class="w-full  grid-flow-col">
             <Tabs bind:value={activeTab} class="w-full">
                 <TabsList
-                    class="mb-4 flex space-x-3 overflow-x-auto  justify-center items-center-safe w-full no-scrollbar"
+                    class="mb-4 flex   overflow-x-auto  justify-center items-center w-full no-scrollbar"
                 >
                     {#each days as day}
                         <TabsTrigger
                             value={day}
-                            class="whitespace-nowrap px-3 py-1 text-sm md:text-base"
+                            class="whitespace-nowrap py-1 text-sm md:text-base"
                         >
                             {day}
                         </TabsTrigger>
@@ -101,7 +112,9 @@
                                     {#each sortByTime(slots.filter((s) => s.day === day)) as slot}
                                         <TableRow>
                                             <TableCell class="font-medium">
-                                                {slot.startTime} – {slot.endTime}
+                                                {to12Hour(slot.startTime)} – {to12Hour(
+                                                    slot.endTime,
+                                                )}
                                             </TableCell>
 
                                             <TableCell>{slot.name}</TableCell>
