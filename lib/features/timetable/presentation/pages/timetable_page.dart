@@ -1,4 +1,3 @@
-// lib/features/timetable/presentation/pages/timetable_page.dart
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -6,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
@@ -26,6 +26,10 @@ class TimetablePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(timetableProvider.notifier).updateTimetable();
+          // var pb = await ref.read(pbProvider.future);
+          // var tt = await ref.watch(timetableProvider.future);
+          // final payload = {...tt.toJson(), "updateTime": tt.updateTime.toInt()};
+          // var temp = await pb.send("/timetable", method: "POST", body: payload);
         } catch (e, _) {
           log("$e");
         }
@@ -98,6 +102,11 @@ class TimetablePage extends HookConsumerWidget {
                           getDaySlotList(data, selectedDay.value),
                         );
 
+                        daySlots.sort((a, b) {
+                          final t1 = _parseTime(a.startTime);
+                          final t2 = _parseTime(b.startTime);
+                          return t1.compareTo(t2);
+                        });
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -190,7 +199,6 @@ class TimetablePage extends HookConsumerWidget {
   }
 }
 
-// Keep your existing helper functions unchanged
 List<int> getDayList(TimetableData? data) {
   if (data == null) return [];
   Map<String, int> map = {
@@ -270,4 +278,11 @@ int getdiff(String a, String b) {
   var second = b.split(":");
   return (int.parse(second[0]) * 60 + int.parse(second[1])) -
       (int.parse(first[0]) * 60 + int.parse(first[1]));
+}
+
+Duration _parseTime(String t) {
+  final parts = t.split(":");
+  final h = int.parse(parts[0]);
+  final m = parts.length > 1 ? int.parse(parts[1]) : 0;
+  return Duration(hours: h, minutes: m);
 }

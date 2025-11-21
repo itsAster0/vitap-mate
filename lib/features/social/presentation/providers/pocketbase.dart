@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/main.dart';
 part 'pocketbase.g.dart';
 
+const pbUrl = "https://api.va.synaptic.gg/";
+// const pbUrl = "http://10.0.2.2:8090/";
 @riverpod
 Future<PocketBase> pb(Ref ref) async {
   final prefs = await SharedPreferences.getInstance();
@@ -14,7 +16,7 @@ Future<PocketBase> pb(Ref ref) async {
     save: (String data) async => prefs.setString('pb_auth', data),
     initial: prefs.getString('pb_auth'),
   );
-  var pb = PocketBase("https://api.va.synaptic.gg", authStore: store);
+  var pb = PocketBase(pbUrl, authStore: store);
 
   try {
     if (pb.authStore.isValid) {
@@ -64,7 +66,7 @@ Future<void> pbSetNtotification({String? tokenNew}) async {
     save: (String data) async => prefs.setString('pb_auth', data),
     initial: prefs.getString('pb_auth'),
   );
-  var pb = PocketBase("https://api.va.synaptic.gg", authStore: store);
+  var pb = PocketBase(pbUrl, authStore: store);
   var token = tokenNew ?? await notifications.getToken();
   await pbSetNotificationToken(pb, token);
 }

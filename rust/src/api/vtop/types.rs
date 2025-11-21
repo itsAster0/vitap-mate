@@ -1,7 +1,7 @@
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct FullAttendanceRecord {
     pub serial: String,
@@ -13,7 +13,7 @@ pub struct FullAttendanceRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct FullAttendanceData {
     pub records: Vec<FullAttendanceRecord>,
@@ -24,7 +24,7 @@ pub struct FullAttendanceData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct AttendanceRecord {
     pub serial: String,
@@ -42,7 +42,7 @@ pub struct AttendanceRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct AttendanceData {
     pub records: Vec<AttendanceRecord>,
@@ -51,7 +51,7 @@ pub struct AttendanceData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct TimetableSlot {
     pub serial: String,
@@ -68,7 +68,7 @@ pub struct TimetableSlot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct TimetableData {
     pub slots: Vec<TimetableSlot>,
@@ -77,7 +77,7 @@ pub struct TimetableData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct MarksRecord {
     pub serial: String,
@@ -89,7 +89,7 @@ pub struct MarksRecord {
     pub marks: Vec<MarksRecordEach>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 #[frb(json_serializable)]
 pub struct MarksRecordEach {
@@ -104,7 +104,7 @@ pub struct MarksRecordEach {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct MarksData {
     pub records: Vec<MarksRecord>,
@@ -113,7 +113,7 @@ pub struct MarksData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct ExamScheduleRecord {
     pub serial: String,
@@ -132,14 +132,14 @@ pub struct ExamScheduleRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct PerExamScheduleRecord {
     pub records: Vec<ExamScheduleRecord>,
     pub exam_type: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct ExamScheduleData {
     pub exams: Vec<PerExamScheduleRecord>,
@@ -148,7 +148,7 @@ pub struct ExamScheduleData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct SemesterInfo {
     pub id: String,
@@ -156,7 +156,7 @@ pub struct SemesterInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
 pub struct SemesterData {
     pub semesters: Vec<SemesterInfo>,

@@ -9,6 +9,7 @@ import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 
 class MarksPage extends HookConsumerWidget {
   const MarksPage({super.key});
@@ -65,7 +66,9 @@ class MarksPage extends HookConsumerWidget {
                     spacing: 4,
                     children: [
                       for (final record in data.records)
-                        MarksCard(record: record),
+                        MarksCard(
+                          record: record.copyWith(marks: sortedMarks(record)),
+                        ),
 
                       _buildFooter(data.updateTime.toInt()),
                     ],
@@ -197,4 +200,10 @@ class MarksPage extends HookConsumerWidget {
       ),
     );
   }
+}
+
+List<MarksRecordEach> sortedMarks(MarksRecord record) {
+  final cloned = [...record.marks];
+  cloned.sort((a, b) => int.parse(a.serial).compareTo(int.parse(b.serial)));
+  return cloned;
 }

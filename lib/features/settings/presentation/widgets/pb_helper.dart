@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/social/presentation/providers/pocketbase.dart';
 
 class PbHelper extends ConsumerWidget {
@@ -18,14 +19,17 @@ class PbHelper extends ConsumerWidget {
       data: (pb) {
         if (!pb.authStore.isValid) {
           return FDialog(
-            title: Text("Not Logged In"),
-            body: Text("Please go to the Social tab to log in."),
+            title: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ShowLogin(pb: pb),
+            ),
             actions: [
               FButton(
+                style: FButtonStyle.secondary(),
                 onPress: () {
                   GoRouter.of(context).pop();
                 },
-                child: Text("ok"),
+                child: Text("cancel"),
               ),
             ],
           );

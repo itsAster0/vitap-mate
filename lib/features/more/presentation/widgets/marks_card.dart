@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_table.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -69,7 +70,7 @@ class MarksCard extends HookConsumerWidget {
 
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
-    final isLab = record.coursetype.toLowerCase().endsWith("lab");
+    final isLab = record.islab();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),

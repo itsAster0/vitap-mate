@@ -11,6 +11,7 @@ part of 'types.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
+
 /// @nodoc
 mixin _$AttendanceData {
 
@@ -21,6 +22,8 @@ mixin _$AttendanceData {
 @pragma('vm:prefer-inline')
 $AttendanceDataCopyWith<AttendanceData> get copyWith => _$AttendanceDataCopyWithImpl<AttendanceData>(this as AttendanceData, _$identity);
 
+  /// Serializes this AttendanceData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -28,7 +31,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is AttendanceData&&const DeepCollectionEquality().equals(other.records, records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(records),semesterId,updateTime);
 
@@ -199,11 +202,11 @@ return $default(_that.records,_that.semesterId,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _AttendanceData implements AttendanceData {
   const _AttendanceData({required final  List<AttendanceRecord> records, required this.semesterId, required this.updateTime}): _records = records;
-  
+  factory _AttendanceData.fromJson(Map<String, dynamic> json) => _$AttendanceDataFromJson(json);
 
  final  List<AttendanceRecord> _records;
 @override List<AttendanceRecord> get records {
@@ -221,14 +224,17 @@ class _AttendanceData implements AttendanceData {
 @pragma('vm:prefer-inline')
 _$AttendanceDataCopyWith<_AttendanceData> get copyWith => __$AttendanceDataCopyWithImpl<_AttendanceData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$AttendanceDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _AttendanceData&&const DeepCollectionEquality().equals(other._records, _records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_records),semesterId,updateTime);
 
@@ -274,6 +280,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$AttendanceRecord {
 
@@ -284,6 +291,8 @@ mixin _$AttendanceRecord {
 @pragma('vm:prefer-inline')
 $AttendanceRecordCopyWith<AttendanceRecord> get copyWith => _$AttendanceRecordCopyWithImpl<AttendanceRecord>(this as AttendanceRecord, _$identity);
 
+  /// Serializes this AttendanceRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -291,7 +300,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is AttendanceRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.category, category) || other.category == category)&&(identical(other.courseName, courseName) || other.courseName == courseName)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.facultyDetail, facultyDetail) || other.facultyDetail == facultyDetail)&&(identical(other.classesAttended, classesAttended) || other.classesAttended == classesAttended)&&(identical(other.totalClasses, totalClasses) || other.totalClasses == totalClasses)&&(identical(other.attendancePercentage, attendancePercentage) || other.attendancePercentage == attendancePercentage)&&(identical(other.attendenceFatCat, attendenceFatCat) || other.attendenceFatCat == attendenceFatCat)&&(identical(other.debarStatus, debarStatus) || other.debarStatus == debarStatus)&&(identical(other.courseId, courseId) || other.courseId == courseId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,category,courseName,courseCode,courseType,facultyDetail,classesAttended,totalClasses,attendancePercentage,attendenceFatCat,debarStatus,courseId);
 
@@ -471,11 +480,11 @@ return $default(_that.serial,_that.category,_that.courseName,_that.courseCode,_t
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _AttendanceRecord implements AttendanceRecord {
   const _AttendanceRecord({required this.serial, required this.category, required this.courseName, required this.courseCode, required this.courseType, required this.facultyDetail, required this.classesAttended, required this.totalClasses, required this.attendancePercentage, required this.attendenceFatCat, required this.debarStatus, required this.courseId});
-  
+  factory _AttendanceRecord.fromJson(Map<String, dynamic> json) => _$AttendanceRecordFromJson(json);
 
 @override final  String serial;
 @override final  String category;
@@ -496,14 +505,17 @@ class _AttendanceRecord implements AttendanceRecord {
 @pragma('vm:prefer-inline')
 _$AttendanceRecordCopyWith<_AttendanceRecord> get copyWith => __$AttendanceRecordCopyWithImpl<_AttendanceRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$AttendanceRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _AttendanceRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.category, category) || other.category == category)&&(identical(other.courseName, courseName) || other.courseName == courseName)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.facultyDetail, facultyDetail) || other.facultyDetail == facultyDetail)&&(identical(other.classesAttended, classesAttended) || other.classesAttended == classesAttended)&&(identical(other.totalClasses, totalClasses) || other.totalClasses == totalClasses)&&(identical(other.attendancePercentage, attendancePercentage) || other.attendancePercentage == attendancePercentage)&&(identical(other.attendenceFatCat, attendenceFatCat) || other.attendenceFatCat == attendenceFatCat)&&(identical(other.debarStatus, debarStatus) || other.debarStatus == debarStatus)&&(identical(other.courseId, courseId) || other.courseId == courseId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,category,courseName,courseCode,courseType,facultyDetail,classesAttended,totalClasses,attendancePercentage,attendenceFatCat,debarStatus,courseId);
 
@@ -558,6 +570,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$ExamScheduleData {
 
@@ -568,6 +581,8 @@ mixin _$ExamScheduleData {
 @pragma('vm:prefer-inline')
 $ExamScheduleDataCopyWith<ExamScheduleData> get copyWith => _$ExamScheduleDataCopyWithImpl<ExamScheduleData>(this as ExamScheduleData, _$identity);
 
+  /// Serializes this ExamScheduleData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -575,7 +590,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is ExamScheduleData&&const DeepCollectionEquality().equals(other.exams, exams)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(exams),semesterId,updateTime);
 
@@ -746,11 +761,11 @@ return $default(_that.exams,_that.semesterId,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _ExamScheduleData implements ExamScheduleData {
   const _ExamScheduleData({required final  List<PerExamScheduleRecord> exams, required this.semesterId, required this.updateTime}): _exams = exams;
-  
+  factory _ExamScheduleData.fromJson(Map<String, dynamic> json) => _$ExamScheduleDataFromJson(json);
 
  final  List<PerExamScheduleRecord> _exams;
 @override List<PerExamScheduleRecord> get exams {
@@ -768,14 +783,17 @@ class _ExamScheduleData implements ExamScheduleData {
 @pragma('vm:prefer-inline')
 _$ExamScheduleDataCopyWith<_ExamScheduleData> get copyWith => __$ExamScheduleDataCopyWithImpl<_ExamScheduleData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$ExamScheduleDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _ExamScheduleData&&const DeepCollectionEquality().equals(other._exams, _exams)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_exams),semesterId,updateTime);
 
@@ -821,6 +839,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$ExamScheduleRecord {
 
@@ -831,6 +850,8 @@ mixin _$ExamScheduleRecord {
 @pragma('vm:prefer-inline')
 $ExamScheduleRecordCopyWith<ExamScheduleRecord> get copyWith => _$ExamScheduleRecordCopyWithImpl<ExamScheduleRecord>(this as ExamScheduleRecord, _$identity);
 
+  /// Serializes this ExamScheduleRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -838,7 +859,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is ExamScheduleRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseName, courseName) || other.courseName == courseName)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.examDate, examDate) || other.examDate == examDate)&&(identical(other.examSession, examSession) || other.examSession == examSession)&&(identical(other.reportingTime, reportingTime) || other.reportingTime == reportingTime)&&(identical(other.examTime, examTime) || other.examTime == examTime)&&(identical(other.venue, venue) || other.venue == venue)&&(identical(other.seatLocation, seatLocation) || other.seatLocation == seatLocation)&&(identical(other.seatNo, seatNo) || other.seatNo == seatNo));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,slot,courseName,courseCode,courseType,courseId,examDate,examSession,reportingTime,examTime,venue,seatLocation,seatNo);
 
@@ -1019,11 +1040,11 @@ return $default(_that.serial,_that.slot,_that.courseName,_that.courseCode,_that.
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _ExamScheduleRecord implements ExamScheduleRecord {
   const _ExamScheduleRecord({required this.serial, required this.slot, required this.courseName, required this.courseCode, required this.courseType, required this.courseId, required this.examDate, required this.examSession, required this.reportingTime, required this.examTime, required this.venue, required this.seatLocation, required this.seatNo});
-  
+  factory _ExamScheduleRecord.fromJson(Map<String, dynamic> json) => _$ExamScheduleRecordFromJson(json);
 
 @override final  String serial;
 @override final  String slot;
@@ -1045,14 +1066,17 @@ class _ExamScheduleRecord implements ExamScheduleRecord {
 @pragma('vm:prefer-inline')
 _$ExamScheduleRecordCopyWith<_ExamScheduleRecord> get copyWith => __$ExamScheduleRecordCopyWithImpl<_ExamScheduleRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$ExamScheduleRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _ExamScheduleRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseName, courseName) || other.courseName == courseName)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.examDate, examDate) || other.examDate == examDate)&&(identical(other.examSession, examSession) || other.examSession == examSession)&&(identical(other.reportingTime, reportingTime) || other.reportingTime == reportingTime)&&(identical(other.examTime, examTime) || other.examTime == examTime)&&(identical(other.venue, venue) || other.venue == venue)&&(identical(other.seatLocation, seatLocation) || other.seatLocation == seatLocation)&&(identical(other.seatNo, seatNo) || other.seatNo == seatNo));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,slot,courseName,courseCode,courseType,courseId,examDate,examSession,reportingTime,examTime,venue,seatLocation,seatNo);
 
@@ -1108,6 +1132,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$FullAttendanceData {
 
@@ -1118,6 +1143,8 @@ mixin _$FullAttendanceData {
 @pragma('vm:prefer-inline')
 $FullAttendanceDataCopyWith<FullAttendanceData> get copyWith => _$FullAttendanceDataCopyWithImpl<FullAttendanceData>(this as FullAttendanceData, _$identity);
 
+  /// Serializes this FullAttendanceData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1125,7 +1152,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is FullAttendanceData&&const DeepCollectionEquality().equals(other.records, records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.courseType, courseType) || other.courseType == courseType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(records),semesterId,updateTime,courseId,courseType);
 
@@ -1298,11 +1325,11 @@ return $default(_that.records,_that.semesterId,_that.updateTime,_that.courseId,_
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _FullAttendanceData implements FullAttendanceData {
   const _FullAttendanceData({required final  List<FullAttendanceRecord> records, required this.semesterId, required this.updateTime, required this.courseId, required this.courseType}): _records = records;
-  
+  factory _FullAttendanceData.fromJson(Map<String, dynamic> json) => _$FullAttendanceDataFromJson(json);
 
  final  List<FullAttendanceRecord> _records;
 @override List<FullAttendanceRecord> get records {
@@ -1322,14 +1349,17 @@ class _FullAttendanceData implements FullAttendanceData {
 @pragma('vm:prefer-inline')
 _$FullAttendanceDataCopyWith<_FullAttendanceData> get copyWith => __$FullAttendanceDataCopyWithImpl<_FullAttendanceData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$FullAttendanceDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _FullAttendanceData&&const DeepCollectionEquality().equals(other._records, _records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.courseType, courseType) || other.courseType == courseType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_records),semesterId,updateTime,courseId,courseType);
 
@@ -1377,6 +1407,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$FullAttendanceRecord {
 
@@ -1387,6 +1418,8 @@ mixin _$FullAttendanceRecord {
 @pragma('vm:prefer-inline')
 $FullAttendanceRecordCopyWith<FullAttendanceRecord> get copyWith => _$FullAttendanceRecordCopyWithImpl<FullAttendanceRecord>(this as FullAttendanceRecord, _$identity);
 
+  /// Serializes this FullAttendanceRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1394,7 +1427,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is FullAttendanceRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.date, date) || other.date == date)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.dayTime, dayTime) || other.dayTime == dayTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.remark, remark) || other.remark == remark));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,date,slot,dayTime,status,remark);
 
@@ -1568,11 +1601,11 @@ return $default(_that.serial,_that.date,_that.slot,_that.dayTime,_that.status,_t
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _FullAttendanceRecord implements FullAttendanceRecord {
   const _FullAttendanceRecord({required this.serial, required this.date, required this.slot, required this.dayTime, required this.status, required this.remark});
-  
+  factory _FullAttendanceRecord.fromJson(Map<String, dynamic> json) => _$FullAttendanceRecordFromJson(json);
 
 @override final  String serial;
 @override final  String date;
@@ -1587,14 +1620,17 @@ class _FullAttendanceRecord implements FullAttendanceRecord {
 @pragma('vm:prefer-inline')
 _$FullAttendanceRecordCopyWith<_FullAttendanceRecord> get copyWith => __$FullAttendanceRecordCopyWithImpl<_FullAttendanceRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$FullAttendanceRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _FullAttendanceRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.date, date) || other.date == date)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.dayTime, dayTime) || other.dayTime == dayTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.remark, remark) || other.remark == remark));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,date,slot,dayTime,status,remark);
 
@@ -1643,6 +1679,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$MarksData {
 
@@ -1653,6 +1690,8 @@ mixin _$MarksData {
 @pragma('vm:prefer-inline')
 $MarksDataCopyWith<MarksData> get copyWith => _$MarksDataCopyWithImpl<MarksData>(this as MarksData, _$identity);
 
+  /// Serializes this MarksData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1660,7 +1699,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MarksData&&const DeepCollectionEquality().equals(other.records, records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(records),semesterId,updateTime);
 
@@ -1831,11 +1870,11 @@ return $default(_that.records,_that.semesterId,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _MarksData implements MarksData {
   const _MarksData({required final  List<MarksRecord> records, required this.semesterId, required this.updateTime}): _records = records;
-  
+  factory _MarksData.fromJson(Map<String, dynamic> json) => _$MarksDataFromJson(json);
 
  final  List<MarksRecord> _records;
 @override List<MarksRecord> get records {
@@ -1853,14 +1892,17 @@ class _MarksData implements MarksData {
 @pragma('vm:prefer-inline')
 _$MarksDataCopyWith<_MarksData> get copyWith => __$MarksDataCopyWithImpl<_MarksData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$MarksDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MarksData&&const DeepCollectionEquality().equals(other._records, _records)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_records),semesterId,updateTime);
 
@@ -1906,6 +1948,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$MarksRecord {
 
@@ -1916,6 +1959,8 @@ mixin _$MarksRecord {
 @pragma('vm:prefer-inline')
 $MarksRecordCopyWith<MarksRecord> get copyWith => _$MarksRecordCopyWithImpl<MarksRecord>(this as MarksRecord, _$identity);
 
+  /// Serializes this MarksRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1923,7 +1968,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is MarksRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.coursecode, coursecode) || other.coursecode == coursecode)&&(identical(other.coursetitle, coursetitle) || other.coursetitle == coursetitle)&&(identical(other.coursetype, coursetype) || other.coursetype == coursetype)&&(identical(other.faculity, faculity) || other.faculity == faculity)&&(identical(other.slot, slot) || other.slot == slot)&&const DeepCollectionEquality().equals(other.marks, marks));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,coursecode,coursetitle,coursetype,faculity,slot,const DeepCollectionEquality().hash(marks));
 
@@ -2098,11 +2143,11 @@ return $default(_that.serial,_that.coursecode,_that.coursetitle,_that.coursetype
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _MarksRecord implements MarksRecord {
   const _MarksRecord({required this.serial, required this.coursecode, required this.coursetitle, required this.coursetype, required this.faculity, required this.slot, required final  List<MarksRecordEach> marks}): _marks = marks;
-  
+  factory _MarksRecord.fromJson(Map<String, dynamic> json) => _$MarksRecordFromJson(json);
 
 @override final  String serial;
 @override final  String coursecode;
@@ -2124,14 +2169,17 @@ class _MarksRecord implements MarksRecord {
 @pragma('vm:prefer-inline')
 _$MarksRecordCopyWith<_MarksRecord> get copyWith => __$MarksRecordCopyWithImpl<_MarksRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$MarksRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _MarksRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.coursecode, coursecode) || other.coursecode == coursecode)&&(identical(other.coursetitle, coursetitle) || other.coursetitle == coursetitle)&&(identical(other.coursetype, coursetype) || other.coursetype == coursetype)&&(identical(other.faculity, faculity) || other.faculity == faculity)&&(identical(other.slot, slot) || other.slot == slot)&&const DeepCollectionEquality().equals(other._marks, _marks));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,coursecode,coursetitle,coursetype,faculity,slot,const DeepCollectionEquality().hash(_marks));
 
@@ -2459,6 +2507,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$PerExamScheduleRecord {
 
@@ -2469,6 +2518,8 @@ mixin _$PerExamScheduleRecord {
 @pragma('vm:prefer-inline')
 $PerExamScheduleRecordCopyWith<PerExamScheduleRecord> get copyWith => _$PerExamScheduleRecordCopyWithImpl<PerExamScheduleRecord>(this as PerExamScheduleRecord, _$identity);
 
+  /// Serializes this PerExamScheduleRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2476,7 +2527,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is PerExamScheduleRecord&&const DeepCollectionEquality().equals(other.records, records)&&(identical(other.examType, examType) || other.examType == examType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(records),examType);
 
@@ -2646,11 +2697,11 @@ return $default(_that.records,_that.examType);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _PerExamScheduleRecord implements PerExamScheduleRecord {
   const _PerExamScheduleRecord({required final  List<ExamScheduleRecord> records, required this.examType}): _records = records;
-  
+  factory _PerExamScheduleRecord.fromJson(Map<String, dynamic> json) => _$PerExamScheduleRecordFromJson(json);
 
  final  List<ExamScheduleRecord> _records;
 @override List<ExamScheduleRecord> get records {
@@ -2667,14 +2718,17 @@ class _PerExamScheduleRecord implements PerExamScheduleRecord {
 @pragma('vm:prefer-inline')
 _$PerExamScheduleRecordCopyWith<_PerExamScheduleRecord> get copyWith => __$PerExamScheduleRecordCopyWithImpl<_PerExamScheduleRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$PerExamScheduleRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _PerExamScheduleRecord&&const DeepCollectionEquality().equals(other._records, _records)&&(identical(other.examType, examType) || other.examType == examType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_records),examType);
 
@@ -2719,6 +2773,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$SemesterData {
 
@@ -2729,6 +2784,8 @@ mixin _$SemesterData {
 @pragma('vm:prefer-inline')
 $SemesterDataCopyWith<SemesterData> get copyWith => _$SemesterDataCopyWithImpl<SemesterData>(this as SemesterData, _$identity);
 
+  /// Serializes this SemesterData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2736,7 +2793,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is SemesterData&&const DeepCollectionEquality().equals(other.semesters, semesters)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(semesters),updateTime);
 
@@ -2906,11 +2963,11 @@ return $default(_that.semesters,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _SemesterData implements SemesterData {
   const _SemesterData({required final  List<SemesterInfo> semesters, required this.updateTime}): _semesters = semesters;
-  
+  factory _SemesterData.fromJson(Map<String, dynamic> json) => _$SemesterDataFromJson(json);
 
  final  List<SemesterInfo> _semesters;
 @override List<SemesterInfo> get semesters {
@@ -2927,14 +2984,17 @@ class _SemesterData implements SemesterData {
 @pragma('vm:prefer-inline')
 _$SemesterDataCopyWith<_SemesterData> get copyWith => __$SemesterDataCopyWithImpl<_SemesterData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$SemesterDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _SemesterData&&const DeepCollectionEquality().equals(other._semesters, _semesters)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_semesters),updateTime);
 
@@ -2979,6 +3039,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$SemesterInfo {
 
@@ -2989,6 +3050,8 @@ mixin _$SemesterInfo {
 @pragma('vm:prefer-inline')
 $SemesterInfoCopyWith<SemesterInfo> get copyWith => _$SemesterInfoCopyWithImpl<SemesterInfo>(this as SemesterInfo, _$identity);
 
+  /// Serializes this SemesterInfo to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2996,7 +3059,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is SemesterInfo&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,id,name);
 
@@ -3166,11 +3229,11 @@ return $default(_that.id,_that.name);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _SemesterInfo implements SemesterInfo {
   const _SemesterInfo({required this.id, required this.name});
-  
+  factory _SemesterInfo.fromJson(Map<String, dynamic> json) => _$SemesterInfoFromJson(json);
 
 @override final  String id;
 @override final  String name;
@@ -3181,14 +3244,17 @@ class _SemesterInfo implements SemesterInfo {
 @pragma('vm:prefer-inline')
 _$SemesterInfoCopyWith<_SemesterInfo> get copyWith => __$SemesterInfoCopyWithImpl<_SemesterInfo>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$SemesterInfoToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _SemesterInfo&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,id,name);
 
@@ -3233,6 +3299,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$TimetableData {
 
@@ -3243,6 +3310,8 @@ mixin _$TimetableData {
 @pragma('vm:prefer-inline')
 $TimetableDataCopyWith<TimetableData> get copyWith => _$TimetableDataCopyWithImpl<TimetableData>(this as TimetableData, _$identity);
 
+  /// Serializes this TimetableData to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -3250,7 +3319,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableData&&const DeepCollectionEquality().equals(other.slots, slots)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(slots),semesterId,updateTime);
 
@@ -3421,11 +3490,11 @@ return $default(_that.slots,_that.semesterId,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _TimetableData implements TimetableData {
   const _TimetableData({required final  List<TimetableSlot> slots, required this.semesterId, required this.updateTime}): _slots = slots;
-  
+  factory _TimetableData.fromJson(Map<String, dynamic> json) => _$TimetableDataFromJson(json);
 
  final  List<TimetableSlot> _slots;
 @override List<TimetableSlot> get slots {
@@ -3443,14 +3512,17 @@ class _TimetableData implements TimetableData {
 @pragma('vm:prefer-inline')
 _$TimetableDataCopyWith<_TimetableData> get copyWith => __$TimetableDataCopyWithImpl<_TimetableData>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$TimetableDataToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableData&&const DeepCollectionEquality().equals(other._slots, _slots)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_slots),semesterId,updateTime);
 
@@ -3496,6 +3568,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$TimetableSlot {
 
@@ -3506,6 +3579,8 @@ mixin _$TimetableSlot {
 @pragma('vm:prefer-inline')
 $TimetableSlotCopyWith<TimetableSlot> get copyWith => _$TimetableSlotCopyWithImpl<TimetableSlot>(this as TimetableSlot, _$identity);
 
+  /// Serializes this TimetableSlot to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -3513,7 +3588,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab);
 
@@ -3692,11 +3767,11 @@ return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseT
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _TimetableSlot implements TimetableSlot {
   const _TimetableSlot({required this.serial, required this.day, required this.slot, required this.courseCode, required this.courseType, required this.roomNo, required this.block, required this.startTime, required this.endTime, required this.name, this.isLab});
-  
+  factory _TimetableSlot.fromJson(Map<String, dynamic> json) => _$TimetableSlotFromJson(json);
 
 @override final  String serial;
 @override final  String day;
@@ -3716,14 +3791,17 @@ class _TimetableSlot implements TimetableSlot {
 @pragma('vm:prefer-inline')
 _$TimetableSlotCopyWith<_TimetableSlot> get copyWith => __$TimetableSlotCopyWithImpl<_TimetableSlot>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$TimetableSlotToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab);
 

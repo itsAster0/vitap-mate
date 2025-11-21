@@ -18,21 +18,71 @@ class SocialPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    var pbasync = ref.watch(pbProvider);
+
+    return pbasync.when(
+      data: (pb) {
+        if (pb.authStore.isValid) {
+          return MessageChatPage();
+        }
+        return ShowLogin(pb: pb);
+      },
+      error: (e, se) {
+        disCommonToast(context, e);
+        String msg = commonErrorMessage(e);
+        return Center(child: Text(msg));
+      },
+      loading: () {
+        return Center(
+          child: SizedBox(
+            width: 50,
+            height: 50,
+            child: CircularProgressIndicator(
+              color: context.theme.colors.primary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+Uri buildAuthUrl(
+  AuthMethodProvider provider,
+  Uri redirectURL,
+  String state, {
+  List<String> scopes = const [],
+}) {
+  final baseUri = Uri.parse(provider.authURL);
+  final queryParameters = <String, String>{
+    ...baseUri.queryParameters,
+    "redirect_uri": redirectURL.toString(),
+    "state": state,
+  };
+  if (scopes.isNotEmpty) {
+    queryParameters["scope"] = scopes.join(" ");
+  }
+  return baseUri.replace(queryParameters: queryParameters);
+}
+
+class ShowLogin extends HookConsumerWidget {
+  final PocketBase pb;
+  const ShowLogin({super.key, required this.pb});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     var isloading = useState(false);
     final redirectURL = Uri.parse("https://api.va.synaptic.gg/social");
     final collectionsName = "users";
     var googleProvider = useRef<AuthMethodProvider?>(null);
     final appLinks = useMemoized(() => AppLinks());
     final stateH = useMemoized(() => Uuid().v4());
-    final pbH = useRef<PocketBase?>(null);
-    var pbasync = ref.watch(pbProvider);
 
     useEffect(() {
       final sub = appLinks.uriLinkStream.listen((uri) async {
         final data = uri.queryParameters;
         final code = data["code"] ?? "";
         try {
-          await pbH.value!
+          await pb
               .collection(collectionsName)
               .authWithOAuth2Code(
                 googleProvider.value!.name,
@@ -88,7 +138,6 @@ class SocialPage extends HookConsumerWidget {
           isloading.value = false;
         }
       } else {
-        pbH.value = pb;
         final providerAuth =
             await pb.collection(collectionsName).listAuthMethods();
         googleProvider.value = providerAuth.oauth2.providers.first;
@@ -97,98 +146,57 @@ class SocialPage extends HookConsumerWidget {
       }
     }
 
-    return pbasync.when(
-      data: (pb) {
-        if (pb.authStore.isValid) {
-          return MessageChatPage();
-        }
-        return !isloading.value
-            ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                spacing: 10,
-                children: [
-                  FButton(
-                    onPress: () => handleClick(pb),
+    return !isloading.value
+        ? Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            spacing: 10,
+            children: [
+              FButton(
+                onPress: () => handleClick(pb),
 
-                    child: Row(
-                      spacing: 10,
-                      children: [
-                        FAvatar(
-                          image: NetworkImage(
-                            "https://yt3.googleusercontent.com/2eI1TjX447QZFDe6R32K0V2mjbVMKT5mIfQR-wK5bAsxttS_7qzUDS1ojoSKeSP0NuWd6sl7qQ=s160-c-k-c0x00ffffff-no-rj",
-                          ),
-                          fallback: Text("Lo"),
-                        ),
-                        Text(
-                          "Login",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.theme.colors.primaryForeground,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        "👋 Just a heads-up! You’ll need to use your college email to log in — other emails won’t get you in",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.blueGrey,
-                        ),
+                child: Row(
+                  spacing: 10,
+                  children: [
+                    FAvatar(
+                      image: NetworkImage(
+                        "https://yt3.googleusercontent.com/2eI1TjX447QZFDe6R32K0V2mjbVMKT5mIfQR-wK5bAsxttS_7qzUDS1ojoSKeSP0NuWd6sl7qQ=s160-c-k-c0x00ffffff-no-rj",
                       ),
+                      fallback: Text("Lo"),
                     ),
-                  ),
-                ],
-              ),
-            )
-            : Center(
-              child: SizedBox(
-                width: 30,
-                height: 30,
-                child: CircularProgressIndicator(
-                  color: context.theme.colors.primary,
+                    Text(
+                      "Login",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
-            );
-      },
-      error: (e, se) {
-        disCommonToast(context, e);
-        String msg = commonErrorMessage(e);
-        return Center(child: Text(msg));
-      },
-      loading: () {
-        return Center(
+              Container(
+                decoration: BoxDecoration(
+                  color: context.theme.colors.primaryForeground,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    "👋 Just a heads-up! You’ll need to use your college email to log in — other emails won’t get you in",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.blueGrey,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        )
+        : Center(
           child: SizedBox(
-            width: 50,
-            height: 50,
+            width: 30,
+            height: 30,
             child: CircularProgressIndicator(
               color: context.theme.colors.primary,
             ),
           ),
         );
-      },
-    );
   }
-}
-
-Uri buildAuthUrl(
-  AuthMethodProvider provider,
-  Uri redirectURL,
-  String state, {
-  List<String> scopes = const [],
-}) {
-  final baseUri = Uri.parse(provider.authURL);
-  final queryParameters = <String, String>{
-    ...baseUri.queryParameters,
-    "redirect_uri": redirectURL.toString(),
-    "state": state,
-  };
-  if (scopes.isNotEmpty) {
-    queryParameters["scope"] = scopes.join(" ");
-  }
-  return baseUri.replace(queryParameters: queryParameters);
 }

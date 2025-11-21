@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
+import 'package:vitapmate/features/timetable/presentation/pages/share_tt.dart';
 
 class ShellLayout extends HookWidget {
   final Widget child;
@@ -107,7 +108,10 @@ Widget? getSidewidget(BuildContext context, String data, String path) {
   return FHeader.nested(
     title: Text(data),
     prefixes: [if (path.contains("social")) InfoSocial()],
-    suffixes: [if (path.contains("social")) LogoutButton()],
+    suffixes: [
+      if (path.contains("social")) LogoutButton(),
+      if (path.contains("timetable")) ShareTt(),
+    ],
   );
 }
 

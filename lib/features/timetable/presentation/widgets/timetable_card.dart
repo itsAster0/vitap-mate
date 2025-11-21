@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -56,7 +57,7 @@ class TimetableCard extends HookConsumerWidget {
     if (isDark) return context.theme.colors.primaryForeground;
     if (slot.serial == "-1") return TimetableColors.freeTimeBackground;
 
-    return slot.courseType.endsWith("LA")
+    return slot.islab()
         ? TimetableColors.labBackground
         : TimetableColors.lectureBackground;
   }
@@ -167,7 +168,7 @@ class TimetableCard extends HookConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color:
-                    slot.courseType.endsWith("LA")
+                    slot.islab()
                         ? const Color(0xFFE1F5FE)
                         : const Color(0xFFE8F4FD),
                 borderRadius: BorderRadius.circular(12),
@@ -176,23 +177,21 @@ class TimetableCard extends HookConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    slot.courseType.endsWith("LA")
-                        ? FIcons.flaskConical
-                        : FIcons.libraryBig,
+                    slot.islab() ? FIcons.flaskConical : FIcons.libraryBig,
                     size: 16,
                     color:
-                        slot.courseType.endsWith("LA")
+                        slot.islab()
                             ? const Color(0xFF0277BD)
                             : const Color(0xFF1565C0),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    slot.courseType.endsWith("LA") ? 'LAB' : 'LECTURE',
+                    slot.islab() ? 'LAB' : 'LECTURE',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color:
-                          slot.courseType.endsWith("LA")
+                          slot.islab()
                               ? const Color(0xFF0277BD)
                               : const Color(0xFF1565C0),
                     ),

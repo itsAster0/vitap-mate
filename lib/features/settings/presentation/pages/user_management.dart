@@ -321,8 +321,20 @@ class UserSemChange extends HookConsumerWidget {
                               ],
                             ),
                         loading:
-                            () => CircularProgressIndicator(
-                              color: context.theme.colors.primary,
+                            () => FDialog(
+                              body: Container(
+                                decoration: BoxDecoration(
+                                  color: context.theme.colors.primaryForeground,
+                                ),
+                                child: FCircularProgress(),
+                              ),
+                              actions: [
+                                FButton(
+                                  style: FButtonStyle.outline(),
+                                  onPress: () => Navigator.of(context).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                              ],
                             ),
                       );
                     },

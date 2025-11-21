@@ -20,6 +20,9 @@ sealed class AttendanceData with _$AttendanceData {
     required String semesterId,
     required BigInt updateTime,
   }) = _AttendanceData;
+
+  factory AttendanceData.fromJson(Map<String, dynamic> json) =>
+      _$AttendanceDataFromJson(json);
 }
 
 @freezed
@@ -39,6 +42,9 @@ sealed class AttendanceRecord with _$AttendanceRecord {
     required String debarStatus,
     required String courseId,
   }) = _AttendanceRecord;
+
+  factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
+      _$AttendanceRecordFromJson(json);
 }
 
 @freezed
@@ -49,6 +55,9 @@ sealed class ExamScheduleData with _$ExamScheduleData {
     required String semesterId,
     required BigInt updateTime,
   }) = _ExamScheduleData;
+
+  factory ExamScheduleData.fromJson(Map<String, dynamic> json) =>
+      _$ExamScheduleDataFromJson(json);
 }
 
 @freezed
@@ -69,6 +78,9 @@ sealed class ExamScheduleRecord with _$ExamScheduleRecord {
     required String seatLocation,
     required String seatNo,
   }) = _ExamScheduleRecord;
+
+  factory ExamScheduleRecord.fromJson(Map<String, dynamic> json) =>
+      _$ExamScheduleRecordFromJson(json);
 }
 
 @freezed
@@ -81,6 +93,9 @@ sealed class FullAttendanceData with _$FullAttendanceData {
     required String courseId,
     required String courseType,
   }) = _FullAttendanceData;
+
+  factory FullAttendanceData.fromJson(Map<String, dynamic> json) =>
+      _$FullAttendanceDataFromJson(json);
 }
 
 @freezed
@@ -94,6 +109,9 @@ sealed class FullAttendanceRecord with _$FullAttendanceRecord {
     required String status,
     required String remark,
   }) = _FullAttendanceRecord;
+
+  factory FullAttendanceRecord.fromJson(Map<String, dynamic> json) =>
+      _$FullAttendanceRecordFromJson(json);
 }
 
 @freezed
@@ -104,6 +122,9 @@ sealed class MarksData with _$MarksData {
     required String semesterId,
     required BigInt updateTime,
   }) = _MarksData;
+
+  factory MarksData.fromJson(Map<String, dynamic> json) =>
+      _$MarksDataFromJson(json);
 }
 
 @freezed
@@ -118,6 +139,9 @@ sealed class MarksRecord with _$MarksRecord {
     required String slot,
     required List<MarksRecordEach> marks,
   }) = _MarksRecord;
+
+  factory MarksRecord.fromJson(Map<String, dynamic> json) =>
+      _$MarksRecordFromJson(json);
 }
 
 @freezed
@@ -145,6 +169,9 @@ sealed class PerExamScheduleRecord with _$PerExamScheduleRecord {
     required List<ExamScheduleRecord> records,
     required String examType,
   }) = _PerExamScheduleRecord;
+
+  factory PerExamScheduleRecord.fromJson(Map<String, dynamic> json) =>
+      _$PerExamScheduleRecordFromJson(json);
 }
 
 @freezed
@@ -154,6 +181,9 @@ sealed class SemesterData with _$SemesterData {
     required List<SemesterInfo> semesters,
     required BigInt updateTime,
   }) = _SemesterData;
+
+  factory SemesterData.fromJson(Map<String, dynamic> json) =>
+      _$SemesterDataFromJson(json);
 }
 
 @freezed
@@ -161,6 +191,9 @@ sealed class SemesterData with _$SemesterData {
 sealed class SemesterInfo with _$SemesterInfo {
   const factory SemesterInfo({required String id, required String name}) =
       _SemesterInfo;
+
+  factory SemesterInfo.fromJson(Map<String, dynamic> json) =>
+      _$SemesterInfoFromJson(json);
 }
 
 @freezed
@@ -171,6 +204,9 @@ sealed class TimetableData with _$TimetableData {
     required String semesterId,
     required BigInt updateTime,
   }) = _TimetableData;
+
+  factory TimetableData.fromJson(Map<String, dynamic> json) =>
+      _$TimetableDataFromJson(json);
 }
 
 @freezed
@@ -189,4 +225,7 @@ sealed class TimetableSlot with _$TimetableSlot {
     required String name,
     bool? isLab,
   }) = _TimetableSlot;
+
+  factory TimetableSlot.fromJson(Map<String, dynamic> json) =>
+      _$TimetableSlotFromJson(json);
 }

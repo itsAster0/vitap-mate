@@ -1,10 +1,10 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_table.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -68,7 +68,7 @@ class AttendanceCard extends HookConsumerWidget {
   }
 
   BoxDecoration _buildCardDecoration(bool isDark, BuildContext context) {
-    final isLab = record.courseType.endsWith("LA");
+    final isLab = record.islab();
     return BoxDecoration(
       gradient:
           !isDark
@@ -164,7 +164,8 @@ class AttendanceCard extends HookConsumerWidget {
   }
 
   Widget _buildCourseIcon(bool isDark, BuildContext conntext) {
-    final isLab = record.courseType.endsWith("LA");
+    final isLab = record.islab();
+
     final iconColor =
         isLab ? AttendanceColors.labIcon : AttendanceColors.theoryIcon;
 
