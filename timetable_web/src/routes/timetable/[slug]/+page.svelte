@@ -46,7 +46,7 @@
     <div class="flex flex-col items-center justify-center h-screen">
         <h1>Error: {error}</h1>
         <br />
-        <p>Invalid Url ? Url expired</p>
+        <p>Invalid Url / Url expired</p>
     </div>
 {:else}
     <Timetable data={result} />
