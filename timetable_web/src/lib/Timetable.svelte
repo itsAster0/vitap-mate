@@ -21,6 +21,7 @@
         TabsList,
         TabsTrigger,
     } from "$lib/components/ui/tabs";
+    import Theme from "./theme.svelte";
 
     export let data;
 
@@ -51,68 +52,89 @@
     };
 </script>
 
-<Card class="p-4 space-y-4">
-    <CardHeader>
-        <CardTitle class="text-xl font-semibold">
-            Timetable — {getSemName(data?.timetable?.semesterId)}
-        </CardTitle>
-    </CardHeader>
+<div class="no-scrollbar">
+    <Card class="p-4 space-y-4 w-full max-w-full h-screen ">
+        <CardHeader>
+            <CardTitle class="text-lg md:text-xl font-semibold">
+                <div class="flex items-end justify-evenly">
+                    <div class="flex-1">
+                        Timetable — {getSemName(data?.timetable?.semesterId)}
+                    </div>
 
-    <CardContent class="h-screen">
-        <Tabs bind:value={activeTab} class="flex items-center justify-center">
-            <TabsList class="mb-4 flex space-x-4">
+                    <Theme />
+                </div>
+            </CardTitle>
+        </CardHeader>
+
+        <CardContent class="w-full  grid-flow-col">
+            <Tabs bind:value={activeTab} class="w-full">
+                <TabsList
+                    class="mb-4 flex space-x-3 overflow-x-auto  justify-center items-center-safe w-full no-scrollbar"
+                >
+                    {#each days as day}
+                        <TabsTrigger
+                            value={day}
+                            class="whitespace-nowrap px-3 py-1 text-sm md:text-base"
+                        >
+                            {day}
+                        </TabsTrigger>
+                    {/each}
+                </TabsList>
+
                 {#each days as day}
-                    <TabsTrigger value={day}>{day}</TabsTrigger>
+                    <TabsContent value={day} class="w-full ">
+                        <div class="overflow-x-auto no-scrollbar">
+                            <Table
+                                class="min-w-[600px] md:min-w-0 w-full no-scrollbar"
+                            >
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Time</TableHead>
+                                        <TableHead>Course</TableHead>
+                                        <TableHead>Code</TableHead>
+                                        <TableHead>Room</TableHead>
+                                        <TableHead>Type</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+
+                                <TableBody>
+                                    {#each sortByTime(slots.filter((s) => s.day === day)) as slot}
+                                        <TableRow>
+                                            <TableCell class="font-medium">
+                                                {slot.startTime} – {slot.endTime}
+                                            </TableCell>
+
+                                            <TableCell>{slot.name}</TableCell>
+
+                                            <TableCell>
+                                                <Badge>{slot.courseCode}</Badge>
+                                            </TableCell>
+
+                                            <TableCell>{slot.roomNo}</TableCell>
+
+                                            <TableCell>
+                                                {#if isLab(slot.courseType)}
+                                                    <Badge
+                                                        variant="destructive"
+                                                    >
+                                                        LAB
+                                                    </Badge>
+                                                {:else}
+                                                    <Badge>THEORY</Badge>
+                                                {/if}
+                                            </TableCell>
+                                        </TableRow>
+                                    {/each}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </TabsContent>
                 {/each}
-            </TabsList>
+            </Tabs>
+        </CardContent>
 
-            {#each days as day}
-                <TabsContent value={day}>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Time</TableHead>
-                                <TableHead>Course</TableHead>
-                                <TableHead>Code</TableHead>
-                                <TableHead>Room</TableHead>
-                                <TableHead>Type</TableHead>
-                            </TableRow>
-                        </TableHeader>
-
-                        <TableBody>
-                            {#each sortByTime(slots.filter((s) => s.day === day)) as slot}
-                                <TableRow>
-                                    <TableCell class="font-medium">
-                                        {slot.startTime} – {slot.endTime}
-                                    </TableCell>
-
-                                    <TableCell>{slot.name}</TableCell>
-
-                                    <TableCell>
-                                        <Badge>{slot.courseCode}</Badge>
-                                    </TableCell>
-
-                                    <TableCell>{slot.roomNo}</TableCell>
-
-                                    <TableCell>
-                                        {#if isLab(slot.courseType)}
-                                            <Badge variant="destructive"
-                                                >LAB</Badge
-                                            >
-                                        {:else}
-                                            <Badge>THEORY</Badge>
-                                        {/if}
-                                    </TableCell>
-                                </TableRow>
-                            {/each}
-                        </TableBody>
-                    </Table>
-                </TabsContent>
-            {/each}
-        </Tabs>
-    </CardContent>
-
-    <CardFooter class="text-sm text-muted-foreground">
-        Last updated: {updateTime}
-    </CardFooter>
-</Card>
+        <CardFooter class="text-xs md:text-sm text-muted-foreground">
+            Last updated: {updateTime}
+        </CardFooter>
+    </Card>
+</div>
