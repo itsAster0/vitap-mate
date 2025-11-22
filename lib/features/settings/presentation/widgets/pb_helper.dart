@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -18,20 +17,9 @@ class PbHelper extends ConsumerWidget {
     return data.when(
       data: (pb) {
         if (!pb.authStore.isValid) {
-          return FDialog(
-            title: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ShowLogin(pb: pb),
-            ),
-            actions: [
-              FButton(
-                style: FButtonStyle.secondary(),
-                onPress: () {
-                  GoRouter.of(context).pop();
-                },
-                child: Text("cancel"),
-              ),
-            ],
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ShowLogin(pb: pb),
           );
         }
         return child(pb);

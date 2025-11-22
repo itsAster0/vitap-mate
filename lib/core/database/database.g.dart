@@ -375,6 +375,29 @@ class $TimetableTableTable extends TimetableTable
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isLabMeta = const VerificationMeta('isLab');
+  @override
+  late final GeneratedColumn<bool> isLab = GeneratedColumn<bool>(
+    'is_lab',
+    aliasedName,
+    true,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_lab" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _facultyMeta = const VerificationMeta(
+    'faculty',
+  );
+  @override
+  late final GeneratedColumn<String> faculty = GeneratedColumn<String>(
+    'faculty',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _semIdMeta = const VerificationMeta('semId');
   @override
   late final GeneratedColumn<String> semId = GeneratedColumn<String>(
@@ -408,6 +431,8 @@ class $TimetableTableTable extends TimetableTable
     block,
     startTime,
     endTime,
+    isLab,
+    faculty,
     semId,
     time,
   ];
@@ -503,6 +528,18 @@ class $TimetableTableTable extends TimetableTable
     } else if (isInserting) {
       context.missing(_endTimeMeta);
     }
+    if (data.containsKey('is_lab')) {
+      context.handle(
+        _isLabMeta,
+        isLab.isAcceptableOrUnknown(data['is_lab']!, _isLabMeta),
+      );
+    }
+    if (data.containsKey('faculty')) {
+      context.handle(
+        _facultyMeta,
+        faculty.isAcceptableOrUnknown(data['faculty']!, _facultyMeta),
+      );
+    }
     if (data.containsKey('sem_id')) {
       context.handle(
         _semIdMeta,
@@ -582,6 +619,14 @@ class $TimetableTableTable extends TimetableTable
             DriftSqlType.string,
             data['${effectivePrefix}end_time'],
           )!,
+      isLab: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_lab'],
+      ),
+      faculty: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}faculty'],
+      ),
       semId:
           attachedDatabase.typeMapping.read(
             DriftSqlType.string,
@@ -613,6 +658,8 @@ class TimetableTableData extends DataClass
   final String block;
   final String startTime;
   final String endTime;
+  final bool? isLab;
+  final String? faculty;
   final String semId;
   final int time;
   const TimetableTableData({
@@ -626,6 +673,8 @@ class TimetableTableData extends DataClass
     required this.block,
     required this.startTime,
     required this.endTime,
+    this.isLab,
+    this.faculty,
     required this.semId,
     required this.time,
   });
@@ -642,6 +691,12 @@ class TimetableTableData extends DataClass
     map['block'] = Variable<String>(block);
     map['start_time'] = Variable<String>(startTime);
     map['end_time'] = Variable<String>(endTime);
+    if (!nullToAbsent || isLab != null) {
+      map['is_lab'] = Variable<bool>(isLab);
+    }
+    if (!nullToAbsent || faculty != null) {
+      map['faculty'] = Variable<String>(faculty);
+    }
     map['sem_id'] = Variable<String>(semId);
     map['time'] = Variable<int>(time);
     return map;
@@ -659,6 +714,12 @@ class TimetableTableData extends DataClass
       block: Value(block),
       startTime: Value(startTime),
       endTime: Value(endTime),
+      isLab:
+          isLab == null && nullToAbsent ? const Value.absent() : Value(isLab),
+      faculty:
+          faculty == null && nullToAbsent
+              ? const Value.absent()
+              : Value(faculty),
       semId: Value(semId),
       time: Value(time),
     );
@@ -680,6 +741,8 @@ class TimetableTableData extends DataClass
       block: serializer.fromJson<String>(json['block']),
       startTime: serializer.fromJson<String>(json['startTime']),
       endTime: serializer.fromJson<String>(json['endTime']),
+      isLab: serializer.fromJson<bool?>(json['isLab']),
+      faculty: serializer.fromJson<String?>(json['faculty']),
       semId: serializer.fromJson<String>(json['semId']),
       time: serializer.fromJson<int>(json['time']),
     );
@@ -698,6 +761,8 @@ class TimetableTableData extends DataClass
       'block': serializer.toJson<String>(block),
       'startTime': serializer.toJson<String>(startTime),
       'endTime': serializer.toJson<String>(endTime),
+      'isLab': serializer.toJson<bool?>(isLab),
+      'faculty': serializer.toJson<String?>(faculty),
       'semId': serializer.toJson<String>(semId),
       'time': serializer.toJson<int>(time),
     };
@@ -714,6 +779,8 @@ class TimetableTableData extends DataClass
     String? block,
     String? startTime,
     String? endTime,
+    Value<bool?> isLab = const Value.absent(),
+    Value<String?> faculty = const Value.absent(),
     String? semId,
     int? time,
   }) => TimetableTableData(
@@ -727,6 +794,8 @@ class TimetableTableData extends DataClass
     block: block ?? this.block,
     startTime: startTime ?? this.startTime,
     endTime: endTime ?? this.endTime,
+    isLab: isLab.present ? isLab.value : this.isLab,
+    faculty: faculty.present ? faculty.value : this.faculty,
     semId: semId ?? this.semId,
     time: time ?? this.time,
   );
@@ -745,6 +814,8 @@ class TimetableTableData extends DataClass
       block: data.block.present ? data.block.value : this.block,
       startTime: data.startTime.present ? data.startTime.value : this.startTime,
       endTime: data.endTime.present ? data.endTime.value : this.endTime,
+      isLab: data.isLab.present ? data.isLab.value : this.isLab,
+      faculty: data.faculty.present ? data.faculty.value : this.faculty,
       semId: data.semId.present ? data.semId.value : this.semId,
       time: data.time.present ? data.time.value : this.time,
     );
@@ -763,6 +834,8 @@ class TimetableTableData extends DataClass
           ..write('block: $block, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
+          ..write('isLab: $isLab, ')
+          ..write('faculty: $faculty, ')
           ..write('semId: $semId, ')
           ..write('time: $time')
           ..write(')'))
@@ -781,6 +854,8 @@ class TimetableTableData extends DataClass
     block,
     startTime,
     endTime,
+    isLab,
+    faculty,
     semId,
     time,
   );
@@ -798,6 +873,8 @@ class TimetableTableData extends DataClass
           other.block == this.block &&
           other.startTime == this.startTime &&
           other.endTime == this.endTime &&
+          other.isLab == this.isLab &&
+          other.faculty == this.faculty &&
           other.semId == this.semId &&
           other.time == this.time);
 }
@@ -813,6 +890,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
   final Value<String> block;
   final Value<String> startTime;
   final Value<String> endTime;
+  final Value<bool?> isLab;
+  final Value<String?> faculty;
   final Value<String> semId;
   final Value<int> time;
   final Value<int> rowid;
@@ -827,6 +906,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
     this.block = const Value.absent(),
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
+    this.isLab = const Value.absent(),
+    this.faculty = const Value.absent(),
     this.semId = const Value.absent(),
     this.time = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -842,6 +923,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
     required String block,
     required String startTime,
     required String endTime,
+    this.isLab = const Value.absent(),
+    this.faculty = const Value.absent(),
     required String semId,
     required int time,
     this.rowid = const Value.absent(),
@@ -868,6 +951,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
     Expression<String>? block,
     Expression<String>? startTime,
     Expression<String>? endTime,
+    Expression<bool>? isLab,
+    Expression<String>? faculty,
     Expression<String>? semId,
     Expression<int>? time,
     Expression<int>? rowid,
@@ -883,6 +968,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
       if (block != null) 'block': block,
       if (startTime != null) 'start_time': startTime,
       if (endTime != null) 'end_time': endTime,
+      if (isLab != null) 'is_lab': isLab,
+      if (faculty != null) 'faculty': faculty,
       if (semId != null) 'sem_id': semId,
       if (time != null) 'time': time,
       if (rowid != null) 'rowid': rowid,
@@ -900,6 +987,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
     Value<String>? block,
     Value<String>? startTime,
     Value<String>? endTime,
+    Value<bool?>? isLab,
+    Value<String?>? faculty,
     Value<String>? semId,
     Value<int>? time,
     Value<int>? rowid,
@@ -915,6 +1004,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
       block: block ?? this.block,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      isLab: isLab ?? this.isLab,
+      faculty: faculty ?? this.faculty,
       semId: semId ?? this.semId,
       time: time ?? this.time,
       rowid: rowid ?? this.rowid,
@@ -954,6 +1045,12 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
     if (endTime.present) {
       map['end_time'] = Variable<String>(endTime.value);
     }
+    if (isLab.present) {
+      map['is_lab'] = Variable<bool>(isLab.value);
+    }
+    if (faculty.present) {
+      map['faculty'] = Variable<String>(faculty.value);
+    }
     if (semId.present) {
       map['sem_id'] = Variable<String>(semId.value);
     }
@@ -979,6 +1076,8 @@ class TimetableTableCompanion extends UpdateCompanion<TimetableTableData> {
           ..write('block: $block, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
+          ..write('isLab: $isLab, ')
+          ..write('faculty: $faculty, ')
           ..write('semId: $semId, ')
           ..write('time: $time, ')
           ..write('rowid: $rowid')
@@ -4711,6 +4810,8 @@ typedef $$TimetableTableTableCreateCompanionBuilder =
       required String block,
       required String startTime,
       required String endTime,
+      Value<bool?> isLab,
+      Value<String?> faculty,
       required String semId,
       required int time,
       Value<int> rowid,
@@ -4727,6 +4828,8 @@ typedef $$TimetableTableTableUpdateCompanionBuilder =
       Value<String> block,
       Value<String> startTime,
       Value<String> endTime,
+      Value<bool?> isLab,
+      Value<String?> faculty,
       Value<String> semId,
       Value<int> time,
       Value<int> rowid,
@@ -4824,6 +4927,16 @@ class $$TimetableTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isLab => $composableBuilder(
+    column: $table.isLab,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get faculty => $composableBuilder(
+    column: $table.faculty,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get time => $composableBuilder(
     column: $table.time,
     builder: (column) => ColumnFilters(column),
@@ -4912,6 +5025,16 @@ class $$TimetableTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isLab => $composableBuilder(
+    column: $table.isLab,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get faculty => $composableBuilder(
+    column: $table.faculty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get time => $composableBuilder(
     column: $table.time,
     builder: (column) => ColumnOrderings(column),
@@ -4986,6 +5109,12 @@ class $$TimetableTableTableAnnotationComposer
   GeneratedColumn<String> get endTime =>
       $composableBuilder(column: $table.endTime, builder: (column) => column);
 
+  GeneratedColumn<bool> get isLab =>
+      $composableBuilder(column: $table.isLab, builder: (column) => column);
+
+  GeneratedColumn<String> get faculty =>
+      $composableBuilder(column: $table.faculty, builder: (column) => column);
+
   GeneratedColumn<int> get time =>
       $composableBuilder(column: $table.time, builder: (column) => column);
 
@@ -5057,6 +5186,8 @@ class $$TimetableTableTableTableManager
                 Value<String> block = const Value.absent(),
                 Value<String> startTime = const Value.absent(),
                 Value<String> endTime = const Value.absent(),
+                Value<bool?> isLab = const Value.absent(),
+                Value<String?> faculty = const Value.absent(),
                 Value<String> semId = const Value.absent(),
                 Value<int> time = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -5071,6 +5202,8 @@ class $$TimetableTableTableTableManager
                 block: block,
                 startTime: startTime,
                 endTime: endTime,
+                isLab: isLab,
+                faculty: faculty,
                 semId: semId,
                 time: time,
                 rowid: rowid,
@@ -5087,6 +5220,8 @@ class $$TimetableTableTableTableManager
                 required String block,
                 required String startTime,
                 required String endTime,
+                Value<bool?> isLab = const Value.absent(),
+                Value<String?> faculty = const Value.absent(),
                 required String semId,
                 required int time,
                 Value<int> rowid = const Value.absent(),
@@ -5101,6 +5236,8 @@ class $$TimetableTableTableTableManager
                 block: block,
                 startTime: startTime,
                 endTime: endTime,
+                isLab: isLab,
+                faculty: faculty,
                 semId: semId,
                 time: time,
                 rowid: rowid,

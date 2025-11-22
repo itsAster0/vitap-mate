@@ -14,6 +14,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
         end_time: String,
     }
     let mut classname_code: HashMap<String, String> = HashMap::new();
+    let mut facultyname_code: HashMap<String, String> = HashMap::new();
     let document = Html::parse_document(&html);
     let rows_selector = Selector::parse("tr").unwrap();
     let mut timetables: Vec<TimetableSlot> = Vec::new();
@@ -49,7 +50,17 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                         .trim()
                         .to_string();
                     if !classname_code.contains_key(&code) {
-                        classname_code.insert(code, name);
+                        classname_code.insert(code.clone(), name);
+                    }
+                    let faculty_name = cells[8]
+                        .text()
+                        .collect::<Vec<_>>()
+                        .join("")
+                        .trim()
+                        .replace("\t", "")
+                        .replace("\n", "");
+                    if !facultyname_code.contains_key(&code) {
+                        facultyname_code.insert(code, faculty_name);
                     }
                 }
             }
@@ -96,7 +107,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                     .replace("\t", "")
                                     .replace("\n", "");
                             }
-                        } else  if count_for_offset == 2 {
+                        } else if count_for_offset == 2 {
                             let timeing = Timeing {
                                 serial: index.to_string(),
                                 start_time: val
@@ -155,8 +166,11 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                         .get(&code)
                                         .unwrap_or(&"".to_string())
                                         .to_string(),
-                                    is_lab: Some(!count_for_offset % 2 == 0),
-                                
+                                    is_lab: !count_for_offset % 2 == 0,
+                                    faculty: facultyname_code
+                                        .get(&code)
+                                        .unwrap_or(&"".to_string())
+                                        .to_string(),
                                 };
                                 timetables.push(class);
                             }
@@ -177,21 +191,25 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
         };
     }
     for timetable in &mut timetables {
-        if let Some(times) = timeings_temp_th.iter().find(|t| t.serial == timetable.serial) {
-            if !timetable.is_lab.unwrap(){
-       timetable.start_time = times.start_time.clone();
-            timetable.end_time = times.end_time.clone();
+        if let Some(times) = timeings_temp_th
+            .iter()
+            .find(|t| t.serial == timetable.serial)
+        {
+            if !timetable.is_lab {
+                timetable.start_time = times.start_time.clone();
+                timetable.end_time = times.end_time.clone();
             }
-       
         }
     }
-        for timetable in &mut timetables {
-        if let Some(times) = timeings_temp_lab.iter().find(|t| t.serial == timetable.serial) {
-            if timetable.is_lab.unwrap(){
-       timetable.start_time = times.start_time.clone();
-            timetable.end_time = times.end_time.clone();
+    for timetable in &mut timetables {
+        if let Some(times) = timeings_temp_lab
+            .iter()
+            .find(|t| t.serial == timetable.serial)
+        {
+            if timetable.is_lab {
+                timetable.start_time = times.start_time.clone();
+                timetable.end_time = times.end_time.clone();
             }
-       
         }
     }
 

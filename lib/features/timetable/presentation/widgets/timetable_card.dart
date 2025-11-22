@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
@@ -107,6 +108,16 @@ class TimetableCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final controller = useAnimationController(
+      duration: const Duration(milliseconds: 300),
+    );
+
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeInOut,
+    );
+
+    final isExpanded = useState(false);
 
     final status =
         slot.serial != "-1"
@@ -117,38 +128,44 @@ class TimetableCard extends HookConsumerWidget {
     final isHighlighted =
         status == ClassStatus.ongoing || status == ClassStatus.nextClass;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        decoration: BoxDecoration(
-          color: getCardBackgroundColor(darkMode, context),
-          borderRadius: BorderRadius.circular(12),
-          border:
-              statusStyle != null && isHighlighted
-                  ? Border.all(color: statusStyle.$1, width: 2)
-                  : null,
-          boxShadow:
-              darkMode
-                  ? null
-                  : [
-                    BoxShadow(
-                      color:
-                          isHighlighted
-                              ? TimetableColors.statusShadow
-                              : TimetableColors.cardShadow,
-                      blurRadius: isHighlighted ? 8 : 6,
-                      offset: const Offset(0, 2),
-                      spreadRadius: isHighlighted ? 1 : 0,
-                    ),
-                  ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child:
-              slot.serial != "-1"
-                  ? _buildClassCard(darkMode, context, statusStyle)
-                  : _buildFreeTimeCard(darkMode, context),
+    return GestureDetector(
+      onTap: () {
+        isExpanded.value = !isExpanded.value;
+        isExpanded.value ? controller.forward() : controller.reverse();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          decoration: BoxDecoration(
+            color: getCardBackgroundColor(darkMode, context),
+            borderRadius: BorderRadius.circular(12),
+            border:
+                statusStyle != null && isHighlighted
+                    ? Border.all(color: statusStyle.$1, width: 2)
+                    : null,
+            boxShadow:
+                darkMode
+                    ? null
+                    : [
+                      BoxShadow(
+                        color:
+                            isHighlighted
+                                ? TimetableColors.statusShadow
+                                : TimetableColors.cardShadow,
+                        blurRadius: isHighlighted ? 8 : 6,
+                        offset: const Offset(0, 2),
+                        spreadRadius: isHighlighted ? 1 : 0,
+                      ),
+                    ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child:
+                slot.serial != "-1"
+                    ? _buildClassCard(darkMode, context, statusStyle, animation)
+                    : _buildFreeTimeCard(darkMode, context),
+          ),
         ),
       ),
     );
@@ -158,6 +175,7 @@ class TimetableCard extends HookConsumerWidget {
     bool isDark,
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
+    CurvedAnimation animation,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,6 +309,33 @@ class TimetableCard extends HookConsumerWidget {
             ),
           ],
         ),
+
+        SizeTransition(
+          sizeFactor: animation,
+          axisAlignment: -1.0,
+          child: Column(
+            children: [
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailChip(
+                      isDark,
+                      context,
+                      icon: FIcons.contact,
+                      text: formateFaculityName(slot.faculty),
+                      color:
+                          isDark
+                              ? context.theme.colors.primary
+                              : const Color(0xFF374151),
+                      isBold: true,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -414,4 +459,15 @@ String to12H(String time) {
   }
 
   return "$hours:${list[1]} $period";
+}
+
+String formateFaculityName(String value) {
+  try {
+    String delimiter = "-";
+    int lastIndex = value.lastIndexOf(delimiter);
+    String partBefore = value.substring(0, lastIndex);
+    return partBefore;
+  } catch (_) {
+    return value;
+  }
 }

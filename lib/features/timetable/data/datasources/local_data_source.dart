@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:vitapmate/core/database/database.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/features/timetable/data/models/timetable_model.dart';
@@ -45,6 +46,8 @@ class TimetableLocalDataSource {
               endTime: i.endTime,
               semId: timetable.semesterId,
               time: timetable.updateTime.toInt(),
+              faculty: Value(i.faculty),
+              isLab: Value(i.isLab),
             ),
         ]);
       })),

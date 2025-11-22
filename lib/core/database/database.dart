@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:vitapmate/core/database/tables/tables.dart';
 import 'package:drift_flutter/drift_flutter.dart';
-// ignore: depend_on_referenced_packages
 import 'package:path_provider/path_provider.dart';
 part 'database.g.dart';
 
@@ -20,7 +19,21 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openConnection(username));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (Migrator m) async {
+        await m.createAll();
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        if (from < 2) {
+          await m.addColumn(timetableTable, timetableTable.isLab);
+          await m.addColumn(timetableTable, timetableTable.faculty);
+        }
+      },
+    );
+  }
 
   static QueryExecutor _openConnection(String? name) {
     return driftDatabase(

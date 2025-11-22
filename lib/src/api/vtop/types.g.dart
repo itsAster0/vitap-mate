@@ -283,7 +283,8 @@ _TimetableSlot _$TimetableSlotFromJson(Map<String, dynamic> json) =>
       startTime: json['startTime'] as String,
       endTime: json['endTime'] as String,
       name: json['name'] as String,
-      isLab: json['isLab'] as bool?,
+      isLab: json['isLab'] as bool,
+      faculty: json['faculty'] as String,
     );
 
 Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
@@ -299,4 +300,5 @@ Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
       'endTime': instance.endTime,
       'name': instance.name,
       'isLab': instance.isLab,
+      'faculty': instance.faculty,
     };

@@ -7,26 +7,25 @@ part of 'pb_links.dart';
 // **************************************************************************
 
 String _$getTimetableSharesLinksHash() =>
-    r'f7fd52d72f8d664a857738600936fcf0f11d2c4d';
+    r'57423445ba4eecc9071a405b40fd490e5eec06e9';
 
 /// See also [getTimetableSharesLinks].
 @ProviderFor(getTimetableSharesLinks)
-final getTimetableSharesLinksProvider =
-    AutoDisposeFutureProvider<List>.internal(
-      getTimetableSharesLinks,
-      name: r'getTimetableSharesLinksProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$getTimetableSharesLinksHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final getTimetableSharesLinksProvider = FutureProvider<List>.internal(
+  getTimetableSharesLinks,
+  name: r'getTimetableSharesLinksProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$getTimetableSharesLinksHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef GetTimetableSharesLinksRef = AutoDisposeFutureProviderRef<List>;
-String _$createTimetabledbHash() => r'd5ccc3b8da017323ab9619102ff5cefc86e98c8d';
+typedef GetTimetableSharesLinksRef = FutureProviderRef<List>;
+String _$createTimetabledbHash() => r'2831ff419b5dc29d9743406318eb0fc7bfe39420';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -54,7 +53,7 @@ class _SystemHash {
 const createTimetabledbProvider = CreateTimetabledbFamily();
 
 /// See also [createTimetabledb].
-class CreateTimetabledbFamily extends Family<AsyncValue<void>> {
+class CreateTimetabledbFamily extends Family<AsyncValue<String?>> {
   /// See also [createTimetabledb].
   const CreateTimetabledbFamily();
 
@@ -86,7 +85,7 @@ class CreateTimetabledbFamily extends Family<AsyncValue<void>> {
 }
 
 /// See also [createTimetabledb].
-class CreateTimetabledbProvider extends AutoDisposeFutureProvider<void> {
+class CreateTimetabledbProvider extends AutoDisposeFutureProvider<String?> {
   /// See also [createTimetabledb].
   CreateTimetabledbProvider(TimetableData ttData)
     : this._internal(
@@ -117,7 +116,7 @@ class CreateTimetabledbProvider extends AutoDisposeFutureProvider<void> {
 
   @override
   Override overrideWith(
-    FutureOr<void> Function(CreateTimetabledbRef provider) create,
+    FutureOr<String?> Function(CreateTimetabledbRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
@@ -134,7 +133,7 @@ class CreateTimetabledbProvider extends AutoDisposeFutureProvider<void> {
   }
 
   @override
-  AutoDisposeFutureProviderElement<void> createElement() {
+  AutoDisposeFutureProviderElement<String?> createElement() {
     return _CreateTimetabledbProviderElement(this);
   }
 
@@ -154,13 +153,13 @@ class CreateTimetabledbProvider extends AutoDisposeFutureProvider<void> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin CreateTimetabledbRef on AutoDisposeFutureProviderRef<void> {
+mixin CreateTimetabledbRef on AutoDisposeFutureProviderRef<String?> {
   /// The parameter `ttData` of this provider.
   TimetableData get ttData;
 }
 
 class _CreateTimetabledbProviderElement
-    extends AutoDisposeFutureProviderElement<void>
+    extends AutoDisposeFutureProviderElement<String?>
     with CreateTimetabledbRef {
   _CreateTimetabledbProviderElement(super.provider);
 

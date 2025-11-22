@@ -223,7 +223,8 @@ sealed class TimetableSlot with _$TimetableSlot {
     required String startTime,
     required String endTime,
     required String name,
-    bool? isLab,
+    required bool isLab,
+    required String faculty,
   }) = _TimetableSlot;
 
   factory TimetableSlot.fromJson(Map<String, dynamic> json) =>

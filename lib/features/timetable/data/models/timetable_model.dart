@@ -16,6 +16,8 @@ class TimetableModel {
         serial: "${i.serial}",
         slot: i.slot,
         startTime: i.startTime,
+        isLab: i.isLab ?? false,
+        faculty: i.faculty ?? "",
       );
       sub.add(temp);
     }

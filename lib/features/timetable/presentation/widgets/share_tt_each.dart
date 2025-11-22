@@ -3,14 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-
 import 'package:vitapmate/features/timetable/presentation/providers/pb_links.dart';
 
 class ShareTtEach extends HookConsumerWidget {
   final List url;
   final String name;
-  final bool selectedTt;
+
   final String timetableId;
   final int updateTime;
   const ShareTtEach({
@@ -19,7 +19,6 @@ class ShareTtEach extends HookConsumerWidget {
     required this.name,
     required this.updateTime,
     required this.timetableId,
-    required this.selectedTt,
   });
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -112,7 +111,7 @@ class ShareTtEach extends HookConsumerWidget {
         }
       }
 
-      handler(() async {
+      await handler(() async {
         await ref.read(createTimetablelinkdbProvider(timetableId).future);
       });
     }
@@ -124,80 +123,54 @@ class ShareTtEach extends HookConsumerWidget {
       });
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: selectedTt ? colors.primaryForeground : colors.background,
-        borderRadius: const BorderRadius.all(Radius.circular(8)),
-        border: Border.all(
-          color: selectedTt ? colors.primary : colors.secondary,
-          width: 1.5,
-        ),
-      ),
-
-      width: MediaQuery.of(context).size.width,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          spacing: 4,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.6,
-                  ),
-                  child: Text(
-                    maxLines: 1,
-                    name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: colors.primary,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              spacing: 5,
-              children: [
-                FButton.icon(
-                  onPress: handelReload,
-                  child: iconOrLoading(Icon(Icons.replay)),
-                ),
-                if (isLinkAvilable)
-                  FButton.icon(
-                    onPress: () async {
-                      await Clipboard.setData(
-                        ClipboardData(
-                          text: "https://va.synaptic.gg/timetable/$selectedurl",
-                        ),
-                      );
-                    },
-                    child: iconOrLoading(Icon(Icons.share)),
-                  ),
-                if (isLinkAvilable)
-                  FButton.icon(
-                    style: FButtonStyle.destructive(),
-                    onPress: handeldel,
-                    child: iconOrLoading(Icon(Icons.delete)),
-                  ),
-              ],
-            ),
-            Text(
-              "Last updated: ${formatUnixTimestamp(updateTime.toInt())}",
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: context.theme.colors.primary,
-                fontWeight: FontWeight.w500,
+    final urlShare = "https://va.synaptic.gg/timetable/$selectedurl";
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        spacing: 8,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            spacing: 5,
+            children: [
+              FButton.icon(
+                onPress: handelReload,
+                child: iconOrLoading(Icon(Icons.replay)),
               ),
+              if (isLinkAvilable)
+                FButton.icon(
+                  onPress: () async {
+                    await SharePlus.instance.share(
+                      ShareParams(text: 'check out my timetable "$urlShare"'),
+                    );
+                  },
+                  child: iconOrLoading(Icon(Icons.share)),
+                ),
+              if (isLinkAvilable)
+                FButton.icon(
+                  onPress: () async {
+                    await Clipboard.setData(ClipboardData(text: urlShare));
+                  },
+                  child: iconOrLoading(Icon(Icons.copy)),
+                ),
+              if (isLinkAvilable)
+                FButton.icon(
+                  style: FButtonStyle.destructive(),
+                  onPress: handeldel,
+                  child: iconOrLoading(Icon(Icons.delete)),
+                ),
+            ],
+          ),
+          Text(
+            "Last updated: ${formatUnixTimestamp(updateTime.toInt())}",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: context.theme.colors.primary,
+              fontWeight: FontWeight.w500,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

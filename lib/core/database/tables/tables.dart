@@ -20,6 +20,8 @@ class TimetableTable extends Table {
   TextColumn get block => text()();
   TextColumn get startTime => text()();
   TextColumn get endTime => text()();
+  BoolColumn get isLab => boolean().nullable()();
+  TextColumn get faculty => text().nullable()();
   TextColumn get semId => text().references(SemesterTable, #semid)();
   IntColumn get time => integer()();
 

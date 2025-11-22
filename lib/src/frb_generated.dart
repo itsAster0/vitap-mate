@@ -2541,12 +2541,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool dco_decode_box_autoadd_bool(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw as bool;
-  }
-
-  @protected
   VtopConfig dco_decode_box_autoadd_vtop_config(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_vtop_config(raw);
@@ -2742,12 +2736,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null ? null : dco_decode_box_autoadd_bool(raw);
-  }
-
-  @protected
   PerExamScheduleRecord dco_decode_per_exam_schedule_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -2810,8 +2798,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TimetableSlot dco_decode_timetable_slot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 11)
-      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    if (arr.length != 12)
+      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return TimetableSlot(
       serial: dco_decode_String(arr[0]),
       day: dco_decode_String(arr[1]),
@@ -2823,7 +2811,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       startTime: dco_decode_String(arr[7]),
       endTime: dco_decode_String(arr[8]),
       name: dco_decode_String(arr[9]),
-      isLab: dco_decode_opt_box_autoadd_bool(arr[10]),
+      isLab: dco_decode_bool(arr[10]),
+      faculty: dco_decode_String(arr[11]),
     );
   }
 
@@ -3287,12 +3276,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return (sse_decode_bool(deserializer));
-  }
-
-  @protected
   VtopConfig sse_decode_box_autoadd_vtop_config(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_vtop_config(deserializer));
@@ -3578,17 +3561,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    if (sse_decode_bool(deserializer)) {
-      return (sse_decode_box_autoadd_bool(deserializer));
-    } else {
-      return null;
-    }
-  }
-
-  @protected
   PerExamScheduleRecord sse_decode_per_exam_schedule_record(
     SseDeserializer deserializer,
   ) {
@@ -3648,7 +3620,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_startTime = sse_decode_String(deserializer);
     var var_endTime = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
-    var var_isLab = sse_decode_opt_box_autoadd_bool(deserializer);
+    var var_isLab = sse_decode_bool(deserializer);
+    var var_faculty = sse_decode_String(deserializer);
     return TimetableSlot(
       serial: var_serial,
       day: var_day,
@@ -3661,6 +3634,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       endTime: var_endTime,
       name: var_name,
       isLab: var_isLab,
+      faculty: var_faculty,
     );
   }
 
@@ -4146,12 +4120,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_bool(self, serializer);
-  }
-
-  @protected
   void sse_encode_box_autoadd_vtop_config(
     VtopConfig self,
     SseSerializer serializer,
@@ -4378,16 +4346,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-
-    sse_encode_bool(self != null, serializer);
-    if (self != null) {
-      sse_encode_box_autoadd_bool(self, serializer);
-    }
-  }
-
-  @protected
   void sse_encode_per_exam_schedule_record(
     PerExamScheduleRecord self,
     SseSerializer serializer,
@@ -4442,7 +4400,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.startTime, serializer);
     sse_encode_String(self.endTime, serializer);
     sse_encode_String(self.name, serializer);
-    sse_encode_opt_box_autoadd_bool(self.isLab, serializer);
+    sse_encode_bool(self.isLab, serializer);
+    sse_encode_String(self.faculty, serializer);
   }
 
   @protected

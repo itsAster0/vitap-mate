@@ -265,6 +265,8 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
           startTime: cClass,
           endTime: nClass,
           name: "-",
+          isLab: false,
+          faculty: '',
         ),
       );
     }

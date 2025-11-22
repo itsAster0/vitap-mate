@@ -104,7 +104,7 @@ class AttendanceTable extends HookConsumerWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "by $name",
+              name,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -116,7 +116,7 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
           if (!isLoading.value)
-            FButton.icon(onPress: callback, child: Icon(FIcons.rotateCcw)),
+            FTappable(onPress: callback, child: Icon(FIcons.rotateCcw)),
           if (isLoading.value) FCircularProgress.pinwheel(),
         ],
       ),
