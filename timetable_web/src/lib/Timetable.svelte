@@ -37,6 +37,20 @@
     function sortByTime(list) {
         return list.sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
+
+    function formatFacultyName(value: string) {
+        try {
+            const delimiter = "-";
+            const lastIndex = value.lastIndexOf(delimiter);
+
+            if (lastIndex === -1) return value;
+
+            return value.substring(0, lastIndex).trim();
+        } catch (err) {
+            return value;
+        }
+    }
+
     function to12Hour(time24: any) {
         let [hour, minute, second] = time24.split(":");
 
@@ -52,15 +66,6 @@
     const updateTime = new Date(
         data?.timetable?.updateTime * 1000,
     ).toLocaleString();
-    let getSemName = (k: string): string => {
-        let map: Map<string, string> = new Map([
-            ["AP2025262", "Fall Sem 2025-26"],
-        ]);
-        if (map.has(k)) {
-            return map.get(k) ?? k;
-        }
-        return k;
-    };
 </script>
 
 <div class="no-scrollbar">
@@ -69,7 +74,7 @@
             <CardTitle class="text-lg md:text-xl font-semibold">
                 <div class="flex items-end justify-evenly">
                     <div class="flex-1">
-                        Timetable — {getSemName(data?.timetable?.semesterId)}
+                        Timetable — {data.timetable["semesterName"]}
                     </div>
 
                     <Theme />
@@ -103,7 +108,9 @@
                                         <TableHead>Time</TableHead>
                                         <TableHead>Course</TableHead>
                                         <TableHead>Code</TableHead>
+                                        <TableHead>Block</TableHead>
                                         <TableHead>Room</TableHead>
+                                        <TableHead>Faculty</TableHead>
                                         <TableHead>Type</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -122,9 +129,13 @@
                                             <TableCell>
                                                 <Badge>{slot.courseCode}</Badge>
                                             </TableCell>
-
+                                            <TableCell>{slot.block}</TableCell>
                                             <TableCell>{slot.roomNo}</TableCell>
-
+                                            <TableHead
+                                                >{formatFacultyName(
+                                                    slot.faculty,
+                                                )}</TableHead
+                                            >
                                             <TableCell>
                                                 {#if isLab(slot.courseType)}
                                                     <Badge
