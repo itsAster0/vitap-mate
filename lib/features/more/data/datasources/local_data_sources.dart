@@ -12,7 +12,7 @@ class MarksLocalDataSource {
 
   Future<MarksData> getMarks(String semid) async {
     final allRows = await _globalAsyncQueue.run(
-      "vtop_marks_$semid",
+      "fromStroage_vtop_marks_$semid",
       () =>
           (_db.select(_db.marksTable)
             ..where((tbl) => tbl.semId.equals(semid))).get(),
@@ -56,7 +56,7 @@ class ExamScheduleLocalDataSource {
 
   Future<ExamScheduleData> getExamSchedule(String semid) async {
     final allRows = await _globalAsyncQueue.run(
-      "vtop_exam_schedule_$semid",
+      "fromStroage__exam_schedule_$semid",
       () =>
           (_db.select(_db.examScheduleTable)
             ..where((tbl) => tbl.semId.equals(semid))).get(),
