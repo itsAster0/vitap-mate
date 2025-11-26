@@ -25,7 +25,7 @@ final getTimetableSharesLinksProvider = FutureProvider<List>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef GetTimetableSharesLinksRef = FutureProviderRef<List>;
-String _$createTimetabledbHash() => r'2831ff419b5dc29d9743406318eb0fc7bfe39420';
+String _$createTimetabledbHash() => r'28c70e8903bd0b3fff56144756f94952365ad57b';
 
 /// Copied from Dart SDK
 class _SystemHash {

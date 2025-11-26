@@ -12,6 +12,7 @@ import 'package:vitapmate/core/utils/users/wifi_details.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:wifi_iot/wifi_iot.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -185,33 +186,40 @@ class WifiCard extends HookConsumerWidget {
     }
 
     void handelLogin(String username, String password) async {
+      var skip = false;
       try {
         isLoading.value = true;
-        final List<ConnectivityResult> connectivityResult =
-            await (Connectivity().checkConnectivity());
-        if (connectivityResult.contains(ConnectivityResult.mobile) ||
-            !connectivityResult.contains(ConnectivityResult.wifi)) {
-          if (context.mounted) {
-            showFDialog(
-              context: context,
-              builder:
-                  (context, style, animation) => FDialog(
-                    animation: animation,
-                    direction: Axis.horizontal,
-                    title: const Text("Not connected to Wi-Fi."),
-                    body: const Text(
-                      'Please disable mobile data and connect to college Wi-Fi.',
-                    ),
-                    actions: [
-                      FButton(
-                        onPress: () => Navigator.of(context).pop(),
-                        child: const Text('OK'),
+        final isco = await WiFiForIoTPlugin.isConnected();
+        if (isco) {
+          skip = await WiFiForIoTPlugin.forceWifiUsage(true);
+        }
+        if (!skip) {
+          final List<ConnectivityResult> connectivityResult =
+              await (Connectivity().checkConnectivity());
+          if ((connectivityResult.contains(ConnectivityResult.mobile) ||
+              !connectivityResult.contains(ConnectivityResult.wifi))) {
+            if (context.mounted) {
+              showFDialog(
+                context: context,
+                builder:
+                    (context, style, animation) => FDialog(
+                      animation: animation,
+                      direction: Axis.horizontal,
+                      title: const Text("Not connected to Wi-Fi."),
+                      body: const Text(
+                        'Please disable mobile data and connect to college Wi-Fi.',
                       ),
-                    ],
-                  ),
-            );
+                      actions: [
+                        FButton(
+                          onPress: () => Navigator.of(context).pop(),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+              );
+            }
+            return;
           }
-          return;
         }
       } catch (e) {
         ();
@@ -229,19 +237,33 @@ class WifiCard extends HookConsumerWidget {
         succesMsg.value = data.$2;
       }
       isLoading.value = false;
+      if (skip) {
+        await WiFiForIoTPlugin.forceWifiUsage(false);
+      }
     }
 
     void handelLogout() async {
       errorMsg.value = null;
       succesMsg.value = null;
       isLoading.value = true;
-      var data = await fetchWifi(username: "...", password: "...", i: 1);
-      if (!data.$1) {
-        errorMsg.value = parseResult(data.$2);
-      } else {
-        succesMsg.value = data.$2;
+      var skip = false;
+      try {
+        final isco = await WiFiForIoTPlugin.isConnected();
+        if (isco) {
+          skip = await WiFiForIoTPlugin.forceWifiUsage(true);
+        }
+        var data = await fetchWifi(username: "...", password: "...", i: 1);
+        if (!data.$1) {
+          errorMsg.value = parseResult(data.$2);
+        } else {
+          succesMsg.value = data.$2;
+        }
+      } finally {
+        isLoading.value = false;
+        if (skip) {
+          await WiFiForIoTPlugin.forceWifiUsage(false);
+        }
       }
-      isLoading.value = false;
     }
 
     return Column(

@@ -10,6 +10,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/services/firebase_notification.dart';
 import 'package:vitapmate/services/update_service.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -35,7 +36,7 @@ Future<void> main() async {
     return true;
   };
   await RustLib.init();
-
+  fileDownloaderConfig();
   runApp(ProviderScope(child: const MyApp()));
 }
 

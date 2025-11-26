@@ -29,6 +29,7 @@ class Gb extends _$Gb {
           attributes: userAttr,
           growthBookTrackingCallBack: (trackData) {},
           backgroundSync: true,
+          remoteEval: false,
         ).initialize();
     return gb;
   }
