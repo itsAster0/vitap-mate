@@ -16,7 +16,7 @@ class AttendanceLocalDataSource {
     String courseType,
   ) async {
     final allrows = await _globalAsyncQueue.run(
-      "fromStrorage_fullattendance_${semid}_${courseType}_$courseId",
+      "fromStorage_fullattendance_${semid}_${courseType}_$courseId",
       () =>
           (_db.select(_db.fullAttendanceTable)..where(
             (tbl) =>

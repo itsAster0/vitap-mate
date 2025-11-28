@@ -10,7 +10,7 @@ class ExamScheduleRemoteDataSource {
 
   Future<ExamScheduleData> fetchScheduleeFromRemote(String semid) async {
     var data = await _globalAsyncQueue.run(
-      "vtop_fetchSchedulee_$semid",
+      "vtop_fetchSchedule_$semid",
       () => fetchExamShedule(client: _client, semesterId: semid),
     );
     return data;

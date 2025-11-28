@@ -13,8 +13,10 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
         start_time: String,
         end_time: String,
     }
+
     let mut classname_code: HashMap<String, String> = HashMap::new();
     let mut facultyname_code: HashMap<String, String> = HashMap::new();
+    let mut facultyname_lab_code: HashMap<String, String> = HashMap::new();
     let document = Html::parse_document(&html);
     let rows_selector = Selector::parse("tr").unwrap();
     let mut timetables: Vec<TimetableSlot> = Vec::new();
@@ -42,13 +44,11 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                     .collect::<Vec<_>>();
                 if tep.len() > 1 {
                     let code = tep[0].trim().to_string();
-                    let name = tep[1]
-                        .to_string()
-                        .split_once("(")
-                        .unwrap_or(("", ""))
-                        .0
-                        .trim()
-                        .to_string();
+                    let val_str = tep[1].to_string();
+                    let temp_val_for = val_str.split_once("(").unwrap_or(("", ""));
+                    let name = temp_val_for.0.trim().to_string();
+                    let islab = temp_val_for.1.to_lowercase().contains("lab");
+
                     if !classname_code.contains_key(&code) {
                         classname_code.insert(code.clone(), name);
                     }
@@ -59,8 +59,14 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                         .trim()
                         .replace("\t", "")
                         .replace("\n", "");
-                    if !facultyname_code.contains_key(&code) {
-                        facultyname_code.insert(code, faculty_name);
+                    if islab {
+                        if !facultyname_lab_code.contains_key(&code) {
+                            facultyname_lab_code.insert(code, faculty_name);
+                        }
+                    } else {
+                        if !facultyname_code.contains_key(&code) {
+                            facultyname_code.insert(code, faculty_name);
+                        }
                     }
                 }
             }
@@ -145,6 +151,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                 .filter(|k| !k.is_empty())
                                 .collect::<Vec<_>>();
                             if cle.len() > 2 {
+                                let is_lab = !count_for_offset % 2 == 0;
                                 let mut cl = class_name.split("-");
                                 let code = class_name
                                     .split("-")
@@ -166,11 +173,18 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                         .get(&code)
                                         .unwrap_or(&"".to_string())
                                         .to_string(),
-                                    is_lab: !count_for_offset % 2 == 0,
-                                    faculty: facultyname_code
-                                        .get(&code)
-                                        .unwrap_or(&"".to_string())
-                                        .to_string(),
+                                    is_lab: is_lab,
+                                    faculty: if is_lab {
+                                        facultyname_lab_code
+                                            .get(&code)
+                                            .unwrap_or(&"".to_string())
+                                            .to_string()
+                                    } else {
+                                        facultyname_code
+                                            .get(&code)
+                                            .unwrap_or(&"".to_string())
+                                            .to_string()
+                                    },
                                 };
                                 timetables.push(class);
                             }

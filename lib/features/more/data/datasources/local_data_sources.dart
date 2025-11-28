@@ -12,7 +12,7 @@ class MarksLocalDataSource {
 
   Future<MarksData> getMarks(String semid) async {
     final allRows = await _globalAsyncQueue.run(
-      "fromStroage_vtop_marks_$semid",
+      "fromStroage_marks_$semid",
       () =>
           (_db.select(_db.marksTable)
             ..where((tbl) => tbl.semId.equals(semid))).get(),
