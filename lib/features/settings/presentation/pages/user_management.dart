@@ -214,6 +214,7 @@ class UserSemChange extends HookConsumerWidget {
     final controller = useFRadioSelectMenuTileGroupController<String>(
       value: user.semid,
     );
+    final outercontext = context;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -233,9 +234,7 @@ class UserSemChange extends HookConsumerWidget {
                             body: ConstrainedBox(
                               constraints: BoxConstraints(maxHeight: 300),
                               child: Container(
-                                decoration: BoxDecoration(
-                                  color: context.theme.colors.primaryForeground,
-                                ),
+                                decoration: BoxDecoration(),
                                 child: SingleChildScrollView(
                                   child: Column(
                                     children: [
@@ -246,14 +245,66 @@ class UserSemChange extends HookConsumerWidget {
                                             final isLoading = ref.watch(
                                               isLoadingSems,
                                             );
+                                            void handelClick() async {
+                                              try {
+                                                ref
+                                                    .read(
+                                                      isLoadingSems.notifier,
+                                                    )
+                                                    .state = true;
+
+                                                await ref
+                                                    .read(
+                                                      semesterIdProvider
+                                                          .notifier,
+                                                    )
+                                                    .updatesemids();
+                                                ref.invalidate(
+                                                  semesterIdProvider,
+                                                );
+                                                ref
+                                                    .read(
+                                                      isLoadingSems.notifier,
+                                                    )
+                                                    .state = false;
+                                              } catch (e, _) {
+                                                if (context.mounted) {
+                                                  ref
+                                                      .read(
+                                                        isLoadingSems.notifier,
+                                                      )
+                                                      .state = false;
+
+                                                  Navigator.of(context).pop();
+                                                }
+                                                if (outercontext.mounted) {
+                                                  disCommonToast(
+                                                    outercontext,
+                                                    e,
+                                                  );
+                                                }
+                                              }
+                                            }
 
                                             return Row(
+                                              mainAxisSize: MainAxisSize.max,
                                               children: [
+                                                // if (isLoading)
+                                                //   const FCircularProgress.pinwheel(),
+                                                // if (isLoading)
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Text('Semesters'),
+                                                ),
+                                                if (!isLoading)
+                                                  FTappable(
+                                                    onPress: handelClick,
+                                                    child: Icon(
+                                                      FIcons.rotateCcw,
+                                                    ),
+                                                  ),
                                                 if (isLoading)
-                                                  const FCircularProgress.pinwheel(),
-                                                if (isLoading)
-                                                  const SizedBox(width: 10),
-                                                Text('Semesters'),
+                                                  FCircularProgress.pinwheel(),
                                               ],
                                             );
                                           },
