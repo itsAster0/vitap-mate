@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
@@ -37,6 +38,26 @@ class SettingsPage extends HookConsumerWidget {
                           context,
                         ).pushNamed(Paths.vtopUserManagement);
                       },
+                    ),
+                    FTile(
+                      prefix: Icon(FIcons.calendarDays),
+                      title: const Text('Merge Labs'),
+                      suffix: FSwitch(
+                        value: ref.watch(mergeTTProvider),
+                        onChange: (value) {
+                          ref.read(toggleMergeTTProvider);
+                        },
+                      ),
+                    ),
+                    FTile(
+                      prefix: Icon(FIcons.userCheck),
+                      title: const Text('Show b/w Exams'),
+                      suffix: FSwitch(
+                        value: ref.watch(btwExamsProvider),
+                        onChange: (value) {
+                          ref.read(toggleBTWExamsProvider);
+                        },
+                      ),
                     ),
                   ],
                 ),

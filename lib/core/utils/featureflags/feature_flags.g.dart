@@ -6,7 +6,7 @@ part of 'feature_flags.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$gbHash() => r'f754dc87bd1ee834cd9dd9c64112e00a7c81e722';
+String _$gbHash() => r'6203d2c4a87df29ee66cfc27f0bb68cda0f77497';
 
 /// See also [Gb].
 @ProviderFor(Gb)

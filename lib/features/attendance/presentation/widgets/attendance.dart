@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
@@ -25,6 +26,7 @@ class AttendanceCard extends HookConsumerWidget {
       CurvedAnimation(parent: animationController, curve: Curves.easeInOut),
     );
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final btwExams = ref.watch(btwExamsProvider);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -54,9 +56,9 @@ class AttendanceCard extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(darkMode, context),
+                        _buildHeader(darkMode, context, btwExams),
                         const SizedBox(height: 16),
-                        _buildStatsRow(darkMode, context),
+                        _buildStatsRow(darkMode, context, btwExams),
                       ],
                     ),
                   ),
@@ -113,7 +115,7 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 
-  Widget _buildHeader(bool isDark, BuildContext context) {
+  Widget _buildHeader(bool isDark, BuildContext context, bool btwExam) {
     final (courseCode, courseName) = formateName(record.courseName);
 
     return Row(
@@ -158,7 +160,7 @@ class AttendanceCard extends HookConsumerWidget {
           ),
         ),
         const SizedBox(width: 8),
-        _buildAttendanceIndicator(isDark, context),
+        _buildAttendanceIndicator(isDark, context, btwExam),
       ],
     );
   }
@@ -190,12 +192,16 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 
-  Widget _buildAttendanceIndicator(bool isDark, BuildContext context) {
+  Widget _buildAttendanceIndicator(
+    bool isDark,
+    BuildContext context,
+    bool btwExams,
+  ) {
     if (record.attendancePercentage == "-") {
       return _buildIndicatorChip("N/A", AttendanceColors.unknownText);
     }
 
-    final percentage = _calculateMaxPercentage();
+    final percentage = _calculateMaxPercentage(btwExams);
     final (color, bgColor) = _getAttendanceColors(percentage);
 
     return _buildIndicatorChip("${percentage.toInt()}%", color, bgColor);
@@ -224,11 +230,16 @@ class AttendanceCard extends HookConsumerWidget {
     );
   }
 
-  double _calculateMaxPercentage() {
-    return max(
-      double.tryParse(record.attendancePercentage.replaceAll("%", "")) ?? 0,
-      double.tryParse(record.attendenceFatCat.replaceAll("%", "")) ?? 0,
-    );
+  double _calculateMaxPercentage(bool btwExams) {
+    final normalattp =
+        double.tryParse(record.attendancePercentage.replaceAll("%", "")) ?? 0;
+    if (btwExams) {
+      return max(
+        normalattp,
+        double.tryParse(record.attendenceFatCat.replaceAll("%", "")) ?? 0,
+      );
+    }
+    return normalattp;
   }
 
   (Color, Color) _getAttendanceColors(double percentage) {
@@ -249,7 +260,7 @@ class AttendanceCard extends HookConsumerWidget {
     }
   }
 
-  Widget _buildStatsRow(bool isDark, BuildContext context) {
+  Widget _buildStatsRow(bool isDark, BuildContext context, bool btwExams) {
     final stats = <Widget>[
       _buildStatItem(
         isDark,
@@ -261,7 +272,7 @@ class AttendanceCard extends HookConsumerWidget {
       ),
     ];
 
-    if (record.attendancePercentage != "-") {
+    if (record.attendancePercentage != "-" && btwExams) {
       stats.add(
         _buildStatItem(
           isDark,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 
@@ -26,10 +27,6 @@ class TimetablePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(timetableProvider.notifier).updateTimetable();
-          // var pb = await ref.read(pbProvider.future);
-          // var tt = await ref.watch(timetableProvider.future);
-          // final payload = {...tt.toJson(), "updateTime": tt.updateTime.toInt()};
-          // var temp = await pb.send("/timetable", method: "POST", body: payload);
         } catch (e, _) {
           log("$e");
         }
@@ -37,6 +34,7 @@ class TimetablePage extends HookConsumerWidget {
 
       return null;
     }, []);
+    final mergeLabs = ref.watch(mergeTTProvider);
 
     Future<void> update() async {
       try {
@@ -97,10 +95,11 @@ class TimetablePage extends HookConsumerWidget {
                         if (!tempList.contains(selectedDay.value)) {
                           selectedDay.value = tempList.first;
                         }
-
-                        final daySlots = addFreeSlots(
-                          getDaySlotList(data, selectedDay.value),
-                        );
+                        var tempdays = getDaySlotList(data, selectedDay.value);
+                        if (mergeLabs) {
+                          tempdays = mergeLabsSloths(tempdays);
+                        }
+                        final daySlots = addFreeSlots(tempdays);
 
                         daySlots.sort((a, b) {
                           final t1 = _parseTime(a.startTime);
@@ -239,6 +238,24 @@ List<TimetableSlot> getDaySlotList(TimetableData data, int i) {
     }
   }
   return slots;
+}
+
+List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> t) {
+  List<TimetableSlot> r = [];
+  for (int i = 0; i < t.length; i++) {
+    final current = t[i];
+
+    TimetableSlot? prev = r.isNotEmpty ? r.last : null;
+    if (prev != null &&
+        current.isLab &&
+        prev.isLab &&
+        current.courseCode == prev.courseCode) {
+      r[r.length - 1] = prev.copyWith(endTime: current.endTime);
+    } else {
+      r.add(current);
+    }
+  }
+  return r;
 }
 
 List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
