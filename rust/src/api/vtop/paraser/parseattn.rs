@@ -9,85 +9,46 @@ pub fn parse_attendance(html: String, sem: String) -> AttendanceData {
     let mut courses: Vec<AttendanceRecord> = Vec::new();
     for row in document.select(&rows_selector).skip(1) {
         let cells: Vec<_> = row.select(&Selector::parse("td").unwrap()).collect();
-        if cells.len() > 10 {
-            let cell9 = cells[10].html();
+        let max = 9;
+        if cells.len() > max {
+            let cell9 = cells[max].html();
             let infocell = cell9.split(",").collect::<Vec<_>>();
             let course_id: String = infocell[2].to_string().replace("'", "");
             let course_type: String = infocell[3].split(")").collect::<Vec<_>>()[0]
                 .to_string()
                 .replace("'", "");
+            let mut index_vec = 0;
+
+            let mut next = || {
+                let v = cells[index_vec].clone();
+                index_vec += 1;
+                v.text()
+                    .collect::<Vec<_>>()
+                    .join("")
+                    .trim()
+                    .replace("\t", "")
+                    .replace("\n", "")
+            };
+
             let course = AttendanceRecord {
-                serial: cells[0]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                category: cells[1]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                course_name: cells[2]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                course_code: cells[3]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                faculty_detail: cells[4]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                classes_attended: cells[5]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                total_classes: cells[6]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                attendance_percentage: cells[7]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                attendence_fat_cat: cells[8]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                debar_status: cells[9]
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join("")
-                    .trim()
-                    .replace("\t", "")
-                    .replace("\n", ""),
-                course_id,
+                serial: next(),
+                category: next(),
+                course_name: next(),
+                course_code: next(),
+                faculty_detail: next(),
+                classes_attended: next(),
+                total_classes: next(),
+                attendance_percentage: next(),
+                attendence_fat_cat: "0".into(),
+                //  cells[8]
+                //     .text()
+                //     .collect::<Vec<_>>()
+                //     .join("")
+                //     .trim()
+                //     .replace("\t", "")
+                //     .replace("\n", ""),
+                debar_status: next(),
+                course_id, //edit the top index for these
                 course_type,
             };
 

@@ -89,7 +89,7 @@ void disCommonToast(BuildContext context, Object e) {
       alignment: FToastAlignment.bottomCenter,
       title: const Text('Feature Disabled'),
       //description: const Text('Visit this page for more information.'),
-      description: const Text('Please try again in a while'),
+      description: const Text('Please try again in a while Or Update the app'),
       suffixBuilder:
           (context, entry) => IntrinsicHeight(
             child: FButton(

@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:growthbook_sdk_flutter/growthbook_sdk_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -17,7 +19,8 @@ class Gb extends _$Gb {
       final major = int.parse(parts[0]);
       final minor = parts.length > 1 ? int.parse(parts[1]) : 0;
       final patch = parts.length > 2 ? int.parse(parts[2]) : 0;
-      return major * 1000000 + minor * 1000 + patch;
+      final out = major * 1000000 + minor * 1000 + patch;
+      return out;
     }
 
     int appVersionCode = versionStringToNumber(info.version);

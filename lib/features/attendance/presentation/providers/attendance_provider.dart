@@ -39,6 +39,7 @@ class Attendance extends _$Attendance {
     var feature = gb.feature("fetch-attendance");
     if (feature.on && feature.value) {
       var data = await UpdateAttendanceUsecase(repo).call();
+
       return data;
     } else {
       throw FeatureDisabledException("Attendance Feature Disabled");
