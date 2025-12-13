@@ -128,6 +128,8 @@ class VtopWebview extends HookConsumerWidget {
               onWebViewCreated: (controller) {
                 webController.value = controller;
               },
+              
+            
               shouldOverrideUrlLoading: (controller, navigationAction) async {
                 final uri = navigationAction.request.url;
 
@@ -143,6 +145,9 @@ class VtopWebview extends HookConsumerWidget {
 
                 return NavigationActionPolicy.CANCEL;
               },
+              onReceivedServerTrustAuthRequest: ( _,_)async{  
+                return ServerTrustAuthResponse(action: ServerTrustAuthResponseAction.PROCEED);
+                },
               onUpdateVisitedHistory: (controller, url, androidIsReload) {
                 final u = url.toString().toLowerCase();
                 if (!u.startsWith("https://vtop.vitap.ac.in")) {
