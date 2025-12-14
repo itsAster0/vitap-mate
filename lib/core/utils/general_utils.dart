@@ -52,10 +52,16 @@ void fileDownloaderConfig() {
   FileDownloader().registerCallbacks(
     taskNotificationTapCallback: myNotificationTapCallback,
   );
+     FileDownloader().configure(
+    androidConfig: [
+       (Config.bypassTLSCertificateValidation, true),
+    ],
+  );
 }
 
 Future<void> downloadFile(String url, String cookie) async {
   Directory? downloadsDir;
+
 
   if (Platform.isAndroid) {
     if (await Permission.notification.request().isDenied) {
@@ -75,6 +81,7 @@ Future<void> downloadFile(String url, String cookie) async {
     url: url,
     headers: {"Cookie": cookie},
     retries: 5,
+ 
     directory: downloadsDir.path,
     filename: DownloadTask.suggestedFilename,
     baseDirectory: BaseDirectory.root,
