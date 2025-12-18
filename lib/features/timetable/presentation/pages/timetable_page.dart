@@ -96,6 +96,7 @@ class TimetablePage extends HookConsumerWidget {
                           selectedDay.value = tempList.first;
                         }
                         var tempdays = getDaySlotList(data, selectedDay.value);
+
                         if (mergeLabs) {
                           tempdays = mergeLabsSloths(tempdays);
                         }
@@ -241,6 +242,11 @@ List<TimetableSlot> getDaySlotList(TimetableData data, int i) {
 }
 
 List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> t) {
+  t.sort((a, b) {
+    final t1 = _parseTime(a.startTime);
+    final t2 = _parseTime(b.startTime);
+    return t1.compareTo(t2);
+  });
   List<TimetableSlot> r = [];
   for (int i = 0; i < t.length; i++) {
     final current = t[i];

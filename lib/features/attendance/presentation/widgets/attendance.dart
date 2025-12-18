@@ -117,7 +117,6 @@ class AttendanceCard extends HookConsumerWidget {
 
   Widget _buildHeader(bool isDark, BuildContext context, bool btwExam) {
     final (courseCode, courseName) = formateName(record.courseName);
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

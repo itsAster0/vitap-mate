@@ -11,16 +11,23 @@ pub fn parse_attendance(html: String, sem: String) -> AttendanceData {
         let cells: Vec<_> = row.select(&Selector::parse("td").unwrap()).collect();
         let max = 9;
         if cells.len() > max {
-            let cell9 = cells[max].html();
+            let cell9 = cells[cells.len() - 1].html();
             let infocell = cell9.split(",").collect::<Vec<_>>();
             let course_id: String = infocell[2].to_string().replace("'", "");
             let course_type: String = infocell[3].split(")").collect::<Vec<_>>()[0]
                 .to_string()
                 .replace("'", "");
+
             let mut index_vec = 0;
+            let mut outer_count = 0;
 
             let mut next = || {
+                if !(cells.len() > max + 1) && outer_count == 8 {
+                    outer_count += 1;
+                    return "-".to_string();
+                }
                 let v = cells[index_vec].clone();
+                outer_count += 1;
                 index_vec += 1;
                 v.text()
                     .collect::<Vec<_>>()
@@ -39,14 +46,8 @@ pub fn parse_attendance(html: String, sem: String) -> AttendanceData {
                 classes_attended: next(),
                 total_classes: next(),
                 attendance_percentage: next(),
-                attendence_fat_cat: "0".into(),
-                //  cells[8]
-                //     .text()
-                //     .collect::<Vec<_>>()
-                //     .join("")
-                //     .trim()
-                //     .replace("\t", "")
-                //     .replace("\n", ""),
+                attendence_fat_cat: next(),
+
                 debar_status: next(),
                 course_id, //edit the top index for these
                 course_type,

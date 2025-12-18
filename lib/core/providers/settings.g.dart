@@ -39,7 +39,7 @@ final mergeTTProvider = AutoDisposeProvider<bool>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MergeTTRef = AutoDisposeProviderRef<bool>;
-String _$btwExamsHash() => r'116f8f24d32345f0123bb73b874173bf3d69f3b0';
+String _$btwExamsHash() => r'77cc43c21a5b8dbd6ef2e949431fa4abf5d24a1b';
 
 /// See also [btwExams].
 @ProviderFor(btwExams)

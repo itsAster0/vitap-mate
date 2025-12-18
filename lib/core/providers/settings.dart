@@ -20,9 +20,8 @@ bool mergeTT(Ref ref) {
 
 @riverpod
 bool btwExams(Ref ref) {
-  // final prefs = ref.watch(settingsProvider).value;
-  // return prefs?.getBool("settings_btw_atten") ?? false;
-  return false;
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool("settings_btw_atten") ?? false;
 }
 
 @riverpod

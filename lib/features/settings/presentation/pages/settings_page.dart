@@ -49,16 +49,16 @@ class SettingsPage extends HookConsumerWidget {
                         },
                       ),
                     ),
-                    // FTile(
-                    //   prefix: Icon(FIcons.userCheck),
-                    //   title: const Text('Show b/w Exams'),
-                    //   suffix: FSwitch(
-                    //     value: ref.watch(btwExamsProvider),
-                    //     onChange: (value) {
-                    //       ref.read(toggleBTWExamsProvider);
-                    //     },
-                    //   ),
-                    // ),
+                    FTile(
+                      prefix: Icon(FIcons.userCheck),
+                      title: const Text('Show b/w Exams'),
+                      suffix: FSwitch(
+                        value: ref.watch(btwExamsProvider),
+                        onChange: (value) {
+                          ref.read(toggleBTWExamsProvider);
+                        },
+                      ),
+                    ),
                   ],
                 ),
 
