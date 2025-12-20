@@ -52,6 +52,7 @@ void fileDownloaderConfig() {
   FileDownloader().registerCallbacks(
     taskNotificationTapCallback: myNotificationTapCallback,
   );
+
   FileDownloader().configure(
     androidConfig: [(Config.bypassTLSCertificateValidation, true)],
   );
