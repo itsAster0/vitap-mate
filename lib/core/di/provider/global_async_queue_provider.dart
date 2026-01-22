@@ -4,8 +4,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/entity/global_async_queue_entity.dart';
 part 'global_async_queue_provider.g.dart';
 
+abstract class AsyncQueue {
+  Future<T> run<T>(String id, Future<T> Function() task);
+}
+
 @Riverpod(keepAlive: true)
-class GlobalAsyncQueue extends _$GlobalAsyncQueue {
+class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   final _taskEvents = StreamController<Set<String>>.broadcast();
   // ignore: avoid_public_notifier_properties
   Stream<Set<String>> get taskStream => _taskEvents.stream;
@@ -14,6 +18,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue {
     return const GlobalAsyncQueueEntity();
   }
 
+  @override
   Future<T> run<T>(String id, Future<T> Function() task) async {
     final current = state.running;
     if (current.containsKey(id)) {

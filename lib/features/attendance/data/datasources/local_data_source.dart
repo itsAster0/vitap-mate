@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 class AttendanceLocalDataSource {
   final AppDatabase _db;
-  final GlobalAsyncQueue _globalAsyncQueue;
+  final AsyncQueue _globalAsyncQueue;
   AttendanceLocalDataSource(this._db, this._globalAsyncQueue);
 
   Future<FullAttendanceData> getFullAttendance(

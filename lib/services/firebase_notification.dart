@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +34,35 @@ class NotificationService {
 
   Future<void> initialize() async {
     await _initializeLocalNotifications();
-
+    requestAndroidNotificationPermission();
     _setupFirebaseListeners();
+  }
+
+  Future<bool> requestAndroidNotificationPermission() async {
+    final plugin = FlutterLocalNotificationsPlugin();
+
+    final android =
+        plugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+
+    if (android == null) return true;
+
+    final enabled = await android.areNotificationsEnabled();
+    if (enabled == true) return true;
+    if (Platform.isAndroid) {
+      final p =
+          plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+      if (p != null) {
+        final perm = await p.requestNotificationsPermission();
+        return perm ?? false;
+      }
+    }
+    return false;
   }
 
   Future<NotificationSettings> requestPermissions() async {

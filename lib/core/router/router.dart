@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:firebase_analytics/observer.dart';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,13 +17,11 @@ import 'package:vitapmate/features/settings/presentation/pages/user_management.d
 import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
 import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
-import 'package:vitapmate/main.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider((ref) {
   return GoRouter(
-    observers: [FirebaseAnalyticsObserver(analytics: analytics)],
     redirect: (context, state) => redirect(context, ref, state),
     initialLocation: '/timetable',
     navigatorKey: rootNavigatorKey,
@@ -33,6 +30,17 @@ final routerProvider = Provider((ref) {
         path: '/onboarding',
         name: Paths.onbaording,
         builder: (context, state) => OnboardingPage(),
+      ),
+      GoRoute(
+        path: '/vtopweb',
+        name: Paths.vtopweb,
+
+        pageBuilder: (context, state) {
+          return NoTransitionPage<void>(
+            key: state.pageKey,
+            child: VtopWebview(),
+          );
+        },
       ),
 
       StatefulShellRoute.indexedStack(
@@ -95,17 +103,6 @@ final routerProvider = Provider((ref) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: ExamSchedulePage(),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'vtopweb',
-                    name: Paths.vtopweb,
-
-                    pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
-                        key: state.pageKey,
-                        child: VtopWebview(),
                       );
                     },
                   ),

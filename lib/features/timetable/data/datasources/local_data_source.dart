@@ -6,7 +6,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetableLocalDataSource {
   final AppDatabase _db;
-  final GlobalAsyncQueue _globalAsyncQueue;
+  final AsyncQueue _globalAsyncQueue;
   TimetableLocalDataSource(this._db, this._globalAsyncQueue);
 
   Future<TimetableData> getTimetable(String semid) async {

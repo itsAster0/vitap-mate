@@ -276,7 +276,7 @@ impl VtopClient {
         }
 
         #[allow(non_snake_case)]
-        let MAX_CAP_TRY = 4;
+        let MAX_CAP_TRY = 40;
         for i in 0..MAX_CAP_TRY {
             if i == 0 {
                 self.load_login_page(true).await?;
@@ -376,7 +376,7 @@ impl VtopClient {
             self.extract_csrf_token()?;
         }
         #[allow(non_snake_case)]
-        let Max_RELOAD_ATTEMPTS = 8;
+        let Max_RELOAD_ATTEMPTS = 20;
         let csrf = self
             .session
             .get_csrf_token()
@@ -549,6 +549,8 @@ impl VtopClient {
     }
     #[cfg(not(target_arch = "wasm32"))]
     fn make_client(cookie_store: Arc<Jar>) -> Client {
+        use std::time::Duration;
+
         let mut headers = HeaderMap::new();
 
         headers.insert(
@@ -582,6 +584,9 @@ impl VtopClient {
             .default_headers(headers)
             .cookie_store(true)
             .cookie_provider(cookie_store)
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Duration::from_secs(60))
+            .tcp_keepalive(Duration::from_secs(60))
             .danger_accept_invalid_certs(true)
             .build()
             .unwrap();

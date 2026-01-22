@@ -5,7 +5,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 class AttendanceRemoteDataSource {
   final VtopClient _client;
-  final GlobalAsyncQueue _globalAsyncQueue;
+  final AsyncQueue _globalAsyncQueue;
   AttendanceRemoteDataSource(this._client, this._globalAsyncQueue);
 
   Future<FullAttendanceData> fetchFullAttendanceFromRemote(

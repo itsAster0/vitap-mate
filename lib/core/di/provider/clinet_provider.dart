@@ -36,7 +36,10 @@ class VClient extends _$VClient {
     int cookieTime = storage.getInt("cookie_time") ?? 0;
     if (DateTime.now().toUtc().millisecondsSinceEpoch - cookieTime <
         30 * 60 * 1000) {
-      _cookie = storage.getString("cookie");
+      final cookiet = storage.getString("cookie");
+      if (cookiet != null && cookiet.isNotEmpty) {
+        _cookie = cookiet;
+      }
     }
 
     return getVtopClient(
@@ -97,6 +100,10 @@ class VClient extends _$VClient {
             .read(vtopusersutilsProvider.notifier)
             .vtopUserSave(user.copyWith(isValid: false));
         ref.invalidate(vtopUserProvider);
+      }
+      if (e is VtopError && e is! VtopError_NetworkError) {
+        var storage = await SharedPreferences.getInstance();
+        await storage.setString("cookie", "");
       }
 
       rethrow;

@@ -1,5 +1,4 @@
 import 'dart:developer';
-
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pocketbase/pocketbase.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -16,7 +15,8 @@ Future<PocketBase> pb(Ref ref) async {
     save: (String data) async => prefs.setString('pb_auth', data),
     initial: prefs.getString('pb_auth'),
   );
-  var pb = PocketBase(pbUrl, authStore: store);
+
+  var pb = PocketBase(pbUrl, authStore: store, reuseHTTPClient: true);
 
   try {
     if (pb.authStore.isValid) {
@@ -29,6 +29,10 @@ Future<PocketBase> pb(Ref ref) async {
       pb.authStore.clear();
     }
   }
+  ref.onDispose(() {
+    pb.close();
+  });
+
   return pb;
 }
 

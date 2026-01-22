@@ -1,8 +1,9 @@
 import 'dart:developer';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
-import 'package:vitapmate/main.dart';
+
 part 'vtop_user_provider.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -13,7 +14,7 @@ class VtopUser extends _$VtopUser {
     var user =
         await ref.read(vtopusersutilsProvider.notifier).vtopUserDefault();
     log("VtopUser build sucessfull $user");
-    analytics.setUserId(id: user?.username);
+
     return user!;
   }
 }

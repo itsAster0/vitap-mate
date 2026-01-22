@@ -10,7 +10,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
-import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
+
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -31,28 +31,28 @@ class OnboardingPage extends HookConsumerWidget {
       header: FHeader.nested(
         title: Text("Vitap Mate"),
         suffixes: [
-          FButton(
-            onPress: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext conntext) {
-                  //return Center(child: WifiCard());
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: WifiCard(),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-            child: Icon(FIcons.wifi),
-          ),
+          // FButton(
+          //   onPress: () {
+          //     showDialog(
+          //       context: context,
+          //       builder: (BuildContext conntext) {
+          //         //return Center(child: WifiCard());
+          //         return Center(
+          //           child: Column(
+          //             mainAxisAlignment: MainAxisAlignment.center,
+          //             children: [
+          //               Padding(
+          //                 padding: const EdgeInsets.all(16.0),
+          //                 child: WifiCard(),
+          //               ),
+          //             ],
+          //           ),
+          //         );
+          //       },
+          //     );
+          //   },
+          //   child: Icon(FIcons.wifi),
+          // ),
         ],
       ),
       child: Column(

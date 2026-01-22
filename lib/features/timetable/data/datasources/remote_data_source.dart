@@ -5,7 +5,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 class TimetableRemoteDataSource {
   final VtopClient _client;
-  final GlobalAsyncQueue _globalAsyncQueue;
+  final AsyncQueue _globalAsyncQueue;
   TimetableRemoteDataSource(this._client, this._globalAsyncQueue);
 
   Future<TimetableData> fetchTimetableFromRemote(String semid) async {

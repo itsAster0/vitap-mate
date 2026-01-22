@@ -39,50 +39,56 @@ class ShellLayout extends HookWidget {
 
     return FScaffold(
       header: headers[selected.value],
-      footer: FBottomNavigationBar(
-        index: selected.value,
-        onChange: (index) {
-          selected.value = index;
-          switch (selected.value) {
-            case 0:
-              GoRouter.of(context).goNamed(Paths.timetable);
-              break;
-            case 1:
-              GoRouter.of(context).goNamed(Paths.attendance);
-              break;
-            case 2:
-              GoRouter.of(context).goNamed(Paths.more);
-              break;
-            case 3:
-              GoRouter.of(context).goNamed(Paths.social);
-              break;
-            case 4:
-              GoRouter.of(context).goNamed(Paths.settings);
-              break;
-          }
-        },
-        children: [
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.calendarDays),
-            label: const Text('Timetable'),
-          ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.userCheck),
-            label: const Text('Attendance'),
-          ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.libraryBig),
-            label: const Text('More'),
-          ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.atSign),
-            label: const Text('social'),
-          ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.settings),
-            label: const Text('Settings'),
-          ),
-        ],
+      footer: SafeArea(
+        top: false,
+        right: false,
+        left: false,
+        bottom: true,
+        child: FBottomNavigationBar(
+          index: selected.value,
+          onChange: (index) {
+            selected.value = index;
+            switch (selected.value) {
+              case 0:
+                GoRouter.of(context).goNamed(Paths.timetable);
+                break;
+              case 1:
+                GoRouter.of(context).goNamed(Paths.attendance);
+                break;
+              case 2:
+                GoRouter.of(context).goNamed(Paths.more);
+                break;
+              case 3:
+                GoRouter.of(context).goNamed(Paths.social);
+                break;
+              case 4:
+                GoRouter.of(context).goNamed(Paths.settings);
+                break;
+            }
+          },
+          children: [
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.calendarDays),
+              label: const Text('Timetable'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.userCheck),
+              label: const Text('Attendance'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.libraryBig),
+              label: const Text('More'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.atSign),
+              label: const Text('social'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.settings),
+              label: const Text('Settings'),
+            ),
+          ],
+        ),
       ),
 
       child: child,

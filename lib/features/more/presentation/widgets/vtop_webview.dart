@@ -3,8 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -24,6 +27,141 @@ class VtopWebview extends HookConsumerWidget {
     final cookieName = useState<String?>(null);
     final cookieValue = useState<String?>(null);
     final webController = useState<InAppWebViewController?>(null);
+    final showHeading = useState("VTOP");
+    final isRemoveSpacing = useState(true);
+    final isdark = useState(ref.read(themeProvider).index == 2);
+    final String darkModeScript = '''
+  (function() {
+    const existingStyle = document.getElementById('dark-mode-style');
+    if (existingStyle) existingStyle.remove();
+    
+    const style = document.createElement('style');
+    style.id = 'dark-mode-style';
+    style.textContent = `
+      html {
+        filter: invert(1) hue-rotate(180deg) !important;
+        background-color: #000 !important;
+      }
+      img, video, [style*="background-image"] {
+        filter: invert(1) hue-rotate(180deg) !important;
+      }
+    `;
+    document.head.appendChild(style);
+  })();
+''';
+
+    final String removeDarkModeScript = '''
+  (function() {
+    const style = document.getElementById('dark-mode-style');
+    if (style) style.remove();
+  })();
+''';
+
+    useEffect(() {
+      final controller = webController.value;
+      if (controller != null) {
+        if (isdark.value) {
+          controller.evaluateJavascript(source: darkModeScript);
+        } else {
+          controller.evaluateJavascript(source: removeDarkModeScript);
+        }
+      }
+      return null;
+    }, [isdark.value]);
+    void removeSpacing({int padding = 2}) {
+      final controller = webController.value;
+      if (controller != null) {
+        controller.evaluateJavascript(
+          source: '''
+      (function() {
+      // Wait a bit for content to load
+      setTimeout(function() {
+        const style = document.createElement('style');
+        style.id = 'custom-spacing-style';
+        style.textContent = `
+          * {
+            margin: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+          }
+          
+          body {
+            padding: ${padding}px !important;
+            margin: 0 !important;
+          }
+          
+          table {
+            border-spacing: 0 !important;
+            border-collapse: collapse !important;
+            width: 100% !important;
+            margin: ${padding}px !important;
+          }
+          
+          td, th {
+            padding: ${padding + 4}px !important;
+          }
+          
+          .card {
+            margin: ${padding}px !important;
+            padding: ${padding}px !important;
+            border-radius: 0 !important;
+          }
+          
+          .container, .container-fluid {
+            padding: ${padding}px !important;
+            margin: ${padding}px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          
+          /* Target the CGPA Details specifically */
+          div[style*="padding"], div[style*="margin"] {
+            padding: ${padding}px !important;
+            margin: ${padding}px !important;
+          }
+        `;
+        
+        // Remove existing style if present
+        const oldStyle = document.getElementById('custom-spacing-style');
+        if (oldStyle) oldStyle.remove();
+        
+        document.head.appendChild(style);
+        
+        // Force layout recalculation
+        document.body.style.display = 'none';
+        document.body.offsetHeight;
+        document.body.style.display = 'block';
+      }, 500);
+    })();
+    ''',
+        );
+      }
+    }
+
+    void resetSpacing() {
+      final controller = webController.value;
+      if (controller != null) {
+        controller.evaluateJavascript(
+          source: '''
+        (function() {
+          // Remove the custom style element
+          const customStyle = document.getElementById('custom-spacing-style');
+          if (customStyle) {
+            customStyle.remove();
+          }
+          
+          // Force layout recalculation
+          document.body.style.display = 'none';
+          document.body.offsetHeight;
+          document.body.style.display = 'block';
+          
+          // Optionally reload the page to fully restore original styles
+          // window.location.reload();
+        })();
+      ''',
+        );
+      }
+    }
 
     useEffect(() {
       Future(() async {
@@ -75,127 +213,276 @@ class VtopWebview extends HookConsumerWidget {
     }, []);
 
     if (envState.value) {
-      return Container(
-        color: MoreColors.tableBackground,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: 50,
-                height: 50,
-                child: CircularProgressIndicator(
-                  color: MoreColors.infoBorder,
-                  strokeWidth: 3,
+      return FScaffold(
+        childPad: false,
+        header: FHeader.nested(
+          title: Text("VTOP"),
+          prefixes: [
+            FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
+          ],
+        ),
+        child: Container(
+          color: context.theme.colors.primaryForeground,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: CircularProgressIndicator(
+                    color: MoreColors.infoBorder,
+                    strokeWidth: 3,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "Setting up VTOP...",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: MoreColors.secondaryText,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 16),
+                Text(
+                  "Setting up VTOP...",
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: MoreColors.secondaryText,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
     }
+    void gorto(String url) async {
+      final controller = webController.value;
+      if (controller != null) {
+        await controller.evaluateJavascript(
+          source: '''
+  (function() {
+    const link = document.querySelector('a[data-url="$url"]');
+    if (link) {
+      link.click();
+      return true;
+    }
+    return false;
+  })();
+''',
+        );
+      }
+    }
 
-    return Container(
-      width: MediaQuery.of(context).size.width,
-      height: MediaQuery.of(context).size.height * 0.8,
-      decoration: BoxDecoration(
-        color: MoreColors.tableBackground,
-        boxShadow: [
-          BoxShadow(
-            color: MoreColors.cardShadow,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+    useEffect(() {
+      if (isRemoveSpacing.value) {
+        removeSpacing(padding: 1);
+      } else {
+        resetSpacing();
+      }
+      return null;
+    }, [isRemoveSpacing.value]);
+    return FScaffold(
+      childPad: false,
+      header: FHeader.nested(
+        title: Text(
+          showHeading.value,
+          style: TextStyle(fontSize: context.theme.typography.sm.fontSize),
+        ),
+        prefixes: [
+          FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
         ],
-      ),
-      child: Column(
-        children: [
-          Expanded(
-            child: InAppWebView(
-              initialSettings: InAppWebViewSettings(isInspectable: kDebugMode),
-              initialUrlRequest: URLRequest(
-                url: WebUri("https://vtop.vitap.ac.in/vtop/content?"),
-              ),
-              onWebViewCreated: (controller) {
-                webController.value = controller;
-              },
-
-              shouldOverrideUrlLoading: (controller, navigationAction) async {
-                final uri = navigationAction.request.url;
-
-                if (uri.toString().toLowerCase().contains("download")) {
-                  String cookie = "${cookieName.value}=${cookieValue.value};";
-                  downloadFile(uri.toString(), cookie);
-                  return NavigationActionPolicy.CANCEL;
-                } else if (uri.toString().toLowerCase().startsWith(
-                  "https://vtop.vitap.ac.in",
-                )) {
-                  return NavigationActionPolicy.ALLOW;
-                }
-
-                return NavigationActionPolicy.CANCEL;
-              },
-              onReceivedServerTrustAuthRequest: (_, _) async {
-                return ServerTrustAuthResponse(
-                  action: ServerTrustAuthResponseAction.PROCEED,
-                );
-              },
-              onUpdateVisitedHistory: (controller, url, androidIsReload) {
-                final u = url.toString().toLowerCase();
-                if (!u.startsWith("https://vtop.vitap.ac.in")) {
-                  controller.stopLoading();
-                  controller.goBack();
-                  dispToast(
-                    context,
-                    "Open in Chrome",
-                    "Please continue in Chrome.",
-                  );
-                }
-              },
-              onLoadStart: (controller, url) {
-                loading.value = true;
-              },
-              onLoadStop: (controller, url) {
-                loading.value = false;
-              },
+        suffixes: [
+          FHeaderAction(
+            icon: Icon(
+              isdark.value ? Icons.light_mode : Icons.dark_mode,
+              size: 20,
             ),
+            onPress: () {
+              isdark.value = !isdark.value;
+            },
           ),
-          if (loading.value)
-            Container(
-              padding: const EdgeInsets.all(8),
-              color: MoreColors.infoBackground,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+          SizedBox(width: 10),
+          FPopoverMenu(
+            autofocus: true,
+            menuAnchor: Alignment.topRight,
+            childAnchor: Alignment.bottomRight,
+            menu: [
+              FItemGroup(
                 children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: MoreColors.infoText,
-                    ),
+                  FItem(
+                    prefix: const Icon(FIcons.calendar),
+                    title: const Text('Timetable'),
+                    onPress: () => gorto("academics/common/StudentTimeTable"),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    "Loading...",
-                    style: TextStyle(
-                      color: MoreColors.secondaryText,
-                      fontSize: 12,
-                    ),
+                  FItem(
+                    prefix: const Icon(FIcons.paperclip),
+                    title: const Text('Attendance'),
+                    onPress: () => gorto("academics/common/StudentAttendance"),
+                  ),
+                  FItem(
+                    prefix: const Icon(FIcons.book),
+                    title: const Text('CoursePage'),
+                    onPress: () => gorto("academics/common/StudentCoursePage"),
+                  ),
+                  FItem(
+                    prefix: const Icon(FIcons.university),
+                    title: const Text('Academic Calendar'),
+                    onPress: () => gorto("academics/common/CalendarPreview"),
                   ),
                 ],
               ),
-            ),
+              FItemGroup(
+                children: [
+                  FItem(
+                    prefix: const Icon(FIcons.graduationCap),
+                    title: const Text('Grades'),
+                    onPress:
+                        () => gorto(
+                          "examinations/examGradeView/StudentGradeView",
+                        ),
+                  ),
+                  FItem(
+                    prefix: const Icon(FIcons.history),
+                    title: const Text('Grades History'),
+                    onPress:
+                        () => gorto(
+                          "examinations/examGradeView/StudentGradeHistory",
+                        ),
+                  ),
+                ],
+              ),
+              FItemGroup(
+                children: [
+                  FItem(
+                    prefix: Icon(
+                      isRemoveSpacing.value ? Icons.compress : FIcons.expand,
+                    ),
+                    title: Text(
+                      isRemoveSpacing.value
+                          ? 'Disable Compact View'
+                          : 'Enable Compact View',
+                    ),
+                    onPress: () {
+                      isRemoveSpacing.value = !isRemoveSpacing.value;
+                    },
+                  ),
+                ],
+              ),
+            ],
+            builder:
+                (_, controller, _) => FHeaderAction(
+                  icon: const Icon(FIcons.ellipsis),
+                  onPress: controller.toggle,
+                ),
+          ),
         ],
+      ),
+      child: SafeArea(
+        bottom: true,
+        top: false,
+        left: false,
+        right: false,
+        child: Container(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height * 0.8,
+          decoration: BoxDecoration(
+            color: MoreColors.tableBackground,
+            boxShadow: [
+              BoxShadow(
+                color: MoreColors.cardShadow,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: InAppWebView(
+                  initialSettings: InAppWebViewSettings(
+                    isInspectable: kDebugMode,
+                  ),
+                  initialUrlRequest: URLRequest(
+                    url: WebUri("https://vtop.vitap.ac.in/vtop/content?"),
+                  ),
+                  onWebViewCreated: (controller) {
+                    webController.value = controller;
+                  },
+
+                  shouldOverrideUrlLoading: (
+                    controller,
+                    navigationAction,
+                  ) async {
+                    final uri = navigationAction.request.url;
+                    // removeSpacing();
+                    if (uri.toString().toLowerCase().contains("download")) {
+                      String cookie =
+                          "${cookieName.value}=${cookieValue.value};";
+                      downloadFile(uri.toString(), cookie);
+                      return NavigationActionPolicy.CANCEL;
+                    } else if (uri.toString().toLowerCase().startsWith(
+                      "https://vtop.vitap.ac.in",
+                    )) {
+                      return NavigationActionPolicy.ALLOW;
+                    }
+
+                    return NavigationActionPolicy.CANCEL;
+                  },
+                  onReceivedServerTrustAuthRequest: (_, _) async {
+                    return ServerTrustAuthResponse(
+                      action: ServerTrustAuthResponseAction.PROCEED,
+                    );
+                  },
+                  onUpdateVisitedHistory: (controller, url, androidIsReload) {
+                    final u = url.toString().toLowerCase();
+                    if (!u.startsWith("https://vtop.vitap.ac.in")) {
+                      controller.stopLoading();
+                      controller.goBack();
+                      dispToast(
+                        context,
+                        "Open in Chrome",
+                        "Please continue in Chrome.",
+                      );
+                    }
+                  },
+                  onLoadStart: (controller, url) {
+                    loading.value = true;
+                  },
+                  onLoadStop: (controller, url) async {
+                    loading.value = false;
+                    removeSpacing(padding: 1);
+                    final k = ref.read(themeProvider);
+
+                    if (isdark.value) {
+                      controller.evaluateJavascript(source: darkModeScript);
+                    }
+                  },
+                ),
+              ),
+              if (loading.value)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: MoreColors.infoBackground,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: MoreColors.infoText,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Loading...",
+                        style: TextStyle(
+                          color: MoreColors.secondaryText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
