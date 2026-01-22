@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+
 import 'package:vitapmate/core/providers/theme_provider.dart';
 
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -29,6 +30,8 @@ class VtopWebview extends HookConsumerWidget {
     final webController = useState<InAppWebViewController?>(null);
     final showHeading = useState("VTOP");
     final isRemoveSpacing = useState(true);
+    final url = WebUri("https://vtop.vitap.ac.in");
+    final initUrl = WebUri("https://vtop.vitap.ac.in/vtop/content?");
     final isdark = useState(ref.read(themeProvider).index == 2);
     final String darkModeScript = '''
   (function() {
@@ -119,7 +122,15 @@ class VtopWebview extends HookConsumerWidget {
             padding: ${padding}px !important;
             margin: ${padding}px !important;
           }
-        `;
+  button[data-bs-target="#expandedSideBar"] {
+    padding: 10px 14px !important;
+    border: none !important;
+    border-radius: 6px !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+  }
+    
+  `;
         
         // Remove existing style if present
         const oldStyle = document.getElementById('custom-spacing-style');
@@ -163,50 +174,53 @@ class VtopWebview extends HookConsumerWidget {
       }
     }
 
-    useEffect(() {
-      Future(() async {
-        final cookieManager = CookieManager.instance();
-        final expiresDate =
-            DateTime.now()
-                .add(const Duration(minutes: 30))
-                .millisecondsSinceEpoch;
-        final url = WebUri("https://vtop.vitap.ac.in");
+    Future<void> loadenv() async {
+      final cookieManager = CookieManager.instance();
+      final expiresDate =
+          DateTime.now()
+              .add(const Duration(minutes: 30))
+              .millisecondsSinceEpoch;
 
-        final client = await ref.read(vClientProvider.future);
-        final raw = await fetchCookies(client: client);
-        final cookieString = String.fromCharCodes(raw);
+      final client = await ref.read(vClientProvider.future);
+      final raw = await fetchCookies(client: client);
+      final cookieString = String.fromCharCodes(raw);
 
-        final parts = cookieString.split(";").first.trim().split('=');
-        if (parts.length < 2) return;
+      final parts = cookieString.split(";").first.trim().split('=');
+      if (parts.length < 2) return;
 
-        final name = parts[0].trim();
-        final value = parts[1].trim();
-        cookieName.value = name;
-        cookieValue.value = value;
+      final name = parts[0].trim();
+      final value = parts[1].trim();
+      cookieName.value = name;
+      cookieValue.value = value;
 
-        if (Platform.isAndroid) {
-          await cookieManagerAndroid.clearCookies();
-          await cookieManagerAndroid.setCookie(
-            WebViewCookie(
-              name: name,
-              value: value,
-              domain: '.vitap.ac.in',
-              path: '/',
-            ),
-          );
-        } else {
-          await cookieManager.setCookie(
-            url: url,
+      if (Platform.isAndroid) {
+        await cookieManagerAndroid.clearCookies();
+        await cookieManagerAndroid.setCookie(
+          WebViewCookie(
             name: name,
             value: value,
-            expiresDate: expiresDate,
-            isSecure: true,
-            domain: ".vitap.ac.in",
+            domain: '.vitap.ac.in',
             path: '/',
-          );
-        }
+          ),
+        );
+      } else {
+        await cookieManager.setCookie(
+          url: url,
+          name: name,
+          value: value,
+          expiresDate: expiresDate,
+          isSecure: true,
+          domain: ".vitap.ac.in",
+          path: '/',
+        );
+      }
 
-        envState.value = false;
+      envState.value = false;
+    }
+
+    useEffect(() {
+      Future(() async {
+        await loadenv();
       });
 
       return null;
@@ -324,6 +338,11 @@ class VtopWebview extends HookConsumerWidget {
                     title: const Text('Academic Calendar'),
                     onPress: () => gorto("academics/common/CalendarPreview"),
                   ),
+                  FItem(
+                    prefix: const Icon(FIcons.workflow),
+                    title: const Text('Digital Assignment'),
+                    onPress: () => gorto("examinations/StudentDA"),
+                  ),
                 ],
               ),
               FItemGroup(
@@ -361,6 +380,27 @@ class VtopWebview extends HookConsumerWidget {
                       isRemoveSpacing.value = !isRemoveSpacing.value;
                     },
                   ),
+                  FItem(
+                    prefix: const Icon(FIcons.logIn),
+                    title: const Text('Force Login'),
+                    onPress: () async {
+                      loading.value = true;
+                      try {
+                          
+                        await ref
+                            .read(vClientProvider.notifier)
+                            .tryLogin(force: true);
+                      
+                        await loadenv();
+                        final controller = webController.value;
+                        if (controller != null) {
+  await controller.loadUrl(urlRequest: URLRequest(url: initUrl));
+                        }
+                      } finally {
+                        loading.value = false;
+                      }
+                    },
+                  ),
                 ],
               ),
             ],
@@ -390,96 +430,66 @@ class VtopWebview extends HookConsumerWidget {
               ),
             ],
           ),
-          child: Column(
+          child: Stack(
             children: [
-              Expanded(
-                child: InAppWebView(
-                  initialSettings: InAppWebViewSettings(
-                    isInspectable: kDebugMode,
-                  ),
-                  initialUrlRequest: URLRequest(
-                    url: WebUri("https://vtop.vitap.ac.in/vtop/content?"),
-                  ),
-                  onWebViewCreated: (controller) {
-                    webController.value = controller;
-                  },
-
-                  shouldOverrideUrlLoading: (
-                    controller,
-                    navigationAction,
-                  ) async {
-                    final uri = navigationAction.request.url;
-                    // removeSpacing();
-                    if (uri.toString().toLowerCase().contains("download")) {
-                      String cookie =
-                          "${cookieName.value}=${cookieValue.value};";
-                      downloadFile(uri.toString(), cookie);
-                      return NavigationActionPolicy.CANCEL;
-                    } else if (uri.toString().toLowerCase().startsWith(
-                      "https://vtop.vitap.ac.in",
-                    )) {
-                      return NavigationActionPolicy.ALLOW;
-                    }
-
-                    return NavigationActionPolicy.CANCEL;
-                  },
-                  onReceivedServerTrustAuthRequest: (_, _) async {
-                    return ServerTrustAuthResponse(
-                      action: ServerTrustAuthResponseAction.PROCEED,
-                    );
-                  },
-                  onUpdateVisitedHistory: (controller, url, androidIsReload) {
-                    final u = url.toString().toLowerCase();
-                    if (!u.startsWith("https://vtop.vitap.ac.in")) {
-                      controller.stopLoading();
-                      controller.goBack();
-                      dispToast(
-                        context,
-                        "Open in Chrome",
-                        "Please continue in Chrome.",
-                      );
-                    }
-                  },
-                  onLoadStart: (controller, url) {
-                    loading.value = true;
-                  },
-                  onLoadStop: (controller, url) async {
-                    loading.value = false;
-                    removeSpacing(padding: 1);
-                    final k = ref.read(themeProvider);
-
-                    if (isdark.value) {
-                      controller.evaluateJavascript(source: darkModeScript);
-                    }
-                  },
+              InAppWebView(
+                initialSettings: InAppWebViewSettings(
+                  isInspectable: kDebugMode,
                 ),
+                initialUrlRequest: URLRequest(
+                  url:initUrl,
+                ),
+                onWebViewCreated: (controller) {
+                  webController.value = controller;
+                },
+
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  final uri = navigationAction.request.url;
+                  // removeSpacing();
+                  if (uri.toString().toLowerCase().contains("download")) {
+                    String cookie = "${cookieName.value}=${cookieValue.value};";
+                    downloadFile(uri.toString(), cookie);
+                    return NavigationActionPolicy.CANCEL;
+                  } else if (uri.toString().toLowerCase().startsWith(
+                    "https://vtop.vitap.ac.in",
+                  )) {
+                    return NavigationActionPolicy.ALLOW;
+                  }
+
+                  return NavigationActionPolicy.CANCEL;
+                },
+                onReceivedServerTrustAuthRequest: (_, _) async {
+                  return ServerTrustAuthResponse(
+                    action: ServerTrustAuthResponseAction.PROCEED,
+                  );
+                },
+                onUpdateVisitedHistory: (controller, url, androidIsReload) {
+                  final u = url.toString().toLowerCase();
+                  if (!u.startsWith("https://vtop.vitap.ac.in")) {
+                    controller.stopLoading();
+                    controller.goBack();
+                    dispToast(
+                      context,
+                      "Open in Chrome",
+                      "Please continue in Chrome.",
+                    );
+                  }
+                },
+                onLoadStart: (controller, url) {
+                  loading.value = true;
+                },
+                onLoadStop: (controller, url) async {
+                  loading.value = false;
+                  removeSpacing(padding: 1);
+                  final k = ref.read(themeProvider);
+
+                  if (isdark.value) {
+                    controller.evaluateJavascript(source: darkModeScript);
+                  }
+                },
               ),
               if (loading.value)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  color: MoreColors.infoBackground,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: MoreColors.infoText,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Loading...",
-                        style: TextStyle(
-                          color: MoreColors.secondaryText,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Positioned(left: 0, right: 0, top: 0, child: FProgress()),
             ],
           ),
         ),

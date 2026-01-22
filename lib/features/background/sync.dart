@@ -112,14 +112,14 @@ class BackgroundNotificationService {
         'background_sync',
         'Background Sync',
         description: 'Background data synchronization',
-        importance: Importance.defaultImportance,
+        importance: Importance.low,
       );
   static const AndroidNotificationChannel _backgroundSyncChannelDone =
       AndroidNotificationChannel(
         'background_sync_done',
         'Background Sync done',
         description: 'Background data synchronization done',
-        importance: Importance.defaultImportance,
+        importance: Importance.low,
       );
 
   static Future<void> initialize() async {
@@ -157,6 +157,7 @@ class BackgroundNotificationService {
           ongoing: true,
           indeterminate: true,
           showProgress: true,
+          silent: true
         ),
       ),
     );
@@ -175,6 +176,7 @@ class BackgroundNotificationService {
           'Background Sync done',
           importance: Importance.low,
           priority: Priority.low,
+          silent: true
         ),
       ),
     );

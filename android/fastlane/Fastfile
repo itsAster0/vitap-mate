@@ -1,5 +1,5 @@
 default_platform(:android)
-update_priority  =2;
+update_priority  =4;
 platform :android do
   desc "Deploy a new version to the Internal track only"
   lane :deploy_internal do
