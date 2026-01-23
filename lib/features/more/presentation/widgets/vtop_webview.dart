@@ -345,6 +345,7 @@ class VtopWebview extends HookConsumerWidget {
                   ),
                 ],
               ),
+
               FItemGroup(
                 children: [
                   FItem(
@@ -362,6 +363,20 @@ class VtopWebview extends HookConsumerWidget {
                         () => gorto(
                           "examinations/examGradeView/StudentGradeHistory",
                         ),
+                  ),
+                ],
+              ),
+              FItemGroup(
+                children: [
+                  FItem(
+                    prefix: const Icon(FIcons.amphora),
+                    title: const Text('Weekend Outing'),
+                    onPress: () => gorto("hostel/StudentWeekendOuting"),
+                  ),
+                  FItem(
+                    prefix: const Icon(FIcons.anchor),
+                    title: const Text('General Outing'),
+                    onPress: () => gorto("hostel/StudentGeneralOuting"),
                   ),
                 ],
               ),
@@ -386,15 +401,16 @@ class VtopWebview extends HookConsumerWidget {
                     onPress: () async {
                       loading.value = true;
                       try {
-                          
                         await ref
                             .read(vClientProvider.notifier)
                             .tryLogin(force: true);
-                      
+
                         await loadenv();
                         final controller = webController.value;
                         if (controller != null) {
-  await controller.loadUrl(urlRequest: URLRequest(url: initUrl));
+                          await controller.loadUrl(
+                            urlRequest: URLRequest(url: initUrl),
+                          );
                         }
                       } finally {
                         loading.value = false;
@@ -436,9 +452,7 @@ class VtopWebview extends HookConsumerWidget {
                 initialSettings: InAppWebViewSettings(
                   isInspectable: kDebugMode,
                 ),
-                initialUrlRequest: URLRequest(
-                  url:initUrl,
-                ),
+                initialUrlRequest: URLRequest(url: initUrl),
                 onWebViewCreated: (controller) {
                   webController.value = controller;
                 },

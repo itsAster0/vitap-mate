@@ -23,15 +23,15 @@ class SettingsPage extends HookConsumerWidget {
     final field15e = useTextEditingController();
 
     final backgroundSync = [
-      FSelectTile(title: Text("Disbale"), value: Duration(seconds: 0)),
+      FSelectTile(title: Text("Disable"), value: Duration(seconds: 0)),
       if (show15.value)
         FSelectTile(title: Text("15 Minutes"), value: Duration(minutes: 15)),
       if (show15.value)
         FSelectTile(title: Text("1 hour"), value: Duration(hours: 1)),
       FSelectTile(title: Text("3 hours"), value: Duration(hours: 3)),
       FSelectTile(title: Text("6 hours"), value: Duration(hours: 6)),
-      FSelectTile(title: Text("9 hours"), value: Duration(hours: 9)),
       FSelectTile(title: Text("12 hours"), value: Duration(hours: 12)),
+      FSelectTile(title: Text("24 hours"), value: Duration(hours: 24)),
     ];
     final initialValSync =
         ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);

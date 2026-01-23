@@ -8,13 +8,13 @@ part 'controller.g.dart';
 
 @Riverpod(keepAlive: true)
 class BackgroundSync extends _$BackgroundSync {
-  final _keySync = "background_sync_key";
+  final _keySync = "background_sync_key_v2";
   @override
   Future<SyncState> build() async {
     final prefs = await SharedPreferences.getInstance();
     final syncjsonstr = prefs.getString(_keySync);
     if (syncjsonstr == null) {
-      final freq = Duration(hours: 6);
+      final freq = Duration(hours: 12);
       final k = SyncState(freq: freq);
 
       _save(k);
@@ -40,7 +40,6 @@ class BackgroundSync extends _$BackgroundSync {
 
   void _configure(Duration freqk) async {
     final freq = freqk == Duration(seconds: 0) ? null : freqk;
-
     final valToken = "sync_vtop";
     if (freq != null) {
       Workmanager().registerPeriodicTask(

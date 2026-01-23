@@ -1,6 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
@@ -30,10 +31,11 @@ void callbackDispatcher() {
 }
 
 Future<bool> _syncData({String? task}) async {
+  final container = ProviderContainer();
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val_start', DateTime.now().toString());
-    final container = ProviderContainer();
+
     await RustLib.init();
     final user = await container.read(vtopUserProvider.future);
     if (!user.isValid || user.semid == null) {
@@ -59,13 +61,15 @@ Future<bool> _syncData({String? task}) async {
         () => container.read(semesterIdProvider.notifier).updatesemids(),
       ),
 
-      _retryer(() => _attendanceSync(container, task)),
+      _attendanceSync(container, task),
     ];
     final k = await Future.wait(futures);
     await prefs.setString('${task}_val_end', DateTime.now().toString());
     return k.every((e) => e);
   } catch (e) {
     return false;
+  } finally {
+    container.dispose();
   }
 }
 
@@ -79,26 +83,39 @@ Future<bool> _retryer(Future<void> Function() func) async {
       await func();
       return true;
     } catch (e) {
-      ();
+      if (e is FeatureDisabledException) {
+        return true;
+      }
     }
   }
   return false;
 }
 
-Future<void> _attendanceSync(ProviderContainer container, String? task) async {
-  await container.read(attendanceProvider.notifier).updateAttendance();
+Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
+  try {
+    final ok = await _retryer(
+      () => container.read(attendanceProvider.notifier).updateAttendance(),
+    );
+    final att = await container.read(attendanceProvider.future);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('${task}_val', att.toString());
 
-  final att = await container.read(attendanceProvider.future);
+    final k = await Future.wait([
+      for (final i in att.records)
+        _retryer(
+          () =>
+              container
+                  .read(
+                    fullAttendanceProvider(i.courseType, i.courseId).notifier,
+                  )
+                  .updateAttendance(),
+        ),
+    ]);
+    return k.every((e) => e) && ok;
+  } catch (e) {
+    return false;
+  }
 
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('${task}_val', att.toString());
-
-  await Future.wait([
-    for (final i in att.records)
-      container
-          .read(fullAttendanceProvider(i.courseType, i.courseId).notifier)
-          .updateAttendance(),
-  ]);
 }
 
 class BackgroundNotificationService {
@@ -106,20 +123,21 @@ class BackgroundNotificationService {
       FlutterLocalNotificationsPlugin();
 
   static const int _syncId = 9001;
-
+  static const _backSyncId = "background_sync_v2";
+  static const _backSyncDoneId = "background_sync_done_v2";
   static const AndroidNotificationChannel _backgroundSyncChannel =
       AndroidNotificationChannel(
-        'background_sync',
+        _backSyncId,
         'Background Sync',
         description: 'Background data synchronization',
-        importance: Importance.low,
+        importance: Importance.min,
       );
   static const AndroidNotificationChannel _backgroundSyncChannelDone =
       AndroidNotificationChannel(
-        'background_sync_done',
+        _backSyncDoneId,
         'Background Sync done',
         description: 'Background data synchronization done',
-        importance: Importance.low,
+        importance: Importance.min,
       );
 
   static Future<void> initialize() async {
@@ -150,14 +168,15 @@ class BackgroundNotificationService {
       'Syncing VTOP data in background…',
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'background_sync',
+          _backSyncId,
           'Background Sync',
           importance: Importance.low,
           priority: Priority.low,
           ongoing: true,
           indeterminate: true,
           showProgress: true,
-          silent: true
+          silent: true,
+          timeoutAfter: 1000 * 60 * 5,
         ),
       ),
     );
@@ -172,11 +191,11 @@ class BackgroundNotificationService {
       success ? 'Background sync completed' : 'Failed to sync some data',
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'background_sync_done',
+          _backSyncDoneId,
           'Background Sync done',
-          importance: Importance.low,
-          priority: Priority.low,
-          silent: true
+          importance: Importance.min,
+          priority: Priority.min,
+          silent: true,
         ),
       ),
     );
