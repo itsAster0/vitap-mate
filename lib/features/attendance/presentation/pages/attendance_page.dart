@@ -101,9 +101,9 @@ class AttendancePage extends HookConsumerWidget {
             },
             error: (e, _) {
               final msg = commonErrorMessage(e);
-              try {
-                disCommonToast(context, e);
-              } catch (_) {}
+              // try {
+              //   disCommonToast(context, e);
+              // } catch (_) {}
               return Center(child: Text(msg));
             },
             loading:

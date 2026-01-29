@@ -107,7 +107,7 @@ class TimetablePage extends HookConsumerWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(height: 80),
+                          const SizedBox(height: 72),
 
                           ...daySlots.map((slot) => TimetableCard(slot: slot)),
 

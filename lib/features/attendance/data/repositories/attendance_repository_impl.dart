@@ -54,6 +54,7 @@ class AttendanceRepositoryImpl extends AttendanceRepository {
   @override
   Future<void> updateAttendance() async {
     var attendance = await remoteDataSource.fetchAttendanceFromRemote(semid);
+    if (attendance.records.isEmpty) return;
     saveAttendanceToStoarge(attendance);
   }
 

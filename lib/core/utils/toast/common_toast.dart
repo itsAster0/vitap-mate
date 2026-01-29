@@ -129,45 +129,46 @@ void disCommonToast(BuildContext context, Object e) {
             ),
           ),
     );
-  } else {
-    showFToast(
-      context: context,
-      alignment: FToastAlignment.bottomCenter,
-      title: const Text('Error oocured'),
-
-      description: const Text('Please try again'),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
-    );
   }
+  // } else {
+  //   showFToast(
+  //     context: context,
+  //     alignment: FToastAlignment.bottomCenter,
+  //     title: const Text('Error oocured'),
+
+  //     description: const Text('Please try again'),
+  //     suffixBuilder:
+  //         (context, entry) => IntrinsicHeight(
+  //           child: FButton(
+  //             style:
+  //                 context.theme.buttonStyles.primary
+  //                     .copyWith(
+  //                       contentStyle:
+  //                           context.theme.buttonStyles.primary.contentStyle
+  //                               .copyWith(
+  //                                 padding: const EdgeInsets.symmetric(
+  //                                   horizontal: 12,
+  //                                   vertical: 7.5,
+  //                                 ),
+  //                                 textStyle: FWidgetStateMap.all(
+  //                                   context.theme.typography.xs.copyWith(
+  //                                     color:
+  //                                         context
+  //                                             .theme
+  //                                             .colors
+  //                                             .primaryForeground,
+  //                                   ),
+  //                                 ),
+  //                               )
+  //                               .call,
+  //                     )
+  //                     .call,
+  //             onPress: entry.dismiss,
+  //             child: const Text('Aye'),
+  //           ),
+  //         ),
+  //   );
+  // }
 }
 
 void disOnbardingCommonToast(BuildContext context, Object e) {

@@ -29,6 +29,7 @@ class TimetableRepositoryImpl extends TimetableRepository {
   @override
   Future<void> updateTimetable() async {
     var timetable = await remoteDataSource.fetchTimetableFromRemote(semid);
+    if (timetable.slots.isEmpty) return;
     saveTimetableToStorage(timetable: timetable);
   }
 }

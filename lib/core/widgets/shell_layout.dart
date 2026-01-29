@@ -3,24 +3,47 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
+import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/share_tt.dart';
 
-class ShellLayout extends HookWidget {
+class ShellLayout extends HookConsumerWidget {
   final Widget child;
   const ShellLayout({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sems = ref.watch(semesterIdProvider);
+
+    final sem = ref.watch(vtopUserProvider);
+    final newSemExist = useMemoized(() {
+      if (sem.value == null || sems.value == null) return false;
+      final max = sems.value!.semesters.fold<int>(0, (i, e) {
+        final result =
+            int.tryParse(e.id.toLowerCase().replaceAll("ap", "")) ?? 0;
+        return result > i ? result : i;
+      });
+
+      if (max == 0) return false;
+      if (sem.value!.semid == null) return false;
+
+      final currentSemID =
+          int.tryParse(sem.value!.semid!.toLowerCase().replaceAll("ap", "")) ??
+          0;
+      return currentSemID < max;
+    }, [sem.value?.semid, sems.value?.semesters.length]);
+
     var k = GoRouter.of(context).routeInformationProvider.value.uri.toString();
     final headers = [
-      getSidewidget(context, "Timetable", k),
-      getSidewidget(context, "Attendance", k),
-      getSidewidget(context, "More", k),
-      getSidewidget(context, "Social", k),
-      getSidewidget(context, "Settings", k),
+      getSidewidget(context, "Timetable", k, newSemExist),
+      getSidewidget(context, "Attendance", k, newSemExist),
+      getSidewidget(context, "More", k, newSemExist),
+      getSidewidget(context, "Social", k, newSemExist),
+      getSidewidget(context, "Settings", k, newSemExist),
     ];
     final selected = useState(0);
     useEffect(() {
@@ -97,7 +120,12 @@ class ShellLayout extends HookWidget {
   }
 }
 
-Widget? getSidewidget(BuildContext context, String data, String path) {
+Widget? getSidewidget(
+  BuildContext context,
+  String data,
+  String path,
+  bool newsem,
+) {
   if (path.split('/').length - 1 > 1) {
     switch (path.split("/")[2]) {
       case "marks":
@@ -107,14 +135,38 @@ Widget? getSidewidget(BuildContext context, String data, String path) {
         data = "Exam Schedule";
         break;
     }
+
     return FHeader.nested(
       title: Text(data),
       prefixes: [FHeaderAction.back(onPress: () => GoRouter.of(context).pop())],
     );
   }
+
   return FHeader.nested(
-    title: Text(data),
+    title:
+        newsem
+            ? Align(
+              alignment: AlignmentGeometry.topLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+
+                children: [
+                  Text(data, style: context.theme.typography.lg),
+
+                  const SizedBox(height: 4),
+                  Text(
+                    "You can change Semseter in Settings → VTOP Details",
+                    maxLines: 2,
+                    style: context.theme.typography.sm,
+                  ),
+                ],
+              ),
+            )
+            : Text(data, style: context.theme.typography.lg),
+
     prefixes: [if (path.contains("social")) InfoSocial()],
+
     suffixes: [
       if (path.contains("social")) LogoutButton(),
       if (path.contains("timetable")) ShareTt(),

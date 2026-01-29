@@ -29,6 +29,7 @@ class ExamScheduleRepoImpl implements ExamScheduleRepository {
   @override
   Future<void> updateExamSchedule() async {
     var data = await remoteDataSource.fetchScheduleeFromRemote(semid);
+    if (data.exams.isEmpty) return;
     saveExamScheduleToStorage(data: data);
   }
 }

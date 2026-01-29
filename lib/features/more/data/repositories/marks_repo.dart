@@ -27,6 +27,7 @@ class MarksRepoImpl implements MarksRepository {
   @override
   Future<void> updateMarks() async {
     var data = await remoteDataSource.fetchMarksFromRemote(semid);
+    if (data.records.isEmpty) return;
     saveMarksToStorage(data: data);
   }
 }
