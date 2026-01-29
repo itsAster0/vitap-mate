@@ -375,7 +375,7 @@ class AttendanceCard extends HookConsumerWidget {
 
   void _showAttendanceDetails(BuildContext context) {
     showFSheet(
-      mainAxisMaxRatio: 2 / 3,
+      mainAxisMaxRatio: 4 / 5,
       context: context,
       side: FLayout.btt,
       builder:

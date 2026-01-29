@@ -115,7 +115,6 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
   } catch (e) {
     return false;
   }
-
 }
 
 class BackgroundNotificationService {

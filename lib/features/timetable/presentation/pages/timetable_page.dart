@@ -1,4 +1,6 @@
 import 'dart:developer';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -6,11 +8,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
-
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetablePage extends HookConsumerWidget {
@@ -21,6 +22,8 @@ class TimetablePage extends HookConsumerWidget {
     final key = useMemoized(() => GlobalKey());
     final selectedDay = useState<int>(DateTime.now().weekday);
     final finalDay = useState<List<int>>([]);
+    final scrollController = useScrollController();
+    final scrollOffset = useState<double>(0);
     final timetableData = ref.watch(timetableProvider);
     final startX = useState<double?>(null);
     useEffect(() {
@@ -47,152 +50,155 @@ class TimetablePage extends HookConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(),
-      child: Column(
+      child: Stack(
         children: [
-          if (timetableData.hasValue)
-            DaysStack(
-              selectedDay: selectedDay,
-              daysList: getDayList(timetableData.value),
-            ),
+          RefreshIndicator(
+            displacement: 120,
+            key: key,
+            backgroundColor: context.theme.colors.primary,
+            color: context.theme.colors.primaryForeground,
+            strokeWidth: 2.5,
+            onRefresh: update,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: GestureDetector(
+                onHorizontalDragStart: (details) {
+                  startX.value = details.globalPosition.dx;
+                },
+                onHorizontalDragUpdate: (details) {
+                  if (finalDay.value.isEmpty) return;
+                  final currentX = details.globalPosition.dx;
+                  final deltaX = currentX - (startX.value ?? currentX);
 
-          Expanded(
-            child: RefreshIndicator(
-              key: key,
-              backgroundColor: context.theme.colors.primary,
-              color: context.theme.colors.primaryForeground,
-              strokeWidth: 2.5,
-              onRefresh: update,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: GestureDetector(
-                  onHorizontalDragStart: (details) {
-                    startX.value = details.globalPosition.dx;
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    final currentX = details.globalPosition.dx;
-                    final deltaX = currentX - (startX.value ?? currentX);
+                  if (deltaX > 80 && finalDay.value.first < selectedDay.value) {
+                    selectedDay.value -= 1;
+                    startX.value = currentX;
+                  } else if (deltaX < -80 &&
+                      finalDay.value.last > selectedDay.value) {
+                    selectedDay.value += 1;
+                    startX.value = currentX;
+                  }
+                },
+                onHorizontalDragEnd: (_) => startX.value = null,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height * 0.8,
+                  ),
+                  child: timetableData.when(
+                    data: (data) {
+                      final tempList = getDayList(data);
+                      finalDay.value = tempList;
 
-                    if (deltaX > 80 &&
-                        finalDay.value.first < selectedDay.value) {
-                      selectedDay.value -= 1;
-                      startX.value = currentX;
-                    } else if (deltaX < -80 &&
-                        finalDay.value.last > selectedDay.value) {
-                      selectedDay.value += 1;
-                      startX.value = currentX;
-                    }
-                  },
-                  onHorizontalDragEnd: (_) => startX.value = null,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: MediaQuery.of(context).size.height * 0.8,
-                    ),
-                    child: timetableData.when(
-                      data: (data) {
-                        final tempList = getDayList(data);
-                        finalDay.value = tempList;
+                      if (!tempList.contains(selectedDay.value)) {
+                        selectedDay.value = tempList.first;
+                      }
+                      var tempdays = getDaySlotList(data, selectedDay.value);
 
-                        if (!tempList.contains(selectedDay.value)) {
-                          selectedDay.value = tempList.first;
-                        }
-                        var tempdays = getDaySlotList(data, selectedDay.value);
+                      if (mergeLabs) {
+                        tempdays = mergeLabsSloths(tempdays);
+                      }
+                      final daySlots = addFreeSlots(tempdays);
 
-                        if (mergeLabs) {
-                          tempdays = mergeLabsSloths(tempdays);
-                        }
-                        final daySlots = addFreeSlots(tempdays);
+                      daySlots.sort((a, b) {
+                        final t1 = _parseTime(a.startTime);
+                        final t2 = _parseTime(b.startTime);
+                        return t1.compareTo(t2);
+                      });
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const SizedBox(height: 80),
 
-                        daySlots.sort((a, b) {
-                          final t1 = _parseTime(a.startTime);
-                          final t2 = _parseTime(b.startTime);
-                          return t1.compareTo(t2);
-                        });
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            const SizedBox(height: 8),
+                          ...daySlots.map((slot) => TimetableCard(slot: slot)),
 
-                            ...daySlots.map(
-                              (slot) => TimetableCard(slot: slot),
+                          Container(
+                            margin: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: context.theme.colors.primaryForeground,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-
-                            Container(
-                              margin: const EdgeInsets.all(16),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: context.theme.colors.primaryForeground,
-                                borderRadius: BorderRadius.circular(8),
+                            child: Text(
+                              "Last updated: ${formatUnixTimestamp(data.updateTime.toInt())}",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: context.theme.colors.primary,
+                                fontWeight: FontWeight.w500,
                               ),
-                              child: Text(
-                                "Last updated: ${formatUnixTimestamp(data.updateTime.toInt())}",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.theme.colors.primary,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                    error: (e, stackTrace) {
+                      disCommonToast(context, e);
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              commonErrorMessage(e),
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
-                        );
-                      },
-                      error: (e, stackTrace) {
-                        disCommonToast(context, e);
-                        return Center(
+                        ),
+                      );
+                    },
+                    loading:
+                        () => const Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Colors.grey[400],
+                              SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    TimetableColors.upcomingBorder,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               Text(
-                                commonErrorMessage(e),
-                                textAlign: TextAlign.center,
+                                'Loading timetable...',
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                      loading:
-                          () => const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 40,
-                                  height: 40,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 3,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      TimetableColors.upcomingBorder,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Loading timetable...',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                    ),
+                        ),
                   ),
                 ),
               ),
             ),
           ),
+          if (timetableData.hasValue)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: FrostedGlassBox(
+                child: DaysStack(
+                  selectedDay: selectedDay,
+                  daysList: getDayList(timetableData.value),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -256,7 +262,10 @@ List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> t) {
         current.isLab &&
         prev.isLab &&
         current.courseCode == prev.courseCode) {
-      r[r.length - 1] = prev.copyWith(endTime: current.endTime);
+      r[r.length - 1] = prev.copyWith(
+        endTime: current.endTime,
+        slot: "${prev.slot}+${current.slot}",
+      );
     } else {
       r.add(current);
     }
@@ -310,4 +319,27 @@ Duration _parseTime(String t) {
   final h = int.parse(parts[0]);
   final m = parts.length > 1 ? int.parse(parts[1]) : 0;
   return Duration(hours: h, minutes: m);
+}
+
+class FrostedGlassBox extends StatelessWidget {
+  final Widget child;
+
+  const FrostedGlassBox({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentGeometry.topCenter,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 6),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
 }

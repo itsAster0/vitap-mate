@@ -4,13 +4,15 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
+import 'package:vitapmate/features/more/presentation/widgets/wifi_card.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
-class MorePage extends StatelessWidget {
+class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
 
   // Future<void> _launchInBrowser(Uri url) async {
@@ -20,7 +22,7 @@ class MorePage extends StatelessWidget {
   // }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
     final Uri url = Uri.parse('https://faculty.synaptic.gg/');
     return Padding(
@@ -52,7 +54,7 @@ class MorePage extends StatelessWidget {
           ),
 
           VtopCard(),
-          // WifiCard(),
+          if (ref.watch(wificardSettingProvider)) WifiCard(),
         ],
       ),
     );

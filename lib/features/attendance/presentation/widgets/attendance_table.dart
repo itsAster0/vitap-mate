@@ -6,6 +6,7 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
+import 'package:vitapmate/features/attendance/presentation/widgets/attendance_cal.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
 
 class AttendanceTable extends HookConsumerWidget {
@@ -27,6 +28,8 @@ class AttendanceTable extends HookConsumerWidget {
     final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final isLoading = useState(false);
+    final selectedTab = useState(0);
+
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
@@ -63,14 +66,131 @@ class AttendanceTable extends HookConsumerWidget {
       child: Column(
         children: [
           _buildHeader(darkMode, context, facultyName, isLoading, handelClick),
-          Expanded(
-            child: dataAsync.when(
-              data: (data) => _buildTableContent(darkMode, context, data),
-              error: (e, se) => _buildErrorState(e),
-              loading: () => _buildLoadingState(),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.theme.colors.background,
+              border: Border(
+                bottom: BorderSide(color: context.theme.colors.border),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTabButton(
+                    context: context,
+                    darkMode: darkMode,
+                    label: "Attendance Table",
+                    icon: Icons.table_chart_rounded,
+                    isSelected: selectedTab.value == 0,
+                    onTap: () => selectedTab.value = 0,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildTabButton(
+                    context: context,
+                    darkMode: darkMode,
+                    label: "Calculator",
+                    icon: Icons.calculate_outlined,
+                    isSelected: selectedTab.value == 1,
+                    onTap: () => selectedTab.value = 1,
+                  ),
+                ),
+              ],
             ),
           ),
+
+          Expanded(
+            child:
+                selectedTab.value == 0
+                    ? dataAsync.when(
+                      data:
+                          (data) => _buildTableContent(darkMode, context, data),
+                      error: (e, se) => _buildErrorState(e),
+                      loading: () => _buildLoadingState(),
+                    )
+                    : dataAsync.when(
+                      data:
+                          (data) => AttendanceCalculator(
+                            currentAttended:
+                                data.records.where((r) {
+                                  final val = r.status.toLowerCase().replaceAll(
+                                    " ",
+                                    "",
+                                  );
+                                  return ["present", "onduty"].contains(val);
+                                }).length,
+                            currentTotal: data.records.length,
+                          ),
+                      error: (e, se) => _buildErrorState(e),
+                      loading: () => _buildLoadingState(),
+                    ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required BuildContext context,
+    required bool darkMode,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return FTappable(
+      onPress: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? (darkMode
+                      ? context.theme.colors.primaryForeground
+                      : AttendanceColors.theoryIcon.withValues(alpha: 0.1))
+                  : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color:
+                isSelected
+                    ? AttendanceColors.theoryIcon
+                    : context.theme.colors.border,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color:
+                  isSelected
+                      ? AttendanceColors.theoryIcon
+                      : AttendanceColors.tertiaryText,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color:
+                      isSelected
+                          ? (darkMode
+                              ? context.theme.colors.primary
+                              : AttendanceColors.theoryIcon)
+                          : AttendanceColors.tertiaryText,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -92,11 +212,13 @@ class AttendanceTable extends HookConsumerWidget {
       child: Row(
         children: [
           Container(
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AttendanceColors.theoryIcon.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.table_chart_rounded,
+              Icons.school_rounded,
               color: AttendanceColors.theoryIcon,
               size: 20,
             ),
@@ -116,9 +238,34 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
           if (!isLoading.value)
-            FTappable(onPress: callback, child: Icon(FIcons.rotateCcw)),
-          if (isLoading.value) FCircularProgress.pinwheel(),
-          SizedBox(width: 10),
+            FTappable(
+              onPress: callback,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color:
+                      isDark
+                          ? context.theme.colors.primaryForeground
+                          : AttendanceColors.tableRowAlternate,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  FIcons.rotateCcw,
+                  size: 16,
+                  color:
+                      isDark
+                          ? context.theme.colors.primary
+                          : AttendanceColors.secondaryText,
+                ),
+              ),
+            ),
+          if (isLoading.value)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: FCircularProgress.pinwheel(),
+            ),
+          const SizedBox(width: 10),
         ],
       ),
     );
@@ -140,7 +287,6 @@ class AttendanceTable extends HookConsumerWidget {
                       ? context.theme.colors.primaryForeground
                       : AttendanceColors.tableBackground,
               borderRadius: BorderRadius.circular(12),
-
               boxShadow: [
                 BoxShadow(
                   color: AttendanceColors.cardShadowSecondary,
@@ -284,12 +430,15 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
         ),
-        Text(
-          "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
-          style: const TextStyle(
-            fontSize: 12,
-            color: AttendanceColors.tertiaryText,
-            fontStyle: FontStyle.italic,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
+            style: const TextStyle(
+              fontSize: 12,
+              color: AttendanceColors.tertiaryText,
+              fontStyle: FontStyle.italic,
+            ),
           ),
         ),
       ],
@@ -345,6 +494,12 @@ class AttendanceTable extends HookConsumerWidget {
         textColor = AttendanceColors.presentText;
         borderColor = AttendanceColors.presentBorder;
         icon = Icons.check_rounded;
+        break;
+      case 'on duty':
+        backgroundColor = Colors.amberAccent.withValues(alpha: 0.2);
+        textColor = Colors.amber;
+        borderColor = Colors.amber;
+        icon = Icons.work;
         break;
       default:
         backgroundColor = AttendanceColors.unknownBackground;

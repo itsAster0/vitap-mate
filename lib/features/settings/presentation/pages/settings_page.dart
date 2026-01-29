@@ -185,6 +185,17 @@ class SettingsPage extends HookConsumerWidget {
                           ),
                         ),
                         FTile(
+                          prefix: Icon(FIcons.wifi),
+                          title: const Text('Show Wi-Fi Card'),
+
+                          suffix: FSwitch(
+                            value: ref.watch(wificardSettingProvider),
+                            onChange: (value) {
+                              ref.read(toggleWificardProvider);
+                            },
+                          ),
+                        ),
+                        FTile(
                           prefix: Icon(FIcons.bell),
                           title: const Text("Notifications"),
                           suffix: Icon(FIcons.dot),

@@ -6,7 +6,7 @@ part of 'controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$backgroundSyncHash() => r'1c73ddb7262ce3a418c8757a6f294d3ca600d4a5';
+String _$backgroundSyncHash() => r'8caa83eb6cde26fe8ea51fd5dd561432e9a1ea31';
 
 /// See also [BackgroundSync].
 @ProviderFor(BackgroundSync)

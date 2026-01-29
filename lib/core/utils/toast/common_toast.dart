@@ -6,6 +6,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 void disCommonToast(BuildContext context, Object e) {
+  if (!context.mounted) return;
   if (e == VtopError.invalidCredentials()) {
     showFToast(
       context: context,
@@ -15,7 +16,10 @@ void disCommonToast(BuildContext context, Object e) {
         'It looks like you changed your VTOP password. Please update it in settings -> Vtop Details .',
       ),
       onDismiss: () {
-        GoRouter.of(context).goNamed(Paths.vtopUserManagement);
+        final router = GoRouter.maybeOf(context);
+        if (router != null) {
+          router.goNamed(Paths.vtopUserManagement);
+        }
       },
       suffixBuilder:
           (context, entry) => IntrinsicHeight(

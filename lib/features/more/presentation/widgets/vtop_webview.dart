@@ -32,8 +32,10 @@ class VtopWebview extends HookConsumerWidget {
     final isRemoveSpacing = useState(true);
     final url = WebUri("https://vtop.vitap.ac.in");
     final initUrl = WebUri("https://vtop.vitap.ac.in/vtop/content?");
+    final isDesktopMode = useState(false);
     final isdark = useState(ref.read(themeProvider).index == 2);
     final String darkModeScript = '''
+    
   (function() {
     const existingStyle = document.getElementById('dark-mode-style');
     if (existingStyle) existingStyle.remove();
@@ -149,6 +151,56 @@ class VtopWebview extends HookConsumerWidget {
       }
     }
 
+    void restDesktopview() {
+      final controller = webController.value;
+      if (controller != null) {
+        controller.evaluateJavascript(
+          source: '''
+(function () {
+  var viewport = document.querySelector('meta[name=viewport]');
+  if (viewport) {
+    viewport.setAttribute(
+      'content',
+      'width=device-width, initial-scale=1'
+    );
+  }
+})();
+      ''',
+        );
+      }
+    }
+
+    void setDesktopview() {
+      final controller = webController.value;
+      if (controller != null) {
+        controller.evaluateJavascript(
+          source: '''
+        (function() {
+    var viewportWidth = 1024;
+    var viewport = document.querySelector("meta[name=viewport]");
+    
+    if (viewport) {
+      viewport.setAttribute('content', 'width=' + viewportWidth + ', user-scalable=yes');
+    } else {
+      var meta = document.createElement('meta');
+      meta.name = "viewport";
+      meta.content = 'width=' + viewportWidth + ', user-scalable=yes';
+      document.head.appendChild(meta);
+    }
+  })();
+      ''',
+        );
+      }
+    }
+
+    useEffect(() {
+      if (isDesktopMode.value) {
+        setDesktopview();
+      } else {
+        restDesktopview();
+      }
+      return null;
+    }, [isDesktopMode.value]);
     void resetSpacing() {
       final controller = webController.value;
       if (controller != null) {
@@ -192,6 +244,7 @@ class VtopWebview extends HookConsumerWidget {
       final value = parts[1].trim();
       cookieName.value = name;
       cookieValue.value = value;
+      await cookieManager.deleteAllCookies();
 
       if (Platform.isAndroid) {
         await cookieManagerAndroid.clearCookies();
@@ -369,6 +422,26 @@ class VtopWebview extends HookConsumerWidget {
               FItemGroup(
                 children: [
                   FItem(
+                    prefix: const Icon(FIcons.graduationCap),
+                    title: const Text('Grades'),
+                    onPress:
+                        () => gorto(
+                          "examinations/examGradeView/StudentGradeView",
+                        ),
+                  ),
+                  FItem(
+                    prefix: const Icon(FIcons.history),
+                    title: const Text('Grades History'),
+                    onPress:
+                        () => gorto(
+                          "examinations/examGradeView/StudentGradeHistory",
+                        ),
+                  ),
+                ],
+              ),
+              FItemGroup(
+                children: [
+                  FItem(
                     prefix: const Icon(FIcons.amphora),
                     title: const Text('Weekend Outing'),
                     onPress: () => gorto("hostel/StudentWeekendOuting"),
@@ -383,16 +456,17 @@ class VtopWebview extends HookConsumerWidget {
               FItemGroup(
                 children: [
                   FItem(
-                    prefix: Icon(
-                      isRemoveSpacing.value ? Icons.compress : FIcons.expand,
-                    ),
-                    title: Text(
-                      isRemoveSpacing.value
-                          ? 'Disable Compact View'
-                          : 'Enable Compact View',
-                    ),
+                    prefix: FCheckbox(value: isRemoveSpacing.value),
+                    title: Text('Compact View'),
                     onPress: () {
                       isRemoveSpacing.value = !isRemoveSpacing.value;
+                    },
+                  ),
+                  FItem(
+                    prefix: FCheckbox(value: isDesktopMode.value),
+                    title: Text('Desktop Mode'),
+                    onPress: () {
+                      isDesktopMode.value = !isDesktopMode.value;
                     },
                   ),
                   FItem(
@@ -489,8 +563,14 @@ class VtopWebview extends HookConsumerWidget {
                     );
                   }
                 },
-                onLoadStart: (controller, url) {
+                onLoadStart: (controller, url) async {
                   loading.value = true;
+                  //removeSpacing(padding: 1);
+                  final k = ref.read(themeProvider);
+
+                  if (isdark.value) {
+                    controller.evaluateJavascript(source: darkModeScript);
+                  }
                 },
                 onLoadStop: (controller, url) async {
                   loading.value = false;

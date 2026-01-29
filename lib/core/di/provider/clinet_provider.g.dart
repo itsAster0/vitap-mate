@@ -6,7 +6,7 @@ part of 'clinet_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$vClientHash() => r'd604910476162dd3f3f6beccaeda08cc585d2b10';
+String _$vClientHash() => r'1b26111e2dd1f65b7cab666c29ebba6f6f58116f';
 
 /// See also [VClient].
 @ProviderFor(VClient)

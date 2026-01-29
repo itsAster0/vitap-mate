@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/share_tt.dart';
 
@@ -117,6 +118,7 @@ Widget? getSidewidget(BuildContext context, String data, String path) {
     suffixes: [
       if (path.contains("social")) LogoutButton(),
       if (path.contains("timetable")) ShareTt(),
+      if (data == "Attendance") AttendanceHeader(),
     ],
   );
 }
