@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/main.dart';
 part 'pocketbase.g.dart';
 
-const pbUrl = "https://api.va.synaptic.gg/";
+const pbUrl = "https://api.va.kryxen.dev/";
 // const pbUrl = "http://10.0.2.2:8090/";
 @riverpod
 Future<PocketBase> pb(Ref ref) async {

@@ -53,9 +53,6 @@ void fileDownloaderConfig() {
     taskNotificationTapCallback: myNotificationTapCallback,
   );
 
-  FileDownloader().configure(
-    androidConfig: [(Config.bypassTLSCertificateValidation, true)],
-  );
 }
 
 Future<void> downloadFile(String url, String cookie) async {

@@ -24,7 +24,7 @@ class MorePage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
-    final Uri url = Uri.parse('https://faculty.synaptic.gg/');
+    final Uri url = Uri.parse('https://faculty.kryxen.dev/');
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Column(

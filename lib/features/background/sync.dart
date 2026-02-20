@@ -184,19 +184,19 @@ class BackgroundNotificationService {
   static Future<void> stop({required bool success}) async {
     await _notifications.cancel(_syncId);
 
-    await _notifications.show(
-      _syncId + 1,
-      'VITAP Mate',
-      success ? 'Background sync completed' : 'Failed to sync some data',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _backSyncDoneId,
-          'Background Sync done',
-          importance: Importance.min,
-          priority: Priority.min,
-          silent: true,
-        ),
-      ),
-    );
+    // await _notifications.show(
+    //   _syncId + 1,
+    //   'VITAP Mate',
+    //   success ? 'Background sync completed' : 'Failed to sync some data',
+    //   const NotificationDetails(
+    //     android: AndroidNotificationDetails(
+    //       _backSyncDoneId,
+    //       'Background Sync done',
+    //       importance: Importance.min,
+    //       priority: Priority.min,
+    //       silent: true,
+    //     ),
+    //   ),
+    // );
   }
 }

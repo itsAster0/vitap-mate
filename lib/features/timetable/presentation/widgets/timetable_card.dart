@@ -288,7 +288,8 @@ class TimetableCard extends HookConsumerWidget {
                 isDark,
                 context,
                 icon: FIcons.clock,
-                text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
+                text:
+                    "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
                 color:
                     isDark
                         ? context.theme.colors.primary
@@ -378,7 +379,8 @@ class TimetableCard extends HookConsumerWidget {
                 isDark,
                 context,
                 icon: FIcons.clock,
-                text: "${to12H(slot.startTime)} - ${to12H(slot.endTime)}",
+                text:
+                    "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
                 color:
                     isDark
                         ? context.theme.colors.primary
@@ -441,7 +443,11 @@ class TimetableCard extends HookConsumerWidget {
   }
 }
 
-String to12H(String time) {
+String to12H(String time, BuildContext context) {
+  if (MediaQuery.of(context).alwaysUse24HourFormat) {
+    return time;
+  }
+
   var list = time.split(":");
   int hours = int.parse(list[0]);
   String period;

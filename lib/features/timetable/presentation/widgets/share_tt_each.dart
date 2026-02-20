@@ -123,7 +123,7 @@ class ShareTtEach extends HookConsumerWidget {
       });
     }
 
-    final urlShare = "https://va.synaptic.gg/timetable/$selectedurl";
+    final urlShare = "https://va.kryxen.dev/timetable/$selectedurl";
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Column(

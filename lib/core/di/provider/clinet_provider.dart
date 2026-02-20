@@ -35,7 +35,7 @@ class VClient extends _$VClient {
     var storage = await SharedPreferences.getInstance();
     int cookieTime = storage.getInt("cookie_time") ?? 0;
     if (DateTime.now().toUtc().millisecondsSinceEpoch - cookieTime <
-        30 * 60 * 1000) {
+        59 * 60 * 1000) {
       final cookiet = storage.getString("cookie");
       if (cookiet != null && cookiet.isNotEmpty) {
         _cookie = cookiet;

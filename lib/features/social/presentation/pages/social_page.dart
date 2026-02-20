@@ -71,7 +71,7 @@ class ShowLogin extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     var isloading = useState(false);
-    final redirectURL = Uri.parse("https://api.va.synaptic.gg/social");
+    final redirectURL = Uri.parse("https://api.va.kryxen.dev/social");
     final collectionsName = "users";
     var googleProvider = useRef<AuthMethodProvider?>(null);
     final appLinks = useMemoized(() => AppLinks());

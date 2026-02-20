@@ -49,7 +49,7 @@ steps:
       MINIO_PASS:
         from_secret: MINIO_PASS
     commands:
-      - mc alias set minio https://storage.synaptic.gg "$MINIO_USER" "$MINIO_PASS"
+      - mc alias set minio https://storage.kryxen.dev "$MINIO_USER" "$MINIO_PASS"
       - mc cp .out/* minio/vitapmate/public/dev/apks/
 
     when:

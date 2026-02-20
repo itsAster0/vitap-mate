@@ -220,7 +220,7 @@ class SettingsPage extends HookConsumerWidget {
                   icon: Icon(FIcons.github),
                   onPressed: () {
                     launchUrl(
-                      Uri.parse("https://github.com/synaptic-gg/vitap-mate"),
+                      Uri.parse("https://github.com/itsKryxen/vitap-mate"),
                     );
                   },
                 ),

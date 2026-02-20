@@ -10,6 +10,7 @@ import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:local_auth/local_auth.dart';
 
 var isLoadingSems = StateProvider<bool>((k) => false);
 
@@ -105,60 +106,103 @@ class UserContainer extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final auth = useMemoized(() => LocalAuthentication());
+    final canUseBiometric =
+        useFuture(() async {
+          final LocalAuthentication auth = LocalAuthentication();
+          final bool canAuthenticateWithBiometrics =
+              await auth.canCheckBiometrics;
+          final bool canAuthenticate =
+              canAuthenticateWithBiometrics || await auth.isDeviceSupported();
+          if (canAuthenticate) {
+            final List<BiometricType> availableBiometrics =
+                await auth.getAvailableBiometrics();
+            return availableBiometrics.isNotEmpty;
+          }
+          return false;
+        }(), initialData: false).data ??
+        false;
+    final showPasswords = useState(false);
     return FFocusedOutline(
       focused: isDefault,
-      child: FTappable(
-        onPress: () {},
-        child: Container(
-          decoration: BoxDecoration(
-            color: context.theme.colors.primaryForeground,
-            borderRadius: BorderRadius.circular(6),
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: context.theme.colors.primaryForeground,
+          borderRadius: BorderRadius.circular(6),
+        ),
 
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              spacing: 5,
-              children: [
-                Row(
-                  spacing: 10,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(FIcons.idCard),
-                    Text(
-                      "Vtop Credential ",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            spacing: 5,
+            children: [
+              Row(
+                spacing: 10,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(FIcons.idCard),
+                  Text(
+                    "Vtop Credential ",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              SizedBox(height: 5),
+              Row(
+                children: [
+                  Text(
+                    "Username : ",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(user.username!),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          "Password : ",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+
+                        Text(
+                          showPasswords.value
+                              ? user.password ?? ""
+                              : "*" * (10),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                SizedBox(height: 5),
-                Row(
-                  children: [
-                    Text(
-                      "Username : ",
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (canUseBiometric)
+                    FButton.icon(
+                      onPress: () async {
+                        final List<BiometricType> availableBiometrics =
+                            await auth.getAvailableBiometrics();
+                        if (availableBiometrics.isNotEmpty &&
+                            !showPasswords.value) {
+                          final bool didAuthenticate = await auth.authenticate(
+                            localizedReason:
+                                'Please authenticate to show Password',
+                          );
+
+                          if (!didAuthenticate) return;
+                        }
+                        showPasswords.value = !showPasswords.value;
+                      },
+                      child: Icon(FIcons.eye),
                     ),
-                    Text(user.username!),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Text(
-                      "Password : ",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text("*" * (10)),
-                  ],
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    UserSemChange(user: user),
-                    if (!user.isValid) UserPassChange(user: user),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  UserSemChange(user: user),
+                  if (!user.isValid) UserPassChange(user: user),
+                ],
+              ),
+            ],
           ),
         ),
       ),

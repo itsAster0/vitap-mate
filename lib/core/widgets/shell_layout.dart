@@ -17,25 +17,27 @@ class ShellLayout extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sems = ref.watch(semesterIdProvider);
-
-    final sem = ref.watch(vtopUserProvider);
+    final sems = ref
+        .watch(semesterIdProvider)
+        .maybeWhen(data: (value) => value, orElse: () => null);
+    final sem = ref
+        .watch(vtopUserProvider)
+        .maybeWhen(data: (value) => value, orElse: () => null);
     final newSemExist = useMemoized(() {
-      if (sem.value == null || sems.value == null) return false;
-      final max = sems.value!.semesters.fold<int>(0, (i, e) {
+      if (sem == null || sems == null) return false;
+      final max = sems.semesters.fold<int>(0, (i, e) {
         final result =
             int.tryParse(e.id.toLowerCase().replaceAll("ap", "")) ?? 0;
         return result > i ? result : i;
       });
 
       if (max == 0) return false;
-      if (sem.value!.semid == null) return false;
+      if (sem.semid == null) return false;
 
       final currentSemID =
-          int.tryParse(sem.value!.semid!.toLowerCase().replaceAll("ap", "")) ??
-          0;
+          int.tryParse(sem.semid!.toLowerCase().replaceAll("ap", "")) ?? 0;
       return currentSemID < max;
-    }, [sem.value?.semid, sems.value?.semesters.length]);
+    }, [sem?.semid, sems?.semesters.length]);
 
     var k = GoRouter.of(context).routeInformationProvider.value.uri.toString();
     final headers = [
@@ -62,6 +64,7 @@ class ShellLayout extends HookConsumerWidget {
     }, [k]);
 
     return FScaffold(
+      childPad: false,
       header: headers[selected.value],
       footer: SafeArea(
         top: false,
@@ -115,7 +118,10 @@ class ShellLayout extends HookConsumerWidget {
         ),
       ),
 
-      child: child,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: child,
+      ),
     );
   }
 }

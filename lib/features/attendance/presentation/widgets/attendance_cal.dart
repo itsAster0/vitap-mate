@@ -139,9 +139,15 @@ class AttendanceCalculator extends HookConsumerWidget {
                           darkMode: darkMode,
                           label: "Attended",
                           value: attended.value,
-                          onIncrement: () => attended.value++,
+                          onIncrement: () {
+                            attended.value++;
+                            total.value++;
+                          },
                           onDecrement: () {
-                            if (attended.value > 0) attended.value--;
+                            if (attended.value > 0) {
+                              attended.value--;
+                              total.value--;
+                            }
                           },
                           color: AttendanceColors.presentText,
                           icon: Icons.check_circle_outline,
