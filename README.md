@@ -1,6 +1,14 @@
 # vitapmate
 **vitapmate** is a companion app designed to simplify and enhance student life at VIT-AP University.
 
+## Archive Notice
+
+This app is archived.
+
+- There will be **no further updates published to the Google Play Store**
+- Source code remains available for reference and community forks
+- No official feature development is planned
+
 ## ✨ Features
 
 - View your **attendance**, **marks**, and **exam schedules**  
