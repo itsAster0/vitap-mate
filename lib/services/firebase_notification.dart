@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/features/social/presentation/providers/pocketbase.dart';
+import 'package:vitapmate/services/class_reminder_notification_service.dart';
+import 'package:vitapmate/services/notification_init_state.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -81,6 +83,10 @@ class NotificationService {
   }
 
   Future<void> _initializeLocalNotifications() async {
+    if (NotificationInitState.localNotificationsInitialized) {
+      return;
+    }
+
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/launcher_icon');
 
@@ -99,6 +105,8 @@ class NotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
+      onDidReceiveBackgroundNotificationResponse:
+          classReminderBackgroundTapHandler,
     );
 
     await _localNotifications
@@ -111,6 +119,8 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(_chatChannel);
+
+    NotificationInitState.localNotificationsInitialized = true;
   }
 
   void _setupFirebaseListeners() {
@@ -175,8 +185,13 @@ class NotificationService {
     }
   }
 
-  void _onNotificationTapped(NotificationResponse response) {
+  void _onNotificationTapped(NotificationResponse response) async {
     log(' Local notification tapped: ${response.payload}');
+    if (await ClassReminderNotificationService.handleNotificationResponse(
+      response,
+    )) {
+      return;
+    }
     _navigateBasedOnPayload(response.payload);
   }
 

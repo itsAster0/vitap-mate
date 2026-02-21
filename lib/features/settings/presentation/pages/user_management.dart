@@ -5,10 +5,13 @@ import 'package:forui/forui.dart';
 import 'package:forui_hooks/forui_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -365,6 +368,26 @@ class UserSemChange extends HookConsumerWidget {
                                                 user.copyWith(semid: value.$1),
                                               );
                                           ref.invalidate(vtopUserProvider);
+                                          final notifSetting = ref.read(
+                                            classReminderSettingsProvider,
+                                          );
+                                          if (notifSetting.enabled) {
+                                            await ref
+                                                .read(
+                                                  timetableProvider.notifier,
+                                                )
+                                                .updateTimetable();
+                                          }
+                                          final examNotifSetting = ref.read(
+                                            examReminderSettingsProvider,
+                                          );
+                                          if (examNotifSetting.enabled) {
+                                            await ref
+                                                .read(
+                                                  examScheduleProvider.notifier,
+                                                )
+                                                .updatexamschedule();
+                                          }
                                           if (context.mounted) {
                                             Navigator.of(context).pop();
                                           }

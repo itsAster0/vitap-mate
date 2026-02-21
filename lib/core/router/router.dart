@@ -13,6 +13,7 @@ import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
 import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
@@ -118,6 +119,16 @@ final routerProvider = Provider((ref) {
                 name: Paths.settings,
                 builder: (context, state) => SettingsPage(),
                 routes: [
+                  GoRoute(
+                    path: 'notification-management',
+                    name: Paths.notificationManagement,
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: NotificationManagementPage(),
+                      );
+                    },
+                  ),
                   GoRoute(
                     path: '/vtopUserManagement',
                     name: Paths.vtopUserManagement,

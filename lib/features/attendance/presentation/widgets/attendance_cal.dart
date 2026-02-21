@@ -18,12 +18,33 @@ class AttendanceCalculator extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    (int, int) getDefaultFuturePlan(int attended, int total) {
+      if (total <= 0) return (0, 0);
+      final currentPct = (attended / total) * 100;
+      if (currentPct >= 75) {
+        final maxSkip = ((4 * attended - 3 * total) / 3).floor();
+        return (0, maxSkip > 0 ? maxSkip : 0);
+      }
+      final needAttend = 3 * total - 4 * attended;
+      return (needAttend > 0 ? needAttend : 0, 0);
+    }
 
+    final initialPlan = useMemoized(
+      () => getDefaultFuturePlan(currentAttended, currentTotal),
+      [currentAttended, currentTotal],
+    );
     final attended = useState(currentAttended);
     final total = useState(currentTotal);
     final editCurrent = useState(false);
-    final futureAttend = useState(0);
-    final futureSkip = useState(0);
+    final futureAttend = useState(initialPlan.$1);
+    final futureSkip = useState(initialPlan.$2);
+
+    useEffect(() {
+      final defaultPlan = getDefaultFuturePlan(attended.value, total.value);
+      futureAttend.value = defaultPlan.$1;
+      futureSkip.value = defaultPlan.$2;
+      return null;
+    }, [attended.value, total.value]);
 
     double getCurrentPercentage() {
       if (total.value == 0) return 0.0;
@@ -264,22 +285,36 @@ class AttendanceCalculator extends HookConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.calculate_outlined,
-                        color: Colors.purple,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Future Prediction",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              darkMode
-                                  ? context.theme.colors.primary
-                                  : AttendanceColors.primaryText,
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calculate_outlined,
+                              color: Colors.purple,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Future Prediction",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color:
+                                    darkMode
+                                        ? context.theme.colors.primary
+                                        : AttendanceColors.primaryText,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      FButton(
+                        style: FButtonStyle.outline(),
+                        onPress: () {
+                          futureAttend.value = 0;
+                          futureSkip.value = 0;
+                        },
+                        child: const Text("Reset"),
                       ),
                     ],
                   ),
@@ -391,20 +426,6 @@ class AttendanceCalculator extends HookConsumerWidget {
                   ],
                 ],
               ),
-            ),
-
-            const SizedBox(height: 24),
-
-            FButton(
-              style: FButtonStyle.secondary(),
-              prefix: const Icon(FIcons.refreshCw, size: 16),
-              onPress: () {
-                attended.value = currentAttended;
-                total.value = currentTotal;
-                futureAttend.value = 0;
-                futureSkip.value = 0;
-              },
-              child: const Text("Reset Calculator"),
             ),
           ],
         ),

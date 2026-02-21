@@ -1,4 +1,3 @@
-import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -12,7 +11,6 @@ import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_avatar_update.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/social_username_update.dart';
-import 'package:vitapmate/main.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -197,14 +195,12 @@ class SettingsPage extends HookConsumerWidget {
                         ),
                         FTile(
                           prefix: Icon(FIcons.bell),
-                          title: const Text("Notifications"),
-                          suffix: Icon(FIcons.dot),
-                          onPress: () async {
-                            var settings =
-                                await notifications.requestPermissions();
-                            AppSettings.openAppSettings(
-                              type: AppSettingsType.notification,
-                            );
+                          title: const Text("Notification Management"),
+                          suffix: Icon(FIcons.chevronRight),
+                          onPress: () {
+                            GoRouter.of(
+                              context,
+                            ).pushNamed(Paths.notificationManagement);
                           },
                         ),
                       ],

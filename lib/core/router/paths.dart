@@ -11,4 +11,5 @@ class Paths {
   static final examSchedule = "examSchedule";
   static final vtopweb = "vtopweb";
   static final messageChat = "messageChat";
+  static final notificationManagement = "notificationManagement";
 }

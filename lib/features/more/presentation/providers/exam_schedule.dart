@@ -6,6 +6,7 @@ import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/features/more/domine/usecases/get_exam_schedule.dart';
 import 'package:vitapmate/features/more/domine/usecases/update_exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
+import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 part 'exam_schedule.g.dart';
 
@@ -19,6 +20,7 @@ class ExamSchedule extends _$ExamSchedule {
       await ref.read(vClientProvider.notifier).tryLogin();
       data = await _update();
     }
+    await ExamReminderNotificationService.syncFromExamSchedule(data);
     log("exam schedule Build done");
     return data;
   }
@@ -27,6 +29,7 @@ class ExamSchedule extends _$ExamSchedule {
     await ref.read(vClientProvider.notifier).tryLogin();
     ExamScheduleData data = await _update();
     state = AsyncData(data);
+    await ExamReminderNotificationService.syncFromExamSchedule(data);
   }
 
   Future<ExamScheduleData> _update() async {

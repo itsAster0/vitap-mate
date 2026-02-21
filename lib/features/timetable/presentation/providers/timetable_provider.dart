@@ -7,6 +7,7 @@ import 'package:vitapmate/features/timetable/domine/usecases/get_timetable.dart'
 import 'package:vitapmate/features/timetable/domine/usecases/update_timetable.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/pb_links.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
+import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 part 'timetable_provider.g.dart';
 
@@ -24,6 +25,7 @@ class Timetable extends _$Timetable {
       await ref.read(vClientProvider.notifier).tryLogin();
       timetable = await _update();
     }
+    await ClassReminderNotificationService.syncFromTimetable(timetable);
     log("timetabel Build done");
     return timetable;
   }
@@ -42,6 +44,7 @@ class Timetable extends _$Timetable {
       }
     });
     state = AsyncData(data);
+    await ClassReminderNotificationService.syncFromTimetable(data);
   }
 
   Future<TimetableData> _update() async {
