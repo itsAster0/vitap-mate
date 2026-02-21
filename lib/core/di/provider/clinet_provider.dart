@@ -32,18 +32,21 @@ class VClient extends _$VClient {
     //     log("$e");
     //   }
     // });
-    var storage = await SharedPreferences.getInstance();
-    int cookieTime = storage.getInt("cookie_time") ?? 0;
+    final uname = username!;
+    final storage = await SharedPreferences.getInstance();
+    final cookieKey = "cookie_$uname";
+    final cookieTimeKey = "cookie_time_$uname";
+    int cookieTime = storage.getInt(cookieTimeKey) ?? 0;
     if (DateTime.now().toUtc().millisecondsSinceEpoch - cookieTime <
         59 * 60 * 1000) {
-      final cookiet = storage.getString("cookie");
+      final cookiet = storage.getString(cookieKey);
       if (cookiet != null && cookiet.isNotEmpty) {
         _cookie = cookiet;
       }
     }
 
     return getVtopClient(
-      username: username!,
+      username: uname,
       password: password!,
       cookie: _cookie,
     );
@@ -80,8 +83,9 @@ class VClient extends _$VClient {
           ).split(";").first.trim();
       log("past cookie ${_cookie ?? ""} and new cookie $newCookie");
       if (_cookie != newCookie) {
-        var storage = await SharedPreferences.getInstance();
-        await storage.setString("cookie", newCookie);
+        final storage = await SharedPreferences.getInstance();
+        final uname = user.username!;
+        await storage.setString("cookie_$uname", newCookie);
         // if (newCookie
         //     .split(";")
         //     .map((e) => e.trim())
@@ -89,7 +93,7 @@ class VClient extends _$VClient {
         //     .intersection((_cookie??"").split(";").map((e) => e.trim()).toSet())
         //     .isEmpty) {}
         await storage.setInt(
-          "cookie_time",
+          "cookie_time_$uname",
           DateTime.now().toUtc().millisecondsSinceEpoch,
         );
 
@@ -104,8 +108,11 @@ class VClient extends _$VClient {
         ref.invalidate(vtopUserProvider);
       }
       if (e is VtopError && e is! VtopError_NetworkError) {
-        var storage = await SharedPreferences.getInstance();
-        await storage.setString("cookie", "");
+        final storage = await SharedPreferences.getInstance();
+        final uname = user.username;
+        if (uname != null && uname.isNotEmpty) {
+          await storage.setString("cookie_$uname", "");
+        }
       }
 
       rethrow;

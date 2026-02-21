@@ -73,9 +73,24 @@ class Vtopusersutils extends _$Vtopusersutils {
     await _storage.write(key: "wifi_password", value: data.$2);
   }
 
-  // Future<void> vtopUserDelete(String username) async {
-  //   await _storage.delete(key: username);
-  // }
+  Future<void> vtopUserDelete(String username) async {
+    await _storage.delete(key: "username_$username");
+    final defaultUsername = await _storage.read(key: _defaultUserKey);
+    if (defaultUsername != username) return;
+
+    final all = await getAllUsers();
+    if (all.$1.isEmpty) {
+      await _storage.delete(key: _defaultUserKey);
+      return;
+    }
+
+    final next = all.$1.first.username;
+    if (next != null && next.isNotEmpty) {
+      await vtopSetDefault(next);
+    } else {
+      await _storage.delete(key: _defaultUserKey);
+    }
+  }
 
   // Future<void> clearAllUsers() async {
   //   await _storage.deleteAll();
