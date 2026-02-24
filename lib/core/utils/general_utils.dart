@@ -52,7 +52,6 @@ void fileDownloaderConfig() {
   FileDownloader().registerCallbacks(
     taskNotificationTapCallback: myNotificationTapCallback,
   );
-
 }
 
 Future<void> downloadFile(String url, String cookie) async {

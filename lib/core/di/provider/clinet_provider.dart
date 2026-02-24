@@ -45,11 +45,7 @@ class VClient extends _$VClient {
       }
     }
 
-    return getVtopClient(
-      username: uname,
-      password: password!,
-      cookie: _cookie,
-    );
+    return getVtopClient(username: uname, password: password!, cookie: _cookie);
   }
 
   void replaceVClinet(VtopClient vclinet) {

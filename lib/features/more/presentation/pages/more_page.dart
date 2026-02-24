@@ -18,15 +18,9 @@ class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
   static final Map<String, String?> _previewCache = {};
 
-  static const _studentProjects =
-      <({
-        int id,
-        String name,
-        String type,
-        String desc,
-        String madeBy,
-        String url,
-      })>[
+  static const _studentProjects = <
+    ({int id, String name, String type, String desc, String madeBy, String url})
+  >[
     (
       id: 1001,
       name: "GPA Calculator",
@@ -114,7 +108,9 @@ class MorePage extends HookConsumerWidget {
               onPress:
                   () =>
                       ref
-                          .read(studentProjectsPinnedOnlySessionProvider.notifier)
+                          .read(
+                            studentProjectsPinnedOnlySessionProvider.notifier,
+                          )
                           .state = !pinnedOnly,
               child: FBadge(
                 style: FBadgeStyle.outline(),
@@ -151,102 +147,110 @@ class MorePage extends HookConsumerWidget {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: colors.border),
             ),
-            child: const Text("No pinned projects yet. Pin one to see it here."),
+            child: const Text(
+              "No pinned projects yet. Pin one to see it here.",
+            ),
           )
         else
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth * 0.82).clamp(240.0, 320.0);
-            final previewHeight = cardWidth * 9 / 16;
-            final listHeight = previewHeight + 205;
-            return SizedBox(
-              height: listHeight,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: visibleProjects.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final p = visibleProjects[index];
-                  final isPinned = pinnedIds.contains(p.id);
-                  return SizedBox(
-                    width: cardWidth,
-                    child: FCard(
-                      image: _projectPreview(p.url, previewHeight),
-                      title: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              p.name,
-                              maxLines: 2,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final cardWidth = (constraints.maxWidth * 0.82).clamp(
+                240.0,
+                320.0,
+              );
+              final previewHeight = cardWidth * 9 / 16;
+              final listHeight = previewHeight + 205;
+              return SizedBox(
+                height: listHeight,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: visibleProjects.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final p = visibleProjects[index];
+                    final isPinned = pinnedIds.contains(p.id);
+                    return SizedBox(
+                      width: cardWidth,
+                      child: FCard(
+                        image: _projectPreview(p.url, previewHeight),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                p.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip:
+                                  isPinned ? "Unpin Project" : "Pin Project",
+                              onPressed: () => controller.togglePinned(p.id),
+                              icon: Icon(
+                                isPinned
+                                    ? Icons.push_pin
+                                    : Icons.push_pin_outlined,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.type,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: MoreColors.secondaryText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              p.desc,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            tooltip: isPinned ? "Unpin Project" : "Pin Project",
-                            onPressed: () => controller.togglePinned(p.id),
-                            icon: Icon(
-                              isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                              size: 20,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Made by: ${p.madeBy}",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: MoreColors.secondaryText,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: FButton(
+                                style: FButtonStyle.outline(),
+                                onPress: () async {
+                                  await launchUrl(
+                                    Uri.parse(p.url),
+                                    mode: LaunchMode.externalApplication,
+                                  );
+                                },
+                                child: const Text("View Project"),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            p.type,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: MoreColors.secondaryText,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            p.desc,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Made by: ${p.madeBy}",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: MoreColors.secondaryText,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: FButton(
-                              style: FButtonStyle.outline(),
-                              onPress: () async {
-                                await launchUrl(
-                                  Uri.parse(p.url),
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              },
-                              child: const Text("View Project"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
         const SizedBox(height: 4),
         FTappable(
           onPress: () async {
@@ -318,22 +322,23 @@ class MorePage extends HookConsumerWidget {
             alignment: Alignment.center,
             width: double.infinity,
             height: double.infinity,
-            errorBuilder: (_, _, _) => Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            errorBuilder:
+                (_, _, _) => Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.rocket_launch_rounded,
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                  ),
                 ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.rocket_launch_rounded,
-                  color: Colors.white,
-                  size: 40,
-                ),
-              ),
-            ),
           ),
         ),
       ),
@@ -361,13 +366,43 @@ class MorePage extends HookConsumerWidget {
 
       final raw =
           extract(
-            r'<meta[^>]+property=["' "'" r']og:image["' "'" r'][^>]+content=["' "'" r']([^"' "'" r']+)["' "'" r']',
+            r'<meta[^>]+property=["'
+            "'"
+            r']og:image["'
+            "'"
+            r'][^>]+content=["'
+            "'"
+            r']([^"'
+            "'"
+            r']+)["'
+            "'"
+            r']',
           ) ??
           extract(
-            r'<meta[^>]+name=["' "'" r']twitter:image["' "'" r'][^>]+content=["' "'" r']([^"' "'" r']+)["' "'" r']',
+            r'<meta[^>]+name=["'
+            "'"
+            r']twitter:image["'
+            "'"
+            r'][^>]+content=["'
+            "'"
+            r']([^"'
+            "'"
+            r']+)["'
+            "'"
+            r']',
           ) ??
           extract(
-            r'<link[^>]+rel=["' "'" r']image_src["' "'" r'][^>]+href=["' "'" r']([^"' "'" r']+)["' "'" r']',
+            r'<link[^>]+rel=["'
+            "'"
+            r']image_src["'
+            "'"
+            r'][^>]+href=["'
+            "'"
+            r']([^"'
+            "'"
+            r']+)["'
+            "'"
+            r']',
           );
 
       if (raw == null || raw.isEmpty) {
@@ -451,7 +486,6 @@ Widget cardConatiner({
   required FColors colors,
   required String title,
   required String desc,
-  
 }) {
   return Container(
     decoration: BoxDecoration(

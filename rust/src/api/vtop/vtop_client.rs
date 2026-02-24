@@ -648,7 +648,7 @@ impl VtopClient {
             client_builder = client_builder.add_root_certificate(cert);
         }
 
-        let client = client_builder.build().unwrap();
+        let client: Client = client_builder.build().unwrap();
         return client;
     }
 }

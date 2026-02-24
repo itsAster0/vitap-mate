@@ -73,7 +73,8 @@ Future<void> toggleBTWExams(Ref ref) async {
 
 final studentProjectPinnedIdsProvider = Provider<Set<int>>((ref) {
   final prefs = ref.watch(settingsProvider).value;
-  final list = prefs?.getStringList("settings_student_projects_pinned_ids") ?? [];
+  final list =
+      prefs?.getStringList("settings_student_projects_pinned_ids") ?? [];
   return list.map(int.tryParse).whereType<int>().toSet();
 });
 
@@ -109,7 +110,6 @@ class StudentProjectsSettingsController {
     );
     ref.invalidate(studentProjectPinnedIdsProvider);
   }
-
 }
 
 class ClassReminderSettings {
@@ -145,7 +145,9 @@ class ClassReminderSettingsController {
 
   Future<void> setEnabled(bool value) async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     await prefs.setBool("settings_class_notifications_enabled", value);
+    await legacyPrefs.setBool("settings_class_notifications_enabled", value);
     if (!value) {
       await ClassReminderNotificationService.cancelAll();
     }
@@ -154,15 +156,22 @@ class ClassReminderSettingsController {
 
   Future<void> setNotifyBeforeMinutes(int value) async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     await prefs.setInt("settings_class_notify_before_minutes", value);
+    await legacyPrefs.setInt("settings_class_notify_before_minutes", value);
     ref.invalidate(classReminderSettingsProvider);
   }
 
   Future<void> pauseForDays(int days) async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
     final until = DateTime(now.year, now.month, now.day + days, 23, 59, 59);
     await prefs.setInt(
+      "settings_class_pause_until_millis",
+      until.millisecondsSinceEpoch,
+    );
+    await legacyPrefs.setInt(
       "settings_class_pause_until_millis",
       until.millisecondsSinceEpoch,
     );
@@ -172,7 +181,9 @@ class ClassReminderSettingsController {
 
   Future<void> clearPause() async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     await prefs.remove("settings_class_pause_until_millis");
+    await legacyPrefs.remove("settings_class_pause_until_millis");
     ref.invalidate(classReminderSettingsProvider);
   }
 }
@@ -207,7 +218,9 @@ class ExamReminderSettingsController {
 
   Future<void> setEnabled(bool value) async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     await prefs.setBool("settings_exam_notifications_enabled", value);
+    await legacyPrefs.setBool("settings_exam_notifications_enabled", value);
     if (!value) {
       await ExamReminderNotificationService.cancelAll();
     }
@@ -216,7 +229,9 @@ class ExamReminderSettingsController {
 
   Future<void> setNotifyBeforeMinutes(int value) async {
     final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
     await prefs.setInt("settings_exam_notify_before_minutes", value);
+    await legacyPrefs.setInt("settings_exam_notify_before_minutes", value);
     ref.invalidate(examReminderSettingsProvider);
   }
 }

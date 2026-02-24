@@ -4,7 +4,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:vitapmate/services/notification_init_state.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class ClassReminderNotificationService {
@@ -28,20 +27,17 @@ class ClassReminderNotificationService {
       _tzInitialized = true;
     }
 
-    if (!NotificationInitState.localNotificationsInitialized) {
-      const androidSettings = AndroidInitializationSettings(
-        '@mipmap/launcher_icon',
-      );
-      await _notifications.initialize(
-        const InitializationSettings(android: androidSettings),
-        onDidReceiveNotificationResponse: (response) {
-          handleNotificationResponse(response);
-        },
-        onDidReceiveBackgroundNotificationResponse:
-            classReminderBackgroundTapHandler,
-      );
-      NotificationInitState.localNotificationsInitialized = true;
-    }
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/launcher_icon',
+    );
+    await _notifications.initialize(
+      const InitializationSettings(android: androidSettings),
+      onDidReceiveNotificationResponse: (response) {
+        handleNotificationResponse(response);
+      },
+      onDidReceiveBackgroundNotificationResponse:
+          classReminderBackgroundTapHandler,
+    );
 
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -75,6 +71,7 @@ class ClassReminderNotificationService {
 
   static Future<void> pauseForToday() async {
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final now = DateTime.now();
     final until = DateTime(now.year, now.month, now.day, 23, 59, 59);
     await prefs.setInt(_pauseUntilKey, until.millisecondsSinceEpoch);
@@ -104,6 +101,7 @@ class ClassReminderNotificationService {
   static Future<void> syncFromTimetable(TimetableData data) async {
     await ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final enabled = prefs.getBool(_enabledKey) ?? false;
     final pauseUntilMillis = prefs.getInt(_pauseUntilKey);
     final paused =
@@ -120,11 +118,17 @@ class ClassReminderNotificationService {
     final beforeMinutes = prefs.getInt(_beforeKey) ?? 10;
     await cancelAll();
 
+    var scheduled = 0;
+
     for (final slot in data.slots) {
-      if (slot.serial == "-1") continue;
+      if (slot.serial == "-1") {
+        continue;
+      }
       final weekday = _weekdayFromSlot(slot.day);
       final classTime = _parseTime(slot.startTime);
-      if (weekday == null || classTime == null) continue;
+      if (weekday == null || classTime == null) {
+        continue;
+      }
 
       var nextClass = _nextDateForWeekday(weekday, classTime);
       var remindAt = nextClass.subtract(Duration(minutes: beforeMinutes));
@@ -150,31 +154,33 @@ class ClassReminderNotificationService {
         "slot": slot.slot,
       });
 
+      final details = NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          "Class reminders",
+          channelDescription: "Notifications before your classes",
+          importance: Importance.high,
+          priority: Priority.high,
+          actions: const [
+            AndroidNotificationAction(
+              _pauseActionId,
+              "Pause for today",
+              cancelNotification: true,
+            ),
+          ],
+        ),
+      );
       await _notifications.zonedSchedule(
         id,
         "Class Reminder",
         "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
         tz.TZDateTime.from(remindAt, tz.local),
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channelId,
-            "Class reminders",
-            channelDescription: "Notifications before your classes",
-            importance: Importance.high,
-            priority: Priority.high,
-            actions: const [
-              AndroidNotificationAction(
-                _pauseActionId,
-                "Pause for today",
-                cancelNotification: true,
-              ),
-            ],
-          ),
-        ),
+        details,
         payload: payload,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
+      scheduled++;
     }
   }
 

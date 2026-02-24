@@ -422,26 +422,6 @@ class VtopWebview extends HookConsumerWidget {
               FItemGroup(
                 children: [
                   FItem(
-                    prefix: const Icon(FIcons.graduationCap),
-                    title: const Text('Grades'),
-                    onPress:
-                        () => gorto(
-                          "examinations/examGradeView/StudentGradeView",
-                        ),
-                  ),
-                  FItem(
-                    prefix: const Icon(FIcons.history),
-                    title: const Text('Grades History'),
-                    onPress:
-                        () => gorto(
-                          "examinations/examGradeView/StudentGradeHistory",
-                        ),
-                  ),
-                ],
-              ),
-              FItemGroup(
-                children: [
-                  FItem(
                     prefix: const Icon(FIcons.amphora),
                     title: const Text('Weekend Outing'),
                     onPress: () => gorto("hostel/StudentWeekendOuting"),

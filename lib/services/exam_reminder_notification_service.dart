@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:vitapmate/services/notification_init_state.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class ExamReminderNotificationService {
@@ -26,15 +25,12 @@ class ExamReminderNotificationService {
       _tzInitialized = true;
     }
 
-    if (!NotificationInitState.localNotificationsInitialized) {
-      const androidSettings = AndroidInitializationSettings(
-        '@mipmap/launcher_icon',
-      );
-      await _notifications.initialize(
-        const InitializationSettings(android: androidSettings),
-      );
-      NotificationInitState.localNotificationsInitialized = true;
-    }
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/launcher_icon',
+    );
+    await _notifications.initialize(
+      const InitializationSettings(android: androidSettings),
+    );
 
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -69,6 +65,7 @@ class ExamReminderNotificationService {
   static Future<void> syncFromExamSchedule(ExamScheduleData data) async {
     await ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
     final enabled = prefs.getBool(_enabledKey) ?? false;
     if (!enabled) {
       await cancelAll();
@@ -77,14 +74,20 @@ class ExamReminderNotificationService {
     final beforeMinutes = prefs.getInt(_beforeKey) ?? 10;
     await cancelAll();
 
+    var scheduled = 0;
+
     for (final group in data.exams) {
       for (final exam in group.records) {
         final examDateTime = _parseExamDateTime(exam);
-        if (examDateTime == null) continue;
+        if (examDateTime == null) {
+          continue;
+        }
         final remindAt = examDateTime.subtract(
           Duration(minutes: beforeMinutes),
         );
-        if (!remindAt.isAfter(DateTime.now())) continue;
+        if (!remindAt.isAfter(DateTime.now())) {
+          continue;
+        }
 
         final id =
             Object.hash(
@@ -117,8 +120,9 @@ class ExamReminderNotificationService {
             ),
           ),
           payload: payload,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         );
+        scheduled++;
       }
     }
   }

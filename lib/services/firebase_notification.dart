@@ -41,10 +41,8 @@ class NotificationService {
   }
 
   Future<bool> requestAndroidNotificationPermission() async {
-    final plugin = FlutterLocalNotificationsPlugin();
-
     final android =
-        plugin
+        _localNotifications
             .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin
             >();
@@ -55,7 +53,7 @@ class NotificationService {
     if (enabled == true) return true;
     if (Platform.isAndroid) {
       final p =
-          plugin
+          _localNotifications
               .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin
               >();
@@ -183,6 +181,37 @@ class NotificationService {
         payload: message.data.toString(),
       );
     }
+  }
+
+  Future<void> showDebugTestNotification({int delaySeconds = 0}) async {
+    if (delaySeconds > 0) {
+      await Future.delayed(Duration(seconds: delaySeconds));
+    }
+
+    await _localNotifications.show(
+      DateTime.now().millisecondsSinceEpoch % 2147483647,
+      "Vitap Mate Test",
+      delaySeconds > 0
+          ? "Notification fired after ${delaySeconds}s delay."
+          : "Notification pipeline is working.",
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channel.id,
+          _channel.name,
+          channelDescription: _channel.description,
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: "debug_test_notification",
+    );
   }
 
   void _onNotificationTapped(NotificationResponse response) async {

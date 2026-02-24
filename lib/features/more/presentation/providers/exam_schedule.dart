@@ -26,10 +26,14 @@ class ExamSchedule extends _$ExamSchedule {
   }
 
   Future<void> updatexamschedule() async {
+    log("[ExamSchedule] updatexamschedule: start");
     await ref.read(vClientProvider.notifier).tryLogin();
     ExamScheduleData data = await _update();
     state = AsyncData(data);
     await ExamReminderNotificationService.syncFromExamSchedule(data);
+    log(
+      "[ExamSchedule] updatexamschedule: end sem=${data.semesterId} groups=${data.exams.length}",
+    );
   }
 
   Future<ExamScheduleData> _update() async {

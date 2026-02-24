@@ -126,7 +126,8 @@ class UserContainer extends HookConsumerWidget {
           final bool canAuthenticateWithBiometrics =
               await localAuth.canCheckBiometrics;
           final bool canAuthenticate =
-              canAuthenticateWithBiometrics || await localAuth.isDeviceSupported();
+              canAuthenticateWithBiometrics ||
+              await localAuth.isDeviceSupported();
           if (canAuthenticate) {
             final List<BiometricType> availableBiometrics =
                 await localAuth.getAvailableBiometrics();
@@ -139,7 +140,9 @@ class UserContainer extends HookConsumerWidget {
 
     Future<void> setActiveUser() async {
       if (user.username == null) return;
-      await ref.read(vtopusersutilsProvider.notifier).vtopSetDefault(user.username!);
+      await ref
+          .read(vtopusersutilsProvider.notifier)
+          .vtopSetDefault(user.username!);
       ref.invalidate(allUsersProviderProvider);
       ref.invalidate(vtopUserProvider);
       ref.invalidate(vClientProvider);
@@ -162,11 +165,14 @@ class UserContainer extends HookConsumerWidget {
 
     Future<void> deleteUser() async {
       if (user.username == null || isDefault) return;
-      await ref.read(vtopusersutilsProvider.notifier).vtopUserDelete(user.username!);
+      await ref
+          .read(vtopusersutilsProvider.notifier)
+          .vtopUserDelete(user.username!);
       ref.invalidate(allUsersProviderProvider);
       ref.invalidate(vtopUserProvider);
       ref.invalidate(vClientProvider);
-      final users = await ref.read(vtopusersutilsProvider.notifier).getAllUsers();
+      final users =
+          await ref.read(vtopusersutilsProvider.notifier).getAllUsers();
       if (users.$1.isEmpty && context.mounted) {
         GoRouter.of(context).go('/onboarding');
       }
@@ -214,7 +220,9 @@ class UserContainer extends HookConsumerWidget {
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          showPasswords.value ? user.password ?? "" : "**********",
+                          showPasswords.value
+                              ? user.password ?? ""
+                              : "**********",
                         ),
                       ],
                     ),
@@ -224,9 +232,11 @@ class UserContainer extends HookConsumerWidget {
                       onPress: () async {
                         final List<BiometricType> availableBiometrics =
                             await auth.getAvailableBiometrics();
-                        if (availableBiometrics.isNotEmpty && !showPasswords.value) {
+                        if (availableBiometrics.isNotEmpty &&
+                            !showPasswords.value) {
                           final bool didAuthenticate = await auth.authenticate(
-                            localizedReason: 'Please authenticate to show Password',
+                            localizedReason:
+                                'Please authenticate to show Password',
                           );
                           if (!didAuthenticate) return;
                         }
@@ -267,7 +277,8 @@ class UserContainer extends HookConsumerWidget {
                               actions: [
                                 FButton(
                                   style: FButtonStyle.outline(),
-                                  onPress: () => Navigator.of(dialogContext).pop(),
+                                  onPress:
+                                      () => Navigator.of(dialogContext).pop(),
                                   child: const Text('Cancel'),
                                 ),
                                 FButton(
@@ -307,187 +318,198 @@ class Useradd extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-          onPress: () => showAdaptiveDialog(
-            context: parentContext,
-            builder: (dialogContext) {
-              return HookConsumer(
-                builder: (context, ref, _) {
-                  final username = useTextEditingController();
-                  final password = useTextEditingController();
-                  final semController =
-                      useFRadioSelectMenuTileGroupController<String>();
-                  final semData = useState<SemesterData?>(null);
-                  final loading = useState(false);
+          onPress:
+              () => showAdaptiveDialog(
+                context: parentContext,
+                builder: (dialogContext) {
+                  return HookConsumer(
+                    builder: (context, ref, _) {
+                      final username = useTextEditingController();
+                      final password = useTextEditingController();
+                      final semController =
+                          useFRadioSelectMenuTileGroupController<String>();
+                      final semData = useState<SemesterData?>(null);
+                      final loading = useState(false);
 
-                  Future<void> verifyAndLoadSemesters() async {
-                    final uname = username.text.trim();
-                    final pass = password.text.trim();
-                    if (uname.isEmpty || pass.isEmpty) return;
-                    loading.value = true;
-                    try {
-                      final client = getVtopClient(
-                        username: uname,
-                        password: pass,
-                      );
-                      await vtopClientLogin(client: client);
-                      semData.value = await fetchSemesters(client: client);
-                    } catch (e) {
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                      if (parentContext.mounted) {
-                        showAdaptiveDialog(
-                          context: parentContext,
-                          builder: (errorContext) {
-                            return FDialog(
-                              title: const Text("Unable to add user"),
-                              body: Text("$e"),
-                              actions: [
-                                FButton(
-                                  style: FButtonStyle.outline(),
-                                  onPress:
-                                      () => Navigator.of(errorContext).pop(),
-                                  child: const Text("Close"),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                    } finally {
-                      loading.value = false;
-                    }
-                  }
-
-                  Future<void> saveUser() async {
-                    final uname = username.text.trim();
-                    final pass = password.text.trim();
-                    if (uname.isEmpty || pass.isEmpty) return;
-                    if (semController.value.isEmpty) return;
-
-                    final util = ref.read(vtopusersutilsProvider.notifier);
-                    final existing = await util.getAllUsers();
-                    final alreadyExists = existing.$1.any(
-                      (u) => (u.username ?? "").toLowerCase() == uname.toLowerCase(),
-                    );
-                    if (alreadyExists) {
-                      if (context.mounted) {
-                        Navigator.of(context).pop();
-                      }
-                      if (parentContext.mounted) {
-                        showAdaptiveDialog(
-                          context: parentContext,
-                          builder: (dupContext) {
-                            return FDialog(
-                              title: const Text("User already exists"),
-                              body: const Text(
-                                "This account is already added. Skipping duplicate.",
-                              ),
-                              actions: [
-                                FButton(
-                                  style: FButtonStyle.outline(),
-                                  onPress:
-                                      () => Navigator.of(dupContext).pop(),
-                                  child: const Text("Close"),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      }
-                      return;
-                    }
-
-                    final user = VtopUserEntity(
-                      username: uname,
-                      password: pass,
-                      semid: semController.value.first,
-                      isValid: true,
-                    );
-
-                    await util.vtopUserSave(user);
-                    final allUsers = await util.getAllUsers();
-                    if (allUsers.$2 == null || allUsers.$2!.isEmpty) {
-                      await util.vtopSetDefault(uname);
-                    }
-
-                    ref.invalidate(allUsersProviderProvider);
-                    ref.invalidate(vtopUserProvider);
-                    ref.invalidate(vClientProvider);
-                    if (context.mounted) {
-                      Navigator.of(context).pop();
-                    }
-                  }
-
-                  return FDialog(
-                    title: const Text('Add User'),
-                    body: Container(
-                      decoration: BoxDecoration(
-                        color: context.theme.colors.primaryForeground,
-                      ),
-                      child: semData.value == null
-                          ? Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                FTextField(
-                                  controller: username,
-                                  label: const Text("VTOP Username"),
-                                ),
-                                const SizedBox(height: 8),
-                                FTextField.password(
-                                  controller: password,
-                                  label: const Text("VTOP Password"),
-                                ),
-                              ],
-                            )
-                          : ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 320),
-                              child: SingleChildScrollView(
-                                child: FSelectTileGroup(
-                                  selectController: semController,
-                                  label: const Text('Semesters'),
-                                  description: const Text(
-                                    'Select the semester for this account.',
-                                  ),
-                                  children: [
-                                    for (final sem in semData.value!.semesters)
-                                      FSelectTile(
-                                        title: Text(sem.name),
-                                        value: sem.id,
-                                      ),
+                      Future<void> verifyAndLoadSemesters() async {
+                        final uname = username.text.trim();
+                        final pass = password.text.trim();
+                        if (uname.isEmpty || pass.isEmpty) return;
+                        loading.value = true;
+                        try {
+                          final client = getVtopClient(
+                            username: uname,
+                            password: pass,
+                          );
+                          await vtopClientLogin(client: client);
+                          semData.value = await fetchSemesters(client: client);
+                        } catch (e) {
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                          if (parentContext.mounted) {
+                            showAdaptiveDialog(
+                              context: parentContext,
+                              builder: (errorContext) {
+                                return FDialog(
+                                  title: const Text("Unable to add user"),
+                                  body: Text("$e"),
+                                  actions: [
+                                    FButton(
+                                      style: FButtonStyle.outline(),
+                                      onPress:
+                                          () =>
+                                              Navigator.of(errorContext).pop(),
+                                      child: const Text("Close"),
+                                    ),
                                   ],
-                                ),
+                                );
+                              },
+                            );
+                          }
+                        } finally {
+                          loading.value = false;
+                        }
+                      }
+
+                      Future<void> saveUser() async {
+                        final uname = username.text.trim();
+                        final pass = password.text.trim();
+                        if (uname.isEmpty || pass.isEmpty) return;
+                        if (semController.value.isEmpty) return;
+
+                        final util = ref.read(vtopusersutilsProvider.notifier);
+                        final existing = await util.getAllUsers();
+                        final alreadyExists = existing.$1.any(
+                          (u) =>
+                              (u.username ?? "").toLowerCase() ==
+                              uname.toLowerCase(),
+                        );
+                        if (alreadyExists) {
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                          }
+                          if (parentContext.mounted) {
+                            showAdaptiveDialog(
+                              context: parentContext,
+                              builder: (dupContext) {
+                                return FDialog(
+                                  title: const Text("User already exists"),
+                                  body: const Text(
+                                    "This account is already added. Skipping duplicate.",
+                                  ),
+                                  actions: [
+                                    FButton(
+                                      style: FButtonStyle.outline(),
+                                      onPress:
+                                          () => Navigator.of(dupContext).pop(),
+                                      child: const Text("Close"),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                          }
+                          return;
+                        }
+
+                        final user = VtopUserEntity(
+                          username: uname,
+                          password: pass,
+                          semid: semController.value.first,
+                          isValid: true,
+                        );
+
+                        await util.vtopUserSave(user);
+                        final allUsers = await util.getAllUsers();
+                        if (allUsers.$2 == null || allUsers.$2!.isEmpty) {
+                          await util.vtopSetDefault(uname);
+                        }
+
+                        ref.invalidate(allUsersProviderProvider);
+                        ref.invalidate(vtopUserProvider);
+                        ref.invalidate(vClientProvider);
+                        if (context.mounted) {
+                          Navigator.of(context).pop();
+                        }
+                      }
+
+                      return FDialog(
+                        title: const Text('Add User'),
+                        body: Container(
+                          decoration: BoxDecoration(
+                            color: context.theme.colors.primaryForeground,
+                          ),
+                          child:
+                              semData.value == null
+                                  ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      FTextField(
+                                        controller: username,
+                                        label: const Text("VTOP Username"),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      FTextField.password(
+                                        controller: password,
+                                        label: const Text("VTOP Password"),
+                                      ),
+                                    ],
+                                  )
+                                  : ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 320,
+                                    ),
+                                    child: SingleChildScrollView(
+                                      child: FSelectTileGroup(
+                                        selectController: semController,
+                                        label: const Text('Semesters'),
+                                        description: const Text(
+                                          'Select the semester for this account.',
+                                        ),
+                                        children: [
+                                          for (final sem
+                                              in semData.value!.semesters)
+                                            FSelectTile(
+                                              title: Text(sem.name),
+                                              value: sem.id,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                        ),
+                        actions: [
+                          FButton(
+                            style: FButtonStyle.outline(),
+                            onPress: () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
+                          ),
+                          if (!loading.value)
+                            FButton(
+                              onPress:
+                                  semData.value == null
+                                      ? verifyAndLoadSemesters
+                                      : saveUser,
+                              child: Text(
+                                semData.value == null ? 'Verify' : 'Save',
+                              ),
+                            )
+                          else
+                            SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: context.theme.colors.primary,
                               ),
                             ),
-                    ),
-                    actions: [
-                      FButton(
-                        style: FButtonStyle.outline(),
-                        onPress: () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                      if (!loading.value)
-                        FButton(
-                          onPress: semData.value == null
-                              ? verifyAndLoadSemesters
-                              : saveUser,
-                          child: Text(semData.value == null ? 'Verify' : 'Save'),
-                        )
-                      else
-                        SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: context.theme.colors.primary,
-                          ),
-                        ),
-                    ],
+                        ],
+                      );
+                    },
                   );
                 },
-              );
-            },
-          ),
+              ),
           child: const Text('Add User'),
         ),
       ],
@@ -536,9 +558,7 @@ class UserSemChange extends HookConsumerWidget {
                                           void handelClick() async {
                                             try {
                                               ref
-                                                  .read(
-                                                    isLoadingSems.notifier,
-                                                  )
+                                                  .read(isLoadingSems.notifier)
                                                   .state = true;
 
                                               await ref
@@ -550,9 +570,7 @@ class UserSemChange extends HookConsumerWidget {
                                                 semesterIdProvider,
                                               );
                                               ref
-                                                  .read(
-                                                    isLoadingSems.notifier,
-                                                  )
+                                                  .read(isLoadingSems.notifier)
                                                   .state = false;
                                             } catch (e, _) {
                                               if (context.mounted) {
@@ -565,10 +583,7 @@ class UserSemChange extends HookConsumerWidget {
                                                 Navigator.of(context).pop();
                                               }
                                               if (outercontext.mounted) {
-                                                disCommonToast(
-                                                  outercontext,
-                                                  e,
-                                                );
+                                                disCommonToast(outercontext, e);
                                               }
                                             }
                                           }
@@ -604,7 +619,9 @@ class UserSemChange extends HookConsumerWidget {
                                             .vtopUserSave(
                                               user.copyWith(semid: value.$1),
                                             );
-                                        ref.invalidate(allUsersProviderProvider);
+                                        ref.invalidate(
+                                          allUsersProviderProvider,
+                                        );
                                         ref.invalidate(vtopUserProvider);
                                         ref.invalidate(vClientProvider);
                                         final notifSetting = ref.read(
@@ -612,9 +629,7 @@ class UserSemChange extends HookConsumerWidget {
                                         );
                                         if (notifSetting.enabled) {
                                           await ref
-                                              .read(
-                                                timetableProvider.notifier,
-                                              )
+                                              .read(timetableProvider.notifier)
                                               .updateTimetable();
                                         }
                                         final examNotifSetting = ref.read(
