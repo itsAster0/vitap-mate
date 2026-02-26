@@ -9,6 +9,7 @@ import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dar
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -65,12 +66,18 @@ Future<bool> _syncData({String? task}) async {
     ];
     final k = await Future.wait(futures);
     await prefs.setString('${task}_val_end', DateTime.now().toString());
-    return k.every((e) => e);
+    return atLeastHalfTrue(k);
   } catch (e) {
     return false;
   } finally {
     container.dispose();
   }
+}
+
+bool atLeastHalfTrue(List<bool> k) {
+  if (k.isEmpty) return true;
+  final trueCount = k.where((e) => e).length;
+  return trueCount * 2 >= k.length;
 }
 
 Future<bool> _retryer(Future<void> Function() func) async {
@@ -86,6 +93,9 @@ Future<bool> _retryer(Future<void> Function() func) async {
       if (e is FeatureDisabledException) {
         return true;
       }
+      if (runs == MAX_TRY && e is VtopError) return true;
+      if (runs == MAX_TRY) break;
+      await Future.delayed(Duration(milliseconds: 400 * (runs + 1)));
     }
   }
   return false;
@@ -111,7 +121,7 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
                   .updateAttendance(),
         ),
     ]);
-    return k.every((e) => e) && ok;
+    return atLeastHalfTrue(k) && ok;
   } catch (e) {
     return false;
   }

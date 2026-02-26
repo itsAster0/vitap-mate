@@ -19,6 +19,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_exam_notifications_enabled",
         "settings_exam_notify_before_minutes",
         "settings_student_projects_pinned_ids",
+        "settings_student_projects_json",
       },
     ),
   );

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -9,6 +10,7 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/features/more/presentation/providers/student_projects_provider.dart';
 
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/features/more/presentation/widgets/wifi_card.dart';
@@ -17,26 +19,10 @@ import 'package:vitapmate/src/api/vtop_get_client.dart';
 class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
   static final Map<String, String?> _previewCache = {};
-
-  static const _studentProjects = <
-    ({int id, String name, String type, String desc, String madeBy, String url})
-  >[
-    (
-      id: 1001,
-      name: "GPA Calculator",
-      type: "Website",
-      desc: "Calculate GPA/CGPA quickly for VIT-AP students.",
-      madeBy: "Venkatsubash07",
-      url: "https://vitapcgpacalculator.vercel.app/",
-    ),
-    (
-      id: 1002,
-      name: "GPA Calculator",
-      type: "App",
-      desc: "VIT-AP GPA calculator app  for VIT-AP students. ",
-      madeBy: "Maddikeri Narendranath Reddy",
-      url: "https://play.google.com/store/apps/details?id=com.gcalc.gcalcpro",
-    ),
+  static const _categoryOrder = <String>[
+    StudentProject.categoryAcademics,
+    StudentProject.categoryCampus,
+    StudentProject.categoryMiscellaneous,
   ];
 
   @override
@@ -72,8 +58,8 @@ class MorePage extends HookConsumerWidget {
               ],
             ),
             VtopCard(),
-            _studentProjectsCard(context, ref),
             if (ref.watch(wificardSettingProvider)) WifiCard(),
+            _studentProjectsCard(context, ref),
           ],
         ),
       ),
@@ -84,11 +70,21 @@ class MorePage extends HookConsumerWidget {
     final colors = context.theme.colors;
     final pinnedIds = ref.watch(studentProjectPinnedIdsProvider);
     final pinnedOnly = ref.watch(studentProjectsPinnedOnlySessionProvider);
+    final allProjects =
+        ref.watch(studentProjectsProvider).valueOrNull ??
+        defaultStudentProjects;
     final controller = ref.read(studentProjectsSettingsControllerProvider);
     final visibleProjects =
         pinnedOnly
-            ? _studentProjects.where((p) => pinnedIds.contains(p.id)).toList()
-            : _studentProjects;
+            ? allProjects.where((p) => pinnedIds.contains(p.id)).toList()
+            : allProjects;
+    final groupedProjects = <String, List<StudentProject>>{
+      for (final category in _categoryOrder) category: <StudentProject>[],
+    };
+    for (final project in visibleProjects) {
+      groupedProjects.putIfAbsent(project.category, () => <StudentProject>[]);
+      groupedProjects[project.category]!.add(project);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -134,7 +130,7 @@ class MorePage extends HookConsumerWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          "Explore useful student-built tools",
+          "Explore useful student-built Projects",
           style: TextStyle(color: MoreColors.secondaryText),
         ),
         const SizedBox(height: 10),
@@ -152,22 +148,73 @@ class MorePage extends HookConsumerWidget {
             ),
           )
         else
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final cardWidth = (constraints.maxWidth * 0.82).clamp(
-                240.0,
-                320.0,
-              );
-              final previewHeight = cardWidth * 9 / 16;
-              final listHeight = previewHeight + 205;
-              return SizedBox(
+          FAccordion(
+            children: [
+              for (final category in _categoryOrder)
+                FAccordionItem(
+                  title: Text(
+                    "${_categoryLabel(category)} (${(groupedProjects[category] ?? const []).length})",
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  initiallyExpanded:
+                      category == StudentProject.categoryAcademics,
+                  child: _categorySection(
+                    context: context,
+                    projects: groupedProjects[category] ?? const [],
+                    pinnedIds: pinnedIds,
+                    controller: controller,
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(height: 4),
+        FTappable(
+          onPress: () async {
+            await launchUrl(
+              Uri.parse("https://www.instagram.com/itsKryxen"),
+              mode: LaunchMode.externalApplication,
+            );
+          },
+          child: Text(
+            "Want your project here? Contact me on Instagram: @itsKryxen",
+            style: TextStyle(
+              color: colors.primary,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _categorySection({
+    required BuildContext context,
+    required List<StudentProject> projects,
+    required Set<int> pinnedIds,
+    required StudentProjectsSettingsController controller,
+  }) {
+    final width = MediaQuery.sizeOf(context).width;
+    final cardWidth = (width * 0.78).clamp(240.0, 320.0);
+    final previewHeight = cardWidth * 9 / 16;
+    final listHeight = previewHeight + 235;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
+      child:
+          projects.isEmpty
+              ? Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                child: const Text("No projects in this category."),
+              )
+              : SizedBox(
                 height: listHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: visibleProjects.length,
+                  itemCount: projects.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 10),
                   itemBuilder: (context, index) {
-                    final p = visibleProjects[index];
+                    final p = projects[index];
                     final isPinned = pinnedIds.contains(p.id);
                     return SizedBox(
                       width: cardWidth,
@@ -211,7 +258,7 @@ class MorePage extends HookConsumerWidget {
                             ),
                             Text(
                               p.desc,
-                              maxLines: 1,
+                              maxLines: 4,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
@@ -228,19 +275,63 @@ class MorePage extends HookConsumerWidget {
                                 color: MoreColors.secondaryText,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: FButton(
-                                style: FButtonStyle.outline(),
-                                onPress: () async {
-                                  await launchUrl(
-                                    Uri.parse(p.url),
-                                    mode: LaunchMode.externalApplication,
-                                  );
-                                },
-                                child: const Text("View Project"),
+                            Text(
+                              p.openSource == null
+                                  ? "Closed source"
+                                  : "Open source ",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: MoreColors.secondaryText,
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FButton(
+                                    style: FButtonStyle.outline(),
+                                    onPress: () async {
+                                      await _confirmAndLaunchUrl(
+                                        context,
+                                        url: Uri.parse(p.url),
+                                        title: "Open Student Project",
+                                        body:
+                                            "You are going to a student-built project.",
+                                      );
+                                    },
+                                    child: const Text("Open"),
+                                  ),
+                                ),
+                                if (p.openSource != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: FTappable(
+                                      onPress: () async {
+                                        await _confirmAndLaunchUrl(
+                                          context,
+                                          url: Uri.parse(p.openSource!),
+                                          title: "Open Open Source Link",
+                                          body:
+                                              "You are going to open a student project open-source link.",
+                                        );
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: context.theme.colors.border,
+                                          ),
+                                        ),
+                                        child: const Icon(Icons.code, size: 16),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
@@ -248,27 +339,52 @@ class MorePage extends HookConsumerWidget {
                     );
                   },
                 ),
-              );
-            },
-          ),
-        const SizedBox(height: 4),
-        FTappable(
-          onPress: () async {
-            await launchUrl(
-              Uri.parse("https://www.instagram.com/itsKryxen"),
-              mode: LaunchMode.externalApplication,
-            );
-          },
-          child: Text(
-            "Want your project here? Contact me on Instagram: @itsKryxen",
-            style: TextStyle(
-              color: colors.primary,
-              decoration: TextDecoration.underline,
-            ),
-          ),
-        ),
-      ],
+              ),
     );
+  }
+
+  String _categoryLabel(String category) {
+    switch (category) {
+      case StudentProject.categoryAcademics:
+        return "Academics";
+      case StudentProject.categoryCampus:
+        return "Campus";
+      case StudentProject.categoryMiscellaneous:
+      default:
+        return "Miscellaneous";
+    }
+  }
+
+  Future<void> _confirmAndLaunchUrl(
+    BuildContext context, {
+    required Uri url,
+    required String title,
+    required String body,
+  }) async {
+    final shouldOpen = await showFDialog<bool>(
+      context: context,
+      builder:
+          (context, style, animation) => FDialog(
+            animation: animation,
+            direction: Axis.horizontal,
+            title: Text(title),
+            body: Text(body),
+            actions: [
+              FButton(
+                style: FButtonStyle.outline(),
+                onPress: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FButton(
+                onPress: () => Navigator.of(context).pop(true),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
+    if (shouldOpen == true) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _projectPreview(String url, double height) {
@@ -316,31 +432,31 @@ class MorePage extends HookConsumerWidget {
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Image.network(
-            imageUrl,
+          child: CachedNetworkImage(
+            imageUrl: imageUrl,
             fit: BoxFit.contain,
             alignment: Alignment.center,
             width: double.infinity,
             height: double.infinity,
-            errorBuilder:
-                (_, _, _) => Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.rocket_launch_rounded,
-                      color: Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                ),
+            errorWidget: (_, _, _) => _previewFallback(),
+            placeholder: (_, _) => _previewFallback(),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _previewFallback() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF06B6D4), Color(0xFF2563EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: const Center(
+        child: Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 40),
       ),
     );
   }
