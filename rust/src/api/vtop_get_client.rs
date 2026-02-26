@@ -1,8 +1,8 @@
 use crate::api::vtop::{
     paraser::wifi_portal::find_captivative_portal,
     types::{
-        AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, SemesterData,
-        TimetableData,
+        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeViewData,
+        GradeHistoryData, MarksData, SemesterData, TimetableData,
     },
     vtop_client::{VtopClient, VtopError},
     vtop_config::VtopClientBuilder,
@@ -73,6 +73,30 @@ pub async fn fetch_exam_shedule(
     semester_id: String,
 ) -> Result<ExamScheduleData, VtopError> {
     client.get_exam_schedule(&semester_id).await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_grade_view(
+    client: &mut VtopClient,
+    semester_id: String,
+) -> Result<GradeViewData, VtopError> {
+    client.get_grade_view(&semester_id).await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_grade_view_details(
+    client: &mut VtopClient,
+    semester_id: String,
+    course_id: String,
+) -> Result<GradeDetailsData, VtopError> {
+    client
+        .get_grade_view_details(&semester_id, &course_id)
+        .await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_grade_history(client: &mut VtopClient) -> Result<GradeHistoryData, VtopError> {
+    client.get_grade_history().await
 }
 
 #[flutter_rust_bridge::frb()]

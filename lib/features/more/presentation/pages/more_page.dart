@@ -47,6 +47,24 @@ class MorePage extends HookConsumerWidget {
                   },
                 ),
                 FTile(
+                  prefix: const Icon(Icons.school_outlined),
+                  title: const Text('Grades'),
+                  subtitle: const Text('View grades with detailed marks'),
+                  suffix: const Icon(FIcons.chevronRight),
+                  onPress: () {
+                    GoRouter.of(context).pushNamed(Paths.grades);
+                  },
+                ),
+                FTile(
+                  prefix: const Icon(Icons.history_outlined),
+                  title: const Text('Grade History'),
+                  subtitle: const Text('View complete grade history'),
+                  suffix: const Icon(FIcons.chevronRight),
+                  onPress: () {
+                    GoRouter.of(context).pushNamed(Paths.gradeHistory);
+                  },
+                ),
+                FTile(
                   prefix: const Icon(Icons.event_note_outlined),
                   title: const Text('Exam Schedule'),
                   subtitle: const Text('View your Exam Schedule'),
@@ -92,7 +110,7 @@ class MorePage extends HookConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                "Projects by Students",
+                "Projects by other Students",
                 style: TextStyle(
                   color: colors.primary,
                   fontWeight: FontWeight.w700,

@@ -12,6 +12,9 @@ part 'database.g.dart';
     AttendanceTable,
     ExamScheduleTable,
     MarksTable,
+    GradeCourseTable,
+    GradeDetailTable,
+    GradeHistoryCacheTable,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -19,7 +22,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? _openConnection(username));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
@@ -30,6 +33,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 2) {
           await m.addColumn(timetableTable, timetableTable.isLab);
           await m.addColumn(timetableTable, timetableTable.faculty);
+        }
+        if (from < 3) {
+          await m.createTable(gradeCourseTable);
+          await m.createTable(gradeDetailTable);
+          await m.createTable(gradeHistoryCacheTable);
         }
       },
     );

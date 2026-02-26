@@ -18,6 +18,22 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 var cookieManagerAndroid = WebViewCookieManager();
 
+({String name, String value})? parseCookiePair(String cookieHeader) {
+  final firstCookiePart = cookieHeader.split(";").first.trim();
+  final separatorIndex = firstCookiePart.indexOf("=");
+  if (separatorIndex <= 0 || separatorIndex >= firstCookiePart.length - 1) {
+    return null;
+  }
+
+  final name = firstCookiePart.substring(0, separatorIndex).trim();
+  final value = firstCookiePart.substring(separatorIndex + 1).trim();
+  if (name.isEmpty || value.isEmpty) {
+    return null;
+  }
+
+  return (name: name, value: value);
+}
+
 class VtopWebview extends HookConsumerWidget {
   const VtopWebview({super.key});
 
@@ -237,17 +253,17 @@ class VtopWebview extends HookConsumerWidget {
       final raw = await fetchCookies(client: client);
       final cookieString = String.fromCharCodes(raw);
 
-      final parts = cookieString.split(";").first.trim().split('=');
-      if (parts.length < 2) return;
+      final parsedCookie = parseCookiePair(cookieString);
+      if (parsedCookie == null) return;
 
-      final name = parts[0].trim();
-      final value = parts[1].trim();
+      final name = parsedCookie.name;
+      final value = parsedCookie.value;
       cookieName.value = name;
       cookieValue.value = value;
       await cookieManager.deleteAllCookies();
+      await cookieManagerAndroid.clearCookies();
 
       if (Platform.isAndroid) {
-        await cookieManagerAndroid.clearCookies();
         await cookieManagerAndroid.setCookie(
           WebViewCookie(
             name: name,

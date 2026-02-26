@@ -104,3 +104,48 @@ class MarksTable extends Table {
   @override
   Set<Column> get primaryKey => {semId, courseCode, courseType, serial, marks};
 }
+
+class GradeCourseTable extends Table {
+  IntColumn get serial => integer()();
+  TextColumn get courseCode => text()();
+  TextColumn get courseTitle => text()();
+  TextColumn get courseType => text()();
+  TextColumn get gradingType => text()();
+  TextColumn get grandTotal => text()();
+  TextColumn get grade => text()();
+  TextColumn get courseId => text()();
+  TextColumn get semId => text().references(SemesterTable, #semid)();
+  IntColumn get time => integer()();
+
+  @override
+  Set<Column> get primaryKey => {semId, courseId};
+}
+
+class GradeDetailTable extends Table {
+  TextColumn get semId => text().references(SemesterTable, #semid)();
+  TextColumn get courseId => text()();
+  TextColumn get classNumber => text()();
+  TextColumn get classCourseType => text()();
+  TextColumn get grandTotal => text()();
+  IntColumn get serial => integer()();
+  TextColumn get markTitle => text()();
+  TextColumn get maxMark => text()();
+  TextColumn get weightage => text()();
+  TextColumn get status => text()();
+  TextColumn get scoredMark => text()();
+  TextColumn get weightageMark => text()();
+  TextColumn get gradeRanges => text().withDefault(const Constant("[]"))();
+  IntColumn get time => integer()();
+
+  @override
+  Set<Column> get primaryKey => {semId, courseId, serial, markTitle};
+}
+
+class GradeHistoryCacheTable extends Table {
+  IntColumn get id => integer().withDefault(const Constant(1))();
+  TextColumn get payload => text()();
+  IntColumn get time => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

@@ -9,6 +9,8 @@ import 'package:vitapmate/core/widgets/onboarding_page.dart';
 import 'package:vitapmate/core/widgets/shell_layout.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/exam_schedule_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/grades_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/grade_history_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
@@ -93,6 +95,27 @@ final routerProvider = Provider((ref) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: MarksPage(),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'grades',
+                    name: Paths.grades,
+
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: GradesPage(),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'grade_history',
+                    name: Paths.gradeHistory,
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: GradeHistoryPage(),
                       );
                     },
                   ),

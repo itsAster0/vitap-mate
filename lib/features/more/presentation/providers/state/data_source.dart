@@ -42,3 +42,37 @@ Future<MarksRemoteDataSource> marksRemoteDataSource(Ref ref) async {
     ref.read(globalAsyncQueueProvider.notifier),
   );
 }
+
+@riverpod
+Future<GradesLocalDataSource> gradesLocalDataSource(Ref ref) async {
+  return GradesLocalDataSource(
+    await ref.read(appDatabaseProvider.future),
+    ref.read(globalAsyncQueueProvider.notifier),
+  );
+}
+
+@riverpod
+Future<GradesRemoteDataSource> gradesRemoteDataSource(Ref ref) async {
+  return GradesRemoteDataSource(
+    await ref.watch(vClientProvider.future),
+    ref.read(globalAsyncQueueProvider.notifier),
+  );
+}
+
+@riverpod
+Future<GradeHistoryLocalDataSource> gradeHistoryLocalDataSource(Ref ref) async {
+  return GradeHistoryLocalDataSource(
+    await ref.read(appDatabaseProvider.future),
+    ref.read(globalAsyncQueueProvider.notifier),
+  );
+}
+
+@riverpod
+Future<GradeHistoryRemoteDataSource> gradeHistoryRemoteDataSource(
+  Ref ref,
+) async {
+  return GradeHistoryRemoteDataSource(
+    await ref.watch(vClientProvider.future),
+    ref.read(globalAsyncQueueProvider.notifier),
+  );
+}

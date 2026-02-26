@@ -29,3 +29,46 @@ class MarksRemoteDataSource {
     return data;
   }
 }
+
+class GradesRemoteDataSource {
+  final VtopClient _client;
+  final GlobalAsyncQueue _globalAsyncQueue;
+  GradesRemoteDataSource(this._client, this._globalAsyncQueue);
+
+  Future<GradeViewData> fetchGradeViewFromRemote(String semid) async {
+    final data = await _globalAsyncQueue.run(
+      "vtop_grades_$semid",
+      () => fetchGradeView(client: _client, semesterId: semid),
+    );
+    return data;
+  }
+
+  Future<GradeDetailsData> fetchGradeDetailsFromRemote({
+    required String semid,
+    required String courseId,
+  }) async {
+    final data = await _globalAsyncQueue.run(
+      "vtop_grade_details_${semid}_$courseId",
+      () => fetchGradeViewDetails(
+        client: _client,
+        semesterId: semid,
+        courseId: courseId,
+      ),
+    );
+    return data;
+  }
+}
+
+class GradeHistoryRemoteDataSource {
+  final VtopClient _client;
+  final GlobalAsyncQueue _globalAsyncQueue;
+  GradeHistoryRemoteDataSource(this._client, this._globalAsyncQueue);
+
+  Future<GradeHistoryData> fetchGradeHistoryFromRemote() async {
+    final data = await _globalAsyncQueue.run(
+      "vtop_grade_history",
+      () => fetchGradeHistory(client: _client),
+    );
+    return data;
+  }
+}

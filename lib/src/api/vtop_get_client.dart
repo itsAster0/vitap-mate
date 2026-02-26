@@ -70,6 +70,27 @@ Future<ExamScheduleData> fetchExamShedule({
   semesterId: semesterId,
 );
 
+Future<GradeViewData> fetchGradeView({
+  required VtopClient client,
+  required String semesterId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchGradeView(
+  client: client,
+  semesterId: semesterId,
+);
+
+Future<GradeDetailsData> fetchGradeViewDetails({
+  required VtopClient client,
+  required String semesterId,
+  required String courseId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchGradeViewDetails(
+  client: client,
+  semesterId: semesterId,
+  courseId: courseId,
+);
+
+Future<GradeHistoryData> fetchGradeHistory({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchGradeHistory(client: client);
+
 Future<Uint8List> fetchCookies({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchCookies(client: client);
 

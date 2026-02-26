@@ -152,6 +152,249 @@ Map<String, dynamic> _$FullAttendanceRecordToJson(
   'remark': instance.remark,
 };
 
+_GradeCourseRecord _$GradeCourseRecordFromJson(Map<String, dynamic> json) =>
+    _GradeCourseRecord(
+      serial: json['serial'] as String,
+      courseCode: json['courseCode'] as String,
+      courseTitle: json['courseTitle'] as String,
+      courseType: json['courseType'] as String,
+      gradingType: json['gradingType'] as String,
+      grandTotal: json['grandTotal'] as String,
+      grade: json['grade'] as String,
+      courseId: json['courseId'] as String,
+    );
+
+Map<String, dynamic> _$GradeCourseRecordToJson(_GradeCourseRecord instance) =>
+    <String, dynamic>{
+      'serial': instance.serial,
+      'courseCode': instance.courseCode,
+      'courseTitle': instance.courseTitle,
+      'courseType': instance.courseType,
+      'gradingType': instance.gradingType,
+      'grandTotal': instance.grandTotal,
+      'grade': instance.grade,
+      'courseId': instance.courseId,
+    };
+
+_GradeDetailMark _$GradeDetailMarkFromJson(Map<String, dynamic> json) =>
+    _GradeDetailMark(
+      serial: json['serial'] as String,
+      markTitle: json['markTitle'] as String,
+      maxMark: json['maxMark'] as String,
+      weightage: json['weightage'] as String,
+      status: json['status'] as String,
+      scoredMark: json['scoredMark'] as String,
+      weightageMark: json['weightageMark'] as String,
+    );
+
+Map<String, dynamic> _$GradeDetailMarkToJson(_GradeDetailMark instance) =>
+    <String, dynamic>{
+      'serial': instance.serial,
+      'markTitle': instance.markTitle,
+      'maxMark': instance.maxMark,
+      'weightage': instance.weightage,
+      'status': instance.status,
+      'scoredMark': instance.scoredMark,
+      'weightageMark': instance.weightageMark,
+    };
+
+_GradeDetailsData _$GradeDetailsDataFromJson(Map<String, dynamic> json) =>
+    _GradeDetailsData(
+      semesterId: json['semesterId'] as String,
+      courseId: json['courseId'] as String,
+      classNumber: json['classNumber'] as String,
+      classCourseType: json['classCourseType'] as String,
+      grandTotal: json['grandTotal'] as String,
+      marks:
+          (json['marks'] as List<dynamic>)
+              .map((e) => GradeDetailMark.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      gradeRanges:
+          (json['gradeRanges'] as List<dynamic>)
+              .map((e) => GradeRange.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$GradeDetailsDataToJson(_GradeDetailsData instance) =>
+    <String, dynamic>{
+      'semesterId': instance.semesterId,
+      'courseId': instance.courseId,
+      'classNumber': instance.classNumber,
+      'classCourseType': instance.classCourseType,
+      'grandTotal': instance.grandTotal,
+      'marks': instance.marks,
+      'gradeRanges': instance.gradeRanges,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_GradeHistoryAttempt _$GradeHistoryAttemptFromJson(Map<String, dynamic> json) =>
+    _GradeHistoryAttempt(
+      courseCode: json['courseCode'] as String,
+      courseTitle: json['courseTitle'] as String,
+      courseType: json['courseType'] as String,
+      credits: json['credits'] as String,
+      grade: json['grade'] as String,
+      examMonth: json['examMonth'] as String,
+      resultDeclared: json['resultDeclared'] as String,
+    );
+
+Map<String, dynamic> _$GradeHistoryAttemptToJson(
+  _GradeHistoryAttempt instance,
+) => <String, dynamic>{
+  'courseCode': instance.courseCode,
+  'courseTitle': instance.courseTitle,
+  'courseType': instance.courseType,
+  'credits': instance.credits,
+  'grade': instance.grade,
+  'examMonth': instance.examMonth,
+  'resultDeclared': instance.resultDeclared,
+};
+
+_GradeHistoryCgpa _$GradeHistoryCgpaFromJson(Map<String, dynamic> json) =>
+    _GradeHistoryCgpa(
+      creditsRegistered: json['creditsRegistered'] as String,
+      creditsEarned: json['creditsEarned'] as String,
+      cgpa: json['cgpa'] as String,
+      sGrades: json['sGrades'] as String,
+      aGrades: json['aGrades'] as String,
+      bGrades: json['bGrades'] as String,
+      cGrades: json['cGrades'] as String,
+      dGrades: json['dGrades'] as String,
+      eGrades: json['eGrades'] as String,
+      fGrades: json['fGrades'] as String,
+      nGrades: json['nGrades'] as String,
+    );
+
+Map<String, dynamic> _$GradeHistoryCgpaToJson(_GradeHistoryCgpa instance) =>
+    <String, dynamic>{
+      'creditsRegistered': instance.creditsRegistered,
+      'creditsEarned': instance.creditsEarned,
+      'cgpa': instance.cgpa,
+      'sGrades': instance.sGrades,
+      'aGrades': instance.aGrades,
+      'bGrades': instance.bGrades,
+      'cGrades': instance.cGrades,
+      'dGrades': instance.dGrades,
+      'eGrades': instance.eGrades,
+      'fGrades': instance.fGrades,
+      'nGrades': instance.nGrades,
+    };
+
+_GradeHistoryData _$GradeHistoryDataFromJson(Map<String, dynamic> json) =>
+    _GradeHistoryData(
+      student: GradeHistoryStudentInfo.fromJson(
+        json['student'] as Map<String, dynamic>,
+      ),
+      records:
+          (json['records'] as List<dynamic>)
+              .map(
+                (e) => GradeHistoryRecord.fromJson(e as Map<String, dynamic>),
+              )
+              .toList(),
+      cgpa: GradeHistoryCgpa.fromJson(json['cgpa'] as Map<String, dynamic>),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$GradeHistoryDataToJson(_GradeHistoryData instance) =>
+    <String, dynamic>{
+      'student': instance.student,
+      'records': instance.records,
+      'cgpa': instance.cgpa,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_GradeHistoryRecord _$GradeHistoryRecordFromJson(Map<String, dynamic> json) =>
+    _GradeHistoryRecord(
+      serial: json['serial'] as String,
+      courseCode: json['courseCode'] as String,
+      courseTitle: json['courseTitle'] as String,
+      courseType: json['courseType'] as String,
+      credits: json['credits'] as String,
+      grade: json['grade'] as String,
+      examMonth: json['examMonth'] as String,
+      resultDeclared: json['resultDeclared'] as String,
+      courseDistribution: json['courseDistribution'] as String,
+      attempts:
+          (json['attempts'] as List<dynamic>)
+              .map(
+                (e) => GradeHistoryAttempt.fromJson(e as Map<String, dynamic>),
+              )
+              .toList(),
+    );
+
+Map<String, dynamic> _$GradeHistoryRecordToJson(_GradeHistoryRecord instance) =>
+    <String, dynamic>{
+      'serial': instance.serial,
+      'courseCode': instance.courseCode,
+      'courseTitle': instance.courseTitle,
+      'courseType': instance.courseType,
+      'credits': instance.credits,
+      'grade': instance.grade,
+      'examMonth': instance.examMonth,
+      'resultDeclared': instance.resultDeclared,
+      'courseDistribution': instance.courseDistribution,
+      'attempts': instance.attempts,
+    };
+
+_GradeHistoryStudentInfo _$GradeHistoryStudentInfoFromJson(
+  Map<String, dynamic> json,
+) => _GradeHistoryStudentInfo(
+  regNo: json['regNo'] as String,
+  name: json['name'] as String,
+  programmeBranch: json['programmeBranch'] as String,
+  programmeMode: json['programmeMode'] as String,
+  studySystem: json['studySystem'] as String,
+  gender: json['gender'] as String,
+  yearJoined: json['yearJoined'] as String,
+  eduStatus: json['eduStatus'] as String,
+  school: json['school'] as String,
+  campus: json['campus'] as String,
+);
+
+Map<String, dynamic> _$GradeHistoryStudentInfoToJson(
+  _GradeHistoryStudentInfo instance,
+) => <String, dynamic>{
+  'regNo': instance.regNo,
+  'name': instance.name,
+  'programmeBranch': instance.programmeBranch,
+  'programmeMode': instance.programmeMode,
+  'studySystem': instance.studySystem,
+  'gender': instance.gender,
+  'yearJoined': instance.yearJoined,
+  'eduStatus': instance.eduStatus,
+  'school': instance.school,
+  'campus': instance.campus,
+};
+
+_GradeRange _$GradeRangeFromJson(Map<String, dynamic> json) =>
+    _GradeRange(grade: json['grade'] as String, range: json['range'] as String);
+
+Map<String, dynamic> _$GradeRangeToJson(_GradeRange instance) =>
+    <String, dynamic>{'grade': instance.grade, 'range': instance.range};
+
+_GradeViewData _$GradeViewDataFromJson(Map<String, dynamic> json) =>
+    _GradeViewData(
+      courses:
+          (json['courses'] as List<dynamic>)
+              .map((e) => GradeCourseRecord.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      semesters:
+          (json['semesters'] as List<dynamic>)
+              .map((e) => SemesterInfo.fromJson(e as Map<String, dynamic>))
+              .toList(),
+      semesterId: json['semesterId'] as String,
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$GradeViewDataToJson(_GradeViewData instance) =>
+    <String, dynamic>{
+      'courses': instance.courses,
+      'semesters': instance.semesters,
+      'semesterId': instance.semesterId,
+      'updateTime': instance.updateTime.toString(),
+    };
+
 _MarksData _$MarksDataFromJson(Map<String, dynamic> json) => _MarksData(
   records:
       (json['records'] as List<dynamic>)

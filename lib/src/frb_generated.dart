@@ -5,6 +5,8 @@
 
 import 'api/simple.dart';
 import 'api/vtop/paraser/parseattn.dart';
+import 'api/vtop/paraser/parsegradehistory.dart';
+import 'api/vtop/paraser/parsegrades.dart';
 import 'api/vtop/paraser/parsemarks.dart';
 import 'api/vtop/paraser/parsesched.dart';
 import 'api/vtop/paraser/parsett.dart';
@@ -80,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -977274604;
+  int get rustContentHash => 1833856223;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -172,6 +174,21 @@ abstract class RustLibApi extends BaseApi {
     required String courseType,
   });
 
+  Future<VtopResultGradeHistoryData>
+  crateApiVtopVtopClientVtopClientGetGradeHistory({required VtopClient that});
+
+  Future<VtopResultGradeViewData> crateApiVtopVtopClientVtopClientGetGradeView({
+    required VtopClient that,
+    required String semesterId,
+  });
+
+  Future<VtopResultGradeDetailsData>
+  crateApiVtopVtopClientVtopClientGetGradeViewDetails({
+    required VtopClient that,
+    required String semesterId,
+    required String courseId,
+  });
+
   Future<VtopResultMarksData> crateApiVtopVtopClientVtopClientGetMarks({
     required VtopClient that,
     required String semesterId,
@@ -228,6 +245,21 @@ abstract class RustLibApi extends BaseApi {
     required String courseType,
   });
 
+  Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
+    required VtopClient client,
+  });
+
+  Future<GradeViewData> crateApiVtopGetClientFetchGradeView({
+    required VtopClient client,
+    required String semesterId,
+  });
+
+  Future<GradeDetailsData> crateApiVtopGetClientFetchGradeViewDetails({
+    required VtopClient client,
+    required String semesterId,
+    required String courseId,
+  });
+
   Future<bool> crateApiVtopGetClientFetchIsAuth({required VtopClient client});
 
   Future<MarksData> crateApiVtopGetClientFetchMarks({
@@ -272,6 +304,20 @@ abstract class RustLibApi extends BaseApi {
     required String sem,
     required String courseId,
     required String courseType,
+  });
+
+  Future<GradeHistoryData>
+  crateApiVtopParaserParsegradehistoryParseGradeHistory({required String html});
+
+  Future<GradeViewData> crateApiVtopParaserParsegradesParseGradeView({
+    required String html,
+    required String sem,
+  });
+
+  Future<GradeDetailsData> crateApiVtopParaserParsegradesParseGradeViewDetails({
+    required String html,
+    required String sem,
+    required String courseId,
   });
 
   Future<MarksData> crateApiVtopParaserParsemarksParseMarks({
@@ -377,6 +423,33 @@ abstract class RustLibApi extends BaseApi {
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_VtopResultFullAttendanceDataPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeDetailsData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeDetailsData;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_VtopResultGradeDetailsDataPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeHistoryData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeHistoryData;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_VtopResultGradeHistoryDataPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeViewData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeViewData;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_VtopResultGradeViewDataPtr;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_VtopResultMarksData;
@@ -1076,6 +1149,125 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<VtopResultGradeHistoryData>
+  crateApiVtopVtopClientVtopClientGetGradeHistory({required VtopClient that}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            that,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiVtopVtopClientVtopClientGetGradeHistoryConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopVtopClientVtopClientGetGradeHistoryConstMeta =>
+      const TaskConstMeta(
+        debugName: "VtopClient_get_grade_history",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<VtopResultGradeViewData> crateApiVtopVtopClientVtopClientGetGradeView({
+    required VtopClient that,
+    required String semesterId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            that,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiVtopVtopClientVtopClientGetGradeViewConstMeta,
+        argValues: [that, semesterId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopVtopClientVtopClientGetGradeViewConstMeta =>
+      const TaskConstMeta(
+        debugName: "VtopClient_get_grade_view",
+        argNames: ["that", "semesterId"],
+      );
+
+  @override
+  Future<VtopResultGradeDetailsData>
+  crateApiVtopVtopClientVtopClientGetGradeViewDetails({
+    required VtopClient that,
+    required String semesterId,
+    required String courseId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            that,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          sse_encode_String(courseId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 20,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopVtopClientVtopClientGetGradeViewDetailsConstMeta,
+        argValues: [that, semesterId, courseId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopVtopClientVtopClientGetGradeViewDetailsConstMeta =>
+      const TaskConstMeta(
+        debugName: "VtopClient_get_grade_view_details",
+        argNames: ["that", "semesterId", "courseId"],
+      );
+
+  @override
   Future<VtopResultMarksData> crateApiVtopVtopClientVtopClientGetMarks({
     required VtopClient that,
     required String semesterId,
@@ -1092,7 +1284,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 21,
             port: port_,
           );
         },
@@ -1131,7 +1323,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 22,
             port: port_,
           );
         },
@@ -1170,7 +1362,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 20,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1207,7 +1399,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 24,
             port: port_,
           );
         },
@@ -1243,7 +1435,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 22,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1279,7 +1471,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 23,
+            funcId: 26,
             port: port_,
           );
         },
@@ -1321,7 +1513,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1360,7 +1552,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1396,7 +1588,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 29,
             port: port_,
           );
         },
@@ -1431,7 +1623,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1473,7 +1665,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1495,6 +1687,120 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
+    required VtopClient client,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_history_data,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchGradeHistoryConstMeta,
+        argValues: [client],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchGradeHistoryConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_grade_history",
+        argNames: ["client"],
+      );
+
+  @override
+  Future<GradeViewData> crateApiVtopGetClientFetchGradeView({
+    required VtopClient client,
+    required String semesterId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 33,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_view_data,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchGradeViewConstMeta,
+        argValues: [client, semesterId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchGradeViewConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_grade_view",
+        argNames: ["client", "semesterId"],
+      );
+
+  @override
+  Future<GradeDetailsData> crateApiVtopGetClientFetchGradeViewDetails({
+    required VtopClient client,
+    required String semesterId,
+    required String courseId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          sse_encode_String(courseId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 34,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_details_data,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchGradeViewDetailsConstMeta,
+        argValues: [client, semesterId, courseId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchGradeViewDetailsConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_grade_view_details",
+        argNames: ["client", "semesterId", "courseId"],
+      );
+
+  @override
   Future<bool> crateApiVtopGetClientFetchIsAuth({required VtopClient client}) {
     return handler.executeNormal(
       NormalTask(
@@ -1507,7 +1813,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1542,7 +1848,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1578,7 +1884,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 37,
             port: port_,
           );
         },
@@ -1613,7 +1919,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 32,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1650,7 +1956,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1680,7 +1986,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1712,7 +2018,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(username, serializer);
           sse_encode_String(password, serializer);
           sse_encode_opt_String(cookie, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
         },
         codec: SseCodec(
           decodeSuccessData:
@@ -1739,7 +2045,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1764,7 +2070,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 37,
+            funcId: 43,
             port: port_,
           );
         },
@@ -1796,7 +2102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 38,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1835,7 +2141,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1857,6 +2163,113 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<GradeHistoryData>
+  crateApiVtopParaserParsegradehistoryParseGradeHistory({
+    required String html,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(html, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 46,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_history_data,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopParaserParsegradehistoryParseGradeHistoryConstMeta,
+        argValues: [html],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopParaserParsegradehistoryParseGradeHistoryConstMeta =>
+      const TaskConstMeta(debugName: "parse_grade_history", argNames: ["html"]);
+
+  @override
+  Future<GradeViewData> crateApiVtopParaserParsegradesParseGradeView({
+    required String html,
+    required String sem,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(html, serializer);
+          sse_encode_String(sem, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 47,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_view_data,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiVtopParaserParsegradesParseGradeViewConstMeta,
+        argValues: [html, sem],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopParaserParsegradesParseGradeViewConstMeta =>
+      const TaskConstMeta(
+        debugName: "parse_grade_view",
+        argNames: ["html", "sem"],
+      );
+
+  @override
+  Future<GradeDetailsData> crateApiVtopParaserParsegradesParseGradeViewDetails({
+    required String html,
+    required String sem,
+    required String courseId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(html, serializer);
+          sse_encode_String(sem, serializer);
+          sse_encode_String(courseId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 48,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_grade_details_data,
+          decodeErrorData: null,
+        ),
+        constMeta:
+            kCrateApiVtopParaserParsegradesParseGradeViewDetailsConstMeta,
+        argValues: [html, sem, courseId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiVtopParaserParsegradesParseGradeViewDetailsConstMeta =>
+      const TaskConstMeta(
+        debugName: "parse_grade_view_details",
+        argNames: ["html", "sem", "courseId"],
+      );
+
+  @override
   Future<MarksData> crateApiVtopParaserParsemarksParseMarks({
     required String html,
     required String sem,
@@ -1870,7 +2283,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 40,
+            funcId: 49,
             port: port_,
           );
         },
@@ -1902,7 +2315,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 50,
             port: port_,
           );
         },
@@ -1935,7 +2348,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 42,
+            funcId: 51,
             port: port_,
           );
         },
@@ -1970,7 +2383,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 52,
             port: port_,
           );
         },
@@ -2006,7 +2419,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 53,
             port: port_,
           );
         },
@@ -2033,7 +2446,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 54,
             port: port_,
           );
         },
@@ -2067,7 +2480,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 46,
+            funcId: 55,
             port: port_,
           );
         },
@@ -2104,7 +2517,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 47,
+            funcId: 56,
             port: port_,
           );
         },
@@ -2188,6 +2601,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
   get rust_arc_decrement_strong_count_VtopResultFullAttendanceData =>
       wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultFullAttendanceData;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeDetailsData =>
+      wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeDetailsData =>
+      wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeHistoryData =>
+      wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeHistoryData =>
+      wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_VtopResultGradeViewData =>
+      wire.rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_VtopResultGradeViewData =>
+      wire.rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData;
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_VtopResultMarksData =>
@@ -2295,6 +2732,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return VtopResultFullAttendanceDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeDetailsData
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeDetailsDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeHistoryData
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeHistoryDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeViewData
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeViewDataImpl.frbInternalDcoDecode(
       raw as List<dynamic>,
     );
   }
@@ -2449,6 +2919,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return VtopResultFullAttendanceDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeDetailsData
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeDetailsDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeHistoryData
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeHistoryDataImpl.frbInternalDcoDecode(
+      raw as List<dynamic>,
+    );
+  }
+
+  @protected
+  VtopResultGradeViewData
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return VtopResultGradeViewDataImpl.frbInternalDcoDecode(
       raw as List<dynamic>,
     );
   }
@@ -2614,6 +3117,177 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GradeCourseRecord dco_decode_grade_course_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return GradeCourseRecord(
+      serial: dco_decode_String(arr[0]),
+      courseCode: dco_decode_String(arr[1]),
+      courseTitle: dco_decode_String(arr[2]),
+      courseType: dco_decode_String(arr[3]),
+      gradingType: dco_decode_String(arr[4]),
+      grandTotal: dco_decode_String(arr[5]),
+      grade: dco_decode_String(arr[6]),
+      courseId: dco_decode_String(arr[7]),
+    );
+  }
+
+  @protected
+  GradeDetailMark dco_decode_grade_detail_mark(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return GradeDetailMark(
+      serial: dco_decode_String(arr[0]),
+      markTitle: dco_decode_String(arr[1]),
+      maxMark: dco_decode_String(arr[2]),
+      weightage: dco_decode_String(arr[3]),
+      status: dco_decode_String(arr[4]),
+      scoredMark: dco_decode_String(arr[5]),
+      weightageMark: dco_decode_String(arr[6]),
+    );
+  }
+
+  @protected
+  GradeDetailsData dco_decode_grade_details_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return GradeDetailsData(
+      semesterId: dco_decode_String(arr[0]),
+      courseId: dco_decode_String(arr[1]),
+      classNumber: dco_decode_String(arr[2]),
+      classCourseType: dco_decode_String(arr[3]),
+      grandTotal: dco_decode_String(arr[4]),
+      marks: dco_decode_list_grade_detail_mark(arr[5]),
+      gradeRanges: dco_decode_list_grade_range(arr[6]),
+      updateTime: dco_decode_u_64(arr[7]),
+    );
+  }
+
+  @protected
+  GradeHistoryAttempt dco_decode_grade_history_attempt(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return GradeHistoryAttempt(
+      courseCode: dco_decode_String(arr[0]),
+      courseTitle: dco_decode_String(arr[1]),
+      courseType: dco_decode_String(arr[2]),
+      credits: dco_decode_String(arr[3]),
+      grade: dco_decode_String(arr[4]),
+      examMonth: dco_decode_String(arr[5]),
+      resultDeclared: dco_decode_String(arr[6]),
+    );
+  }
+
+  @protected
+  GradeHistoryCgpa dco_decode_grade_history_cgpa(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 11)
+      throw Exception('unexpected arr length: expect 11 but see ${arr.length}');
+    return GradeHistoryCgpa(
+      creditsRegistered: dco_decode_String(arr[0]),
+      creditsEarned: dco_decode_String(arr[1]),
+      cgpa: dco_decode_String(arr[2]),
+      sGrades: dco_decode_String(arr[3]),
+      aGrades: dco_decode_String(arr[4]),
+      bGrades: dco_decode_String(arr[5]),
+      cGrades: dco_decode_String(arr[6]),
+      dGrades: dco_decode_String(arr[7]),
+      eGrades: dco_decode_String(arr[8]),
+      fGrades: dco_decode_String(arr[9]),
+      nGrades: dco_decode_String(arr[10]),
+    );
+  }
+
+  @protected
+  GradeHistoryData dco_decode_grade_history_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return GradeHistoryData(
+      student: dco_decode_grade_history_student_info(arr[0]),
+      records: dco_decode_list_grade_history_record(arr[1]),
+      cgpa: dco_decode_grade_history_cgpa(arr[2]),
+      updateTime: dco_decode_u_64(arr[3]),
+    );
+  }
+
+  @protected
+  GradeHistoryRecord dco_decode_grade_history_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return GradeHistoryRecord(
+      serial: dco_decode_String(arr[0]),
+      courseCode: dco_decode_String(arr[1]),
+      courseTitle: dco_decode_String(arr[2]),
+      courseType: dco_decode_String(arr[3]),
+      credits: dco_decode_String(arr[4]),
+      grade: dco_decode_String(arr[5]),
+      examMonth: dco_decode_String(arr[6]),
+      resultDeclared: dco_decode_String(arr[7]),
+      courseDistribution: dco_decode_String(arr[8]),
+      attempts: dco_decode_list_grade_history_attempt(arr[9]),
+    );
+  }
+
+  @protected
+  GradeHistoryStudentInfo dco_decode_grade_history_student_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return GradeHistoryStudentInfo(
+      regNo: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      programmeBranch: dco_decode_String(arr[2]),
+      programmeMode: dco_decode_String(arr[3]),
+      studySystem: dco_decode_String(arr[4]),
+      gender: dco_decode_String(arr[5]),
+      yearJoined: dco_decode_String(arr[6]),
+      eduStatus: dco_decode_String(arr[7]),
+      school: dco_decode_String(arr[8]),
+      campus: dco_decode_String(arr[9]),
+    );
+  }
+
+  @protected
+  GradeRange dco_decode_grade_range(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GradeRange(
+      grade: dco_decode_String(arr[0]),
+      range: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  GradeViewData dco_decode_grade_view_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return GradeViewData(
+      courses: dco_decode_list_grade_course_record(arr[0]),
+      semesters: dco_decode_list_semester_info(arr[1]),
+      semesterId: dco_decode_String(arr[2]),
+      updateTime: dco_decode_u_64(arr[3]),
+    );
+  }
+
+  @protected
   int dco_decode_i_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -2639,6 +3313,38 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return (raw as List<dynamic>)
         .map(dco_decode_full_attendance_record)
         .toList();
+  }
+
+  @protected
+  List<GradeCourseRecord> dco_decode_list_grade_course_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_grade_course_record).toList();
+  }
+
+  @protected
+  List<GradeDetailMark> dco_decode_list_grade_detail_mark(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_grade_detail_mark).toList();
+  }
+
+  @protected
+  List<GradeHistoryAttempt> dco_decode_list_grade_history_attempt(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_grade_history_attempt)
+        .toList();
+  }
+
+  @protected
+  List<GradeHistoryRecord> dco_decode_list_grade_history_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_grade_history_record).toList();
+  }
+
+  @protected
+  List<GradeRange> dco_decode_list_grade_range(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_grade_range).toList();
   }
 
   @protected
@@ -2979,6 +3685,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  VtopResultGradeDetailsData
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeDetailsDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  VtopResultGradeHistoryData
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeHistoryDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  VtopResultGradeViewData
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeViewDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   VtopResultMarksData
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultMarksData(
     SseDeserializer deserializer,
@@ -3165,6 +3907,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return VtopResultFullAttendanceDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  VtopResultGradeDetailsData
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeDetailsDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  VtopResultGradeHistoryData
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeHistoryDataImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  VtopResultGradeViewData
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return VtopResultGradeViewDataImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -3370,6 +4148,223 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GradeCourseRecord sse_decode_grade_course_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_courseCode = sse_decode_String(deserializer);
+    var var_courseTitle = sse_decode_String(deserializer);
+    var var_courseType = sse_decode_String(deserializer);
+    var var_gradingType = sse_decode_String(deserializer);
+    var var_grandTotal = sse_decode_String(deserializer);
+    var var_grade = sse_decode_String(deserializer);
+    var var_courseId = sse_decode_String(deserializer);
+    return GradeCourseRecord(
+      serial: var_serial,
+      courseCode: var_courseCode,
+      courseTitle: var_courseTitle,
+      courseType: var_courseType,
+      gradingType: var_gradingType,
+      grandTotal: var_grandTotal,
+      grade: var_grade,
+      courseId: var_courseId,
+    );
+  }
+
+  @protected
+  GradeDetailMark sse_decode_grade_detail_mark(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_markTitle = sse_decode_String(deserializer);
+    var var_maxMark = sse_decode_String(deserializer);
+    var var_weightage = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_scoredMark = sse_decode_String(deserializer);
+    var var_weightageMark = sse_decode_String(deserializer);
+    return GradeDetailMark(
+      serial: var_serial,
+      markTitle: var_markTitle,
+      maxMark: var_maxMark,
+      weightage: var_weightage,
+      status: var_status,
+      scoredMark: var_scoredMark,
+      weightageMark: var_weightageMark,
+    );
+  }
+
+  @protected
+  GradeDetailsData sse_decode_grade_details_data(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_semesterId = sse_decode_String(deserializer);
+    var var_courseId = sse_decode_String(deserializer);
+    var var_classNumber = sse_decode_String(deserializer);
+    var var_classCourseType = sse_decode_String(deserializer);
+    var var_grandTotal = sse_decode_String(deserializer);
+    var var_marks = sse_decode_list_grade_detail_mark(deserializer);
+    var var_gradeRanges = sse_decode_list_grade_range(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return GradeDetailsData(
+      semesterId: var_semesterId,
+      courseId: var_courseId,
+      classNumber: var_classNumber,
+      classCourseType: var_classCourseType,
+      grandTotal: var_grandTotal,
+      marks: var_marks,
+      gradeRanges: var_gradeRanges,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  GradeHistoryAttempt sse_decode_grade_history_attempt(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_courseCode = sse_decode_String(deserializer);
+    var var_courseTitle = sse_decode_String(deserializer);
+    var var_courseType = sse_decode_String(deserializer);
+    var var_credits = sse_decode_String(deserializer);
+    var var_grade = sse_decode_String(deserializer);
+    var var_examMonth = sse_decode_String(deserializer);
+    var var_resultDeclared = sse_decode_String(deserializer);
+    return GradeHistoryAttempt(
+      courseCode: var_courseCode,
+      courseTitle: var_courseTitle,
+      courseType: var_courseType,
+      credits: var_credits,
+      grade: var_grade,
+      examMonth: var_examMonth,
+      resultDeclared: var_resultDeclared,
+    );
+  }
+
+  @protected
+  GradeHistoryCgpa sse_decode_grade_history_cgpa(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_creditsRegistered = sse_decode_String(deserializer);
+    var var_creditsEarned = sse_decode_String(deserializer);
+    var var_cgpa = sse_decode_String(deserializer);
+    var var_sGrades = sse_decode_String(deserializer);
+    var var_aGrades = sse_decode_String(deserializer);
+    var var_bGrades = sse_decode_String(deserializer);
+    var var_cGrades = sse_decode_String(deserializer);
+    var var_dGrades = sse_decode_String(deserializer);
+    var var_eGrades = sse_decode_String(deserializer);
+    var var_fGrades = sse_decode_String(deserializer);
+    var var_nGrades = sse_decode_String(deserializer);
+    return GradeHistoryCgpa(
+      creditsRegistered: var_creditsRegistered,
+      creditsEarned: var_creditsEarned,
+      cgpa: var_cgpa,
+      sGrades: var_sGrades,
+      aGrades: var_aGrades,
+      bGrades: var_bGrades,
+      cGrades: var_cGrades,
+      dGrades: var_dGrades,
+      eGrades: var_eGrades,
+      fGrades: var_fGrades,
+      nGrades: var_nGrades,
+    );
+  }
+
+  @protected
+  GradeHistoryData sse_decode_grade_history_data(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_student = sse_decode_grade_history_student_info(deserializer);
+    var var_records = sse_decode_list_grade_history_record(deserializer);
+    var var_cgpa = sse_decode_grade_history_cgpa(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return GradeHistoryData(
+      student: var_student,
+      records: var_records,
+      cgpa: var_cgpa,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  GradeHistoryRecord sse_decode_grade_history_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_courseCode = sse_decode_String(deserializer);
+    var var_courseTitle = sse_decode_String(deserializer);
+    var var_courseType = sse_decode_String(deserializer);
+    var var_credits = sse_decode_String(deserializer);
+    var var_grade = sse_decode_String(deserializer);
+    var var_examMonth = sse_decode_String(deserializer);
+    var var_resultDeclared = sse_decode_String(deserializer);
+    var var_courseDistribution = sse_decode_String(deserializer);
+    var var_attempts = sse_decode_list_grade_history_attempt(deserializer);
+    return GradeHistoryRecord(
+      serial: var_serial,
+      courseCode: var_courseCode,
+      courseTitle: var_courseTitle,
+      courseType: var_courseType,
+      credits: var_credits,
+      grade: var_grade,
+      examMonth: var_examMonth,
+      resultDeclared: var_resultDeclared,
+      courseDistribution: var_courseDistribution,
+      attempts: var_attempts,
+    );
+  }
+
+  @protected
+  GradeHistoryStudentInfo sse_decode_grade_history_student_info(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_regNo = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_programmeBranch = sse_decode_String(deserializer);
+    var var_programmeMode = sse_decode_String(deserializer);
+    var var_studySystem = sse_decode_String(deserializer);
+    var var_gender = sse_decode_String(deserializer);
+    var var_yearJoined = sse_decode_String(deserializer);
+    var var_eduStatus = sse_decode_String(deserializer);
+    var var_school = sse_decode_String(deserializer);
+    var var_campus = sse_decode_String(deserializer);
+    return GradeHistoryStudentInfo(
+      regNo: var_regNo,
+      name: var_name,
+      programmeBranch: var_programmeBranch,
+      programmeMode: var_programmeMode,
+      studySystem: var_studySystem,
+      gender: var_gender,
+      yearJoined: var_yearJoined,
+      eduStatus: var_eduStatus,
+      school: var_school,
+      campus: var_campus,
+    );
+  }
+
+  @protected
+  GradeRange sse_decode_grade_range(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_grade = sse_decode_String(deserializer);
+    var var_range = sse_decode_String(deserializer);
+    return GradeRange(grade: var_grade, range: var_range);
+  }
+
+  @protected
+  GradeViewData sse_decode_grade_view_data(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_courses = sse_decode_list_grade_course_record(deserializer);
+    var var_semesters = sse_decode_list_semester_info(deserializer);
+    var var_semesterId = sse_decode_String(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return GradeViewData(
+      courses: var_courses,
+      semesters: var_semesters,
+      semesterId: var_semesterId,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getInt32();
@@ -3413,6 +4408,74 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <FullAttendanceRecord>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_full_attendance_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GradeCourseRecord> sse_decode_list_grade_course_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GradeCourseRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_grade_course_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GradeDetailMark> sse_decode_list_grade_detail_mark(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GradeDetailMark>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_grade_detail_mark(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GradeHistoryAttempt> sse_decode_list_grade_history_attempt(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GradeHistoryAttempt>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_grade_history_attempt(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GradeHistoryRecord> sse_decode_list_grade_history_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GradeHistoryRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_grade_history_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GradeRange> sse_decode_list_grade_range(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GradeRange>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_grade_range(deserializer));
     }
     return ans_;
   }
@@ -3816,6 +4879,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    VtopResultGradeDetailsData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeDetailsDataImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    VtopResultGradeHistoryData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeHistoryDataImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    VtopResultGradeViewData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeViewDataImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultMarksData(
     VtopResultMarksData self,
     SseSerializer serializer,
@@ -4026,6 +5128,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeDetailsData(
+    VtopResultGradeDetailsData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeDetailsDataImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeHistoryData(
+    VtopResultGradeHistoryData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeHistoryDataImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultGradeViewData(
+    VtopResultGradeViewData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as VtopResultGradeViewDataImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultMarksData(
     VtopResultMarksData self,
     SseSerializer serializer,
@@ -4188,6 +5329,154 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_grade_course_record(
+    GradeCourseRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.courseCode, serializer);
+    sse_encode_String(self.courseTitle, serializer);
+    sse_encode_String(self.courseType, serializer);
+    sse_encode_String(self.gradingType, serializer);
+    sse_encode_String(self.grandTotal, serializer);
+    sse_encode_String(self.grade, serializer);
+    sse_encode_String(self.courseId, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_detail_mark(
+    GradeDetailMark self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.markTitle, serializer);
+    sse_encode_String(self.maxMark, serializer);
+    sse_encode_String(self.weightage, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_String(self.scoredMark, serializer);
+    sse_encode_String(self.weightageMark, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_details_data(
+    GradeDetailsData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.semesterId, serializer);
+    sse_encode_String(self.courseId, serializer);
+    sse_encode_String(self.classNumber, serializer);
+    sse_encode_String(self.classCourseType, serializer);
+    sse_encode_String(self.grandTotal, serializer);
+    sse_encode_list_grade_detail_mark(self.marks, serializer);
+    sse_encode_list_grade_range(self.gradeRanges, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_history_attempt(
+    GradeHistoryAttempt self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.courseCode, serializer);
+    sse_encode_String(self.courseTitle, serializer);
+    sse_encode_String(self.courseType, serializer);
+    sse_encode_String(self.credits, serializer);
+    sse_encode_String(self.grade, serializer);
+    sse_encode_String(self.examMonth, serializer);
+    sse_encode_String(self.resultDeclared, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_history_cgpa(
+    GradeHistoryCgpa self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.creditsRegistered, serializer);
+    sse_encode_String(self.creditsEarned, serializer);
+    sse_encode_String(self.cgpa, serializer);
+    sse_encode_String(self.sGrades, serializer);
+    sse_encode_String(self.aGrades, serializer);
+    sse_encode_String(self.bGrades, serializer);
+    sse_encode_String(self.cGrades, serializer);
+    sse_encode_String(self.dGrades, serializer);
+    sse_encode_String(self.eGrades, serializer);
+    sse_encode_String(self.fGrades, serializer);
+    sse_encode_String(self.nGrades, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_history_data(
+    GradeHistoryData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_grade_history_student_info(self.student, serializer);
+    sse_encode_list_grade_history_record(self.records, serializer);
+    sse_encode_grade_history_cgpa(self.cgpa, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_history_record(
+    GradeHistoryRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.courseCode, serializer);
+    sse_encode_String(self.courseTitle, serializer);
+    sse_encode_String(self.courseType, serializer);
+    sse_encode_String(self.credits, serializer);
+    sse_encode_String(self.grade, serializer);
+    sse_encode_String(self.examMonth, serializer);
+    sse_encode_String(self.resultDeclared, serializer);
+    sse_encode_String(self.courseDistribution, serializer);
+    sse_encode_list_grade_history_attempt(self.attempts, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_history_student_info(
+    GradeHistoryStudentInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.regNo, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.programmeBranch, serializer);
+    sse_encode_String(self.programmeMode, serializer);
+    sse_encode_String(self.studySystem, serializer);
+    sse_encode_String(self.gender, serializer);
+    sse_encode_String(self.yearJoined, serializer);
+    sse_encode_String(self.eduStatus, serializer);
+    sse_encode_String(self.school, serializer);
+    sse_encode_String(self.campus, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_range(GradeRange self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.grade, serializer);
+    sse_encode_String(self.range, serializer);
+  }
+
+  @protected
+  void sse_encode_grade_view_data(
+    GradeViewData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_grade_course_record(self.courses, serializer);
+    sse_encode_list_semester_info(self.semesters, serializer);
+    sse_encode_String(self.semesterId, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
@@ -4226,6 +5515,66 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_full_attendance_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_grade_course_record(
+    List<GradeCourseRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_grade_course_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_grade_detail_mark(
+    List<GradeDetailMark> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_grade_detail_mark(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_grade_history_attempt(
+    List<GradeHistoryAttempt> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_grade_history_attempt(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_grade_history_record(
+    List<GradeHistoryRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_grade_history_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_grade_range(
+    List<GradeRange> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_grade_range(item, serializer);
     }
   }
 
@@ -4642,6 +5991,25 @@ class VtopClientImpl extends RustOpaque implements VtopClient {
     courseType: courseType,
   );
 
+  Future<VtopResultGradeHistoryData> getGradeHistory() => RustLib.instance.api
+      .crateApiVtopVtopClientVtopClientGetGradeHistory(that: this);
+
+  Future<VtopResultGradeViewData> getGradeView({required String semesterId}) =>
+      RustLib.instance.api.crateApiVtopVtopClientVtopClientGetGradeView(
+        that: this,
+        semesterId: semesterId,
+      );
+
+  Future<VtopResultGradeDetailsData> getGradeViewDetails({
+    required String semesterId,
+    required String courseId,
+  }) =>
+      RustLib.instance.api.crateApiVtopVtopClientVtopClientGetGradeViewDetails(
+        that: this,
+        semesterId: semesterId,
+        courseId: courseId,
+      );
+
   Future<VtopResultMarksData> getMarks({required String semesterId}) =>
       RustLib.instance.api.crateApiVtopVtopClientVtopClientGetMarks(
         that: this,
@@ -4762,6 +6130,102 @@ class VtopResultFullAttendanceDataImpl extends RustOpaque
             .instance
             .api
             .rust_arc_decrement_strong_count_VtopResultFullAttendanceDataPtr,
+  );
+}
+
+@sealed
+class VtopResultGradeDetailsDataImpl extends RustOpaque
+    implements VtopResultGradeDetailsData {
+  // Not to be used by end users
+  VtopResultGradeDetailsDataImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  VtopResultGradeDetailsDataImpl.frbInternalSseDecode(
+    BigInt ptr,
+    int externalSizeOnNative,
+  ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_increment_strong_count_VtopResultGradeDetailsData,
+    rustArcDecrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeDetailsData,
+    rustArcDecrementStrongCountPtr:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeDetailsDataPtr,
+  );
+}
+
+@sealed
+class VtopResultGradeHistoryDataImpl extends RustOpaque
+    implements VtopResultGradeHistoryData {
+  // Not to be used by end users
+  VtopResultGradeHistoryDataImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  VtopResultGradeHistoryDataImpl.frbInternalSseDecode(
+    BigInt ptr,
+    int externalSizeOnNative,
+  ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_increment_strong_count_VtopResultGradeHistoryData,
+    rustArcDecrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeHistoryData,
+    rustArcDecrementStrongCountPtr:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeHistoryDataPtr,
+  );
+}
+
+@sealed
+class VtopResultGradeViewDataImpl extends RustOpaque
+    implements VtopResultGradeViewData {
+  // Not to be used by end users
+  VtopResultGradeViewDataImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  VtopResultGradeViewDataImpl.frbInternalSseDecode(
+    BigInt ptr,
+    int externalSizeOnNative,
+  ) : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_increment_strong_count_VtopResultGradeViewData,
+    rustArcDecrementStrongCount:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeViewData,
+    rustArcDecrementStrongCountPtr:
+        RustLib
+            .instance
+            .api
+            .rust_arc_decrement_strong_count_VtopResultGradeViewDataPtr,
   );
 }
 

@@ -260,6 +260,115 @@ impl VtopClient {
         Ok(parsemarks::parse_marks(text, semester_id.to_string()))
     }
 
+    pub async fn get_grade_view(&mut self, semester_id: &str) -> VtopResult<GradeViewData> {
+        if !self.session.is_authenticated() {
+            return Err(VtopError::SessionExpired);
+        }
+        let url = format!(
+            "{}/vtop/examinations/examGradeView/doStudentGradeView",
+            self.config.base_url
+        );
+        let form = multipart::Form::new()
+            .text("authorizedID", self.username.clone())
+            .text("semesterSubId", semester_id.to_string())
+            .text(
+                "_csrf",
+                self.session
+                    .get_csrf_token()
+                    .ok_or(VtopError::SessionExpired)?,
+            );
+
+        let res = self
+            .client
+            .post(url)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|_| VtopError::NetworkError)?;
+        if !res.status().is_success() || res.url().to_string().contains("login") {
+            self.session.set_authenticated(false);
+            return Err(VtopError::SessionExpired);
+        }
+
+        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+        Ok(parsegrades::parse_grade_view(text, semester_id.to_string()))
+    }
+
+    pub async fn get_grade_view_details(
+        &mut self,
+        semester_id: &str,
+        course_id: &str,
+    ) -> VtopResult<GradeDetailsData> {
+        if !self.session.is_authenticated() {
+            return Err(VtopError::SessionExpired);
+        }
+        let url = format!(
+            "{}/vtop/examinations/examGradeView/getGradeViewDetails",
+            self.config.base_url
+        );
+        let params = [
+            ("authorizedID", self.username.clone()),
+            ("x", "codex".to_string()),
+            ("semesterSubId", semester_id.to_string()),
+            ("courseId", course_id.to_string()),
+            (
+                "_csrf",
+                self.session
+                    .get_csrf_token()
+                    .ok_or(VtopError::SessionExpired)?,
+            ),
+        ];
+
+        let res = self
+            .client
+            .post(url)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|_| VtopError::NetworkError)?;
+        if !res.status().is_success() || res.url().to_string().contains("login") {
+            self.session.set_authenticated(false);
+            return Err(VtopError::SessionExpired);
+        }
+
+        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+        Ok(parsegrades::parse_grade_view_details(
+            text,
+            semester_id.to_string(),
+            course_id.to_string(),
+        ))
+    }
+
+    pub async fn get_grade_history(&mut self) -> VtopResult<GradeHistoryData> {
+        if !self.session.is_authenticated() {
+            return Err(VtopError::SessionExpired);
+        }
+        let url = format!(
+            "{}/vtop/examinations/examGradeView/StudentGradeHistory",
+            self.config.base_url
+        );
+        let body = format!(
+            "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
+            self.username,
+            self.session
+                .get_csrf_token()
+                .ok_or(VtopError::SessionExpired)?,
+        );
+        let res = self
+            .client
+            .post(url)
+            .body(body)
+            .send()
+            .await
+            .map_err(|_| VtopError::NetworkError)?;
+        if !res.status().is_success() || res.url().to_string().contains("login") {
+            self.session.set_authenticated(false);
+            return Err(VtopError::SessionExpired);
+        }
+        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+        Ok(parsegradehistory::parse_grade_history(text))
+    }
+
     pub async fn get_exam_schedule(&mut self, semester_id: &str) -> VtopResult<ExamScheduleData> {
         if !self.session.is_authenticated() {
             return Err(VtopError::SessionExpired);
@@ -359,9 +468,12 @@ impl VtopClient {
         if !response.status().is_success() || response.url().to_string().contains("login") {
             return Err(VtopError::VtopServerError);
         }
-        self.current_page = Some(response.text().await.map_err(|error| {
-            reqwest_network_error("get_csrf_for_cookie_set.text", error)
-        })?);
+        self.current_page = Some(
+            response
+                .text()
+                .await
+                .map_err(|error| reqwest_network_error("get_csrf_for_cookie_set.text", error))?,
+        );
         let _ = self.extract_csrf_token();
         Ok(())
     }
@@ -542,9 +654,12 @@ impl VtopClient {
         if !response.status().is_success() {
             return Err(VtopError::VtopServerError);
         }
-        self.current_page = Some(response.text().await.map_err(|error| {
-            reqwest_network_error("load_initial_page.text", error)
-        })?);
+        self.current_page = Some(
+            response
+                .text()
+                .await
+                .map_err(|error| reqwest_network_error("load_initial_page.text", error))?,
+        );
 
         Ok(())
     }

@@ -4079,6 +4079,1727 @@ class MarksTableCompanion extends UpdateCompanion<MarksTableData> {
   }
 }
 
+class $GradeCourseTableTable extends GradeCourseTable
+    with TableInfo<$GradeCourseTableTable, GradeCourseTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GradeCourseTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _serialMeta = const VerificationMeta('serial');
+  @override
+  late final GeneratedColumn<int> serial = GeneratedColumn<int>(
+    'serial',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _courseCodeMeta = const VerificationMeta(
+    'courseCode',
+  );
+  @override
+  late final GeneratedColumn<String> courseCode = GeneratedColumn<String>(
+    'course_code',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _courseTitleMeta = const VerificationMeta(
+    'courseTitle',
+  );
+  @override
+  late final GeneratedColumn<String> courseTitle = GeneratedColumn<String>(
+    'course_title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _courseTypeMeta = const VerificationMeta(
+    'courseType',
+  );
+  @override
+  late final GeneratedColumn<String> courseType = GeneratedColumn<String>(
+    'course_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gradingTypeMeta = const VerificationMeta(
+    'gradingType',
+  );
+  @override
+  late final GeneratedColumn<String> gradingType = GeneratedColumn<String>(
+    'grading_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _grandTotalMeta = const VerificationMeta(
+    'grandTotal',
+  );
+  @override
+  late final GeneratedColumn<String> grandTotal = GeneratedColumn<String>(
+    'grand_total',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gradeMeta = const VerificationMeta('grade');
+  @override
+  late final GeneratedColumn<String> grade = GeneratedColumn<String>(
+    'grade',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _courseIdMeta = const VerificationMeta(
+    'courseId',
+  );
+  @override
+  late final GeneratedColumn<String> courseId = GeneratedColumn<String>(
+    'course_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _semIdMeta = const VerificationMeta('semId');
+  @override
+  late final GeneratedColumn<String> semId = GeneratedColumn<String>(
+    'sem_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES semester_table (semid)',
+    ),
+  );
+  static const VerificationMeta _timeMeta = const VerificationMeta('time');
+  @override
+  late final GeneratedColumn<int> time = GeneratedColumn<int>(
+    'time',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    serial,
+    courseCode,
+    courseTitle,
+    courseType,
+    gradingType,
+    grandTotal,
+    grade,
+    courseId,
+    semId,
+    time,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'grade_course_table';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GradeCourseTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('serial')) {
+      context.handle(
+        _serialMeta,
+        serial.isAcceptableOrUnknown(data['serial']!, _serialMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serialMeta);
+    }
+    if (data.containsKey('course_code')) {
+      context.handle(
+        _courseCodeMeta,
+        courseCode.isAcceptableOrUnknown(data['course_code']!, _courseCodeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_courseCodeMeta);
+    }
+    if (data.containsKey('course_title')) {
+      context.handle(
+        _courseTitleMeta,
+        courseTitle.isAcceptableOrUnknown(
+          data['course_title']!,
+          _courseTitleMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_courseTitleMeta);
+    }
+    if (data.containsKey('course_type')) {
+      context.handle(
+        _courseTypeMeta,
+        courseType.isAcceptableOrUnknown(data['course_type']!, _courseTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_courseTypeMeta);
+    }
+    if (data.containsKey('grading_type')) {
+      context.handle(
+        _gradingTypeMeta,
+        gradingType.isAcceptableOrUnknown(
+          data['grading_type']!,
+          _gradingTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_gradingTypeMeta);
+    }
+    if (data.containsKey('grand_total')) {
+      context.handle(
+        _grandTotalMeta,
+        grandTotal.isAcceptableOrUnknown(data['grand_total']!, _grandTotalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_grandTotalMeta);
+    }
+    if (data.containsKey('grade')) {
+      context.handle(
+        _gradeMeta,
+        grade.isAcceptableOrUnknown(data['grade']!, _gradeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_gradeMeta);
+    }
+    if (data.containsKey('course_id')) {
+      context.handle(
+        _courseIdMeta,
+        courseId.isAcceptableOrUnknown(data['course_id']!, _courseIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_courseIdMeta);
+    }
+    if (data.containsKey('sem_id')) {
+      context.handle(
+        _semIdMeta,
+        semId.isAcceptableOrUnknown(data['sem_id']!, _semIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_semIdMeta);
+    }
+    if (data.containsKey('time')) {
+      context.handle(
+        _timeMeta,
+        time.isAcceptableOrUnknown(data['time']!, _timeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {semId, courseId};
+  @override
+  GradeCourseTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GradeCourseTableData(
+      serial:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}serial'],
+          )!,
+      courseCode:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}course_code'],
+          )!,
+      courseTitle:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}course_title'],
+          )!,
+      courseType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}course_type'],
+          )!,
+      gradingType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}grading_type'],
+          )!,
+      grandTotal:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}grand_total'],
+          )!,
+      grade:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}grade'],
+          )!,
+      courseId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}course_id'],
+          )!,
+      semId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}sem_id'],
+          )!,
+      time:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}time'],
+          )!,
+    );
+  }
+
+  @override
+  $GradeCourseTableTable createAlias(String alias) {
+    return $GradeCourseTableTable(attachedDatabase, alias);
+  }
+}
+
+class GradeCourseTableData extends DataClass
+    implements Insertable<GradeCourseTableData> {
+  final int serial;
+  final String courseCode;
+  final String courseTitle;
+  final String courseType;
+  final String gradingType;
+  final String grandTotal;
+  final String grade;
+  final String courseId;
+  final String semId;
+  final int time;
+  const GradeCourseTableData({
+    required this.serial,
+    required this.courseCode,
+    required this.courseTitle,
+    required this.courseType,
+    required this.gradingType,
+    required this.grandTotal,
+    required this.grade,
+    required this.courseId,
+    required this.semId,
+    required this.time,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['serial'] = Variable<int>(serial);
+    map['course_code'] = Variable<String>(courseCode);
+    map['course_title'] = Variable<String>(courseTitle);
+    map['course_type'] = Variable<String>(courseType);
+    map['grading_type'] = Variable<String>(gradingType);
+    map['grand_total'] = Variable<String>(grandTotal);
+    map['grade'] = Variable<String>(grade);
+    map['course_id'] = Variable<String>(courseId);
+    map['sem_id'] = Variable<String>(semId);
+    map['time'] = Variable<int>(time);
+    return map;
+  }
+
+  GradeCourseTableCompanion toCompanion(bool nullToAbsent) {
+    return GradeCourseTableCompanion(
+      serial: Value(serial),
+      courseCode: Value(courseCode),
+      courseTitle: Value(courseTitle),
+      courseType: Value(courseType),
+      gradingType: Value(gradingType),
+      grandTotal: Value(grandTotal),
+      grade: Value(grade),
+      courseId: Value(courseId),
+      semId: Value(semId),
+      time: Value(time),
+    );
+  }
+
+  factory GradeCourseTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GradeCourseTableData(
+      serial: serializer.fromJson<int>(json['serial']),
+      courseCode: serializer.fromJson<String>(json['courseCode']),
+      courseTitle: serializer.fromJson<String>(json['courseTitle']),
+      courseType: serializer.fromJson<String>(json['courseType']),
+      gradingType: serializer.fromJson<String>(json['gradingType']),
+      grandTotal: serializer.fromJson<String>(json['grandTotal']),
+      grade: serializer.fromJson<String>(json['grade']),
+      courseId: serializer.fromJson<String>(json['courseId']),
+      semId: serializer.fromJson<String>(json['semId']),
+      time: serializer.fromJson<int>(json['time']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'serial': serializer.toJson<int>(serial),
+      'courseCode': serializer.toJson<String>(courseCode),
+      'courseTitle': serializer.toJson<String>(courseTitle),
+      'courseType': serializer.toJson<String>(courseType),
+      'gradingType': serializer.toJson<String>(gradingType),
+      'grandTotal': serializer.toJson<String>(grandTotal),
+      'grade': serializer.toJson<String>(grade),
+      'courseId': serializer.toJson<String>(courseId),
+      'semId': serializer.toJson<String>(semId),
+      'time': serializer.toJson<int>(time),
+    };
+  }
+
+  GradeCourseTableData copyWith({
+    int? serial,
+    String? courseCode,
+    String? courseTitle,
+    String? courseType,
+    String? gradingType,
+    String? grandTotal,
+    String? grade,
+    String? courseId,
+    String? semId,
+    int? time,
+  }) => GradeCourseTableData(
+    serial: serial ?? this.serial,
+    courseCode: courseCode ?? this.courseCode,
+    courseTitle: courseTitle ?? this.courseTitle,
+    courseType: courseType ?? this.courseType,
+    gradingType: gradingType ?? this.gradingType,
+    grandTotal: grandTotal ?? this.grandTotal,
+    grade: grade ?? this.grade,
+    courseId: courseId ?? this.courseId,
+    semId: semId ?? this.semId,
+    time: time ?? this.time,
+  );
+  GradeCourseTableData copyWithCompanion(GradeCourseTableCompanion data) {
+    return GradeCourseTableData(
+      serial: data.serial.present ? data.serial.value : this.serial,
+      courseCode:
+          data.courseCode.present ? data.courseCode.value : this.courseCode,
+      courseTitle:
+          data.courseTitle.present ? data.courseTitle.value : this.courseTitle,
+      courseType:
+          data.courseType.present ? data.courseType.value : this.courseType,
+      gradingType:
+          data.gradingType.present ? data.gradingType.value : this.gradingType,
+      grandTotal:
+          data.grandTotal.present ? data.grandTotal.value : this.grandTotal,
+      grade: data.grade.present ? data.grade.value : this.grade,
+      courseId: data.courseId.present ? data.courseId.value : this.courseId,
+      semId: data.semId.present ? data.semId.value : this.semId,
+      time: data.time.present ? data.time.value : this.time,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeCourseTableData(')
+          ..write('serial: $serial, ')
+          ..write('courseCode: $courseCode, ')
+          ..write('courseTitle: $courseTitle, ')
+          ..write('courseType: $courseType, ')
+          ..write('gradingType: $gradingType, ')
+          ..write('grandTotal: $grandTotal, ')
+          ..write('grade: $grade, ')
+          ..write('courseId: $courseId, ')
+          ..write('semId: $semId, ')
+          ..write('time: $time')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    serial,
+    courseCode,
+    courseTitle,
+    courseType,
+    gradingType,
+    grandTotal,
+    grade,
+    courseId,
+    semId,
+    time,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GradeCourseTableData &&
+          other.serial == this.serial &&
+          other.courseCode == this.courseCode &&
+          other.courseTitle == this.courseTitle &&
+          other.courseType == this.courseType &&
+          other.gradingType == this.gradingType &&
+          other.grandTotal == this.grandTotal &&
+          other.grade == this.grade &&
+          other.courseId == this.courseId &&
+          other.semId == this.semId &&
+          other.time == this.time);
+}
+
+class GradeCourseTableCompanion extends UpdateCompanion<GradeCourseTableData> {
+  final Value<int> serial;
+  final Value<String> courseCode;
+  final Value<String> courseTitle;
+  final Value<String> courseType;
+  final Value<String> gradingType;
+  final Value<String> grandTotal;
+  final Value<String> grade;
+  final Value<String> courseId;
+  final Value<String> semId;
+  final Value<int> time;
+  final Value<int> rowid;
+  const GradeCourseTableCompanion({
+    this.serial = const Value.absent(),
+    this.courseCode = const Value.absent(),
+    this.courseTitle = const Value.absent(),
+    this.courseType = const Value.absent(),
+    this.gradingType = const Value.absent(),
+    this.grandTotal = const Value.absent(),
+    this.grade = const Value.absent(),
+    this.courseId = const Value.absent(),
+    this.semId = const Value.absent(),
+    this.time = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GradeCourseTableCompanion.insert({
+    required int serial,
+    required String courseCode,
+    required String courseTitle,
+    required String courseType,
+    required String gradingType,
+    required String grandTotal,
+    required String grade,
+    required String courseId,
+    required String semId,
+    required int time,
+    this.rowid = const Value.absent(),
+  }) : serial = Value(serial),
+       courseCode = Value(courseCode),
+       courseTitle = Value(courseTitle),
+       courseType = Value(courseType),
+       gradingType = Value(gradingType),
+       grandTotal = Value(grandTotal),
+       grade = Value(grade),
+       courseId = Value(courseId),
+       semId = Value(semId),
+       time = Value(time);
+  static Insertable<GradeCourseTableData> custom({
+    Expression<int>? serial,
+    Expression<String>? courseCode,
+    Expression<String>? courseTitle,
+    Expression<String>? courseType,
+    Expression<String>? gradingType,
+    Expression<String>? grandTotal,
+    Expression<String>? grade,
+    Expression<String>? courseId,
+    Expression<String>? semId,
+    Expression<int>? time,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (serial != null) 'serial': serial,
+      if (courseCode != null) 'course_code': courseCode,
+      if (courseTitle != null) 'course_title': courseTitle,
+      if (courseType != null) 'course_type': courseType,
+      if (gradingType != null) 'grading_type': gradingType,
+      if (grandTotal != null) 'grand_total': grandTotal,
+      if (grade != null) 'grade': grade,
+      if (courseId != null) 'course_id': courseId,
+      if (semId != null) 'sem_id': semId,
+      if (time != null) 'time': time,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GradeCourseTableCompanion copyWith({
+    Value<int>? serial,
+    Value<String>? courseCode,
+    Value<String>? courseTitle,
+    Value<String>? courseType,
+    Value<String>? gradingType,
+    Value<String>? grandTotal,
+    Value<String>? grade,
+    Value<String>? courseId,
+    Value<String>? semId,
+    Value<int>? time,
+    Value<int>? rowid,
+  }) {
+    return GradeCourseTableCompanion(
+      serial: serial ?? this.serial,
+      courseCode: courseCode ?? this.courseCode,
+      courseTitle: courseTitle ?? this.courseTitle,
+      courseType: courseType ?? this.courseType,
+      gradingType: gradingType ?? this.gradingType,
+      grandTotal: grandTotal ?? this.grandTotal,
+      grade: grade ?? this.grade,
+      courseId: courseId ?? this.courseId,
+      semId: semId ?? this.semId,
+      time: time ?? this.time,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (serial.present) {
+      map['serial'] = Variable<int>(serial.value);
+    }
+    if (courseCode.present) {
+      map['course_code'] = Variable<String>(courseCode.value);
+    }
+    if (courseTitle.present) {
+      map['course_title'] = Variable<String>(courseTitle.value);
+    }
+    if (courseType.present) {
+      map['course_type'] = Variable<String>(courseType.value);
+    }
+    if (gradingType.present) {
+      map['grading_type'] = Variable<String>(gradingType.value);
+    }
+    if (grandTotal.present) {
+      map['grand_total'] = Variable<String>(grandTotal.value);
+    }
+    if (grade.present) {
+      map['grade'] = Variable<String>(grade.value);
+    }
+    if (courseId.present) {
+      map['course_id'] = Variable<String>(courseId.value);
+    }
+    if (semId.present) {
+      map['sem_id'] = Variable<String>(semId.value);
+    }
+    if (time.present) {
+      map['time'] = Variable<int>(time.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeCourseTableCompanion(')
+          ..write('serial: $serial, ')
+          ..write('courseCode: $courseCode, ')
+          ..write('courseTitle: $courseTitle, ')
+          ..write('courseType: $courseType, ')
+          ..write('gradingType: $gradingType, ')
+          ..write('grandTotal: $grandTotal, ')
+          ..write('grade: $grade, ')
+          ..write('courseId: $courseId, ')
+          ..write('semId: $semId, ')
+          ..write('time: $time, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $GradeDetailTableTable extends GradeDetailTable
+    with TableInfo<$GradeDetailTableTable, GradeDetailTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GradeDetailTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _semIdMeta = const VerificationMeta('semId');
+  @override
+  late final GeneratedColumn<String> semId = GeneratedColumn<String>(
+    'sem_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES semester_table (semid)',
+    ),
+  );
+  static const VerificationMeta _courseIdMeta = const VerificationMeta(
+    'courseId',
+  );
+  @override
+  late final GeneratedColumn<String> courseId = GeneratedColumn<String>(
+    'course_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _classNumberMeta = const VerificationMeta(
+    'classNumber',
+  );
+  @override
+  late final GeneratedColumn<String> classNumber = GeneratedColumn<String>(
+    'class_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _classCourseTypeMeta = const VerificationMeta(
+    'classCourseType',
+  );
+  @override
+  late final GeneratedColumn<String> classCourseType = GeneratedColumn<String>(
+    'class_course_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _grandTotalMeta = const VerificationMeta(
+    'grandTotal',
+  );
+  @override
+  late final GeneratedColumn<String> grandTotal = GeneratedColumn<String>(
+    'grand_total',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _serialMeta = const VerificationMeta('serial');
+  @override
+  late final GeneratedColumn<int> serial = GeneratedColumn<int>(
+    'serial',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _markTitleMeta = const VerificationMeta(
+    'markTitle',
+  );
+  @override
+  late final GeneratedColumn<String> markTitle = GeneratedColumn<String>(
+    'mark_title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _maxMarkMeta = const VerificationMeta(
+    'maxMark',
+  );
+  @override
+  late final GeneratedColumn<String> maxMark = GeneratedColumn<String>(
+    'max_mark',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _weightageMeta = const VerificationMeta(
+    'weightage',
+  );
+  @override
+  late final GeneratedColumn<String> weightage = GeneratedColumn<String>(
+    'weightage',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _scoredMarkMeta = const VerificationMeta(
+    'scoredMark',
+  );
+  @override
+  late final GeneratedColumn<String> scoredMark = GeneratedColumn<String>(
+    'scored_mark',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _weightageMarkMeta = const VerificationMeta(
+    'weightageMark',
+  );
+  @override
+  late final GeneratedColumn<String> weightageMark = GeneratedColumn<String>(
+    'weightage_mark',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _gradeRangesMeta = const VerificationMeta(
+    'gradeRanges',
+  );
+  @override
+  late final GeneratedColumn<String> gradeRanges = GeneratedColumn<String>(
+    'grade_ranges',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant("[]"),
+  );
+  static const VerificationMeta _timeMeta = const VerificationMeta('time');
+  @override
+  late final GeneratedColumn<int> time = GeneratedColumn<int>(
+    'time',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    semId,
+    courseId,
+    classNumber,
+    classCourseType,
+    grandTotal,
+    serial,
+    markTitle,
+    maxMark,
+    weightage,
+    status,
+    scoredMark,
+    weightageMark,
+    gradeRanges,
+    time,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'grade_detail_table';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GradeDetailTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('sem_id')) {
+      context.handle(
+        _semIdMeta,
+        semId.isAcceptableOrUnknown(data['sem_id']!, _semIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_semIdMeta);
+    }
+    if (data.containsKey('course_id')) {
+      context.handle(
+        _courseIdMeta,
+        courseId.isAcceptableOrUnknown(data['course_id']!, _courseIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_courseIdMeta);
+    }
+    if (data.containsKey('class_number')) {
+      context.handle(
+        _classNumberMeta,
+        classNumber.isAcceptableOrUnknown(
+          data['class_number']!,
+          _classNumberMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_classNumberMeta);
+    }
+    if (data.containsKey('class_course_type')) {
+      context.handle(
+        _classCourseTypeMeta,
+        classCourseType.isAcceptableOrUnknown(
+          data['class_course_type']!,
+          _classCourseTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_classCourseTypeMeta);
+    }
+    if (data.containsKey('grand_total')) {
+      context.handle(
+        _grandTotalMeta,
+        grandTotal.isAcceptableOrUnknown(data['grand_total']!, _grandTotalMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_grandTotalMeta);
+    }
+    if (data.containsKey('serial')) {
+      context.handle(
+        _serialMeta,
+        serial.isAcceptableOrUnknown(data['serial']!, _serialMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serialMeta);
+    }
+    if (data.containsKey('mark_title')) {
+      context.handle(
+        _markTitleMeta,
+        markTitle.isAcceptableOrUnknown(data['mark_title']!, _markTitleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_markTitleMeta);
+    }
+    if (data.containsKey('max_mark')) {
+      context.handle(
+        _maxMarkMeta,
+        maxMark.isAcceptableOrUnknown(data['max_mark']!, _maxMarkMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_maxMarkMeta);
+    }
+    if (data.containsKey('weightage')) {
+      context.handle(
+        _weightageMeta,
+        weightage.isAcceptableOrUnknown(data['weightage']!, _weightageMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_weightageMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    if (data.containsKey('scored_mark')) {
+      context.handle(
+        _scoredMarkMeta,
+        scoredMark.isAcceptableOrUnknown(data['scored_mark']!, _scoredMarkMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_scoredMarkMeta);
+    }
+    if (data.containsKey('weightage_mark')) {
+      context.handle(
+        _weightageMarkMeta,
+        weightageMark.isAcceptableOrUnknown(
+          data['weightage_mark']!,
+          _weightageMarkMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_weightageMarkMeta);
+    }
+    if (data.containsKey('grade_ranges')) {
+      context.handle(
+        _gradeRangesMeta,
+        gradeRanges.isAcceptableOrUnknown(
+          data['grade_ranges']!,
+          _gradeRangesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('time')) {
+      context.handle(
+        _timeMeta,
+        time.isAcceptableOrUnknown(data['time']!, _timeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {semId, courseId, serial, markTitle};
+  @override
+  GradeDetailTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GradeDetailTableData(
+      semId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}sem_id'],
+          )!,
+      courseId:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}course_id'],
+          )!,
+      classNumber:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}class_number'],
+          )!,
+      classCourseType:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}class_course_type'],
+          )!,
+      grandTotal:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}grand_total'],
+          )!,
+      serial:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}serial'],
+          )!,
+      markTitle:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}mark_title'],
+          )!,
+      maxMark:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}max_mark'],
+          )!,
+      weightage:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}weightage'],
+          )!,
+      status:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}status'],
+          )!,
+      scoredMark:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}scored_mark'],
+          )!,
+      weightageMark:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}weightage_mark'],
+          )!,
+      gradeRanges:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}grade_ranges'],
+          )!,
+      time:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}time'],
+          )!,
+    );
+  }
+
+  @override
+  $GradeDetailTableTable createAlias(String alias) {
+    return $GradeDetailTableTable(attachedDatabase, alias);
+  }
+}
+
+class GradeDetailTableData extends DataClass
+    implements Insertable<GradeDetailTableData> {
+  final String semId;
+  final String courseId;
+  final String classNumber;
+  final String classCourseType;
+  final String grandTotal;
+  final int serial;
+  final String markTitle;
+  final String maxMark;
+  final String weightage;
+  final String status;
+  final String scoredMark;
+  final String weightageMark;
+  final String gradeRanges;
+  final int time;
+  const GradeDetailTableData({
+    required this.semId,
+    required this.courseId,
+    required this.classNumber,
+    required this.classCourseType,
+    required this.grandTotal,
+    required this.serial,
+    required this.markTitle,
+    required this.maxMark,
+    required this.weightage,
+    required this.status,
+    required this.scoredMark,
+    required this.weightageMark,
+    required this.gradeRanges,
+    required this.time,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['sem_id'] = Variable<String>(semId);
+    map['course_id'] = Variable<String>(courseId);
+    map['class_number'] = Variable<String>(classNumber);
+    map['class_course_type'] = Variable<String>(classCourseType);
+    map['grand_total'] = Variable<String>(grandTotal);
+    map['serial'] = Variable<int>(serial);
+    map['mark_title'] = Variable<String>(markTitle);
+    map['max_mark'] = Variable<String>(maxMark);
+    map['weightage'] = Variable<String>(weightage);
+    map['status'] = Variable<String>(status);
+    map['scored_mark'] = Variable<String>(scoredMark);
+    map['weightage_mark'] = Variable<String>(weightageMark);
+    map['grade_ranges'] = Variable<String>(gradeRanges);
+    map['time'] = Variable<int>(time);
+    return map;
+  }
+
+  GradeDetailTableCompanion toCompanion(bool nullToAbsent) {
+    return GradeDetailTableCompanion(
+      semId: Value(semId),
+      courseId: Value(courseId),
+      classNumber: Value(classNumber),
+      classCourseType: Value(classCourseType),
+      grandTotal: Value(grandTotal),
+      serial: Value(serial),
+      markTitle: Value(markTitle),
+      maxMark: Value(maxMark),
+      weightage: Value(weightage),
+      status: Value(status),
+      scoredMark: Value(scoredMark),
+      weightageMark: Value(weightageMark),
+      gradeRanges: Value(gradeRanges),
+      time: Value(time),
+    );
+  }
+
+  factory GradeDetailTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GradeDetailTableData(
+      semId: serializer.fromJson<String>(json['semId']),
+      courseId: serializer.fromJson<String>(json['courseId']),
+      classNumber: serializer.fromJson<String>(json['classNumber']),
+      classCourseType: serializer.fromJson<String>(json['classCourseType']),
+      grandTotal: serializer.fromJson<String>(json['grandTotal']),
+      serial: serializer.fromJson<int>(json['serial']),
+      markTitle: serializer.fromJson<String>(json['markTitle']),
+      maxMark: serializer.fromJson<String>(json['maxMark']),
+      weightage: serializer.fromJson<String>(json['weightage']),
+      status: serializer.fromJson<String>(json['status']),
+      scoredMark: serializer.fromJson<String>(json['scoredMark']),
+      weightageMark: serializer.fromJson<String>(json['weightageMark']),
+      gradeRanges: serializer.fromJson<String>(json['gradeRanges']),
+      time: serializer.fromJson<int>(json['time']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'semId': serializer.toJson<String>(semId),
+      'courseId': serializer.toJson<String>(courseId),
+      'classNumber': serializer.toJson<String>(classNumber),
+      'classCourseType': serializer.toJson<String>(classCourseType),
+      'grandTotal': serializer.toJson<String>(grandTotal),
+      'serial': serializer.toJson<int>(serial),
+      'markTitle': serializer.toJson<String>(markTitle),
+      'maxMark': serializer.toJson<String>(maxMark),
+      'weightage': serializer.toJson<String>(weightage),
+      'status': serializer.toJson<String>(status),
+      'scoredMark': serializer.toJson<String>(scoredMark),
+      'weightageMark': serializer.toJson<String>(weightageMark),
+      'gradeRanges': serializer.toJson<String>(gradeRanges),
+      'time': serializer.toJson<int>(time),
+    };
+  }
+
+  GradeDetailTableData copyWith({
+    String? semId,
+    String? courseId,
+    String? classNumber,
+    String? classCourseType,
+    String? grandTotal,
+    int? serial,
+    String? markTitle,
+    String? maxMark,
+    String? weightage,
+    String? status,
+    String? scoredMark,
+    String? weightageMark,
+    String? gradeRanges,
+    int? time,
+  }) => GradeDetailTableData(
+    semId: semId ?? this.semId,
+    courseId: courseId ?? this.courseId,
+    classNumber: classNumber ?? this.classNumber,
+    classCourseType: classCourseType ?? this.classCourseType,
+    grandTotal: grandTotal ?? this.grandTotal,
+    serial: serial ?? this.serial,
+    markTitle: markTitle ?? this.markTitle,
+    maxMark: maxMark ?? this.maxMark,
+    weightage: weightage ?? this.weightage,
+    status: status ?? this.status,
+    scoredMark: scoredMark ?? this.scoredMark,
+    weightageMark: weightageMark ?? this.weightageMark,
+    gradeRanges: gradeRanges ?? this.gradeRanges,
+    time: time ?? this.time,
+  );
+  GradeDetailTableData copyWithCompanion(GradeDetailTableCompanion data) {
+    return GradeDetailTableData(
+      semId: data.semId.present ? data.semId.value : this.semId,
+      courseId: data.courseId.present ? data.courseId.value : this.courseId,
+      classNumber:
+          data.classNumber.present ? data.classNumber.value : this.classNumber,
+      classCourseType:
+          data.classCourseType.present
+              ? data.classCourseType.value
+              : this.classCourseType,
+      grandTotal:
+          data.grandTotal.present ? data.grandTotal.value : this.grandTotal,
+      serial: data.serial.present ? data.serial.value : this.serial,
+      markTitle: data.markTitle.present ? data.markTitle.value : this.markTitle,
+      maxMark: data.maxMark.present ? data.maxMark.value : this.maxMark,
+      weightage: data.weightage.present ? data.weightage.value : this.weightage,
+      status: data.status.present ? data.status.value : this.status,
+      scoredMark:
+          data.scoredMark.present ? data.scoredMark.value : this.scoredMark,
+      weightageMark:
+          data.weightageMark.present
+              ? data.weightageMark.value
+              : this.weightageMark,
+      gradeRanges:
+          data.gradeRanges.present ? data.gradeRanges.value : this.gradeRanges,
+      time: data.time.present ? data.time.value : this.time,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeDetailTableData(')
+          ..write('semId: $semId, ')
+          ..write('courseId: $courseId, ')
+          ..write('classNumber: $classNumber, ')
+          ..write('classCourseType: $classCourseType, ')
+          ..write('grandTotal: $grandTotal, ')
+          ..write('serial: $serial, ')
+          ..write('markTitle: $markTitle, ')
+          ..write('maxMark: $maxMark, ')
+          ..write('weightage: $weightage, ')
+          ..write('status: $status, ')
+          ..write('scoredMark: $scoredMark, ')
+          ..write('weightageMark: $weightageMark, ')
+          ..write('gradeRanges: $gradeRanges, ')
+          ..write('time: $time')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    semId,
+    courseId,
+    classNumber,
+    classCourseType,
+    grandTotal,
+    serial,
+    markTitle,
+    maxMark,
+    weightage,
+    status,
+    scoredMark,
+    weightageMark,
+    gradeRanges,
+    time,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GradeDetailTableData &&
+          other.semId == this.semId &&
+          other.courseId == this.courseId &&
+          other.classNumber == this.classNumber &&
+          other.classCourseType == this.classCourseType &&
+          other.grandTotal == this.grandTotal &&
+          other.serial == this.serial &&
+          other.markTitle == this.markTitle &&
+          other.maxMark == this.maxMark &&
+          other.weightage == this.weightage &&
+          other.status == this.status &&
+          other.scoredMark == this.scoredMark &&
+          other.weightageMark == this.weightageMark &&
+          other.gradeRanges == this.gradeRanges &&
+          other.time == this.time);
+}
+
+class GradeDetailTableCompanion extends UpdateCompanion<GradeDetailTableData> {
+  final Value<String> semId;
+  final Value<String> courseId;
+  final Value<String> classNumber;
+  final Value<String> classCourseType;
+  final Value<String> grandTotal;
+  final Value<int> serial;
+  final Value<String> markTitle;
+  final Value<String> maxMark;
+  final Value<String> weightage;
+  final Value<String> status;
+  final Value<String> scoredMark;
+  final Value<String> weightageMark;
+  final Value<String> gradeRanges;
+  final Value<int> time;
+  final Value<int> rowid;
+  const GradeDetailTableCompanion({
+    this.semId = const Value.absent(),
+    this.courseId = const Value.absent(),
+    this.classNumber = const Value.absent(),
+    this.classCourseType = const Value.absent(),
+    this.grandTotal = const Value.absent(),
+    this.serial = const Value.absent(),
+    this.markTitle = const Value.absent(),
+    this.maxMark = const Value.absent(),
+    this.weightage = const Value.absent(),
+    this.status = const Value.absent(),
+    this.scoredMark = const Value.absent(),
+    this.weightageMark = const Value.absent(),
+    this.gradeRanges = const Value.absent(),
+    this.time = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GradeDetailTableCompanion.insert({
+    required String semId,
+    required String courseId,
+    required String classNumber,
+    required String classCourseType,
+    required String grandTotal,
+    required int serial,
+    required String markTitle,
+    required String maxMark,
+    required String weightage,
+    required String status,
+    required String scoredMark,
+    required String weightageMark,
+    this.gradeRanges = const Value.absent(),
+    required int time,
+    this.rowid = const Value.absent(),
+  }) : semId = Value(semId),
+       courseId = Value(courseId),
+       classNumber = Value(classNumber),
+       classCourseType = Value(classCourseType),
+       grandTotal = Value(grandTotal),
+       serial = Value(serial),
+       markTitle = Value(markTitle),
+       maxMark = Value(maxMark),
+       weightage = Value(weightage),
+       status = Value(status),
+       scoredMark = Value(scoredMark),
+       weightageMark = Value(weightageMark),
+       time = Value(time);
+  static Insertable<GradeDetailTableData> custom({
+    Expression<String>? semId,
+    Expression<String>? courseId,
+    Expression<String>? classNumber,
+    Expression<String>? classCourseType,
+    Expression<String>? grandTotal,
+    Expression<int>? serial,
+    Expression<String>? markTitle,
+    Expression<String>? maxMark,
+    Expression<String>? weightage,
+    Expression<String>? status,
+    Expression<String>? scoredMark,
+    Expression<String>? weightageMark,
+    Expression<String>? gradeRanges,
+    Expression<int>? time,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (semId != null) 'sem_id': semId,
+      if (courseId != null) 'course_id': courseId,
+      if (classNumber != null) 'class_number': classNumber,
+      if (classCourseType != null) 'class_course_type': classCourseType,
+      if (grandTotal != null) 'grand_total': grandTotal,
+      if (serial != null) 'serial': serial,
+      if (markTitle != null) 'mark_title': markTitle,
+      if (maxMark != null) 'max_mark': maxMark,
+      if (weightage != null) 'weightage': weightage,
+      if (status != null) 'status': status,
+      if (scoredMark != null) 'scored_mark': scoredMark,
+      if (weightageMark != null) 'weightage_mark': weightageMark,
+      if (gradeRanges != null) 'grade_ranges': gradeRanges,
+      if (time != null) 'time': time,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GradeDetailTableCompanion copyWith({
+    Value<String>? semId,
+    Value<String>? courseId,
+    Value<String>? classNumber,
+    Value<String>? classCourseType,
+    Value<String>? grandTotal,
+    Value<int>? serial,
+    Value<String>? markTitle,
+    Value<String>? maxMark,
+    Value<String>? weightage,
+    Value<String>? status,
+    Value<String>? scoredMark,
+    Value<String>? weightageMark,
+    Value<String>? gradeRanges,
+    Value<int>? time,
+    Value<int>? rowid,
+  }) {
+    return GradeDetailTableCompanion(
+      semId: semId ?? this.semId,
+      courseId: courseId ?? this.courseId,
+      classNumber: classNumber ?? this.classNumber,
+      classCourseType: classCourseType ?? this.classCourseType,
+      grandTotal: grandTotal ?? this.grandTotal,
+      serial: serial ?? this.serial,
+      markTitle: markTitle ?? this.markTitle,
+      maxMark: maxMark ?? this.maxMark,
+      weightage: weightage ?? this.weightage,
+      status: status ?? this.status,
+      scoredMark: scoredMark ?? this.scoredMark,
+      weightageMark: weightageMark ?? this.weightageMark,
+      gradeRanges: gradeRanges ?? this.gradeRanges,
+      time: time ?? this.time,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (semId.present) {
+      map['sem_id'] = Variable<String>(semId.value);
+    }
+    if (courseId.present) {
+      map['course_id'] = Variable<String>(courseId.value);
+    }
+    if (classNumber.present) {
+      map['class_number'] = Variable<String>(classNumber.value);
+    }
+    if (classCourseType.present) {
+      map['class_course_type'] = Variable<String>(classCourseType.value);
+    }
+    if (grandTotal.present) {
+      map['grand_total'] = Variable<String>(grandTotal.value);
+    }
+    if (serial.present) {
+      map['serial'] = Variable<int>(serial.value);
+    }
+    if (markTitle.present) {
+      map['mark_title'] = Variable<String>(markTitle.value);
+    }
+    if (maxMark.present) {
+      map['max_mark'] = Variable<String>(maxMark.value);
+    }
+    if (weightage.present) {
+      map['weightage'] = Variable<String>(weightage.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (scoredMark.present) {
+      map['scored_mark'] = Variable<String>(scoredMark.value);
+    }
+    if (weightageMark.present) {
+      map['weightage_mark'] = Variable<String>(weightageMark.value);
+    }
+    if (gradeRanges.present) {
+      map['grade_ranges'] = Variable<String>(gradeRanges.value);
+    }
+    if (time.present) {
+      map['time'] = Variable<int>(time.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeDetailTableCompanion(')
+          ..write('semId: $semId, ')
+          ..write('courseId: $courseId, ')
+          ..write('classNumber: $classNumber, ')
+          ..write('classCourseType: $classCourseType, ')
+          ..write('grandTotal: $grandTotal, ')
+          ..write('serial: $serial, ')
+          ..write('markTitle: $markTitle, ')
+          ..write('maxMark: $maxMark, ')
+          ..write('weightage: $weightage, ')
+          ..write('status: $status, ')
+          ..write('scoredMark: $scoredMark, ')
+          ..write('weightageMark: $weightageMark, ')
+          ..write('gradeRanges: $gradeRanges, ')
+          ..write('time: $time, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $GradeHistoryCacheTableTable extends GradeHistoryCacheTable
+    with TableInfo<$GradeHistoryCacheTableTable, GradeHistoryCacheTableData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GradeHistoryCacheTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _timeMeta = const VerificationMeta('time');
+  @override
+  late final GeneratedColumn<int> time = GeneratedColumn<int>(
+    'time',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, payload, time];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'grade_history_cache_table';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GradeHistoryCacheTableData> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('time')) {
+      context.handle(
+        _timeMeta,
+        time.isAcceptableOrUnknown(data['time']!, _timeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_timeMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GradeHistoryCacheTableData map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GradeHistoryCacheTableData(
+      id:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}id'],
+          )!,
+      payload:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.string,
+            data['${effectivePrefix}payload'],
+          )!,
+      time:
+          attachedDatabase.typeMapping.read(
+            DriftSqlType.int,
+            data['${effectivePrefix}time'],
+          )!,
+    );
+  }
+
+  @override
+  $GradeHistoryCacheTableTable createAlias(String alias) {
+    return $GradeHistoryCacheTableTable(attachedDatabase, alias);
+  }
+}
+
+class GradeHistoryCacheTableData extends DataClass
+    implements Insertable<GradeHistoryCacheTableData> {
+  final int id;
+  final String payload;
+  final int time;
+  const GradeHistoryCacheTableData({
+    required this.id,
+    required this.payload,
+    required this.time,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['payload'] = Variable<String>(payload);
+    map['time'] = Variable<int>(time);
+    return map;
+  }
+
+  GradeHistoryCacheTableCompanion toCompanion(bool nullToAbsent) {
+    return GradeHistoryCacheTableCompanion(
+      id: Value(id),
+      payload: Value(payload),
+      time: Value(time),
+    );
+  }
+
+  factory GradeHistoryCacheTableData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GradeHistoryCacheTableData(
+      id: serializer.fromJson<int>(json['id']),
+      payload: serializer.fromJson<String>(json['payload']),
+      time: serializer.fromJson<int>(json['time']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'payload': serializer.toJson<String>(payload),
+      'time': serializer.toJson<int>(time),
+    };
+  }
+
+  GradeHistoryCacheTableData copyWith({int? id, String? payload, int? time}) =>
+      GradeHistoryCacheTableData(
+        id: id ?? this.id,
+        payload: payload ?? this.payload,
+        time: time ?? this.time,
+      );
+  GradeHistoryCacheTableData copyWithCompanion(
+    GradeHistoryCacheTableCompanion data,
+  ) {
+    return GradeHistoryCacheTableData(
+      id: data.id.present ? data.id.value : this.id,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      time: data.time.present ? data.time.value : this.time,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeHistoryCacheTableData(')
+          ..write('id: $id, ')
+          ..write('payload: $payload, ')
+          ..write('time: $time')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, payload, time);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GradeHistoryCacheTableData &&
+          other.id == this.id &&
+          other.payload == this.payload &&
+          other.time == this.time);
+}
+
+class GradeHistoryCacheTableCompanion
+    extends UpdateCompanion<GradeHistoryCacheTableData> {
+  final Value<int> id;
+  final Value<String> payload;
+  final Value<int> time;
+  const GradeHistoryCacheTableCompanion({
+    this.id = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.time = const Value.absent(),
+  });
+  GradeHistoryCacheTableCompanion.insert({
+    this.id = const Value.absent(),
+    required String payload,
+    required int time,
+  }) : payload = Value(payload),
+       time = Value(time);
+  static Insertable<GradeHistoryCacheTableData> custom({
+    Expression<int>? id,
+    Expression<String>? payload,
+    Expression<int>? time,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (payload != null) 'payload': payload,
+      if (time != null) 'time': time,
+    });
+  }
+
+  GradeHistoryCacheTableCompanion copyWith({
+    Value<int>? id,
+    Value<String>? payload,
+    Value<int>? time,
+  }) {
+    return GradeHistoryCacheTableCompanion(
+      id: id ?? this.id,
+      payload: payload ?? this.payload,
+      time: time ?? this.time,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (time.present) {
+      map['time'] = Variable<int>(time.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradeHistoryCacheTableCompanion(')
+          ..write('id: $id, ')
+          ..write('payload: $payload, ')
+          ..write('time: $time')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4092,6 +5813,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ExamScheduleTableTable examScheduleTable =
       $ExamScheduleTableTable(this);
   late final $MarksTableTable marksTable = $MarksTableTable(this);
+  late final $GradeCourseTableTable gradeCourseTable = $GradeCourseTableTable(
+    this,
+  );
+  late final $GradeDetailTableTable gradeDetailTable = $GradeDetailTableTable(
+    this,
+  );
+  late final $GradeHistoryCacheTableTable gradeHistoryCacheTable =
+      $GradeHistoryCacheTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4103,6 +5832,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     attendanceTable,
     examScheduleTable,
     marksTable,
+    gradeCourseTable,
+    gradeDetailTable,
+    gradeHistoryCacheTable,
   ];
 }
 
@@ -4244,6 +5976,52 @@ final class $$SemesterTableTableReferences
     ).filter((f) => f.semId.semid.sqlEquals($_itemColumn<String>('semid')!));
 
     final cache = $_typedResult.readTableOrNull(_marksTableRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$GradeCourseTableTable, List<GradeCourseTableData>>
+  _gradeCourseTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.gradeCourseTable,
+    aliasName: $_aliasNameGenerator(
+      db.semesterTable.semid,
+      db.gradeCourseTable.semId,
+    ),
+  );
+
+  $$GradeCourseTableTableProcessedTableManager get gradeCourseTableRefs {
+    final manager = $$GradeCourseTableTableTableManager(
+      $_db,
+      $_db.gradeCourseTable,
+    ).filter((f) => f.semId.semid.sqlEquals($_itemColumn<String>('semid')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _gradeCourseTableRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$GradeDetailTableTable, List<GradeDetailTableData>>
+  _gradeDetailTableRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.gradeDetailTable,
+    aliasName: $_aliasNameGenerator(
+      db.semesterTable.semid,
+      db.gradeDetailTable.semId,
+    ),
+  );
+
+  $$GradeDetailTableTableProcessedTableManager get gradeDetailTableRefs {
+    final manager = $$GradeDetailTableTableTableManager(
+      $_db,
+      $_db.gradeDetailTable,
+    ).filter((f) => f.semId.semid.sqlEquals($_itemColumn<String>('semid')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _gradeDetailTableRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4390,6 +6168,56 @@ class $$SemesterTableTableFilterComposer
           }) => $$MarksTableTableFilterComposer(
             $db: $db,
             $table: $db.marksTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> gradeCourseTableRefs(
+    Expression<bool> Function($$GradeCourseTableTableFilterComposer f) f,
+  ) {
+    final $$GradeCourseTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semid,
+      referencedTable: $db.gradeCourseTable,
+      getReferencedColumn: (t) => t.semId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GradeCourseTableTableFilterComposer(
+            $db: $db,
+            $table: $db.gradeCourseTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> gradeDetailTableRefs(
+    Expression<bool> Function($$GradeDetailTableTableFilterComposer f) f,
+  ) {
+    final $$GradeDetailTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semid,
+      referencedTable: $db.gradeDetailTable,
+      getReferencedColumn: (t) => t.semId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GradeDetailTableTableFilterComposer(
+            $db: $db,
+            $table: $db.gradeDetailTable,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4569,6 +6397,56 @@ class $$SemesterTableTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> gradeCourseTableRefs<T extends Object>(
+    Expression<T> Function($$GradeCourseTableTableAnnotationComposer a) f,
+  ) {
+    final $$GradeCourseTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semid,
+      referencedTable: $db.gradeCourseTable,
+      getReferencedColumn: (t) => t.semId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GradeCourseTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.gradeCourseTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> gradeDetailTableRefs<T extends Object>(
+    Expression<T> Function($$GradeDetailTableTableAnnotationComposer a) f,
+  ) {
+    final $$GradeDetailTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semid,
+      referencedTable: $db.gradeDetailTable,
+      getReferencedColumn: (t) => t.semId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GradeDetailTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.gradeDetailTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$SemesterTableTableTableManager
@@ -4590,6 +6468,8 @@ class $$SemesterTableTableTableManager
             bool attendanceTableRefs,
             bool examScheduleTableRefs,
             bool marksTableRefs,
+            bool gradeCourseTableRefs,
+            bool gradeDetailTableRefs,
           })
         > {
   $$SemesterTableTableTableManager(_$AppDatabase db, $SemesterTableTable table)
@@ -4647,6 +6527,8 @@ class $$SemesterTableTableTableManager
             attendanceTableRefs = false,
             examScheduleTableRefs = false,
             marksTableRefs = false,
+            gradeCourseTableRefs = false,
+            gradeDetailTableRefs = false,
           }) {
             return PrefetchHooks(
               db: db,
@@ -4656,6 +6538,8 @@ class $$SemesterTableTableTableManager
                 if (attendanceTableRefs) db.attendanceTable,
                 if (examScheduleTableRefs) db.examScheduleTable,
                 if (marksTableRefs) db.marksTable,
+                if (gradeCourseTableRefs) db.gradeCourseTable,
+                if (gradeDetailTableRefs) db.gradeDetailTable,
               ],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
@@ -4770,6 +6654,50 @@ class $$SemesterTableTableTableManager
                           ),
                       typedResults: items,
                     ),
+                  if (gradeCourseTableRefs)
+                    await $_getPrefetchedData<
+                      SemesterTableData,
+                      $SemesterTableTable,
+                      GradeCourseTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$SemesterTableTableReferences
+                          ._gradeCourseTableRefsTable(db),
+                      managerFromTypedResult:
+                          (p0) =>
+                              $$SemesterTableTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).gradeCourseTableRefs,
+                      referencedItemsForCurrentItem:
+                          (item, referencedItems) => referencedItems.where(
+                            (e) => e.semId == item.semid,
+                          ),
+                      typedResults: items,
+                    ),
+                  if (gradeDetailTableRefs)
+                    await $_getPrefetchedData<
+                      SemesterTableData,
+                      $SemesterTableTable,
+                      GradeDetailTableData
+                    >(
+                      currentTable: table,
+                      referencedTable: $$SemesterTableTableReferences
+                          ._gradeDetailTableRefsTable(db),
+                      managerFromTypedResult:
+                          (p0) =>
+                              $$SemesterTableTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).gradeDetailTableRefs,
+                      referencedItemsForCurrentItem:
+                          (item, referencedItems) => referencedItems.where(
+                            (e) => e.semId == item.semid,
+                          ),
+                      typedResults: items,
+                    ),
                 ];
               },
             );
@@ -4796,6 +6724,8 @@ typedef $$SemesterTableTableProcessedTableManager =
         bool attendanceTableRefs,
         bool examScheduleTableRefs,
         bool marksTableRefs,
+        bool gradeCourseTableRefs,
+        bool gradeDetailTableRefs,
       })
     >;
 typedef $$TimetableTableTableCreateCompanionBuilder =
@@ -7249,6 +9179,1154 @@ typedef $$MarksTableTableProcessedTableManager =
       MarksTableData,
       PrefetchHooks Function({bool semId})
     >;
+typedef $$GradeCourseTableTableCreateCompanionBuilder =
+    GradeCourseTableCompanion Function({
+      required int serial,
+      required String courseCode,
+      required String courseTitle,
+      required String courseType,
+      required String gradingType,
+      required String grandTotal,
+      required String grade,
+      required String courseId,
+      required String semId,
+      required int time,
+      Value<int> rowid,
+    });
+typedef $$GradeCourseTableTableUpdateCompanionBuilder =
+    GradeCourseTableCompanion Function({
+      Value<int> serial,
+      Value<String> courseCode,
+      Value<String> courseTitle,
+      Value<String> courseType,
+      Value<String> gradingType,
+      Value<String> grandTotal,
+      Value<String> grade,
+      Value<String> courseId,
+      Value<String> semId,
+      Value<int> time,
+      Value<int> rowid,
+    });
+
+final class $$GradeCourseTableTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GradeCourseTableTable,
+          GradeCourseTableData
+        > {
+  $$GradeCourseTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SemesterTableTable _semIdTable(_$AppDatabase db) =>
+      db.semesterTable.createAlias(
+        $_aliasNameGenerator(db.gradeCourseTable.semId, db.semesterTable.semid),
+      );
+
+  $$SemesterTableTableProcessedTableManager get semId {
+    final $_column = $_itemColumn<String>('sem_id')!;
+
+    final manager = $$SemesterTableTableTableManager(
+      $_db,
+      $_db.semesterTable,
+    ).filter((f) => f.semid.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_semIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$GradeCourseTableTableFilterComposer
+    extends Composer<_$AppDatabase, $GradeCourseTableTable> {
+  $$GradeCourseTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get serial => $composableBuilder(
+    column: $table.serial,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get courseCode => $composableBuilder(
+    column: $table.courseCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get courseTitle => $composableBuilder(
+    column: $table.courseTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get courseType => $composableBuilder(
+    column: $table.courseType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gradingType => $composableBuilder(
+    column: $table.gradingType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get grade => $composableBuilder(
+    column: $table.grade,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get courseId => $composableBuilder(
+    column: $table.courseId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SemesterTableTableFilterComposer get semId {
+    final $$SemesterTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableFilterComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeCourseTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $GradeCourseTableTable> {
+  $$GradeCourseTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get serial => $composableBuilder(
+    column: $table.serial,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get courseCode => $composableBuilder(
+    column: $table.courseCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get courseTitle => $composableBuilder(
+    column: $table.courseTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get courseType => $composableBuilder(
+    column: $table.courseType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gradingType => $composableBuilder(
+    column: $table.gradingType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get grade => $composableBuilder(
+    column: $table.grade,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get courseId => $composableBuilder(
+    column: $table.courseId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SemesterTableTableOrderingComposer get semId {
+    final $$SemesterTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeCourseTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GradeCourseTableTable> {
+  $$GradeCourseTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get serial =>
+      $composableBuilder(column: $table.serial, builder: (column) => column);
+
+  GeneratedColumn<String> get courseCode => $composableBuilder(
+    column: $table.courseCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get courseTitle => $composableBuilder(
+    column: $table.courseTitle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get courseType => $composableBuilder(
+    column: $table.courseType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get gradingType => $composableBuilder(
+    column: $table.gradingType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get grade =>
+      $composableBuilder(column: $table.grade, builder: (column) => column);
+
+  GeneratedColumn<String> get courseId =>
+      $composableBuilder(column: $table.courseId, builder: (column) => column);
+
+  GeneratedColumn<int> get time =>
+      $composableBuilder(column: $table.time, builder: (column) => column);
+
+  $$SemesterTableTableAnnotationComposer get semId {
+    final $$SemesterTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeCourseTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GradeCourseTableTable,
+          GradeCourseTableData,
+          $$GradeCourseTableTableFilterComposer,
+          $$GradeCourseTableTableOrderingComposer,
+          $$GradeCourseTableTableAnnotationComposer,
+          $$GradeCourseTableTableCreateCompanionBuilder,
+          $$GradeCourseTableTableUpdateCompanionBuilder,
+          (GradeCourseTableData, $$GradeCourseTableTableReferences),
+          GradeCourseTableData,
+          PrefetchHooks Function({bool semId})
+        > {
+  $$GradeCourseTableTableTableManager(
+    _$AppDatabase db,
+    $GradeCourseTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () =>
+                  $$GradeCourseTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () => $$GradeCourseTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$GradeCourseTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> serial = const Value.absent(),
+                Value<String> courseCode = const Value.absent(),
+                Value<String> courseTitle = const Value.absent(),
+                Value<String> courseType = const Value.absent(),
+                Value<String> gradingType = const Value.absent(),
+                Value<String> grandTotal = const Value.absent(),
+                Value<String> grade = const Value.absent(),
+                Value<String> courseId = const Value.absent(),
+                Value<String> semId = const Value.absent(),
+                Value<int> time = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GradeCourseTableCompanion(
+                serial: serial,
+                courseCode: courseCode,
+                courseTitle: courseTitle,
+                courseType: courseType,
+                gradingType: gradingType,
+                grandTotal: grandTotal,
+                grade: grade,
+                courseId: courseId,
+                semId: semId,
+                time: time,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int serial,
+                required String courseCode,
+                required String courseTitle,
+                required String courseType,
+                required String gradingType,
+                required String grandTotal,
+                required String grade,
+                required String courseId,
+                required String semId,
+                required int time,
+                Value<int> rowid = const Value.absent(),
+              }) => GradeCourseTableCompanion.insert(
+                serial: serial,
+                courseCode: courseCode,
+                courseTitle: courseTitle,
+                courseType: courseType,
+                gradingType: gradingType,
+                grandTotal: grandTotal,
+                grade: grade,
+                courseId: courseId,
+                semId: semId,
+                time: time,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          $$GradeCourseTableTableReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: ({semId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                T extends TableManagerState<
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic
+                >
+              >(state) {
+                if (semId) {
+                  state =
+                      state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.semId,
+                            referencedTable: $$GradeCourseTableTableReferences
+                                ._semIdTable(db),
+                            referencedColumn:
+                                $$GradeCourseTableTableReferences
+                                    ._semIdTable(db)
+                                    .semid,
+                          )
+                          as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GradeCourseTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GradeCourseTableTable,
+      GradeCourseTableData,
+      $$GradeCourseTableTableFilterComposer,
+      $$GradeCourseTableTableOrderingComposer,
+      $$GradeCourseTableTableAnnotationComposer,
+      $$GradeCourseTableTableCreateCompanionBuilder,
+      $$GradeCourseTableTableUpdateCompanionBuilder,
+      (GradeCourseTableData, $$GradeCourseTableTableReferences),
+      GradeCourseTableData,
+      PrefetchHooks Function({bool semId})
+    >;
+typedef $$GradeDetailTableTableCreateCompanionBuilder =
+    GradeDetailTableCompanion Function({
+      required String semId,
+      required String courseId,
+      required String classNumber,
+      required String classCourseType,
+      required String grandTotal,
+      required int serial,
+      required String markTitle,
+      required String maxMark,
+      required String weightage,
+      required String status,
+      required String scoredMark,
+      required String weightageMark,
+      Value<String> gradeRanges,
+      required int time,
+      Value<int> rowid,
+    });
+typedef $$GradeDetailTableTableUpdateCompanionBuilder =
+    GradeDetailTableCompanion Function({
+      Value<String> semId,
+      Value<String> courseId,
+      Value<String> classNumber,
+      Value<String> classCourseType,
+      Value<String> grandTotal,
+      Value<int> serial,
+      Value<String> markTitle,
+      Value<String> maxMark,
+      Value<String> weightage,
+      Value<String> status,
+      Value<String> scoredMark,
+      Value<String> weightageMark,
+      Value<String> gradeRanges,
+      Value<int> time,
+      Value<int> rowid,
+    });
+
+final class $$GradeDetailTableTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GradeDetailTableTable,
+          GradeDetailTableData
+        > {
+  $$GradeDetailTableTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SemesterTableTable _semIdTable(_$AppDatabase db) =>
+      db.semesterTable.createAlias(
+        $_aliasNameGenerator(db.gradeDetailTable.semId, db.semesterTable.semid),
+      );
+
+  $$SemesterTableTableProcessedTableManager get semId {
+    final $_column = $_itemColumn<String>('sem_id')!;
+
+    final manager = $$SemesterTableTableTableManager(
+      $_db,
+      $_db.semesterTable,
+    ).filter((f) => f.semid.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_semIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$GradeDetailTableTableFilterComposer
+    extends Composer<_$AppDatabase, $GradeDetailTableTable> {
+  $$GradeDetailTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get courseId => $composableBuilder(
+    column: $table.courseId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get classNumber => $composableBuilder(
+    column: $table.classNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get classCourseType => $composableBuilder(
+    column: $table.classCourseType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serial => $composableBuilder(
+    column: $table.serial,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get markTitle => $composableBuilder(
+    column: $table.markTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get maxMark => $composableBuilder(
+    column: $table.maxMark,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get weightage => $composableBuilder(
+    column: $table.weightage,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get scoredMark => $composableBuilder(
+    column: $table.scoredMark,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get weightageMark => $composableBuilder(
+    column: $table.weightageMark,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get gradeRanges => $composableBuilder(
+    column: $table.gradeRanges,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SemesterTableTableFilterComposer get semId {
+    final $$SemesterTableTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableFilterComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeDetailTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $GradeDetailTableTable> {
+  $$GradeDetailTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get courseId => $composableBuilder(
+    column: $table.courseId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get classNumber => $composableBuilder(
+    column: $table.classNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get classCourseType => $composableBuilder(
+    column: $table.classCourseType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serial => $composableBuilder(
+    column: $table.serial,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get markTitle => $composableBuilder(
+    column: $table.markTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get maxMark => $composableBuilder(
+    column: $table.maxMark,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get weightage => $composableBuilder(
+    column: $table.weightage,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get scoredMark => $composableBuilder(
+    column: $table.scoredMark,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get weightageMark => $composableBuilder(
+    column: $table.weightageMark,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get gradeRanges => $composableBuilder(
+    column: $table.gradeRanges,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SemesterTableTableOrderingComposer get semId {
+    final $$SemesterTableTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableOrderingComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeDetailTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GradeDetailTableTable> {
+  $$GradeDetailTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get courseId =>
+      $composableBuilder(column: $table.courseId, builder: (column) => column);
+
+  GeneratedColumn<String> get classNumber => $composableBuilder(
+    column: $table.classNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get classCourseType => $composableBuilder(
+    column: $table.classCourseType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get grandTotal => $composableBuilder(
+    column: $table.grandTotal,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serial =>
+      $composableBuilder(column: $table.serial, builder: (column) => column);
+
+  GeneratedColumn<String> get markTitle =>
+      $composableBuilder(column: $table.markTitle, builder: (column) => column);
+
+  GeneratedColumn<String> get maxMark =>
+      $composableBuilder(column: $table.maxMark, builder: (column) => column);
+
+  GeneratedColumn<String> get weightage =>
+      $composableBuilder(column: $table.weightage, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<String> get scoredMark => $composableBuilder(
+    column: $table.scoredMark,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get weightageMark => $composableBuilder(
+    column: $table.weightageMark,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get gradeRanges => $composableBuilder(
+    column: $table.gradeRanges,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get time =>
+      $composableBuilder(column: $table.time, builder: (column) => column);
+
+  $$SemesterTableTableAnnotationComposer get semId {
+    final $$SemesterTableTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.semId,
+      referencedTable: $db.semesterTable,
+      getReferencedColumn: (t) => t.semid,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SemesterTableTableAnnotationComposer(
+            $db: $db,
+            $table: $db.semesterTable,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GradeDetailTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GradeDetailTableTable,
+          GradeDetailTableData,
+          $$GradeDetailTableTableFilterComposer,
+          $$GradeDetailTableTableOrderingComposer,
+          $$GradeDetailTableTableAnnotationComposer,
+          $$GradeDetailTableTableCreateCompanionBuilder,
+          $$GradeDetailTableTableUpdateCompanionBuilder,
+          (GradeDetailTableData, $$GradeDetailTableTableReferences),
+          GradeDetailTableData,
+          PrefetchHooks Function({bool semId})
+        > {
+  $$GradeDetailTableTableTableManager(
+    _$AppDatabase db,
+    $GradeDetailTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () =>
+                  $$GradeDetailTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer:
+              () => $$GradeDetailTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$GradeDetailTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> semId = const Value.absent(),
+                Value<String> courseId = const Value.absent(),
+                Value<String> classNumber = const Value.absent(),
+                Value<String> classCourseType = const Value.absent(),
+                Value<String> grandTotal = const Value.absent(),
+                Value<int> serial = const Value.absent(),
+                Value<String> markTitle = const Value.absent(),
+                Value<String> maxMark = const Value.absent(),
+                Value<String> weightage = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<String> scoredMark = const Value.absent(),
+                Value<String> weightageMark = const Value.absent(),
+                Value<String> gradeRanges = const Value.absent(),
+                Value<int> time = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GradeDetailTableCompanion(
+                semId: semId,
+                courseId: courseId,
+                classNumber: classNumber,
+                classCourseType: classCourseType,
+                grandTotal: grandTotal,
+                serial: serial,
+                markTitle: markTitle,
+                maxMark: maxMark,
+                weightage: weightage,
+                status: status,
+                scoredMark: scoredMark,
+                weightageMark: weightageMark,
+                gradeRanges: gradeRanges,
+                time: time,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String semId,
+                required String courseId,
+                required String classNumber,
+                required String classCourseType,
+                required String grandTotal,
+                required int serial,
+                required String markTitle,
+                required String maxMark,
+                required String weightage,
+                required String status,
+                required String scoredMark,
+                required String weightageMark,
+                Value<String> gradeRanges = const Value.absent(),
+                required int time,
+                Value<int> rowid = const Value.absent(),
+              }) => GradeDetailTableCompanion.insert(
+                semId: semId,
+                courseId: courseId,
+                classNumber: classNumber,
+                classCourseType: classCourseType,
+                grandTotal: grandTotal,
+                serial: serial,
+                markTitle: markTitle,
+                maxMark: maxMark,
+                weightage: weightage,
+                status: status,
+                scoredMark: scoredMark,
+                weightageMark: weightageMark,
+                gradeRanges: gradeRanges,
+                time: time,
+                rowid: rowid,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          $$GradeDetailTableTableReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: ({semId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                T extends TableManagerState<
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic,
+                  dynamic
+                >
+              >(state) {
+                if (semId) {
+                  state =
+                      state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.semId,
+                            referencedTable: $$GradeDetailTableTableReferences
+                                ._semIdTable(db),
+                            referencedColumn:
+                                $$GradeDetailTableTableReferences
+                                    ._semIdTable(db)
+                                    .semid,
+                          )
+                          as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GradeDetailTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GradeDetailTableTable,
+      GradeDetailTableData,
+      $$GradeDetailTableTableFilterComposer,
+      $$GradeDetailTableTableOrderingComposer,
+      $$GradeDetailTableTableAnnotationComposer,
+      $$GradeDetailTableTableCreateCompanionBuilder,
+      $$GradeDetailTableTableUpdateCompanionBuilder,
+      (GradeDetailTableData, $$GradeDetailTableTableReferences),
+      GradeDetailTableData,
+      PrefetchHooks Function({bool semId})
+    >;
+typedef $$GradeHistoryCacheTableTableCreateCompanionBuilder =
+    GradeHistoryCacheTableCompanion Function({
+      Value<int> id,
+      required String payload,
+      required int time,
+    });
+typedef $$GradeHistoryCacheTableTableUpdateCompanionBuilder =
+    GradeHistoryCacheTableCompanion Function({
+      Value<int> id,
+      Value<String> payload,
+      Value<int> time,
+    });
+
+class $$GradeHistoryCacheTableTableFilterComposer
+    extends Composer<_$AppDatabase, $GradeHistoryCacheTableTable> {
+  $$GradeHistoryCacheTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$GradeHistoryCacheTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $GradeHistoryCacheTableTable> {
+  $$GradeHistoryCacheTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get time => $composableBuilder(
+    column: $table.time,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$GradeHistoryCacheTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GradeHistoryCacheTableTable> {
+  $$GradeHistoryCacheTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<int> get time =>
+      $composableBuilder(column: $table.time, builder: (column) => column);
+}
+
+class $$GradeHistoryCacheTableTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GradeHistoryCacheTableTable,
+          GradeHistoryCacheTableData,
+          $$GradeHistoryCacheTableTableFilterComposer,
+          $$GradeHistoryCacheTableTableOrderingComposer,
+          $$GradeHistoryCacheTableTableAnnotationComposer,
+          $$GradeHistoryCacheTableTableCreateCompanionBuilder,
+          $$GradeHistoryCacheTableTableUpdateCompanionBuilder,
+          (
+            GradeHistoryCacheTableData,
+            BaseReferences<
+              _$AppDatabase,
+              $GradeHistoryCacheTableTable,
+              GradeHistoryCacheTableData
+            >,
+          ),
+          GradeHistoryCacheTableData,
+          PrefetchHooks Function()
+        > {
+  $$GradeHistoryCacheTableTableTableManager(
+    _$AppDatabase db,
+    $GradeHistoryCacheTableTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer:
+              () => $$GradeHistoryCacheTableTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer:
+              () => $$GradeHistoryCacheTableTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer:
+              () => $$GradeHistoryCacheTableTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<int> time = const Value.absent(),
+              }) => GradeHistoryCacheTableCompanion(
+                id: id,
+                payload: payload,
+                time: time,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String payload,
+                required int time,
+              }) => GradeHistoryCacheTableCompanion.insert(
+                id: id,
+                payload: payload,
+                time: time,
+              ),
+          withReferenceMapper:
+              (p0) =>
+                  p0
+                      .map(
+                        (e) => (
+                          e.readTable(table),
+                          BaseReferences(db, table, e),
+                        ),
+                      )
+                      .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$GradeHistoryCacheTableTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GradeHistoryCacheTableTable,
+      GradeHistoryCacheTableData,
+      $$GradeHistoryCacheTableTableFilterComposer,
+      $$GradeHistoryCacheTableTableOrderingComposer,
+      $$GradeHistoryCacheTableTableAnnotationComposer,
+      $$GradeHistoryCacheTableTableCreateCompanionBuilder,
+      $$GradeHistoryCacheTableTableUpdateCompanionBuilder,
+      (
+        GradeHistoryCacheTableData,
+        BaseReferences<
+          _$AppDatabase,
+          $GradeHistoryCacheTableTable,
+          GradeHistoryCacheTableData
+        >,
+      ),
+      GradeHistoryCacheTableData,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7265,4 +10343,13 @@ class $AppDatabaseManager {
       $$ExamScheduleTableTableTableManager(_db, _db.examScheduleTable);
   $$MarksTableTableTableManager get marksTable =>
       $$MarksTableTableTableManager(_db, _db.marksTable);
+  $$GradeCourseTableTableTableManager get gradeCourseTable =>
+      $$GradeCourseTableTableTableManager(_db, _db.gradeCourseTable);
+  $$GradeDetailTableTableTableManager get gradeDetailTable =>
+      $$GradeDetailTableTableTableManager(_db, _db.gradeDetailTable);
+  $$GradeHistoryCacheTableTableTableManager get gradeHistoryCacheTable =>
+      $$GradeHistoryCacheTableTableTableManager(
+        _db,
+        _db.gradeHistoryCacheTable,
+      );
 }

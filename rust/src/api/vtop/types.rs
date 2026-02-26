@@ -163,3 +163,134 @@ pub struct SemesterData {
     pub semesters: Vec<SemesterInfo>,
     pub update_time: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeCourseRecord {
+    pub serial: String,
+    pub course_code: String,
+    pub course_title: String,
+    pub course_type: String,
+    pub grading_type: String,
+    pub grand_total: String,
+    pub grade: String,
+    pub course_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeViewData {
+    pub courses: Vec<GradeCourseRecord>,
+    pub semesters: Vec<SemesterInfo>,
+    pub semester_id: String,
+    pub update_time: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeDetailMark {
+    pub serial: String,
+    pub mark_title: String,
+    pub max_mark: String,
+    pub weightage: String,
+    pub status: String,
+    pub scored_mark: String,
+    pub weightage_mark: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeRange {
+    pub grade: String,
+    pub range: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeDetailsData {
+    pub semester_id: String,
+    pub course_id: String,
+    pub class_number: String,
+    pub class_course_type: String,
+    pub grand_total: String,
+    pub marks: Vec<GradeDetailMark>,
+    pub grade_ranges: Vec<GradeRange>,
+    pub update_time: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeHistoryStudentInfo {
+    pub reg_no: String,
+    pub name: String,
+    pub programme_branch: String,
+    pub programme_mode: String,
+    pub study_system: String,
+    pub gender: String,
+    pub year_joined: String,
+    pub edu_status: String,
+    pub school: String,
+    pub campus: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeHistoryAttempt {
+    pub course_code: String,
+    pub course_title: String,
+    pub course_type: String,
+    pub credits: String,
+    pub grade: String,
+    pub exam_month: String,
+    pub result_declared: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeHistoryRecord {
+    pub serial: String,
+    pub course_code: String,
+    pub course_title: String,
+    pub course_type: String,
+    pub credits: String,
+    pub grade: String,
+    pub exam_month: String,
+    pub result_declared: String,
+    pub course_distribution: String,
+    pub attempts: Vec<GradeHistoryAttempt>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeHistoryCgpa {
+    pub credits_registered: String,
+    pub credits_earned: String,
+    pub cgpa: String,
+    pub s_grades: String,
+    pub a_grades: String,
+    pub b_grades: String,
+    pub c_grades: String,
+    pub d_grades: String,
+    pub e_grades: String,
+    pub f_grades: String,
+    pub n_grades: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct GradeHistoryData {
+    pub student: GradeHistoryStudentInfo,
+    pub records: Vec<GradeHistoryRecord>,
+    pub cgpa: GradeHistoryCgpa,
+    pub update_time: u64,
+}

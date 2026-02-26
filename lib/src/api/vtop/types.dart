@@ -10,7 +10,7 @@ import 'package:meta/meta.dart' as meta;
 part 'types.freezed.dart';
 part 'types.g.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 @freezed
 @meta.immutable
@@ -112,6 +112,175 @@ sealed class FullAttendanceRecord with _$FullAttendanceRecord {
 
   factory FullAttendanceRecord.fromJson(Map<String, dynamic> json) =>
       _$FullAttendanceRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeCourseRecord with _$GradeCourseRecord {
+  const factory GradeCourseRecord({
+    required String serial,
+    required String courseCode,
+    required String courseTitle,
+    required String courseType,
+    required String gradingType,
+    required String grandTotal,
+    required String grade,
+    required String courseId,
+  }) = _GradeCourseRecord;
+
+  factory GradeCourseRecord.fromJson(Map<String, dynamic> json) =>
+      _$GradeCourseRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeDetailMark with _$GradeDetailMark {
+  const factory GradeDetailMark({
+    required String serial,
+    required String markTitle,
+    required String maxMark,
+    required String weightage,
+    required String status,
+    required String scoredMark,
+    required String weightageMark,
+  }) = _GradeDetailMark;
+
+  factory GradeDetailMark.fromJson(Map<String, dynamic> json) =>
+      _$GradeDetailMarkFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeDetailsData with _$GradeDetailsData {
+  const factory GradeDetailsData({
+    required String semesterId,
+    required String courseId,
+    required String classNumber,
+    required String classCourseType,
+    required String grandTotal,
+    required List<GradeDetailMark> marks,
+    required List<GradeRange> gradeRanges,
+    required BigInt updateTime,
+  }) = _GradeDetailsData;
+
+  factory GradeDetailsData.fromJson(Map<String, dynamic> json) =>
+      _$GradeDetailsDataFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeHistoryAttempt with _$GradeHistoryAttempt {
+  const factory GradeHistoryAttempt({
+    required String courseCode,
+    required String courseTitle,
+    required String courseType,
+    required String credits,
+    required String grade,
+    required String examMonth,
+    required String resultDeclared,
+  }) = _GradeHistoryAttempt;
+
+  factory GradeHistoryAttempt.fromJson(Map<String, dynamic> json) =>
+      _$GradeHistoryAttemptFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeHistoryCgpa with _$GradeHistoryCgpa {
+  const factory GradeHistoryCgpa({
+    required String creditsRegistered,
+    required String creditsEarned,
+    required String cgpa,
+    required String sGrades,
+    required String aGrades,
+    required String bGrades,
+    required String cGrades,
+    required String dGrades,
+    required String eGrades,
+    required String fGrades,
+    required String nGrades,
+  }) = _GradeHistoryCgpa;
+
+  factory GradeHistoryCgpa.fromJson(Map<String, dynamic> json) =>
+      _$GradeHistoryCgpaFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeHistoryData with _$GradeHistoryData {
+  const factory GradeHistoryData({
+    required GradeHistoryStudentInfo student,
+    required List<GradeHistoryRecord> records,
+    required GradeHistoryCgpa cgpa,
+    required BigInt updateTime,
+  }) = _GradeHistoryData;
+
+  factory GradeHistoryData.fromJson(Map<String, dynamic> json) =>
+      _$GradeHistoryDataFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeHistoryRecord with _$GradeHistoryRecord {
+  const factory GradeHistoryRecord({
+    required String serial,
+    required String courseCode,
+    required String courseTitle,
+    required String courseType,
+    required String credits,
+    required String grade,
+    required String examMonth,
+    required String resultDeclared,
+    required String courseDistribution,
+    required List<GradeHistoryAttempt> attempts,
+  }) = _GradeHistoryRecord;
+
+  factory GradeHistoryRecord.fromJson(Map<String, dynamic> json) =>
+      _$GradeHistoryRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeHistoryStudentInfo with _$GradeHistoryStudentInfo {
+  const factory GradeHistoryStudentInfo({
+    required String regNo,
+    required String name,
+    required String programmeBranch,
+    required String programmeMode,
+    required String studySystem,
+    required String gender,
+    required String yearJoined,
+    required String eduStatus,
+    required String school,
+    required String campus,
+  }) = _GradeHistoryStudentInfo;
+
+  factory GradeHistoryStudentInfo.fromJson(Map<String, dynamic> json) =>
+      _$GradeHistoryStudentInfoFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeRange with _$GradeRange {
+  const factory GradeRange({required String grade, required String range}) =
+      _GradeRange;
+
+  factory GradeRange.fromJson(Map<String, dynamic> json) =>
+      _$GradeRangeFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GradeViewData with _$GradeViewData {
+  const factory GradeViewData({
+    required List<GradeCourseRecord> courses,
+    required List<SemesterInfo> semesters,
+    required String semesterId,
+    required BigInt updateTime,
+  }) = _GradeViewData;
+
+  factory GradeViewData.fromJson(Map<String, dynamic> json) =>
+      _$GradeViewDataFromJson(json);
 }
 
 @freezed

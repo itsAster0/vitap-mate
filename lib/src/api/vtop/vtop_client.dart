@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'session_manager.dart';
 import 'vtop_config.dart';
 
-// These functions are ignored because they are not marked as `pub`: `extract_captcha_data`, `extract_csrf_token`, `get_csrf_for_cookie_set`, `get_regno`, `load_initial_page`, `load_login_page`, `make_client`, `perform_login`, `solve_captcha`
+// These functions are ignored because they are not marked as `pub`: `extract_captcha_data`, `extract_csrf_token`, `get_csrf_for_cookie_set`, `get_regno`, `load_initial_page`, `load_login_page`, `make_client`, `perform_login`, `reqwest_network_error`, `solve_captcha`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>
 abstract class VtopClient implements RustOpaqueInterface {
@@ -24,6 +24,15 @@ abstract class VtopClient implements RustOpaqueInterface {
     required String semesterId,
     required String courseId,
     required String courseType,
+  });
+
+  Future<VtopResultGradeHistoryData> getGradeHistory();
+
+  Future<VtopResultGradeViewData> getGradeView({required String semesterId});
+
+  Future<VtopResultGradeDetailsData> getGradeViewDetails({
+    required String semesterId,
+    required String courseId,
   });
 
   Future<VtopResultMarksData> getMarks({required String semesterId});
@@ -62,6 +71,15 @@ abstract class VtopResultExamScheduleData implements RustOpaqueInterface {}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopResult < FullAttendanceData >>>
 abstract class VtopResultFullAttendanceData implements RustOpaqueInterface {}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopResult < GradeDetailsData >>>
+abstract class VtopResultGradeDetailsData implements RustOpaqueInterface {}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopResult < GradeHistoryData >>>
+abstract class VtopResultGradeHistoryData implements RustOpaqueInterface {}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopResult < GradeViewData >>>
+abstract class VtopResultGradeViewData implements RustOpaqueInterface {}
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopResult < MarksData >>>
 abstract class VtopResultMarksData implements RustOpaqueInterface {}

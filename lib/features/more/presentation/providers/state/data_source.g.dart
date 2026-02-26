@@ -90,5 +90,89 @@ final marksRemoteDataSourceProvider =
 // ignore: unused_element
 typedef MarksRemoteDataSourceRef =
     AutoDisposeFutureProviderRef<MarksRemoteDataSource>;
+String _$gradesLocalDataSourceHash() =>
+    r'2a3dac0b74ded7208e131a1aaa2776cb20a25008';
+
+/// See also [gradesLocalDataSource].
+@ProviderFor(gradesLocalDataSource)
+final gradesLocalDataSourceProvider =
+    AutoDisposeFutureProvider<GradesLocalDataSource>.internal(
+      gradesLocalDataSource,
+      name: r'gradesLocalDataSourceProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$gradesLocalDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef GradesLocalDataSourceRef =
+    AutoDisposeFutureProviderRef<GradesLocalDataSource>;
+String _$gradesRemoteDataSourceHash() =>
+    r'561067eb1d3746ef37468639884697ec92d9ce6b';
+
+/// See also [gradesRemoteDataSource].
+@ProviderFor(gradesRemoteDataSource)
+final gradesRemoteDataSourceProvider =
+    AutoDisposeFutureProvider<GradesRemoteDataSource>.internal(
+      gradesRemoteDataSource,
+      name: r'gradesRemoteDataSourceProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$gradesRemoteDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef GradesRemoteDataSourceRef =
+    AutoDisposeFutureProviderRef<GradesRemoteDataSource>;
+String _$gradeHistoryLocalDataSourceHash() =>
+    r'9bdd29c63ed7b49f233197b83bf327da18752487';
+
+/// See also [gradeHistoryLocalDataSource].
+@ProviderFor(gradeHistoryLocalDataSource)
+final gradeHistoryLocalDataSourceProvider =
+    AutoDisposeFutureProvider<GradeHistoryLocalDataSource>.internal(
+      gradeHistoryLocalDataSource,
+      name: r'gradeHistoryLocalDataSourceProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$gradeHistoryLocalDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef GradeHistoryLocalDataSourceRef =
+    AutoDisposeFutureProviderRef<GradeHistoryLocalDataSource>;
+String _$gradeHistoryRemoteDataSourceHash() =>
+    r'48002118984d6e8297d36e93d0a6144e61b81954';
+
+/// See also [gradeHistoryRemoteDataSource].
+@ProviderFor(gradeHistoryRemoteDataSource)
+final gradeHistoryRemoteDataSourceProvider =
+    AutoDisposeFutureProvider<GradeHistoryRemoteDataSource>.internal(
+      gradeHistoryRemoteDataSource,
+      name: r'gradeHistoryRemoteDataSourceProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$gradeHistoryRemoteDataSourceHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef GradeHistoryRemoteDataSourceRef =
+    AutoDisposeFutureProviderRef<GradeHistoryRemoteDataSource>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
