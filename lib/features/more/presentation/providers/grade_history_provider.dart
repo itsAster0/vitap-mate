@@ -1,5 +1,3 @@
-import 'dart:developer';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';

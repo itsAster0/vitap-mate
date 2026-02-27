@@ -174,6 +174,11 @@ pub fn parse_grade_view_details(html: String, sem: String, course_id: String) ->
         }
     }
 
+    let mut class_numbers = Vec::<String>::new();
+    let mut class_types = Vec::<String>::new();
+    let mut class_totals = Vec::<String>::new();
+    let mut per_class_marks = Vec::<(String, Vec<GradeDetailMark>)>::new();
+
     for table in document.select(&table_sel) {
         let ths: Vec<_> = table.select(&th_sel).collect();
         if ths.len() < 2 {
@@ -185,25 +190,27 @@ pub fn parse_grade_view_details(html: String, sem: String, course_id: String) ->
             continue;
         }
 
-        class_number = header_line
+        let parsed_class_number = header_line
             .split("Class Number")
             .nth(1)
             .unwrap_or("")
             .replace(':', "")
             .trim()
             .to_string();
-        class_course_type = extract_text(ths.get(1))
+        let parsed_class_course_type = extract_text(ths.get(1))
             .split("Course Type")
             .nth(1)
             .unwrap_or("")
             .replace(':', "")
             .trim()
             .to_string();
+        let mut parsed_grand_total = String::new();
+        let mut table_marks = Vec::<GradeDetailMark>::new();
 
         for row in table.select(&tr_sel) {
             let outputs: Vec<_> = row.select(&output_sel).collect();
             if outputs.len() == 7 {
-                marks.push(GradeDetailMark {
+                table_marks.push(GradeDetailMark {
                     serial: extract_text(outputs.first()),
                     mark_title: extract_text(outputs.get(1)),
                     max_mark: extract_text(outputs.get(2)),
@@ -224,12 +231,42 @@ pub fn parse_grade_view_details(html: String, sem: String, course_id: String) ->
                     .join(" ");
                 if th_text.contains("Total") {
                     if let Some(last_th) = row.select(&th_sel).last() {
-                        grand_total = extract_text(Some(&last_th));
+                        parsed_grand_total = extract_text(Some(&last_th));
                     }
                 }
             }
         }
-        break;
+
+        if !parsed_class_number.is_empty() {
+            class_numbers.push(parsed_class_number.clone());
+        }
+        if !parsed_class_course_type.is_empty() {
+            class_types.push(parsed_class_course_type.clone());
+        }
+        if !parsed_grand_total.is_empty() {
+            class_totals.push(parsed_grand_total.clone());
+        }
+        per_class_marks.push((parsed_class_course_type, table_marks));
+    }
+
+    if !class_numbers.is_empty() {
+        class_number = class_numbers.join(" | ");
+    }
+    if !class_types.is_empty() {
+        class_course_type = class_types.join(" | ");
+    }
+    if !class_totals.is_empty() {
+        grand_total = class_totals.join(" | ");
+    }
+
+    let has_multiple_classes = per_class_marks.len() > 1;
+    for (class_type, table_marks) in per_class_marks {
+        for mut mark in table_marks {
+            if has_multiple_classes && !class_type.is_empty() {
+                mark.mark_title = format!("{} • {}", class_type, mark.mark_title);
+            }
+            marks.push(mark);
+        }
     }
 
     GradeDetailsData {

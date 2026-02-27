@@ -552,68 +552,169 @@ class _GradeDetailsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            "Class: ${detail!.classNumber} • ${detail!.classCourseType}",
-            style: TextStyle(
-              fontSize: 13,
-              color: context.theme.colors.mutedForeground,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: context.theme.colors.primaryForeground.withValues(
-                      alpha: 0.5,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 6,
-                  ),
-                  child: _row(
-                    context,
-                    "Serial Number",
-                    "Mark Title",
-                    "Scored Mark",
-                    "Maximum Mark",
-                    "Weightage (%)",
-                    "Weightage Mark",
-                    true,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (int i = 0; i < detail!.marks.length; i++) ...[
-                  _row(
-                    context,
-                    detail!.marks[i].serial,
-                    detail!.marks[i].markTitle,
-                    detail!.marks[i].scoredMark,
-                    detail!.marks[i].maxMark,
-                    detail!.marks[i].weightage,
-                    detail!.marks[i].weightageMark,
-                    false,
-                  ),
-                  if (i != detail!.marks.length - 1)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      height: 1,
-                      width: 760,
-                      color: context.theme.colors.border.withValues(alpha: 0.7),
-                    ),
-                ],
-              ],
-            ),
-          ),
+          ..._buildMarkSectionTables(context, detail!),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildMarkSectionTables(
+    BuildContext context,
+    GradeDetailsData detail,
+  ) {
+    final sections = _groupMarksBySection(detail);
+    final out = <Widget>[];
+    for (int idx = 0; idx < sections.length; idx++) {
+      final section = sections[idx];
+      out.add(
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: context.theme.colors.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: context.theme.colors.border),
+          ),
+          child: Text(
+            _sectionHeader(section),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: context.theme.colors.primary,
+            ),
+          ),
+        ),
+      );
+      out.add(const SizedBox(height: 8));
+      out.add(
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: context.theme.colors.primaryForeground.withValues(
+                    alpha: 0.5,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: _row(
+                  context,
+                  "Serial Number",
+                  "Mark Title",
+                  "Scored Mark",
+                  "Maximum Mark",
+                  "Weightage (%)",
+                  "Weightage Mark",
+                  true,
+                ),
+              ),
+              const SizedBox(height: 8),
+              for (int i = 0; i < section.marks.length; i++) ...[
+                _row(
+                  context,
+                  section.marks[i].serial,
+                  section.marks[i].markTitle,
+                  section.marks[i].scoredMark,
+                  section.marks[i].maxMark,
+                  section.marks[i].weightage,
+                  section.marks[i].weightageMark,
+                  false,
+                ),
+                if (i != section.marks.length - 1)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    height: 1,
+                    width: 760,
+                    color: context.theme.colors.border.withValues(alpha: 0.7),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      );
+      if (idx != sections.length - 1) {
+        out.add(const SizedBox(height: 10));
+      }
+    }
+    return out;
+  }
+
+  List<_MarkSection> _groupMarksBySection(GradeDetailsData detail) {
+    final classTypes =
+        detail.classCourseType
+            .split('|')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    final classNumbers =
+        detail.classNumber
+            .split('|')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+    final classNumberByType = <String, String>{};
+    for (int i = 0; i < classTypes.length; i++) {
+      classNumberByType[classTypes[i]] =
+          i < classNumbers.length ? classNumbers[i] : "";
+    }
+
+    final grouped = <String, List<GradeDetailMark>>{};
+    final order = <String>[];
+    for (final mark in detail.marks) {
+      String section = detail.classCourseType;
+      String title = mark.markTitle;
+      if (mark.markTitle.contains("•")) {
+        final parts = mark.markTitle.split("•");
+        if (parts.length >= 2) {
+          section = parts.first.trim();
+          title = parts.sublist(1).join("•").trim();
+        }
+      }
+      if (!grouped.containsKey(section)) {
+        order.add(section);
+      }
+      grouped.putIfAbsent(section, () => []);
+      grouped[section]!.add(mark.copyWith(markTitle: title));
+    }
+
+    return [
+      for (final section in order)
+        _MarkSection(
+          sectionTitle: section,
+          classNumber: classNumberByType[section] ?? "",
+          total: _sumWeightageMarks(grouped[section] ?? const []),
+          marks: grouped[section] ?? const [],
+        ),
+    ];
+  }
+
+  String _sumWeightageMarks(List<GradeDetailMark> marks) {
+    double sum = 0;
+    bool hasAny = false;
+    for (final m in marks) {
+      final raw = m.weightageMark.trim();
+      if (raw.isEmpty) continue;
+      final val = double.tryParse(raw);
+      if (val == null) continue;
+      hasAny = true;
+      sum += val;
+    }
+    if (!hasAny) return "";
+    if (sum == sum.truncateToDouble()) {
+      return sum.toStringAsFixed(0);
+    }
+    return sum.toStringAsFixed(1);
+  }
+
+  String _sectionHeader(_MarkSection section) {
+    final parts = <String>[section.sectionTitle];
+    if (section.total.isNotEmpty) {
+      parts.add("Total: ${section.total}");
+    }
+    return parts.join(" • ");
   }
 
   Widget _row(
@@ -674,6 +775,20 @@ class _GradeDetailsPanel extends StatelessWidget {
     if (normalized.isEmpty) return "Grade ranges unavailable";
     return normalized.map((r) => "${r.grade}: ${r.range}").join("   ");
   }
+}
+
+class _MarkSection {
+  final String sectionTitle;
+  final String classNumber;
+  final String total;
+  final List<GradeDetailMark> marks;
+
+  const _MarkSection({
+    required this.sectionTitle,
+    required this.classNumber,
+    required this.total,
+    required this.marks,
+  });
 }
 
 class _CenterInfo extends StatelessWidget {

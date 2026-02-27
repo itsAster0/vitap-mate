@@ -57,11 +57,7 @@ class GradesModel {
             scoredMark: r.scoredMark,
             weightageMark: r.weightageMark,
           ),
-      ]..sort(
-        (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
-          int.tryParse(b.serial) ?? 0,
-        ),
-      );
+      ];
       List<GradeRange> gradeRanges = const [];
       try {
         final decoded = jsonDecode(first.gradeRanges) as List<dynamic>;
