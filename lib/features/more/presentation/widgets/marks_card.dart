@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_table.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -19,23 +20,13 @@ class MarksCard extends HookConsumerWidget {
     double weightagePercentage,
   )
   _calculateWeightageTotals() {
-    double totalWeightageGained = 0;
-    double totalWeightagePossible = 0;
-
-    for (final mark in record.marks) {
-      final weightageGained = double.tryParse(mark.weightagemark) ?? 0;
-      totalWeightageGained += weightageGained;
-
-      final weightagePossible =
-          double.tryParse(mark.weightage.replaceAll('%', '')) ?? 0;
-      totalWeightagePossible += weightagePossible;
-    }
-
-    final weightagePercentage =
-        totalWeightagePossible > 0
-            ? (totalWeightageGained / totalWeightagePossible) * 100
-            : 0.0;
-    return (totalWeightageGained, totalWeightagePossible, weightagePercentage);
+    final totals = calculateWeightageTotals<MarksRecordEach>(
+      record.marks,
+      titleOf: (m) => m.markstitle,
+      gainedOf: (m) => m.weightagemark,
+      possibleOf: (m) => m.weightage,
+    );
+    return (totals.gained, totals.possible, totals.percentage);
   }
 
   Color _getPerformanceColor(double percentage) {

@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
@@ -692,17 +693,14 @@ class _GradeDetailsPanel extends StatelessWidget {
   }
 
   String _sumWeightageMarks(List<GradeDetailMark> marks) {
-    double sum = 0;
-    bool hasAny = false;
-    for (final m in marks) {
-      final raw = m.weightageMark.trim();
-      if (raw.isEmpty) continue;
-      final val = double.tryParse(raw);
-      if (val == null) continue;
-      hasAny = true;
-      sum += val;
-    }
-    if (!hasAny) return "";
+    final totals = calculateWeightageTotals<GradeDetailMark>(
+      marks,
+      titleOf: (m) => m.markTitle,
+      gainedOf: (m) => m.weightageMark,
+      possibleOf: (m) => m.weightage,
+    );
+    final sum = totals.gained;
+    if (sum == 0) return "";
     if (sum == sum.truncateToDouble()) {
       return sum.toStringAsFixed(0);
     }
