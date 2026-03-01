@@ -20,6 +20,7 @@ import 'package:vitapmate/features/settings/presentation/pages/user_management.d
 import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
 import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
+import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -62,6 +63,16 @@ final routerProvider = Provider((ref) {
                   GoRoute(
                     path: 'details',
                     builder: (context, state) => Placeholder(),
+                  ),
+                  GoRoute(
+                    path: 'calendar-sync',
+                    name: Paths.calendarSync,
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: CalendarSyncPage(),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -10,6 +10,7 @@ import 'package:vitapmate/features/attendance/presentation/pages/attendance_page
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/share_tt.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 
 class ShellLayout extends HookConsumerWidget {
   final Widget child;
@@ -175,6 +176,7 @@ Widget? getSidewidget(
 
     suffixes: [
       if (path.contains("social")) LogoutButton(),
+      if (path.contains("timetable")) SyncGoogleCalendarButton(),
       if (path.contains("timetable")) ShareTt(),
       if (data == "Attendance") AttendanceHeader(),
     ],

@@ -14,4 +14,5 @@ class Paths {
   static final vtopweb = "vtopweb";
   static final messageChat = "messageChat";
   static final notificationManagement = "notificationManagement";
+  static final calendarSync = "calendarSync";
 }
