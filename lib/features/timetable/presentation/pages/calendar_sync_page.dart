@@ -5,9 +5,13 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/services/google_calendar_sync_service.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
+
+enum _DateSelectionTab { start, end }
 
 class CalendarSyncPage extends HookConsumerWidget {
   const CalendarSyncPage({super.key});
@@ -16,35 +20,32 @@ class CalendarSyncPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final loading = useState(false);
     final now = DateTime.now();
-    final initialUntil = now.add(const Duration(days: 120));
-    final calendarController = useMemoized(
-      () => FCalendarController.date(
-        initialSelection: DateTime.utc(
-          initialUntil.year,
-          initialUntil.month,
-          initialUntil.day,
-        ),
-        toggleable: false,
+    final startDate = useState(DateTime(now.year, now.month, now.day));
+    final endDate = useState(
+      DateTime(
+        now.add(const Duration(days: 30)).year,
+        now.add(const Duration(days: 30)).month,
+        now.add(const Duration(days: 30)).day,
+        23,
+        59,
+        59,
       ),
     );
-    useEffect(() => calendarController.dispose, [calendarController]);
-    final selectedUntilUtc = useValueListenable(calendarController);
-    final selectedUntilLocal = DateTime(
-      (selectedUntilUtc ?? DateTime.utc(now.year, now.month, now.day)).year,
-      (selectedUntilUtc ?? DateTime.utc(now.year, now.month, now.day)).month,
-      (selectedUntilUtc ?? DateTime.utc(now.year, now.month, now.day)).day,
-      23,
-      59,
-      59,
-    );
+    final selectingDate = useState(_DateSelectionTab.end);
+
     final appsLoading = useState(true);
+    final permissionGranted = useState(false);
     final googleCalendarAvailable = useState(false);
     final googleAccounts = useState<List<String>>([]);
     final selectedAccount = useState<String?>(null);
+    final currentSemesterId = useState<String?>(null);
+    final timetableChangedSinceLastSync = useState(false);
+    final reminderMinutes = useState(10);
+
     final titleTemplateController = useTextEditingController(text: "{name}");
     final descriptionTemplateController = useTextEditingController(
       text:
-          "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}\nSEM:{semesterId}",
+          "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}",
     );
     final locationTemplateController = useTextEditingController(
       text: "{block}-{roomNo}",
@@ -55,40 +56,25 @@ class CalendarSyncPage extends HookConsumerWidget {
           Platform.isAndroid &&
           !appsLoading.value &&
           googleCalendarAvailable.value &&
-          selectedAccount.value != null,
-      [appsLoading.value, googleCalendarAvailable.value, selectedAccount.value],
+          selectedAccount.value != null &&
+          !endDate.value.isBefore(startDate.value),
+      [
+        appsLoading.value,
+        googleCalendarAvailable.value,
+        selectedAccount.value,
+        startDate.value,
+        endDate.value,
+      ],
     );
 
-    Future<void> loadAppsAndCalendars() async {
-      if (!Platform.isAndroid) {
-        appsLoading.value = false;
-        return;
-      }
-      appsLoading.value = true;
-      final installed =
-          await GoogleCalendarSyncService.getAvailableCalendarApps();
-      final googleAppAvailable = installed.any(
-        (app) => app.packageName == "com.google.android.calendar",
-      );
-      List<String> accounts = const [];
-      try {
-        accounts = await GoogleCalendarSyncService.getGoogleAccounts();
-      } catch (_) {
-        accounts = const [];
-      }
-      googleAccounts.value = accounts;
-      selectedAccount.value =
-          accounts.contains(selectedAccount.value)
-              ? selectedAccount.value
-              : accounts.firstOrNull;
-      googleCalendarAvailable.value = googleAppAvailable && accounts.isNotEmpty;
-      appsLoading.value = false;
-    }
-
-    useEffect(() {
-      loadAppsAndCalendars();
-      return null;
-    }, const []);
+    final canClear = useMemoized(
+      () =>
+          Platform.isAndroid &&
+          !loading.value &&
+          !appsLoading.value &&
+          selectedAccount.value != null,
+      [loading.value, appsLoading.value, selectedAccount.value],
+    );
 
     String formatDate(DateTime dt) {
       return "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
@@ -104,13 +90,53 @@ class CalendarSyncPage extends HookConsumerWidget {
       );
     }
 
+    String timetableHashFor(TimetableData timetable) {
+      final slots =
+          timetable.slots
+              .where((slot) => slot.serial != "-1")
+              .map(
+                (slot) =>
+                    "${slot.day}|${slot.slot}|${slot.courseCode}|${slot.courseType}|${slot.startTime}|${slot.endTime}|${slot.name}|${slot.faculty}|${slot.block}|${slot.roomNo}",
+              )
+              .toList()
+            ..sort();
+      final canonical =
+          "${timetable.semesterId}::${timetable.updateTime}::${slots.join("||")}";
+
+      // Stable FNV-1a 64-bit hash for local change detection.
+      var hash = 0xcbf29ce484222325;
+      for (final codeUnit in canonical.codeUnits) {
+        hash ^= codeUnit;
+        hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+      }
+      return hash.toRadixString(16).padLeft(16, "0");
+    }
+
+    String endDateKey(String semesterId) =>
+        "calendar_sync_end_date_$semesterId";
+    String timetableHashKey(String semesterId) =>
+        "calendar_sync_last_hash_$semesterId";
+
+    Future<void> persistEndDateForCurrentSemester() async {
+      final semesterId = currentSemesterId.value;
+      if (semesterId == null || semesterId.isEmpty) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(
+        endDateKey(semesterId),
+        endDate.value.millisecondsSinceEpoch,
+      );
+    }
+
     Future<bool> ensureCalendarPermission() async {
       var status = await Permission.calendarFullAccess.status;
       if (!status.isGranted) {
         status = await Permission.calendarWriteOnly.status;
       }
 
-      if (status.isGranted) return true;
+      if (status.isGranted) {
+        permissionGranted.value = true;
+        return true;
+      }
 
       if (status.isPermanentlyDenied || status.isRestricted) {
         if (!context.mounted) return false;
@@ -132,6 +158,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                 ),
               ),
         );
+        permissionGranted.value = false;
         return false;
       }
 
@@ -140,7 +167,10 @@ class CalendarSyncPage extends HookConsumerWidget {
         status = await Permission.calendarWriteOnly.request();
       }
 
-      if (status.isGranted) return true;
+      if (status.isGranted) {
+        permissionGranted.value = true;
+        return true;
+      }
 
       if (status.isPermanentlyDenied || status.isRestricted) {
         if (!context.mounted) return false;
@@ -162,6 +192,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                 ),
               ),
         );
+        permissionGranted.value = false;
         return false;
       }
 
@@ -169,8 +200,73 @@ class CalendarSyncPage extends HookConsumerWidget {
         "Permission Required",
         "Please allow Calendar permission to continue.",
       );
+      permissionGranted.value = false;
       return false;
     }
+
+    Future<void> loadAppsAndCalendars() async {
+      if (!Platform.isAndroid) {
+        permissionGranted.value = false;
+        appsLoading.value = false;
+        return;
+      }
+
+      appsLoading.value = true;
+      final fullAccessGranted = await Permission.calendarFullAccess.isGranted;
+      final writeOnlyGranted = await Permission.calendarWriteOnly.isGranted;
+      permissionGranted.value = fullAccessGranted || writeOnlyGranted;
+      final installed =
+          await GoogleCalendarSyncService.getAvailableCalendarApps();
+      final googleAppAvailable = installed.any(
+        (app) => app.packageName == "com.google.android.calendar",
+      );
+
+      List<String> accounts = const [];
+      try {
+        accounts = await GoogleCalendarSyncService.getGoogleAccounts();
+      } catch (_) {
+        accounts = const [];
+      }
+
+      googleAccounts.value = accounts;
+      selectedAccount.value =
+          accounts.contains(selectedAccount.value)
+              ? selectedAccount.value
+              : accounts.firstOrNull;
+      googleCalendarAvailable.value = googleAppAvailable && accounts.isNotEmpty;
+      appsLoading.value = false;
+    }
+
+    Future<void> loadSyncState() async {
+      final timetable = await ref.read(timetableProvider.future);
+      final prefs = await SharedPreferences.getInstance();
+      final semesterId = timetable.semesterId;
+      currentSemesterId.value = semesterId;
+
+      final cachedEndMs = prefs.getInt(endDateKey(semesterId));
+      if (cachedEndMs != null) {
+        final cachedEnd = DateTime.fromMillisecondsSinceEpoch(cachedEndMs);
+        endDate.value = DateTime(
+          cachedEnd.year,
+          cachedEnd.month,
+          cachedEnd.day,
+          23,
+          59,
+          59,
+        );
+      }
+
+      final oldSignature = prefs.getString(timetableHashKey(semesterId));
+      final newSignature = timetableHashFor(timetable);
+      timetableChangedSinceLastSync.value =
+          oldSignature != null && oldSignature != newSignature;
+    }
+
+    useEffect(() {
+      loadAppsAndCalendars();
+      loadSyncState();
+      return null;
+    }, const []);
 
     Future<void> sync() async {
       if (loading.value) return;
@@ -212,7 +308,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                         Text("Syncing classes..."),
                       ],
                     ),
-                    actions: [
+                    actions: const [
                       Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: 20,
@@ -228,13 +324,25 @@ class CalendarSyncPage extends HookConsumerWidget {
         final timetable = await ref.read(timetableProvider.future);
         final result = await GoogleCalendarSyncService.syncTimetable(
           timetable,
-          selectedUntilLocal,
+          startDate.value,
+          endDate.value,
           accountName: selectedAccount.value,
+          reminderMinutes: reminderMinutes.value,
           titleTemplate: titleTemplateController.text.trim(),
           descriptionTemplate: descriptionTemplateController.text.trim(),
           locationTemplate: locationTemplateController.text.trim(),
         );
-        final count = result.created;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          timetableHashKey(timetable.semesterId),
+          timetableHashFor(timetable),
+        );
+        await prefs.setInt(
+          endDateKey(timetable.semesterId),
+          endDate.value.millisecondsSinceEpoch,
+        );
+        timetableChangedSinceLastSync.value = false;
+        currentSemesterId.value = timetable.semesterId;
 
         if (loadingDialogShown &&
             context.mounted &&
@@ -248,16 +356,16 @@ class CalendarSyncPage extends HookConsumerWidget {
           context: context,
           alignment: FToastAlignment.bottomCenter,
           title:
-              count > 0
+              result.created > 0
                   ? const Text("Calendar Synced")
                   : const Text("No Classes Synced"),
           description: Text(
-            count > 0
-                ? "$count classes updated till ${formatDate(selectedUntilLocal)}${result.calendarName != null ? " in ${result.calendarName}" : ""}."
-                : "No class events were created. Check selected date and timetable data.",
+            result.created > 0
+                ? "${result.created} classes updated from ${formatDate(startDate.value)} to ${formatDate(endDate.value)}${result.calendarName != null ? " in ${result.calendarName}" : ""}."
+                : "No class events were created. Check date range and timetable data.",
           ),
           suffixBuilder:
-              count > 0
+              result.created > 0
                   ? (context, entry) => IntrinsicHeight(
                     child: FButton(
                       onPress: () async {
@@ -289,6 +397,75 @@ class CalendarSyncPage extends HookConsumerWidget {
       }
     }
 
+    Future<void> clearSemesterEvents() async {
+      if (!canClear || loading.value) return;
+      if (!await ensureCalendarPermission()) return;
+
+      final timetable = await ref.read(timetableProvider.future);
+      if (!context.mounted) return;
+      final confirmed = await showAdaptiveDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder:
+            (_) => FDialog(
+              title: const Text("Clear Synced Events"),
+              body: Text(
+                "This removes only events synced by this app for semester ${timetable.semesterId} in the selected Google account.",
+              ),
+              actions: [
+                FButton(
+                  style: FButtonStyle.outline(),
+                  onPress:
+                      () =>
+                          Navigator.of(context, rootNavigator: true).pop(false),
+                  child: const Text("Cancel"),
+                ),
+                FButton(
+                  style: FButtonStyle.destructive(),
+                  onPress:
+                      () =>
+                          Navigator.of(context, rootNavigator: true).pop(true),
+                  child: const Text("Clear"),
+                ),
+              ],
+            ),
+      );
+
+      if (confirmed != true) return;
+
+      loading.value = true;
+      try {
+        final (
+          deleted,
+          calendarName,
+        ) = await GoogleCalendarSyncService.clearAllSyncedEvents(
+          accountName: selectedAccount.value,
+          semesterId: timetable.semesterId,
+        );
+
+        if (!context.mounted) return;
+        showFToast(
+          context: context,
+          alignment: FToastAlignment.bottomCenter,
+          title: const Text("Cleared"),
+          description: Text(
+            deleted > 0
+                ? "$deleted synced events removed${calendarName != null ? " from $calendarName" : ""}."
+                : "No synced events found for this semester.",
+          ),
+        );
+      } catch (e) {
+        if (context.mounted) disCommonToast(context, e);
+      } finally {
+        loading.value = false;
+      }
+    }
+
+    final calendarFocusDate =
+        selectingDate.value == _DateSelectionTab.start
+            ? startDate.value
+            : endDate.value;
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -302,31 +479,117 @@ class CalendarSyncPage extends HookConsumerWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
-
             const Text(
-              "Choose until when classes should be created. Re-sync will remove older synced classes and replace them with the latest timetable.",
+              "Pick start and end dates. Re-sync clears previously synced events for the same semester, then adds fresh classes.",
             ),
-            FDivider(),
+            const FDivider(),
+
             Text(
-              "Add Classes Till",
+              "Date Range",
               style: context.theme.typography.base.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              formatDate(selectedUntilLocal),
-              style: context.theme.typography.lg,
+            Row(
+              children: [
+                Expanded(
+                  child: FButton(
+                    style:
+                        selectingDate.value == _DateSelectionTab.start
+                            ? FButtonStyle.primary()
+                            : FButtonStyle.outline(),
+                    onPress:
+                        loading.value
+                            ? null
+                            : () {
+                              selectingDate.value = _DateSelectionTab.start;
+                            },
+                    child: Text("Start: ${formatDate(startDate.value)}"),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FButton(
+                    style:
+                        selectingDate.value == _DateSelectionTab.end
+                            ? FButtonStyle.primary()
+                            : FButtonStyle.outline(),
+                    onPress:
+                        loading.value
+                            ? null
+                            : () {
+                              selectingDate.value = _DateSelectionTab.end;
+                            },
+                    child: Text("End: ${formatDate(endDate.value)}"),
+                  ),
+                ),
+              ],
             ),
-
+            const SizedBox(height: 8),
             Center(
               child: FCalendar(
-                controller: calendarController,
-                start: DateTime(now.year, now.month, now.day),
-                end: DateTime(now.year + 2, now.month, now.day + 1),
-                initialMonth: initialUntil,
+                key: ValueKey(
+                  "${selectingDate.value.name}-${calendarFocusDate.year}-${calendarFocusDate.month}",
+                ),
+                controller: FCalendarController.date(
+                  initialSelection: calendarFocusDate,
+                ),
+                onPress: (selected) {
+                  final pickedStart = DateTime(
+                    selected.year,
+                    selected.month,
+                    selected.day,
+                  );
+                  final pickedEnd = DateTime(
+                    selected.year,
+                    selected.month,
+                    selected.day,
+                    23,
+                    59,
+                    59,
+                  );
+
+                  if (selectingDate.value == _DateSelectionTab.start) {
+                    startDate.value = pickedStart;
+                    if (endDate.value.isBefore(startDate.value)) {
+                      endDate.value = pickedEnd;
+                      Future.microtask(persistEndDateForCurrentSemester);
+                    }
+                  } else {
+                    endDate.value = pickedEnd;
+                    Future.microtask(persistEndDateForCurrentSemester);
+                    if (endDate.value.isBefore(startDate.value)) {
+                      startDate.value = pickedStart;
+                    }
+                  }
+                },
+                start: DateTime(now.year - 1, 1, 1),
+                end: DateTime(now.year + 3, 1, 1),
+                initialMonth: calendarFocusDate,
               ),
             ),
-            FDivider(),
+            if (endDate.value.isBefore(startDate.value))
+              Text(
+                "End date must be on or after start date.",
+                style: context.theme.typography.sm,
+              ),
+
+            const FDivider(),
+            if (timetableChangedSinceLastSync.value)
+              FCard(
+                title: Text(
+                  "Timetable Changed",
+                  style: context.theme.typography.base.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  "New timetable changes were detected for this semester.",
+                ),
+                child: const Text(
+                  "Please sync again to update your calendar with latest classes.",
+                ),
+              ),
 
             FCard(
               title: Text(
@@ -335,7 +598,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: Text(
+              subtitle: const Text(
                 "Choose which Google account should receive synced classes.",
               ),
               child:
@@ -380,11 +643,13 @@ class CalendarSyncPage extends HookConsumerWidget {
                                       },
                             )
                           else
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text("No writable Google accounts found."),
-                                const SizedBox(height: 8),
+                            const Text("No writable Google accounts found."),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (!permissionGranted.value)
                                 FButton(
                                   style: FButtonStyle.outline(),
                                   onPress:
@@ -399,11 +664,20 @@ class CalendarSyncPage extends HookConsumerWidget {
                                           },
                                   child: const Text("Grant Permission"),
                                 ),
-                              ],
-                            ),
+                              FButton(
+                                style: FButtonStyle.outline(),
+                                onPress:
+                                    (loading.value || appsLoading.value)
+                                        ? null
+                                        : loadAppsAndCalendars,
+                                child: const Text("Reload Accounts"),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
             ),
+
             FCard(
               title: Text(
                 "Event Layout",
@@ -417,6 +691,33 @@ class CalendarSyncPage extends HookConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  FSelectMenuTile<int>(
+                    title: const Text("Reminder"),
+                    details: Text(
+                      reminderMinutes.value == 0
+                          ? "Off"
+                          : "${reminderMinutes.value} min before",
+                    ),
+                    initialValue: reminderMinutes.value,
+                    menu: const [
+                      FSelectTile<int>(title: Text("Off"), value: 0),
+                      FSelectTile<int>(title: Text("5 min before"), value: 5),
+                      FSelectTile<int>(title: Text("10 min before"), value: 10),
+                      FSelectTile<int>(title: Text("15 min before"), value: 15),
+                      FSelectTile<int>(title: Text("30 min before"), value: 30),
+                      FSelectTile<int>(title: Text("60 min before"), value: 60),
+                    ],
+                    onChange:
+                        loading.value
+                            ? null
+                            : (value) {
+                              final selected = value.firstOrNull;
+                              if (selected != null) {
+                                reminderMinutes.value = selected;
+                              }
+                            },
+                  ),
+                  const SizedBox(height: 8),
                   FTextField(
                     controller: titleTemplateController,
                     label: const Text("Title Template"),
@@ -437,12 +738,13 @@ class CalendarSyncPage extends HookConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Placeholders: {name} {courseCode} {courseType} {faculty} {slot} {day} {startTime} {endTime} {block} {roomNo} {semesterId}",
+                    "Placeholders: {name} {courseCode} {courseType} {faculty} {slot} {day} {startTime} {endTime} {block} {roomNo}",
                     style: context.theme.typography.sm,
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 16),
             FButton(
               onPress: (loading.value || !canSync) ? null : sync,
@@ -456,6 +758,34 @@ class CalendarSyncPage extends HookConsumerWidget {
                       : const Text("Sync Timetable"),
             ),
             const SizedBox(height: 8),
+            FAccordion(
+              children: [
+                FAccordionItem(
+                  title: const Text("Danger Zone: Clear Synced Events"),
+                  initiallyExpanded: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        "Clear only removes events tagged by this app for the current semester, not your other calendar events.",
+                        style: context.theme.typography.sm,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      FButton(
+                        style: FButtonStyle.destructive(),
+                        onPress: canClear ? clearSemesterEvents : null,
+                        child: const Text(
+                          "Clear Synced Events (This Semester)",
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               "Note: Google Calendar may take a few minutes to display newly synced events.",
               style: context.theme.typography.sm,

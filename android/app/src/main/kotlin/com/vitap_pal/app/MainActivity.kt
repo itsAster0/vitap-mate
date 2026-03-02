@@ -33,6 +33,7 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "syncTimetableToGoogleCalendar" -> syncTimetable(call, result)
+                    "clearAllSyncedEvents" -> clearAllSyncedEvents(call, result)
                     "getGoogleAccounts" -> getGoogleAccounts(result)
                     "getAvailableCalendarApps" -> getAvailableCalendarApps(result)
                     "openCalendarApp" -> openCalendarApp(call, result)
@@ -50,18 +51,28 @@ class MainActivity : FlutterFragmentActivity() {
         val accountName = call.argument<String>("accountName")
         val titleTemplate = call.argument<String>("titleTemplate") ?: "{name}"
         val descriptionTemplate = call.argument<String>("descriptionTemplate")
-            ?: "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}\nSEM:{semesterId}"
+            ?: "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}"
         val locationTemplate = call.argument<String>("locationTemplate") ?: "{block}-{roomNo}"
         val calendar = resolveWritableGoogleCalendar(accountName) ?: run {
             result.error("google_calendar_not_found", "No writable Google calendar found", null)
             return
         }
 
-        val semesterId = call.argument<String>("semesterId") ?: ""
+        val semesterId = call.argument<String>("semesterId")?.trim().orEmpty()
+        if (semesterId.isEmpty()) {
+            result.error("invalid_semester_id", "Semester ID is required for sync", null)
+            return
+        }
+        val reminderMinutes = (call.argument<Number>("reminderMinutes")?.toInt() ?: 10).coerceAtLeast(0)
+        val startEpochMs = call.argument<Number>("startEpochMs")?.toLong()
         val untilEpochMs = call.argument<Number>("untilEpochMs")?.toLong()
         val rawSlots = call.argument<List<*>>("slots") ?: emptyList<Any?>()
 
-        removeSyncedEvents(calendar.id, semesterId)
+        removeSyncedEvents(
+            calendar.id,
+            semesterId,
+            startEpochMs
+        )
 
         var created = 0
         for (item in rawSlots) {
@@ -71,7 +82,9 @@ class MainActivity : FlutterFragmentActivity() {
                     calendar.id,
                     slot,
                     semesterId,
+                    startEpochMs,
                     untilEpochMs,
+                    reminderMinutes,
                     titleTemplate,
                     descriptionTemplate,
                     locationTemplate
@@ -174,24 +187,92 @@ class MainActivity : FlutterFragmentActivity() {
         result.success(accounts)
     }
 
-    private fun removeSyncedEvents(calendarId: Long, semesterId: String) {
+    private fun clearAllSyncedEvents(call: MethodCall, result: MethodChannel.Result) {
+        if (!hasCalendarPermission()) {
+            result.error("permission_denied", "Calendar permission not granted", null)
+            return
+        }
+
+        val accountName = call.argument<String>("accountName")
+        val semesterId = call.argument<String>("semesterId")?.trim().orEmpty()
+        if (semesterId.isEmpty()) {
+            result.error("invalid_semester_id", "Semester ID is required for clear", null)
+            return
+        }
+        val calendar = resolveWritableGoogleCalendar(accountName) ?: run {
+            result.error("google_calendar_not_found", "No writable Google calendar found", null)
+            return
+        }
+
+        val deleted = clearTaggedEvents(calendar.id, semesterId)
+        result.success(
+            mapOf(
+                "deleted" to deleted,
+                "calendarName" to calendar.displayName
+            )
+        )
+    }
+
+    private fun removeSyncedEvents(
+        calendarId: Long,
+        semesterId: String,
+        startEpochMs: Long?
+    ): Int {
+        val semesterToken = semesterTag(semesterId)
+        val (selection, args) =
+            if (startEpochMs != null) {
+                // Resync scope: remove semester-tagged events from selected start date onward.
+                // Recurring series are removed too so future occurrences are recreated with latest data.
+                Pair(
+                    "${CalendarContract.Events.CALENDAR_ID}=? AND " +
+                        "${CalendarContract.Events.DESCRIPTION} LIKE ? AND " +
+                        "${CalendarContract.Events.DESCRIPTION} LIKE ? AND (" +
+                        "${CalendarContract.Events.DTSTART}>=? OR " +
+                        "${CalendarContract.Events.RRULE} IS NOT NULL" +
+                        ")",
+                    arrayOf(
+                        calendarId.toString(),
+                        "%$SYNC_TAG%",
+                        "%$semesterToken%",
+                        startEpochMs.toString()
+                    )
+                )
+            } else {
+                Pair(
+                    "${CalendarContract.Events.CALENDAR_ID}=? AND " +
+                        "${CalendarContract.Events.DESCRIPTION} LIKE ? AND " +
+                        "${CalendarContract.Events.DESCRIPTION} LIKE ?",
+                    arrayOf(
+                        calendarId.toString(),
+                        "%$SYNC_TAG%",
+                        "%$semesterToken%"
+                    )
+                )
+            }
+        return contentResolver.delete(CalendarContract.Events.CONTENT_URI, selection, args)
+    }
+
+    private fun clearTaggedEvents(calendarId: Long, semesterId: String): Int {
+        val semesterToken = semesterTag(semesterId)
         val selection =
-            "${CalendarContract.Events.CALENDAR_ID}=? AND (" +
-                "${CalendarContract.Events.DESCRIPTION} LIKE ? OR " +
-                "${CalendarContract.Events.DESCRIPTION} LIKE ?)"
+            "${CalendarContract.Events.CALENDAR_ID}=? AND " +
+                "${CalendarContract.Events.DESCRIPTION} LIKE ? AND " +
+                "${CalendarContract.Events.DESCRIPTION} LIKE ?"
         val args = arrayOf(
             calendarId.toString(),
             "%$SYNC_TAG%",
-            "%SEM:$semesterId%"
+            "%$semesterToken%"
         )
-        contentResolver.delete(CalendarContract.Events.CONTENT_URI, selection, args)
+        return contentResolver.delete(CalendarContract.Events.CONTENT_URI, selection, args)
     }
 
     private fun createRecurringEvent(
         calendarId: Long,
         slot: Map<*, *>,
         semesterId: String,
+        startEpochMs: Long?,
         untilEpochMs: Long?,
+        reminderMinutes: Int,
         titleTemplate: String,
         descriptionTemplate: String,
         locationTemplate: String
@@ -202,8 +283,9 @@ class MainActivity : FlutterFragmentActivity() {
         val day = slot["day"]?.toString() ?: return false
         val byDay = toByDay(day) ?: return false
 
-        var startMillis = nextOccurrenceMillis(day, slot["startTime"]?.toString()) ?: return false
-        var endMillis = nextOccurrenceMillis(day, slot["endTime"]?.toString()) ?: return false
+        val baseMillis = startEpochMs ?: System.currentTimeMillis()
+        var startMillis = nextOccurrenceMillisFromBase(day, slot["startTime"]?.toString(), baseMillis) ?: return false
+        var endMillis = nextOccurrenceMillisFromBase(day, slot["endTime"]?.toString(), startMillis) ?: return false
 
         if (untilEpochMs != null && startMillis > untilEpochMs) return false
         if (endMillis <= startMillis) {
@@ -212,18 +294,15 @@ class MainActivity : FlutterFragmentActivity() {
 
         val title = renderTemplate(
             titleTemplate,
-            slot,
-            semesterId
+            slot
         ).ifBlank { slot["name"]?.toString()?.ifBlank { "Class" } ?: "Class" }
         val location = renderTemplate(
             locationTemplate,
-            slot,
-            semesterId
+            slot
         ).ifBlank { buildLocation(slot["block"]?.toString(), slot["roomNo"]?.toString()) }
         val description = renderTemplate(
             descriptionTemplate,
-            slot,
-            semesterId
+            slot
         ).ifBlank { buildDescription(slot, semesterId) }
         val trackedDescription = buildTrackedDescription(description, semesterId)
         val rrule = if (untilEpochMs != null) {
@@ -243,11 +322,38 @@ class MainActivity : FlutterFragmentActivity() {
             put(CalendarContract.Events.RRULE, rrule)
             put(CalendarContract.Events.AVAILABILITY, CalendarContract.Events.AVAILABILITY_BUSY)
             put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CONFIRMED)
-            put(CalendarContract.Events.HAS_ALARM, 0)
+            put(CalendarContract.Events.HAS_ALARM, if (reminderMinutes > 0) 1 else 0)
         }
 
         val uri = contentResolver.insert(CalendarContract.Events.CONTENT_URI, values)
-        return uri != null
+        if (uri == null) return false
+        val eventId = uri.lastPathSegment?.toLongOrNull() ?: return true
+
+        contentResolver.delete(
+            CalendarContract.Reminders.CONTENT_URI,
+            "${CalendarContract.Reminders.EVENT_ID}=?",
+            arrayOf(eventId.toString())
+        )
+
+        if (reminderMinutes > 0) {
+            val reminder = ContentValues().apply {
+                put(CalendarContract.Reminders.EVENT_ID, eventId)
+                put(CalendarContract.Reminders.MINUTES, reminderMinutes)
+                put(CalendarContract.Reminders.METHOD, CalendarContract.Reminders.METHOD_ALERT)
+            }
+            contentResolver.insert(CalendarContract.Reminders.CONTENT_URI, reminder)
+        } else {
+            val noAlarm = ContentValues().apply {
+                put(CalendarContract.Events.HAS_ALARM, 0)
+            }
+            contentResolver.update(
+                CalendarContract.Events.CONTENT_URI,
+                noAlarm,
+                "${CalendarContract.Events._ID}=?",
+                arrayOf(eventId.toString())
+            )
+        }
+        return true
     }
 
     private fun buildDescription(slot: Map<*, *>, semesterId: String): String {
@@ -256,13 +362,18 @@ class MainActivity : FlutterFragmentActivity() {
         val faculty = slot["faculty"]?.toString() ?: ""
         val slotName = slot["slot"]?.toString() ?: ""
 
-        return "Course: $code\nType: $courseType\nSlot: $slotName\nFaculty: $faculty\nSEM:$semesterId\n$SYNC_TAG"
+        return buildString {
+            append("Course: $code\nType: $courseType\nSlot: $slotName\nFaculty: $faculty")
+            append("\n${semesterTag(semesterId)}")
+            append("\n$SYNC_TAG")
+        }
     }
 
     private fun buildTrackedDescription(description: String, semesterId: String): String {
         var out = description.trim()
-        if (!out.contains("SEM:$semesterId")) {
-            out = if (out.isEmpty()) "SEM:$semesterId" else "$out\nSEM:$semesterId"
+        val semesterToken = semesterTag(semesterId)
+        if (!out.contains(semesterToken)) {
+            out = if (out.isEmpty()) semesterToken else "$out\n$semesterToken"
         }
         if (!out.contains(SYNC_TAG)) {
             out = if (out.isEmpty()) SYNC_TAG else "$out\n$SYNC_TAG"
@@ -270,7 +381,7 @@ class MainActivity : FlutterFragmentActivity() {
         return out
     }
 
-    private fun renderTemplate(template: String, slot: Map<*, *>, semesterId: String): String {
+    private fun renderTemplate(template: String, slot: Map<*, *>): String {
         val replacements = mapOf(
             "serial" to (slot["serial"]?.toString() ?: ""),
             "day" to (slot["day"]?.toString() ?: ""),
@@ -282,14 +393,17 @@ class MainActivity : FlutterFragmentActivity() {
             "startTime" to (slot["startTime"]?.toString() ?: ""),
             "endTime" to (slot["endTime"]?.toString() ?: ""),
             "name" to (slot["name"]?.toString() ?: ""),
-            "faculty" to (slot["faculty"]?.toString() ?: ""),
-            "semesterId" to semesterId
+            "faculty" to (slot["faculty"]?.toString() ?: "")
         )
         var out = template
         for ((key, value) in replacements) {
             out = out.replace("{$key}", value)
         }
         return out
+    }
+
+    private fun semesterTag(semesterId: String): String {
+        return "SEM:${semesterId.trim()}"
     }
 
     private fun buildLocation(block: String?, roomNo: String?): String {
@@ -303,14 +417,17 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    private fun nextOccurrenceMillis(dayCode: String, hhmm: String?): Long? {
+    private fun nextOccurrenceMillisFromBase(dayCode: String, hhmm: String?, baseMillis: Long): Long? {
         val targetDay = toCalendarDay(dayCode) ?: return null
         val parts = hhmm?.split(":") ?: return null
         val hour = parts.getOrNull(0)?.toIntOrNull() ?: return null
         val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
 
-        val now = Calendar.getInstance()
+        val now = Calendar.getInstance().apply {
+            timeInMillis = baseMillis
+        }
         val cal = Calendar.getInstance().apply {
+            timeInMillis = baseMillis
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
             set(Calendar.HOUR_OF_DAY, hour)

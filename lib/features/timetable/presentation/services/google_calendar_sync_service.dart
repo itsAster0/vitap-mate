@@ -29,11 +29,13 @@ class GoogleCalendarSyncService {
 
   static Future<CalendarSyncResult> syncTimetable(
     TimetableData timetable,
-    DateTime untilDate, {
+    DateTime startDate,
+    DateTime endDate, {
     String? accountName,
+    int reminderMinutes = 10,
     String titleTemplate = "{name}",
     String descriptionTemplate =
-        "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}\nSEM:{semesterId}",
+        "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}",
     String locationTemplate = "{block}-{roomNo}",
   }) async {
     final slots =
@@ -59,8 +61,10 @@ class GoogleCalendarSyncService {
     final raw = await _channel
         .invokeMethod<dynamic>("syncTimetableToGoogleCalendar", {
           "semesterId": timetable.semesterId,
-          "untilEpochMs": untilDate.millisecondsSinceEpoch,
+          "startEpochMs": startDate.millisecondsSinceEpoch,
+          "untilEpochMs": endDate.millisecondsSinceEpoch,
           "accountName": accountName,
+          "reminderMinutes": reminderMinutes,
           "titleTemplate": titleTemplate,
           "descriptionTemplate": descriptionTemplate,
           "locationTemplate": locationTemplate,
@@ -77,6 +81,23 @@ class GoogleCalendarSyncService {
       );
     }
     return const CalendarSyncResult(created: 0);
+  }
+
+  static Future<(int deleted, String? calendarName)> clearAllSyncedEvents({
+    String? accountName,
+    required String semesterId,
+  }) async {
+    final raw = await _channel.invokeMethod<dynamic>("clearAllSyncedEvents", {
+      "accountName": accountName,
+      "semesterId": semesterId,
+    });
+    if (raw is Map<Object?, Object?>) {
+      return (
+        (raw["deleted"] as num?)?.toInt() ?? 0,
+        raw["calendarName"]?.toString(),
+      );
+    }
+    return (0, null);
   }
 
   static Future<List<CalendarAppInfo>> getAvailableCalendarApps() async {
