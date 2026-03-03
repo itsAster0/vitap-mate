@@ -9,6 +9,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
@@ -245,32 +246,6 @@ List<TimetableSlot> getDaySlotList(TimetableData data, int i) {
     }
   }
   return slots;
-}
-
-List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> t) {
-  t.sort((a, b) {
-    final t1 = _parseTime(a.startTime);
-    final t2 = _parseTime(b.startTime);
-    return t1.compareTo(t2);
-  });
-  List<TimetableSlot> r = [];
-  for (int i = 0; i < t.length; i++) {
-    final current = t[i];
-
-    TimetableSlot? prev = r.isNotEmpty ? r.last : null;
-    if (prev != null &&
-        current.isLab &&
-        prev.isLab &&
-        current.courseCode == prev.courseCode) {
-      r[r.length - 1] = prev.copyWith(
-        endTime: current.endTime,
-        slot: "${prev.slot}+${current.slot}",
-      );
-    } else {
-      r.add(current);
-    }
-  }
-  return r;
 }
 
 List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {

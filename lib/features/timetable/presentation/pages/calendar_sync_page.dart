@@ -66,7 +66,6 @@ class CalendarSyncPage extends HookConsumerWidget {
         endDate.value,
       ],
     );
-
     final canClear = useMemoized(
       () =>
           Platform.isAndroid &&

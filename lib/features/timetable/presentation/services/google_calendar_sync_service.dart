@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class CalendarAppInfo {
@@ -38,9 +39,11 @@ class GoogleCalendarSyncService {
         "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}",
     String locationTemplate = "{block}-{roomNo}",
   }) async {
+    final rawSlots =
+        timetable.slots.where((slot) => slot.serial != "-1").toList();
+    final preparedSlots = _mergeLabsByDay(rawSlots);
     final slots =
-        timetable.slots
-            .where((slot) => slot.serial != "-1")
+        preparedSlots
             .map(
               (slot) => {
                 "serial": slot.serial,
@@ -125,5 +128,18 @@ class GoogleCalendarSyncService {
       "packageName": packageName,
     });
     return isOpened ?? false;
+  }
+
+  static List<TimetableSlot> _mergeLabsByDay(List<TimetableSlot> slots) {
+    final grouped = <String, List<TimetableSlot>>{};
+    for (final slot in slots) {
+      grouped.putIfAbsent(slot.day, () => []).add(slot);
+    }
+
+    final out = <TimetableSlot>[];
+    for (final daySlots in grouped.values) {
+      out.addAll(mergeLabsSloths(daySlots));
+    }
+    return out;
   }
 }
