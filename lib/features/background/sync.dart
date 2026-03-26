@@ -3,12 +3,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
+import 'package:vitapmate/features/attendance/domine/usecases/get_attendance_usecase.dart';
+import 'package:vitapmate/features/attendance/domine/usecases/get_full_attendance_usecase.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
+import 'package:vitapmate/features/more/domine/usecases/get_exam_schedule.dart';
+import 'package:vitapmate/features/more/domine/usecases/get_marks.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
+import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
+import 'package:vitapmate/features/settings/domine/usecases/get_semester_id.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
+import 'package:vitapmate/features/timetable/domine/usecases/get_timetable.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
@@ -23,7 +33,7 @@ void callbackDispatcher() {
         await BackgroundNotificationService.showProgress();
         final k = await _syncData(task: task);
         await BackgroundNotificationService.stop(success: k);
-        return k;
+        return true;
       default:
         break;
     }
@@ -47,23 +57,56 @@ Future<bool> _syncData({String? task}) async {
     if (!(feature.on && feature.value)) {
       return true;
     }
-    final List<Future<bool>> futures = [
-      _retryer(
-        () => container.read(timetableProvider.notifier).updateTimetable(),
-      ),
+    final List<Future<bool>> futures = [];
 
-      _retryer(() => container.read(marksProvider.notifier).updatemarks()),
+    final timetable =
+        await GetTimetableUsecase(
+          await container.read(timetableRepositoryProvider.future),
+        ).call();
+    if (!_isUpdatedWithinBacksyncWindow(timetable.updateTime)) {
+      futures.add(
+        _retryer(
+          () => container.read(timetableProvider.notifier).updateTimetable(),
+        ),
+      );
+    }
 
-      _retryer(
-        () => container.read(examScheduleProvider.notifier).updatexamschedule(),
-      ),
+    final marks =
+        await GetMarksUsecase(
+          await container.read(marksRepositoryProvider.future),
+        ).call();
+    if (!_isUpdatedWithinBacksyncWindow(marks.updateTime)) {
+      futures.add(
+        _retryer(() => container.read(marksProvider.notifier).updatemarks()),
+      );
+    }
 
-      _retryer(
-        () => container.read(semesterIdProvider.notifier).updatesemids(),
-      ),
+    final examSchedule =
+        await GetExamScheduleUsecase(
+          await container.read(examScheduleRepositoryProvider.future),
+        ).call();
+    if (!_isUpdatedWithinBacksyncWindow(examSchedule.updateTime)) {
+      futures.add(
+        _retryer(
+          () =>
+              container.read(examScheduleProvider.notifier).updatexamschedule(),
+        ),
+      );
+    }
 
-      _attendanceSync(container, task),
-    ];
+    final semids =
+        await GetSemidsUsecase(
+          await container.read(semidRepositoryProvider.future),
+        ).call();
+    if (!_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
+      futures.add(
+        _retryer(
+          () => container.read(semesterIdProvider.notifier).updatesemids(),
+        ),
+      );
+    }
+
+    futures.add(_attendanceSync(container, task));
     final k = await Future.wait(futures);
     await prefs.setString('${task}_val_end', DateTime.now().toString());
     return atLeastHalfTrue(k);
@@ -74,6 +117,18 @@ Future<bool> _syncData({String? task}) async {
   }
 }
 
+const _backsyncFreshWindow = Duration(minutes: 15);
+
+bool _isUpdatedWithinBacksyncWindow(BigInt updatedAt) {
+  final nowUnixSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final minFresh = BigInt.from(nowUnixSeconds - _backsyncFreshWindow.inSeconds);
+  return _isFreshSince(updatedAt, minFresh);
+}
+
+bool _isFreshSince(BigInt updatedAt, BigInt minFresh) {
+  return updatedAt > BigInt.zero && updatedAt >= minFresh;
+}
+
 bool atLeastHalfTrue(List<bool> k) {
   if (k.isEmpty) return true;
   final trueCount = k.where((e) => e).length;
@@ -82,7 +137,7 @@ bool atLeastHalfTrue(List<bool> k) {
 
 Future<bool> _retryer(Future<void> Function() func) async {
   // ignore: non_constant_identifier_names
-  final int MAX_TRY = 4;
+  final int MAX_TRY = 3;
   int runs = 0;
   while (runs < MAX_TRY) {
     runs += 1;
@@ -103,23 +158,41 @@ Future<bool> _retryer(Future<void> Function() func) async {
 
 Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
   try {
-    final ok = await _retryer(
-      () => container.read(attendanceProvider.notifier).updateAttendance(),
+    final attendanceRepo = await container.read(
+      attendanceRepositoryProvider.future,
     );
-    final att = await container.read(attendanceProvider.future);
+    var att = await GetAttendanceUsecase(attendanceRepo).call();
+    var ok = true;
+    if (!_isUpdatedWithinBacksyncWindow(att.updateTime)) {
+      ok = await _retryer(
+        () => container.read(attendanceProvider.notifier).updateAttendance(),
+      );
+      att = await container.read(attendanceProvider.future);
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val', att.toString());
 
     final k = await Future.wait([
       for (final i in att.records)
-        _retryer(
-          () =>
-              container
-                  .read(
-                    fullAttendanceProvider(i.courseType, i.courseId).notifier,
-                  )
-                  .updateAttendance(),
-        ),
+        () async {
+          final fullAttendance =
+              await GetFullAttendanceUsecase(
+                attendanceRepo,
+                i.courseType,
+                i.courseId,
+              ).call();
+          if (_isUpdatedWithinBacksyncWindow(fullAttendance.updateTime)) {
+            return true;
+          }
+          return _retryer(
+            () =>
+                container
+                    .read(
+                      fullAttendanceProvider(i.courseType, i.courseId).notifier,
+                    )
+                    .updateAttendance(),
+          );
+        }(),
     ]);
     return atLeastHalfTrue(k) && ok;
   } catch (e) {

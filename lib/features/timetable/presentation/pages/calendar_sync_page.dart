@@ -33,11 +33,11 @@ class CalendarSyncPage extends HookConsumerWidget {
     );
     final selectingDate = useState(_DateSelectionTab.end);
 
-    final appsLoading = useState(true);
+    final calendarsLoading = useState(true);
     final permissionGranted = useState(false);
-    final googleCalendarAvailable = useState(false);
-    final googleAccounts = useState<List<String>>([]);
-    final selectedAccount = useState<String?>(null);
+    final writableCalendarAvailable = useState(false);
+    final writableCalendars = useState<List<CalendarInfo>>([]);
+    final selectedCalendarId = useState<String?>(null);
     final currentSemesterId = useState<String?>(null);
     final timetableChangedSinceLastSync = useState(false);
     final reminderMinutes = useState(10);
@@ -54,14 +54,14 @@ class CalendarSyncPage extends HookConsumerWidget {
     final canSync = useMemoized(
       () =>
           Platform.isAndroid &&
-          !appsLoading.value &&
-          googleCalendarAvailable.value &&
-          selectedAccount.value != null &&
+          !calendarsLoading.value &&
+          writableCalendarAvailable.value &&
+          selectedCalendarId.value != null &&
           !endDate.value.isBefore(startDate.value),
       [
-        appsLoading.value,
-        googleCalendarAvailable.value,
-        selectedAccount.value,
+        calendarsLoading.value,
+        writableCalendarAvailable.value,
+        selectedCalendarId.value,
         startDate.value,
         endDate.value,
       ],
@@ -70,9 +70,9 @@ class CalendarSyncPage extends HookConsumerWidget {
       () =>
           Platform.isAndroid &&
           !loading.value &&
-          !appsLoading.value &&
-          selectedAccount.value != null,
-      [loading.value, appsLoading.value, selectedAccount.value],
+          !calendarsLoading.value &&
+          selectedCalendarId.value != null,
+      [loading.value, calendarsLoading.value, selectedCalendarId.value],
     );
 
     String formatDate(DateTime dt) {
@@ -102,7 +102,6 @@ class CalendarSyncPage extends HookConsumerWidget {
       final canonical =
           "${timetable.semesterId}::${timetable.updateTime}::${slots.join("||")}";
 
-      // Stable FNV-1a 64-bit hash for local change detection.
       var hash = 0xcbf29ce484222325;
       for (final codeUnit in canonical.codeUnits) {
         hash ^= codeUnit;
@@ -131,7 +130,6 @@ class CalendarSyncPage extends HookConsumerWidget {
       if (!status.isGranted) {
         status = await Permission.calendarWriteOnly.status;
       }
-
       if (status.isGranted) {
         permissionGranted.value = true;
         return true;
@@ -165,34 +163,9 @@ class CalendarSyncPage extends HookConsumerWidget {
       if (!status.isGranted) {
         status = await Permission.calendarWriteOnly.request();
       }
-
       if (status.isGranted) {
         permissionGranted.value = true;
         return true;
-      }
-
-      if (status.isPermanentlyDenied || status.isRestricted) {
-        if (!context.mounted) return false;
-        showFToast(
-          context: context,
-          alignment: FToastAlignment.bottomCenter,
-          title: const Text("Permission Blocked"),
-          description: const Text(
-            "Calendar permission is permanently denied. Open app settings to enable it.",
-          ),
-          suffixBuilder:
-              (context, entry) => IntrinsicHeight(
-                child: FButton(
-                  onPress: () async {
-                    entry.dismiss();
-                    await openAppSettings();
-                  },
-                  child: const Text("Settings"),
-                ),
-              ),
-        );
-        permissionGranted.value = false;
-        return false;
       }
 
       await showInfo(
@@ -203,37 +176,32 @@ class CalendarSyncPage extends HookConsumerWidget {
       return false;
     }
 
-    Future<void> loadAppsAndCalendars() async {
+    Future<void> loadCalendars() async {
       if (!Platform.isAndroid) {
         permissionGranted.value = false;
-        appsLoading.value = false;
+        calendarsLoading.value = false;
         return;
       }
 
-      appsLoading.value = true;
+      calendarsLoading.value = true;
       final fullAccessGranted = await Permission.calendarFullAccess.isGranted;
       final writeOnlyGranted = await Permission.calendarWriteOnly.isGranted;
       permissionGranted.value = fullAccessGranted || writeOnlyGranted;
-      final installed =
-          await GoogleCalendarSyncService.getAvailableCalendarApps();
-      final googleAppAvailable = installed.any(
-        (app) => app.packageName == "com.google.android.calendar",
-      );
 
-      List<String> accounts = const [];
+      List<CalendarInfo> calendars = const [];
       try {
-        accounts = await GoogleCalendarSyncService.getGoogleAccounts();
+        calendars = await CalendarSyncService.getWritableCalendars();
       } catch (_) {
-        accounts = const [];
+        calendars = const [];
       }
 
-      googleAccounts.value = accounts;
-      selectedAccount.value =
-          accounts.contains(selectedAccount.value)
-              ? selectedAccount.value
-              : accounts.firstOrNull;
-      googleCalendarAvailable.value = googleAppAvailable && accounts.isNotEmpty;
-      appsLoading.value = false;
+      writableCalendars.value = calendars;
+      selectedCalendarId.value =
+          calendars.any((item) => item.id == selectedCalendarId.value)
+              ? selectedCalendarId.value
+              : calendars.firstOrNull?.id;
+      writableCalendarAvailable.value = calendars.isNotEmpty;
+      calendarsLoading.value = false;
     }
 
     Future<void> loadSyncState() async {
@@ -262,7 +230,7 @@ class CalendarSyncPage extends HookConsumerWidget {
     }
 
     useEffect(() {
-      loadAppsAndCalendars();
+      loadCalendars();
       loadSyncState();
       return null;
     }, const []);
@@ -276,10 +244,7 @@ class CalendarSyncPage extends HookConsumerWidget {
         );
         return;
       }
-
-      if (!await ensureCalendarPermission()) {
-        return;
-      }
+      if (!await ensureCalendarPermission()) return;
 
       var loadingDialogShown = false;
       loading.value = true;
@@ -321,16 +286,22 @@ class CalendarSyncPage extends HookConsumerWidget {
         }
 
         final timetable = await ref.read(timetableProvider.future);
-        final result = await GoogleCalendarSyncService.syncTimetable(
+        final selectedCalendar = selectedCalendarId.value;
+        if (selectedCalendar == null || selectedCalendar.isEmpty) {
+          throw Exception("No writable calendar selected");
+        }
+
+        final result = await CalendarSyncService.syncTimetable(
           timetable,
           startDate.value,
           endDate.value,
-          accountName: selectedAccount.value,
+          calendarId: selectedCalendar,
           reminderMinutes: reminderMinutes.value,
           titleTemplate: titleTemplateController.text.trim(),
           descriptionTemplate: descriptionTemplateController.text.trim(),
           locationTemplate: locationTemplateController.text.trim(),
         );
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(
           timetableHashKey(timetable.semesterId),
@@ -360,23 +331,9 @@ class CalendarSyncPage extends HookConsumerWidget {
                   : const Text("No Classes Synced"),
           description: Text(
             result.created > 0
-                ? "${result.created} classes updated from ${formatDate(startDate.value)} to ${formatDate(endDate.value)}${result.calendarName != null ? " in ${result.calendarName}" : ""}."
+                ? "${result.created} recurring classes synced as v${result.version} from ${formatDate(startDate.value)} to ${formatDate(endDate.value)}${result.calendarName != null ? " in ${result.calendarName}" : ""}."
                 : "No class events were created. Check date range and timetable data.",
           ),
-          suffixBuilder:
-              result.created > 0
-                  ? (context, entry) => IntrinsicHeight(
-                    child: FButton(
-                      onPress: () async {
-                        entry.dismiss();
-                        await GoogleCalendarSyncService.openCalendarApp(
-                          "com.google.android.calendar",
-                        );
-                      },
-                      child: const Text("Open"),
-                    ),
-                  )
-                  : null,
         );
       } catch (e) {
         if (loadingDialogShown &&
@@ -409,7 +366,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             (_) => FDialog(
               title: const Text("Clear Synced Events"),
               body: Text(
-                "This removes only events synced by this app for semester ${timetable.semesterId} in the selected Google account.",
+                "This removes only events synced by this app for semester ${timetable.semesterId} in the selected calendar.",
               ),
               actions: [
                 FButton(
@@ -432,13 +389,21 @@ class CalendarSyncPage extends HookConsumerWidget {
 
       if (confirmed != true) return;
 
+      final selectedCalendar = selectedCalendarId.value;
+      if (selectedCalendar == null || selectedCalendar.isEmpty) {
+        if (context.mounted) {
+          disCommonToast(context, Exception("No writable calendar selected"));
+        }
+        return;
+      }
+
       loading.value = true;
       try {
         final (
           deleted,
           calendarName,
-        ) = await GoogleCalendarSyncService.clearAllSyncedEvents(
-          accountName: selectedAccount.value,
+        ) = await CalendarSyncService.clearAllSyncedEvents(
+          calendarId: selectedCalendar,
           semesterId: timetable.semesterId,
         );
 
@@ -464,6 +429,10 @@ class CalendarSyncPage extends HookConsumerWidget {
         selectingDate.value == _DateSelectionTab.start
             ? startDate.value
             : endDate.value;
+    final selectedCalendar =
+        writableCalendars.value
+            .where((item) => item.id == selectedCalendarId.value)
+            .firstOrNull;
 
     return SingleChildScrollView(
       child: Padding(
@@ -479,10 +448,9 @@ class CalendarSyncPage extends HookConsumerWidget {
               ),
             ),
             const Text(
-              "Pick start and end dates. Re-sync clears previously synced events for the same semester, then adds fresh classes.",
+              "Pick start and end dates, then sync your timetable to calendar.",
             ),
             const FDivider(),
-
             Text(
               "Date Range",
               style: context.theme.typography.base.copyWith(
@@ -500,9 +468,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                     onPress:
                         loading.value
                             ? null
-                            : () {
-                              selectingDate.value = _DateSelectionTab.start;
-                            },
+                            : () => selectingDate.value = _DateSelectionTab.start,
                     child: Text("Start: ${formatDate(startDate.value)}"),
                   ),
                 ),
@@ -516,9 +482,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                     onPress:
                         loading.value
                             ? null
-                            : () {
-                              selectingDate.value = _DateSelectionTab.end;
-                            },
+                            : () => selectingDate.value = _DateSelectionTab.end,
                     child: Text("End: ${formatDate(endDate.value)}"),
                   ),
                 ),
@@ -572,7 +536,6 @@ class CalendarSyncPage extends HookConsumerWidget {
                 "End date must be on or after start date.",
                 style: context.theme.typography.sm,
               ),
-
             const FDivider(),
             if (timetableChangedSinceLastSync.value)
               FCard(
@@ -589,19 +552,18 @@ class CalendarSyncPage extends HookConsumerWidget {
                   "Please sync again to update your calendar with latest classes.",
                 ),
               ),
-
             FCard(
               title: Text(
-                "Google Calendar Setup",
+                "Calendar Setup",
                 style: context.theme.typography.base.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
               subtitle: const Text(
-                "Choose which Google account should receive synced classes.",
+                "Choose writable calendar for recurring sync.",
               ),
               child:
-                  appsLoading.value
+                  calendarsLoading.value
                       ? const SizedBox(
                         height: 24,
                         width: 24,
@@ -611,24 +573,28 @@ class CalendarSyncPage extends HookConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            googleCalendarAvailable.value
-                                ? "Google Calendar is ready."
-                                : "Google Calendar app or writable account not available.",
+                            writableCalendarAvailable.value
+                                ? "Writable calendar is ready."
+                                : "No writable calendar available.",
                           ),
                           const SizedBox(height: 8),
-                          if (googleAccounts.value.isNotEmpty)
+                          if (writableCalendars.value.isNotEmpty)
                             FSelectMenuTile<String>(
-                              title: const Text("Google Account"),
+                              title: const Text("Calendar"),
                               details: Text(
-                                selectedAccount.value ??
-                                    googleAccounts.value.first,
+                                selectedCalendar?.name ??
+                                    writableCalendars.value.first.name,
                               ),
-                              initialValue: selectedAccount.value,
+                              initialValue: selectedCalendarId.value,
                               menu: [
-                                for (final account in googleAccounts.value)
+                                for (final calendar in writableCalendars.value)
                                   FSelectTile<String>(
-                                    title: Text(account),
-                                    value: account,
+                                    title: Text(
+                                      calendar.accountName.isEmpty
+                                          ? calendar.name
+                                          : "${calendar.name} (${calendar.accountName})",
+                                    ),
+                                    value: calendar.id,
                                   ),
                               ],
                               onChange:
@@ -637,12 +603,12 @@ class CalendarSyncPage extends HookConsumerWidget {
                                       : (value) {
                                         final selected = value.firstOrNull;
                                         if (selected != null) {
-                                          selectedAccount.value = selected;
+                                          selectedCalendarId.value = selected;
                                         }
                                       },
                             )
                           else
-                            const Text("No writable Google accounts found."),
+                            const Text("No writable calendars found."),
                           const SizedBox(height: 8),
                           Wrap(
                             spacing: 8,
@@ -652,13 +618,13 @@ class CalendarSyncPage extends HookConsumerWidget {
                                 FButton(
                                   style: FButtonStyle.outline(),
                                   onPress:
-                                      (loading.value || appsLoading.value)
+                                      (loading.value || calendarsLoading.value)
                                           ? null
                                           : () async {
                                             final ok =
                                                 await ensureCalendarPermission();
                                             if (ok) {
-                                              await loadAppsAndCalendars();
+                                              await loadCalendars();
                                             }
                                           },
                                   child: const Text("Grant Permission"),
@@ -666,17 +632,16 @@ class CalendarSyncPage extends HookConsumerWidget {
                               FButton(
                                 style: FButtonStyle.outline(),
                                 onPress:
-                                    (loading.value || appsLoading.value)
+                                    (loading.value || calendarsLoading.value)
                                         ? null
-                                        : loadAppsAndCalendars,
-                                child: const Text("Reload Accounts"),
+                                        : loadCalendars,
+                                child: const Text("Reload Calendars"),
                               ),
                             ],
                           ),
                         ],
                       ),
             ),
-
             FCard(
               title: Text(
                 "Event Layout",
@@ -684,9 +649,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text(
-                "Customize how events look in Google Calendar.",
-              ),
+              subtitle: const Text("Customize recurring event fields."),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -743,7 +706,6 @@ class CalendarSyncPage extends HookConsumerWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
             FButton(
               onPress: (loading.value || !canSync) ? null : sync,
@@ -766,7 +728,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        "Clear only removes events tagged by this app for the current semester, not your other calendar events.",
+                        "Clear only removes events tagged by this app for the current semester.",
                         style: context.theme.typography.sm,
                         textAlign: TextAlign.center,
                       ),
@@ -786,7 +748,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             const SizedBox(height: 8),
             const SizedBox(height: 4),
             Text(
-              "Note: Google Calendar may take a few minutes to display newly synced events.",
+              "Note: Calendar apps may take a few minutes to display updates.",
               style: context.theme.typography.sm,
               textAlign: TextAlign.center,
             ),

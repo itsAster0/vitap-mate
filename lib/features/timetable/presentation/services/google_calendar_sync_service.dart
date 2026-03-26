@@ -1,17 +1,25 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class CalendarAppInfo {
-  final String packageName;
-  final String label;
+class CalendarInfo {
+  final String id;
+  final String name;
+  final String accountName;
 
-  const CalendarAppInfo({required this.packageName, required this.label});
+  const CalendarInfo({
+    required this.id,
+    required this.name,
+    required this.accountName,
+  });
 
-  factory CalendarAppInfo.fromMap(Map<Object?, Object?> map) {
-    return CalendarAppInfo(
-      packageName: (map["packageName"] ?? "").toString(),
-      label: (map["label"] ?? "").toString(),
+  factory CalendarInfo.fromMap(Map<Object?, Object?> map) {
+    return CalendarInfo(
+      id: (map["id"] ?? "").toString(),
+      name: (map["name"] ?? "").toString(),
+      accountName: (map["accountName"] ?? "").toString(),
     );
   }
 }
@@ -19,11 +27,16 @@ class CalendarAppInfo {
 class CalendarSyncResult {
   final int created;
   final String? calendarName;
+  final int version;
 
-  const CalendarSyncResult({required this.created, this.calendarName});
+  const CalendarSyncResult({
+    required this.created,
+    required this.version,
+    this.calendarName,
+  });
 }
 
-class GoogleCalendarSyncService {
+class CalendarSyncService {
   static const MethodChannel _channel = MethodChannel(
     "vitapmate/google_calendar_sync",
   );
@@ -32,13 +45,16 @@ class GoogleCalendarSyncService {
     TimetableData timetable,
     DateTime startDate,
     DateTime endDate, {
-    String? accountName,
+    required String calendarId,
     int reminderMinutes = 10,
     String titleTemplate = "{name}",
     String descriptionTemplate =
         "Course: {courseCode}\nType: {courseType}\nSlot: {slot}\nFaculty: {faculty}",
     String locationTemplate = "{block}-{roomNo}",
   }) async {
+    if (!Platform.isAndroid) {
+      throw Exception("Calendar sync is currently Android-only.");
+    }
     final rawSlots =
         timetable.slots.where((slot) => slot.serial != "-1").toList();
     final preparedSlots = _mergeLabsByDay(rawSlots);
@@ -61,37 +77,36 @@ class GoogleCalendarSyncService {
             )
             .toList();
 
-    final raw = await _channel
-        .invokeMethod<dynamic>("syncTimetableToGoogleCalendar", {
-          "semesterId": timetable.semesterId,
-          "startEpochMs": startDate.millisecondsSinceEpoch,
-          "untilEpochMs": endDate.millisecondsSinceEpoch,
-          "accountName": accountName,
-          "reminderMinutes": reminderMinutes,
-          "titleTemplate": titleTemplate,
-          "descriptionTemplate": descriptionTemplate,
-          "locationTemplate": locationTemplate,
-          "slots": slots,
-        });
+    final raw = await _channel.invokeMethod<dynamic>("syncTimetableRecurring", {
+      "calendarId": calendarId,
+      "semesterId": timetable.semesterId,
+      "startEpochMs": startDate.millisecondsSinceEpoch,
+      "untilEpochMs": endDate.millisecondsSinceEpoch,
+      "reminderMinutes": reminderMinutes,
+      "titleTemplate": titleTemplate,
+      "descriptionTemplate": descriptionTemplate,
+      "locationTemplate": locationTemplate,
+      "slots": slots,
+    });
 
-    if (raw is int) {
-      return CalendarSyncResult(created: raw);
-    }
     if (raw is Map<Object?, Object?>) {
       return CalendarSyncResult(
         created: (raw["created"] as num?)?.toInt() ?? 0,
+        version: (raw["version"] as num?)?.toInt() ?? 1,
         calendarName: raw["calendarName"]?.toString(),
       );
     }
-    return const CalendarSyncResult(created: 0);
+    return const CalendarSyncResult(created: 0, version: 1);
   }
 
   static Future<(int deleted, String? calendarName)> clearAllSyncedEvents({
-    String? accountName,
+    required String calendarId,
     required String semesterId,
   }) async {
+    if (!Platform.isAndroid) return (0, null);
+
     final raw = await _channel.invokeMethod<dynamic>("clearAllSyncedEvents", {
-      "accountName": accountName,
+      "calendarId": calendarId,
       "semesterId": semesterId,
     });
     if (raw is Map<Object?, Object?>) {
@@ -103,31 +118,15 @@ class GoogleCalendarSyncService {
     return (0, null);
   }
 
-  static Future<List<CalendarAppInfo>> getAvailableCalendarApps() async {
-    final raw = await _channel.invokeMethod<List<dynamic>>(
-      "getAvailableCalendarApps",
-    );
+  static Future<List<CalendarInfo>> getWritableCalendars() async {
+    if (!Platform.isAndroid) return const [];
+    final raw = await _channel.invokeMethod<List<dynamic>>("getWritableCalendars");
     if (raw == null) return const [];
     return raw
         .whereType<Map<Object?, Object?>>()
-        .map(CalendarAppInfo.fromMap)
+        .map(CalendarInfo.fromMap)
+        .where((c) => c.id.trim().isNotEmpty)
         .toList();
-  }
-
-  static Future<List<String>> getGoogleAccounts() async {
-    final raw = await _channel.invokeMethod<List<dynamic>>("getGoogleAccounts");
-    if (raw == null) return const [];
-    return raw
-        .map((e) => e.toString())
-        .where((e) => e.trim().isNotEmpty)
-        .toList();
-  }
-
-  static Future<bool> openCalendarApp(String packageName) async {
-    final isOpened = await _channel.invokeMethod<bool>("openCalendarApp", {
-      "packageName": packageName,
-    });
-    return isOpened ?? false;
   }
 
   static List<TimetableSlot> _mergeLabsByDay(List<TimetableSlot> slots) {
