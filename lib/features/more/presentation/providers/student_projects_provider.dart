@@ -56,18 +56,34 @@ const defaultStudentProjects = <StudentProject>[
 class StudentProjects extends _$StudentProjects {
   static const _cacheKey = 'settings_student_projects_json';
   static const _featureKey = 'student-projects';
+  static const _rotationSeedKey = 'settings_student_projects_rotation_seed';
 
   @override
   Future<List<StudentProject>> build() async {
+    final prefs = await ref.read(settingsProvider.future);
+    final rotationSeed = prefs.getInt(_rotationSeedKey) ?? 0;
     final cached = await _readFromCache();
-    final initial = cached.isNotEmpty ? cached : defaultStudentProjects;
-    unawaited(_refreshFromGb(current: initial));
+    final initial = _rotateProjects(
+      cached.isNotEmpty ? cached : defaultStudentProjects,
+      rotationSeed,
+    );
+    await prefs.setInt(_rotationSeedKey, rotationSeed + 1);
+    unawaited(
+      _refreshFromGb(current: initial, rotationSeed: rotationSeed),
+    );
     return initial;
   }
 
   Future<void> refresh() async {
     final current = state.valueOrNull ?? defaultStudentProjects;
-    await _refreshFromGb(current: current, forceStateUpdate: true);
+    final prefs = await ref.read(settingsProvider.future);
+    final nextRotationSeed = prefs.getInt(_rotationSeedKey) ?? 0;
+    final activeRotationSeed = nextRotationSeed > 0 ? nextRotationSeed - 1 : 0;
+    await _refreshFromGb(
+      current: current,
+      forceStateUpdate: true,
+      rotationSeed: activeRotationSeed,
+    );
   }
 
   Future<List<StudentProject>> _readFromCache() async {
@@ -86,6 +102,7 @@ class StudentProjects extends _$StudentProjects {
 
   Future<void> _refreshFromGb({
     required List<StudentProject> current,
+    required int rotationSeed,
     bool forceStateUpdate = false,
   }) async {
     try {
@@ -96,6 +113,8 @@ class StudentProjects extends _$StudentProjects {
       final remoteProjects = _parseProjectsPayload(feature.value);
       if (remoteProjects.isEmpty) return;
 
+      final rotatedProjects = _rotateProjects(remoteProjects, rotationSeed);
+
       final prefs = await ref.read(settingsProvider.future);
       await prefs.setString(
         _cacheKey,
@@ -103,11 +122,43 @@ class StudentProjects extends _$StudentProjects {
       );
 
       final shouldUpdate =
-          forceStateUpdate || !_sameProjects(current, remoteProjects);
+          forceStateUpdate || !_sameProjects(current, rotatedProjects);
       if (shouldUpdate) {
-        state = AsyncData(remoteProjects);
+        state = AsyncData(rotatedProjects);
       }
     } catch (_) {}
+  }
+
+  List<StudentProject> _rotateProjects(
+    List<StudentProject> projects,
+    int rotationSeed,
+  ) {
+    if (projects.length < 2) return projects;
+
+    final categoriesInOrder = <String>[];
+    final grouped = <String, List<StudentProject>>{};
+    for (final project in projects) {
+      if (!grouped.containsKey(project.category)) {
+        categoriesInOrder.add(project.category);
+        grouped[project.category] = <StudentProject>[];
+      }
+      grouped[project.category]!.add(project);
+    }
+
+    return [
+      for (final category in categoriesInOrder)
+        ..._rotateCategory(grouped[category]!, rotationSeed),
+    ];
+  }
+
+  List<StudentProject> _rotateCategory(
+    List<StudentProject> projects,
+    int rotationSeed,
+  ) {
+    if (projects.length < 2) return projects;
+    final offset = rotationSeed % projects.length;
+    if (offset == 0) return projects;
+    return [...projects.sublist(offset), ...projects.sublist(0, offset)];
   }
 
   List<StudentProject> _parseProjectsPayload(dynamic payload) {
