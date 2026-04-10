@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -51,6 +52,49 @@ class ClassReminderNotificationService {
             importance: Importance.high,
           ),
         );
+  }
+
+  static Future<bool> requestAndroidNotificationPermission() async {
+    await ensureInitialized();
+    final android =
+        _notifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+
+    if (android == null) return true;
+
+    final enabled = await android.areNotificationsEnabled();
+    if (enabled == true) return true;
+    if (!Platform.isAndroid) return true;
+
+    final granted = await android.requestNotificationsPermission();
+    return granted ?? false;
+  }
+
+  static Future<void> showDebugTestNotification({int delaySeconds = 0}) async {
+    await ensureInitialized();
+    if (delaySeconds > 0) {
+      await Future.delayed(Duration(seconds: delaySeconds));
+    }
+
+    await _notifications.show(
+      DateTime.now().millisecondsSinceEpoch % 2147483647,
+      "Vitap Mate Test",
+      delaySeconds > 0
+          ? "Notification fired after ${delaySeconds}s delay."
+          : "Notification pipeline is working.",
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          channelId,
+          "Class reminders",
+          channelDescription: "Notifications before your classes",
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+      payload: "debug_test_notification",
+    );
   }
 
   static Future<void> cancelAll() async {

@@ -1,15 +1,14 @@
-import 'dart:developer';
 import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:pocketbase/pocketbase.dart';
-import 'package:vitapmate/core/exceptions.dart';
-import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
+import 'package:vitapmate/core/utils/app_error.dart';
 
 final _androidDir = Directory('/storage/emulated/0/Download');
+const _downloadManagerChannel = MethodChannel('vitapmate/download_manager');
 String formatUnixTimestamp(int timestamp) {
   final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   final formatter = DateFormat("MMM dd, yyyy hh:mm a");
@@ -17,15 +16,7 @@ String formatUnixTimestamp(int timestamp) {
 }
 
 String commonErrorMessage(Object e) {
-  if (e == VtopError.invalidCredentials()) {
-    return 'It looks like you changed your VTOP password. Please update it.';
-  } else if (e == VtopError.networkError() || e is ClientException) {
-    return "You're offline. Please check your connection and try again by refreshing.";
-  } else if (e is FeatureDisabledException) {
-    return 'This feature is currently disabled. Please try again in a while';
-  } else {
-    return "Something went wrong. Please try reopening the app.";
-  }
+  return appErrorMessage(e);
 }
 
 void myNotificationTapCallback(
@@ -33,9 +24,14 @@ void myNotificationTapCallback(
   NotificationType notificationType,
 ) async {
   if (notificationType == NotificationType.complete) {
-    var path = await task.filePath();
-    var k = await OpenFile.open(path);
-    if (k.type == ResultType.noAppToOpen) {
+    if (Platform.isAndroid) {
+      await _openAndroidDownloadsFolder();
+      return;
+    }
+
+    final path = await task.filePath();
+    final result = await OpenFile.open(path);
+    if (result.type == ResultType.noAppToOpen) {
       await OpenFile.open(_androidDir.path);
     }
   }
@@ -54,12 +50,26 @@ void fileDownloaderConfig() {
   );
 }
 
-Future<void> downloadFile(String url, String cookie) async {
+Future<void> downloadFile(
+  String url,
+  String cookie, {
+  String? contentDisposition,
+  String? mimeType,
+  String? suggestedFilename,
+}) async {
   Directory? downloadsDir;
 
   if (Platform.isAndroid) {
-    if (await Permission.notification.request().isDenied) {
-      log("notification permission denied");
+    await Permission.notification.request();
+    final queuedInSystemDownloads = await _downloadWithAndroidDownloadManager(
+      url,
+      cookie,
+      contentDisposition: contentDisposition,
+      mimeType: mimeType,
+      suggestedFilename: suggestedFilename,
+    );
+    if (queuedInSystemDownloads) {
+      return;
     }
     downloadsDir = _androidDir;
   } else if (Platform.isIOS) {
@@ -67,20 +77,66 @@ Future<void> downloadFile(String url, String cookie) async {
   }
 
   if (downloadsDir == null || !await downloadsDir.exists()) {
-    log("Downloads directory not found");
     return;
   }
 
+  final fallbackFilename = _normalizeDownloadFilename(suggestedFilename);
   final task = DownloadTask(
     url: url,
     headers: {"Cookie": cookie},
     retries: 5,
 
     directory: downloadsDir.path,
-    filename: DownloadTask.suggestedFilename,
+    filename: fallbackFilename ?? DownloadTask.suggestedFilename,
     baseDirectory: BaseDirectory.root,
     allowPause: true,
   );
-  final result = await FileDownloader().download(task);
-  log("Download started with taskId: $result");
+  await FileDownloader().download(task);
+}
+
+Future<bool> _downloadWithAndroidDownloadManager(
+  String url,
+  String cookie, {
+  String? contentDisposition,
+  String? mimeType,
+  String? suggestedFilename,
+}) async {
+  try {
+    final downloadId = await _downloadManagerChannel
+        .invokeMethod<int>('enqueueDownload', {
+          'url': url,
+          'cookie': cookie,
+          'contentDisposition': contentDisposition,
+          'mimeType': mimeType,
+          'suggestedFilename': suggestedFilename,
+        });
+    return downloadId != null && downloadId > 0;
+  } on MissingPluginException {
+    return false;
+  } on PlatformException {
+    return false;
+  }
+}
+
+String? _normalizeDownloadFilename(String? filename) {
+  final trimmed = filename?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+
+  if (trimmed.toLowerCase().endsWith('.bin')) {
+    return '${trimmed.substring(0, trimmed.length - 4)}.zip';
+  }
+
+  return trimmed;
+}
+
+Future<void> _openAndroidDownloadsFolder() async {
+  try {
+    await _downloadManagerChannel.invokeMethod<void>('openDownloadsFolder');
+  } on MissingPluginException {
+    await OpenFile.open(_androidDir.path);
+  } on PlatformException {
+    await OpenFile.open(_androidDir.path);
+  }
 }

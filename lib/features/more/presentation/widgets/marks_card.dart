@@ -59,7 +59,7 @@ class MarksCard extends HookConsumerWidget {
       }
     }
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     final isLab = record.islab();
 

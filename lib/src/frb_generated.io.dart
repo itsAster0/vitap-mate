@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/logging.dart';
 import 'api/simple.dart';
 import 'api/vtop/paraser/parseattn.dart';
 import 'api/vtop/paraser/parsegradehistory.dart';
@@ -10,13 +11,11 @@ import 'api/vtop/paraser/parsegrades.dart';
 import 'api/vtop/paraser/parsemarks.dart';
 import 'api/vtop/paraser/parsesched.dart';
 import 'api/vtop/paraser/parsett.dart';
-import 'api/vtop/paraser/wifi_portal.dart';
 import 'api/vtop/session_manager.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
 import 'api/vtop/vtop_config.dart';
 import 'api/vtop/vtop_errors.dart';
-import 'api/vtop/wifi.dart';
 import 'api/vtop_get_client.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -90,6 +89,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_VtopResultVecU8Ptr =>
       wire._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultVecu8Ptr;
+
+  @protected
+  AnyhowException dco_decode_AnyhowException(dynamic raw);
 
   @protected
   ArcJar
@@ -296,6 +298,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<BridgeLogEntry> dco_decode_StreamSink_bridge_log_entry_Sse(
+    dynamic raw,
+  );
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -309,6 +316,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopConfig dco_decode_box_autoadd_vtop_config(dynamic raw);
+
+  @protected
+  BridgeLogEntry dco_decode_bridge_log_entry(dynamic raw);
+
+  @protected
+  BridgeLogLevel dco_decode_bridge_log_level(dynamic raw);
 
   @protected
   ExamScheduleData dco_decode_exam_schedule_data(dynamic raw);
@@ -417,9 +430,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PerExamScheduleRecord dco_decode_per_exam_schedule_record(dynamic raw);
 
   @protected
-  (bool, String) dco_decode_record_bool_string(dynamic raw);
-
-  @protected
   SemesterData dco_decode_semester_data(dynamic raw);
 
   @protected
@@ -448,6 +458,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopError dco_decode_vtop_error(dynamic raw);
+
+  @protected
+  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
   ArcJar
@@ -654,6 +667,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<BridgeLogEntry> sse_decode_StreamSink_bridge_log_entry_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -667,6 +685,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopConfig sse_decode_box_autoadd_vtop_config(SseDeserializer deserializer);
+
+  @protected
+  BridgeLogEntry sse_decode_bridge_log_entry(SseDeserializer deserializer);
+
+  @protected
+  BridgeLogLevel sse_decode_bridge_log_level(SseDeserializer deserializer);
 
   @protected
   ExamScheduleData sse_decode_exam_schedule_data(SseDeserializer deserializer);
@@ -809,9 +833,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  (bool, String) sse_decode_record_bool_string(SseDeserializer deserializer);
-
-  @protected
   SemesterData sse_decode_semester_data(SseDeserializer deserializer);
 
   @protected
@@ -840,6 +861,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopError sse_decode_vtop_error(SseDeserializer deserializer);
+
+  @protected
+  void sse_encode_AnyhowException(
+    AnyhowException self,
+    SseSerializer serializer,
+  );
 
   @protected
   void
@@ -1080,6 +1107,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_bridge_log_entry_Sse(
+    RustStreamSink<BridgeLogEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -1100,6 +1133,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_vtop_config(
     VtopConfig self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_bridge_log_entry(
+    BridgeLogEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_bridge_log_level(
+    BridgeLogLevel self,
     SseSerializer serializer,
   );
 
@@ -1286,12 +1331,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_per_exam_schedule_record(
     PerExamScheduleRecord self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_record_bool_string(
-    (bool, String) self,
     SseSerializer serializer,
   );
 

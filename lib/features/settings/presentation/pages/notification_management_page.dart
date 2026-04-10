@@ -7,7 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/main.dart';
+import 'package:vitapmate/services/class_reminder_notification_service.dart';
 
 class NotificationManagementPage extends HookConsumerWidget {
   const NotificationManagementPage({super.key});
@@ -54,7 +54,7 @@ class NotificationManagementPage extends HookConsumerWidget {
               title: const Text("System Notification Settings"),
               suffix: Icon(FIcons.chevronRight),
               onPress: () async {
-                await notifications.requestPermissions();
+                await ClassReminderNotificationService.requestAndroidNotificationPermission();
                 AppSettings.openAppSettings(type: AppSettingsType.notification);
               },
             ),
@@ -89,8 +89,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                             FButton(
                               onPress: () async {
                                 final granted =
-                                    await notifications
-                                        .requestAndroidNotificationPermission();
+                                    await ClassReminderNotificationService.requestAndroidNotificationPermission();
                                 if (!granted) return;
                                 final delay =
                                     int.tryParse(
@@ -100,7 +99,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                                 if (context.mounted) {
                                   Navigator.of(context).pop();
                                 }
-                                await notifications.showDebugTestNotification(
+                                await ClassReminderNotificationService.showDebugTestNotification(
                                   delaySeconds: delay < 0 ? 0 : delay,
                                 );
                               },
@@ -120,8 +119,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                 onChange: (value) async {
                   if (value) {
                     final granted =
-                        await notifications
-                            .requestAndroidNotificationPermission();
+                        await ClassReminderNotificationService.requestAndroidNotificationPermission();
                     if (!granted) {
                       await ref
                           .read(classReminderSettingsControllerProvider)
@@ -243,8 +241,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                 onChange: (value) async {
                   if (value) {
                     final granted =
-                        await notifications
-                            .requestAndroidNotificationPermission();
+                        await ClassReminderNotificationService.requestAndroidNotificationPermission();
                     if (!granted) {
                       await ref
                           .read(examReminderSettingsControllerProvider)

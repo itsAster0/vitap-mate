@@ -17,7 +17,7 @@ class AttendanceCalculator extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
     (int, int) getDefaultFuturePlan(int attended, int total) {
       if (total <= 0) return (0, 0);
       final currentPct = (attended / total) * 100;

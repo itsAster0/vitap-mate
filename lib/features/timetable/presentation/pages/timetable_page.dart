@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -31,9 +30,7 @@ class TimetablePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(timetableProvider.notifier).updateTimetable();
-        } catch (e, _) {
-          log("$e");
-        }
+        } catch (_) {}
       });
 
       return null;
@@ -44,7 +41,6 @@ class TimetablePage extends HookConsumerWidget {
       try {
         await ref.read(timetableProvider.notifier).updateTimetable();
       } catch (e) {
-        log("$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }

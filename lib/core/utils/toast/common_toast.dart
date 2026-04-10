@@ -1,8 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/exceptions.dart';
-import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/app_error.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 void disCommonToast(BuildContext context, Object e) {
@@ -13,14 +12,8 @@ void disCommonToast(BuildContext context, Object e) {
       alignment: FToastAlignment.bottomCenter,
       title: const Text('Password Changed'),
       description: const Text(
-        'It looks like you changed your VTOP password. Please update it in settings -> Vtop Details .',
+        'It looks like you changed your VTOP password. Please update it in Settings.',
       ),
-      onDismiss: () {
-        final router = GoRouter.maybeOf(context);
-        if (router != null) {
-          router.goNamed(Paths.vtopUserManagement);
-        }
-      },
       suffixBuilder:
           (context, entry) => IntrinsicHeight(
             child: FButton(
@@ -129,46 +122,9 @@ void disCommonToast(BuildContext context, Object e) {
             ),
           ),
     );
+  } else {
+    dispToast(context, 'Error', appErrorMessage(e));
   }
-  // } else {
-  //   showFToast(
-  //     context: context,
-  //     alignment: FToastAlignment.bottomCenter,
-  //     title: const Text('Error oocured'),
-
-  //     description: const Text('Please try again'),
-  //     suffixBuilder:
-  //         (context, entry) => IntrinsicHeight(
-  //           child: FButton(
-  //             style:
-  //                 context.theme.buttonStyles.primary
-  //                     .copyWith(
-  //                       contentStyle:
-  //                           context.theme.buttonStyles.primary.contentStyle
-  //                               .copyWith(
-  //                                 padding: const EdgeInsets.symmetric(
-  //                                   horizontal: 12,
-  //                                   vertical: 7.5,
-  //                                 ),
-  //                                 textStyle: FWidgetStateMap.all(
-  //                                   context.theme.typography.xs.copyWith(
-  //                                     color:
-  //                                         context
-  //                                             .theme
-  //                                             .colors
-  //                                             .primaryForeground,
-  //                                   ),
-  //                                 ),
-  //                               )
-  //                               .call,
-  //                     )
-  //                     .call,
-  //             onPress: entry.dismiss,
-  //             child: const Text('Aye'),
-  //           ),
-  //         ),
-  //   );
-  // }
 }
 
 void disOnbardingCommonToast(BuildContext context, Object e) {
@@ -288,6 +244,8 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
             ),
           ),
     );
+  } else {
+    dispToast(context, 'Login Failed', appErrorMessage(e));
   }
 }
 

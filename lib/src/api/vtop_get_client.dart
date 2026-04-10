@@ -96,13 +96,3 @@ Future<Uint8List> fetchCookies({required VtopClient client}) =>
 
 Future<bool> fetchIsAuth({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchIsAuth(client: client);
-
-Future<(bool, String)> fetchWifi({
-  required String username,
-  required String password,
-  required int i,
-}) => RustLib.instance.api.crateApiVtopGetClientFetchWifi(
-  username: username,
-  password: password,
-  i: i,
-);

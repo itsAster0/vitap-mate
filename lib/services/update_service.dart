@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:in_app_update/in_app_update.dart';
 
 class UpdateService {
@@ -15,8 +14,6 @@ class UpdateService {
           await InAppUpdate.completeFlexibleUpdate();
         }
       }
-    } catch (e) {
-      log("Flexible update check failed: $e");
-    }
+    } catch (_) {}
   }
 }

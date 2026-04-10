@@ -11,7 +11,7 @@ class MarksTable extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     return Container(
       constraints: BoxConstraints(

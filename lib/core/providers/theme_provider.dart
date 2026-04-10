@@ -1,18 +1,21 @@
+// ignore_for_file: avoid_public_notifier_properties
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:forui/forui.dart';
 
-final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((ref) {
-  return ThemeNotifier();
-});
+part 'theme_provider.g.dart';
 
-class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.system) {
-    _loadThemeMode();
-  }
-
+@Riverpod(keepAlive: true)
+class ThemeController extends _$ThemeController {
   static const String _themeKey = 'theme_mode';
+
+  @override
+  ThemeMode build() {
+    _loadThemeMode();
+    return ThemeMode.system;
+  }
 
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -37,8 +40,9 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
   bool get isSystemMode => state == ThemeMode.system;
 }
 
-final fThemeProvider = Provider<FThemeData>((ref) {
-  final themeMode = ref.watch(themeProvider);
+@Riverpod(keepAlive: true)
+FThemeData fTheme(Ref ref) {
+  final themeMode = ref.watch(themeControllerProvider);
 
   switch (themeMode) {
     case ThemeMode.dark:
@@ -52,4 +56,4 @@ final fThemeProvider = Provider<FThemeData>((ref) {
           ? FThemes.zinc.dark
           : FThemes.zinc.light;
   }
-});
+}

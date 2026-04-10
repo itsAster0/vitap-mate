@@ -6,7 +6,7 @@ part of 'settings.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$settingsHash() => r'b62b713f75808fc15a8805484aa02f42714c7891';
+String _$settingsHash() => r'eeed4dda4caf2ff41b22f80485b37c03814be5bc';
 
 /// See also [settings].
 @ProviderFor(settings)
@@ -23,42 +23,6 @@ final settingsProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef SettingsRef = AutoDisposeFutureProviderRef<SharedPreferencesWithCache>;
-String _$wificardSettingHash() => r'a113ea84ffa0d5650b53891ccc3a227c610c3a0f';
-
-/// See also [wificardSetting].
-@ProviderFor(wificardSetting)
-final wificardSettingProvider = AutoDisposeProvider<bool>.internal(
-  wificardSetting,
-  name: r'wificardSettingProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$wificardSettingHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef WificardSettingRef = AutoDisposeProviderRef<bool>;
-String _$toggleWificardHash() => r'fbbe59e63ccf4e09da9b783be5a394d2b2e1e0a7';
-
-/// See also [toggleWificard].
-@ProviderFor(toggleWificard)
-final toggleWificardProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleWificard,
-  name: r'toggleWificardProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleWificardHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleWificardRef = AutoDisposeFutureProviderRef<void>;
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
 
 /// See also [mergeTT].
@@ -127,5 +91,85 @@ final toggleBTWExamsProvider = AutoDisposeFutureProvider<void>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef ToggleBTWExamsRef = AutoDisposeFutureProviderRef<void>;
+String _$classReminderSettingsHash() =>
+    r'80a6515f1742503a3547b58bb16b946f64f8a32c';
+
+/// See also [classReminderSettings].
+@ProviderFor(classReminderSettings)
+final classReminderSettingsProvider = Provider<ClassReminderSettings>.internal(
+  classReminderSettings,
+  name: r'classReminderSettingsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$classReminderSettingsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ClassReminderSettingsRef = ProviderRef<ClassReminderSettings>;
+String _$classReminderSettingsControllerHash() =>
+    r'8bfd4bc5e7f0e0ca582931a183103a446e6ff273';
+
+/// See also [classReminderSettingsController].
+@ProviderFor(classReminderSettingsController)
+final classReminderSettingsControllerProvider =
+    Provider<ClassReminderSettingsController>.internal(
+      classReminderSettingsController,
+      name: r'classReminderSettingsControllerProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$classReminderSettingsControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ClassReminderSettingsControllerRef =
+    ProviderRef<ClassReminderSettingsController>;
+String _$examReminderSettingsHash() =>
+    r'a907de04556718c380f670b1cf74dd83d773a166';
+
+/// See also [examReminderSettings].
+@ProviderFor(examReminderSettings)
+final examReminderSettingsProvider = Provider<ExamReminderSettings>.internal(
+  examReminderSettings,
+  name: r'examReminderSettingsProvider',
+  debugGetCreateSourceHash:
+      const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$examReminderSettingsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ExamReminderSettingsRef = ProviderRef<ExamReminderSettings>;
+String _$examReminderSettingsControllerHash() =>
+    r'307386b85a678b5bdb9faecf2dac3740efc17dcd';
+
+/// See also [examReminderSettingsController].
+@ProviderFor(examReminderSettingsController)
+final examReminderSettingsControllerProvider =
+    Provider<ExamReminderSettingsController>.internal(
+      examReminderSettingsController,
+      name: r'examReminderSettingsControllerProvider',
+      debugGetCreateSourceHash:
+          const bool.fromEnvironment('dart.vm.product')
+              ? null
+              : _$examReminderSettingsControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef ExamReminderSettingsControllerRef =
+    ProviderRef<ExamReminderSettingsController>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

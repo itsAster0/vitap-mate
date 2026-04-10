@@ -8,7 +8,7 @@ import '../types.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:meta/meta.dart' as meta;
 
-// These functions are ignored because they are not marked as `pub`: `extract_course_id`, `extract_text`, `now_unix`
+// These functions are ignored because they are not marked as `pub`: `clean_grade_range_text`, `extract_course_id`, `extract_text`, `looks_like_grade_range`, `now_unix`
 
 Future<GradeViewData> parseGradeView({
   required String html,

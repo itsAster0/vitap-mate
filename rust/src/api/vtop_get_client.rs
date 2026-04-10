@@ -1,19 +1,16 @@
+use crate::api::logging::{log_debug, log_info, log_warn};
 use crate::api::vtop::{
-    paraser::wifi_portal::find_captivative_portal,
     types::{
-        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeViewData,
-        GradeHistoryData, MarksData, SemesterData, TimetableData,
+        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeHistoryData,
+        GradeViewData, MarksData, SemesterData, TimetableData,
     },
     vtop_client::{VtopClient, VtopError},
     vtop_config::VtopClientBuilder,
-    wifi::*,
 };
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
-use tokio::task;
 
 #[flutter_rust_bridge::frb(sync)]
 pub fn get_vtop_client(username: String, password: String, cookie: Option<String>) -> VtopClient {
+    log_info("bridge", format!("Creating VTOP client for {username}"));
     let mut client = VtopClientBuilder::new().build(username, password);
     if let Some(cookie) = cookie {
         if (!cookie.is_empty()) {
@@ -25,10 +22,12 @@ pub fn get_vtop_client(username: String, password: String, cookie: Option<String
 
 #[flutter_rust_bridge::frb()]
 pub async fn vtop_client_login(client: &mut VtopClient) -> Result<(), VtopError> {
+    log_info("bridge", "Attempting VTOP login");
     client.login().await
 }
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_semesters(client: &mut VtopClient) -> Result<SemesterData, VtopError> {
+    log_debug("bridge", "Fetching semesters");
     client.get_semesters(true).await
 }
 #[flutter_rust_bridge::frb()]
@@ -36,6 +35,7 @@ pub async fn fetch_attendance(
     client: &mut VtopClient,
     semester_id: String,
 ) -> Result<AttendanceData, VtopError> {
+    log_debug("bridge", format!("Fetching attendance for {semester_id}"));
     client.get_attendance(&semester_id).await
 }
 
@@ -46,6 +46,10 @@ pub async fn fetch_full_attendance(
     course_id: String,
     course_type: String,
 ) -> Result<FullAttendanceData, VtopError> {
+    log_debug(
+        "bridge",
+        format!("Fetching full attendance for {semester_id}/{course_id}/{course_type}"),
+    );
     client
         .get_full_attendance(&semester_id, &course_id, &course_type)
         .await
@@ -56,6 +60,7 @@ pub async fn fetch_timetable(
     client: &mut VtopClient,
     semester_id: String,
 ) -> Result<TimetableData, VtopError> {
+    log_debug("bridge", format!("Fetching timetable for {semester_id}"));
     client.get_timetable(&semester_id).await
 }
 
@@ -64,6 +69,7 @@ pub async fn fetch_marks(
     client: &mut VtopClient,
     semester_id: String,
 ) -> Result<MarksData, VtopError> {
+    log_debug("bridge", format!("Fetching marks for {semester_id}"));
     client.get_marks(&semester_id).await
 }
 
@@ -72,6 +78,7 @@ pub async fn fetch_exam_shedule(
     client: &mut VtopClient,
     semester_id: String,
 ) -> Result<ExamScheduleData, VtopError> {
+    log_debug("bridge", format!("Fetching exam schedule for {semester_id}"));
     client.get_exam_schedule(&semester_id).await
 }
 
@@ -80,6 +87,7 @@ pub async fn fetch_grade_view(
     client: &mut VtopClient,
     semester_id: String,
 ) -> Result<GradeViewData, VtopError> {
+    log_debug("bridge", format!("Fetching grades for {semester_id}"));
     client.get_grade_view(&semester_id).await
 }
 
@@ -89,6 +97,10 @@ pub async fn fetch_grade_view_details(
     semester_id: String,
     course_id: String,
 ) -> Result<GradeDetailsData, VtopError> {
+    log_debug(
+        "bridge",
+        format!("Fetching grade details for {semester_id}/{course_id}"),
+    );
     client
         .get_grade_view_details(&semester_id, &course_id)
         .await
@@ -96,76 +108,22 @@ pub async fn fetch_grade_view_details(
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_grade_history(client: &mut VtopClient) -> Result<GradeHistoryData, VtopError> {
+    log_debug("bridge", "Fetching grade history");
     client.get_grade_history().await
 }
 
 #[flutter_rust_bridge::frb()]
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn fetch_cookies(client: &mut VtopClient) -> Result<Vec<u8>, VtopError> {
+    log_debug("bridge", "Fetching VTOP cookies");
     client.get_cookie(true).await.clone()
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_is_auth(client: &mut VtopClient) -> bool {
-    client.is_authenticated().clone()
-}
-
-#[flutter_rust_bridge::frb()]
-pub async fn fetch_wifi(username: String, password: String, i: i32) -> (bool, String) {
-    if (i != 0) {
-        // let k = wifi_login_logout(i, username.clone(), password.clone()).await;
-        // if (k.0) {
-        //     return k;
-        // } else {
-        //     return wifi_login_logout_hostel(i, username, password).await;
-        // }
-        let mut tasks = FuturesUnordered::new();
-
-        let username_clone = username.clone();
-        let password_clone = password.clone();
-        tasks.push(task::spawn(async move {
-            (
-                "non_hostel",
-                wifi_login_logout(i, username_clone, password_clone).await,
-            )
-        }));
-
-        let username_clone_2 = username.clone();
-        let password_clone_2 = password.clone();
-        tasks.push(task::spawn(async move {
-            (
-                "hostel",
-                wifi_login_logout_hostel(i, username_clone_2, password_clone_2).await,
-            )
-        }));
-
-        while let Some(result) = tasks.next().await {
-            match result {
-                Ok((_task_name, (is_success, message))) => {
-                    if is_success {
-                        return (is_success, message);
-                    }
-
-                    if tasks.is_empty() {
-                        return (is_success, message);
-                    }
-                }
-                Err(_) => {}
-            }
-        }
-        return (false, "Unknow Error".to_string());
+    let is_authenticated = client.is_authenticated().clone();
+    if !is_authenticated {
+        log_warn("bridge", "VTOP client is not authenticated");
     }
-
-    let captive = find_captivative_portal().await;
-
-    if (captive.contains("hfw.vitap.ac.in")) {
-        return wifi_login_logout_hostel(i, username, password).await;
-    } else if (captive == "IE") {
-        return (
-            false,
-            "You are already connected to the internet.".to_string(),
-        );
-    } else {
-        wifi_login_logout(i, username, password).await
-    }
+    is_authenticated
 }

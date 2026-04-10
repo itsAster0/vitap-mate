@@ -8,8 +8,6 @@ import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
-import 'package:vitapmate/features/social/presentation/widgets/logout_button.dart';
-import 'package:vitapmate/features/timetable/presentation/pages/share_tt.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 
 class ShellLayout extends HookConsumerWidget {
@@ -45,7 +43,6 @@ class ShellLayout extends HookConsumerWidget {
       getSidewidget(context, "Timetable", k, newSemExist),
       getSidewidget(context, "Attendance", k, newSemExist),
       getSidewidget(context, "More", k, newSemExist),
-      getSidewidget(context, "Social", k, newSemExist),
       getSidewidget(context, "Settings", k, newSemExist),
     ];
     final selected = useState(0);
@@ -56,10 +53,8 @@ class ShellLayout extends HookConsumerWidget {
         selected.value = 1;
       } else if (k.startsWith("/more")) {
         selected.value = 2;
-      } else if (k.startsWith("/social")) {
-        selected.value = 3;
       } else if (k.startsWith("/settings")) {
-        selected.value = 4;
+        selected.value = 3;
       }
       return null;
     }, [k]);
@@ -87,9 +82,6 @@ class ShellLayout extends HookConsumerWidget {
                 GoRouter.of(context).goNamed(Paths.more);
                 break;
               case 3:
-                GoRouter.of(context).goNamed(Paths.social);
-                break;
-              case 4:
                 GoRouter.of(context).goNamed(Paths.settings);
                 break;
             }
@@ -106,10 +98,6 @@ class ShellLayout extends HookConsumerWidget {
             FBottomNavigationBarItem(
               icon: Icon(FIcons.libraryBig),
               label: const Text('More'),
-            ),
-            FBottomNavigationBarItem(
-              icon: Icon(FIcons.atSign),
-              label: const Text('social'),
             ),
             FBottomNavigationBarItem(
               icon: Icon(FIcons.settings),
@@ -140,6 +128,9 @@ Widget? getSidewidget(
         break;
       case "exam_schedule":
         data = "Exam Schedule";
+        break;
+      case "logs":
+        data = "Logs";
         break;
     }
 
@@ -172,45 +163,9 @@ Widget? getSidewidget(
             )
             : Text(data, style: context.theme.typography.lg),
 
-    prefixes: [if (path.contains("social")) InfoSocial()],
-
     suffixes: [
-      if (path.contains("social")) LogoutButton(),
       if (path.contains("timetable")) SyncGoogleCalendarButton(),
-      if (path.contains("timetable")) ShareTt(),
       if (data == "Attendance") AttendanceHeader(),
     ],
   );
-}
-
-class InfoSocial extends StatelessWidget {
-  const InfoSocial({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: FTappable(
-        onPress:
-            () => showAdaptiveDialog(
-              context: context,
-              builder:
-                  (context) => FDialog(
-                    direction: Axis.horizontal,
-                    title: const Text('What information is shown?'),
-                    body: const Text(
-                      'Only your name and avatar are visible to others. You can change both anytime in Settings. '
-                      'Your email remains private and is never shared.',
-                    ),
-                    actions: [
-                      FButton(
-                        onPress: () => Navigator.of(context).pop(),
-                        child: const Text('Ok'),
-                      ),
-                    ],
-                  ),
-            ),
-        child: const Icon(FIcons.info),
-      ),
-    );
-  }
 }

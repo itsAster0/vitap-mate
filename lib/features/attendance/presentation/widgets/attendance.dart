@@ -25,7 +25,7 @@ class AttendanceCard extends HookConsumerWidget {
     final scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: animationController, curve: Curves.easeInOut),
     );
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
     final btwExams = ref.watch(btwExamsProvider);
 
     return Padding(

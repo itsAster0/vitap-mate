@@ -6,7 +6,7 @@ part of 'grade_history_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$gradeHistoryHash() => r'45d4c4bb9c846977766ed54be805b683ad13d900';
+String _$gradeHistoryHash() => r'3f2f480141e47c45c6e656dcfbca13a73e5acb56';
 
 /// See also [GradeHistory].
 @ProviderFor(GradeHistory)

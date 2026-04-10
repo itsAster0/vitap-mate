@@ -6,7 +6,7 @@ part of 'global_async_queue_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$globalAsyncQueueHash() => r'1842eb70b7871ca8f5cd27e7424e2868b6ef45b8';
+String _$globalAsyncQueueHash() => r'6592c3e12f604487222d928fc9dcacde0f609186';
 
 /// See also [GlobalAsyncQueue].
 @ProviderFor(GlobalAsyncQueue)

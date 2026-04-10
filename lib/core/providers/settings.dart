@@ -12,33 +12,14 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         "settings_merge_tt",
         "settings_btw_atten",
-        "settings_wifi_card",
         "settings_class_notifications_enabled",
         "settings_class_notify_before_minutes",
         "settings_class_pause_until_millis",
         "settings_exam_notifications_enabled",
         "settings_exam_notify_before_minutes",
-        "settings_student_projects_pinned_ids",
-        "settings_student_projects_json",
-        "settings_student_projects_rotation_seed",
       },
     ),
   );
-}
-
-@riverpod
-bool wificardSetting(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_wifi_card") ?? false;
-}
-
-@riverpod
-Future<void> toggleWificard(Ref ref) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final current = prefs.getBool("settings_wifi_card") ?? true;
-  await prefs.setBool("settings_wifi_card", !current);
-
-  ref.invalidate(wificardSettingProvider);
 }
 
 @riverpod
@@ -73,47 +54,6 @@ Future<void> toggleBTWExams(Ref ref) async {
   ref.invalidate(btwExamsProvider);
 }
 
-final studentProjectPinnedIdsProvider = Provider<Set<int>>((ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  final list =
-      prefs?.getStringList("settings_student_projects_pinned_ids") ?? [];
-  return list.map(int.tryParse).whereType<int>().toSet();
-});
-
-final studentProjectsPinnedOnlySessionProvider = StateProvider<bool>(
-  (ref) => false,
-);
-
-final studentProjectsSettingsControllerProvider =
-    Provider<StudentProjectsSettingsController>((ref) {
-      return StudentProjectsSettingsController(ref);
-    });
-
-class StudentProjectsSettingsController {
-  final Ref ref;
-  StudentProjectsSettingsController(this.ref);
-
-  Future<void> togglePinned(int id) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final current =
-        (prefs.getStringList("settings_student_projects_pinned_ids") ?? [])
-            .map(int.tryParse)
-            .whereType<int>()
-            .toSet();
-    if (current.contains(id)) {
-      current.remove(id);
-    } else {
-      current.add(id);
-    }
-    final sorted = current.toList()..sort();
-    await prefs.setStringList(
-      "settings_student_projects_pinned_ids",
-      sorted.map((e) => "$e").toList(),
-    );
-    ref.invalidate(studentProjectPinnedIdsProvider);
-  }
-}
-
 class ClassReminderSettings {
   final bool enabled;
   final int notifyBeforeMinutes;
@@ -126,7 +66,8 @@ class ClassReminderSettings {
   });
 }
 
-final classReminderSettingsProvider = Provider<ClassReminderSettings>((ref) {
+@Riverpod(keepAlive: true)
+ClassReminderSettings classReminderSettings(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
   return ClassReminderSettings(
     enabled: prefs?.getBool("settings_class_notifications_enabled") ?? false,
@@ -134,12 +75,12 @@ final classReminderSettingsProvider = Provider<ClassReminderSettings>((ref) {
         prefs?.getInt("settings_class_notify_before_minutes") ?? 10,
     pauseUntilMillis: prefs?.getInt("settings_class_pause_until_millis"),
   );
-});
+}
 
-final classReminderSettingsControllerProvider =
-    Provider<ClassReminderSettingsController>((ref) {
-      return ClassReminderSettingsController(ref);
-    });
+@Riverpod(keepAlive: true)
+ClassReminderSettingsController classReminderSettingsController(Ref ref) {
+  return ClassReminderSettingsController(ref);
+}
 
 class ClassReminderSettingsController {
   final Ref ref;
@@ -200,19 +141,20 @@ class ExamReminderSettings {
   });
 }
 
-final examReminderSettingsProvider = Provider<ExamReminderSettings>((ref) {
+@Riverpod(keepAlive: true)
+ExamReminderSettings examReminderSettings(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
   return ExamReminderSettings(
     enabled: prefs?.getBool("settings_exam_notifications_enabled") ?? false,
     notifyBeforeMinutes:
         prefs?.getInt("settings_exam_notify_before_minutes") ?? 10,
   );
-});
+}
 
-final examReminderSettingsControllerProvider =
-    Provider<ExamReminderSettingsController>((ref) {
-      return ExamReminderSettingsController(ref);
-    });
+@Riverpod(keepAlive: true)
+ExamReminderSettingsController examReminderSettingsController(Ref ref) {
+  return ExamReminderSettingsController(ref);
+}
 
 class ExamReminderSettingsController {
   final Ref ref;

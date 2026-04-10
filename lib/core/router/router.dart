@@ -1,8 +1,7 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/widgets/onboarding_page.dart';
@@ -16,15 +15,16 @@ import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
-import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
-import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
-import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/logs_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
 
+part 'router.g.dart';
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
-final routerProvider = Provider((ref) {
+@Riverpod(keepAlive: true)
+GoRouter router(Ref ref) {
   return GoRouter(
     redirect: (context, state) => redirect(context, ref, state),
     initialLocation: '/timetable',
@@ -164,36 +164,12 @@ final routerProvider = Provider((ref) {
                     },
                   ),
                   GoRoute(
-                    path: '/vtopUserManagement',
-                    name: Paths.vtopUserManagement,
-
+                    path: 'logs',
+                    name: Paths.logs,
                     pageBuilder: (context, state) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
-                        child: UserManagementPage(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/social',
-                name: Paths.social,
-                builder: (context, state) => SocialPage(),
-                routes: [
-                  GoRoute(
-                    path: 'messagechat',
-                    name: Paths.messageChat,
-
-                    pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
-                        key: state.pageKey,
-                        child: MessageChatPage(),
+                        child: LogsPage(),
                       );
                     },
                   ),
@@ -205,7 +181,7 @@ final routerProvider = Provider((ref) {
       ),
     ],
   );
-});
+}
 
 FutureOr<String?> redirect(
   BuildContext context,

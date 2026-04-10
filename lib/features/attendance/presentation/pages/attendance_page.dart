@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -21,7 +20,6 @@ class AttendancePage extends HookConsumerWidget {
       try {
         await ref.read(attendanceProvider.notifier).updateAttendance();
       } catch (e) {
-        log("$e");
         if (context.mounted) {
           try {
             disCommonToast(context, e);

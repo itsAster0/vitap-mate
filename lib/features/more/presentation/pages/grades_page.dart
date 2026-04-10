@@ -1,5 +1,3 @@
-import 'dart:developer' show log;
-
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -35,8 +33,6 @@ class GradesPage extends HookConsumerWidget {
         await ref.read(semesterIdProvider.future);
         await ref.read(gradesProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
-
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -268,7 +264,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
 
   @override
   Widget build(BuildContext context) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
     final state = ref.watch(gradesProvider).valueOrNull;
     final detail = state?.detailsByCourseId[widget.course.courseId];
     final loading =

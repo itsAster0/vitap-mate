@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
@@ -19,12 +18,11 @@ class ExamSchedulePage extends HookConsumerWidget {
       try {
         await ref.read(examScheduleProvider.notifier).updatexamschedule();
       } catch (e) {
-        log("$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {

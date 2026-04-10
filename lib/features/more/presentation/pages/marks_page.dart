@@ -1,4 +1,3 @@
-import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
@@ -30,12 +29,11 @@ class MarksPage extends HookConsumerWidget {
       try {
         await ref.read(marksProvider.notifier).updatemarks();
       } catch (e) {
-        log("$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     var marksData = ref.watch(marksProvider);
 

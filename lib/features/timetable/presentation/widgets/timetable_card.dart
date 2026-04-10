@@ -107,7 +107,7 @@ class TimetableCard extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
     final controller = useAnimationController(
       duration: const Duration(milliseconds: 300),
     );

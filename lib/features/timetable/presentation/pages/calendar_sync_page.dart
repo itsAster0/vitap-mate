@@ -468,7 +468,8 @@ class CalendarSyncPage extends HookConsumerWidget {
                     onPress:
                         loading.value
                             ? null
-                            : () => selectingDate.value = _DateSelectionTab.start,
+                            : () =>
+                                selectingDate.value = _DateSelectionTab.start,
                     child: Text("Start: ${formatDate(startDate.value)}"),
                   ),
                 ),

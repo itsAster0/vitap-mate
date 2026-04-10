@@ -6,7 +6,7 @@ part of 'vtop_user_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$vtopUserHash() => r'05695658353e0cb6a7075f78b8b713550290936f';
+String _$vtopUserHash() => r'100559c09ed8cf5ec571769465a4eb052d53a1cf';
 
 /// See also [VtopUser].
 @ProviderFor(VtopUser)

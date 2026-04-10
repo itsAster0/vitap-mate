@@ -26,7 +26,7 @@ class AttendanceTable extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
     final isLoading = useState(false);
     final selectedTab = useState(0);
 

@@ -1,14 +1,12 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
+import 'package:vitapmate/core/services/service_layer.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_grades.dart';
-import 'package:vitapmate/features/more/domine/repositories/grades_repo.dart';
-import 'package:vitapmate/features/more/domine/usecases/update_grades.dart';
-import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+
+part 'grades_provider.g.dart';
 
 class GradesUiState {
   final GradeViewData gradeView;
@@ -42,11 +40,8 @@ class GradesUiState {
   }
 }
 
-final gradesProvider = AsyncNotifierProvider<GradesNotifier, GradesUiState>(
-  GradesNotifier.new,
-);
-
-class GradesNotifier extends AsyncNotifier<GradesUiState> {
+@Riverpod(keepAlive: true)
+class Grades extends _$Grades {
   @override
   Future<GradesUiState> build() async {
     final user = await ref.read(vtopUserProvider.future);
@@ -60,9 +55,10 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     final semId = current?.selectedSemesterId;
     if (semId == null || semId.isEmpty) return;
 
-    final hasLocalData = current?.gradeView.courses.isNotEmpty ?? false;
-    final repo = await ref.read(gradesRepositoryForSemProvider(semId).future);
-    final didFetchRemote = await _updateView(repo, hasLocalData: hasLocalData);
+    final didFetchRemote = await _updateView(
+      semId,
+      hasLocalData: current?.gradeView.courses.isNotEmpty ?? false,
+    );
     final next = await _loadSemester(
       semId,
       current!.semesters,
@@ -104,11 +100,13 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     state = AsyncData(current.copyWith(loadingDetailsFor: loadingSet));
 
     try {
-      await ref.read(vClientProvider.notifier).tryLogin();
-      final repo = await ref.read(
-        gradesRepositoryForSemProvider(current.selectedSemesterId).future,
-      );
-      final details = await FetchGradeDetailsUsecase(repo).call(courseId);
+      final services = await ref.read(appServicesProvider.future);
+      final details = await services.vtopDataRepository
+          .loadGradeDetailsForSemester(
+            semesterId: current.selectedSemesterId,
+            courseId: courseId,
+            refresh: force,
+          );
 
       final now = state.valueOrNull ?? current;
       final nextMap = {...now.detailsByCourseId, courseId: details};
@@ -140,21 +138,20 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
       selected = semesters.first.id;
     }
 
-    final repo = await ref.read(
-      gradesRepositoryForSemProvider(selected).future,
+    final services = await ref.read(appServicesProvider.future);
+    var view = await services.vtopDataRepository.loadGradesForSemester(
+      selected,
     );
-
-    var view = await GetGradeViewUsecase(repo).call();
-    final details = await GetGradeDetailsMapUsecase(repo).call();
+    final details = <String, GradeDetailsData>{};
 
     if (forceRemote) {
-      await _updateView(repo, hasLocalData: view.courses.isNotEmpty);
-      view = await GetGradeViewUsecase(repo).call();
+      await _updateView(selected, hasLocalData: view.courses.isNotEmpty);
+      view = await services.vtopDataRepository.loadGradesForSemester(selected);
     }
 
     if (view.courses.isEmpty) {
-      await _updateView(repo, hasLocalData: false);
-      view = await GetGradeViewUsecase(repo).call();
+      await _updateView(selected, hasLocalData: false);
+      view = await services.vtopDataRepository.loadGradesForSemester(selected);
     }
 
     return GradesUiState(
@@ -167,14 +164,17 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }
 
   Future<bool> _updateView(
-    GradesRepository repo, {
+    String semesterId, {
     required bool hasLocalData,
   }) async {
+    final services = await ref.read(appServicesProvider.future);
     final gb = await ref.read(gbProvider.future);
     final feature = gb.feature("fetch-grades");
     if (feature.on && feature.value) {
-      await ref.read(vClientProvider.notifier).tryLogin();
-      await UpdateGradeViewUsecase(repo).call();
+      await services.vtopDataRepository.loadGradesForSemester(
+        semesterId,
+        refresh: true,
+      );
       return true;
     } else {
       if (hasLocalData) {

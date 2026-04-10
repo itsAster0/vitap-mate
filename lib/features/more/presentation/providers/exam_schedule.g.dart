@@ -6,7 +6,7 @@ part of 'exam_schedule.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$examScheduleHash() => r'c35790ddd7f6a2784f9d80c4f1d0ddf83c6f7508';
+String _$examScheduleHash() => r'45c11b70d0c34e11ac4ff129b52739b6f6579c79';
 
 /// See also [ExamSchedule].
 @ProviderFor(ExamSchedule)

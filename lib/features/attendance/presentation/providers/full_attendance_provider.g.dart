@@ -6,7 +6,7 @@ part of 'full_attendance_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$fullAttendanceHash() => r'57c3ce511b9f763899734eb41ac4c54905057b38';
+String _$fullAttendanceHash() => r'6d3a844c231da49b41e674d0cf65115fa749cd68';
 
 /// Copied from Dart SDK
 class _SystemHash {

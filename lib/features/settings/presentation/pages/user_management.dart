@@ -1,4 +1,3 @@
-import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -6,21 +5,30 @@ import 'package:forui_hooks/forui_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/services/service_layer.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
-var isLoadingSems = StateProvider<bool>((k) => false);
+part 'user_management.g.dart';
+
+@Riverpod(keepAlive: true)
+class IsLoadingSems extends _$IsLoadingSems {
+  @override
+  bool build() => false;
+
+  void setLoading(bool value) {
+    state = value;
+  }
+}
 
 class UserManagementPage extends HookConsumerWidget {
   const UserManagementPage({super.key});
@@ -29,7 +37,10 @@ class UserManagementPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       color: context.theme.colors.background,
-      child: const Padding(padding: EdgeInsets.all(8.0), child: UserBox()),
+      child: const Padding(
+        padding: EdgeInsets.all(8.0),
+        child: SingleChildScrollView(child: UserBox()),
+      ),
     );
   }
 }
@@ -42,80 +53,58 @@ class UserBox extends HookConsumerWidget {
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
-          ref.read(isLoadingSems.notifier).state = true;
+          ref.read(isLoadingSemsProvider.notifier).setLoading(true);
           await ref.read(semesterIdProvider.notifier).updatesemids();
           ref.invalidate(semesterIdProvider);
         } catch (_) {
           ();
         } finally {
-          ref.read(isLoadingSems.notifier).state = false;
+          ref.read(isLoadingSemsProvider.notifier).setLoading(false);
         }
       });
       return null;
     }, []);
 
-    final users = ref.watch(allUsersProviderProvider);
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: MediaQuery.of(context).size.height * 0.8,
-      ),
-      child: users.when(
-        data: (data) {
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                for (final i in data.$1)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: UserContainer(
-                      user: i,
-                      isDefault: i.username == data.$2,
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                const Useradd(),
-              ],
-            ),
-          );
-        },
-        error: (e, _) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Something went worng"),
-                FButton(
-                  onPress: () {
-                    AppSettings.openAppSettings(type: AppSettingsType.settings);
-                  },
-                  child: const Text("Fix it "),
-                ),
-                const Text("Click the above button and clear the data"),
-              ],
-            ),
-          );
-        },
-        loading: () {
-          return Center(
-            child: SizedBox(
-              width: 100,
-              height: 100,
-              child: CircularProgressIndicator(
-                color: context.theme.colors.primary,
+    final user = ref.watch(vtopUserProvider);
+    return user.when(
+      data: (data) {
+        return UserContainer(user: data);
+      },
+      error: (e, _) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("Unable to load VTOP details"),
+              FButton(
+                onPress: () {
+                  GoRouter.of(context).go('/onboarding');
+                },
+                child: const Text("Set up again"),
               ),
+            ],
+          ),
+        );
+      },
+      loading: () {
+        return Center(
+          child: SizedBox(
+            width: 100,
+            height: 100,
+            child: CircularProgressIndicator(
+              color: context.theme.colors.primary,
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
 
 class UserContainer extends HookConsumerWidget {
   final VtopUserEntity user;
-  final bool isDefault;
 
-  const UserContainer({super.key, required this.user, required this.isDefault});
+  const UserContainer({super.key, required this.user});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -138,380 +127,114 @@ class UserContainer extends HookConsumerWidget {
         false;
     final showPasswords = useState(false);
 
-    Future<void> setActiveUser() async {
-      if (user.username == null) return;
-      await ref
-          .read(vtopusersutilsProvider.notifier)
-          .vtopSetDefault(user.username!);
-      ref.invalidate(allUsersProviderProvider);
-      ref.invalidate(vtopUserProvider);
-      ref.invalidate(vClientProvider);
-      try {
-        await ref.read(vClientProvider.notifier).tryLogin(force: true);
-      } catch (_) {}
-      try {
-        await ref.read(timetableProvider.notifier).updateTimetable();
-      } catch (_) {}
-      try {
-        await ref.read(examScheduleProvider.notifier).updatexamschedule();
-      } catch (_) {}
-      try {
-        await ref.read(marksProvider.notifier).updatemarks();
-      } catch (_) {}
-      try {
-        await ref.read(attendanceProvider.notifier).updateAttendance();
-      } catch (_) {}
-    }
-
-    Future<void> deleteUser() async {
-      if (user.username == null || isDefault) return;
-      await ref
-          .read(vtopusersutilsProvider.notifier)
-          .vtopUserDelete(user.username!);
-      ref.invalidate(allUsersProviderProvider);
-      ref.invalidate(vtopUserProvider);
-      ref.invalidate(vClientProvider);
-      final users =
-          await ref.read(vtopusersutilsProvider.notifier).getAllUsers();
-      if (users.$1.isEmpty && context.mounted) {
-        GoRouter.of(context).go('/onboarding');
-      }
-    }
-
-    return FFocusedOutline(
-      focused: isDefault,
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.theme.colors.primaryForeground,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            spacing: 8,
-            children: [
-              Row(
-                spacing: 10,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(FIcons.idCard),
-                  Text(
-                    isDefault ? "VTOP Credential (Active)" : "VTOP Credential",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+    return Container(
+      decoration: BoxDecoration(
+        color: context.theme.colors.primaryForeground,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.theme.colors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 14,
+          children: [
+            Row(
+              spacing: 12,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: context.theme.colors.primary.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Text(
-                    "Username : ",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  child: Icon(
+                    FIcons.idCard,
+                    color: context.theme.colors.primary,
                   ),
-                  Expanded(child: Text(user.username ?? "")),
-                ],
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Text(
-                          "Password : ",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          showPasswords.value
-                              ? user.password ?? ""
-                              : "**********",
-                        ),
-                      ],
-                    ),
+                ),
+                Text(
+                  "VTOP Account",
+                  style: context.theme.typography.lg.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  if (canUseBiometric)
-                    FButton.icon(
-                      onPress: () async {
-                        final List<BiometricType> availableBiometrics =
-                            await auth.getAvailableBiometrics();
-                        if (availableBiometrics.isNotEmpty &&
-                            !showPasswords.value) {
-                          final bool didAuthenticate = await auth.authenticate(
-                            localizedReason:
-                                'Please authenticate to show Password',
-                          );
-                          if (!didAuthenticate) return;
-                        }
-                        showPasswords.value = !showPasswords.value;
-                      },
-                      child: const Icon(FIcons.eye),
-                    ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  if (isDefault) UserSemChange(user: user),
-                  if (!user.isValid) UserPassChange(user: user),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  if (!isDefault)
-                    FButton(
-                      style: FButtonStyle.outline(),
-                      onPress: setActiveUser,
-                      child: const Text("Set Active"),
-                    ),
-                  if (!isDefault)
-                    FButton(
-                      style: FButtonStyle.destructive(),
-                      onPress: () async {
-                        await showAdaptiveDialog(
-                          context: context,
-                          builder: (dialogContext) {
-                            return FDialog(
-                              title: const Text("Delete Account"),
-                              body: Text(
-                                "Delete ${user.username ?? "this account"} from this device?",
-                              ),
-                              actions: [
-                                FButton(
-                                  style: FButtonStyle.outline(),
-                                  onPress:
-                                      () => Navigator.of(dialogContext).pop(),
-                                  child: const Text('Cancel'),
-                                ),
-                                FButton(
-                                  style: FButtonStyle.destructive(),
-                                  onPress: () async {
-                                    await deleteUser();
-                                    if (dialogContext.mounted) {
-                                      Navigator.of(dialogContext).pop();
-                                    }
-                                  },
-                                  child: const Text('Delete'),
-                                ),
-                              ],
-                            );
-                          },
+                ),
+              ],
+            ),
+            _DetailRow(
+              label: "Username",
+              value: user.username ?? "",
+              icon: FIcons.user,
+            ),
+            Row(
+              children: [
+                const Icon(FIcons.keyRound, size: 18),
+                const SizedBox(width: 10),
+                const Text(
+                  "Password",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    showPasswords.value ? user.password ?? "" : "**********",
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (canUseBiometric)
+                  FButton.icon(
+                    onPress: () async {
+                      final List<BiometricType> availableBiometrics =
+                          await auth.getAvailableBiometrics();
+                      if (availableBiometrics.isNotEmpty &&
+                          !showPasswords.value) {
+                        final bool didAuthenticate = await auth.authenticate(
+                          localizedReason:
+                              'Please authenticate to show Password',
                         );
-                      },
-                      child: const Text("Delete"),
-                    ),
-                ],
-              ),
-            ],
-          ),
+                        if (!didAuthenticate) return;
+                      }
+                      showPasswords.value = !showPasswords.value;
+                    },
+                    child: const Icon(FIcons.eye),
+                  ),
+              ],
+            ),
+            Row(
+              spacing: 10,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                UserSemChange(user: user),
+                if (!user.isValid) UserPassChange(user: user),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class Useradd extends HookConsumerWidget {
-  const Useradd({super.key});
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final parentContext = context;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        FButton(
-          onPress:
-              () => showAdaptiveDialog(
-                context: parentContext,
-                builder: (dialogContext) {
-                  return HookConsumer(
-                    builder: (context, ref, _) {
-                      final username = useTextEditingController();
-                      final password = useTextEditingController();
-                      final semController =
-                          useFRadioSelectMenuTileGroupController<String>();
-                      final semData = useState<SemesterData?>(null);
-                      final loading = useState(false);
-
-                      Future<void> verifyAndLoadSemesters() async {
-                        final uname = username.text.trim();
-                        final pass = password.text.trim();
-                        if (uname.isEmpty || pass.isEmpty) return;
-                        loading.value = true;
-                        try {
-                          final client = getVtopClient(
-                            username: uname,
-                            password: pass,
-                          );
-                          await vtopClientLogin(client: client);
-                          semData.value = await fetchSemesters(client: client);
-                        } catch (e) {
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                          if (parentContext.mounted) {
-                            showAdaptiveDialog(
-                              context: parentContext,
-                              builder: (errorContext) {
-                                return FDialog(
-                                  title: const Text("Unable to add user"),
-                                  body: Text("$e"),
-                                  actions: [
-                                    FButton(
-                                      style: FButtonStyle.outline(),
-                                      onPress:
-                                          () =>
-                                              Navigator.of(errorContext).pop(),
-                                      child: const Text("Close"),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          }
-                        } finally {
-                          loading.value = false;
-                        }
-                      }
-
-                      Future<void> saveUser() async {
-                        final uname = username.text.trim();
-                        final pass = password.text.trim();
-                        if (uname.isEmpty || pass.isEmpty) return;
-                        if (semController.value.isEmpty) return;
-
-                        final util = ref.read(vtopusersutilsProvider.notifier);
-                        final existing = await util.getAllUsers();
-                        final alreadyExists = existing.$1.any(
-                          (u) =>
-                              (u.username ?? "").toLowerCase() ==
-                              uname.toLowerCase(),
-                        );
-                        if (alreadyExists) {
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                          }
-                          if (parentContext.mounted) {
-                            showAdaptiveDialog(
-                              context: parentContext,
-                              builder: (dupContext) {
-                                return FDialog(
-                                  title: const Text("User already exists"),
-                                  body: const Text(
-                                    "This account is already added. Skipping duplicate.",
-                                  ),
-                                  actions: [
-                                    FButton(
-                                      style: FButtonStyle.outline(),
-                                      onPress:
-                                          () => Navigator.of(dupContext).pop(),
-                                      child: const Text("Close"),
-                                    ),
-                                  ],
-                                );
-                              },
-                            );
-                          }
-                          return;
-                        }
-
-                        final user = VtopUserEntity(
-                          username: uname,
-                          password: pass,
-                          semid: semController.value.first,
-                          isValid: true,
-                        );
-
-                        await util.vtopUserSave(user);
-                        final allUsers = await util.getAllUsers();
-                        if (allUsers.$2 == null || allUsers.$2!.isEmpty) {
-                          await util.vtopSetDefault(uname);
-                        }
-
-                        ref.invalidate(allUsersProviderProvider);
-                        ref.invalidate(vtopUserProvider);
-                        ref.invalidate(vClientProvider);
-                        if (context.mounted) {
-                          Navigator.of(context).pop();
-                        }
-                      }
-
-                      return FDialog(
-                        title: const Text('Add User'),
-                        body: Container(
-                          decoration: BoxDecoration(
-                            color: context.theme.colors.primaryForeground,
-                          ),
-                          child:
-                              semData.value == null
-                                  ? Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      FTextField(
-                                        controller: username,
-                                        label: const Text("VTOP Username"),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      FTextField.password(
-                                        controller: password,
-                                        label: const Text("VTOP Password"),
-                                      ),
-                                    ],
-                                  )
-                                  : ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxHeight: 320,
-                                    ),
-                                    child: SingleChildScrollView(
-                                      child: FSelectTileGroup(
-                                        selectController: semController,
-                                        label: const Text('Semesters'),
-                                        description: const Text(
-                                          'Select the semester for this account.',
-                                        ),
-                                        children: [
-                                          for (final sem
-                                              in semData.value!.semesters)
-                                            FSelectTile(
-                                              title: Text(sem.name),
-                                              value: sem.id,
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                        ),
-                        actions: [
-                          FButton(
-                            style: FButtonStyle.outline(),
-                            onPress: () => Navigator.of(context).pop(),
-                            child: const Text('Cancel'),
-                          ),
-                          if (!loading.value)
-                            FButton(
-                              onPress:
-                                  semData.value == null
-                                      ? verifyAndLoadSemesters
-                                      : saveUser,
-                              child: Text(
-                                semData.value == null ? 'Verify' : 'Save',
-                              ),
-                            )
-                          else
-                            SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: context.theme.colors.primary,
-                              ),
-                            ),
-                        ],
-                      );
-                    },
-                  );
-                },
-              ),
-          child: const Text('Add User'),
-        ),
+        Icon(icon, size: 18),
+        const SizedBox(width: 10),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(width: 12),
+        Expanded(child: Text(value, overflow: TextOverflow.ellipsis)),
       ],
     );
   }
@@ -553,13 +276,16 @@ class UserSemChange extends HookConsumerWidget {
                                       label: Consumer(
                                         builder: (context, ref, child) {
                                           final isLoading = ref.watch(
-                                            isLoadingSems,
+                                            isLoadingSemsProvider,
                                           );
                                           void handelClick() async {
                                             try {
                                               ref
-                                                  .read(isLoadingSems.notifier)
-                                                  .state = true;
+                                                  .read(
+                                                    isLoadingSemsProvider
+                                                        .notifier,
+                                                  )
+                                                  .setLoading(true);
 
                                               await ref
                                                   .read(
@@ -570,15 +296,19 @@ class UserSemChange extends HookConsumerWidget {
                                                 semesterIdProvider,
                                               );
                                               ref
-                                                  .read(isLoadingSems.notifier)
-                                                  .state = false;
+                                                  .read(
+                                                    isLoadingSemsProvider
+                                                        .notifier,
+                                                  )
+                                                  .setLoading(false);
                                             } catch (e, _) {
                                               if (context.mounted) {
                                                 ref
                                                     .read(
-                                                      isLoadingSems.notifier,
+                                                      isLoadingSemsProvider
+                                                          .notifier,
                                                     )
-                                                    .state = false;
+                                                    .setLoading(false);
 
                                                 Navigator.of(context).pop();
                                               }
@@ -619,9 +349,6 @@ class UserSemChange extends HookConsumerWidget {
                                             .vtopUserSave(
                                               user.copyWith(semid: value.$1),
                                             );
-                                        ref.invalidate(
-                                          allUsersProviderProvider,
-                                        );
                                         ref.invalidate(vtopUserProvider);
                                         ref.invalidate(vClientProvider);
                                         final notifSetting = ref.read(
@@ -723,93 +450,108 @@ class UserPassChange extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final outerContext = context;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
           onPress: () {
             showAdaptiveDialog(
-              context: outerContext,
-              builder: (dialogContext) {
-                return HookBuilder(
-                  builder: (context) {
-                    final controller = useTextEditingController();
-                    final isLoading = useState(false);
-
-                    return FDialog(
-                      title: const Text('Update Password'),
-                      body: Container(
-                        decoration: BoxDecoration(
-                          color: context.theme.colors.primaryForeground,
-                        ),
-                        child: FTextField.password(
-                          controller: controller,
-                          obscuringCharacter: '*',
-                          label: const Text("New Password"),
-                        ),
-                      ),
-                      actions: [
-                        if (!isLoading.value)
-                          FButton(
-                            onPress: () async {
-                              final newPassword = controller.text.trim();
-                              if (newPassword.isEmpty) return;
-
-                              isLoading.value = true;
-                              try {
-                                var client = getVtopClient(
-                                  username: user.username!,
-                                  password: newPassword,
-                                );
-                                await vtopClientLogin(client: client);
-                                await ref
-                                    .read(vtopusersutilsProvider.notifier)
-                                    .vtopUserSave(
-                                      user.copyWith(
-                                        password: newPassword,
-                                        isValid: true,
-                                      ),
-                                    );
-                                ref.invalidate(allUsersProviderProvider);
-                                ref.invalidate(vtopUserProvider);
-                                ref.invalidate(vClientProvider);
-                              } catch (e) {
-                                if (outerContext.mounted) {
-                                  disOnbardingCommonToast(outerContext, e);
-                                }
-                              } finally {
-                                isLoading.value = false;
-                              }
-
-                              if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
-                            },
-                            child: const Text('Update'),
-                          )
-                        else
-                          SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: context.theme.colors.primary,
-                            ),
-                          ),
-                        FButton(
-                          style: FButtonStyle.outline(),
-                          onPress: () => Navigator.of(dialogContext).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
+              context: context,
+              builder: (dialogContext) => UserPassChangeDialog(user: user),
             );
           },
-          child: const Text("Update Password"),
+          child: const Text("Edit Details"),
+        ),
+      ],
+    );
+  }
+}
+
+class UserPassChangeDialog extends HookConsumerWidget {
+  final VtopUserEntity user;
+  const UserPassChangeDialog({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usernameController = useTextEditingController(text: user.username);
+    final passwordController = useTextEditingController(text: user.password);
+    final isLoading = useState(false);
+
+    return FDialog(
+      title: const Text('Edit Details'),
+      body: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 12,
+        children: [
+          FTextField(
+            controller: usernameController,
+            label: const Text("VTOP Username"),
+            hint: "registration number",
+          ),
+          FTextField.password(
+            controller: passwordController,
+            obscuringCharacter: '*',
+            label: const Text("VTOP Password"),
+            clearable: (k) => k.text.isNotEmpty,
+          ),
+        ],
+      ),
+      actions: [
+        if (!isLoading.value)
+          FButton(
+            onPress: () async {
+              final newUsername = usernameController.text.trim();
+              final newPassword = passwordController.text.trim();
+              if (newUsername.isEmpty || newPassword.isEmpty) return;
+
+              isLoading.value = true;
+              try {
+                var client = getVtopClient(
+                  username: newUsername,
+                  password: newPassword,
+                );
+                await vtopClientLogin(client: client);
+                final services = await ref.read(appServicesProvider.future);
+                await ref
+                    .read(vtopusersutilsProvider.notifier)
+                    .vtopUserSave(
+                      user.copyWith(
+                        username: newUsername,
+                        password: newPassword,
+                        isValid: true,
+                      ),
+                    );
+                await services.preferenceStore.writeCookie(null);
+                services.sessionCoordinator.clearClient();
+                ref.invalidate(vtopUserProvider);
+                ref.invalidate(vClientProvider);
+                ref.invalidate(activeAccountProvider);
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  disOnbardingCommonToast(context, e);
+                }
+              } finally {
+                isLoading.value = false;
+              }
+            },
+            child: const Text('Save'),
+          )
+        else
+          SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: context.theme.colors.primary,
+            ),
+          ),
+        FButton(
+          style: FButtonStyle.outline(),
+          onPress: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
         ),
       ],
     );

@@ -25,7 +25,7 @@ class ExamScheduleCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final upcomingCount = _getUpcomingExamsCount();
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),

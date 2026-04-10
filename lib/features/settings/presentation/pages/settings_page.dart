@@ -7,10 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/services/service_layer.dart';
 import 'package:vitapmate/features/background/controller.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/social_avatar_update.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/social_username_update.dart';
+import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -58,16 +57,6 @@ class SettingsPage extends HookConsumerWidget {
                     FTileGroup(
                       label: const Text('Vtop'),
                       children: [
-                        FTile(
-                          prefix: Icon(FIcons.user),
-                          title: const Text('Vtop Details'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress: () {
-                            GoRouter.of(
-                              context,
-                            ).pushNamed(Paths.vtopUserManagement);
-                          },
-                        ),
                         FTile(
                           prefix: Icon(FIcons.calendarDays),
                           title: const Text('Merge Labs'),
@@ -134,39 +123,8 @@ class SettingsPage extends HookConsumerWidget {
                         ),
                       ],
                     ),
+                    const UserBox(),
 
-                    FTileGroup(
-                      divider: FItemDivider.indented,
-                      label: const Text('Social'),
-                      children: [
-                        FTile(
-                          prefix: Icon(FIcons.atSign),
-                          title: const Text('Username'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress:
-                              () => showAdaptiveDialog(
-                                context: context,
-                                builder:
-                                    (context) => PbHelper(
-                                      child: (pb) => SocialUsernameUpdate(pb),
-                                    ),
-                              ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.image),
-                          title: const Text('Avatar'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress:
-                              () => showAdaptiveDialog(
-                                context: context,
-                                builder:
-                                    (context) => PbHelper(
-                                      child: (pb) => SocialAvatarUpdate(pb),
-                                    ),
-                              ),
-                        ),
-                      ],
-                    ),
                     FTileGroup(
                       divider: FItemDivider.indented,
                       label: const Text('App Settings'),
@@ -176,20 +134,13 @@ class SettingsPage extends HookConsumerWidget {
                           title: const Text('Dark Mode'),
 
                           suffix: FSwitch(
-                            value: ref.watch(themeProvider) == ThemeMode.dark,
+                            value:
+                                ref.watch(themeControllerProvider) ==
+                                ThemeMode.dark,
                             onChange: (value) {
-                              ref.read(themeProvider.notifier).toggleTheme();
-                            },
-                          ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.wifi),
-                          title: const Text('Show Wi-Fi Card'),
-
-                          suffix: FSwitch(
-                            value: ref.watch(wificardSettingProvider),
-                            onChange: (value) {
-                              ref.read(toggleWificardProvider);
+                              ref
+                                  .read(themeControllerProvider.notifier)
+                                  .toggleTheme();
                             },
                           ),
                         ),
@@ -201,6 +152,29 @@ class SettingsPage extends HookConsumerWidget {
                             GoRouter.of(
                               context,
                             ).pushNamed(Paths.notificationManagement);
+                          },
+                        ),
+                        FTile(
+                          prefix: Icon(FIcons.logs),
+                          title: const Text("Logs"),
+                          suffix: Icon(FIcons.chevronRight),
+                          onPress: () {
+                            GoRouter.of(context).pushNamed(Paths.logs);
+                          },
+                        ),
+                        FTile(
+                          prefix: Icon(FIcons.logOut),
+                          title: const Text("Sign Out"),
+                          onPress: () async {
+                            final router = GoRouter.of(context);
+                            final services = await ref.read(
+                              appServicesProvider.future,
+                            );
+                            await services.authRepository.signOut();
+                            ref.invalidate(activeAccountProvider);
+                            if (context.mounted) {
+                              router.go('/onboarding');
+                            }
                           },
                         ),
                       ],

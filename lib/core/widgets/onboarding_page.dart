@@ -1,4 +1,3 @@
-import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -7,7 +6,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/services/service_layer.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
+import 'package:vitapmate/core/utils/registration_number.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 
@@ -19,6 +20,8 @@ import 'package:forui_hooks/forui_hooks.dart';
 late VtopClient _globalClient;
 late String _globalUsername;
 late String _globalPassword;
+String? _globalEmail;
+PendingSignInResult? _globalPending;
 
 class OnboardingPage extends HookConsumerWidget {
   const OnboardingPage({super.key});
@@ -28,33 +31,7 @@ class OnboardingPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final stepTwo = useState(false);
     return FScaffold(
-      header: FHeader.nested(
-        title: Text("Vitap Mate"),
-        suffixes: [
-          // FButton(
-          //   onPress: () {
-          //     showDialog(
-          //       context: context,
-          //       builder: (BuildContext conntext) {
-          //         //return Center(child: WifiCard());
-          //         return Center(
-          //           child: Column(
-          //             mainAxisAlignment: MainAxisAlignment.center,
-          //             children: [
-          //               Padding(
-          //                 padding: const EdgeInsets.all(16.0),
-          //                 child: WifiCard(),
-          //               ),
-          //             ],
-          //           ),
-          //         );
-          //       },
-          //     );
-          //   },
-          //   child: Icon(FIcons.wifi),
-          // ),
-        ],
-      ),
+      header: FHeader.nested(title: Text("Vitap Mate"), suffixes: []),
       child: Column(
         children: [
           Padding(
@@ -101,18 +78,51 @@ class Step1 extends HookConsumerWidget {
     final isloading = useState(false);
     final username = useTextEditingController();
     final password = useTextEditingController();
+    final email = useTextEditingController();
+    Future<void> handleGooglePress() async {
+      isloading.value = true;
+      try {
+        final collegeEmail =
+            await (await ref.read(
+              appServicesProvider.future,
+            )).authRepository.signInWithGoogleEmail();
+        if (username.text.trim().isEmpty) {
+          username.text = deriveRegistrationNumber(collegeEmail);
+        }
+        email.text = collegeEmail;
+        _globalEmail = collegeEmail;
+      } catch (e) {
+        if (context.mounted) {
+          disOnbardingCommonToast(context, e);
+        }
+      } finally {
+        isloading.value = false;
+      }
+    }
+
     Future<void> handlePress() async {
       isloading.value = true;
 
       try {
-        VtopClient client = getVtopClient(
-          username: username.text,
+        if (_globalEmail == null || username.text.trim().isEmpty) {
+          throw const FormatException('Continue with your VITAP email first.');
+        }
+        final pending = await (await ref.read(
+          appServicesProvider.future,
+        )).authRepository.verifyUsernameAndPassword(
+          email: _globalEmail,
+          username: username.text.trim(),
           password: password.text,
         );
-        await vtopClientLogin(client: client);
-        _globalUsername = username.text;
-        _globalPassword = password.text;
+        VtopClient client = getVtopClient(
+          username: pending.registrationNumber,
+          password: pending.password,
+          cookie: pending.cookie,
+        );
+        _globalUsername = pending.registrationNumber;
+        _globalPassword = pending.password;
         _globalClient = client;
+        _globalPending = pending;
         two.value = true;
       } catch (e) {
         if (context.mounted) {
@@ -129,16 +139,47 @@ class Step1 extends HookConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.start,
         children: [
           SizedBox(height: 25),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: FAlert(
+              icon: const Icon(FIcons.mail),
+              title: const Text('Use your college email'),
+              subtitle: const Text(
+                'Continue with your VITAP email and allow Gmail access for OTP.',
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (!isloading.value)
+            FButton(
+              style: FButtonStyle.outline(),
+              onPress: handleGooglePress,
+              child: const Text('Continue with VITAP Email'),
+            ),
+          const SizedBox(height: 10),
           FTextFormField(
-            label: Text("Username"),
+            label: const Text("College Email"),
+            controller: email,
+            hint: 'vitapstudent.ac.in email',
+            enabled: false,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            validator:
+                (value) =>
+                    1 <= (value?.trim().length ?? 0)
+                        ? null
+                        : 'Continue with your VITAP email first.',
+          ),
+          const SizedBox(height: 10),
+          FTextFormField(
+            label: const Text("VTOP Username"),
             controller: username,
-            hint: 'vtop username',
+            hint: 'registration number',
             autovalidateMode: AutovalidateMode.onUserInteraction,
             validator:
                 (value) =>
                     1 <= (value?.length ?? 0)
                         ? null
-                        : 'Please enter your vtop username.',
+                        : 'Enter your VTOP username.',
           ),
           const SizedBox(height: 10),
           FTextFormField.password(
@@ -167,9 +208,21 @@ class Step1 extends HookConsumerWidget {
                 width: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.black,
+                  color: context.theme.colors.primary,
                 ),
               ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: FAlert(
+              style: FAlertStyle.destructive(),
+              icon: const Icon(FIcons.shieldCheck),
+              title: const Text('Use the Play Store app'),
+              subtitle: const Text(
+                'Make sure you installed Vitap Mate from the Play Store before signing in.',
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -188,8 +241,9 @@ class Step2 extends HookConsumerWidget {
     Future<void> getSemData() async {
       fetching.value = true;
       try {
-        SemesterData semdata = await fetchSemesters(client: _globalClient);
-        data.value = semdata;
+        data.value =
+            _globalPending?.semesters ??
+            await fetchSemesters(client: _globalClient);
       } catch (e) {
         if (context.mounted) {
           disOnbardingCommonToast(context, e);
@@ -232,6 +286,15 @@ class Step2 extends HookConsumerWidget {
               onPress: () async {
                 if (formKey.currentState!.validate()) {
                   try {
+                    final pending = _globalPending;
+                    if (pending != null) {
+                      await (await ref.read(
+                        appServicesProvider.future,
+                      )).authRepository.saveVerifiedAccount(
+                        pending: pending,
+                        selectedSemesterId: controller.value.first,
+                      );
+                    }
                     var user = VtopUserEntity(
                       username: _globalUsername,
                       password: _globalPassword,
@@ -250,7 +313,9 @@ class Step2 extends HookConsumerWidget {
                       GoRouter.of(context).goNamed(Paths.timetable);
                     }
                   } catch (e) {
-                    log("$e");
+                    if (context.mounted) {
+                      disOnbardingCommonToast(context, e);
+                    }
                   }
                   return;
                 }
@@ -262,7 +327,9 @@ class Step2 extends HookConsumerWidget {
         ),
       );
     } else if (fetching.value && data.value == null) {
-      return Center(child: CircularProgressIndicator(color: Colors.black));
+      return Center(
+        child: CircularProgressIndicator(color: context.theme.colors.primary),
+      );
     } else {
       return Center(
         child: Column(
