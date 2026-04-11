@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/exceptions.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/services/service_layer.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
@@ -13,7 +14,7 @@ class ExamSchedule extends _$ExamSchedule {
     final services = await ref.watch(appServicesProvider.future);
     ExamScheduleData data =
         await services.vtopDataRepository.loadExamSchedule();
-    if (data.semesterId.isEmpty) {
+    if (data.semesterId.isEmpty && ref.watch(autoRefreshOnOpenProvider)) {
       data = await _update();
     }
     await ExamReminderNotificationService.syncFromExamSchedule(data);

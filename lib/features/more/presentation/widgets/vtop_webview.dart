@@ -15,14 +15,16 @@ import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_w
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 class VtopWebview extends HookConsumerWidget {
-  const VtopWebview({super.key});
+  const VtopWebview({this.initialMenuUrl, super.key});
+
+  final String? initialMenuUrl;
 
   static final _baseUrl = WebUri('https://vtop.vitap.ac.in');
   static final _initialUrl = WebUri('https://vtop.vitap.ac.in/vtop/content?');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPreparingSession = useState(true);
+    final isPreparingSession = useState(false);
     final loading = useState(false);
     final cookie = useState<VtopWebviewCookie?>(null);
     final webController = useState<InAppWebViewController?>(null);
@@ -31,6 +33,8 @@ class VtopWebview extends HookConsumerWidget {
     final isDesktopMode = useState(false);
     final isDarkMode = useState(ref.read(themeControllerProvider).index == 2);
     final setupError = useState<Object?>(null);
+    final isLoginRedirectPromptOpen = useRef(false);
+    final pendingInitialMenuUrl = useState(initialMenuUrl);
 
     Future<bool> prepareSession({bool force = false}) async {
       isPreparingSession.value = true;
@@ -86,14 +90,47 @@ class VtopWebview extends HookConsumerWidget {
       }
     }
 
-    void goTo(String url) {
-      webController.value?.clickVtopMenuLink(url);
+    Future<void> promptForceLogin() async {
+      if (isLoginRedirectPromptOpen.value || loading.value) return;
+      isLoginRedirectPromptOpen.value = true;
+
+      try {
+        final shouldLoginAgain = await showFDialog<bool>(
+          context: context,
+          builder:
+              (context, style, animation) => FDialog(
+                animation: animation,
+                direction: Axis.horizontal,
+                title: const Text('Login expired'),
+                body: const Text(
+                  'VTOP sent you back to the login page. Try logging in again?',
+                ),
+                actions: [
+                  FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  FButton(
+                    onPress: () => Navigator.of(context).pop(true),
+                    child: const Text('Try again'),
+                  ),
+                ],
+              ),
+        );
+
+        if (shouldLoginAgain == true && context.mounted) {
+          await forceLogin();
+        }
+      } finally {
+        isLoginRedirectPromptOpen.value = false;
+      }
     }
 
-    useEffect(() {
-      Future(prepareSession);
-      return null;
-    }, const []);
+    Future<bool> goTo(String url) async {
+      final result = await webController.value?.clickVtopMenuLink(url);
+      return result == true;
+    }
 
     useEffect(() {
       webController.value?.setVtopDarkMode(isDarkMode.value);
@@ -140,7 +177,10 @@ class VtopWebview extends HookConsumerWidget {
           VtopWebviewActionsMenu(
             isCompactMode: isCompactMode.value,
             isDesktopMode: isDesktopMode.value,
-            onGoTo: goTo,
+            onGoTo: (url) {
+              pendingInitialMenuUrl.value = null;
+              goTo(url);
+            },
             onToggleCompactMode:
                 () => isCompactMode.value = !isCompactMode.value,
             onToggleDesktopMode:
@@ -156,6 +196,16 @@ class VtopWebview extends HookConsumerWidget {
         loading: loading.value,
         cookie: cookie.value,
         onLoadingChanged: (value) => loading.value = value,
+        onLoginRedirect: promptForceLogin,
+        onPageReady: (controller) async {
+          final target = pendingInitialMenuUrl.value;
+          if (target == null) return;
+
+          final didOpen = await controller.clickVtopMenuLink(target);
+          if (didOpen == true) {
+            pendingInitialMenuUrl.value = null;
+          }
+        },
         onWebViewCreated: (controller) {
           webController.value = controller;
           controller.setVtopDarkMode(isDarkMode.value);

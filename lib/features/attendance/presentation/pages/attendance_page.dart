@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
@@ -14,7 +15,8 @@ class AttendancePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(attendanceFilterNotifierProvider);
+    final filter = ref.watch(attendanceFilterProvider);
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
 
     Future<void> update() async {
       try {
@@ -29,13 +31,16 @@ class AttendancePage extends HookConsumerWidget {
     }
 
     useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(attendanceProvider.notifier).updateAttendance();
         } catch (_) {}
       });
       return null;
-    }, []);
+    }, [autoRefreshOnOpen]);
 
     final attendanceData = ref.watch(attendanceProvider);
 
@@ -54,8 +59,14 @@ class AttendancePage extends HookConsumerWidget {
               if (data.records.isEmpty) {
                 return const Center(
                   child: Padding(
-                    padding: EdgeInsets.only(top: 40),
-                    child: Text("No Data to show yet"),
+                    padding: EdgeInsets.all(16),
+                    child: FAlert(
+                      icon: Icon(FIcons.info),
+                      title: Text("No attendance yet"),
+                      subtitle: Text(
+                        "Pull to refresh once attendance is available.",
+                      ),
+                    ),
                   ),
                 );
               }
@@ -71,12 +82,23 @@ class AttendancePage extends HookConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.all(6),
                 child: Column(
-                  spacing: 4,
+                  spacing: 8,
                   children: [
+                    const AttendanceFilterTabs(),
                     if (filteredRecords.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 40),
-                        child: Text("No records for this filter"),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: FAlert(
+                          icon: const Icon(FIcons.info),
+                          title: Text(
+                            filter == AttendanceFilter.labs
+                                ? "No Lab records"
+                                : "No Class records",
+                          ),
+                          subtitle: const Text(
+                            "Try another attendance filter.",
+                          ),
+                        ),
                       )
                     else
                       for (final i in filteredRecords.asMap().entries)
@@ -106,10 +128,10 @@ class AttendancePage extends HookConsumerWidget {
             },
             loading:
                 () => Center(
-                  child: SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: CircularProgressIndicator(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: _LoadingBar(
+                      label: "Loading attendance...",
                       color: context.theme.colors.primary,
                     ),
                   ),
@@ -121,57 +143,101 @@ class AttendancePage extends HookConsumerWidget {
   }
 }
 
-class AttendanceHeader extends HookConsumerWidget {
-  const AttendanceHeader({super.key});
+class _LoadingBar extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _LoadingBar({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: context.theme.colors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            minHeight: 3,
+            color: color,
+            backgroundColor: color.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AttendanceFilterTabs extends HookConsumerWidget {
+  const AttendanceFilterTabs({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(attendanceFilterNotifierProvider);
-    final notifier = ref.read(attendanceFilterNotifierProvider.notifier);
+    final filter = ref.watch(attendanceFilterProvider);
+    final notifier = ref.read(attendanceFilterProvider.notifier);
 
-    Widget tick(AttendanceFilter value) {
-      return filter == value
-          ? const Icon(FIcons.check, size: 16)
-          : const SizedBox(width: 16);
+    Widget tab({
+      required AttendanceFilter value,
+      required String label,
+      required IconData icon,
+    }) {
+      final selected = filter == value;
+
+      return Expanded(
+        child: FButton(
+          variant: selected ? FButtonVariant.primary : FButtonVariant.outline,
+          size: FButtonSizeVariant.sm,
+          onPress: () => notifier.setFilter(value),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    return FPopoverMenu(
-      menuAnchor: Alignment.topRight,
-      childAnchor: Alignment.bottomRight,
-      menu: [
-        FItemGroup(
-          children: [
-            FItem(
-              title: const Text('All'),
-              prefix: tick(AttendanceFilter.all),
-              onPress: () {
-                notifier.setFilter(AttendanceFilter.all);
-              },
-            ),
-            FItem(
-              prefix: tick(AttendanceFilter.classes),
-              title: const Text('Classes'),
-
-              onPress: () {
-                notifier.setFilter(AttendanceFilter.classes);
-              },
-            ),
-            FItem(
-              prefix: tick(AttendanceFilter.labs),
-              title: const Text('Labs'),
-
-              onPress: () {
-                notifier.setFilter(AttendanceFilter.labs);
-              },
-            ),
-          ],
-        ),
-      ],
-      builder:
-          (_, controller, _) => FHeaderAction(
-            icon: const Icon(FIcons.ellipsis),
-            onPress: controller.toggle,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        spacing: 8,
+        children: [
+          tab(
+            value: AttendanceFilter.all,
+            label: 'All',
+            icon: FIcons.listFilter,
           ),
+          tab(
+            value: AttendanceFilter.classes,
+            label: 'Class',
+            icon: FIcons.libraryBig,
+          ),
+          tab(
+            value: AttendanceFilter.labs,
+            label: 'Lab',
+            icon: FIcons.flaskConical,
+          ),
+        ],
+      ),
     );
   }
 }

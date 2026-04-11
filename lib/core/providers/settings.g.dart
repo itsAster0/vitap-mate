@@ -6,170 +6,431 @@ part of 'settings.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$settingsHash() => r'eeed4dda4caf2ff41b22f80485b37c03814be5bc';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [settings].
 @ProviderFor(settings)
-final settingsProvider =
-    AutoDisposeFutureProvider<SharedPreferencesWithCache>.internal(
-      settings,
-      name: r'settingsProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product') ? null : _$settingsHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final settingsProvider = SettingsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef SettingsRef = AutoDisposeFutureProviderRef<SharedPreferencesWithCache>;
+final class SettingsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SharedPreferencesWithCache>,
+          SharedPreferencesWithCache,
+          FutureOr<SharedPreferencesWithCache>
+        >
+    with
+        $FutureModifier<SharedPreferencesWithCache>,
+        $FutureProvider<SharedPreferencesWithCache> {
+  SettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'settingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$settingsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<SharedPreferencesWithCache> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<SharedPreferencesWithCache> create(Ref ref) {
+    return settings(ref);
+  }
+}
+
+String _$settingsHash() => r'73cb70c94c63cbe7b07dac26281c422c5e3692eb';
+
+@ProviderFor(mergeTT)
+final mergeTTProvider = MergeTTProvider._();
+
+final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  MergeTTProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mergeTTProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mergeTTHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return mergeTT(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
 
-/// See also [mergeTT].
-@ProviderFor(mergeTT)
-final mergeTTProvider = AutoDisposeProvider<bool>.internal(
-  mergeTT,
-  name: r'mergeTTProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$mergeTTHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(toggleMergeTT)
+final toggleMergeTTProvider = ToggleMergeTTProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef MergeTTRef = AutoDisposeProviderRef<bool>;
+final class ToggleMergeTTProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
+  ToggleMergeTTProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'toggleMergeTTProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$toggleMergeTTHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<void> create(Ref ref) {
+    return toggleMergeTT(ref);
+  }
+}
+
 String _$toggleMergeTTHash() => r'4089aa249c098148ae172a46690855636c7370b8';
 
-/// See also [toggleMergeTT].
-@ProviderFor(toggleMergeTT)
-final toggleMergeTTProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleMergeTT,
-  name: r'toggleMergeTTProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleMergeTTHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(btwExams)
+final btwExamsProvider = BtwExamsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleMergeTTRef = AutoDisposeFutureProviderRef<void>;
+final class BtwExamsProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  BtwExamsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'btwExamsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$btwExamsHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return btwExams(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
 String _$btwExamsHash() => r'77cc43c21a5b8dbd6ef2e949431fa4abf5d24a1b';
 
-/// See also [btwExams].
-@ProviderFor(btwExams)
-final btwExamsProvider = AutoDisposeProvider<bool>.internal(
-  btwExams,
-  name: r'btwExamsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$btwExamsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(toggleBTWExams)
+final toggleBTWExamsProvider = ToggleBTWExamsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef BtwExamsRef = AutoDisposeProviderRef<bool>;
+final class ToggleBTWExamsProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
+  ToggleBTWExamsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'toggleBTWExamsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$toggleBTWExamsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<void> create(Ref ref) {
+    return toggleBTWExams(ref);
+  }
+}
+
 String _$toggleBTWExamsHash() => r'd6f29e77007ef71042f30310115986286dd5522c';
 
-/// See also [toggleBTWExams].
-@ProviderFor(toggleBTWExams)
-final toggleBTWExamsProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleBTWExams,
-  name: r'toggleBTWExamsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleBTWExamsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(autoRefreshOnOpen)
+final autoRefreshOnOpenProvider = AutoRefreshOnOpenProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleBTWExamsRef = AutoDisposeFutureProviderRef<void>;
+final class AutoRefreshOnOpenProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  AutoRefreshOnOpenProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'autoRefreshOnOpenProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$autoRefreshOnOpenHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return autoRefreshOnOpen(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$autoRefreshOnOpenHash() => r'7764a675809137b4c16effd74988e7fb224fc53a';
+
+@ProviderFor(classReminderSettings)
+final classReminderSettingsProvider = ClassReminderSettingsProvider._();
+
+final class ClassReminderSettingsProvider
+    extends
+        $FunctionalProvider<
+          ClassReminderSettings,
+          ClassReminderSettings,
+          ClassReminderSettings
+        >
+    with $Provider<ClassReminderSettings> {
+  ClassReminderSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'classReminderSettingsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$classReminderSettingsHash();
+
+  @$internal
+  @override
+  $ProviderElement<ClassReminderSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ClassReminderSettings create(Ref ref) {
+    return classReminderSettings(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ClassReminderSettings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ClassReminderSettings>(value),
+    );
+  }
+}
+
 String _$classReminderSettingsHash() =>
     r'80a6515f1742503a3547b58bb16b946f64f8a32c';
 
-/// See also [classReminderSettings].
-@ProviderFor(classReminderSettings)
-final classReminderSettingsProvider = Provider<ClassReminderSettings>.internal(
-  classReminderSettings,
-  name: r'classReminderSettingsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$classReminderSettingsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(classReminderSettingsController)
+final classReminderSettingsControllerProvider =
+    ClassReminderSettingsControllerProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ClassReminderSettingsRef = ProviderRef<ClassReminderSettings>;
+final class ClassReminderSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          ClassReminderSettingsController,
+          ClassReminderSettingsController,
+          ClassReminderSettingsController
+        >
+    with $Provider<ClassReminderSettingsController> {
+  ClassReminderSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'classReminderSettingsControllerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$classReminderSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<ClassReminderSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ClassReminderSettingsController create(Ref ref) {
+    return classReminderSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ClassReminderSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ClassReminderSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
 String _$classReminderSettingsControllerHash() =>
     r'8bfd4bc5e7f0e0ca582931a183103a446e6ff273';
 
-/// See also [classReminderSettingsController].
-@ProviderFor(classReminderSettingsController)
-final classReminderSettingsControllerProvider =
-    Provider<ClassReminderSettingsController>.internal(
-      classReminderSettingsController,
-      name: r'classReminderSettingsControllerProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$classReminderSettingsControllerHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+@ProviderFor(examReminderSettings)
+final examReminderSettingsProvider = ExamReminderSettingsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ClassReminderSettingsControllerRef =
-    ProviderRef<ClassReminderSettingsController>;
+final class ExamReminderSettingsProvider
+    extends
+        $FunctionalProvider<
+          ExamReminderSettings,
+          ExamReminderSettings,
+          ExamReminderSettings
+        >
+    with $Provider<ExamReminderSettings> {
+  ExamReminderSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'examReminderSettingsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$examReminderSettingsHash();
+
+  @$internal
+  @override
+  $ProviderElement<ExamReminderSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ExamReminderSettings create(Ref ref) {
+    return examReminderSettings(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ExamReminderSettings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ExamReminderSettings>(value),
+    );
+  }
+}
+
 String _$examReminderSettingsHash() =>
     r'a907de04556718c380f670b1cf74dd83d773a166';
 
-/// See also [examReminderSettings].
-@ProviderFor(examReminderSettings)
-final examReminderSettingsProvider = Provider<ExamReminderSettings>.internal(
-  examReminderSettings,
-  name: r'examReminderSettingsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$examReminderSettingsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ExamReminderSettingsRef = ProviderRef<ExamReminderSettings>;
-String _$examReminderSettingsControllerHash() =>
-    r'307386b85a678b5bdb9faecf2dac3740efc17dcd';
-
-/// See also [examReminderSettingsController].
 @ProviderFor(examReminderSettingsController)
 final examReminderSettingsControllerProvider =
-    Provider<ExamReminderSettingsController>.internal(
-      examReminderSettingsController,
-      name: r'examReminderSettingsControllerProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$examReminderSettingsControllerHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+    ExamReminderSettingsControllerProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ExamReminderSettingsControllerRef =
-    ProviderRef<ExamReminderSettingsController>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class ExamReminderSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          ExamReminderSettingsController,
+          ExamReminderSettingsController,
+          ExamReminderSettingsController
+        >
+    with $Provider<ExamReminderSettingsController> {
+  ExamReminderSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'examReminderSettingsControllerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$examReminderSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<ExamReminderSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ExamReminderSettingsController create(Ref ref) {
+    return examReminderSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ExamReminderSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ExamReminderSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$examReminderSettingsControllerHash() =>
+    r'307386b85a678b5bdb9faecf2dac3740efc17dcd';

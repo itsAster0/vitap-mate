@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -17,8 +19,8 @@ class GradesPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gradesProvider);
     final semAsync = ref.watch(semesterIdProvider);
-    final semData = semAsync.valueOrNull;
-    final stateValue = state.valueOrNull;
+    final semData = semAsync.value;
+    final stateValue = state.value;
     final stateSems = stateValue?.semesters ?? const <SemesterInfo>[];
     final semesters =
         stateSems.isNotEmpty ? stateSems : (semData?.semesters ?? const []);
@@ -27,6 +29,19 @@ class GradesPage extends HookConsumerWidget {
     final selectedSemesterId =
         stateValue?.selectedSemesterId ??
         (semesters.isNotEmpty ? semesters.first.id : "");
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
+
+    useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await ref.read(gradesProvider.notifier).refresh();
+        } catch (_) {}
+      });
+      return null;
+    }, [autoRefreshOnOpen]);
 
     Future<void> refresh() async {
       try {
@@ -81,10 +96,23 @@ class GradesPage extends HookConsumerWidget {
                       details: Text(
                         _semesterNameFromList(semesters, selectedSemesterId),
                       ),
-                      initialValue:
-                          selectedSemesterId.isEmpty
-                              ? null
-                              : selectedSemesterId,
+                      selectControl: FMultiValueControl.managedRadio(
+                        initial:
+                            selectedSemesterId.isEmpty
+                                ? null
+                                : selectedSemesterId,
+                        onChange: (value) async {
+                          final selected = value.firstOrNull;
+                          if (selected == null) return;
+                          try {
+                            await ref
+                                .read(gradesProvider.notifier)
+                                .selectSemester(selected);
+                          } catch (e) {
+                            if (context.mounted) disCommonToast(context, e);
+                          }
+                        },
+                      ),
                       menu: [
                         for (final sem in semesters)
                           FSelectTile<String>(
@@ -92,17 +120,6 @@ class GradesPage extends HookConsumerWidget {
                             value: sem.id,
                           ),
                       ],
-                      onChange: (value) async {
-                        final selected = value.firstOrNull;
-                        if (selected == null) return;
-                        try {
-                          await ref
-                              .read(gradesProvider.notifier)
-                              .selectSemester(selected);
-                        } catch (e) {
-                          if (context.mounted) disCommonToast(context, e);
-                        }
-                      },
                     ),
                 ],
               ),
@@ -113,6 +130,7 @@ class GradesPage extends HookConsumerWidget {
                       height: MediaQuery.of(context).size.height * 0.7,
                       child: const _CenterInfo(
                         title: "Loading grades...",
+                        loading: true,
                         icon: FIcons.loaderCircle,
                       ),
                     ),
@@ -230,7 +248,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
     setState(() => _expanded = !_expanded);
     if (_expanded) {
       _controller.forward();
-      final s = ref.read(gradesProvider).valueOrNull;
+      final s = ref.read(gradesProvider).value;
       final has =
           s?.detailsByCourseId.containsKey(widget.course.courseId) ?? false;
       final loading =
@@ -265,7 +283,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
   @override
   Widget build(BuildContext context) {
     final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
-    final state = ref.watch(gradesProvider).valueOrNull;
+    final state = ref.watch(gradesProvider).value;
     final detail = state?.detailsByCourseId[widget.course.courseId];
     final loading =
         state?.loadingDetailsFor.contains(widget.course.courseId) ?? false;
@@ -789,7 +807,13 @@ class _CenterInfo extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData icon;
-  const _CenterInfo({required this.title, this.subtitle, required this.icon});
+  final bool loading;
+  const _CenterInfo({
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    this.loading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -797,8 +821,10 @@ class _CenterInfo extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 36, color: context.theme.colors.mutedForeground),
-          const SizedBox(height: 10),
+          if (!loading) ...[
+            Icon(icon, size: 36, color: context.theme.colors.mutedForeground),
+            const SizedBox(height: 10),
+          ],
           Text(
             title,
             style: TextStyle(
@@ -812,6 +838,20 @@ class _CenterInfo extends StatelessWidget {
               subtitle!,
               textAlign: TextAlign.center,
               style: TextStyle(color: context.theme.colors.mutedForeground),
+            ),
+          ],
+          if (loading) ...[
+            const SizedBox(height: 12),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                color: context.theme.colors.primary,
+                backgroundColor: context.theme.colors.primary.withValues(
+                  alpha: 0.18,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ],
         ],

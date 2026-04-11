@@ -6,20 +6,49 @@ part of 'vtop_user_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+
+@ProviderFor(VtopUser)
+final vtopUserProvider = VtopUserProvider._();
+
+final class VtopUserProvider
+    extends $AsyncNotifierProvider<VtopUser, VtopUserEntity> {
+  VtopUserProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'vtopUserProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$vtopUserHash();
+
+  @$internal
+  @override
+  VtopUser create() => VtopUser();
+}
+
 String _$vtopUserHash() => r'100559c09ed8cf5ec571769465a4eb052d53a1cf';
 
-/// See also [VtopUser].
-@ProviderFor(VtopUser)
-final vtopUserProvider =
-    AsyncNotifierProvider<VtopUser, VtopUserEntity>.internal(
-      VtopUser.new,
-      name: r'vtopUserProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product') ? null : _$vtopUserHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
-
-typedef _$VtopUser = AsyncNotifier<VtopUserEntity>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$VtopUser extends $AsyncNotifier<VtopUserEntity> {
+  FutureOr<VtopUserEntity> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<VtopUserEntity>, VtopUserEntity>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<VtopUserEntity>, VtopUserEntity>,
+              AsyncValue<VtopUserEntity>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

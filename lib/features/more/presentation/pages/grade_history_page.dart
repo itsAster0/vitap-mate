@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -14,6 +16,19 @@ class GradeHistoryPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(gradeHistoryProvider);
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
+
+    useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          await ref.read(gradeHistoryProvider.notifier).refresh();
+        } catch (_) {}
+      });
+      return null;
+    }, [autoRefreshOnOpen]);
 
     Future<void> reload() async {
       try {
@@ -37,6 +52,7 @@ class GradeHistoryPage extends HookConsumerWidget {
                 height: MediaQuery.of(context).size.height * 0.7,
                 child: const _CenterInfo(
                   title: "Loading grade history...",
+                  loading: true,
                   icon: FIcons.loaderCircle,
                 ),
               ),
@@ -592,16 +608,24 @@ class _CenterInfo extends StatelessWidget {
   final String title;
   final String? subtitle;
   final IconData icon;
+  final bool loading;
 
-  const _CenterInfo({required this.title, required this.icon, this.subtitle});
+  const _CenterInfo({
+    required this.title,
+    required this.icon,
+    this.subtitle,
+    this.loading = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 28, color: context.theme.colors.mutedForeground),
-        const SizedBox(height: 10),
+        if (!loading) ...[
+          Icon(icon, size: 28, color: context.theme.colors.mutedForeground),
+          const SizedBox(height: 10),
+        ],
         Text(
           title,
           style: TextStyle(
@@ -615,6 +639,20 @@ class _CenterInfo extends StatelessWidget {
             subtitle!,
             textAlign: TextAlign.center,
             style: TextStyle(color: context.theme.colors.mutedForeground),
+          ),
+        ],
+        if (loading) ...[
+          const SizedBox(height: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 280),
+            child: LinearProgressIndicator(
+              minHeight: 3,
+              color: context.theme.colors.primary,
+              backgroundColor: context.theme.colors.primary.withValues(
+                alpha: 0.18,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ],
       ],

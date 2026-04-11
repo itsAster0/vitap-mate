@@ -370,14 +370,14 @@ class CalendarSyncPage extends HookConsumerWidget {
               ),
               actions: [
                 FButton(
-                  style: FButtonStyle.outline(),
+                  variant: FButtonVariant.outline,
                   onPress:
                       () =>
                           Navigator.of(context, rootNavigator: true).pop(false),
                   child: const Text("Cancel"),
                 ),
                 FButton(
-                  style: FButtonStyle.destructive(),
+                  variant: FButtonVariant.destructive,
                   onPress:
                       () =>
                           Navigator.of(context, rootNavigator: true).pop(true),
@@ -453,7 +453,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             const FDivider(),
             Text(
               "Date Range",
-              style: context.theme.typography.base.copyWith(
+              style: context.theme.typography.sm.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -461,10 +461,10 @@ class CalendarSyncPage extends HookConsumerWidget {
               children: [
                 Expanded(
                   child: FButton(
-                    style:
+                    variant:
                         selectingDate.value == _DateSelectionTab.start
-                            ? FButtonStyle.primary()
-                            : FButtonStyle.outline(),
+                            ? FButtonVariant.primary
+                            : FButtonVariant.outline,
                     onPress:
                         loading.value
                             ? null
@@ -476,10 +476,10 @@ class CalendarSyncPage extends HookConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: FButton(
-                    style:
+                    variant:
                         selectingDate.value == _DateSelectionTab.end
-                            ? FButtonStyle.primary()
-                            : FButtonStyle.outline(),
+                            ? FButtonVariant.primary
+                            : FButtonVariant.outline,
                     onPress:
                         loading.value
                             ? null
@@ -495,8 +495,8 @@ class CalendarSyncPage extends HookConsumerWidget {
                 key: ValueKey(
                   "${selectingDate.value.name}-${calendarFocusDate.year}-${calendarFocusDate.month}",
                 ),
-                controller: FCalendarController.date(
-                  initialSelection: calendarFocusDate,
+                control: FCalendarControl.managedDate(
+                  initial: calendarFocusDate,
                 ),
                 onPress: (selected) {
                   final pickedStart = DateTime(
@@ -542,7 +542,7 @@ class CalendarSyncPage extends HookConsumerWidget {
               FCard(
                 title: Text(
                   "Timetable Changed",
-                  style: context.theme.typography.base.copyWith(
+                  style: context.theme.typography.sm.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -556,7 +556,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             FCard(
               title: Text(
                 "Calendar Setup",
-                style: context.theme.typography.base.copyWith(
+                style: context.theme.typography.sm.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -586,7 +586,18 @@ class CalendarSyncPage extends HookConsumerWidget {
                                 selectedCalendar?.name ??
                                     writableCalendars.value.first.name,
                               ),
-                              initialValue: selectedCalendarId.value,
+                              selectControl: FMultiValueControl.managedRadio(
+                                initial: selectedCalendarId.value,
+                                onChange:
+                                    loading.value
+                                        ? null
+                                        : (value) {
+                                          final selected = value.firstOrNull;
+                                          if (selected != null) {
+                                            selectedCalendarId.value = selected;
+                                          }
+                                        },
+                              ),
                               menu: [
                                 for (final calendar in writableCalendars.value)
                                   FSelectTile<String>(
@@ -598,15 +609,6 @@ class CalendarSyncPage extends HookConsumerWidget {
                                     value: calendar.id,
                                   ),
                               ],
-                              onChange:
-                                  loading.value
-                                      ? null
-                                      : (value) {
-                                        final selected = value.firstOrNull;
-                                        if (selected != null) {
-                                          selectedCalendarId.value = selected;
-                                        }
-                                      },
                             )
                           else
                             const Text("No writable calendars found."),
@@ -617,7 +619,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                             children: [
                               if (!permissionGranted.value)
                                 FButton(
-                                  style: FButtonStyle.outline(),
+                                  variant: FButtonVariant.outline,
                                   onPress:
                                       (loading.value || calendarsLoading.value)
                                           ? null
@@ -631,7 +633,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                                   child: const Text("Grant Permission"),
                                 ),
                               FButton(
-                                style: FButtonStyle.outline(),
+                                variant: FButtonVariant.outline,
                                 onPress:
                                     (loading.value || calendarsLoading.value)
                                         ? null
@@ -646,7 +648,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             FCard(
               title: Text(
                 "Event Layout",
-                style: context.theme.typography.base.copyWith(
+                style: context.theme.typography.sm.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -661,7 +663,18 @@ class CalendarSyncPage extends HookConsumerWidget {
                           ? "Off"
                           : "${reminderMinutes.value} min before",
                     ),
-                    initialValue: reminderMinutes.value,
+                    selectControl: FMultiValueControl.managedRadio(
+                      initial: reminderMinutes.value,
+                      onChange:
+                          loading.value
+                              ? null
+                              : (value) {
+                                final selected = value.firstOrNull;
+                                if (selected != null) {
+                                  reminderMinutes.value = selected;
+                                }
+                              },
+                    ),
                     menu: const [
                       FSelectTile<int>(title: Text("Off"), value: 0),
                       FSelectTile<int>(title: Text("5 min before"), value: 5),
@@ -670,32 +683,29 @@ class CalendarSyncPage extends HookConsumerWidget {
                       FSelectTile<int>(title: Text("30 min before"), value: 30),
                       FSelectTile<int>(title: Text("60 min before"), value: 60),
                     ],
-                    onChange:
-                        loading.value
-                            ? null
-                            : (value) {
-                              final selected = value.firstOrNull;
-                              if (selected != null) {
-                                reminderMinutes.value = selected;
-                              }
-                            },
                   ),
                   const SizedBox(height: 8),
                   FTextField(
-                    controller: titleTemplateController,
+                    control: FTextFieldControl.managed(
+                      controller: titleTemplateController,
+                    ),
                     label: const Text("Title Template"),
                     hint: "{name}",
                   ),
                   const SizedBox(height: 8),
                   FTextField.multiline(
                     maxLines: 4,
-                    controller: descriptionTemplateController,
+                    control: FTextFieldControl.managed(
+                      controller: descriptionTemplateController,
+                    ),
                     label: const Text("Description Template"),
                     hint: "Course: {courseCode}",
                   ),
                   const SizedBox(height: 8),
                   FTextField(
-                    controller: locationTemplateController,
+                    control: FTextFieldControl.managed(
+                      controller: locationTemplateController,
+                    ),
                     label: const Text("Location Template"),
                     hint: "{block}-{roomNo}",
                   ),
@@ -735,7 +745,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       FButton(
-                        style: FButtonStyle.destructive(),
+                        variant: FButtonVariant.destructive,
                         onPress: canClear ? clearSemesterEvents : null,
                         child: const Text(
                           "Clear Synced Events (This Semester)",

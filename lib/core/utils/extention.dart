@@ -11,5 +11,6 @@ extension IslabMarksRecord on MarksRecord {
 }
 
 extension IslabTimetable on TimetableSlot {
-  bool islab() => courseType.endsWith("LA") || courseType.endsWith("LO");
+  bool islab() =>
+      isLab || courseType.endsWith("LA") || courseType.endsWith("LO");
 }

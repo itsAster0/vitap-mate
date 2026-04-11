@@ -11,7 +11,6 @@ import 'package:vitapmate/features/timetable/presentation/providers/timetable_pr
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetablePage extends HookConsumerWidget {
@@ -26,7 +25,11 @@ class TimetablePage extends HookConsumerWidget {
     final scrollOffset = useState<double>(0);
     final timetableData = ref.watch(timetableProvider);
     final startX = useState<double?>(null);
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
     useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(timetableProvider.notifier).updateTimetable();
@@ -34,7 +37,7 @@ class TimetablePage extends HookConsumerWidget {
       });
 
       return null;
-    }, []);
+    }, [autoRefreshOnOpen]);
     final mergeLabs = ref.watch(mergeTTProvider);
 
     Future<void> update() async {
@@ -85,6 +88,20 @@ class TimetablePage extends HookConsumerWidget {
                     data: (data) {
                       final tempList = getDayList(data);
                       finalDay.value = tempList;
+                      if (tempList.isEmpty) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: FAlert(
+                              icon: Icon(FIcons.info),
+                              title: Text("No timetable yet"),
+                              subtitle: Text(
+                                "Pull to refresh once your timetable is available.",
+                              ),
+                            ),
+                          ),
+                        );
+                      }
 
                       if (!tempList.contains(selectedDay.value)) {
                         selectedDay.value = tempList.first;
@@ -131,52 +148,25 @@ class TimetablePage extends HookConsumerWidget {
                     error: (e, stackTrace) {
                       disCommonToast(context, e);
                       return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 48,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              commonErrorMessage(e),
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: FAlert(
+                            variant: FAlertVariant.destructive,
+                            icon: const Icon(FIcons.triangleAlert),
+                            title: const Text("Unable to load timetable"),
+                            subtitle: Text(commonErrorMessage(e)),
+                          ),
                         ),
                       );
                     },
                     loading:
-                        () => const Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 40,
-                                height: 40,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 3,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    TimetableColors.upcomingBorder,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(height: 16),
-                              Text(
-                                'Loading timetable...',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                        () => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: _LoadingBar(
+                              label: "Loading timetable...",
+                              color: context.theme.colors.primary,
+                            ),
                           ),
                         ),
                   ),
@@ -192,10 +182,47 @@ class TimetablePage extends HookConsumerWidget {
               child: FrostedGlassBox(
                 child: DaysStack(
                   selectedDay: selectedDay,
-                  daysList: getDayList(timetableData.value),
+                  daysList:
+                      getDayList(timetableData.value).isEmpty
+                          ? const [1, 2, 3, 4, 5]
+                          : getDayList(timetableData.value),
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoadingBar extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _LoadingBar({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 280),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: context.theme.colors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            minHeight: 3,
+            color: color,
+            backgroundColor: color.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(8),
+          ),
         ],
       ),
     );

@@ -309,7 +309,7 @@ class AttendanceCalculator extends HookConsumerWidget {
                         ),
                       ),
                       FButton(
-                        style: FButtonStyle.outline(),
+                        variant: FButtonVariant.outline,
                         onPress: () {
                           futureAttend.value = 0;
                           futureSkip.value = 0;

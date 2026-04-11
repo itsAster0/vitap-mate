@@ -29,7 +29,7 @@ class ExamReminderNotificationService {
       '@mipmap/launcher_icon',
     );
     await _notifications.initialize(
-      const InitializationSettings(android: androidSettings),
+      settings: const InitializationSettings(android: androidSettings),
     );
 
     await _notifications
@@ -54,7 +54,7 @@ class ExamReminderNotificationService {
         if (payload == null) continue;
         final parsed = jsonDecode(payload);
         if (parsed is Map<String, dynamic> && parsed["type"] == _payloadType) {
-          await _notifications.cancel(request.id);
+          await _notifications.cancel(id: request.id);
         }
       } catch (_) {
         continue;
@@ -106,11 +106,12 @@ class ExamReminderNotificationService {
         });
 
         await _notifications.zonedSchedule(
-          id,
-          "Exam Reminder",
-          "${exam.courseCode} ${exam.courseName} in $beforeMinutes minutes",
-          tz.TZDateTime.from(remindAt, tz.local),
-          NotificationDetails(
+          id: id,
+          title: "Exam Reminder",
+          body:
+              "${exam.courseCode} ${exam.courseName} in $beforeMinutes minutes",
+          scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+          notificationDetails: NotificationDetails(
             android: AndroidNotificationDetails(
               channelId,
               "Exam reminders",

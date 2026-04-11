@@ -50,9 +50,11 @@ class _LogsPageState extends ConsumerState<LogsPage> {
               Padding(
                 padding: const EdgeInsets.all(8),
                 child: FTextField(
-                  controller: _searchController,
+                  control: FTextFieldControl.managed(
+                    controller: _searchController,
+                    onChange: (_) => setState(() {}),
+                  ),
                   hint: 'Search logs',
-                  onChange: (_) => setState(() {}),
                 ),
               ),
               SingleChildScrollView(
@@ -110,7 +112,7 @@ class _LogsPageState extends ConsumerState<LogsPage> {
                           Expanded(
                             child: Text(
                               entry.message,
-                              style: context.theme.typography.base.copyWith(
+                              style: context.theme.typography.sm.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -167,7 +169,7 @@ class _FilterButton extends StatelessWidget {
       return FButton(onPress: onPress, child: Text(label));
     }
     return FButton(
-      style: FButtonStyle.outline(),
+      variant: FButtonVariant.outline,
       onPress: onPress,
       child: Text(label),
     );

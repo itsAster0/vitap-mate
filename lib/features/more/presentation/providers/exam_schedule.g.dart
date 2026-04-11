@@ -6,22 +6,50 @@ part of 'exam_schedule.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$examScheduleHash() => r'45c11b70d0c34e11ac4ff129b52739b6f6579c79';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [ExamSchedule].
 @ProviderFor(ExamSchedule)
-final examScheduleProvider =
-    AutoDisposeAsyncNotifierProvider<ExamSchedule, ExamScheduleData>.internal(
-      ExamSchedule.new,
-      name: r'examScheduleProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$examScheduleHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final examScheduleProvider = ExamScheduleProvider._();
 
-typedef _$ExamSchedule = AutoDisposeAsyncNotifier<ExamScheduleData>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class ExamScheduleProvider
+    extends $AsyncNotifierProvider<ExamSchedule, ExamScheduleData> {
+  ExamScheduleProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'examScheduleProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$examScheduleHash();
+
+  @$internal
+  @override
+  ExamSchedule create() => ExamSchedule();
+}
+
+String _$examScheduleHash() => r'6f06b67f3afb1a50504e1e9e0a14ef09793a05cb';
+
+abstract class _$ExamSchedule extends $AsyncNotifier<ExamScheduleData> {
+  FutureOr<ExamScheduleData> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref as $Ref<AsyncValue<ExamScheduleData>, ExamScheduleData>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<ExamScheduleData>, ExamScheduleData>,
+              AsyncValue<ExamScheduleData>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

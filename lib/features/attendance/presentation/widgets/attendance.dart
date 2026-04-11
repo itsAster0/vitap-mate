@@ -49,10 +49,20 @@ class AttendanceCard extends HookConsumerWidget {
                   animationController.reverse();
                 },
                 onTap: () => _showAttendanceDetails(context),
-                child: Container(
-                  decoration: _buildCardDecoration(darkMode, context),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border(
+                      left: BorderSide(
+                        color:
+                            record.islab()
+                                ? AttendanceColors.labIcon
+                                : AttendanceColors.theoryIcon,
+                        width: 4,
+                      ),
+                    ),
+                  ),
+                  child: FCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -65,52 +75,6 @@ class AttendanceCard extends HookConsumerWidget {
                 ),
               ),
             ),
-      ),
-    );
-  }
-
-  BoxDecoration _buildCardDecoration(bool isDark, BuildContext context) {
-    final isLab = record.islab();
-    return BoxDecoration(
-      gradient:
-          !isDark
-              ? LinearGradient(
-                colors:
-                    isLab
-                        ? [
-                          AttendanceColors.labCardBackground,
-                          AttendanceColors.labCardSecondary,
-                        ]
-                        : [
-                          AttendanceColors.theoryCardBackground,
-                          AttendanceColors.theoryCardSecondary,
-                        ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-              : null,
-      color: isDark ? context.theme.colors.primaryForeground : null,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow:
-          !isDark
-              ? [
-                BoxShadow(
-                  color: AttendanceColors.cardShadow,
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                  spreadRadius: 0,
-                ),
-                BoxShadow(
-                  color: AttendanceColors.cardShadowSecondary,
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                  spreadRadius: 0,
-                ),
-              ]
-              : [],
-      border: Border.all(
-        color: context.theme.colors.primaryForeground.withValues(alpha: 0.8),
-        width: 1,
       ),
     );
   }
@@ -211,21 +175,24 @@ class AttendanceCard extends HookConsumerWidget {
     Color color, [
     Color? backgroundColor,
   ]) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor ?? color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: color,
+    return FBadge(
+      style: FBadgeStyleDelta.delta(
+        decoration: DecorationDelta.value(
+          BoxDecoration(
+            color: backgroundColor ?? color.withValues(alpha: 0.1),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        contentStyle: FBadgeContentStyleDelta.delta(
+          labelTextStyle: TextStyleDelta.delta(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
         ),
       ),
+      child: Text(text),
     );
   }
 
@@ -249,17 +216,40 @@ class AttendanceCard extends HookConsumerWidget {
       );
     } else if (percentage >= 70) {
       return (AttendanceColors.goodText, AttendanceColors.goodBackground);
-    } else if (percentage >= 60) {
-      return (AttendanceColors.warningText, AttendanceColors.warningBackground);
     } else {
-      return (
-        AttendanceColors.criticalText,
-        AttendanceColors.criticalBackground,
-      );
+      return (AttendanceColors.warningText, AttendanceColors.warningBackground);
     }
   }
 
   Widget _buildStatsRow(bool isDark, BuildContext context, bool btwExams) {
+    if (!btwExams || record.attendancePercentage == "-") {
+      return Row(
+        children: [
+          Expanded(
+            child: _buildInlineStatItem(
+              isDark,
+              context,
+              "Total",
+              record.attendancePercentage,
+              FIcons.percent,
+              AttendanceColors.totalStatColor,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildInlineStatItem(
+              isDark,
+              context,
+              "Present",
+              "${record.classesAttended}/${record.totalClasses}",
+              FIcons.check,
+              AttendanceColors.presentStatColor,
+            ),
+          ),
+        ],
+      );
+    }
+
     final stats = <Widget>[
       _buildStatItem(
         isDark,
@@ -318,15 +308,69 @@ class AttendanceCard extends HookConsumerWidget {
     IconData icon,
     Color accentColor,
   ) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black : AttendanceColors.statItemBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withValues(alpha: 0.1), width: 1),
+    return FCard(
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: accentColor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : AttendanceColors.primaryText,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color:
+                    isDark
+                        ? context.theme.colors.primary
+                        : AttendanceColors.secondaryText,
+                height: 1.2,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    );
+  }
+
+  Widget _buildInlineStatItem(
+    bool isDark,
+    BuildContext context,
+    String label,
+    String value,
+    IconData icon,
+    Color accentColor,
+  ) {
+    return FCard(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(6),
@@ -336,37 +380,45 @@ class AttendanceCard extends HookConsumerWidget {
             ),
             child: Icon(icon, size: 16, color: accentColor),
           ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.2,
-              color:
-                  isDark
-                      ? context.theme.colors.primary
-                      : AttendanceColors.primaryText,
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                    color:
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.primaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color:
+                        isDark
+                            ? context.theme.colors.primary
+                            : AttendanceColors.secondaryText,
+                    height: 1.2,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color:
-                  isDark
-                      ? context.theme.colors.primary
-                      : AttendanceColors.secondaryText,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

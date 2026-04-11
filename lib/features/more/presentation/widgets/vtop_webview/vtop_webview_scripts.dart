@@ -89,7 +89,7 @@ extension VtopWebviewScripts on InAppWebViewController {
     return evaluateJavascript(source: _resetSpacingScript);
   }
 
-  Future<void> clickVtopMenuLink(String url) {
+  Future<dynamic> clickVtopMenuLink(String url) {
     return evaluateJavascript(source: _clickMenuLinkScript(url));
   }
 }

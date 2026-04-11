@@ -51,7 +51,7 @@ class Grades extends _$Grades {
   }
 
   Future<void> refresh() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     final semId = current?.selectedSemesterId;
     if (semId == null || semId.isEmpty) return;
 
@@ -71,7 +71,7 @@ class Grades extends _$Grades {
   }
 
   Future<void> selectSemester(String semId) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current != null && current.selectedSemesterId == semId) return;
     if (current != null) {
       state = AsyncData(current.copyWith(selectedSemesterId: semId));
@@ -88,7 +88,7 @@ class Grades extends _$Grades {
   }
 
   Future<void> loadDetails(String courseId, {bool force = false}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || courseId.isEmpty) return;
     if (!force &&
         (current.detailsByCourseId.containsKey(courseId) ||
@@ -108,7 +108,7 @@ class Grades extends _$Grades {
             refresh: force,
           );
 
-      final now = state.valueOrNull ?? current;
+      final now = state.value ?? current;
       final nextMap = {...now.detailsByCourseId, courseId: details};
       final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
       state = AsyncData(
@@ -118,7 +118,7 @@ class Grades extends _$Grades {
         ),
       );
     } catch (_) {
-      final now = state.valueOrNull ?? current;
+      final now = state.value ?? current;
       final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
       state = AsyncData(now.copyWith(loadingDetailsFor: nextLoading));
       rethrow;

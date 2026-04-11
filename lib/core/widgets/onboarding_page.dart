@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:forui_hooks/forui_hooks.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
@@ -15,7 +16,6 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
-import 'package:forui_hooks/forui_hooks.dart';
 
 late VtopClient _globalClient;
 late String _globalUsername;
@@ -31,6 +31,7 @@ class OnboardingPage extends HookConsumerWidget {
     final theme = Theme.of(context);
     final stepTwo = useState(false);
     return FScaffold(
+      resizeToAvoidBottomInset: true,
       header: FHeader.nested(title: Text("Vitap Mate"), suffixes: []),
       child: Column(
         children: [
@@ -133,97 +134,99 @@ class Step1 extends HookConsumerWidget {
       }
     }
 
-    return Form(
-      key: formKey,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          SizedBox(height: 25),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: FAlert(
-              icon: const Icon(FIcons.mail),
-              title: const Text('Use your college email'),
-              subtitle: const Text(
-                'Continue with your VITAP email and allow Gmail access for OTP.',
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (!isloading.value)
-            FButton(
-              style: FButtonStyle.outline(),
-              onPress: handleGooglePress,
-              child: const Text('Continue with VITAP Email'),
-            ),
-          const SizedBox(height: 10),
-          FTextFormField(
-            label: const Text("College Email"),
-            controller: email,
-            hint: 'vitapstudent.ac.in email',
-            enabled: false,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator:
-                (value) =>
-                    1 <= (value?.trim().length ?? 0)
-                        ? null
-                        : 'Continue with your VITAP email first.',
-          ),
-          const SizedBox(height: 10),
-          FTextFormField(
-            label: const Text("VTOP Username"),
-            controller: username,
-            hint: 'registration number',
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator:
-                (value) =>
-                    1 <= (value?.length ?? 0)
-                        ? null
-                        : 'Enter your VTOP username.',
-          ),
-          const SizedBox(height: 10),
-          FTextFormField.password(
-            controller: password,
-            hint: 'vtop password',
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator:
-                (value) =>
-                    1 <= (value?.length ?? 0)
-                        ? null
-                        : 'Please enter your vtop password.',
-          ),
-          const SizedBox(height: 20),
-          !isloading.value
-              ? FButton(
-                child: const Text('Next'),
-                onPress: () {
-                  if (formKey.currentState!.validate()) {
-                    handlePress();
-                    return;
-                  }
-                },
-              )
-              : SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: context.theme.colors.primary,
+    return SingleChildScrollView(
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            SizedBox(height: 25),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FAlert(
+                icon: const Icon(FIcons.mail),
+                title: const Text('Use your college email'),
+                subtitle: const Text(
+                  'Continue with your VITAP email and allow Gmail access for OTP.',
                 ),
               ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: FAlert(
-              style: FAlertStyle.destructive(),
-              icon: const Icon(FIcons.shieldCheck),
-              title: const Text('Use the Play Store app'),
-              subtitle: const Text(
-                'Make sure you installed Vitap Mate from the Play Store before signing in.',
+            ),
+            const SizedBox(height: 10),
+            if (!isloading.value)
+              FButton(
+                variant: FButtonVariant.outline,
+                onPress: handleGooglePress,
+                child: const Text('Continue with VITAP Email'),
+              ),
+            const SizedBox(height: 10),
+            FTextFormField(
+              label: const Text("College Email"),
+              control: FTextFieldControl.managed(controller: email),
+              hint: 'vitapstudent.ac.in email',
+              enabled: false,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator:
+                  (value) =>
+                      1 <= (value?.trim().length ?? 0)
+                          ? null
+                          : 'Continue with your VITAP email first.',
+            ),
+            const SizedBox(height: 10),
+            FTextFormField(
+              label: const Text("VTOP Username"),
+              control: FTextFieldControl.managed(controller: username),
+              hint: 'registration number',
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator:
+                  (value) =>
+                      1 <= (value?.length ?? 0)
+                          ? null
+                          : 'Enter your VTOP username.',
+            ),
+            const SizedBox(height: 10),
+            FTextFormField.password(
+              control: FTextFieldControl.managed(controller: password),
+              hint: 'vtop password',
+              autovalidateMode: AutovalidateMode.onUserInteraction,
+              validator:
+                  (value) =>
+                      1 <= (value?.length ?? 0)
+                          ? null
+                          : 'Please enter your vtop password.',
+            ),
+            const SizedBox(height: 20),
+            !isloading.value
+                ? FButton(
+                  child: const Text('Next'),
+                  onPress: () {
+                    if (formKey.currentState!.validate()) {
+                      handlePress();
+                      return;
+                    }
+                  },
+                )
+                : SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: context.theme.colors.primary,
+                  ),
+                ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: FAlert(
+                variant: FAlertVariant.destructive,
+                icon: const Icon(FIcons.shieldCheck),
+                title: const Text('Use the Play Store app'),
+                subtitle: const Text(
+                  'Make sure you installed Vitap Mate from the Play Store before signing in.',
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -236,7 +239,7 @@ class Step2 extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fetching = useState(true);
     final formKey = useMemoized(() => GlobalKey<FormState>());
-    final controller = useFRadioSelectMenuTileGroupController<String>();
+    final controller = useFRadioMultiValueNotifier<String>();
     final data = useState<SemesterData?>(null);
     Future<void> getSemData() async {
       fetching.value = true;
@@ -268,7 +271,7 @@ class Step2 extends HookConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             FSelectTileGroup(
-              selectController: controller,
+              control: FMultiValueControl.managedRadio(controller: controller),
               label: const Text('Semesters'),
               description: const Text('Select the Semester.'),
               validator:

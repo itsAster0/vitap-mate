@@ -1,6 +1,5 @@
 // ignore_for_file: avoid_public_notifier_properties
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:forui/forui.dart';
@@ -46,14 +45,14 @@ FThemeData fTheme(Ref ref) {
 
   switch (themeMode) {
     case ThemeMode.dark:
-      return FThemes.zinc.dark;
+      return FThemes.zinc.dark.touch;
     case ThemeMode.light:
-      return FThemes.zinc.light;
+      return FThemes.zinc.light.touch;
     case ThemeMode.system:
       final brightness =
           WidgetsBinding.instance.platformDispatcher.platformBrightness;
       return brightness == Brightness.dark
-          ? FThemes.zinc.dark
-          : FThemes.zinc.light;
+          ? FThemes.zinc.dark.touch
+          : FThemes.zinc.light.touch;
   }
 }

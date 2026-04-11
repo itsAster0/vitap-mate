@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
-import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 
@@ -154,7 +153,7 @@ Widget? getSidewidget(
 
                   const SizedBox(height: 4),
                   Text(
-                    "You can change Semseter in Settings → VTOP Details",
+                    "New semester available. Change it in Settings -> VTOP Details.",
                     maxLines: 2,
                     style: context.theme.typography.sm,
                   ),
@@ -163,9 +162,6 @@ Widget? getSidewidget(
             )
             : Text(data, style: context.theme.typography.lg),
 
-    suffixes: [
-      if (path.contains("timetable")) SyncGoogleCalendarButton(),
-      if (data == "Attendance") AttendanceHeader(),
-    ],
+    suffixes: [if (path.contains("timetable")) SyncGoogleCalendarButton()],
   );
 }

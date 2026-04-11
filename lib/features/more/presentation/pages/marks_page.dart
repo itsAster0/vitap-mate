@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -15,7 +16,11 @@ class MarksPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
     useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(marksProvider.notifier).updatemarks();
@@ -24,7 +29,7 @@ class MarksPage extends HookConsumerWidget {
         }
       });
       return null;
-    }, []);
+    }, [autoRefreshOnOpen]);
     Future<void> update() async {
       try {
         await ref.read(marksProvider.notifier).updatemarks();
@@ -158,27 +163,31 @@ class MarksPage extends HookConsumerWidget {
 
   Widget _buildLoadingState(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: CircularProgressIndicator(
-              color: MarksColors.theoryIcon,
-              strokeWidth: 3,
-            ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "Loading marks...",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: context.theme.colors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                minHeight: 3,
+                color: MarksColors.theoryIcon,
+                backgroundColor: MarksColors.theoryIcon.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            "Loading marks data...",
-            style: TextStyle(
-              fontSize: 14,
-              color: context.theme.colors.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

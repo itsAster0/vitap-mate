@@ -15,6 +15,8 @@ class VtopWebviewBody extends StatelessWidget {
     required this.isDarkMode,
     required this.loading,
     required this.onLoadingChanged,
+    required this.onLoginRedirect,
+    required this.onPageReady,
     required this.onWebViewCreated,
     required this.cookie,
     super.key,
@@ -25,6 +27,8 @@ class VtopWebviewBody extends StatelessWidget {
   final bool isDarkMode;
   final bool loading;
   final ValueChanged<bool> onLoadingChanged;
+  final VoidCallback onLoginRedirect;
+  final Future<void> Function(InAppWebViewController controller) onPageReady;
   final ValueChanged<InAppWebViewController> onWebViewCreated;
   final VtopWebviewCookie? cookie;
 
@@ -80,6 +84,11 @@ class VtopWebviewBody extends StatelessWidget {
                 }
 
                 if (lowerUrl.startsWith('https://vtop.vitap.ac.in')) {
+                  if (lowerUrl.startsWith(
+                    'https://vtop.vitap.ac.in/vtop/login',
+                  )) {
+                    onLoginRedirect();
+                  }
                   return NavigationActionPolicy.ALLOW;
                 }
 
@@ -100,7 +109,14 @@ class VtopWebviewBody extends StatelessWidget {
                     'Open in Chrome',
                     'Please continue in Chrome.',
                   );
+                  return;
                 }
+
+                // if (visitedUrl.startsWith(
+                //   'https://vtop.vitap.ac.in/vtop/login',
+                // )) {
+                //   onLoginRedirect();
+                // }
               },
               onLoadStart: (controller, url) async {
                 onLoadingChanged(true);
@@ -116,6 +132,7 @@ class VtopWebviewBody extends StatelessWidget {
                 if (isDarkMode) {
                   await controller.setVtopDarkMode(true);
                 }
+                await onPageReady(controller);
               },
             ),
             if (loading)

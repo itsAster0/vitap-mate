@@ -200,7 +200,7 @@ class BackgroundNotificationService {
 
     const settings = InitializationSettings(android: androidSettings);
 
-    await _notifications.initialize(settings);
+    await _notifications.initialize(settings: settings);
 
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -217,10 +217,10 @@ class BackgroundNotificationService {
 
   static Future<void> showProgress() async {
     await _notifications.show(
-      _syncId,
-      'VITAP Mate',
-      'Syncing VTOP data in background…',
-      const NotificationDetails(
+      id: _syncId,
+      title: 'VITAP Mate',
+      body: 'Syncing VTOP data in background...',
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _backSyncId,
           'Background Sync',
@@ -237,7 +237,7 @@ class BackgroundNotificationService {
   }
 
   static Future<void> stop({required bool success}) async {
-    await _notifications.cancel(_syncId);
+    await _notifications.cancel(id: _syncId);
 
     // await _notifications.show(
     //   _syncId + 1,

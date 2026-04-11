@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -59,11 +60,11 @@ class TimetableCard extends HookConsumerWidget {
     if (slot.serial == "-1") return TimetableColors.freeTimeBackground;
 
     return slot.islab()
-        ? TimetableColors.labBackground
-        : TimetableColors.lectureBackground;
+        ? AttendanceColors.labCardBackground
+        : AttendanceColors.theoryCardBackground;
   }
 
-  (Color border, Color background, Color text, String label) getStatusStyle(
+  (Color border, Color background, Color text, String label)? getStatusStyle(
     ClassStatus status,
   ) {
     switch (status) {
@@ -75,12 +76,7 @@ class TimetableCard extends HookConsumerWidget {
           'ONGOING',
         );
       case ClassStatus.completed:
-        return (
-          TimetableColors.completedBorder,
-          TimetableColors.completedBackground,
-          TimetableColors.completedText,
-          'COMPLETED',
-        );
+        return null;
       case ClassStatus.nextClass:
         return (
           TimetableColors.nextClassBorder,
@@ -89,19 +85,9 @@ class TimetableCard extends HookConsumerWidget {
           'NEXT CLASS',
         );
       case ClassStatus.upcoming:
-        return (
-          TimetableColors.upcomingBorder,
-          TimetableColors.upcomingBackground,
-          TimetableColors.upcomingText,
-          'UPCOMING',
-        );
+        return null;
       case ClassStatus.notToday:
-        return (
-          const Color.fromARGB(255, 86, 25, 183),
-          TimetableColors.upcomingBackground,
-          const Color.fromARGB(255, 99, 25, 210),
-          'NOT TODAY',
-        );
+        return null;
     }
   }
 
@@ -127,6 +113,10 @@ class TimetableCard extends HookConsumerWidget {
     final statusStyle = status != null ? getStatusStyle(status) : null;
     final isHighlighted =
         status == ClassStatus.ongoing || status == ClassStatus.nextClass;
+    final fillTypeBadge =
+        status == ClassStatus.ongoing ||
+        status == ClassStatus.nextClass ||
+        status == ClassStatus.upcoming;
 
     return GestureDetector(
       onTap: () {
@@ -135,39 +125,112 @@ class TimetableCard extends HookConsumerWidget {
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: getCardBackgroundColor(darkMode, context),
-            borderRadius: BorderRadius.circular(12),
-            border:
-                statusStyle != null && isHighlighted
-                    ? Border.all(color: statusStyle.$1, width: 2)
-                    : null,
-            boxShadow:
-                darkMode
-                    ? null
-                    : [
-                      BoxShadow(
-                        color:
-                            isHighlighted
-                                ? TimetableColors.statusShadow
-                                : TimetableColors.cardShadow,
-                        blurRadius: isHighlighted ? 8 : 6,
-                        offset: const Offset(0, 2),
-                        spreadRadius: isHighlighted ? 1 : 0,
-                      ),
-                    ],
+            borderRadius: BorderRadius.circular(8),
+            border: Border(
+              left: BorderSide(
+                color:
+                    statusStyle != null && isHighlighted
+                        ? statusStyle.$1
+                        : slot.serial == "-1"
+                        ? TimetableColors.nextClassText
+                        : slot.islab()
+                        ? AttendanceColors.labIcon
+                        : AttendanceColors.theoryIcon,
+                width: 4,
+              ),
+            ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
+          child: FCard(
             child:
                 slot.serial != "-1"
-                    ? _buildClassCard(darkMode, context, statusStyle, animation)
+                    ? _buildClassCard(
+                      darkMode,
+                      context,
+                      statusStyle,
+                      animation,
+                      fillTypeBadge,
+                    )
                     : _buildFreeTimeCard(darkMode, context),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _courseTypeBadge({required bool filled}) {
+    final lab = slot.islab();
+    final accent = lab ? AttendanceColors.labIcon : AttendanceColors.theoryIcon;
+
+    return FBadge(
+      style: FBadgeStyleDelta.delta(
+        decoration: DecorationDelta.value(
+          BoxDecoration(
+            color: filled ? accent.withValues(alpha: 0.12) : Colors.transparent,
+            border:
+                filled
+                    ? null
+                    : Border.all(color: accent.withValues(alpha: 0.35)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            lab ? FIcons.flaskConical : FIcons.libraryBig,
+            size: 16,
+            color: accent,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            lab ? 'LAB' : 'LECTURE',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge((Color, Color, Color, String) statusStyle) {
+    return _coloredBadge(
+      label: statusStyle.$4,
+      foreground: statusStyle.$3,
+      background: statusStyle.$2,
+      border: statusStyle.$1,
+    );
+  }
+
+  Widget _coloredBadge({
+    required String label,
+    required Color foreground,
+    required Color background,
+    required Color border,
+  }) {
+    return FBadge(
+      style: FBadgeStyleDelta.delta(
+        decoration: DecorationDelta.value(
+          BoxDecoration(
+            color: background,
+            border: Border.all(color: border.withValues(alpha: 0.45)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        contentStyle: FBadgeContentStyleDelta.delta(
+          labelTextStyle: TextStyleDelta.delta(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: foreground,
+          ),
+        ),
+      ),
+      child: Text(label),
     );
   }
 
@@ -176,65 +239,22 @@ class TimetableCard extends HookConsumerWidget {
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
     CurvedAnimation animation,
+    bool fillTypeBadge,
   ) {
+    final timeAccent = switch (statusStyle?.$4) {
+      'ONGOING' => TimetableColors.ongoingBorder,
+      'NEXT CLASS' => TimetableColors.nextClassBorder,
+      _ => null,
+    };
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color:
-                    slot.islab()
-                        ? const Color(0xFFE1F5FE)
-                        : const Color(0xFFE8F4FD),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    slot.islab() ? FIcons.flaskConical : FIcons.libraryBig,
-                    size: 16,
-                    color:
-                        slot.islab()
-                            ? const Color(0xFF0277BD)
-                            : const Color(0xFF1565C0),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    slot.islab() ? 'LAB' : 'LECTURE',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          slot.islab()
-                              ? const Color(0xFF0277BD)
-                              : const Color(0xFF1565C0),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _courseTypeBadge(filled: fillTypeBadge),
             const Spacer(),
-            if (statusStyle != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusStyle.$2,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusStyle.$1, width: 1),
-                ),
-                child: Text(
-                  statusStyle.$4,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: statusStyle.$3,
-                  ),
-                ),
-              ),
+            if (statusStyle != null) _statusBadge(statusStyle),
           ],
         ),
         const SizedBox(height: 8),
@@ -244,7 +264,10 @@ class TimetableCard extends HookConsumerWidget {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: isDark ? context.theme.colors.primary : Color(0xFF374151),
+            color:
+                isDark
+                    ? context.theme.colors.primary
+                    : AttendanceColors.primaryText,
             //height: 1.2,
           ),
           maxLines: 1,
@@ -291,9 +314,12 @@ class TimetableCard extends HookConsumerWidget {
                 text:
                     "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
                 color:
-                    isDark
+                    timeAccent ??
+                    (isDark
                         ? context.theme.colors.primary
-                        : const Color(0xFF374151),
+                        : const Color(0xFF374151)),
+                backgroundColor: timeAccent?.withValues(alpha: 0.1),
+                borderColor: timeAccent,
                 isBold: true,
               ),
             ),
@@ -346,12 +372,8 @@ class TimetableCard extends HookConsumerWidget {
       children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            FBadge(
+              variant: FBadgeVariant.secondary,
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -412,14 +434,22 @@ class TimetableCard extends HookConsumerWidget {
     required IconData icon,
     required String text,
     required Color color,
+    Color? backgroundColor,
+    Color? borderColor,
     bool isBold = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: (isDark ? Colors.black : context.theme.colors.primaryForeground)
-            .withValues(alpha: 0.7),
+        color:
+            backgroundColor ??
+            (isDark ? Colors.black : context.theme.colors.primaryForeground)
+                .withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(8),
+        border:
+            borderColor == null
+                ? null
+                : Border.all(color: borderColor.withValues(alpha: 0.45)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

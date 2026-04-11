@@ -6,19 +6,49 @@ part of 'grades_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$gradesHash() => r'75e8b19b9b2c0bf75b46805a18cb23ed7f577151';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [Grades].
 @ProviderFor(Grades)
-final gradesProvider = AsyncNotifierProvider<Grades, GradesUiState>.internal(
-  Grades.new,
-  name: r'gradesProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$gradesHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+final gradesProvider = GradesProvider._();
 
-typedef _$Grades = AsyncNotifier<GradesUiState>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class GradesProvider
+    extends $AsyncNotifierProvider<Grades, GradesUiState> {
+  GradesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'gradesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$gradesHash();
+
+  @$internal
+  @override
+  Grades create() => Grades();
+}
+
+String _$gradesHash() => r'fdeb488dbc35041e6bd17db6a339206eb5ddf55c';
+
+abstract class _$Grades extends $AsyncNotifier<GradesUiState> {
+  FutureOr<GradesUiState> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<GradesUiState>, GradesUiState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<GradesUiState>, GradesUiState>,
+              AsyncValue<GradesUiState>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

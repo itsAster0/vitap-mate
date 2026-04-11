@@ -4,6 +4,16 @@ import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/app_error.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
+Widget _dismissToastButton(BuildContext context, dynamic entry) {
+  return IntrinsicHeight(
+    child: FButton(
+      size: FButtonSizeVariant.xs,
+      onPress: entry.dismiss,
+      child: const Text('Aye'),
+    ),
+  );
+}
+
 void disCommonToast(BuildContext context, Object e) {
   if (!context.mounted) return;
   if (e == VtopError.invalidCredentials()) {
@@ -14,36 +24,7 @@ void disCommonToast(BuildContext context, Object e) {
       description: const Text(
         'It looks like you changed your VTOP password. Please update it in Settings.',
       ),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else if (e == VtopError.networkError()) {
     showFToast(
@@ -53,36 +34,7 @@ void disCommonToast(BuildContext context, Object e) {
       description: const Text(
         "You're offline. Please check your connection and try again",
       ),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else if (e is FeatureDisabledException) {
     showFToast(
@@ -91,36 +43,7 @@ void disCommonToast(BuildContext context, Object e) {
       title: const Text('Feature Disabled'),
 
       description: const Text('Please try again in a while Or Update the app'),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else {
     dispToast(context, 'Error', appErrorMessage(e));
@@ -136,36 +59,7 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       description: const Text(
         'The username or password you entered is incorrect.',
       ),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else if (e == VtopError.networkError()) {
     showFToast(
@@ -175,36 +69,7 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       description: const Text(
         "You're offline. Please check your connection and try again",
       ),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else if (e is FeatureDisabledException) {
     showFToast(
@@ -213,36 +78,7 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       title: const Text('Feature Disabled'),
       //description: const Text('Visit this page for more information.'),
       description: const Text('Please try again in a while'),
-      suffixBuilder:
-          (context, entry) => IntrinsicHeight(
-            child: FButton(
-              style:
-                  context.theme.buttonStyles.primary
-                      .copyWith(
-                        contentStyle:
-                            context.theme.buttonStyles.primary.contentStyle
-                                .copyWith(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 7.5,
-                                  ),
-                                  textStyle: FWidgetStateMap.all(
-                                    context.theme.typography.xs.copyWith(
-                                      color:
-                                          context
-                                              .theme
-                                              .colors
-                                              .primaryForeground,
-                                    ),
-                                  ),
-                                )
-                                .call,
-                      )
-                      .call,
-              onPress: entry.dismiss,
-              child: const Text('Aye'),
-            ),
-          ),
+      suffixBuilder: _dismissToastButton,
     );
   } else {
     dispToast(context, 'Login Failed', appErrorMessage(e));
@@ -256,32 +92,6 @@ void dispToast(BuildContext context, String title, String des) {
     title: Text(title),
     //description: const Text('Visit this page for more information.'),
     description: Text(des),
-    suffixBuilder:
-        (context, entry) => IntrinsicHeight(
-          child: FButton(
-            style:
-                context.theme.buttonStyles.primary
-                    .copyWith(
-                      contentStyle:
-                          context.theme.buttonStyles.primary.contentStyle
-                              .copyWith(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 7.5,
-                                ),
-                                textStyle: FWidgetStateMap.all(
-                                  context.theme.typography.xs.copyWith(
-                                    color:
-                                        context.theme.colors.primaryForeground,
-                                  ),
-                                ),
-                              )
-                              .call,
-                    )
-                    .call,
-            onPress: entry.dismiss,
-            child: const Text('Aye'),
-          ),
-        ),
+    suffixBuilder: _dismissToastButton,
   );
 }

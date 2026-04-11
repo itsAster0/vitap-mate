@@ -6,189 +6,96 @@ part of 'full_attendance_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$fullAttendanceHash() => r'6d3a844c231da49b41e674d0cf65115fa749cd68';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// Copied from Dart SDK
-class _SystemHash {
-  _SystemHash._();
-
-  static int combine(int hash, int value) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + value);
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
-    return hash ^ (hash >> 6);
-  }
-
-  static int finish(int hash) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
-    // ignore: parameter_assignments
-    hash = hash ^ (hash >> 11);
-    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
-  }
-}
-
-abstract class _$FullAttendance
-    extends BuildlessAutoDisposeAsyncNotifier<FullAttendanceData> {
-  late final String courseType;
-  late final String courseId;
-
-  FutureOr<FullAttendanceData> build(String courseType, String courseId);
-}
-
-/// See also [FullAttendance].
 @ProviderFor(FullAttendance)
-const fullAttendanceProvider = FullAttendanceFamily();
+final fullAttendanceProvider = FullAttendanceFamily._();
 
-/// See also [FullAttendance].
-class FullAttendanceFamily extends Family<AsyncValue<FullAttendanceData>> {
-  /// See also [FullAttendance].
-  const FullAttendanceFamily();
+final class FullAttendanceProvider
+    extends $AsyncNotifierProvider<FullAttendance, FullAttendanceData> {
+  FullAttendanceProvider._({
+    required FullAttendanceFamily super.from,
+    required (String, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'fullAttendanceProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
-  /// See also [FullAttendance].
-  FullAttendanceProvider call(String courseType, String courseId) {
-    return FullAttendanceProvider(courseType, courseId);
+  @override
+  String debugGetCreateSourceHash() => _$fullAttendanceHash();
+
+  @override
+  String toString() {
+    return r'fullAttendanceProvider'
+        ''
+        '$argument';
   }
 
+  @$internal
   @override
-  FullAttendanceProvider getProviderOverride(
-    covariant FullAttendanceProvider provider,
-  ) {
-    return call(provider.courseType, provider.courseId);
-  }
-
-  static const Iterable<ProviderOrFamily>? _dependencies = null;
-
-  @override
-  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
-
-  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
-
-  @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
-      _allTransitiveDependencies;
-
-  @override
-  String? get name => r'fullAttendanceProvider';
-}
-
-/// See also [FullAttendance].
-class FullAttendanceProvider
-    extends
-        AutoDisposeAsyncNotifierProviderImpl<
-          FullAttendance,
-          FullAttendanceData
-        > {
-  /// See also [FullAttendance].
-  FullAttendanceProvider(String courseType, String courseId)
-    : this._internal(
-        () =>
-            FullAttendance()
-              ..courseType = courseType
-              ..courseId = courseId,
-        from: fullAttendanceProvider,
-        name: r'fullAttendanceProvider',
-        debugGetCreateSourceHash:
-            const bool.fromEnvironment('dart.vm.product')
-                ? null
-                : _$fullAttendanceHash,
-        dependencies: FullAttendanceFamily._dependencies,
-        allTransitiveDependencies:
-            FullAttendanceFamily._allTransitiveDependencies,
-        courseType: courseType,
-        courseId: courseId,
-      );
-
-  FullAttendanceProvider._internal(
-    super._createNotifier, {
-    required super.name,
-    required super.dependencies,
-    required super.allTransitiveDependencies,
-    required super.debugGetCreateSourceHash,
-    required super.from,
-    required this.courseType,
-    required this.courseId,
-  }) : super.internal();
-
-  final String courseType;
-  final String courseId;
-
-  @override
-  FutureOr<FullAttendanceData> runNotifierBuild(
-    covariant FullAttendance notifier,
-  ) {
-    return notifier.build(courseType, courseId);
-  }
-
-  @override
-  Override overrideWith(FullAttendance Function() create) {
-    return ProviderOverride(
-      origin: this,
-      override: FullAttendanceProvider._internal(
-        () =>
-            create()
-              ..courseType = courseType
-              ..courseId = courseId,
-        from: from,
-        name: null,
-        dependencies: null,
-        allTransitiveDependencies: null,
-        debugGetCreateSourceHash: null,
-        courseType: courseType,
-        courseId: courseId,
-      ),
-    );
-  }
-
-  @override
-  AutoDisposeAsyncNotifierProviderElement<FullAttendance, FullAttendanceData>
-  createElement() {
-    return _FullAttendanceProviderElement(this);
-  }
+  FullAttendance create() => FullAttendance();
 
   @override
   bool operator ==(Object other) {
-    return other is FullAttendanceProvider &&
-        other.courseType == courseType &&
-        other.courseId == courseId;
+    return other is FullAttendanceProvider && other.argument == argument;
   }
 
   @override
   int get hashCode {
-    var hash = _SystemHash.combine(0, runtimeType.hashCode);
-    hash = _SystemHash.combine(hash, courseType.hashCode);
-    hash = _SystemHash.combine(hash, courseId.hashCode);
-
-    return _SystemHash.finish(hash);
+    return argument.hashCode;
   }
 }
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-mixin FullAttendanceRef
-    on AutoDisposeAsyncNotifierProviderRef<FullAttendanceData> {
-  /// The parameter `courseType` of this provider.
-  String get courseType;
+String _$fullAttendanceHash() => r'6d3a844c231da49b41e674d0cf65115fa749cd68';
 
-  /// The parameter `courseId` of this provider.
-  String get courseId;
-}
-
-class _FullAttendanceProviderElement
-    extends
-        AutoDisposeAsyncNotifierProviderElement<
+final class FullAttendanceFamily extends $Family
+    with
+        $ClassFamilyOverride<
           FullAttendance,
-          FullAttendanceData
-        >
-    with FullAttendanceRef {
-  _FullAttendanceProviderElement(super.provider);
+          AsyncValue<FullAttendanceData>,
+          FullAttendanceData,
+          FutureOr<FullAttendanceData>,
+          (String, String)
+        > {
+  FullAttendanceFamily._()
+    : super(
+        retry: null,
+        name: r'fullAttendanceProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  FullAttendanceProvider call(String courseType, String courseId) =>
+      FullAttendanceProvider._(argument: (courseType, courseId), from: this);
 
   @override
-  String get courseType => (origin as FullAttendanceProvider).courseType;
-  @override
-  String get courseId => (origin as FullAttendanceProvider).courseId;
+  String toString() => r'fullAttendanceProvider';
 }
 
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$FullAttendance extends $AsyncNotifier<FullAttendanceData> {
+  late final _$args = ref.$arg as (String, String);
+  String get courseType => _$args.$1;
+  String get courseId => _$args.$2;
+
+  FutureOr<FullAttendanceData> build(String courseType, String courseId);
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref as $Ref<AsyncValue<FullAttendanceData>, FullAttendanceData>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<FullAttendanceData>, FullAttendanceData>,
+              AsyncValue<FullAttendanceData>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, () => build(_$args.$1, _$args.$2));
+  }
+}

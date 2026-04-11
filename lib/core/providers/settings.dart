@@ -17,6 +17,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_class_pause_until_millis",
         "settings_exam_notifications_enabled",
         "settings_exam_notify_before_minutes",
+        "settings_auto_refresh_on_open",
       },
     ),
   );
@@ -52,6 +53,19 @@ Future<void> toggleBTWExams(Ref ref) async {
   await prefs.setBool("settings_btw_atten", !current);
 
   ref.invalidate(btwExamsProvider);
+}
+
+@riverpod
+bool autoRefreshOnOpen(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool("settings_auto_refresh_on_open") ?? false;
+}
+
+Future<void> setAutoRefreshOnOpen(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool("settings_auto_refresh_on_open", value);
+
+  ref.invalidate(autoRefreshOnOpenProvider);
 }
 
 class ClassReminderSettings {

@@ -32,6 +32,7 @@ class SettingsPage extends HookConsumerWidget {
     ];
     final initialValSync =
         ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (initialValSync == Duration(minutes: 15) ||
@@ -46,163 +47,202 @@ class SettingsPage extends HookConsumerWidget {
     return Container(
       decoration: BoxDecoration(color: context.theme.colors.background),
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  spacing: 8,
-                  children: [
-                    FTileGroup(
-                      label: const Text('Vtop'),
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: SingleChildScrollView(
+          child: Column(
+            spacing: 8,
+            children: [
+              FTileGroup(
+                label: const Text('Vtop'),
+                divider: FItemDivider.indented,
+                children: [
+                  FTile(
+                    prefix: Icon(FIcons.calendarDays),
+                    title: const Text('Merge Labs'),
+                    suffix: FSwitch(
+                      value: ref.watch(mergeTTProvider),
+                      onChange: (value) {
+                        ref.read(toggleMergeTTProvider);
+                      },
+                    ),
+                  ),
+                  FTile(
+                    prefix: Icon(FIcons.userCheck),
+                    title: const Text('Show b/w Exams'),
+                    suffix: FSwitch(
+                      value: ref.watch(btwExamsProvider),
+                      onChange: (value) {
+                        ref.read(toggleBTWExamsProvider);
+                      },
+                    ),
+                  ),
+                  FTile(
+                    prefix: Icon(FIcons.refreshCw),
+                    title: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        FTile(
-                          prefix: Icon(FIcons.calendarDays),
-                          title: const Text('Merge Labs'),
-                          suffix: FSwitch(
-                            value: ref.watch(mergeTTProvider),
-                            onChange: (value) {
-                              ref.read(toggleMergeTTProvider);
-                            },
+                        const Flexible(child: Text('Auto Refresh on Open')),
+                        const SizedBox(width: 8),
+                        FTooltip(
+                          tipBuilder:
+                              (context, _) => const Text(
+                                'When enabled, opening VTOP data pages loads cached data first, then refreshes in the background. Keep it off to avoid login attempts until you pull to refresh.',
+                              ),
+                          child: Icon(
+                            FIcons.info,
+                            size: 16,
+                            color: context.theme.colors.mutedForeground,
                           ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.userCheck),
-                          title: const Text('Show b/w Exams'),
-                          suffix: FSwitch(
-                            value: ref.watch(btwExamsProvider),
-                            onChange: (value) {
-                              ref.read(toggleBTWExamsProvider);
-                            },
-                          ),
-                        ),
-                        FSelectMenuTile(
-                          prefix: Icon(FIcons.folderSync),
-                          title: FTappable(
-                            onLongPress: () {
-                              showFDialog(
-                                context: context,
-                                builder:
-                                    (context, style, animation) => FDialog(
-                                      animation: animation,
-                                      direction: Axis.horizontal,
-                                      title: const Text(
-                                        'Are you absolutely sure?',
-                                      ),
-                                      body: FTextField(controller: field15e),
-                                      actions: [
-                                        FButton(
-                                          child: const Text('Continue'),
-                                          onPress: () {
-                                            if (field15e.text
-                                                    .trim()
-                                                    .toLowerCase() ==
-                                                "why") {
-                                              show15.value = true;
-                                            }
-
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                              );
-                            },
-                            child: Text('Background Sync'),
-                          ),
-
-                          onChange:
-                              (value) => {
-                                ref
-                                    .read(backgroundSyncProvider.notifier)
-                                    .updateFreq(value.first),
-                              },
-                          initialValue: initialValSync,
-                          menu: backgroundSync,
                         ),
                       ],
                     ),
-                    const UserBox(),
+                    subtitle: const Text(
+                      'Refresh cached pages in the background after opening.',
+                    ),
+                    suffix: FSwitch(
+                      value: autoRefreshOnOpen,
+                      onChange: (value) {
+                        setAutoRefreshOnOpen(ref, value);
+                      },
+                    ),
+                  ),
+                  FSelectMenuTile(
+                    prefix: Icon(FIcons.folderSync),
+                    title: FTappable(
+                      onLongPress: () {
+                        showFDialog(
+                          context: context,
+                          builder:
+                              (context, style, animation) => FDialog(
+                                animation: animation,
+                                direction: Axis.horizontal,
+                                title: const Text('Are you absolutely sure?'),
+                                body: FTextField(
+                                  control: FTextFieldControl.managed(
+                                    controller: field15e,
+                                  ),
+                                ),
+                                actions: [
+                                  FButton(
+                                    child: const Text('Continue'),
+                                    onPress: () {
+                                      if (field15e.text.trim().toLowerCase() ==
+                                          "why") {
+                                        show15.value = true;
+                                      }
 
-                    FTileGroup(
-                      divider: FItemDivider.indented,
-                      label: const Text('App Settings'),
-                      children: [
-                        FTile(
-                          prefix: Icon(FIcons.moon),
-                          title: const Text('Dark Mode'),
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                ],
+                              ),
+                        );
+                      },
+                      child: Text('Background Sync'),
+                    ),
 
-                          suffix: FSwitch(
-                            value:
-                                ref.watch(themeControllerProvider) ==
-                                ThemeMode.dark,
-                            onChange: (value) {
-                              ref
-                                  .read(themeControllerProvider.notifier)
-                                  .toggleTheme();
-                            },
-                          ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.bell),
-                          title: const Text("Notification Management"),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress: () {
-                            GoRouter.of(
-                              context,
-                            ).pushNamed(Paths.notificationManagement);
+                    selectControl: FMultiValueControl.managedRadio(
+                      initial: initialValSync,
+                      onChange:
+                          (value) => {
+                            ref
+                                .read(backgroundSyncProvider.notifier)
+                                .updateFreq(value.first),
                           },
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.logs),
-                          title: const Text("Logs"),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress: () {
-                            GoRouter.of(context).pushNamed(Paths.logs);
-                          },
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.logOut),
-                          title: const Text("Sign Out"),
-                          onPress: () async {
-                            final router = GoRouter.of(context);
-                            final services = await ref.read(
-                              appServicesProvider.future,
-                            );
-                            await services.authRepository.signOut();
-                            ref.invalidate(activeAccountProvider);
-                            if (context.mounted) {
-                              router.go('/onboarding');
-                            }
-                          },
-                        ),
-                      ],
+                    ),
+                    menu: backgroundSync,
+                  ),
+                ],
+              ),
+              const UserBox(),
+
+              FTileGroup(
+                divider: FItemDivider.indented,
+                label: const Text('App Settings'),
+                children: [
+                  FTile(
+                    prefix: Icon(FIcons.moon),
+                    title: const Text('Dark Mode'),
+
+                    suffix: FSwitch(
+                      value:
+                          ref.watch(themeControllerProvider) == ThemeMode.dark,
+                      onChange: (value) {
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .toggleTheme();
+                      },
+                    ),
+                  ),
+                  FTile(
+                    prefix: Icon(FIcons.bell),
+                    title: const Text("Notification Management"),
+                    suffix: Icon(FIcons.chevronRight),
+                    onPress: () {
+                      GoRouter.of(
+                        context,
+                      ).pushNamed(Paths.notificationManagement);
+                    },
+                  ),
+                  FTile(
+                    prefix: Icon(FIcons.logs),
+                    title: const Text("Logs"),
+                    suffix: Icon(FIcons.chevronRight),
+                    onPress: () {
+                      GoRouter.of(context).pushNamed(Paths.logs);
+                    },
+                  ),
+                  FTile(
+                    prefix: Icon(FIcons.logOut),
+                    title: const Text("Sign Out"),
+                    onPress: () async {
+                      final router = GoRouter.of(context);
+                      final services = await ref.read(
+                        appServicesProvider.future,
+                      );
+                      await services.authRepository.signOut();
+                      ref.invalidate(activeAccountProvider);
+                      if (context.mounted) {
+                        router.go('/onboarding');
+                      }
+                    },
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: Icon(FIcons.github),
+                      onPressed: () {
+                        launchUrl(
+                          Uri.parse("https://github.com/itsKryxen/vitap-mate"),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 24),
+                    IconButton(
+                      icon: Icon(FIcons.contact),
+                      onPressed: () {
+                        launchUrl(Uri.parse("https://bio.link/synaptic"));
+                      },
+                    ),
+                    const SizedBox(width: 24),
+                    IconButton(
+                      icon: Icon(FIcons.instagram),
+                      onPressed: () {
+                        launchUrl(
+                          Uri.parse("https://www.instagram.com/itsKryxen"),
+                        );
+                      },
                     ),
                   ],
                 ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(FIcons.github),
-                  onPressed: () {
-                    launchUrl(
-                      Uri.parse("https://github.com/itsKryxen/vitap-mate"),
-                    );
-                  },
-                ),
-                IconButton(
-                  icon: Icon(FIcons.contact),
-                  onPressed: () {
-                    launchUrl(Uri.parse("https://bio.link/synaptic"));
-                  },
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

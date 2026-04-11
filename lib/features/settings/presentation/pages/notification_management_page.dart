@@ -18,28 +18,10 @@ class NotificationManagementPage extends HookConsumerWidget {
     final debugDelayController = useTextEditingController(text: "0");
     final classReminderSettings = ref.watch(classReminderSettingsProvider);
     final examReminderSettings = ref.watch(examReminderSettingsProvider);
-    final classController = useMemoized(
-      () => FContinuousSliderController(
-        selection: FSliderSelection(
-          max: ((classReminderSettings.notifyBeforeMinutes - 5) / 55).clamp(
-            0.0,
-            1.0,
-          ),
-        ),
-      ),
-      [classReminderSettings.notifyBeforeMinutes],
-    );
-    final examController = useMemoized(
-      () => FContinuousSliderController(
-        selection: FSliderSelection(
-          max: ((examReminderSettings.notifyBeforeMinutes - 5) / 115).clamp(
-            0.0,
-            1.0,
-          ),
-        ),
-      ),
-      [examReminderSettings.notifyBeforeMinutes],
-    );
+    final classSliderValue =
+        ((classReminderSettings.notifyBeforeMinutes - 5) / 55).clamp(0.0, 1.0);
+    final examSliderValue =
+        ((examReminderSettings.notifyBeforeMinutes - 5) / 115).clamp(0.0, 1.0);
 
     return Container(
       color: context.theme.colors.background,
@@ -77,12 +59,16 @@ class NotificationManagementPage extends HookConsumerWidget {
                             children: [
                               const Text("Delay in seconds (0 = immediate)."),
                               const SizedBox(height: 8),
-                              FTextField(controller: debugDelayController),
+                              FTextField(
+                                control: FTextFieldControl.managed(
+                                  controller: debugDelayController,
+                                ),
+                              ),
                             ],
                           ),
                           actions: [
                             FButton(
-                              style: FButtonStyle.outline(),
+                              variant: FButtonVariant.outline,
                               onPress: () => Navigator.of(context).pop(),
                               child: const Text("Cancel"),
                             ),
@@ -149,23 +135,27 @@ class NotificationManagementPage extends HookConsumerWidget {
                 children: [
                   Text("${classReminderSettings.notifyBeforeMinutes} minutes"),
                   FSlider(
-                    controller: classController,
-                    onChange: (selection) async {
-                      final minutes = (5 + (selection.offset.max * 55).round())
-                          .clamp(5, 60);
-                      if (minutes ==
-                          classReminderSettings.notifyBeforeMinutes) {
-                        return;
-                      }
-                      await ref
-                          .read(classReminderSettingsControllerProvider)
-                          .setNotifyBeforeMinutes(minutes);
-                      if (ref.read(classReminderSettingsProvider).enabled) {
+                    control: FSliderControl.managedContinuous(
+                      initial: FSliderValue(max: classSliderValue),
+                      onChange: (value) async {
+                        final minutes = (5 + (value.max * 55).round()).clamp(
+                          5,
+                          60,
+                        );
+                        if (minutes ==
+                            classReminderSettings.notifyBeforeMinutes) {
+                          return;
+                        }
                         await ref
-                            .read(timetableProvider.notifier)
-                            .updateTimetable();
-                      }
-                    },
+                            .read(classReminderSettingsControllerProvider)
+                            .setNotifyBeforeMinutes(minutes);
+                        if (ref.read(classReminderSettingsProvider).enabled) {
+                          await ref
+                              .read(timetableProvider.notifier)
+                              .updateTimetable();
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -191,12 +181,16 @@ class NotificationManagementPage extends HookConsumerWidget {
                               "Enter number of days to pause class notifications.",
                             ),
                             const SizedBox(height: 8),
-                            FTextField(controller: pauseDaysController),
+                            FTextField(
+                              control: FTextFieldControl.managed(
+                                controller: pauseDaysController,
+                              ),
+                            ),
                           ],
                         ),
                         actions: [
                           FButton(
-                            style: FButtonStyle.outline(),
+                            variant: FButtonVariant.outline,
                             child: const Text("Clear Pause"),
                             onPress: () async {
                               await ref
@@ -270,22 +264,27 @@ class NotificationManagementPage extends HookConsumerWidget {
                 children: [
                   Text("${examReminderSettings.notifyBeforeMinutes} minutes"),
                   FSlider(
-                    controller: examController,
-                    onChange: (selection) async {
-                      final minutes = (5 + (selection.offset.max * 115).round())
-                          .clamp(5, 120);
-                      if (minutes == examReminderSettings.notifyBeforeMinutes) {
-                        return;
-                      }
-                      await ref
-                          .read(examReminderSettingsControllerProvider)
-                          .setNotifyBeforeMinutes(minutes);
-                      if (ref.read(examReminderSettingsProvider).enabled) {
+                    control: FSliderControl.managedContinuous(
+                      initial: FSliderValue(max: examSliderValue),
+                      onChange: (value) async {
+                        final minutes = (5 + (value.max * 115).round()).clamp(
+                          5,
+                          120,
+                        );
+                        if (minutes ==
+                            examReminderSettings.notifyBeforeMinutes) {
+                          return;
+                        }
                         await ref
-                            .read(examScheduleProvider.notifier)
-                            .updatexamschedule();
-                      }
-                    },
+                            .read(examReminderSettingsControllerProvider)
+                            .setNotifyBeforeMinutes(minutes);
+                        if (ref.read(examReminderSettingsProvider).enabled) {
+                          await ref
+                              .read(examScheduleProvider.notifier)
+                              .updatexamschedule();
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),

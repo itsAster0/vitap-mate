@@ -6,21 +6,57 @@ part of 'user_management.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+
+@ProviderFor(IsLoadingSems)
+final isLoadingSemsProvider = IsLoadingSemsProvider._();
+
+final class IsLoadingSemsProvider
+    extends $NotifierProvider<IsLoadingSems, bool> {
+  IsLoadingSemsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'isLoadingSemsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$isLoadingSemsHash();
+
+  @$internal
+  @override
+  IsLoadingSems create() => IsLoadingSems();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
 String _$isLoadingSemsHash() => r'f1c937265eb67dc18363cb1a4803aecbd9193d0d';
 
-/// See also [IsLoadingSems].
-@ProviderFor(IsLoadingSems)
-final isLoadingSemsProvider = NotifierProvider<IsLoadingSems, bool>.internal(
-  IsLoadingSems.new,
-  name: r'isLoadingSemsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$isLoadingSemsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-typedef _$IsLoadingSems = Notifier<bool>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$IsLoadingSems extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

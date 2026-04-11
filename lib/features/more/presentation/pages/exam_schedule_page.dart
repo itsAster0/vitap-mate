@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -14,6 +15,7 @@ class ExamSchedulePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final autoRefreshOnOpen = ref.watch(autoRefreshOnOpenProvider);
     Future<void> update() async {
       try {
         await ref.read(examScheduleProvider.notifier).updatexamschedule();
@@ -25,6 +27,9 @@ class ExamSchedulePage extends HookConsumerWidget {
     final darkMode = ref.watch(themeControllerProvider) == ThemeMode.dark;
 
     useEffect(() {
+      if (!autoRefreshOnOpen) {
+        return null;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref.read(examScheduleProvider.notifier).updatexamschedule();
@@ -34,7 +39,7 @@ class ExamSchedulePage extends HookConsumerWidget {
       });
 
       return null;
-    }, []);
+    }, [autoRefreshOnOpen]);
     var examData = ref.watch(examScheduleProvider);
     return RefreshIndicator(
       onRefresh: () async {
@@ -173,27 +178,36 @@ class ExamSchedulePage extends HookConsumerWidget {
               },
               loading: () {
                 return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: 50,
-                        height: 50,
-                        child: CircularProgressIndicator(
-                          color: ExamColors.examIcon,
-                          strokeWidth: 3,
-                        ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Loading exam schedule...",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color:
+                                  darkMode
+                                      ? context.theme.colors.primary
+                                      : ExamColors.secondaryText,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          LinearProgressIndicator(
+                            minHeight: 3,
+                            color: ExamColors.examIcon,
+                            backgroundColor: ExamColors.examIcon.withValues(
+                              alpha: 0.18,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Loading exam schedule...",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: ExamColors.secondaryText,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 );
               },

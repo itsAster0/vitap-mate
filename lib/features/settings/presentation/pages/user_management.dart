@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -246,108 +248,52 @@ class UserSemChange extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controller = useFRadioSelectMenuTileGroupController<String>(
-      value: user.semid,
-    );
+    final controller = useFRadioMultiValueNotifier<String>(value: user.semid);
     final outercontext = context;
+
+    Future<void> refreshSemesters() async {
+      try {
+        ref.read(isLoadingSemsProvider.notifier).setLoading(true);
+        await ref.read(semesterIdProvider.notifier).updatesemids();
+        ref.invalidate(semesterIdProvider);
+      } finally {
+        ref.read(isLoadingSemsProvider.notifier).setLoading(false);
+      }
+    }
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
-          onPress:
-              () => showAdaptiveDialog(
-                context: context,
-                builder: (context) {
-                  return Consumer(
-                    builder: (context, ref, child) {
-                      var semester = ref.watch(semesterIdProvider);
+          onPress: () {
+            unawaited(refreshSemesters().catchError((e) {}));
+            showAdaptiveDialog(
+              context: context,
+              builder: (context) {
+                return Consumer(
+                  builder: (context, ref, child) {
+                    var semester = ref.watch(semesterIdProvider);
 
-                      return semester.when(
-                        data: (data) {
-                          return FDialog(
-                            body: ConstrainedBox(
-                              constraints: const BoxConstraints(maxHeight: 300),
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  children: [
-                                    FSelectTileGroup(
-                                      selectController: controller,
-                                      label: Consumer(
-                                        builder: (context, ref, child) {
-                                          final isLoading = ref.watch(
-                                            isLoadingSemsProvider,
-                                          );
-                                          void handelClick() async {
-                                            try {
-                                              ref
-                                                  .read(
-                                                    isLoadingSemsProvider
-                                                        .notifier,
-                                                  )
-                                                  .setLoading(true);
-
-                                              await ref
-                                                  .read(
-                                                    semesterIdProvider.notifier,
-                                                  )
-                                                  .updatesemids();
-                                              ref.invalidate(
-                                                semesterIdProvider,
-                                              );
-                                              ref
-                                                  .read(
-                                                    isLoadingSemsProvider
-                                                        .notifier,
-                                                  )
-                                                  .setLoading(false);
-                                            } catch (e, _) {
-                                              if (context.mounted) {
-                                                ref
-                                                    .read(
-                                                      isLoadingSemsProvider
-                                                          .notifier,
-                                                    )
-                                                    .setLoading(false);
-
-                                                Navigator.of(context).pop();
-                                              }
-                                              if (outercontext.mounted) {
-                                                disCommonToast(outercontext, e);
-                                              }
-                                            }
-                                          }
-
-                                          return Row(
-                                            mainAxisSize: MainAxisSize.max,
-                                            children: [
-                                              const SizedBox(width: 10),
-                                              const Expanded(
-                                                child: Text('Semesters'),
-                                              ),
-                                              if (!isLoading)
-                                                FTappable(
-                                                  onPress: handelClick,
-                                                  child: const Icon(
-                                                    FIcons.rotateCcw,
-                                                  ),
-                                                ),
-                                              if (isLoading)
-                                                FCircularProgress.pinwheel(),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                      description: const Text(
-                                        'Select the Semester.',
-                                      ),
-                                      onSelect: (value) async {
+                    return semester.when(
+                      data: (data) {
+                        return FDialog(
+                          body: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 300),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  FSelectTileGroup(
+                                    control: FMultiValueControl.managedRadio(
+                                      controller: controller,
+                                      onChange: (value) async {
+                                        final selected = value.firstOrNull;
+                                        if (selected == null) return;
                                         await ref
                                             .read(
                                               vtopusersutilsProvider.notifier,
                                             )
                                             .vtopUserSave(
-                                              user.copyWith(semid: value.$1),
+                                              user.copyWith(semid: selected),
                                             );
                                         ref.invalidate(vtopUserProvider);
                                         ref.invalidate(vClientProvider);
@@ -373,70 +319,113 @@ class UserSemChange extends HookConsumerWidget {
                                           Navigator.of(context).pop();
                                         }
                                       },
-                                      validator:
-                                          (values) =>
-                                              values?.isEmpty ?? true
-                                                  ? 'Please select a value.'
-                                                  : null,
-                                      children: [
-                                        for (final i in data.semesters)
-                                          FSelectTile(
-                                            title: Text(i.name, maxLines: 2),
-                                            value: i.id,
-                                          ),
-                                      ],
                                     ),
-                                  ],
-                                ),
+                                    label: Consumer(
+                                      builder: (context, ref, child) {
+                                        final isLoading = ref.watch(
+                                          isLoadingSemsProvider,
+                                        );
+                                        void handelClick() async {
+                                          try {
+                                            await refreshSemesters();
+                                          } catch (e, _) {
+                                            if (context.mounted) {
+                                              Navigator.of(context).pop();
+                                            }
+                                            if (outercontext.mounted) {
+                                              disCommonToast(outercontext, e);
+                                            }
+                                          }
+                                        }
+
+                                        return Row(
+                                          mainAxisSize: MainAxisSize.max,
+                                          children: [
+                                            const SizedBox(width: 10),
+                                            const Expanded(
+                                              child: Text('Semesters'),
+                                            ),
+                                            if (!isLoading)
+                                              FTappable(
+                                                onPress: handelClick,
+                                                child: const Icon(
+                                                  FIcons.rotateCcw,
+                                                ),
+                                              ),
+                                            if (isLoading)
+                                              FCircularProgress.pinwheel(),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                    description: const Text(
+                                      'Select the Semester.',
+                                    ),
+                                    validator:
+                                        (values) =>
+                                            values?.isEmpty ?? true
+                                                ? 'Please select a value.'
+                                                : null,
+                                    children: [
+                                      for (final i in data.semesters)
+                                        FSelectTile(
+                                          title: Text(i.name, maxLines: 2),
+                                          value: i.id,
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
-                            title: const Text('Semesters'),
+                          ),
+                          title: const Text('Semesters'),
+                          actions: [
+                            FButton(
+                              variant: FButtonVariant.outline,
+                              onPress: () => Navigator.of(context).pop(),
+                              child: const Text('Cancel'),
+                            ),
+                          ],
+                        );
+                      },
+                      error:
+                          (e, et) => FDialog(
+                            body: Container(
+                              decoration: BoxDecoration(
+                                color: context.theme.colors.primaryForeground,
+                              ),
+                              child: Text("$e"),
+                            ),
                             actions: [
                               FButton(
-                                style: FButtonStyle.outline(),
+                                variant: FButtonVariant.outline,
                                 onPress: () => Navigator.of(context).pop(),
                                 child: const Text('Cancel'),
                               ),
                             ],
-                          );
-                        },
-                        error:
-                            (e, et) => FDialog(
-                              body: Container(
-                                decoration: BoxDecoration(
-                                  color: context.theme.colors.primaryForeground,
-                                ),
-                                child: Text("$e"),
+                          ),
+                      loading:
+                          () => FDialog(
+                            body: Container(
+                              decoration: BoxDecoration(
+                                color: context.theme.colors.primaryForeground,
                               ),
-                              actions: [
-                                FButton(
-                                  style: FButtonStyle.outline(),
-                                  onPress: () => Navigator.of(context).pop(),
-                                  child: const Text('Cancel'),
-                                ),
-                              ],
+                              child: FCircularProgress(),
                             ),
-                        loading:
-                            () => FDialog(
-                              body: Container(
-                                decoration: BoxDecoration(
-                                  color: context.theme.colors.primaryForeground,
-                                ),
-                                child: FCircularProgress(),
+                            actions: [
+                              FButton(
+                                variant: FButtonVariant.outline,
+                                onPress: () => Navigator.of(context).pop(),
+                                child: const Text('Cancel'),
                               ),
-                              actions: [
-                                FButton(
-                                  style: FButtonStyle.outline(),
-                                  onPress: () => Navigator.of(context).pop(),
-                                  child: const Text('Cancel'),
-                                ),
-                              ],
-                            ),
-                      );
-                    },
-                  );
-                },
-              ),
+                            ],
+                          ),
+                    );
+                  },
+                );
+              },
+            );
+          },
           child: const Text("Change Semester"),
         ),
       ],
@@ -484,12 +473,12 @@ class UserPassChangeDialog extends HookConsumerWidget {
         spacing: 12,
         children: [
           FTextField(
-            controller: usernameController,
+            control: FTextFieldControl.managed(controller: usernameController),
             label: const Text("VTOP Username"),
             hint: "registration number",
           ),
           FTextField.password(
-            controller: passwordController,
+            control: FTextFieldControl.managed(controller: passwordController),
             obscuringCharacter: '*',
             label: const Text("VTOP Password"),
             clearable: (k) => k.text.isNotEmpty,
@@ -549,7 +538,7 @@ class UserPassChangeDialog extends HookConsumerWidget {
             ),
           ),
         FButton(
-          style: FButtonStyle.outline(),
+          variant: FButtonVariant.outline,
           onPress: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
