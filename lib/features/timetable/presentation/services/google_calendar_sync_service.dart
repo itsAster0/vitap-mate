@@ -120,7 +120,9 @@ class CalendarSyncService {
 
   static Future<List<CalendarInfo>> getWritableCalendars() async {
     if (!Platform.isAndroid) return const [];
-    final raw = await _channel.invokeMethod<List<dynamic>>("getWritableCalendars");
+    final raw = await _channel.invokeMethod<List<dynamic>>(
+      "getWritableCalendars",
+    );
     if (raw == null) return const [];
     return raw
         .whereType<Map<Object?, Object?>>()

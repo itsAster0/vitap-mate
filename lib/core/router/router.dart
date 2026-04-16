@@ -17,8 +17,6 @@ import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
-import 'package:vitapmate/features/social/presentation/pages/message_chat_page.dart';
-import 'package:vitapmate/features/social/presentation/pages/social_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
 
@@ -171,29 +169,6 @@ final routerProvider = Provider((ref) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: UserManagementPage(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/social',
-                name: Paths.social,
-                builder: (context, state) => SocialPage(),
-                routes: [
-                  GoRoute(
-                    path: 'messagechat',
-                    name: Paths.messageChat,
-
-                    pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
-                        key: state.pageKey,
-                        child: MessageChatPage(),
                       );
                     },
                   ),

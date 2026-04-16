@@ -5,7 +5,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/router.dart';
-import 'package:vitapmate/features/social/presentation/providers/pocketbase.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/notification_init_state.dart';
 
@@ -124,18 +123,7 @@ class NotificationService {
   void _setupFirebaseListeners() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       log('📲 Foreground notification: ${message.notification?.title}');
-      try {
-        if (rootNavigatorKey.currentContext == null) return;
-        String location =
-            GoRouter.of(
-              rootNavigatorKey.currentContext!,
-            ).routeInformationProvider.value.uri.toString();
-        if (!location.contains("social")) {
-          showNotification(message);
-        }
-      } catch (e) {
-        ();
-      }
+      showNotification(message);
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
@@ -145,7 +133,6 @@ class NotificationService {
 
     _firebaseMessaging.onTokenRefresh.listen((newToken) {
       log('FCM Token refreshed: $newToken');
-      pbSetNtotification(tokenNew: newToken);
     });
   }
 
@@ -232,7 +219,7 @@ class NotificationService {
   void _navigateBasedOnPayload(String? payload) {
     if (payload != null) {
       if (rootNavigatorKey.currentContext == null) return;
-      GoRouter.of(rootNavigatorKey.currentContext!).goNamed(Paths.social);
+      GoRouter.of(rootNavigatorKey.currentContext!).goNamed(Paths.timetable);
 
       log('Navigating based on payload: $payload');
     }
@@ -240,7 +227,7 @@ class NotificationService {
 
   void _navigateBasedOnData(Map<String, dynamic> data) {
     if (rootNavigatorKey.currentContext == null) return;
-    GoRouter.of(rootNavigatorKey.currentContext!).goNamed(Paths.social);
+    GoRouter.of(rootNavigatorKey.currentContext!).goNamed(Paths.timetable);
 
     if (data.isNotEmpty) {
       log('Navigating based on data: $data');

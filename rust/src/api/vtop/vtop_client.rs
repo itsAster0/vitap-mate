@@ -412,9 +412,10 @@ impl VtopClient {
             match cookie {
                 Ok(value_of_cookie) => {
                     if !value_of_cookie.is_empty() {
-                        if self.get_csrf_for_cookie_set().await.is_ok() {
+                      if matches!(self.validate_authenticated_session().await, Ok(true)) {
                             self.session.set_authenticated(true);
                             self.session.set_cookie_external(false);
+                         
                             return Ok(());
                         }
                         self.session.set_authenticated(false);
@@ -456,27 +457,7 @@ impl VtopClient {
             "Max login attempts exceeded".to_string(),
         ))
     }
-    async fn get_csrf_for_cookie_set(&mut self) -> VtopResult<()> {
-        let url = format!("{}/vtop/open/page", self.config.base_url);
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|error| reqwest_network_error("get_csrf_for_cookie_set.send", error))?;
 
-        if !response.status().is_success() || response.url().to_string().contains("login") {
-            return Err(VtopError::VtopServerError);
-        }
-        self.current_page = Some(
-            response
-                .text()
-                .await
-                .map_err(|error| reqwest_network_error("get_csrf_for_cookie_set.text", error))?,
-        );
-        let _ = self.extract_csrf_token();
-        Ok(())
-    }
     async fn perform_login(&mut self, captcha_answer: &str) -> VtopResult<()> {
         let csrf = self
             .session
@@ -510,15 +491,15 @@ impl VtopClient {
                 return Err(VtopError::AuthenticationFailed(
                     "Invalid Captcha".to_string(),
                 ));
-            } else if response_text.contains("Invalid LoginId/Password")
-                || response_text.contains("Invalid  Username/Password")
+            } else if response_text.to_lowercase().contains(&"Invalid LoginId/Password".to_lowercase())
+                || response_text.to_lowercase().contains(&"Invalid  Username/Password".to_lowercase())
             {
                 return Err(VtopError::InvalidCredentials);
             } else {
-                // Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
-                //     &response_text,
-                // )))
-                return Err(VtopError::InvalidCredentials);
+               return  Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
+                    &response_text,
+                )));
+               
             }
         } else {
             self.current_page = Some(response_text);
@@ -530,6 +511,30 @@ impl VtopClient {
             Ok(())
         }
     }
+
+        async fn validate_authenticated_session(&mut self) -> VtopResult<bool> {
+        let url = format!("{}/vtop/content", self.config.base_url);
+        let response =
+            self.client.get(&url).send().await.map_err(|error| {
+                reqwest_network_error("validate_authenticated_session.send", error)
+            })?;
+        let final_url = response.url().to_string();
+        let status = response.status();
+        let is_same_url = final_url.trim_end_matches('/') == url.trim_end_matches('/');
+        let redirected = !is_same_url || status.is_redirection();
+        if !status.is_success() || redirected {
+            return Ok(false);
+        }
+        self.current_page = Some(
+            response
+                .text()
+                .await
+                .map_err(|error| reqwest_network_error("get_csrf_for_cookie_set.text", error))?,
+        );
+        let _ = self.extract_csrf_token();
+        Ok(true)
+    }
+
     async fn load_login_page(&mut self, k: bool) -> VtopResult<()> {
         if k {
             self.load_initial_page().await?;
@@ -663,17 +668,17 @@ impl VtopClient {
 
         Ok(())
     }
-    // fn get_login_page_error(data: &str) -> String {
-    //     let ptext = r#"span.text-danger.text-center[role="alert"]"#;
-    //     let document = Html::parse_document(data);
-    //     let selector = Selector::parse(&ptext).unwrap();
-    //     if let Some(element) = document.select(&selector).next() {
-    //         let error_message = element.text().collect::<Vec<_>>().join(" ");
-    //         error_message.trim().into()
-    //     } else {
-    //         "Unknown login error".into()
-    //     }
-    // }
+    fn get_login_page_error(data: &str) -> String {
+        let ptext = r#"span.text-danger.text-center[role="alert"]"#;
+        let document = Html::parse_document(data);
+        let selector = Selector::parse(&ptext).unwrap();
+        if let Some(element) = document.select(&selector).next() {
+            let error_message = element.text().collect::<Vec<_>>().join(" ");
+            error_message.trim().into()
+        } else {
+            "Unknown login error".into()
+        }
+    }
 }
 // for building
 impl VtopClient {

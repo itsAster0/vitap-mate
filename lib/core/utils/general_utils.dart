@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:pocketbase/pocketbase.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
@@ -19,13 +18,30 @@ String formatUnixTimestamp(int timestamp) {
 String commonErrorMessage(Object e) {
   if (e == VtopError.invalidCredentials()) {
     return 'It looks like you changed your VTOP password. Please update it.';
-  } else if (e == VtopError.networkError() || e is ClientException) {
-    return "You're offline. Please check your connection and try again by refreshing.";
-  } else if (e is FeatureDisabledException) {
-    return 'This feature is currently disabled. Please try again in a while';
-  } else {
-    return "Something went wrong. Please try reopening the app.";
   }
+
+  if (e is VtopError) {
+    final authMessage = e.maybeWhen(
+      authenticationFailed: (message) {
+        final trimmed = message.trim();
+        return trimmed.isNotEmpty ? trimmed : 'Authentication failed';
+      },
+      orElse: () => '',
+    );
+    if (authMessage.isNotEmpty) {
+      return authMessage;
+    }
+  }
+
+  if (e == VtopError.networkError()) {
+    return "You're offline. Please check your connection and try again by refreshing.";
+  }
+
+  if (e is FeatureDisabledException) {
+    return 'This feature is currently disabled. Please try again in a while';
+  }
+
+  return "Something went wrong. Please try reopening the app.";
 }
 
 void myNotificationTapCallback(

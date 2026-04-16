@@ -68,9 +68,7 @@ class StudentProjects extends _$StudentProjects {
       rotationSeed,
     );
     await prefs.setInt(_rotationSeedKey, rotationSeed + 1);
-    unawaited(
-      _refreshFromGb(current: initial, rotationSeed: rotationSeed),
-    );
+    unawaited(_refreshFromGb(current: initial, rotationSeed: rotationSeed));
     return initial;
   }
 

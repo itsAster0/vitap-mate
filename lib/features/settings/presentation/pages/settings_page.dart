@@ -8,9 +8,6 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/background/controller.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/pb_helper.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/social_avatar_update.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/social_username_update.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -135,38 +132,6 @@ class SettingsPage extends HookConsumerWidget {
                       ],
                     ),
 
-                    FTileGroup(
-                      divider: FItemDivider.indented,
-                      label: const Text('Social'),
-                      children: [
-                        FTile(
-                          prefix: Icon(FIcons.atSign),
-                          title: const Text('Username'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress:
-                              () => showAdaptiveDialog(
-                                context: context,
-                                builder:
-                                    (context) => PbHelper(
-                                      child: (pb) => SocialUsernameUpdate(pb),
-                                    ),
-                              ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.image),
-                          title: const Text('Avatar'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress:
-                              () => showAdaptiveDialog(
-                                context: context,
-                                builder:
-                                    (context) => PbHelper(
-                                      child: (pb) => SocialAvatarUpdate(pb),
-                                    ),
-                              ),
-                        ),
-                      ],
-                    ),
                     FTileGroup(
                       divider: FItemDivider.indented,
                       label: const Text('App Settings'),
