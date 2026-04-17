@@ -72,23 +72,21 @@ class MarksCard extends HookConsumerWidget {
             onPress: toggle,
             child: Container(
               decoration: BoxDecoration(
-                gradient:
-                    !darkMode
-                        ? LinearGradient(
-                          colors:
-                              isLab
-                                  ? [
-                                    MarksColors.labCardBackground,
-                                    MarksColors.labCardSecondary,
-                                  ]
-                                  : [
-                                    MarksColors.theoryCardBackground,
-                                    MarksColors.theoryCardSecondary,
-                                  ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                        : null,
+                gradient: !darkMode
+                    ? LinearGradient(
+                        colors: isLab
+                            ? [
+                                MarksColors.labCardBackground,
+                                MarksColors.labCardSecondary,
+                              ]
+                            : [
+                                MarksColors.theoryCardBackground,
+                                MarksColors.theoryCardSecondary,
+                              ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(12),
                 color: darkMode ? context.theme.colors.primaryForeground : null,
                 boxShadow: [
@@ -120,10 +118,11 @@ class MarksCard extends HookConsumerWidget {
                             borderRadius: BorderRadius.circular(10),
                             boxShadow: [
                               BoxShadow(
-                                color: (isLab
-                                        ? MarksColors.labIcon
-                                        : MarksColors.theoryIcon)
-                                    .withValues(alpha: 0.1),
+                                color:
+                                    (isLab
+                                            ? MarksColors.labIcon
+                                            : MarksColors.theoryIcon)
+                                        .withValues(alpha: 0.1),
                                 blurRadius: 8,
                                 offset: const Offset(0, 2),
                               ),
@@ -132,10 +131,9 @@ class MarksCard extends HookConsumerWidget {
                           child: Icon(
                             isLab ? FIcons.flaskConical : FIcons.libraryBig,
 
-                            color:
-                                isLab
-                                    ? MarksColors.labIcon
-                                    : MarksColors.theoryIcon,
+                            color: isLab
+                                ? MarksColors.labIcon
+                                : MarksColors.theoryIcon,
                             size: 20,
                           ),
                         ),
@@ -151,10 +149,9 @@ class MarksCard extends HookConsumerWidget {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.primaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.primaryText,
                                   height: 1.3,
                                 ),
                               ),
@@ -164,10 +161,9 @@ class MarksCard extends HookConsumerWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.secondaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.secondaryText,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -200,10 +196,9 @@ class MarksCard extends HookConsumerWidget {
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.primaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.primaryText,
                                 ),
                               ),
                               Text(
@@ -238,10 +233,9 @@ class MarksCard extends HookConsumerWidget {
                       ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
-                        widthFactor:
-                            totals.$2 > 0
-                                ? (totals.$1 / totals.$2).clamp(0.0, 1.0)
-                                : 0,
+                        widthFactor: totals.$2 > 0
+                            ? (totals.$1 / totals.$2).clamp(0.0, 1.0)
+                            : 0,
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -271,10 +265,9 @@ class MarksCard extends HookConsumerWidget {
                         Icon(
                           Icons.person_outline,
                           size: 16,
-                          color:
-                              darkMode
-                                  ? context.theme.colors.primary
-                                  : MarksColors.secondaryText,
+                          color: darkMode
+                              ? context.theme.colors.primary
+                              : MarksColors.secondaryText,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
@@ -282,10 +275,9 @@ class MarksCard extends HookConsumerWidget {
                             "by ${record.faculity}",
                             style: TextStyle(
                               fontSize: 14,
-                              color:
-                                  darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.secondaryText,
+                              color: darkMode
+                                  ? context.theme.colors.primary
+                                  : MarksColors.secondaryText,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -296,10 +288,9 @@ class MarksCard extends HookConsumerWidget {
                           "${record.marks.length} items",
                           style: TextStyle(
                             fontSize: 12,
-                            color:
-                                darkMode
-                                    ? context.theme.colors.primary
-                                    : MarksColors.tertiaryText,
+                            color: darkMode
+                                ? context.theme.colors.primary
+                                : MarksColors.tertiaryText,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -313,9 +304,8 @@ class MarksCard extends HookConsumerWidget {
           const SizedBox(height: 8),
           AnimatedBuilder(
             animation: animation,
-            builder:
-                (context, child) =>
-                    FCollapsible(value: animation.value, child: child!),
+            builder: (context, child) =>
+                FCollapsible(value: animation.value, child: child!),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 4),
               child: MarksTable(marks: record.marks),

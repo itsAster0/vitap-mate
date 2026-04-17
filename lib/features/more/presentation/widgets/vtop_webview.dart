@@ -93,7 +93,8 @@ class VtopWebview extends HookConsumerWidget {
       final controller = webController.value;
       if (controller != null) {
         controller.evaluateJavascript(
-          source: '''
+          source:
+              '''
       (function() {
       // Wait a bit for content to load
       setTimeout(function() {
@@ -244,10 +245,9 @@ class VtopWebview extends HookConsumerWidget {
 
     Future<void> loadenv() async {
       final cookieManager = CookieManager.instance();
-      final expiresDate =
-          DateTime.now()
-              .add(const Duration(minutes: 30))
-              .millisecondsSinceEpoch;
+      final expiresDate = DateTime.now()
+          .add(const Duration(minutes: 30))
+          .millisecondsSinceEpoch;
 
       final client = await ref.read(vClientProvider.future);
       final raw = await fetchCookies(client: client);
@@ -337,7 +337,8 @@ class VtopWebview extends HookConsumerWidget {
       final controller = webController.value;
       if (controller != null) {
         await controller.evaluateJavascript(
-          source: '''
+          source:
+              '''
   (function() {
     const link = document.querySelector('a[data-url="$url"]');
     if (link) {
@@ -420,18 +421,14 @@ class VtopWebview extends HookConsumerWidget {
                   FItem(
                     prefix: const Icon(FIcons.graduationCap),
                     title: const Text('Grades'),
-                    onPress:
-                        () => gorto(
-                          "examinations/examGradeView/StudentGradeView",
-                        ),
+                    onPress: () =>
+                        gorto("examinations/examGradeView/StudentGradeView"),
                   ),
                   FItem(
                     prefix: const Icon(FIcons.history),
                     title: const Text('Grades History'),
-                    onPress:
-                        () => gorto(
-                          "examinations/examGradeView/StudentGradeHistory",
-                        ),
+                    onPress: () =>
+                        gorto("examinations/examGradeView/StudentGradeHistory"),
                   ),
                 ],
               ),
@@ -490,11 +487,10 @@ class VtopWebview extends HookConsumerWidget {
                 ],
               ),
             ],
-            builder:
-                (_, controller, _) => FHeaderAction(
-                  icon: const Icon(FIcons.ellipsis),
-                  onPress: controller.toggle,
-                ),
+            builder: (_, controller, _) => FHeaderAction(
+              icon: const Icon(FIcons.ellipsis),
+              onPress: controller.toggle,
+            ),
           ),
         ],
       ),

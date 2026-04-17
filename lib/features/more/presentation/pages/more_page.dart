@@ -13,7 +13,6 @@ import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/student_projects_provider.dart';
 
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
-import 'package:vitapmate/features/more/presentation/widgets/wifi_card.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 class MorePage extends HookConsumerWidget {
@@ -76,7 +75,6 @@ class MorePage extends HookConsumerWidget {
               ],
             ),
             VtopCard(),
-            if (ref.watch(wificardSettingProvider)) WifiCard(),
             _studentProjectsCard(context, ref),
           ],
         ),
@@ -89,13 +87,11 @@ class MorePage extends HookConsumerWidget {
     final pinnedIds = ref.watch(studentProjectPinnedIdsProvider);
     final pinnedOnly = ref.watch(studentProjectsPinnedOnlySessionProvider);
     final allProjects =
-        ref.watch(studentProjectsProvider).valueOrNull ??
-        defaultStudentProjects;
+        ref.watch(studentProjectsProvider).value ?? defaultStudentProjects;
     final controller = ref.read(studentProjectsSettingsControllerProvider);
-    final visibleProjects =
-        pinnedOnly
-            ? allProjects.where((p) => pinnedIds.contains(p.id)).toList()
-            : allProjects;
+    final visibleProjects = pinnedOnly
+        ? allProjects.where((p) => pinnedIds.contains(p.id)).toList()
+        : allProjects;
     final groupedProjects = <String, List<StudentProject>>{
       for (final category in _categoryOrder) category: <StudentProject>[],
     };
@@ -119,15 +115,11 @@ class MorePage extends HookConsumerWidget {
               ),
             ),
             FTappable(
-              onPress:
-                  () =>
-                      ref
-                          .read(
-                            studentProjectsPinnedOnlySessionProvider.notifier,
-                          )
-                          .state = !pinnedOnly,
+              onPress: () => ref
+                  .read(studentProjectsPinnedOnlySessionProvider.notifier)
+                  .setValue(!pinnedOnly),
               child: FBadge(
-                style: FBadgeStyle.outline(),
+                variant: FBadgeVariant.outline,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -218,146 +210,142 @@ class MorePage extends HookConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 10),
-      child:
-          projects.isEmpty
-              ? Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                child: const Text("No projects in this category."),
-              )
-              : SizedBox(
-                height: listHeight,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: projects.length,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
-                  itemBuilder: (context, index) {
-                    final p = projects[index];
-                    final isPinned = pinnedIds.contains(p.id);
-                    return SizedBox(
-                      width: cardWidth,
-                      child: FCard(
-                        image: _projectPreview(p.url, previewHeight),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                p.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              tooltip:
-                                  isPinned ? "Unpin Project" : "Pin Project",
-                              onPressed: () => controller.togglePinned(p.id),
-                              icon: Icon(
-                                isPinned
-                                    ? Icons.push_pin
-                                    : Icons.push_pin_outlined,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.type,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: MoreColors.secondaryText,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              p.desc,
-                              maxLines: 4,
+      child: projects.isEmpty
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              child: const Text("No projects in this category."),
+            )
+          : SizedBox(
+              height: listHeight,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: projects.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final p = projects[index];
+                  final isPinned = pinnedIds.contains(p.id);
+                  return SizedBox(
+                    width: cardWidth,
+                    child: FCard(
+                      image: _projectPreview(p.url, previewHeight),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              p.name,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Made by: ${p.madeBy}",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: MoreColors.secondaryText,
-                              ),
+                          ),
+                          IconButton(
+                            visualDensity: VisualDensity.compact,
+                            tooltip: isPinned ? "Unpin Project" : "Pin Project",
+                            onPressed: () => controller.togglePinned(p.id),
+                            icon: Icon(
+                              isPinned
+                                  ? Icons.push_pin
+                                  : Icons.push_pin_outlined,
+                              size: 20,
                             ),
-                            Text(
-                              p.openSource == null
-                                  ? "Closed source"
-                                  : "Open source ",
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: MoreColors.secondaryText,
-                              ),
+                          ),
+                        ],
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p.type,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: MoreColors.secondaryText,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: FButton(
-                                    style: FButtonStyle.outline(),
+                          ),
+                          Text(
+                            p.desc,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Made by: ${p.madeBy}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: MoreColors.secondaryText,
+                            ),
+                          ),
+                          Text(
+                            p.openSource == null
+                                ? "Closed source"
+                                : "Open source ",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: MoreColors.secondaryText,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FButton(
+                                  variant: FButtonVariant.outline,
+                                  onPress: () async {
+                                    await _confirmAndLaunchUrl(
+                                      context,
+                                      url: Uri.parse(p.url),
+                                      title: "Open Student Project",
+                                      body:
+                                          "You are going to a student-built project.",
+                                    );
+                                  },
+                                  child: const Text("Open"),
+                                ),
+                              ),
+                              if (p.openSource != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: FTappable(
                                     onPress: () async {
                                       await _confirmAndLaunchUrl(
                                         context,
-                                        url: Uri.parse(p.url),
-                                        title: "Open Student Project",
+                                        url: Uri.parse(p.openSource!),
+                                        title: "Open Open Source Link",
                                         body:
-                                            "You are going to a student-built project.",
+                                            "You are going to open a student project open-source link.",
                                       );
                                     },
-                                    child: const Text("Open"),
-                                  ),
-                                ),
-                                if (p.openSource != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: FTappable(
-                                      onPress: () async {
-                                        await _confirmAndLaunchUrl(
-                                          context,
-                                          url: Uri.parse(p.openSource!),
-                                          title: "Open Open Source Link",
-                                          body:
-                                              "You are going to open a student project open-source link.",
-                                        );
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: context.theme.colors.border,
-                                          ),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: context.theme.colors.border,
                                         ),
-                                        child: const Icon(Icons.code, size: 16),
                                       ),
+                                      child: const Icon(Icons.code, size: 16),
                                     ),
                                   ),
-                              ],
-                            ),
-                          ],
-                        ),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
+            ),
     );
   }
 
@@ -381,24 +369,23 @@ class MorePage extends HookConsumerWidget {
   }) async {
     final shouldOpen = await showFDialog<bool>(
       context: context,
-      builder:
-          (context, style, animation) => FDialog(
-            animation: animation,
-            direction: Axis.horizontal,
-            title: Text(title),
-            body: Text(body),
-            actions: [
-              FButton(
-                style: FButtonStyle.outline(),
-                onPress: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FButton(
-                onPress: () => Navigator.of(context).pop(true),
-                child: const Text('OK'),
-              ),
-            ],
+      builder: (context, style, animation) => FDialog(
+        animation: animation,
+        direction: Axis.horizontal,
+        title: Text(title),
+        body: Text(body),
+        actions: [
+          FButton(
+            variant: FButtonVariant.outline,
+            onPress: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
           ),
+          FButton(
+            onPress: () => Navigator.of(context).pop(true),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
     if (shouldOpen == true) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -590,24 +577,23 @@ class VtopCard extends HookConsumerWidget {
     }
 
     return cardConatiner(
-      child:
-          !isLoading.value
-              ? FButton(
-                onPress: () async {
-                  handelclick();
-                },
-                child: Text("Open"),
-              )
-              : Center(
-                child: const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: MoreColors.infoBorder,
-                  ),
+      child: !isLoading.value
+          ? FButton(
+              onPress: () async {
+                handelclick();
+              },
+              child: Text("Open"),
+            )
+          : Center(
+              child: const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: MoreColors.infoBorder,
                 ),
               ),
+            ),
       colors: colors,
       title: 'VTOP',
       desc: 'No login requried',

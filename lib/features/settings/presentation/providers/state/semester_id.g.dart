@@ -6,24 +6,44 @@ part of 'semester_id.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$semidRepositoryHash() => r'c4d7918822009843b6689cee98077dbb5a093ab4';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [semidRepository].
 @ProviderFor(semidRepository)
-final semidRepositoryProvider =
-    AutoDisposeFutureProvider<SemidRepository>.internal(
-      semidRepository,
-      name: r'semidRepositoryProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$semidRepositoryHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final semidRepositoryProvider = SemidRepositoryProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef SemidRepositoryRef = AutoDisposeFutureProviderRef<SemidRepository>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class SemidRepositoryProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SemidRepository>,
+          SemidRepository,
+          FutureOr<SemidRepository>
+        >
+    with $FutureModifier<SemidRepository>, $FutureProvider<SemidRepository> {
+  SemidRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'semidRepositoryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$semidRepositoryHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<SemidRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<SemidRepository> create(Ref ref) {
+    return semidRepository(ref);
+  }
+}
+
+String _$semidRepositoryHash() => r'c4d7918822009843b6689cee98077dbb5a093ab4';

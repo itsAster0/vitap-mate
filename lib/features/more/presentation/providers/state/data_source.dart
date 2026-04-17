@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/database/app_db_provider.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';

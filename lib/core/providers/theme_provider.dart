@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:forui/forui.dart';
+part 'theme_provider.g.dart';
 
-final themeProvider = StateNotifierProvider<ThemeNotifier, ThemeMode>((ref) {
-  return ThemeNotifier();
-});
-
-class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.system) {
-    _loadThemeMode();
-  }
-
+@Riverpod(keepAlive: true)
+class ThemeModeController extends _$ThemeModeController {
   static const String _themeKey = 'theme_mode';
+
+  @override
+  ThemeMode build() {
+    _loadThemeMode();
+    return ThemeMode.system;
+  }
 
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -27,8 +27,9 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
   }
 
   Future<void> toggleTheme() async {
-    final newThemeMode =
-        state == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    final newThemeMode = state == ThemeMode.light
+        ? ThemeMode.dark
+        : ThemeMode.light;
     await setThemeMode(newThemeMode);
   }
 
@@ -37,19 +38,22 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
   bool get isSystemMode => state == ThemeMode.system;
 }
 
-final fThemeProvider = Provider<FThemeData>((ref) {
+final themeProvider = themeModeControllerProvider;
+
+@riverpod
+FThemeData fTheme(Ref ref) {
   final themeMode = ref.watch(themeProvider);
 
   switch (themeMode) {
     case ThemeMode.dark:
-      return FThemes.zinc.dark;
+      return FThemes.zinc.dark.touch;
     case ThemeMode.light:
-      return FThemes.zinc.light;
+      return FThemes.zinc.light.touch;
     case ThemeMode.system:
       final brightness =
           WidgetsBinding.instance.platformDispatcher.platformBrightness;
       return brightness == Brightness.dark
-          ? FThemes.zinc.dark
-          : FThemes.zinc.light;
+          ? FThemes.zinc.dark.touch
+          : FThemes.zinc.light.touch;
   }
-});
+}

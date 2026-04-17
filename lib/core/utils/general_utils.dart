@@ -2,7 +2,6 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/core/exceptions.dart';
@@ -49,11 +48,7 @@ void myNotificationTapCallback(
   NotificationType notificationType,
 ) async {
   if (notificationType == NotificationType.complete) {
-    var path = await task.filePath();
-    var k = await OpenFile.open(path);
-    if (k.type == ResultType.noAppToOpen) {
-      await OpenFile.open(_androidDir.path);
-    }
+    //TODO : use downlaod maneger
   }
 }
 

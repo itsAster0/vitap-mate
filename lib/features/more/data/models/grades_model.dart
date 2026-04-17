@@ -61,13 +61,11 @@ class GradesModel {
       List<GradeRange> gradeRanges = const [];
       try {
         final decoded = jsonDecode(first.gradeRanges) as List<dynamic>;
-        gradeRanges =
-            decoded
-                .map(
-                  (e) =>
-                      GradeRange.fromJson(Map<String, dynamic>.from(e as Map)),
-                )
-                .toList();
+        gradeRanges = decoded
+            .map(
+              (e) => GradeRange.fromJson(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList();
       } catch (_) {}
       result[entry.key] = GradeDetailsData(
         semesterId: first.semId,

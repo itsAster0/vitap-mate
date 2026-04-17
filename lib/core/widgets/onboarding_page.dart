@@ -14,7 +14,6 @@ import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
-import 'package:forui_hooks/forui_hooks.dart';
 
 late VtopClient _globalClient;
 late String _globalUsername;
@@ -25,36 +24,9 @@ class OnboardingPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final stepTwo = useState(false);
     return FScaffold(
-      header: FHeader.nested(
-        title: Text("Vitap Mate"),
-        suffixes: [
-          // FButton(
-          //   onPress: () {
-          //     showDialog(
-          //       context: context,
-          //       builder: (BuildContext conntext) {
-          //         //return Center(child: WifiCard());
-          //         return Center(
-          //           child: Column(
-          //             mainAxisAlignment: MainAxisAlignment.center,
-          //             children: [
-          //               Padding(
-          //                 padding: const EdgeInsets.all(16.0),
-          //                 child: WifiCard(),
-          //               ),
-          //             ],
-          //           ),
-          //         );
-          //       },
-          //     );
-          //   },
-          //   child: Icon(FIcons.wifi),
-          // ),
-        ],
-      ),
+      header: FHeader.nested(title: Text("Vitap Mate")),
       child: Column(
         children: [
           Padding(
@@ -83,6 +55,16 @@ class OnboardingPage extends HookConsumerWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 10, 12, 0),
+            child: FAlert(
+              variant: FAlertVariant.primary,
+              title: Text('Heads Up!'),
+              subtitle: Text(
+                'Please install or update the app from Play Store.',
+              ),
             ),
           ),
           Expanded(child: !stepTwo.value ? Step1(two: stepTwo) : Step2()),
@@ -131,45 +113,41 @@ class Step1 extends HookConsumerWidget {
           SizedBox(height: 25),
           FTextFormField(
             label: Text("Username"),
-            controller: username,
+            control: FTextFieldControl.managed(controller: username),
             hint: 'vtop username',
             autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator:
-                (value) =>
-                    1 <= (value?.length ?? 0)
-                        ? null
-                        : 'Please enter your vtop username.',
+            validator: (value) => 1 <= (value?.length ?? 0)
+                ? null
+                : 'Please enter your vtop username.',
           ),
           const SizedBox(height: 10),
           FTextFormField.password(
-            controller: password,
+            control: FTextFieldControl.managed(controller: password),
             hint: 'vtop password',
             autovalidateMode: AutovalidateMode.onUserInteraction,
-            validator:
-                (value) =>
-                    1 <= (value?.length ?? 0)
-                        ? null
-                        : 'Please enter your vtop password.',
+            validator: (value) => 1 <= (value?.length ?? 0)
+                ? null
+                : 'Please enter your vtop password.',
           ),
           const SizedBox(height: 20),
           !isloading.value
               ? FButton(
-                child: const Text('Next'),
-                onPress: () {
-                  if (formKey.currentState!.validate()) {
-                    handlePress();
-                    return;
-                  }
-                },
-              )
+                  child: const Text('Next'),
+                  onPress: () {
+                    if (formKey.currentState!.validate()) {
+                      handlePress();
+                      return;
+                    }
+                  },
+                )
               : SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black,
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.black,
+                  ),
                 ),
-              ),
         ],
       ),
     );
@@ -183,7 +161,7 @@ class Step2 extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fetching = useState(true);
     final formKey = useMemoized(() => GlobalKey<FormState>());
-    final controller = useFRadioSelectMenuTileGroupController<String>();
+    final selectedSemesterId = useState<String?>(null);
     final data = useState<SemesterData?>(null);
     Future<void> getSemData() async {
       fetching.value = true;
@@ -214,13 +192,17 @@ class Step2 extends HookConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             FSelectTileGroup(
-              selectController: controller,
+              control: FMultiValueControl.managedRadio(
+                initial: selectedSemesterId.value,
+                onChange: (value) => selectedSemesterId.value = value.isEmpty
+                    ? null
+                    : value.first,
+              ),
               label: const Text('Semesters'),
               description: const Text('Select the Semester.'),
-              validator:
-                  (values) =>
-                      values?.isEmpty ?? true ? 'Please select a value.' : null,
-              maxHeight: MediaQuery.of(context).size.height * 075,
+              validator: (values) =>
+                  values?.isEmpty ?? true ? 'Please select a value.' : null,
+              maxHeight: MediaQuery.of(context).size.height * 0.75,
               children: [
                 for (final i in data.value!.semesters)
                   FSelectTile(title: Text(i.name), value: i.id),
@@ -235,7 +217,7 @@ class Step2 extends HookConsumerWidget {
                     var user = VtopUserEntity(
                       username: _globalUsername,
                       password: _globalPassword,
-                      semid: controller.value.first,
+                      semid: selectedSemesterId.value!,
                       isValid: true,
                     );
                     await ref

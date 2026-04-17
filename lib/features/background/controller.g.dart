@@ -6,22 +6,49 @@ part of 'controller.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+
+@ProviderFor(BackgroundSync)
+final backgroundSyncProvider = BackgroundSyncProvider._();
+
+final class BackgroundSyncProvider
+    extends $AsyncNotifierProvider<BackgroundSync, SyncState> {
+  BackgroundSyncProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'backgroundSyncProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$backgroundSyncHash();
+
+  @$internal
+  @override
+  BackgroundSync create() => BackgroundSync();
+}
+
 String _$backgroundSyncHash() => r'8caa83eb6cde26fe8ea51fd5dd561432e9a1ea31';
 
-/// See also [BackgroundSync].
-@ProviderFor(BackgroundSync)
-final backgroundSyncProvider =
-    AsyncNotifierProvider<BackgroundSync, SyncState>.internal(
-      BackgroundSync.new,
-      name: r'backgroundSyncProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$backgroundSyncHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
-
-typedef _$BackgroundSync = AsyncNotifier<SyncState>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$BackgroundSync extends $AsyncNotifier<SyncState> {
+  FutureOr<SyncState> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<SyncState>, SyncState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<SyncState>, SyncState>,
+              AsyncValue<SyncState>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

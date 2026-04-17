@@ -55,27 +55,27 @@ class CalendarSyncService {
     if (!Platform.isAndroid) {
       throw Exception("Calendar sync is currently Android-only.");
     }
-    final rawSlots =
-        timetable.slots.where((slot) => slot.serial != "-1").toList();
+    final rawSlots = timetable.slots
+        .where((slot) => slot.serial != "-1")
+        .toList();
     final preparedSlots = _mergeLabsByDay(rawSlots);
-    final slots =
-        preparedSlots
-            .map(
-              (slot) => {
-                "serial": slot.serial,
-                "day": slot.day,
-                "slot": slot.slot,
-                "courseCode": slot.courseCode,
-                "courseType": slot.courseType,
-                "roomNo": slot.roomNo,
-                "block": slot.block,
-                "startTime": slot.startTime,
-                "endTime": slot.endTime,
-                "name": slot.name,
-                "faculty": slot.faculty,
-              },
-            )
-            .toList();
+    final slots = preparedSlots
+        .map(
+          (slot) => {
+            "serial": slot.serial,
+            "day": slot.day,
+            "slot": slot.slot,
+            "courseCode": slot.courseCode,
+            "courseType": slot.courseType,
+            "roomNo": slot.roomNo,
+            "block": slot.block,
+            "startTime": slot.startTime,
+            "endTime": slot.endTime,
+            "name": slot.name,
+            "faculty": slot.faculty,
+          },
+        )
+        .toList();
 
     final raw = await _channel.invokeMethod<dynamic>("syncTimetableRecurring", {
       "calendarId": calendarId,

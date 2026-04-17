@@ -56,7 +56,7 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }
 
   Future<void> refresh() async {
-    final current = state.valueOrNull;
+    final current = state.value;
     final semId = current?.selectedSemesterId;
     if (semId == null || semId.isEmpty) return;
 
@@ -75,7 +75,7 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }
 
   Future<void> selectSemester(String semId) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current != null && current.selectedSemesterId == semId) return;
     if (current != null) {
       state = AsyncData(current.copyWith(selectedSemesterId: semId));
@@ -92,7 +92,7 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }
 
   Future<void> loadDetails(String courseId, {bool force = false}) async {
-    final current = state.valueOrNull;
+    final current = state.value;
     if (current == null || courseId.isEmpty) return;
     if (!force &&
         (current.detailsByCourseId.containsKey(courseId) ||
@@ -110,7 +110,7 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
       );
       final details = await FetchGradeDetailsUsecase(repo).call(courseId);
 
-      final now = state.valueOrNull ?? current;
+      final now = state.value ?? current;
       final nextMap = {...now.detailsByCourseId, courseId: details};
       final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
       state = AsyncData(
@@ -120,7 +120,7 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
         ),
       );
     } catch (_) {
-      final now = state.valueOrNull ?? current;
+      final now = state.value ?? current;
       final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
       state = AsyncData(now.copyWith(loadingDetailsFor: nextLoading));
       rethrow;

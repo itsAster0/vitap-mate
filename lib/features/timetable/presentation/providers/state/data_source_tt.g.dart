@@ -6,47 +6,89 @@ part of 'data_source_tt.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+
+@ProviderFor(timetableLocalDataSource)
+final timetableLocalDataSourceProvider = TimetableLocalDataSourceProvider._();
+
+final class TimetableLocalDataSourceProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TimetableLocalDataSource>,
+          TimetableLocalDataSource,
+          FutureOr<TimetableLocalDataSource>
+        >
+    with
+        $FutureModifier<TimetableLocalDataSource>,
+        $FutureProvider<TimetableLocalDataSource> {
+  TimetableLocalDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'timetableLocalDataSourceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$timetableLocalDataSourceHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<TimetableLocalDataSource> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TimetableLocalDataSource> create(Ref ref) {
+    return timetableLocalDataSource(ref);
+  }
+}
+
 String _$timetableLocalDataSourceHash() =>
     r'1518c0c6feff2b62a0d738e3d9a347d113f3b0ea';
 
-/// See also [timetableLocalDataSource].
-@ProviderFor(timetableLocalDataSource)
-final timetableLocalDataSourceProvider =
-    AutoDisposeFutureProvider<TimetableLocalDataSource>.internal(
-      timetableLocalDataSource,
-      name: r'timetableLocalDataSourceProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$timetableLocalDataSourceHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+@ProviderFor(timetableRemoteDataSource)
+final timetableRemoteDataSourceProvider = TimetableRemoteDataSourceProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef TimetableLocalDataSourceRef =
-    AutoDisposeFutureProviderRef<TimetableLocalDataSource>;
+final class TimetableRemoteDataSourceProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<TimetableRemoteDataSource>,
+          TimetableRemoteDataSource,
+          FutureOr<TimetableRemoteDataSource>
+        >
+    with
+        $FutureModifier<TimetableRemoteDataSource>,
+        $FutureProvider<TimetableRemoteDataSource> {
+  TimetableRemoteDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'timetableRemoteDataSourceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$timetableRemoteDataSourceHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<TimetableRemoteDataSource> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<TimetableRemoteDataSource> create(Ref ref) {
+    return timetableRemoteDataSource(ref);
+  }
+}
+
 String _$timetableRemoteDataSourceHash() =>
     r'157f3a0c15ce8f057ff2e7f72288c9dbfa4e437a';
-
-/// See also [timetableRemoteDataSource].
-@ProviderFor(timetableRemoteDataSource)
-final timetableRemoteDataSourceProvider =
-    AutoDisposeFutureProvider<TimetableRemoteDataSource>.internal(
-      timetableRemoteDataSource,
-      name: r'timetableRemoteDataSourceProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$timetableRemoteDataSourceHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef TimetableRemoteDataSourceRef =
-    AutoDisposeFutureProviderRef<TimetableRemoteDataSource>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

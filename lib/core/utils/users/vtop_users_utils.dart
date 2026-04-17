@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
@@ -60,17 +59,6 @@ class Vtopusersutils extends _$Vtopusersutils {
       }
     }
     return (users, defaultUser);
-  }
-
-  Future<(String?, String?)> getWifiDetails() async {
-    var username = await _storage.read(key: "wifi_username");
-    var password = await _storage.read(key: "wifi_password");
-    return (username, password);
-  }
-
-  Future<void> saveWifiDetails((String, String) data) async {
-    await _storage.write(key: "wifi_username", value: data.$1);
-    await _storage.write(key: "wifi_password", value: data.$2);
   }
 
   Future<void> vtopUserDelete(String username) async {

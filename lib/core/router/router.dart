@@ -1,8 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/widgets/onboarding_page.dart';
@@ -19,10 +17,12 @@ import 'package:vitapmate/features/settings/presentation/pages/notification_mana
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
+part 'router.g.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
-final routerProvider = Provider((ref) {
+@Riverpod(keepAlive: true)
+GoRouter router(Ref ref) {
   return GoRouter(
     redirect: (context, state) => redirect(context, ref, state),
     initialLocation: '/timetable',
@@ -180,7 +180,7 @@ final routerProvider = Provider((ref) {
       ),
     ],
   );
-});
+}
 
 FutureOr<String?> redirect(
   BuildContext context,

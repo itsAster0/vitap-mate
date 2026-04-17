@@ -20,12 +20,11 @@ class FullAttendance extends _$FullAttendance {
     var attendanceRepository = await ref.watch(
       attendanceRepositoryProvider.future,
     );
-    FullAttendanceData attendance =
-        await GetFullAttendanceUsecase(
-          attendanceRepository,
-          _courseType,
-          _courseId,
-        ).call();
+    FullAttendanceData attendance = await GetFullAttendanceUsecase(
+      attendanceRepository,
+      _courseType,
+      _courseId,
+    ).call();
     if (attendance.semesterId.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
 
@@ -46,12 +45,11 @@ class FullAttendance extends _$FullAttendance {
     var gb = await ref.read(gbProvider.future);
     var feature = gb.feature("fetch-full-attendance");
     if (feature.on && feature.value) {
-      var data =
-          await UpdateFullAttendanceUsecase(
-            repo,
-            _courseType,
-            _courseId,
-          ).call();
+      var data = await UpdateFullAttendanceUsecase(
+        repo,
+        _courseType,
+        _courseId,
+      ).call();
       return data;
     } else {
       throw FeatureDisabledException("Full Attendance Feature Disabled");

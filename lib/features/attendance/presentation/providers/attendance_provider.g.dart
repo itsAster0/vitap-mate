@@ -6,22 +6,49 @@ part of 'attendance_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
+
+@ProviderFor(Attendance)
+final attendanceProvider = AttendanceProvider._();
+
+final class AttendanceProvider
+    extends $AsyncNotifierProvider<Attendance, AttendanceData> {
+  AttendanceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'attendanceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$attendanceHash();
+
+  @$internal
+  @override
+  Attendance create() => Attendance();
+}
+
 String _$attendanceHash() => r'14597710a65508b2eda614d41463f3ba2cb0d021';
 
-/// See also [Attendance].
-@ProviderFor(Attendance)
-final attendanceProvider =
-    AutoDisposeAsyncNotifierProvider<Attendance, AttendanceData>.internal(
-      Attendance.new,
-      name: r'attendanceProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$attendanceHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
-
-typedef _$Attendance = AutoDisposeAsyncNotifier<AttendanceData>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$Attendance extends $AsyncNotifier<AttendanceData> {
+  FutureOr<AttendanceData> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<AttendanceData>, AttendanceData>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<AttendanceData>, AttendanceData>,
+              AsyncValue<AttendanceData>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

@@ -12,9 +12,9 @@ class TimetableLocalDataSource {
   Future<TimetableData> getTimetable(String semid) async {
     final allRows = await _globalAsyncQueue.run(
       "fromStorage_timetable_$semid",
-      () =>
-          (_db.select(_db.timetableTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.timetableTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
     if (allRows.isEmpty) {
       return TimetableData(

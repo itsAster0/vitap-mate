@@ -42,10 +42,9 @@ class ExamSchedulePage extends HookConsumerWidget {
       onRefresh: () async {
         await update();
       },
-      backgroundColor:
-          darkMode
-              ? context.theme.colors.primaryForeground
-              : ExamColors.tableBackground,
+      backgroundColor: darkMode
+          ? context.theme.colors.primaryForeground
+          : ExamColors.tableBackground,
       color: darkMode ? context.theme.colors.primary : ExamColors.primaryText,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -71,10 +70,9 @@ class ExamSchedulePage extends HookConsumerWidget {
                           child: Icon(
                             Icons.event_note_outlined,
                             size: 48,
-                            color:
-                                darkMode
-                                    ? context.theme.colors.primary
-                                    : ExamColors.tertiaryText,
+                            color: darkMode
+                                ? context.theme.colors.primary
+                                : ExamColors.tertiaryText,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -83,10 +81,9 @@ class ExamSchedulePage extends HookConsumerWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color:
-                                darkMode
-                                    ? context.theme.colors.primary
-                                    : ExamColors.secondaryText,
+                            color: darkMode
+                                ? context.theme.colors.primary
+                                : ExamColors.secondaryText,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -94,10 +91,9 @@ class ExamSchedulePage extends HookConsumerWidget {
                           "Check back later for updates",
                           style: TextStyle(
                             fontSize: 14,
-                            color:
-                                darkMode
-                                    ? context.theme.colors.primary
-                                    : ExamColors.tertiaryText,
+                            color: darkMode
+                                ? context.theme.colors.primary
+                                : ExamColors.tertiaryText,
                           ),
                         ),
                       ],
@@ -151,10 +147,9 @@ class ExamSchedulePage extends HookConsumerWidget {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color:
-                              darkMode
-                                  ? context.theme.colors.primary
-                                  : ExamColors.secondaryText,
+                          color: darkMode
+                              ? context.theme.colors.primary
+                              : ExamColors.secondaryText,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -162,10 +157,9 @@ class ExamSchedulePage extends HookConsumerWidget {
                         msg,
                         style: TextStyle(
                           fontSize: 14,
-                          color:
-                              darkMode
-                                  ? context.theme.colors.primary
-                                  : ExamColors.tertiaryText,
+                          color: darkMode
+                              ? context.theme.colors.primary
+                              : ExamColors.tertiaryText,
                         ),
                         textAlign: TextAlign.center,
                       ),

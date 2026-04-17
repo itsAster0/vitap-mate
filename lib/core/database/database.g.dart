@@ -85,21 +85,18 @@ class $SemesterTableTable extends SemesterTable
   SemesterTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return SemesterTableData(
-      semid:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}semid'],
-          )!,
-      semName:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_name'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      semid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}semid'],
+      )!,
+      semName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_name'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -569,56 +566,46 @@ class $TimetableTableTable extends TimetableTable
   TimetableTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return TimetableTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      day:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}day'],
-          )!,
-      slot:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}slot'],
-          )!,
-      courseCode:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_code'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      courseName:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_name'],
-          )!,
-      roomNo:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}room_no'],
-          )!,
-      block:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}block'],
-          )!,
-      startTime:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}start_time'],
-          )!,
-      endTime:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}end_time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      day: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}day'],
+      )!,
+      slot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slot'],
+      )!,
+      courseCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_code'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      courseName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_name'],
+      )!,
+      roomNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}room_no'],
+      )!,
+      block: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}block'],
+      )!,
+      startTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_time'],
+      )!,
+      endTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_time'],
+      )!,
       isLab: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_lab'],
@@ -627,16 +614,14 @@ class $TimetableTableTable extends TimetableTable
         DriftSqlType.string,
         data['${effectivePrefix}faculty'],
       ),
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -714,12 +699,12 @@ class TimetableTableData extends DataClass
       block: Value(block),
       startTime: Value(startTime),
       endTime: Value(endTime),
-      isLab:
-          isLab == null && nullToAbsent ? const Value.absent() : Value(isLab),
-      faculty:
-          faculty == null && nullToAbsent
-              ? const Value.absent()
-              : Value(faculty),
+      isLab: isLab == null && nullToAbsent
+          ? const Value.absent()
+          : Value(isLab),
+      faculty: faculty == null && nullToAbsent
+          ? const Value.absent()
+          : Value(faculty),
       semId: Value(semId),
       time: Value(time),
     );
@@ -804,12 +789,15 @@ class TimetableTableData extends DataClass
       serial: data.serial.present ? data.serial.value : this.serial,
       day: data.day.present ? data.day.value : this.day,
       slot: data.slot.present ? data.slot.value : this.slot,
-      courseCode:
-          data.courseCode.present ? data.courseCode.value : this.courseCode,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
-      courseName:
-          data.courseName.present ? data.courseName.value : this.courseName,
+      courseCode: data.courseCode.present
+          ? data.courseCode.value
+          : this.courseCode,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
+      courseName: data.courseName.present
+          ? data.courseName.value
+          : this.courseName,
       roomNo: data.roomNo.present ? data.roomNo.value : this.roomNo,
       block: data.block.present ? data.block.value : this.block,
       startTime: data.startTime.present ? data.startTime.value : this.startTime,
@@ -1308,56 +1296,46 @@ class $FullAttendanceTableTable extends FullAttendanceTable
   }) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return FullAttendanceTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      date:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}date'],
-          )!,
-      slot:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}slot'],
-          )!,
-      dayTime:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}day_time'],
-          )!,
-      status:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}status'],
-          )!,
-      remark:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}remark'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      courseId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_id'],
-          )!,
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}date'],
+      )!,
+      slot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slot'],
+      )!,
+      dayTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}day_time'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      remark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}remark'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      courseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_id'],
+      )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -1488,8 +1466,9 @@ class FullAttendanceTableData extends DataClass
       dayTime: data.dayTime.present ? data.dayTime.value : this.dayTime,
       status: data.status.present ? data.status.value : this.status,
       remark: data.remark.present ? data.remark.value : this.remark,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
       courseId: data.courseId.present ? data.courseId.value : this.courseId,
       semId: data.semId.present ? data.semId.value : this.semId,
       time: data.time.present ? data.time.value : this.time,
@@ -2033,76 +2012,62 @@ class $AttendanceTableTable extends AttendanceTable
   AttendanceTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return AttendanceTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      category:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}category'],
-          )!,
-      courseName:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_name'],
-          )!,
-      courseCode:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_code'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      facultyDetail:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}faculty_detail'],
-          )!,
-      classesAttended:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}classes_attended'],
-          )!,
-      totalClasses:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}total_classes'],
-          )!,
-      attendancePercentage:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}attendance_percentage'],
-          )!,
-      attendenceFatCat:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}attendence_fat_cat'],
-          )!,
-      debarStatus:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}debar_status'],
-          )!,
-      courseId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_id'],
-          )!,
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      courseName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_name'],
+      )!,
+      courseCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_code'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      facultyDetail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}faculty_detail'],
+      )!,
+      classesAttended: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}classes_attended'],
+      )!,
+      totalClasses: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}total_classes'],
+      )!,
+      attendancePercentage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attendance_percentage'],
+      )!,
+      attendenceFatCat: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}attendence_fat_cat'],
+      )!,
+      debarStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}debar_status'],
+      )!,
+      courseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_id'],
+      )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -2263,34 +2228,33 @@ class AttendanceTableData extends DataClass
     return AttendanceTableData(
       serial: data.serial.present ? data.serial.value : this.serial,
       category: data.category.present ? data.category.value : this.category,
-      courseName:
-          data.courseName.present ? data.courseName.value : this.courseName,
-      courseCode:
-          data.courseCode.present ? data.courseCode.value : this.courseCode,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
-      facultyDetail:
-          data.facultyDetail.present
-              ? data.facultyDetail.value
-              : this.facultyDetail,
-      classesAttended:
-          data.classesAttended.present
-              ? data.classesAttended.value
-              : this.classesAttended,
-      totalClasses:
-          data.totalClasses.present
-              ? data.totalClasses.value
-              : this.totalClasses,
-      attendancePercentage:
-          data.attendancePercentage.present
-              ? data.attendancePercentage.value
-              : this.attendancePercentage,
-      attendenceFatCat:
-          data.attendenceFatCat.present
-              ? data.attendenceFatCat.value
-              : this.attendenceFatCat,
-      debarStatus:
-          data.debarStatus.present ? data.debarStatus.value : this.debarStatus,
+      courseName: data.courseName.present
+          ? data.courseName.value
+          : this.courseName,
+      courseCode: data.courseCode.present
+          ? data.courseCode.value
+          : this.courseCode,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
+      facultyDetail: data.facultyDetail.present
+          ? data.facultyDetail.value
+          : this.facultyDetail,
+      classesAttended: data.classesAttended.present
+          ? data.classesAttended.value
+          : this.classesAttended,
+      totalClasses: data.totalClasses.present
+          ? data.totalClasses.value
+          : this.totalClasses,
+      attendancePercentage: data.attendancePercentage.present
+          ? data.attendancePercentage.value
+          : this.attendancePercentage,
+      attendenceFatCat: data.attendenceFatCat.present
+          ? data.attendenceFatCat.value
+          : this.attendenceFatCat,
+      debarStatus: data.debarStatus.present
+          ? data.debarStatus.value
+          : this.debarStatus,
       courseId: data.courseId.present ? data.courseId.value : this.courseId,
       semId: data.semId.present ? data.semId.value : this.semId,
       time: data.time.present ? data.time.value : this.time,
@@ -2921,86 +2885,70 @@ class $ExamScheduleTableTable extends ExamScheduleTable
   ExamScheduleTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ExamScheduleTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      slot:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}slot'],
-          )!,
-      courseName:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_name'],
-          )!,
-      courseCode:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_code'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      courseId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_id'],
-          )!,
-      examType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}exam_type'],
-          )!,
-      examDate:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}exam_date'],
-          )!,
-      examSession:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}exam_session'],
-          )!,
-      reportingTime:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}reporting_time'],
-          )!,
-      examTime:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}exam_time'],
-          )!,
-      venue:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}venue'],
-          )!,
-      seatLocation:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}seat_location'],
-          )!,
-      seatNo:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}seat_no'],
-          )!,
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      slot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slot'],
+      )!,
+      courseName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_name'],
+      )!,
+      courseCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_code'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      courseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_id'],
+      )!,
+      examType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exam_type'],
+      )!,
+      examDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exam_date'],
+      )!,
+      examSession: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exam_session'],
+      )!,
+      reportingTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reporting_time'],
+      )!,
+      examTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}exam_time'],
+      )!,
+      venue: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}venue'],
+      )!,
+      seatLocation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seat_location'],
+      )!,
+      seatNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}seat_no'],
+      )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -3175,27 +3123,29 @@ class ExamScheduleTableData extends DataClass
     return ExamScheduleTableData(
       serial: data.serial.present ? data.serial.value : this.serial,
       slot: data.slot.present ? data.slot.value : this.slot,
-      courseName:
-          data.courseName.present ? data.courseName.value : this.courseName,
-      courseCode:
-          data.courseCode.present ? data.courseCode.value : this.courseCode,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
+      courseName: data.courseName.present
+          ? data.courseName.value
+          : this.courseName,
+      courseCode: data.courseCode.present
+          ? data.courseCode.value
+          : this.courseCode,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
       courseId: data.courseId.present ? data.courseId.value : this.courseId,
       examType: data.examType.present ? data.examType.value : this.examType,
       examDate: data.examDate.present ? data.examDate.value : this.examDate,
-      examSession:
-          data.examSession.present ? data.examSession.value : this.examSession,
-      reportingTime:
-          data.reportingTime.present
-              ? data.reportingTime.value
-              : this.reportingTime,
+      examSession: data.examSession.present
+          ? data.examSession.value
+          : this.examSession,
+      reportingTime: data.reportingTime.present
+          ? data.reportingTime.value
+          : this.reportingTime,
       examTime: data.examTime.present ? data.examTime.value : this.examTime,
       venue: data.venue.present ? data.venue.value : this.venue,
-      seatLocation:
-          data.seatLocation.present
-              ? data.seatLocation.value
-              : this.seatLocation,
+      seatLocation: data.seatLocation.present
+          ? data.seatLocation.value
+          : this.seatLocation,
       seatNo: data.seatNo.present ? data.seatNo.value : this.seatNo,
       semId: data.semId.present ? data.semId.value : this.semId,
       time: data.time.present ? data.time.value : this.time,
@@ -3712,51 +3662,42 @@ class $MarksTableTable extends MarksTable
   MarksTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return MarksTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      courseCode:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_code'],
-          )!,
-      courseTitle:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_title'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      faculty:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}faculty'],
-          )!,
-      slot:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}slot'],
-          )!,
-      marks:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}marks'],
-          )!,
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      courseCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_code'],
+      )!,
+      courseTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_title'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      faculty: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}faculty'],
+      )!,
+      slot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slot'],
+      )!,
+      marks: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}marks'],
+      )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -3873,12 +3814,15 @@ class MarksTableData extends DataClass implements Insertable<MarksTableData> {
   MarksTableData copyWithCompanion(MarksTableCompanion data) {
     return MarksTableData(
       serial: data.serial.present ? data.serial.value : this.serial,
-      courseCode:
-          data.courseCode.present ? data.courseCode.value : this.courseCode,
-      courseTitle:
-          data.courseTitle.present ? data.courseTitle.value : this.courseTitle,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
+      courseCode: data.courseCode.present
+          ? data.courseCode.value
+          : this.courseCode,
+      courseTitle: data.courseTitle.present
+          ? data.courseTitle.value
+          : this.courseTitle,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
       faculty: data.faculty.present ? data.faculty.value : this.faculty,
       slot: data.slot.present ? data.slot.value : this.slot,
       marks: data.marks.present ? data.marks.value : this.marks,
@@ -4310,56 +4254,46 @@ class $GradeCourseTableTable extends GradeCourseTable
   GradeCourseTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return GradeCourseTableData(
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      courseCode:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_code'],
-          )!,
-      courseTitle:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_title'],
-          )!,
-      courseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_type'],
-          )!,
-      gradingType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}grading_type'],
-          )!,
-      grandTotal:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}grand_total'],
-          )!,
-      grade:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}grade'],
-          )!,
-      courseId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_id'],
-          )!,
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      courseCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_code'],
+      )!,
+      courseTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_title'],
+      )!,
+      courseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_type'],
+      )!,
+      gradingType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grading_type'],
+      )!,
+      grandTotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grand_total'],
+      )!,
+      grade: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grade'],
+      )!,
+      courseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_id'],
+      )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -4485,16 +4419,21 @@ class GradeCourseTableData extends DataClass
   GradeCourseTableData copyWithCompanion(GradeCourseTableCompanion data) {
     return GradeCourseTableData(
       serial: data.serial.present ? data.serial.value : this.serial,
-      courseCode:
-          data.courseCode.present ? data.courseCode.value : this.courseCode,
-      courseTitle:
-          data.courseTitle.present ? data.courseTitle.value : this.courseTitle,
-      courseType:
-          data.courseType.present ? data.courseType.value : this.courseType,
-      gradingType:
-          data.gradingType.present ? data.gradingType.value : this.gradingType,
-      grandTotal:
-          data.grandTotal.present ? data.grandTotal.value : this.grandTotal,
+      courseCode: data.courseCode.present
+          ? data.courseCode.value
+          : this.courseCode,
+      courseTitle: data.courseTitle.present
+          ? data.courseTitle.value
+          : this.courseTitle,
+      courseType: data.courseType.present
+          ? data.courseType.value
+          : this.courseType,
+      gradingType: data.gradingType.present
+          ? data.gradingType.value
+          : this.gradingType,
+      grandTotal: data.grandTotal.present
+          ? data.grandTotal.value
+          : this.grandTotal,
       grade: data.grade.present ? data.grade.value : this.grade,
       courseId: data.courseId.present ? data.courseId.value : this.courseId,
       semId: data.semId.present ? data.semId.value : this.semId,
@@ -5025,76 +4964,62 @@ class $GradeDetailTableTable extends GradeDetailTable
   GradeDetailTableData map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return GradeDetailTableData(
-      semId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}sem_id'],
-          )!,
-      courseId:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}course_id'],
-          )!,
-      classNumber:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}class_number'],
-          )!,
-      classCourseType:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}class_course_type'],
-          )!,
-      grandTotal:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}grand_total'],
-          )!,
-      serial:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}serial'],
-          )!,
-      markTitle:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}mark_title'],
-          )!,
-      maxMark:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}max_mark'],
-          )!,
-      weightage:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}weightage'],
-          )!,
-      status:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}status'],
-          )!,
-      scoredMark:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}scored_mark'],
-          )!,
-      weightageMark:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}weightage_mark'],
-          )!,
-      gradeRanges:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}grade_ranges'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      semId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sem_id'],
+      )!,
+      courseId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}course_id'],
+      )!,
+      classNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}class_number'],
+      )!,
+      classCourseType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}class_course_type'],
+      )!,
+      grandTotal: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grand_total'],
+      )!,
+      serial: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}serial'],
+      )!,
+      markTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mark_title'],
+      )!,
+      maxMark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}max_mark'],
+      )!,
+      weightage: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}weightage'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      scoredMark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}scored_mark'],
+      )!,
+      weightageMark: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}weightage_mark'],
+      )!,
+      gradeRanges: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}grade_ranges'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -5253,27 +5178,29 @@ class GradeDetailTableData extends DataClass
     return GradeDetailTableData(
       semId: data.semId.present ? data.semId.value : this.semId,
       courseId: data.courseId.present ? data.courseId.value : this.courseId,
-      classNumber:
-          data.classNumber.present ? data.classNumber.value : this.classNumber,
-      classCourseType:
-          data.classCourseType.present
-              ? data.classCourseType.value
-              : this.classCourseType,
-      grandTotal:
-          data.grandTotal.present ? data.grandTotal.value : this.grandTotal,
+      classNumber: data.classNumber.present
+          ? data.classNumber.value
+          : this.classNumber,
+      classCourseType: data.classCourseType.present
+          ? data.classCourseType.value
+          : this.classCourseType,
+      grandTotal: data.grandTotal.present
+          ? data.grandTotal.value
+          : this.grandTotal,
       serial: data.serial.present ? data.serial.value : this.serial,
       markTitle: data.markTitle.present ? data.markTitle.value : this.markTitle,
       maxMark: data.maxMark.present ? data.maxMark.value : this.maxMark,
       weightage: data.weightage.present ? data.weightage.value : this.weightage,
       status: data.status.present ? data.status.value : this.status,
-      scoredMark:
-          data.scoredMark.present ? data.scoredMark.value : this.scoredMark,
-      weightageMark:
-          data.weightageMark.present
-              ? data.weightageMark.value
-              : this.weightageMark,
-      gradeRanges:
-          data.gradeRanges.present ? data.gradeRanges.value : this.gradeRanges,
+      scoredMark: data.scoredMark.present
+          ? data.scoredMark.value
+          : this.scoredMark,
+      weightageMark: data.weightageMark.present
+          ? data.weightageMark.value
+          : this.weightageMark,
+      gradeRanges: data.gradeRanges.present
+          ? data.gradeRanges.value
+          : this.gradeRanges,
       time: data.time.present ? data.time.value : this.time,
     );
   }
@@ -5625,21 +5552,18 @@ class $GradeHistoryCacheTableTable extends GradeHistoryCacheTable
   }) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return GradeHistoryCacheTableData(
-      id:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}id'],
-          )!,
-      payload:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.string,
-            data['${effectivePrefix}payload'],
-          )!,
-      time:
-          attachedDatabase.typeMapping.read(
-            DriftSqlType.int,
-            data['${effectivePrefix}time'],
-          )!,
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      time: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}time'],
+      )!,
     );
   }
 
@@ -6477,16 +6401,12 @@ class $$SemesterTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$SemesterTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () =>
-                  $$SemesterTableTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer:
-              () => $$SemesterTableTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+          createFilteringComposer: () =>
+              $$SemesterTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SemesterTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SemesterTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> semid = const Value.absent(),
@@ -6511,197 +6431,189 @@ class $$SemesterTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$SemesterTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
-          prefetchHooksCallback: ({
-            timetableTableRefs = false,
-            fullAttendanceTableRefs = false,
-            attendanceTableRefs = false,
-            examScheduleTableRefs = false,
-            marksTableRefs = false,
-            gradeCourseTableRefs = false,
-            gradeDetailTableRefs = false,
-          }) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (timetableTableRefs) db.timetableTable,
-                if (fullAttendanceTableRefs) db.fullAttendanceTable,
-                if (attendanceTableRefs) db.attendanceTable,
-                if (examScheduleTableRefs) db.examScheduleTable,
-                if (marksTableRefs) db.marksTable,
-                if (gradeCourseTableRefs) db.gradeCourseTable,
-                if (gradeDetailTableRefs) db.gradeDetailTable,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (timetableTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      TimetableTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._timetableTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$SemesterTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                timetableTableRefs = false,
+                fullAttendanceTableRefs = false,
+                attendanceTableRefs = false,
+                examScheduleTableRefs = false,
+                marksTableRefs = false,
+                gradeCourseTableRefs = false,
+                gradeDetailTableRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (timetableTableRefs) db.timetableTable,
+                    if (fullAttendanceTableRefs) db.fullAttendanceTable,
+                    if (attendanceTableRefs) db.attendanceTable,
+                    if (examScheduleTableRefs) db.examScheduleTable,
+                    if (marksTableRefs) db.marksTable,
+                    if (gradeCourseTableRefs) db.gradeCourseTable,
+                    if (gradeDetailTableRefs) db.gradeDetailTable,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (timetableTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          TimetableTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._timetableTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).timetableTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (fullAttendanceTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      FullAttendanceTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._fullAttendanceTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (fullAttendanceTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          FullAttendanceTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._fullAttendanceTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).fullAttendanceTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (attendanceTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      AttendanceTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._attendanceTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (attendanceTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          AttendanceTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._attendanceTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).attendanceTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (examScheduleTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      ExamScheduleTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._examScheduleTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (examScheduleTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          ExamScheduleTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._examScheduleTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).examScheduleTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (marksTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      MarksTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._marksTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (marksTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          MarksTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._marksTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).marksTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (gradeCourseTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      GradeCourseTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._gradeCourseTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (gradeCourseTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          GradeCourseTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._gradeCourseTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).gradeCourseTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                  if (gradeDetailTableRefs)
-                    await $_getPrefetchedData<
-                      SemesterTableData,
-                      $SemesterTableTable,
-                      GradeDetailTableData
-                    >(
-                      currentTable: table,
-                      referencedTable: $$SemesterTableTableReferences
-                          ._gradeDetailTableRefsTable(db),
-                      managerFromTypedResult:
-                          (p0) =>
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (gradeDetailTableRefs)
+                        await $_getPrefetchedData<
+                          SemesterTableData,
+                          $SemesterTableTable,
+                          GradeDetailTableData
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SemesterTableTableReferences
+                              ._gradeDetailTableRefsTable(db),
+                          managerFromTypedResult: (p0) =>
                               $$SemesterTableTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).gradeDetailTableRefs,
-                      referencedItemsForCurrentItem:
-                          (item, referencedItems) => referencedItems.where(
-                            (e) => e.semId == item.semid,
-                          ),
-                      typedResults: items,
-                    ),
-                ];
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.semId == item.semid,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -7094,16 +7006,12 @@ class $$TimetableTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$TimetableTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () =>
-                  $$TimetableTableTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer:
-              () => $$TimetableTableTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+          createFilteringComposer: () =>
+              $$TimetableTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TimetableTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TimetableTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> serial = const Value.absent(),
@@ -7172,52 +7080,51 @@ class $$TimetableTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$TimetableTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TimetableTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$TimetableTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$TimetableTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable: $$TimetableTableTableReferences
+                                    ._semIdTable(db),
+                                referencedColumn:
+                                    $$TimetableTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -7546,18 +7453,15 @@ class $$FullAttendanceTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$FullAttendanceTableTableFilterComposer(
+          createFilteringComposer: () =>
+              $$FullAttendanceTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FullAttendanceTableTableOrderingComposer(
                 $db: db,
                 $table: table,
               ),
-          createOrderingComposer:
-              () => $$FullAttendanceTableTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer:
-              () => $$FullAttendanceTableTableAnnotationComposer(
+          createComputedFieldComposer: () =>
+              $$FullAttendanceTableTableAnnotationComposer(
                 $db: db,
                 $table: table,
               ),
@@ -7613,53 +7517,52 @@ class $$FullAttendanceTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$FullAttendanceTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$FullAttendanceTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable:
-                                $$FullAttendanceTableTableReferences
-                                    ._semIdTable(db),
-                            referencedColumn:
-                                $$FullAttendanceTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable:
+                                    $$FullAttendanceTableTableReferences
+                                        ._semIdTable(db),
+                                referencedColumn:
+                                    $$FullAttendanceTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -8061,19 +7964,12 @@ class $$AttendanceTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () =>
-                  $$AttendanceTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () => $$AttendanceTableTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer:
-              () => $$AttendanceTableTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+          createFilteringComposer: () =>
+              $$AttendanceTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AttendanceTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AttendanceTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> serial = const Value.absent(),
@@ -8142,52 +8038,52 @@ class $$AttendanceTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$AttendanceTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$AttendanceTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$AttendanceTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$AttendanceTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable:
+                                    $$AttendanceTableTableReferences
+                                        ._semIdTable(db),
+                                referencedColumn:
+                                    $$AttendanceTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -8616,18 +8512,12 @@ class $$ExamScheduleTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$ExamScheduleTableTableFilterComposer(
-                $db: db,
-                $table: table,
-              ),
-          createOrderingComposer:
-              () => $$ExamScheduleTableTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer:
-              () => $$ExamScheduleTableTableAnnotationComposer(
+          createFilteringComposer: () =>
+              $$ExamScheduleTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExamScheduleTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExamScheduleTableTableAnnotationComposer(
                 $db: db,
                 $table: table,
               ),
@@ -8707,52 +8597,52 @@ class $$ExamScheduleTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$ExamScheduleTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ExamScheduleTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$ExamScheduleTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$ExamScheduleTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable:
+                                    $$ExamScheduleTableTableReferences
+                                        ._semIdTable(db),
+                                referencedColumn:
+                                    $$ExamScheduleTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -9056,12 +8946,12 @@ class $$MarksTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$MarksTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () => $$MarksTableTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer:
-              () => $$MarksTableTableAnnotationComposer($db: db, $table: table),
+          createFilteringComposer: () =>
+              $$MarksTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MarksTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MarksTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> serial = const Value.absent(),
@@ -9110,52 +9000,50 @@ class $$MarksTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$MarksTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MarksTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$MarksTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$MarksTableTableReferences
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable: $$MarksTableTableReferences
+                                    ._semIdTable(db),
+                                referencedColumn: $$MarksTableTableReferences
                                     ._semIdTable(db)
                                     .semid,
-                          )
-                          as T;
-                }
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -9489,19 +9377,12 @@ class $$GradeCourseTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () =>
-                  $$GradeCourseTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () => $$GradeCourseTableTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer:
-              () => $$GradeCourseTableTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+          createFilteringComposer: () =>
+              $$GradeCourseTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GradeCourseTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GradeCourseTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> serial = const Value.absent(),
@@ -9554,52 +9435,52 @@ class $$GradeCourseTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$GradeCourseTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$GradeCourseTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$GradeCourseTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$GradeCourseTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable:
+                                    $$GradeCourseTableTableReferences
+                                        ._semIdTable(db),
+                                referencedColumn:
+                                    $$GradeCourseTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -9995,19 +9876,12 @@ class $$GradeDetailTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () =>
-                  $$GradeDetailTableTableFilterComposer($db: db, $table: table),
-          createOrderingComposer:
-              () => $$GradeDetailTableTableOrderingComposer(
-                $db: db,
-                $table: table,
-              ),
-          createComputedFieldComposer:
-              () => $$GradeDetailTableTableAnnotationComposer(
-                $db: db,
-                $table: table,
-              ),
+          createFilteringComposer: () =>
+              $$GradeDetailTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GradeDetailTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GradeDetailTableTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<String> semId = const Value.absent(),
@@ -10076,52 +9950,52 @@ class $$GradeDetailTableTableTableManager
                 time: time,
                 rowid: rowid,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          $$GradeDetailTableTableReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$GradeDetailTableTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
           prefetchHooksCallback: ({semId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
-              addJoins: <
-                T extends TableManagerState<
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic,
-                  dynamic
-                >
-              >(state) {
-                if (semId) {
-                  state =
-                      state.withJoin(
-                            currentTable: table,
-                            currentColumn: table.semId,
-                            referencedTable: $$GradeDetailTableTableReferences
-                                ._semIdTable(db),
-                            referencedColumn:
-                                $$GradeDetailTableTableReferences
-                                    ._semIdTable(db)
-                                    .semid,
-                          )
-                          as T;
-                }
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (semId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.semId,
+                                referencedTable:
+                                    $$GradeDetailTableTableReferences
+                                        ._semIdTable(db),
+                                referencedColumn:
+                                    $$GradeDetailTableTableReferences
+                                        ._semIdTable(db)
+                                        .semid,
+                              )
+                              as T;
+                    }
 
-                return state;
-              },
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [];
               },
@@ -10256,18 +10130,18 @@ class $$GradeHistoryCacheTableTableTableManager
         TableManagerState(
           db: db,
           table: table,
-          createFilteringComposer:
-              () => $$GradeHistoryCacheTableTableFilterComposer(
+          createFilteringComposer: () =>
+              $$GradeHistoryCacheTableTableFilterComposer(
                 $db: db,
                 $table: table,
               ),
-          createOrderingComposer:
-              () => $$GradeHistoryCacheTableTableOrderingComposer(
+          createOrderingComposer: () =>
+              $$GradeHistoryCacheTableTableOrderingComposer(
                 $db: db,
                 $table: table,
               ),
-          createComputedFieldComposer:
-              () => $$GradeHistoryCacheTableTableAnnotationComposer(
+          createComputedFieldComposer: () =>
+              $$GradeHistoryCacheTableTableAnnotationComposer(
                 $db: db,
                 $table: table,
               ),
@@ -10291,16 +10165,9 @@ class $$GradeHistoryCacheTableTableTableManager
                 payload: payload,
                 time: time,
               ),
-          withReferenceMapper:
-              (p0) =>
-                  p0
-                      .map(
-                        (e) => (
-                          e.readTable(table),
-                          BaseReferences(db, table, e),
-                        ),
-                      )
-                      .toList(),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
           prefetchHooksCallback: null,
         ),
       );

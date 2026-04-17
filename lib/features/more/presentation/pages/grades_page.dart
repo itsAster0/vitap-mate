@@ -19,11 +19,12 @@ class GradesPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gradesProvider);
     final semAsync = ref.watch(semesterIdProvider);
-    final semData = semAsync.valueOrNull;
-    final stateValue = state.valueOrNull;
+    final semData = semAsync.value;
+    final stateValue = state.value;
     final stateSems = stateValue?.semesters ?? const <SemesterInfo>[];
-    final semesters =
-        stateSems.isNotEmpty ? stateSems : (semData?.semesters ?? const []);
+    final semesters = stateSems.isNotEmpty
+        ? stateSems
+        : (semData?.semesters ?? const []);
     final semLoading = semesters.isEmpty && semAsync.isLoading;
     final semLoadError = semesters.isEmpty && semAsync.hasError;
     final selectedSemesterId =
@@ -85,10 +86,22 @@ class GradesPage extends HookConsumerWidget {
                       details: Text(
                         _semesterNameFromList(semesters, selectedSemesterId),
                       ),
-                      initialValue:
-                          selectedSemesterId.isEmpty
-                              ? null
-                              : selectedSemesterId,
+                      selectControl: FMultiValueControl.managedRadio(
+                        initial: selectedSemesterId.isEmpty
+                            ? null
+                            : selectedSemesterId,
+                        onChange: (value) async {
+                          final selected = value.firstOrNull;
+                          if (selected == null) return;
+                          try {
+                            await ref
+                                .read(gradesProvider.notifier)
+                                .selectSemester(selected);
+                          } catch (e) {
+                            if (context.mounted) disCommonToast(context, e);
+                          }
+                        },
+                      ),
                       menu: [
                         for (final sem in semesters)
                           FSelectTile<String>(
@@ -96,45 +109,33 @@ class GradesPage extends HookConsumerWidget {
                             value: sem.id,
                           ),
                       ],
-                      onChange: (value) async {
-                        final selected = value.firstOrNull;
-                        if (selected == null) return;
-                        try {
-                          await ref
-                              .read(gradesProvider.notifier)
-                              .selectSemester(selected);
-                        } catch (e) {
-                          if (context.mounted) disCommonToast(context, e);
-                        }
-                      },
                     ),
                 ],
               ),
               const SizedBox(height: 10),
               state.when(
-                loading:
-                    () => SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.7,
-                      child: const _CenterInfo(
-                        title: "Loading grades...",
-                        icon: FIcons.loaderCircle,
-                      ),
-                    ),
-                error:
-                    (e, _) => SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.7,
-                      child: _CenterInfo(
-                        title: "Unable to load grades",
-                        subtitle: commonErrorMessage(e),
-                        icon: FIcons.triangleAlert,
-                      ),
-                    ),
+                loading: () => SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: const _CenterInfo(
+                    title: "Loading grades...",
+                    icon: FIcons.loaderCircle,
+                  ),
+                ),
+                error: (e, _) => SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.7,
+                  child: _CenterInfo(
+                    title: "Unable to load grades",
+                    subtitle: commonErrorMessage(e),
+                    icon: FIcons.triangleAlert,
+                  ),
+                ),
                 data: (data) {
-                  final sorted = [...data.gradeView.courses]..sort(
-                    (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
-                      int.tryParse(b.serial) ?? 0,
-                    ),
-                  );
+                  final sorted = [...data.gradeView.courses]
+                    ..sort(
+                      (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
+                        int.tryParse(b.serial) ?? 0,
+                      ),
+                    );
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,7 +235,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
     setState(() => _expanded = !_expanded);
     if (_expanded) {
       _controller.forward();
-      final s = ref.read(gradesProvider).valueOrNull;
+      final s = ref.read(gradesProvider).value;
       final has =
           s?.detailsByCourseId.containsKey(widget.course.courseId) ?? false;
       final loading =
@@ -269,7 +270,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
   @override
   Widget build(BuildContext context) {
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    final state = ref.watch(gradesProvider).valueOrNull;
+    final state = ref.watch(gradesProvider).value;
     final detail = state?.detailsByCourseId[widget.course.courseId];
     final loading =
         state?.loadingDetailsFor.contains(widget.course.courseId) ?? false;
@@ -282,17 +283,16 @@ class _GradeCardState extends ConsumerState<_GradeCard>
             onPress: _toggle,
             child: Container(
               decoration: BoxDecoration(
-                gradient:
-                    !darkMode
-                        ? const LinearGradient(
-                          colors: [
-                            MarksColors.theoryCardBackground,
-                            MarksColors.theoryCardSecondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                        : null,
+                gradient: !darkMode
+                    ? const LinearGradient(
+                        colors: [
+                          MarksColors.theoryCardBackground,
+                          MarksColors.theoryCardSecondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(12),
                 color: darkMode ? context.theme.colors.primaryForeground : null,
                 boxShadow: const [
@@ -340,10 +340,9 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.primaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.primaryText,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -351,10 +350,9 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                                 "${widget.course.courseCode} • ${widget.course.courseType}",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.secondaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.secondaryText,
                                 ),
                               ),
                             ],
@@ -399,10 +397,9 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                           child: Text(
                             "Grand Total: ${widget.course.grandTotal}",
                             style: TextStyle(
-                              color:
-                                  darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.primaryText,
+                              color: darkMode
+                                  ? context.theme.colors.primary
+                                  : MarksColors.primaryText,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -434,9 +431,8 @@ class _GradeCardState extends ConsumerState<_GradeCard>
           const SizedBox(height: 8),
           AnimatedBuilder(
             animation: _animation,
-            builder:
-                (context, child) =>
-                    FCollapsible(value: _animation.value, child: child!),
+            builder: (context, child) =>
+                FCollapsible(value: _animation.value, child: child!),
             child: _GradeDetailsPanel(
               detail: detail,
               loading: loading,
@@ -644,22 +640,21 @@ class _GradeDetailsPanel extends StatelessWidget {
   }
 
   List<_MarkSection> _groupMarksBySection(GradeDetailsData detail) {
-    final classTypes =
-        detail.classCourseType
-            .split('|')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
-    final classNumbers =
-        detail.classNumber
-            .split('|')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
+    final classTypes = detail.classCourseType
+        .split('|')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    final classNumbers = detail.classNumber
+        .split('|')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
     final classNumberByType = <String, String>{};
     for (int i = 0; i < classTypes.length; i++) {
-      classNumberByType[classTypes[i]] =
-          i < classNumbers.length ? classNumbers[i] : "";
+      classNumberByType[classTypes[i]] = i < classNumbers.length
+          ? classNumbers[i]
+          : "";
     }
 
     final grouped = <String, List<GradeDetailMark>>{};
@@ -728,10 +723,9 @@ class _GradeDetailsPanel extends StatelessWidget {
     final style = TextStyle(
       fontSize: header ? 13 : 12,
       fontWeight: header ? FontWeight.w700 : FontWeight.w400,
-      color:
-          header
-              ? context.theme.colors.primary
-              : context.theme.colors.foreground,
+      color: header
+          ? context.theme.colors.primary
+          : context.theme.colors.foreground,
     );
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -760,16 +754,15 @@ class _GradeDetailsPanel extends StatelessWidget {
 
   String _formatGradeRanges(List<GradeRange> ranges) {
     if (ranges.isEmpty) return "Grade ranges unavailable";
-    final normalized =
-        ranges
-            .map(
-              (r) => GradeRange(
-                grade: r.grade,
-                range: r.range.replaceAll('#', '').trim(),
-              ),
-            )
-            .where((r) => r.range.isNotEmpty)
-            .toList();
+    final normalized = ranges
+        .map(
+          (r) => GradeRange(
+            grade: r.grade,
+            range: r.range.replaceAll('#', '').trim(),
+          ),
+        )
+        .where((r) => r.range.isNotEmpty)
+        .toList();
     if (normalized.isEmpty) return "Grade ranges unavailable";
     return normalized.map((r) => "${r.grade}: ${r.range}").join("   ");
   }

@@ -24,14 +24,6 @@ class VClient extends _$VClient {
     String? password = await ref.watch(
       vtopUserProvider.selectAsync((user) => user.password),
     );
-    log("Vtop client build sucessfull");
-    // Future.microtask(() async {
-    //   try {
-    //     await tryLogin();
-    //   } catch (e) {
-    //     log("$e");
-    //   }
-    // });
     final uname = username!;
     final storage = await SharedPreferences.getInstance();
     final cookieKey = "cookie_$uname";
@@ -73,21 +65,14 @@ class VClient extends _$VClient {
             "vtop_login_${user.username}",
             () => vtopClientLogin(client: client),
           );
-      var newCookie =
-          String.fromCharCodes(
-            await fetchCookies(client: client),
-          ).split(";").first.trim();
+      var newCookie = String.fromCharCodes(
+        await fetchCookies(client: client),
+      ).split(";").first.trim();
       log("past cookie ${_cookie ?? ""} and new cookie $newCookie");
       if (_cookie != newCookie) {
         final storage = await SharedPreferences.getInstance();
         final uname = user.username!;
         await storage.setString("cookie_$uname", newCookie);
-        // if (newCookie
-        //     .split(";")
-        //     .map((e) => e.trim())
-        //     .toSet()
-        //     .intersection((_cookie??"").split(";").map((e) => e.trim()).toSet())
-        //     .isEmpty) {}
         await storage.setInt(
           "cookie_time_$uname",
           DateTime.now().toUtc().millisecondsSinceEpoch,

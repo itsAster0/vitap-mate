@@ -91,42 +91,49 @@ class SettingsPage extends HookConsumerWidget {
                             onLongPress: () {
                               showFDialog(
                                 context: context,
-                                builder:
-                                    (context, style, animation) => FDialog(
-                                      animation: animation,
-                                      direction: Axis.horizontal,
-                                      title: const Text(
-                                        'Are you absolutely sure?',
-                                      ),
-                                      body: FTextField(controller: field15e),
-                                      actions: [
-                                        FButton(
-                                          child: const Text('Continue'),
-                                          onPress: () {
-                                            if (field15e.text
-                                                    .trim()
-                                                    .toLowerCase() ==
-                                                "why") {
-                                              show15.value = true;
-                                            }
-
-                                            Navigator.of(context).pop();
-                                          },
-                                        ),
-                                      ],
+                                builder: (context, style, animation) => FDialog(
+                                  animation: animation,
+                                  direction: Axis.horizontal,
+                                  title: const Text('Are you absolutely sure?'),
+                                  body: FTextField(
+                                    control: FTextFieldControl.managed(
+                                      controller: field15e,
                                     ),
+                                  ),
+                                  actions: [
+                                    FButton(
+                                      child: const Text('Continue'),
+                                      onPress: () {
+                                        if (field15e.text
+                                                .trim()
+                                                .toLowerCase() ==
+                                            "why") {
+                                          show15.value = true;
+                                        }
+
+                                        Navigator.of(context).pop();
+                                      },
+                                    ),
+                                  ],
+                                ),
                               );
                             },
                             child: Text('Background Sync'),
                           ),
 
-                          onChange:
-                              (value) => {
+                          selectControl: FMultiValueControl.managedRadio(
+                            initial: initialValSync,
+                            onChange: (value) {
+                              final selected = value.isEmpty
+                                  ? null
+                                  : value.first;
+                              if (selected != null) {
                                 ref
                                     .read(backgroundSyncProvider.notifier)
-                                    .updateFreq(value.first),
-                              },
-                          initialValue: initialValSync,
+                                    .updateFreq(selected);
+                              }
+                            },
+                          ),
                           menu: backgroundSync,
                         ),
                       ],
@@ -144,17 +151,6 @@ class SettingsPage extends HookConsumerWidget {
                             value: ref.watch(themeProvider) == ThemeMode.dark,
                             onChange: (value) {
                               ref.read(themeProvider.notifier).toggleTheme();
-                            },
-                          ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.wifi),
-                          title: const Text('Show Wi-Fi Card'),
-
-                          suffix: FSwitch(
-                            value: ref.watch(wificardSettingProvider),
-                            onChange: (value) {
-                              ref.read(toggleWificardProvider);
                             },
                           ),
                         ),

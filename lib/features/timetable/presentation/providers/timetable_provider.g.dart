@@ -6,22 +6,49 @@ part of 'timetable_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$timetableHash() => r'3cf56d4894fb512e7519edec1d981ee72ccd0268';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [Timetable].
 @ProviderFor(Timetable)
-final timetableProvider =
-    AutoDisposeAsyncNotifierProvider<Timetable, TimetableData>.internal(
-      Timetable.new,
-      name: r'timetableProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product')
-              ? null
-              : _$timetableHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+final timetableProvider = TimetableProvider._();
 
-typedef _$Timetable = AutoDisposeAsyncNotifier<TimetableData>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class TimetableProvider
+    extends $AsyncNotifierProvider<Timetable, TimetableData> {
+  TimetableProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'timetableProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$timetableHash();
+
+  @$internal
+  @override
+  Timetable create() => Timetable();
+}
+
+String _$timetableHash() => r'662810b872252f8e69e6565dd09f0cc29d51c0ef';
+
+abstract class _$Timetable extends $AsyncNotifier<TimetableData> {
+  FutureOr<TimetableData> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<TimetableData>, TimetableData>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<TimetableData>, TimetableData>,
+              AsyncValue<TimetableData>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

@@ -16,8 +16,9 @@ class Attendance extends _$Attendance {
     var attendanceRepository = await ref.watch(
       attendanceRepositoryProvider.future,
     );
-    AttendanceData attendance =
-        await GetAttendanceUsecase(attendanceRepository).call();
+    AttendanceData attendance = await GetAttendanceUsecase(
+      attendanceRepository,
+    ).call();
     if (attendance.semesterId.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
 

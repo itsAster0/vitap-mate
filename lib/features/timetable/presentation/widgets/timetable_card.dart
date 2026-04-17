@@ -119,10 +119,9 @@ class TimetableCard extends HookConsumerWidget {
 
     final isExpanded = useState(false);
 
-    final status =
-        slot.serial != "-1"
-            ? getClassStatus(slot.startTime, slot.endTime, slot.day)
-            : null;
+    final status = slot.serial != "-1"
+        ? getClassStatus(slot.startTime, slot.endTime, slot.day)
+        : null;
 
     final statusStyle = status != null ? getStatusStyle(status) : null;
     final isHighlighted =
@@ -140,31 +139,27 @@ class TimetableCard extends HookConsumerWidget {
           decoration: BoxDecoration(
             color: getCardBackgroundColor(darkMode, context),
             borderRadius: BorderRadius.circular(12),
-            border:
-                statusStyle != null && isHighlighted
-                    ? Border.all(color: statusStyle.$1, width: 2)
-                    : null,
-            boxShadow:
-                darkMode
-                    ? null
-                    : [
-                      BoxShadow(
-                        color:
-                            isHighlighted
-                                ? TimetableColors.statusShadow
-                                : TimetableColors.cardShadow,
-                        blurRadius: isHighlighted ? 8 : 6,
-                        offset: const Offset(0, 2),
-                        spreadRadius: isHighlighted ? 1 : 0,
-                      ),
-                    ],
+            border: statusStyle != null && isHighlighted
+                ? Border.all(color: statusStyle.$1, width: 2)
+                : null,
+            boxShadow: darkMode
+                ? null
+                : [
+                    BoxShadow(
+                      color: isHighlighted
+                          ? TimetableColors.statusShadow
+                          : TimetableColors.cardShadow,
+                      blurRadius: isHighlighted ? 8 : 6,
+                      offset: const Offset(0, 2),
+                      spreadRadius: isHighlighted ? 1 : 0,
+                    ),
+                  ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child:
-                slot.serial != "-1"
-                    ? _buildClassCard(darkMode, context, statusStyle, animation)
-                    : _buildFreeTimeCard(darkMode, context),
+            child: slot.serial != "-1"
+                ? _buildClassCard(darkMode, context, statusStyle, animation)
+                : _buildFreeTimeCard(darkMode, context),
           ),
         ),
       ),
@@ -185,10 +180,9 @@ class TimetableCard extends HookConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color:
-                    slot.islab()
-                        ? const Color(0xFFE1F5FE)
-                        : const Color(0xFFE8F4FD),
+                color: slot.islab()
+                    ? const Color(0xFFE1F5FE)
+                    : const Color(0xFFE8F4FD),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -197,10 +191,9 @@ class TimetableCard extends HookConsumerWidget {
                   Icon(
                     slot.islab() ? FIcons.flaskConical : FIcons.libraryBig,
                     size: 16,
-                    color:
-                        slot.islab()
-                            ? const Color(0xFF0277BD)
-                            : const Color(0xFF1565C0),
+                    color: slot.islab()
+                        ? const Color(0xFF0277BD)
+                        : const Color(0xFF1565C0),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -208,10 +201,9 @@ class TimetableCard extends HookConsumerWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color:
-                          slot.islab()
-                              ? const Color(0xFF0277BD)
-                              : const Color(0xFF1565C0),
+                      color: slot.islab()
+                          ? const Color(0xFF0277BD)
+                          : const Color(0xFF1565C0),
                     ),
                   ),
                 ],
@@ -260,10 +252,9 @@ class TimetableCard extends HookConsumerWidget {
                 context,
                 icon: FIcons.mapPin,
                 text: "${slot.block} - ${slot.roomNo}",
-                color:
-                    isDark
-                        ? context.theme.colors.primary
-                        : const Color(0xFF6B7280),
+                color: isDark
+                    ? context.theme.colors.primary
+                    : const Color(0xFF6B7280),
               ),
             ),
             const SizedBox(width: 8),
@@ -272,10 +263,9 @@ class TimetableCard extends HookConsumerWidget {
               context,
               icon: FIcons.hash,
               text: slot.courseCode,
-              color:
-                  isDark
-                      ? context.theme.colors.primary
-                      : const Color(0xFF6B7280),
+              color: isDark
+                  ? context.theme.colors.primary
+                  : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -290,10 +280,9 @@ class TimetableCard extends HookConsumerWidget {
                 icon: FIcons.clock,
                 text:
                     "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
-                color:
-                    isDark
-                        ? context.theme.colors.primary
-                        : const Color(0xFF374151),
+                color: isDark
+                    ? context.theme.colors.primary
+                    : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
@@ -303,10 +292,9 @@ class TimetableCard extends HookConsumerWidget {
               context,
               icon: FIcons.calendar,
               text: slot.slot,
-              color:
-                  isDark
-                      ? context.theme.colors.primary
-                      : const Color(0xFF6B7280),
+              color: isDark
+                  ? context.theme.colors.primary
+                  : const Color(0xFF6B7280),
             ),
           ],
         ),
@@ -325,10 +313,9 @@ class TimetableCard extends HookConsumerWidget {
                       context,
                       icon: FIcons.contact,
                       text: formateFaculityName(slot.faculty),
-                      color:
-                          isDark
-                              ? context.theme.colors.primary
-                              : const Color(0xFF374151),
+                      color: isDark
+                          ? context.theme.colors.primary
+                          : const Color(0xFF374151),
                       isBold: true,
                     ),
                   ),
@@ -381,10 +368,9 @@ class TimetableCard extends HookConsumerWidget {
                 icon: FIcons.clock,
                 text:
                     "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
-                color:
-                    isDark
-                        ? context.theme.colors.primary
-                        : const Color(0xFF374151),
+                color: isDark
+                    ? context.theme.colors.primary
+                    : const Color(0xFF374151),
                 isBold: true,
               ),
             ),
@@ -393,12 +379,12 @@ class TimetableCard extends HookConsumerWidget {
               isDark,
               context,
               icon: FIcons.timer,
-              text:
-                  slot.slot == "1" ? "${slot.slot} hour" : "${slot.slot} hours",
-              color:
-                  isDark
-                      ? context.theme.colors.primary
-                      : const Color(0xFF6B7280),
+              text: slot.slot == "1"
+                  ? "${slot.slot} hour"
+                  : "${slot.slot} hours",
+              color: isDark
+                  ? context.theme.colors.primary
+                  : const Color(0xFF6B7280),
             ),
           ],
         ),

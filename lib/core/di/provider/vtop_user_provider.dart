@@ -11,8 +11,9 @@ class VtopUser extends _$VtopUser {
   @override
   Future<VtopUserEntity> build() async {
     log("VtopUser build start");
-    var user =
-        await ref.read(vtopusersutilsProvider.notifier).vtopUserDefault();
+    var user = await ref
+        .read(vtopusersutilsProvider.notifier)
+        .vtopUserDefault();
     log("VtopUser build sucessfull $user");
 
     return user!;

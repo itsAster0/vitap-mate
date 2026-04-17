@@ -1,4 +1,3 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -8,12 +7,11 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
-import 'package:vitapmate/services/firebase_notification.dart';
+
 import 'package:vitapmate/services/update_service.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 
-var notifications = NotificationService.instance;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Workmanager().initialize(callbackDispatcher);
@@ -34,7 +32,6 @@ class MyApp extends HookConsumerWidget {
         await Future.delayed(Duration(milliseconds: 500));
 
         UpdateService.checkForFlexibleUpdate();
-        await FirebaseMessaging.instance.getInitialMessage();
       });
       return null;
     }, []);

@@ -25,7 +25,7 @@ class AttendanceTable extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dataAsync = ref.watch(FullAttendanceProvider(courseType, courseId));
+    final dataAsync = ref.watch(fullAttendanceProvider(courseType, courseId));
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final isLoading = useState(false);
     final selectedTab = useState(0);
@@ -34,7 +34,7 @@ class AttendanceTable extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         try {
           await ref
-              .read(FullAttendanceProvider(courseType, courseId).notifier)
+              .read(fullAttendanceProvider(courseType, courseId).notifier)
               .updateAttendance();
         } catch (e, _) {
           ();
@@ -47,7 +47,7 @@ class AttendanceTable extends HookConsumerWidget {
       isLoading.value = true;
       try {
         await ref
-            .read(FullAttendanceProvider(courseType, courseId).notifier)
+            .read(fullAttendanceProvider(courseType, courseId).notifier)
             .updateAttendance();
       } catch (e, _) {
         if (context.mounted) disCommonToast(context, e);
@@ -103,30 +103,23 @@ class AttendanceTable extends HookConsumerWidget {
           ),
 
           Expanded(
-            child:
-                selectedTab.value == 0
-                    ? dataAsync.when(
-                      data:
-                          (data) => _buildTableContent(darkMode, context, data),
-                      error: (e, se) => _buildErrorState(e),
-                      loading: () => _buildLoadingState(),
-                    )
-                    : dataAsync.when(
-                      data:
-                          (data) => AttendanceCalculator(
-                            currentAttended:
-                                data.records.where((r) {
-                                  final val = r.status.toLowerCase().replaceAll(
-                                    " ",
-                                    "",
-                                  );
-                                  return ["present", "onduty"].contains(val);
-                                }).length,
-                            currentTotal: data.records.length,
-                          ),
-                      error: (e, se) => _buildErrorState(e),
-                      loading: () => _buildLoadingState(),
+            child: selectedTab.value == 0
+                ? dataAsync.when(
+                    data: (data) => _buildTableContent(darkMode, context, data),
+                    error: (e, se) => _buildErrorState(e),
+                    loading: () => _buildLoadingState(),
+                  )
+                : dataAsync.when(
+                    data: (data) => AttendanceCalculator(
+                      currentAttended: data.records.where((r) {
+                        final val = r.status.toLowerCase().replaceAll(" ", "");
+                        return ["present", "onduty"].contains(val);
+                      }).length,
+                      currentTotal: data.records.length,
                     ),
+                    error: (e, se) => _buildErrorState(e),
+                    loading: () => _buildLoadingState(),
+                  ),
           ),
         ],
       ),
@@ -146,18 +139,16 @@ class AttendanceTable extends HookConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? (darkMode
-                      ? context.theme.colors.primaryForeground
-                      : AttendanceColors.theoryIcon.withValues(alpha: 0.1))
-                  : Colors.transparent,
+          color: isSelected
+              ? (darkMode
+                    ? context.theme.colors.primaryForeground
+                    : AttendanceColors.theoryIcon.withValues(alpha: 0.1))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color:
-                isSelected
-                    ? AttendanceColors.theoryIcon
-                    : context.theme.colors.border,
+            color: isSelected
+                ? AttendanceColors.theoryIcon
+                : context.theme.colors.border,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -167,10 +158,9 @@ class AttendanceTable extends HookConsumerWidget {
             Icon(
               icon,
               size: 18,
-              color:
-                  isSelected
-                      ? AttendanceColors.theoryIcon
-                      : AttendanceColors.tertiaryText,
+              color: isSelected
+                  ? AttendanceColors.theoryIcon
+                  : AttendanceColors.tertiaryText,
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -179,12 +169,11 @@ class AttendanceTable extends HookConsumerWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      isSelected
-                          ? (darkMode
-                              ? context.theme.colors.primary
-                              : AttendanceColors.theoryIcon)
-                          : AttendanceColors.tertiaryText,
+                  color: isSelected
+                      ? (darkMode
+                            ? context.theme.colors.primary
+                            : AttendanceColors.theoryIcon)
+                      : AttendanceColors.tertiaryText,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -230,10 +219,9 @@ class AttendanceTable extends HookConsumerWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color:
-                    isDark
-                        ? context.theme.colors.primary
-                        : AttendanceColors.primaryText,
+                color: isDark
+                    ? context.theme.colors.primary
+                    : AttendanceColors.primaryText,
               ),
             ),
           ),
@@ -243,19 +231,17 @@ class AttendanceTable extends HookConsumerWidget {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color:
-                      isDark
-                          ? context.theme.colors.primaryForeground
-                          : AttendanceColors.tableRowAlternate,
+                  color: isDark
+                      ? context.theme.colors.primaryForeground
+                      : AttendanceColors.tableRowAlternate,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   FIcons.rotateCcw,
                   size: 16,
-                  color:
-                      isDark
-                          ? context.theme.colors.primary
-                          : AttendanceColors.secondaryText,
+                  color: isDark
+                      ? context.theme.colors.primary
+                      : AttendanceColors.secondaryText,
                 ),
               ),
             ),
@@ -282,10 +268,9 @@ class AttendanceTable extends HookConsumerWidget {
           child: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color:
-                  isDark
-                      ? context.theme.colors.primaryForeground
-                      : AttendanceColors.tableBackground,
+              color: isDark
+                  ? context.theme.colors.primaryForeground
+                  : AttendanceColors.tableBackground,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
@@ -357,73 +342,68 @@ class AttendanceTable extends HookConsumerWidget {
                         120,
                       ),
                     ],
-                    rows:
-                        data.records.asMap().entries.map<DataRow>((entry) {
-                          final index = entry.key;
-                          final record = entry.value;
-                          final isEven = index % 2 == 0;
+                    rows: data.records.asMap().entries.map<DataRow>((entry) {
+                      final index = entry.key;
+                      final record = entry.value;
+                      final isEven = index % 2 == 0;
 
-                          return DataRow(
-                            color: WidgetStateProperty.all(
-                              isEven
-                                  ? Colors.transparent
-                                  : isDark
-                                  ? context.theme.colors.primaryForeground
-                                  : AttendanceColors.tableRowAlternate,
-                            ),
-                            cells: [
-                              _buildDataCell(
-                                isDark
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.secondaryText,
-                                record.serial,
-                                isNumeric: true,
-                              ),
-                              _buildDataCell(
-                                isDark
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.secondaryText,
-                                _formatDate(record.date),
-                              ),
-                              DataCell(_buildStatusBadge(record.status)),
-                              _buildDataCell(
-                                isDark
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.secondaryText,
-                                record.dayTime,
-                              ),
-                              _buildDataCell(
-                                isDark
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.secondaryText,
-                                record.slot,
-                              ),
-                              DataCell(
-                                Container(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 120,
-                                  ),
-                                  child: Tooltip(
-                                    message: record.remark,
-                                    child: Text(
-                                      record.remark,
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 2,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color:
-                                            isDark
-                                                ? context.theme.colors.primary
-                                                : AttendanceColors
-                                                    .secondaryText,
-                                      ),
-                                    ),
+                      return DataRow(
+                        color: WidgetStateProperty.all(
+                          isEven
+                              ? Colors.transparent
+                              : isDark
+                              ? context.theme.colors.primaryForeground
+                              : AttendanceColors.tableRowAlternate,
+                        ),
+                        cells: [
+                          _buildDataCell(
+                            isDark
+                                ? context.theme.colors.primary
+                                : AttendanceColors.secondaryText,
+                            record.serial,
+                            isNumeric: true,
+                          ),
+                          _buildDataCell(
+                            isDark
+                                ? context.theme.colors.primary
+                                : AttendanceColors.secondaryText,
+                            _formatDate(record.date),
+                          ),
+                          DataCell(_buildStatusBadge(record.status)),
+                          _buildDataCell(
+                            isDark
+                                ? context.theme.colors.primary
+                                : AttendanceColors.secondaryText,
+                            record.dayTime,
+                          ),
+                          _buildDataCell(
+                            isDark
+                                ? context.theme.colors.primary
+                                : AttendanceColors.secondaryText,
+                            record.slot,
+                          ),
+                          DataCell(
+                            Container(
+                              constraints: const BoxConstraints(maxWidth: 120),
+                              child: Tooltip(
+                                message: record.remark,
+                                child: Text(
+                                  record.remark,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark
+                                        ? context.theme.colors.primary
+                                        : AttendanceColors.secondaryText,
                                   ),
                                 ),
                               ),
-                            ],
-                          );
-                        }).toList(),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
                   ),
                 ),
               ),

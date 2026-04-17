@@ -19,11 +19,12 @@ class AttendanceLocalDataSource {
       "fromStorage_fullattendance_${semid}_${courseType}_$courseId",
       () =>
           (_db.select(_db.fullAttendanceTable)..where(
-            (tbl) =>
-                tbl.semId.equals(semid) &
-                tbl.courseId.equals(courseId) &
-                tbl.courseType.equals(courseType),
-          )).get(),
+                (tbl) =>
+                    tbl.semId.equals(semid) &
+                    tbl.courseId.equals(courseId) &
+                    tbl.courseType.equals(courseType),
+              ))
+              .get(),
     );
     return FullAttendanceModel.toEntityFromLocal(allrows, courseId, courseType);
   }
@@ -97,9 +98,9 @@ class AttendanceLocalDataSource {
   Future<AttendanceData> getAttendance(String semid) async {
     final allrow = await _globalAsyncQueue.run(
       "fromStorage_attendance_$semid",
-      () =>
-          (_db.select(_db.attendanceTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.attendanceTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
 
     return AttendanceModel.toEntityFromLocal(allrow);

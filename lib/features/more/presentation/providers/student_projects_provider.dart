@@ -73,7 +73,7 @@ class StudentProjects extends _$StudentProjects {
   }
 
   Future<void> refresh() async {
-    final current = state.valueOrNull ?? defaultStudentProjects;
+    final current = state.value ?? defaultStudentProjects;
     final prefs = await ref.read(settingsProvider.future);
     final nextRotationSeed = prefs.getInt(_rotationSeedKey) ?? 0;
     final activeRotationSeed = nextRotationSeed > 0 ? nextRotationSeed - 1 : 0;
@@ -249,14 +249,12 @@ class StudentProject {
       return null;
     }
 
-    final openSourceUrl =
-        openSource is String && openSource.trim().isNotEmpty
-            ? openSource.trim()
-            : null;
-    final categoryKey =
-        category is String
-            ? _normalizeCategory(category)
-            : categoryMiscellaneous;
+    final openSourceUrl = openSource is String && openSource.trim().isNotEmpty
+        ? openSource.trim()
+        : null;
+    final categoryKey = category is String
+        ? _normalizeCategory(category)
+        : categoryMiscellaneous;
 
     return StudentProject(
       id: id.toInt(),

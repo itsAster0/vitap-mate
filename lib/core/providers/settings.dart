@@ -1,4 +1,3 @@
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
@@ -12,7 +11,6 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         "settings_merge_tt",
         "settings_btw_atten",
-        "settings_wifi_card",
         "settings_class_notifications_enabled",
         "settings_class_notify_before_minutes",
         "settings_class_pause_until_millis",
@@ -24,21 +22,6 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       },
     ),
   );
-}
-
-@riverpod
-bool wificardSetting(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_wifi_card") ?? false;
-}
-
-@riverpod
-Future<void> toggleWificard(Ref ref) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final current = prefs.getBool("settings_wifi_card") ?? true;
-  await prefs.setBool("settings_wifi_card", !current);
-
-  ref.invalidate(wificardSettingProvider);
 }
 
 @riverpod
@@ -73,21 +56,29 @@ Future<void> toggleBTWExams(Ref ref) async {
   ref.invalidate(btwExamsProvider);
 }
 
-final studentProjectPinnedIdsProvider = Provider<Set<int>>((ref) {
+@riverpod
+Set<int> studentProjectPinnedIds(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
   final list =
       prefs?.getStringList("settings_student_projects_pinned_ids") ?? [];
   return list.map(int.tryParse).whereType<int>().toSet();
-});
+}
 
-final studentProjectsPinnedOnlySessionProvider = StateProvider<bool>(
-  (ref) => false,
-);
+@riverpod
+class StudentProjectsPinnedOnlySession
+    extends _$StudentProjectsPinnedOnlySession {
+  @override
+  bool build() => false;
 
-final studentProjectsSettingsControllerProvider =
-    Provider<StudentProjectsSettingsController>((ref) {
-      return StudentProjectsSettingsController(ref);
-    });
+  void setValue(bool value) {
+    state = value;
+  }
+}
+
+@riverpod
+StudentProjectsSettingsController studentProjectsSettingsController(Ref ref) {
+  return StudentProjectsSettingsController(ref);
+}
 
 class StudentProjectsSettingsController {
   final Ref ref;
@@ -126,7 +117,8 @@ class ClassReminderSettings {
   });
 }
 
-final classReminderSettingsProvider = Provider<ClassReminderSettings>((ref) {
+@riverpod
+ClassReminderSettings classReminderSettings(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
   return ClassReminderSettings(
     enabled: prefs?.getBool("settings_class_notifications_enabled") ?? false,
@@ -134,12 +126,12 @@ final classReminderSettingsProvider = Provider<ClassReminderSettings>((ref) {
         prefs?.getInt("settings_class_notify_before_minutes") ?? 10,
     pauseUntilMillis: prefs?.getInt("settings_class_pause_until_millis"),
   );
-});
+}
 
-final classReminderSettingsControllerProvider =
-    Provider<ClassReminderSettingsController>((ref) {
-      return ClassReminderSettingsController(ref);
-    });
+@riverpod
+ClassReminderSettingsController classReminderSettingsController(Ref ref) {
+  return ClassReminderSettingsController(ref);
+}
 
 class ClassReminderSettingsController {
   final Ref ref;
@@ -200,19 +192,20 @@ class ExamReminderSettings {
   });
 }
 
-final examReminderSettingsProvider = Provider<ExamReminderSettings>((ref) {
+@riverpod
+ExamReminderSettings examReminderSettings(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
   return ExamReminderSettings(
     enabled: prefs?.getBool("settings_exam_notifications_enabled") ?? false,
     notifyBeforeMinutes:
         prefs?.getInt("settings_exam_notify_before_minutes") ?? 10,
   );
-});
+}
 
-final examReminderSettingsControllerProvider =
-    Provider<ExamReminderSettingsController>((ref) {
-      return ExamReminderSettingsController(ref);
-    });
+@riverpod
+ExamReminderSettingsController examReminderSettingsController(Ref ref) {
+  return ExamReminderSettingsController(ref);
+}
 
 class ExamReminderSettingsController {
   final Ref ref;

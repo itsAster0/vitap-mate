@@ -8,10 +8,9 @@ part of 'types.dart';
 
 _AttendanceData _$AttendanceDataFromJson(Map<String, dynamic> json) =>
     _AttendanceData(
-      records:
-          (json['records'] as List<dynamic>)
-              .map((e) => AttendanceRecord.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      records: (json['records'] as List<dynamic>)
+          .map((e) => AttendanceRecord.fromJson(e as Map<String, dynamic>))
+          .toList(),
       semesterId: json['semesterId'] as String,
       updateTime: BigInt.parse(json['updateTime'] as String),
     );
@@ -55,16 +54,14 @@ Map<String, dynamic> _$AttendanceRecordToJson(_AttendanceRecord instance) =>
       'courseId': instance.courseId,
     };
 
-_ExamScheduleData _$ExamScheduleDataFromJson(
-  Map<String, dynamic> json,
-) => _ExamScheduleData(
-  exams:
-      (json['exams'] as List<dynamic>)
+_ExamScheduleData _$ExamScheduleDataFromJson(Map<String, dynamic> json) =>
+    _ExamScheduleData(
+      exams: (json['exams'] as List<dynamic>)
           .map((e) => PerExamScheduleRecord.fromJson(e as Map<String, dynamic>))
           .toList(),
-  semesterId: json['semesterId'] as String,
-  updateTime: BigInt.parse(json['updateTime'] as String),
-);
+      semesterId: json['semesterId'] as String,
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
 
 Map<String, dynamic> _$ExamScheduleDataToJson(_ExamScheduleData instance) =>
     <String, dynamic>{
@@ -109,12 +106,9 @@ Map<String, dynamic> _$ExamScheduleRecordToJson(_ExamScheduleRecord instance) =>
 
 _FullAttendanceData _$FullAttendanceDataFromJson(Map<String, dynamic> json) =>
     _FullAttendanceData(
-      records:
-          (json['records'] as List<dynamic>)
-              .map(
-                (e) => FullAttendanceRecord.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
+      records: (json['records'] as List<dynamic>)
+          .map((e) => FullAttendanceRecord.fromJson(e as Map<String, dynamic>))
+          .toList(),
       semesterId: json['semesterId'] as String,
       updateTime: BigInt.parse(json['updateTime'] as String),
       courseId: json['courseId'] as String,
@@ -205,14 +199,12 @@ _GradeDetailsData _$GradeDetailsDataFromJson(Map<String, dynamic> json) =>
       classNumber: json['classNumber'] as String,
       classCourseType: json['classCourseType'] as String,
       grandTotal: json['grandTotal'] as String,
-      marks:
-          (json['marks'] as List<dynamic>)
-              .map((e) => GradeDetailMark.fromJson(e as Map<String, dynamic>))
-              .toList(),
-      gradeRanges:
-          (json['gradeRanges'] as List<dynamic>)
-              .map((e) => GradeRange.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      marks: (json['marks'] as List<dynamic>)
+          .map((e) => GradeDetailMark.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      gradeRanges: (json['gradeRanges'] as List<dynamic>)
+          .map((e) => GradeRange.fromJson(e as Map<String, dynamic>))
+          .toList(),
       updateTime: BigInt.parse(json['updateTime'] as String),
     );
 
@@ -286,12 +278,9 @@ _GradeHistoryData _$GradeHistoryDataFromJson(Map<String, dynamic> json) =>
       student: GradeHistoryStudentInfo.fromJson(
         json['student'] as Map<String, dynamic>,
       ),
-      records:
-          (json['records'] as List<dynamic>)
-              .map(
-                (e) => GradeHistoryRecord.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
+      records: (json['records'] as List<dynamic>)
+          .map((e) => GradeHistoryRecord.fromJson(e as Map<String, dynamic>))
+          .toList(),
       cgpa: GradeHistoryCgpa.fromJson(json['cgpa'] as Map<String, dynamic>),
       updateTime: BigInt.parse(json['updateTime'] as String),
     );
@@ -315,12 +304,9 @@ _GradeHistoryRecord _$GradeHistoryRecordFromJson(Map<String, dynamic> json) =>
       examMonth: json['examMonth'] as String,
       resultDeclared: json['resultDeclared'] as String,
       courseDistribution: json['courseDistribution'] as String,
-      attempts:
-          (json['attempts'] as List<dynamic>)
-              .map(
-                (e) => GradeHistoryAttempt.fromJson(e as Map<String, dynamic>),
-              )
-              .toList(),
+      attempts: (json['attempts'] as List<dynamic>)
+          .map((e) => GradeHistoryAttempt.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
 
 Map<String, dynamic> _$GradeHistoryRecordToJson(_GradeHistoryRecord instance) =>
@@ -375,14 +361,12 @@ Map<String, dynamic> _$GradeRangeToJson(_GradeRange instance) =>
 
 _GradeViewData _$GradeViewDataFromJson(Map<String, dynamic> json) =>
     _GradeViewData(
-      courses:
-          (json['courses'] as List<dynamic>)
-              .map((e) => GradeCourseRecord.fromJson(e as Map<String, dynamic>))
-              .toList(),
-      semesters:
-          (json['semesters'] as List<dynamic>)
-              .map((e) => SemesterInfo.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      courses: (json['courses'] as List<dynamic>)
+          .map((e) => GradeCourseRecord.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      semesters: (json['semesters'] as List<dynamic>)
+          .map((e) => SemesterInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
       semesterId: json['semesterId'] as String,
       updateTime: BigInt.parse(json['updateTime'] as String),
     );
@@ -396,10 +380,9 @@ Map<String, dynamic> _$GradeViewDataToJson(_GradeViewData instance) =>
     };
 
 _MarksData _$MarksDataFromJson(Map<String, dynamic> json) => _MarksData(
-  records:
-      (json['records'] as List<dynamic>)
-          .map((e) => MarksRecord.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  records: (json['records'] as List<dynamic>)
+      .map((e) => MarksRecord.fromJson(e as Map<String, dynamic>))
+      .toList(),
   semesterId: json['semesterId'] as String,
   updateTime: BigInt.parse(json['updateTime'] as String),
 );
@@ -418,10 +401,9 @@ _MarksRecord _$MarksRecordFromJson(Map<String, dynamic> json) => _MarksRecord(
   coursetype: json['coursetype'] as String,
   faculity: json['faculity'] as String,
   slot: json['slot'] as String,
-  marks:
-      (json['marks'] as List<dynamic>)
-          .map((e) => MarksRecordEach.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  marks: (json['marks'] as List<dynamic>)
+      .map((e) => MarksRecordEach.fromJson(e as Map<String, dynamic>))
+      .toList(),
 );
 
 Map<String, dynamic> _$MarksRecordToJson(_MarksRecord instance) =>
@@ -462,10 +444,9 @@ Map<String, dynamic> _$MarksRecordEachToJson(_MarksRecordEach instance) =>
 _PerExamScheduleRecord _$PerExamScheduleRecordFromJson(
   Map<String, dynamic> json,
 ) => _PerExamScheduleRecord(
-  records:
-      (json['records'] as List<dynamic>)
-          .map((e) => ExamScheduleRecord.fromJson(e as Map<String, dynamic>))
-          .toList(),
+  records: (json['records'] as List<dynamic>)
+      .map((e) => ExamScheduleRecord.fromJson(e as Map<String, dynamic>))
+      .toList(),
   examType: json['examType'] as String,
 );
 
@@ -478,10 +459,9 @@ Map<String, dynamic> _$PerExamScheduleRecordToJson(
 
 _SemesterData _$SemesterDataFromJson(Map<String, dynamic> json) =>
     _SemesterData(
-      semesters:
-          (json['semesters'] as List<dynamic>)
-              .map((e) => SemesterInfo.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      semesters: (json['semesters'] as List<dynamic>)
+          .map((e) => SemesterInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
       updateTime: BigInt.parse(json['updateTime'] as String),
     );
 
@@ -499,10 +479,9 @@ Map<String, dynamic> _$SemesterInfoToJson(_SemesterInfo instance) =>
 
 _TimetableData _$TimetableDataFromJson(Map<String, dynamic> json) =>
     _TimetableData(
-      slots:
-          (json['slots'] as List<dynamic>)
-              .map((e) => TimetableSlot.fromJson(e as Map<String, dynamic>))
-              .toList(),
+      slots: (json['slots'] as List<dynamic>)
+          .map((e) => TimetableSlot.fromJson(e as Map<String, dynamic>))
+          .toList(),
       semesterId: json['semesterId'] as String,
       updateTime: BigInt.parse(json['updateTime'] as String),
     );

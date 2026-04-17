@@ -16,9 +16,9 @@ class MarksLocalDataSource {
   Future<MarksData> getMarks(String semid) async {
     final allRows = await _globalAsyncQueue.run(
       "fromStroage_marks_$semid",
-      () =>
-          (_db.select(_db.marksTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.marksTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
     if (allRows.isEmpty) {
       return MarksData(records: [], semesterId: "", updateTime: BigInt.from(0));
@@ -60,9 +60,9 @@ class ExamScheduleLocalDataSource {
   Future<ExamScheduleData> getExamSchedule(String semid) async {
     final allRows = await _globalAsyncQueue.run(
       "fromStroage__exam_schedule_$semid",
-      () =>
-          (_db.select(_db.examScheduleTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.examScheduleTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
     if (allRows.isEmpty) {
       return ExamScheduleData(
@@ -117,9 +117,9 @@ class GradesLocalDataSource {
   Future<GradeViewData> getGradeView(String semid) async {
     final rows = await _globalAsyncQueue.run(
       "fromStorage_grades_view_$semid",
-      () =>
-          (_db.select(_db.gradeCourseTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.gradeCourseTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
     if (rows.isEmpty) {
       return GradeViewData(
@@ -135,9 +135,9 @@ class GradesLocalDataSource {
   Future<Map<String, GradeDetailsData>> getGradeDetailsMap(String semid) async {
     final rows = await _globalAsyncQueue.run(
       "fromStorage_grades_details_$semid",
-      () =>
-          (_db.select(_db.gradeDetailTable)
-            ..where((tbl) => tbl.semId.equals(semid))).get(),
+      () => (_db.select(
+        _db.gradeDetailTable,
+      )..where((tbl) => tbl.semId.equals(semid))).get(),
     );
     if (rows.isEmpty) return {};
     return GradesModel.toDetailsMapFromLocal(rows);

@@ -95,71 +95,70 @@ class MarksTable extends HookConsumerWidget {
                   "Remark",
                 ),
               ],
-              rows:
-                  marks.asMap().entries.map<DataRow>((entry) {
-                    final index = entry.key;
-                    final mark = entry.value;
-                    final isEven = index % 2 == 0;
+              rows: marks.asMap().entries.map<DataRow>((entry) {
+                final index = entry.key;
+                final mark = entry.value;
+                final isEven = index % 2 == 0;
 
-                    return DataRow(
-                      color: WidgetStateProperty.all(
-                        darkMode
-                            ? context.theme.colors.primaryForeground
-                            : isEven
-                            ? Colors.transparent
-                            : MarksColors.tableRowAlternate,
-                      ),
-                      cells: [
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.serial,
-                          isNumeric: true,
-                        ),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.markstitle,
-                        ),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.scoredmark,
-                          isNumeric: true,
-                        ),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.maxmarks,
-                          isNumeric: true,
-                        ),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.weightagemark,
-                          isNumeric: true,
-                        ),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.weightage,
-                        ),
-                        DataCell(_buildStatusBadge(mark.status)),
-                        _buildDataCell(
-                          darkMode
-                              ? context.theme.colors.primary
-                              : MarksColors.primaryText,
-                          mark.remark,
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                return DataRow(
+                  color: WidgetStateProperty.all(
+                    darkMode
+                        ? context.theme.colors.primaryForeground
+                        : isEven
+                        ? Colors.transparent
+                        : MarksColors.tableRowAlternate,
+                  ),
+                  cells: [
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.serial,
+                      isNumeric: true,
+                    ),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.markstitle,
+                    ),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.scoredmark,
+                      isNumeric: true,
+                    ),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.maxmarks,
+                      isNumeric: true,
+                    ),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.weightagemark,
+                      isNumeric: true,
+                    ),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.weightage,
+                    ),
+                    DataCell(_buildStatusBadge(mark.status)),
+                    _buildDataCell(
+                      darkMode
+                          ? context.theme.colors.primary
+                          : MarksColors.primaryText,
+                      mark.remark,
+                    ),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         ),

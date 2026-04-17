@@ -31,7 +31,7 @@ class ClassReminderNotificationService {
       '@mipmap/launcher_icon',
     );
     await _notifications.initialize(
-      const InitializationSettings(android: androidSettings),
+      settings: const InitializationSettings(android: androidSettings),
       onDidReceiveNotificationResponse: (response) {
         handleNotificationResponse(response);
       },
@@ -61,7 +61,7 @@ class ClassReminderNotificationService {
         if (payload == null) continue;
         final parsed = jsonDecode(payload);
         if (parsed is Map<String, dynamic> && parsed["type"] == _payloadType) {
-          await _notifications.cancel(request.id);
+          await _notifications.cancel(id: request.id);
         }
       } catch (_) {
         continue;
@@ -171,11 +171,11 @@ class ClassReminderNotificationService {
         ),
       );
       await _notifications.zonedSchedule(
-        id,
-        "Class Reminder",
-        "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
-        tz.TZDateTime.from(remindAt, tz.local),
-        details,
+        id: id,
+        title: "Class Reminder",
+        body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
+        scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+        notificationDetails: details,
         payload: payload,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,

@@ -1,5 +1,3 @@
-// ignore: depend_on_referenced_packages
-import 'package:riverpod/riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/features/timetable/data/repositories/timetable_repository_impl.dart';

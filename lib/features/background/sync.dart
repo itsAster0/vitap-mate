@@ -59,10 +59,9 @@ Future<bool> _syncData({String? task}) async {
     }
     final List<Future<bool>> futures = [];
 
-    final timetable =
-        await GetTimetableUsecase(
-          await container.read(timetableRepositoryProvider.future),
-        ).call();
+    final timetable = await GetTimetableUsecase(
+      await container.read(timetableRepositoryProvider.future),
+    ).call();
     if (!_isUpdatedWithinBacksyncWindow(timetable.updateTime)) {
       futures.add(
         _retryer(
@@ -71,20 +70,18 @@ Future<bool> _syncData({String? task}) async {
       );
     }
 
-    final marks =
-        await GetMarksUsecase(
-          await container.read(marksRepositoryProvider.future),
-        ).call();
+    final marks = await GetMarksUsecase(
+      await container.read(marksRepositoryProvider.future),
+    ).call();
     if (!_isUpdatedWithinBacksyncWindow(marks.updateTime)) {
       futures.add(
         _retryer(() => container.read(marksProvider.notifier).updatemarks()),
       );
     }
 
-    final examSchedule =
-        await GetExamScheduleUsecase(
-          await container.read(examScheduleRepositoryProvider.future),
-        ).call();
+    final examSchedule = await GetExamScheduleUsecase(
+      await container.read(examScheduleRepositoryProvider.future),
+    ).call();
     if (!_isUpdatedWithinBacksyncWindow(examSchedule.updateTime)) {
       futures.add(
         _retryer(
@@ -94,10 +91,9 @@ Future<bool> _syncData({String? task}) async {
       );
     }
 
-    final semids =
-        await GetSemidsUsecase(
-          await container.read(semidRepositoryProvider.future),
-        ).call();
+    final semids = await GetSemidsUsecase(
+      await container.read(semidRepositoryProvider.future),
+    ).call();
     if (!_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
       futures.add(
         _retryer(
@@ -175,22 +171,18 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
     final k = await Future.wait([
       for (final i in att.records)
         () async {
-          final fullAttendance =
-              await GetFullAttendanceUsecase(
-                attendanceRepo,
-                i.courseType,
-                i.courseId,
-              ).call();
+          final fullAttendance = await GetFullAttendanceUsecase(
+            attendanceRepo,
+            i.courseType,
+            i.courseId,
+          ).call();
           if (_isUpdatedWithinBacksyncWindow(fullAttendance.updateTime)) {
             return true;
           }
           return _retryer(
-            () =>
-                container
-                    .read(
-                      fullAttendanceProvider(i.courseType, i.courseId).notifier,
-                    )
-                    .updateAttendance(),
+            () => container
+                .read(fullAttendanceProvider(i.courseType, i.courseId).notifier)
+                .updateAttendance(),
           );
         }(),
     ]);
@@ -228,7 +220,7 @@ class BackgroundNotificationService {
 
     const settings = InitializationSettings(android: androidSettings);
 
-    await _notifications.initialize(settings);
+    await _notifications.initialize(settings: settings);
 
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -245,10 +237,10 @@ class BackgroundNotificationService {
 
   static Future<void> showProgress() async {
     await _notifications.show(
-      _syncId,
-      'VITAP Mate',
-      'Syncing VTOP data in background…',
-      const NotificationDetails(
+      id: _syncId,
+      title: 'VITAP Mate',
+      body: 'Syncing VTOP data in background…',
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _backSyncId,
           'Background Sync',
@@ -265,7 +257,7 @@ class BackgroundNotificationService {
   }
 
   static Future<void> stop({required bool success}) async {
-    await _notifications.cancel(_syncId);
+    await _notifications.cancel(id: _syncId);
 
     // await _notifications.show(
     //   _syncId + 1,

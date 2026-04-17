@@ -6,126 +6,539 @@ part of 'settings.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$settingsHash() => r'b62b713f75808fc15a8805484aa02f42714c7891';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [settings].
 @ProviderFor(settings)
-final settingsProvider =
-    AutoDisposeFutureProvider<SharedPreferencesWithCache>.internal(
-      settings,
-      name: r'settingsProvider',
-      debugGetCreateSourceHash:
-          const bool.fromEnvironment('dart.vm.product') ? null : _$settingsHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
+final settingsProvider = SettingsProvider._();
+
+final class SettingsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<SharedPreferencesWithCache>,
+          SharedPreferencesWithCache,
+          FutureOr<SharedPreferencesWithCache>
+        >
+    with
+        $FutureModifier<SharedPreferencesWithCache>,
+        $FutureProvider<SharedPreferencesWithCache> {
+  SettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'settingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$settingsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<SharedPreferencesWithCache> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<SharedPreferencesWithCache> create(Ref ref) {
+    return settings(ref);
+  }
+}
+
+String _$settingsHash() => r'f13baee0041c2097d28ebee586cf94192b242d78';
+
+@ProviderFor(mergeTT)
+final mergeTTProvider = MergeTTProvider._();
+
+final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  MergeTTProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mergeTTProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mergeTTHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return mergeTT(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
     );
+  }
+}
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef SettingsRef = AutoDisposeFutureProviderRef<SharedPreferencesWithCache>;
-String _$wificardSettingHash() => r'a113ea84ffa0d5650b53891ccc3a227c610c3a0f';
-
-/// See also [wificardSetting].
-@ProviderFor(wificardSetting)
-final wificardSettingProvider = AutoDisposeProvider<bool>.internal(
-  wificardSetting,
-  name: r'wificardSettingProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$wificardSettingHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef WificardSettingRef = AutoDisposeProviderRef<bool>;
-String _$toggleWificardHash() => r'fbbe59e63ccf4e09da9b783be5a394d2b2e1e0a7';
-
-/// See also [toggleWificard].
-@ProviderFor(toggleWificard)
-final toggleWificardProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleWificard,
-  name: r'toggleWificardProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleWificardHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleWificardRef = AutoDisposeFutureProviderRef<void>;
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
 
-/// See also [mergeTT].
-@ProviderFor(mergeTT)
-final mergeTTProvider = AutoDisposeProvider<bool>.internal(
-  mergeTT,
-  name: r'mergeTTProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$mergeTTHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(toggleMergeTT)
+final toggleMergeTTProvider = ToggleMergeTTProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef MergeTTRef = AutoDisposeProviderRef<bool>;
+final class ToggleMergeTTProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
+  ToggleMergeTTProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'toggleMergeTTProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$toggleMergeTTHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<void> create(Ref ref) {
+    return toggleMergeTT(ref);
+  }
+}
+
 String _$toggleMergeTTHash() => r'4089aa249c098148ae172a46690855636c7370b8';
 
-/// See also [toggleMergeTT].
-@ProviderFor(toggleMergeTT)
-final toggleMergeTTProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleMergeTT,
-  name: r'toggleMergeTTProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleMergeTTHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(btwExams)
+final btwExamsProvider = BtwExamsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleMergeTTRef = AutoDisposeFutureProviderRef<void>;
+final class BtwExamsProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  BtwExamsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'btwExamsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$btwExamsHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return btwExams(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
 String _$btwExamsHash() => r'77cc43c21a5b8dbd6ef2e949431fa4abf5d24a1b';
 
-/// See also [btwExams].
-@ProviderFor(btwExams)
-final btwExamsProvider = AutoDisposeProvider<bool>.internal(
-  btwExams,
-  name: r'btwExamsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$btwExamsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(toggleBTWExams)
+final toggleBTWExamsProvider = ToggleBTWExamsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef BtwExamsRef = AutoDisposeProviderRef<bool>;
+final class ToggleBTWExamsProvider
+    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
+    with $FutureModifier<void>, $FutureProvider<void> {
+  ToggleBTWExamsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'toggleBTWExamsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$toggleBTWExamsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<void> create(Ref ref) {
+    return toggleBTWExams(ref);
+  }
+}
+
 String _$toggleBTWExamsHash() => r'd6f29e77007ef71042f30310115986286dd5522c';
 
-/// See also [toggleBTWExams].
-@ProviderFor(toggleBTWExams)
-final toggleBTWExamsProvider = AutoDisposeFutureProvider<void>.internal(
-  toggleBTWExams,
-  name: r'toggleBTWExamsProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$toggleBTWExamsHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+@ProviderFor(studentProjectPinnedIds)
+final studentProjectPinnedIdsProvider = StudentProjectPinnedIdsProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ToggleBTWExamsRef = AutoDisposeFutureProviderRef<void>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class StudentProjectPinnedIdsProvider
+    extends $FunctionalProvider<Set<int>, Set<int>, Set<int>>
+    with $Provider<Set<int>> {
+  StudentProjectPinnedIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'studentProjectPinnedIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$studentProjectPinnedIdsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<int>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<int> create(Ref ref) {
+    return studentProjectPinnedIds(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<int> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<int>>(value),
+    );
+  }
+}
+
+String _$studentProjectPinnedIdsHash() =>
+    r'9bba55d0d44e1aabcebc1bbe66acecd2e7b47de5';
+
+@ProviderFor(StudentProjectsPinnedOnlySession)
+final studentProjectsPinnedOnlySessionProvider =
+    StudentProjectsPinnedOnlySessionProvider._();
+
+final class StudentProjectsPinnedOnlySessionProvider
+    extends $NotifierProvider<StudentProjectsPinnedOnlySession, bool> {
+  StudentProjectsPinnedOnlySessionProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'studentProjectsPinnedOnlySessionProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$studentProjectsPinnedOnlySessionHash();
+
+  @$internal
+  @override
+  StudentProjectsPinnedOnlySession create() =>
+      StudentProjectsPinnedOnlySession();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$studentProjectsPinnedOnlySessionHash() =>
+    r'ae1c6c87f2c3ab6b64a96f50925000259c08ae6a';
+
+abstract class _$StudentProjectsPinnedOnlySession extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
+@ProviderFor(studentProjectsSettingsController)
+final studentProjectsSettingsControllerProvider =
+    StudentProjectsSettingsControllerProvider._();
+
+final class StudentProjectsSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          StudentProjectsSettingsController,
+          StudentProjectsSettingsController,
+          StudentProjectsSettingsController
+        >
+    with $Provider<StudentProjectsSettingsController> {
+  StudentProjectsSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'studentProjectsSettingsControllerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() =>
+      _$studentProjectsSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<StudentProjectsSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  StudentProjectsSettingsController create(Ref ref) {
+    return studentProjectsSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(StudentProjectsSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<StudentProjectsSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$studentProjectsSettingsControllerHash() =>
+    r'725ff06cf1a7669349581d7f30979b934f19806a';
+
+@ProviderFor(classReminderSettings)
+final classReminderSettingsProvider = ClassReminderSettingsProvider._();
+
+final class ClassReminderSettingsProvider
+    extends
+        $FunctionalProvider<
+          ClassReminderSettings,
+          ClassReminderSettings,
+          ClassReminderSettings
+        >
+    with $Provider<ClassReminderSettings> {
+  ClassReminderSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'classReminderSettingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$classReminderSettingsHash();
+
+  @$internal
+  @override
+  $ProviderElement<ClassReminderSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ClassReminderSettings create(Ref ref) {
+    return classReminderSettings(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ClassReminderSettings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ClassReminderSettings>(value),
+    );
+  }
+}
+
+String _$classReminderSettingsHash() =>
+    r'f9ea74430e3c44d719f806d37acc4adde6dd2f0b';
+
+@ProviderFor(classReminderSettingsController)
+final classReminderSettingsControllerProvider =
+    ClassReminderSettingsControllerProvider._();
+
+final class ClassReminderSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          ClassReminderSettingsController,
+          ClassReminderSettingsController,
+          ClassReminderSettingsController
+        >
+    with $Provider<ClassReminderSettingsController> {
+  ClassReminderSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'classReminderSettingsControllerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$classReminderSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<ClassReminderSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ClassReminderSettingsController create(Ref ref) {
+    return classReminderSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ClassReminderSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ClassReminderSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$classReminderSettingsControllerHash() =>
+    r'3248a7f45836dbb0a55b1125234d569e107d7a1e';
+
+@ProviderFor(examReminderSettings)
+final examReminderSettingsProvider = ExamReminderSettingsProvider._();
+
+final class ExamReminderSettingsProvider
+    extends
+        $FunctionalProvider<
+          ExamReminderSettings,
+          ExamReminderSettings,
+          ExamReminderSettings
+        >
+    with $Provider<ExamReminderSettings> {
+  ExamReminderSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'examReminderSettingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$examReminderSettingsHash();
+
+  @$internal
+  @override
+  $ProviderElement<ExamReminderSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ExamReminderSettings create(Ref ref) {
+    return examReminderSettings(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ExamReminderSettings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ExamReminderSettings>(value),
+    );
+  }
+}
+
+String _$examReminderSettingsHash() =>
+    r'd250da3ff304498381ee39343e9ac11baf175d08';
+
+@ProviderFor(examReminderSettingsController)
+final examReminderSettingsControllerProvider =
+    ExamReminderSettingsControllerProvider._();
+
+final class ExamReminderSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          ExamReminderSettingsController,
+          ExamReminderSettingsController,
+          ExamReminderSettingsController
+        >
+    with $Provider<ExamReminderSettingsController> {
+  ExamReminderSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'examReminderSettingsControllerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$examReminderSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<ExamReminderSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ExamReminderSettingsController create(Ref ref) {
+    return examReminderSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ExamReminderSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ExamReminderSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$examReminderSettingsControllerHash() =>
+    r'2df8f91ec2e0cc1b1a8d32fd66d66e70705c672b';

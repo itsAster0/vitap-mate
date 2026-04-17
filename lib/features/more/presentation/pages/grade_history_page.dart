@@ -35,23 +35,21 @@ class GradeHistoryPage extends HookConsumerWidget {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
         child: data.when(
-          loading:
-              () => SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: const _CenterInfo(
-                  title: "Loading grade history...",
-                  icon: FIcons.loaderCircle,
-                ),
-              ),
-          error:
-              (e, _) => SizedBox(
-                height: MediaQuery.of(context).size.height * 0.7,
-                child: _CenterInfo(
-                  title: "Unable to load grade history",
-                  subtitle: commonErrorMessage(e),
-                  icon: FIcons.triangleAlert,
-                ),
-              ),
+          loading: () => SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: const _CenterInfo(
+              title: "Loading grade history...",
+              icon: FIcons.loaderCircle,
+            ),
+          ),
+          error: (e, _) => SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: _CenterInfo(
+              title: "Unable to load grade history",
+              subtitle: commonErrorMessage(e),
+              icon: FIcons.triangleAlert,
+            ),
+          ),
           data: (gradeHistory) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -104,17 +102,16 @@ class _StudentCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient:
-            darkMode
-                ? null
-                : const LinearGradient(
-                  colors: [
-                    MarksColors.theoryCardBackground,
-                    MarksColors.theoryCardSecondary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+        gradient: darkMode
+            ? null
+            : const LinearGradient(
+                colors: [
+                  MarksColors.theoryCardBackground,
+                  MarksColors.theoryCardSecondary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
         borderRadius: BorderRadius.circular(12),
         color: darkMode ? context.theme.colors.primaryForeground : null,
         boxShadow: const [
@@ -135,10 +132,9 @@ class _StudentCard extends ConsumerWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color:
-                  darkMode
-                      ? context.theme.colors.primary
-                      : MarksColors.primaryText,
+              color: darkMode
+                  ? context.theme.colors.primary
+                  : MarksColors.primaryText,
             ),
           ),
           const SizedBox(height: 6),
@@ -146,10 +142,9 @@ class _StudentCard extends ConsumerWidget {
             info.regNo,
             style: TextStyle(
               fontSize: 13,
-              color:
-                  darkMode
-                      ? context.theme.colors.mutedForeground
-                      : MarksColors.secondaryText,
+              color: darkMode
+                  ? context.theme.colors.mutedForeground
+                  : MarksColors.secondaryText,
             ),
           ),
           const SizedBox(height: 3),
@@ -159,10 +154,9 @@ class _StudentCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
-              color:
-                  darkMode
-                      ? context.theme.colors.mutedForeground
-                      : MarksColors.secondaryText,
+              color: darkMode
+                  ? context.theme.colors.mutedForeground
+                  : MarksColors.secondaryText,
             ),
           ),
         ],
@@ -305,17 +299,16 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
             onPress: _toggle,
             child: Container(
               decoration: BoxDecoration(
-                gradient:
-                    !darkMode
-                        ? const LinearGradient(
-                          colors: [
-                            MarksColors.theoryCardBackground,
-                            MarksColors.theoryCardSecondary,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                        : null,
+                gradient: !darkMode
+                    ? const LinearGradient(
+                        colors: [
+                          MarksColors.theoryCardBackground,
+                          MarksColors.theoryCardSecondary,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
                 borderRadius: BorderRadius.circular(12),
                 color: darkMode ? context.theme.colors.primaryForeground : null,
                 boxShadow: const [
@@ -356,10 +349,9 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.primaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.primaryText,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -367,10 +359,9 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                                 "${r.courseCode} • ${r.courseType} • ${r.credits} credits",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color:
-                                      darkMode
-                                          ? context.theme.colors.primary
-                                          : MarksColors.secondaryText,
+                                  color: darkMode
+                                      ? context.theme.colors.primary
+                                      : MarksColors.secondaryText,
                                 ),
                               ),
                             ],

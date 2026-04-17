@@ -81,10 +81,9 @@ class AttendanceCalculator extends HookConsumerWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                color:
-                    darkMode
-                        ? context.theme.colors.primary
-                        : AttendanceColors.primaryText,
+                color: darkMode
+                    ? context.theme.colors.primary
+                    : AttendanceColors.primaryText,
               ),
             ),
             const SizedBox(height: 8),
@@ -100,10 +99,9 @@ class AttendanceCalculator extends HookConsumerWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color:
-                    darkMode
-                        ? context.theme.colors.primaryForeground
-                        : AttendanceColors.tableBackground,
+                color: darkMode
+                    ? context.theme.colors.primaryForeground
+                    : AttendanceColors.tableBackground,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: context.theme.colors.border,
@@ -131,10 +129,9 @@ class AttendanceCalculator extends HookConsumerWidget {
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color:
-                                        darkMode
-                                            ? context.theme.colors.primary
-                                            : AttendanceColors.primaryText,
+                                    color: darkMode
+                                        ? context.theme.colors.primary
+                                        : AttendanceColors.primaryText,
                                   ),
                                 ),
                               ],
@@ -197,10 +194,9 @@ class AttendanceCalculator extends HookConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color:
-                          darkMode
-                              ? context.theme.colors.background
-                              : Colors.white,
+                      color: darkMode
+                          ? context.theme.colors.background
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: context.theme.colors.border,
@@ -226,10 +222,9 @@ class AttendanceCalculator extends HookConsumerWidget {
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w700,
-                                color:
-                                    darkMode
-                                        ? context.theme.colors.primary
-                                        : AttendanceColors.primaryText,
+                                color: darkMode
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.primaryText,
                               ),
                             ),
                           ],
@@ -270,10 +265,9 @@ class AttendanceCalculator extends HookConsumerWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color:
-                    darkMode
-                        ? context.theme.colors.primaryForeground
-                        : AttendanceColors.tableBackground,
+                color: darkMode
+                    ? context.theme.colors.primaryForeground
+                    : AttendanceColors.tableBackground,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: context.theme.colors.border,
@@ -299,17 +293,16 @@ class AttendanceCalculator extends HookConsumerWidget {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color:
-                                    darkMode
-                                        ? context.theme.colors.primary
-                                        : AttendanceColors.primaryText,
+                                color: darkMode
+                                    ? context.theme.colors.primary
+                                    : AttendanceColors.primaryText,
                               ),
                             ),
                           ],
                         ),
                       ),
                       FButton(
-                        style: FButtonStyle.outline(),
+                        variant: FButtonVariant.outline,
                         onPress: () {
                           futureAttend.value = 0;
                           futureSkip.value = 0;
@@ -490,10 +483,9 @@ class AttendanceCalculator extends HookConsumerWidget {
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
-                  color:
-                      darkMode
-                          ? context.theme.colors.primary
-                          : AttendanceColors.primaryText,
+                  color: darkMode
+                      ? context.theme.colors.primary
+                      : AttendanceColors.primaryText,
                 ),
               ),
               if (enable)

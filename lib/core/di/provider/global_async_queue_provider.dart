@@ -11,7 +11,6 @@ abstract class AsyncQueue {
 @Riverpod(keepAlive: true)
 class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   final _taskEvents = StreamController<Set<String>>.broadcast();
-  // ignore: avoid_public_notifier_properties
   Stream<Set<String>> get taskStream => _taskEvents.stream;
   @override
   GlobalAsyncQueueEntity build() {
@@ -26,11 +25,10 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
       return current[id] as Future<T>;
     }
     if (id.startsWith("vtop")) {
-      final mainFutures =
-          state.running.entries
-              .where((entry) => entry.key.startsWith('vtop_login'))
-              .map((entry) => entry.value)
-              .toList();
+      final mainFutures = state.running.entries
+          .where((entry) => entry.key.startsWith('vtop_login'))
+          .map((entry) => entry.value)
+          .toList();
       if (mainFutures.isNotEmpty) {
         log("waiting for the on start run code ", level: 400);
         await Future.wait(mainFutures);
@@ -41,10 +39,8 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
     final before = {...current1, id: future};
     state = state.copyWith(running: before);
     _taskEvents.add(before.keys.toSet());
-    log("added $id  to ${state.running}", level: 400);
     future.whenComplete(() {
       final before1 = state.running;
-      log("removing $id from $before1", level: 400);
       final after = {...before1}..remove(id);
       state = state.copyWith(running: after);
       _taskEvents.add(after.keys.toSet());

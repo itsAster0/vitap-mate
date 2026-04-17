@@ -18,8 +18,9 @@ class Timetable extends _$Timetable {
       timetableRepositoryProvider.future,
     );
 
-    TimetableData timetable =
-        await GetTimetableUsecase(timetableRepository).call();
+    TimetableData timetable = await GetTimetableUsecase(
+      timetableRepository,
+    ).call();
     if (timetable.slots.isEmpty) {
       await ref.read(vClientProvider.notifier).tryLogin();
       timetable = await _update();
