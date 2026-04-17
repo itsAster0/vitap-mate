@@ -31,9 +31,8 @@ class Marks extends _$Marks {
 
   Future<MarksData> _update() async {
     var repo = await ref.read(marksRepositoryProvider.future);
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("fetch-marks");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-marks")) {
       var data = await UpdateMarksUsecase(repo).call();
       return data;
     } else {

@@ -51,9 +51,8 @@ class VClient extends _$VClient {
       if (await fetchIsAuth(client: client)) return;
     }
     if (!user.isValid) throw VtopError.invalidCredentials();
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("try-login");
-    if (!feature.on || !feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (!await featureFlags.isEnabled("try-login")) {
       throw FeatureDisabledException("Login is Disabled");
     }
     log("login try");

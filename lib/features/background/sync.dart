@@ -52,9 +52,10 @@ Future<bool> _syncData({String? task}) async {
     if (!user.isValid || user.semid == null) {
       return true;
     }
-    var gb = await container.read(gbProvider.future);
-    var feature = gb.feature("background-sync");
-    if (!(feature.on && feature.value)) {
+    final featureFlags = await container.read(
+      featureFlagsControllerProvider.future,
+    );
+    if (!await featureFlags.isEnabled("background-sync")) {
       return true;
     }
     final List<Future<bool>> futures = [];

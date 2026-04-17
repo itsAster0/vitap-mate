@@ -52,7 +52,7 @@ dependencies:
   forui: ^0.21.1
   forui_hooks: ^0.21.0
   flutter_riverpod: ^3.1.0
-  growthbook_sdk_flutter: ^4.2.4
+  flagsmith: ^6.1.0
   device_info_plus: ^12.4.0
   flutter_inappwebview:
   url_launcher: ^6.3.1

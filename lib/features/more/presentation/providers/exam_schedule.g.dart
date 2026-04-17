@@ -33,7 +33,7 @@ final class ExamScheduleProvider
   ExamSchedule create() => ExamSchedule();
 }
 
-String _$examScheduleHash() => r'c35790ddd7f6a2784f9d80c4f1d0ddf83c6f7508';
+String _$examScheduleHash() => r'ef3e273c3ab23034dd6a87855eaedf2a146a6fd2';
 
 abstract class _$ExamSchedule extends $AsyncNotifier<ExamScheduleData> {
   FutureOr<ExamScheduleData> build();

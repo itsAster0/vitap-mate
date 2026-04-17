@@ -10,7 +10,6 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
-
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -223,11 +222,9 @@ class Step2 extends HookConsumerWidget {
                     await ref
                         .read(vtopusersutilsProvider.notifier)
                         .vtopUserInitialData(user);
-                    ref.invalidate(vtopUserProvider);
+                await  ref.refresh(vtopUserProvider);
+                  
                     await ref.read(vClientProvider.future);
-                    // ref
-                    //     .read(vClientProvider.notifier)
-                    //     .replaceVClinet(_globalClient);
                     if (context.mounted) {
                       GoRouter.of(context).goNamed(Paths.timetable);
                     }

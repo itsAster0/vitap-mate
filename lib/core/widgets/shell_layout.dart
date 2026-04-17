@@ -42,6 +42,7 @@ class ShellLayout extends HookConsumerWidget {
       getSidewidget(context, "Timetable", k, newSemExist),
       getSidewidget(context, "Attendance", k, newSemExist),
       getSidewidget(context, "More", k, newSemExist),
+      getSidewidget(context, "Projects", k, newSemExist),
       getSidewidget(context, "Settings", k, newSemExist),
     ];
     final selected = useState(0);
@@ -52,8 +53,10 @@ class ShellLayout extends HookConsumerWidget {
         selected.value = 1;
       } else if (k.startsWith("/more")) {
         selected.value = 2;
-      } else if (k.startsWith("/settings")) {
+      } else if (k.startsWith("/student-projects")) {
         selected.value = 3;
+      } else if (k.startsWith("/settings")) {
+        selected.value = 4;
       }
       return null;
     }, [k]);
@@ -81,6 +84,9 @@ class ShellLayout extends HookConsumerWidget {
                 GoRouter.of(context).goNamed(Paths.more);
                 break;
               case 3:
+                GoRouter.of(context).goNamed(Paths.studentProjects);
+                break;
+              case 4:
                 GoRouter.of(context).goNamed(Paths.settings);
                 break;
             }
@@ -97,6 +103,10 @@ class ShellLayout extends HookConsumerWidget {
             FBottomNavigationBarItem(
               icon: Icon(FIcons.libraryBig),
               label: const Text('More'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FIcons.rocket),
+              label: const Text('Projects'),
             ),
             FBottomNavigationBarItem(
               icon: Icon(FIcons.settings),
@@ -145,6 +155,7 @@ Widget? getSidewidget(
               ? context.theme.typography.sm
               : context.theme.typography.lg,
         ),
+        if(newsem)
         Text(
           "New semester data available!",
           style: context.theme.typography.sm,

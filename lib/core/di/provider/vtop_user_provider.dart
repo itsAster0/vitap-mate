@@ -15,7 +15,9 @@ class VtopUser extends _$VtopUser {
         .read(vtopusersutilsProvider.notifier)
         .vtopUserDefault();
     log("VtopUser build sucessfull $user");
-
-    return user!;
+    if (user == null) {
+      return VtopUserEntity(username: null, password: null, semid: '');
+    }
+    return user;
   }
 }

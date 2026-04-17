@@ -6,6 +6,7 @@ class Paths {
   static final onbaording = "onbaording";
   static final vtopUserManagement = "vtopUsermanagement";
   static final settings = "settings";
+  static final studentProjects = "studentProjects";
   static final marks = "marks";
   static final grades = "grades";
   static final gradeHistory = "gradeHistory";

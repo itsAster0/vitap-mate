@@ -36,9 +36,8 @@ class Attendance extends _$Attendance {
 
   Future<AttendanceData> _update() async {
     var repo = await ref.read(attendanceRepositoryProvider.future);
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("fetch-attendance");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-attendance")) {
       var data = await UpdateAttendanceUsecase(repo).call();
 
       return data;

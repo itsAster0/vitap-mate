@@ -170,9 +170,8 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     GradesRepository repo, {
     required bool hasLocalData,
   }) async {
-    final gb = await ref.read(gbProvider.future);
-    final feature = gb.feature("fetch-grades");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-grades")) {
       await ref.read(vClientProvider.notifier).tryLogin();
       await UpdateGradeViewUsecase(repo).call();
       return true;

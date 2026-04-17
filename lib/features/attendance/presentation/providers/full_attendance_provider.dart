@@ -42,9 +42,8 @@ class FullAttendance extends _$FullAttendance {
 
   Future<FullAttendanceData> _update() async {
     var repo = await ref.read(attendanceRepositoryProvider.future);
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("fetch-full-attendance");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-full-attendance")) {
       var data = await UpdateFullAttendanceUsecase(
         repo,
         _courseType,

@@ -65,6 +65,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.7.0"
+  asn1lib:
+    dependency: transitive
+    description:
+      name: asn1lib
+      sha256: "9a8f69025044eb466b9b60ef3bc3ac99b4dc6c158ae9c56d25eeccf5bc56d024"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.5"
   async:
     dependency: transitive
     description:
@@ -385,14 +393,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.8"
-  equatable:
+  encrypt:
     dependency: transitive
     description:
-      name: equatable
-      sha256: "3e0141505477fd8ad55d6eb4e7776d3fe8430be8e497ccb1521370c3f21a3e2b"
+      name: encrypt
+      sha256: "62d9aa4670cc2a8798bab89b39fc71b6dfbacf615de6cf5001fb39f7e4a996a2"
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.8"
+    version: "5.0.3"
   fake_async:
     dependency: transitive
     description:
@@ -425,6 +433,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  flagsmith:
+    dependency: "direct main"
+    description:
+      name: flagsmith
+      sha256: "44145e3c22797c78fec02c6f090a5844fe630afdb828a0930637511a72a7f07d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.0"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -438,6 +454,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.1"
+  flutter_client_sse:
+    dependency: transitive
+    description:
+      name: flutter_client_sse
+      sha256: "4ce0297206473dfc064b255fe086713240002e149f52519bd48c21423e4aa5d2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.3"
   flutter_driver:
     dependency: transitive
     description: flutter
@@ -727,14 +751,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
-  growthbook_sdk_flutter:
-    dependency: "direct main"
-    description:
-      name: growthbook_sdk_flutter
-      sha256: "762f42a4d23020d86c1ec02f03d4b6cd0fd119b38966e6804e8ae243ae523b32"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.2.4"
   hooks:
     dependency: transitive
     description:
@@ -1212,14 +1228,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
-  quiver:
-    dependency: transitive
-    description:
-      name: quiver
-      sha256: ea0b925899e64ecdfbf9c7becb60d5b50e706ade44a85b2363be2a22d88117d2
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.2.2"
   recase:
     dependency: transitive
     description:
@@ -1584,14 +1592,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.11.0"
-  tuple:
-    dependency: transitive
-    description:
-      name: tuple
-      sha256: a97ce2013f240b2f3807bcbaf218765b6f301c3eff91092bcfa23a039e7dd151
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.2"
   typed_data:
     dependency: transitive
     description:

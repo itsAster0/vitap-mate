@@ -32,7 +32,7 @@ final class MarksProvider extends $AsyncNotifierProvider<Marks, MarksData> {
   Marks create() => Marks();
 }
 
-String _$marksHash() => r'644e4b4506aed0df2cf4f042d4dd3064a373ee18';
+String _$marksHash() => r'0d6fb90d3ed2007286ab84285667fd3873d09d57';
 
 abstract class _$Marks extends $AsyncNotifier<MarksData> {
   FutureOr<MarksData> build();

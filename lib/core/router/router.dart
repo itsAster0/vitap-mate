@@ -11,6 +11,7 @@ import 'package:vitapmate/features/more/presentation/pages/grades_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/grade_history_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/student_projects_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
@@ -85,6 +86,16 @@ GoRouter router(Ref ref) {
                 name: Paths.attendance,
 
                 builder: (context, state) => AttendancePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: GlobalKey<NavigatorState>(),
+            routes: [
+              GoRoute(
+                path: '/student-projects',
+                name: Paths.studentProjects,
+                builder: (context, state) => StudentProjectsPage(),
               ),
             ],
           ),

@@ -39,9 +39,8 @@ class Timetable extends _$Timetable {
 
   Future<TimetableData> _update() async {
     var repo = await ref.read(timetableRepositoryProvider.future);
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("fetch-timetable");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-timetable")) {
       var data = await UpdateTimetableUsecase(repo).call();
       return data;
     } else {

@@ -38,9 +38,8 @@ class ExamSchedule extends _$ExamSchedule {
 
   Future<ExamScheduleData> _update() async {
     var repo = await ref.read(examScheduleRepositoryProvider.future);
-    var gb = await ref.read(gbProvider.future);
-    var feature = gb.feature("fetch-exam-schedule");
-    if (feature.on && feature.value) {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    if (await featureFlags.isEnabled("fetch-exam-schedule")) {
       var data = await UpdateExamScheduleUsecase(repo).call();
       return data;
     } else {

@@ -9,42 +9,57 @@ part of 'feature_flags.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(Gb)
-final gbProvider = GbProvider._();
+@ProviderFor(FeatureFlagsController)
+final featureFlagsControllerProvider = FeatureFlagsControllerProvider._();
 
-final class GbProvider extends $AsyncNotifierProvider<Gb, GrowthBookSDK> {
-  GbProvider._()
+final class FeatureFlagsControllerProvider
+    extends
+        $AsyncNotifierProvider<
+          FeatureFlagsController,
+          FeatureFlagPodController
+        > {
+  FeatureFlagsControllerProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'gbProvider',
+        name: r'featureFlagsControllerProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$gbHash();
+  String debugGetCreateSourceHash() => _$featureFlagsControllerHash();
 
   @$internal
   @override
-  Gb create() => Gb();
+  FeatureFlagsController create() => FeatureFlagsController();
 }
 
-String _$gbHash() => r'ef2cd4f243a23adcf41e1eacbc93a838673c4297';
+String _$featureFlagsControllerHash() =>
+    r'6c63e083c6f72942f3d1fc46d4ff25b4cbe8b584';
 
-abstract class _$Gb extends $AsyncNotifier<GrowthBookSDK> {
-  FutureOr<GrowthBookSDK> build();
+abstract class _$FeatureFlagsController
+    extends $AsyncNotifier<FeatureFlagPodController> {
+  FutureOr<FeatureFlagPodController> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<GrowthBookSDK>, GrowthBookSDK>;
+    final ref =
+        this.ref
+            as $Ref<
+              AsyncValue<FeatureFlagPodController>,
+              FeatureFlagPodController
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<GrowthBookSDK>, GrowthBookSDK>,
-              AsyncValue<GrowthBookSDK>,
+              AnyNotifier<
+                AsyncValue<FeatureFlagPodController>,
+                FeatureFlagPodController
+              >,
+              AsyncValue<FeatureFlagPodController>,
               Object?,
               Object?
             >;

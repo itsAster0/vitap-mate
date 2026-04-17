@@ -33,7 +33,7 @@ final class GradeHistoryProvider
   GradeHistory create() => GradeHistory();
 }
 
-String _$gradeHistoryHash() => r'e0f95d187d65cd5bdf4e84dd3734014349bea10f';
+String _$gradeHistoryHash() => r'0b9740bcaed0350abb355a05b063f543f8211d9b';
 
 abstract class _$GradeHistory extends $AsyncNotifier<GradeHistoryData> {
   FutureOr<GradeHistoryData> build();

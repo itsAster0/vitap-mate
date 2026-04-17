@@ -33,7 +33,7 @@ final class TimetableProvider
   Timetable create() => Timetable();
 }
 
-String _$timetableHash() => r'662810b872252f8e69e6565dd09f0cc29d51c0ef';
+String _$timetableHash() => r'64e32cb0998c38e25998bbcc500e3642730d23d0';
 
 abstract class _$Timetable extends $AsyncNotifier<TimetableData> {
   FutureOr<TimetableData> build();
