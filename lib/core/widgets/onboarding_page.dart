@@ -86,6 +86,7 @@ class OnboardingPage extends HookConsumerWidget {
                 ),
               ),
             ),
+               const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
               child: FAlert(

@@ -11,8 +11,6 @@ import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_w
 class VtopWebviewBody extends StatelessWidget {
   const VtopWebviewBody({
     required this.initialUrl,
-    required this.requestHeaders,
-    required this.userAgent,
     required this.isCompactMode,
     required this.isDarkMode,
     required this.loading,
@@ -25,8 +23,6 @@ class VtopWebviewBody extends StatelessWidget {
   });
 
   final WebUri initialUrl;
-  final Map<String, String> requestHeaders;
-  final String userAgent;
   final bool isCompactMode;
   final bool isDarkMode;
   final bool loading;
@@ -62,11 +58,10 @@ class VtopWebviewBody extends StatelessWidget {
               initialSettings: InAppWebViewSettings(
                 isInspectable: kDebugMode,
                 useOnDownloadStart: true,
-                userAgent: userAgent,
               ),
               initialUrlRequest: URLRequest(
                 url: initialUrl,
-                headers: requestHeaders,
+         
               ),
               onWebViewCreated: onWebViewCreated,
               onDownloadStartRequest: (controller, request) async {

@@ -194,11 +194,7 @@ pub struct PersistedCookie {
 pub struct PersistedVtopSession {
     pub username: String,
     pub saved_at_epoch_ms: u64,
-    pub expires_at_epoch_ms: u64,
-    pub csrf_token: Option<String>,
-    pub authenticated_hint: bool,
-    pub cookies: Vec<PersistedCookie>,
-    pub headers: Vec<PersistedHeader>,
+    pub cookies: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

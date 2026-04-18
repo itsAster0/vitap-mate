@@ -119,9 +119,8 @@ pub async fn fetch_cookies(client: &mut VtopClient) -> Result<Vec<u8>, VtopError
 pub fn export_session_snapshot(
     client: &VtopClient,
     saved_at_epoch_ms: u64,
-    expires_at_epoch_ms: u64,
 ) -> PersistedVtopSession {
-    client.export_session_snapshot(saved_at_epoch_ms, expires_at_epoch_ms)
+    client.export_session_snapshot(saved_at_epoch_ms)
 }
 
 #[flutter_rust_bridge::frb()]

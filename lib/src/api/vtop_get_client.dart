@@ -110,11 +110,9 @@ Future<Uint8List> fetchCookies({required VtopClient client}) =>
 PersistedVtopSession exportSessionSnapshot({
   required VtopClient client,
   required BigInt savedAtEpochMs,
-  required BigInt expiresAtEpochMs,
 }) => RustLib.instance.api.crateApiVtopGetClientExportSessionSnapshot(
   client: client,
   savedAtEpochMs: savedAtEpochMs,
-  expiresAtEpochMs: expiresAtEpochMs,
 );
 
 Future<bool> fetchIsAuth({required VtopClient client}) =>

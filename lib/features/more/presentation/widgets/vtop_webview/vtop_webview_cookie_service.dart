@@ -8,16 +8,13 @@ final _androidCookieManager = WebViewCookieManager();
 
 class VtopWebviewSession {
   const VtopWebviewSession({
-    required this.cookies,
-    required this.headers,
-    required this.userAgent,
+    required this.cookies
   });
 
   final List<VtopWebviewCookie> cookies;
-  final Map<String, String> headers;
-  final String userAgent;
 
-  String get cookieHeader => cookies.map((cookie) => cookie.header).join(' ');
+
+  String get cookieHeader => cookies.map((cookie) => cookie.header).join('; ');
 }
 
 class VtopWebviewCookie {
@@ -37,7 +34,7 @@ class VtopWebviewCookie {
   final bool isSecure;
   final int? expiresDate;
 
-  String get header => '$name=$value;';
+  String get header => '$name=$value';
 }
 
 Future<String> loadLatestVtopCookieHeader(
@@ -61,16 +58,21 @@ Future<VtopWebviewSession?> loadVtopWebviewSession({
   required WebUri baseUrl,
 }) async {
   final cookieManager = CookieManager.instance();
-  final cookies = snapshot.cookies
-      .where((cookie) => cookie.name.isNotEmpty && cookie.value.isNotEmpty)
+  final parsedCookies = <({String name, String value})>[];
+  for (final cookiePart in (snapshot.cookies ?? '').split(';')) {
+    final parsedCookie = parseCookiePair(cookiePart);
+    if (parsedCookie == null) continue;
+    parsedCookies.add(parsedCookie);
+  }
+final path = '/vtop';
+  final cookies = parsedCookies
       .map(
         (cookie) => VtopWebviewCookie(
           name: cookie.name,
           value: cookie.value,
-          domain: cookie.domain.isNotEmpty ? cookie.domain : '.vitap.ac.in',
-          path: cookie.path.isNotEmpty ? cookie.path : '/',
-          isSecure: cookie.secure,
-          expiresDate: cookie.expiresAtEpochMs?.toInt(),
+          domain: '.vitap.ac.in',
+          path: path,
+          isSecure: true,
         ),
       )
       .toList(growable: false);
@@ -80,48 +82,45 @@ Future<VtopWebviewSession?> loadVtopWebviewSession({
   await _androidCookieManager.clearCookies();
 
   for (final cookie in cookies) {
-    await cookieManager.setCookie(
-      url: baseUrl,
-      name: cookie.name,
-      value: cookie.value,
-      expiresDate: cookie.expiresDate,
-      isSecure: cookie.isSecure,
-      domain: cookie.domain,
-      path: cookie.path,
-    );
-
     if (Platform.isAndroid) {
       await _androidCookieManager.setCookie(
         WebViewCookie(
           name: cookie.name,
           value: cookie.value,
-          domain: cookie.domain,
-          path: cookie.path,
+          domain: '.vitap.ac.in',
+          path: path,
         ),
+      );
+    } else {
+      await cookieManager.setCookie(
+        url: baseUrl,
+        name: cookie.name,
+        value: cookie.value,
+        expiresDate: cookie.expiresDate,
+        isSecure: true,
+        domain: '.vitap.ac.in',
+        path: path,
       );
     }
   }
 
-  final headers = <String, String>{};
-  for (final header in snapshot.headers) {
-    final name = header.name.trim();
-    final value = header.value.trim();
-    if (name.isEmpty || value.isEmpty) continue;
-    headers[name] = value;
-  }
-
-  headers['Cookie'] = cookies
-      .map((cookie) => '${cookie.name}=${cookie.value}')
-      .join('; ');
-
-  final userAgent =
-      headers['User-Agent'] ??
-      headers['user-agent'] ??
-      'Mozilla/5.0 (Linux; U; Linux x86_64; en-US) Gecko/20100101 Firefox/130.5';
-
   return VtopWebviewSession(
     cookies: cookies,
-    headers: headers,
-    userAgent: userAgent,
   );
+}
+
+({String name, String value})? parseCookiePair(String cookieHeader) {
+  final firstCookiePart = cookieHeader.split(';').first.trim();
+  final separatorIndex = firstCookiePart.indexOf('=');
+  if (separatorIndex <= 0 || separatorIndex >= firstCookiePart.length - 1) {
+    return null;
+  }
+
+  final name = firstCookiePart.substring(0, separatorIndex).trim();
+  final value = firstCookiePart.substring(separatorIndex + 1).trim();
+  if (name.isEmpty || value.isEmpty) {
+    return null;
+  }
+
+  return (name: name, value: value);
 }

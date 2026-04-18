@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
@@ -27,9 +26,8 @@ class VClient extends _$VClient {
     String? password = await ref.watch(
       vtopUserProvider.selectAsync((user) => user.password),
     );
-    final uname = username!;
-
-    final storedSession = await loadStoredVtopSession(uname);
+    final uname = username!.toUpperCase();
+    final StoredVtopSession? storedSession = await loadStoredVtopSession(uname);
     PersistedVtopSession? persistedSession;
     if (storedSession != null) {
       AppLogger.instance.info(
@@ -46,7 +44,7 @@ class VClient extends _$VClient {
         persistedSession = storedSession.snapshot;
         AppLogger.instance.info(
           'client.session',
-          'restoring saved session for $uname with ${storedSession.snapshot.cookies.length} cookies',
+          'restoring saved session for $uname with ${storedSession.snapshot.cookies?.length ?? 0} cookies',
         );
       }
     }
@@ -104,7 +102,7 @@ class VClient extends _$VClient {
       await saveStoredVtopSession(snapshot);
       AppLogger.instance.info(
         'client.session',
-        'saved refreshed session for ${snapshot.username} with ${snapshot.cookies.length} cookies and ${snapshot.headers.length} headers',
+        'saved refreshed session for ${snapshot.username} with ${snapshot.cookies} cookies',
       );
       AppLogger.instance.info('client.auth', 'login attempt finished');
     } catch (e) {

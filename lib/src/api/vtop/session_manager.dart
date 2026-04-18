@@ -9,7 +9,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:meta/meta.dart' as meta;
 import 'types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `add_persisted_cookie`, `collect_persisted_cookies`, `default_persisted_headers`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SessionManager>>
@@ -17,21 +16,20 @@ abstract class SessionManager implements RustOpaqueInterface {
   Future<void> clear();
 
   Future<PersistedVtopSession> exportPersistedSession({
-    required String baseUrl,
+    required String url,
     required String username,
     required BigInt savedAtEpochMs,
-    required BigInt expiresAtEpochMs,
   });
+
+  Future<String?> getCookie({required String url});
 
   Future<ArcJar> getCookieStore();
 
   Future<String?> getCsrfToken();
 
-  Future<List<PersistedHeader>> getPersistedHeaders();
-
   Future<void> importPersistedSession({
-    required String baseUrl,
-    required PersistedVtopSession snapshot,
+    required String url,
+    required PersistedVtopSession session,
   });
 
   Future<bool> isAuthenticated();
@@ -44,7 +42,7 @@ abstract class SessionManager implements RustOpaqueInterface {
 
   Future<void> setAuthenticated({required bool authenticated});
 
-  Future<void> setCookieExternal({required bool value});
+  Future<void> setCookieExternal({required bool bool});
 
   Future<void> setCookieFromExternal({
     required String url,
@@ -54,6 +52,4 @@ abstract class SessionManager implements RustOpaqueInterface {
   Future<void> setCsrfFromExternal({required String token});
 
   Future<void> setCsrfToken({required String token});
-
-  Future<void> setPersistedHeaders({required List<PersistedHeader> headers});
 }

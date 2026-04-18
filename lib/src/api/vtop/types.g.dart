@@ -457,59 +457,12 @@ Map<String, dynamic> _$PerExamScheduleRecordToJson(
   'examType': instance.examType,
 };
 
-_PersistedCookie _$PersistedCookieFromJson(Map<String, dynamic> json) =>
-    _PersistedCookie(
-      name: json['name'] as String,
-      value: json['value'] as String,
-      domain: json['domain'] as String,
-      path: json['path'] as String,
-      expiresAtEpochMs: json['expiresAtEpochMs'] == null
-          ? null
-          : BigInt.parse(json['expiresAtEpochMs'] as String),
-      secure: json['secure'] as bool,
-      httpOnly: json['httpOnly'] as bool,
-      sameSite: json['sameSite'] as String?,
-      hostOnly: json['hostOnly'] as bool,
-      persistent: json['persistent'] as bool,
-    );
-
-Map<String, dynamic> _$PersistedCookieToJson(_PersistedCookie instance) =>
-    <String, dynamic>{
-      'name': instance.name,
-      'value': instance.value,
-      'domain': instance.domain,
-      'path': instance.path,
-      'expiresAtEpochMs': instance.expiresAtEpochMs?.toString(),
-      'secure': instance.secure,
-      'httpOnly': instance.httpOnly,
-      'sameSite': instance.sameSite,
-      'hostOnly': instance.hostOnly,
-      'persistent': instance.persistent,
-    };
-
-_PersistedHeader _$PersistedHeaderFromJson(Map<String, dynamic> json) =>
-    _PersistedHeader(
-      name: json['name'] as String,
-      value: json['value'] as String,
-    );
-
-Map<String, dynamic> _$PersistedHeaderToJson(_PersistedHeader instance) =>
-    <String, dynamic>{'name': instance.name, 'value': instance.value};
-
 _PersistedVtopSession _$PersistedVtopSessionFromJson(
   Map<String, dynamic> json,
 ) => _PersistedVtopSession(
   username: json['username'] as String,
   savedAtEpochMs: BigInt.parse(json['savedAtEpochMs'] as String),
-  expiresAtEpochMs: BigInt.parse(json['expiresAtEpochMs'] as String),
-  csrfToken: json['csrfToken'] as String?,
-  authenticatedHint: json['authenticatedHint'] as bool,
-  cookies: (json['cookies'] as List<dynamic>)
-      .map((e) => PersistedCookie.fromJson(e as Map<String, dynamic>))
-      .toList(),
-  headers: (json['headers'] as List<dynamic>)
-      .map((e) => PersistedHeader.fromJson(e as Map<String, dynamic>))
-      .toList(),
+  cookies: json['cookies'] as String?,
 );
 
 Map<String, dynamic> _$PersistedVtopSessionToJson(
@@ -517,11 +470,7 @@ Map<String, dynamic> _$PersistedVtopSessionToJson(
 ) => <String, dynamic>{
   'username': instance.username,
   'savedAtEpochMs': instance.savedAtEpochMs.toString(),
-  'expiresAtEpochMs': instance.expiresAtEpochMs.toString(),
-  'csrfToken': instance.csrfToken,
-  'authenticatedHint': instance.authenticatedHint,
   'cookies': instance.cookies,
-  'headers': instance.headers,
 };
 
 _SemesterData _$SemesterDataFromJson(Map<String, dynamic> json) =>

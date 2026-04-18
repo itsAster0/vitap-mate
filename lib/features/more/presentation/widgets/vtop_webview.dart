@@ -58,7 +58,7 @@ class VtopWebview extends HookConsumerWidget {
               client: client,
               ttl: vtopSessionReuseTtl,
             );
-        if (snapshot.cookies.isEmpty) {
+        if (snapshot.cookies?.isEmpty ?? true) {
           throw Exception('Could not prepare VTOP session for webview.');
         }
         await saveStoredVtopSession(snapshot);
@@ -215,8 +215,6 @@ class VtopWebview extends HookConsumerWidget {
       ),
       child: VtopWebviewBody(
         initialUrl: _initialUrl,
-        requestHeaders: webviewSession.value!.headers,
-        userAgent: webviewSession.value!.userAgent,
         isCompactMode: isCompactMode.value,
         isDarkMode: isDarkMode.value,
         loading: loading.value,

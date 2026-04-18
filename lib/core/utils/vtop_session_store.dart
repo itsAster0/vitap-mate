@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -20,7 +19,7 @@ class StoredVtopSession {
   final Duration age;
 }
 
-String _sessionKey(String username) => 'vtop_session_$username';
+String _sessionKey(String username) => 'vtop_session_${username.toUpperCase()}';
 
 Future<StoredVtopSession?> loadStoredVtopSession(String username) async {
   final storage = await SharedPreferences.getInstance();
@@ -38,11 +37,7 @@ Future<StoredVtopSession?> loadStoredVtopSession(String username) async {
       isUtc: true,
     );
     final age = DateTime.now().toUtc().difference(savedAt);
-    final isExpired =
-        age > vtopSessionReuseTtl ||
-        DateTime.now().toUtc().millisecondsSinceEpoch >
-            snapshot.expiresAtEpochMs.toInt();
-
+    final isExpired = age > vtopSessionReuseTtl;
     return StoredVtopSession(
       snapshot: snapshot,
       isExpired: isExpired,
@@ -77,6 +72,5 @@ PersistedVtopSession createPersistedVtopSessionSnapshot({
   return exportSessionSnapshot(
     client: client,
     savedAtEpochMs: BigInt.from(savedAt.millisecondsSinceEpoch),
-    expiresAtEpochMs: BigInt.from(expiresAt.millisecondsSinceEpoch),
   );
 }

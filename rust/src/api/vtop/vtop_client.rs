@@ -8,19 +8,15 @@ pub use super::{
 };
 use crate::api::native_logs::append_native_log;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-
-#[cfg(not(target_arch = "wasm32"))]
 pub use reqwest::cookie::{CookieStore, Jar};
 use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
     multipart, Certificate, Client, Response, Url,
 };
-
 use scraper::{Html, Selector};
 use serde::Serialize;
 use std::sync::Arc;
 
-#[cfg(not(target_arch = "wasm32"))]
 const VITAP_CUSTOM_CERT_PEM: &str = r#"-----BEGIN CERTIFICATE-----
 MIIGTDCCBDSgAwIBAgIQOXpmzCdWNi4NqofKbqvjsTANBgkqhkiG9w0BAQwFADBf
 MQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTYwNAYDVQQD
@@ -58,7 +54,6 @@ r8IWKIMxzxLPv5Kt3ePKcUdvkBU/smqujSczTzzSjIoR5QqQA6lN1ZRSnuHIWCvh
 JEltkYnTAH41QJ6SAWO66GrrUESwN/cgZzL4JLEqz1Y=
 -----END CERTIFICATE-----"#;
 
-#[cfg(not(target_arch = "wasm32"))]
 fn reqwest_network_error(context: &str, error: reqwest::Error) -> VtopError {
     append_native_log("ERROR", "rust.network", &format!("{context}: {error}"));
     VtopError::NetworkError
@@ -99,12 +94,31 @@ pub struct VtopClient {
     config: VtopConfig,
     session: SessionManager,
     current_page: Option<String>,
+    real_username: String,
     username: String,
     password: String,
     captcha_data: Option<String>,
 }
 
 impl VtopClient {
+    fn log_cookie_store_state(&self, context: &str) {
+        let url = format!("{}/vtop", self.config.base_url);
+        let cookie_header = self
+            .session
+            .get_cookie(url)
+            .unwrap_or_else(|| "<empty>".to_string());
+        let external_cookie_header = self
+            .session
+            .get_external_cookie_header()
+            .unwrap_or_else(|| "<empty>".to_string());
+        log_auth_event(
+            "INFO",
+            &format!(
+                "{context}: cookie store = {cookie_header}; external cookie header = {external_cookie_header}"
+            ),
+        );
+    }
+
     fn mark_session_expired(&mut self, context: &str, reason: &str) {
         self.session.set_authenticated(false);
         log_auth_event(
@@ -131,11 +145,6 @@ impl VtopClient {
             .await
             .map_err(|error| reqwest_network_error(&format!("{context}.text"), error))?;
 
-        if Self::looks_like_login_page(&text) {
-            self.mark_session_expired(context, "VTOP returned the login page");
-            return Err(VtopError::SessionExpired);
-        }
-
         if !status.is_success() {
             return Err(vtop_server_error(
                 context,
@@ -149,27 +158,17 @@ impl VtopClient {
     pub fn restore_session_snapshot(&mut self, session: PersistedVtopSession) {
         log_auth_event(
             "INFO",
-            &format!(
-                "restoring persisted session for {} with {} cookie(s)",
-                session.username,
-                session.cookies.len()
-            ),
+            &format!("restoring persisted session for {} ", session.username,),
         );
-        self.session
-            .import_persisted_session(self.config.base_url.clone(), session);
+        let url = format!("{}/vtop", self.config.base_url);
+        self.session.import_persisted_session(url, session);
+        self.log_cookie_store_state("restore_session_snapshot");
     }
 
-    pub fn export_session_snapshot(
-        &self,
-        saved_at_epoch_ms: u64,
-        expires_at_epoch_ms: u64,
-    ) -> PersistedVtopSession {
-        self.session.export_persisted_session(
-            self.config.base_url.clone(),
-            self.username.clone(),
-            saved_at_epoch_ms,
-            expires_at_epoch_ms,
-        )
+    pub fn export_session_snapshot(&self, saved_at_epoch_ms: u64) -> PersistedVtopSession {
+        let url = format!("{}/vtop", self.config.base_url);
+        self.session
+            .export_persisted_session(url, self.real_username.clone(), saved_at_epoch_ms)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -782,7 +781,7 @@ impl VtopClient {
             .await
             .map_err(|error| reqwest_network_error("follow_security_otp_redirect.text", error))?;
 
-        if Self::is_login_url(&final_url) || Self::looks_like_login_page(&text) {
+        if Self::is_login_url(&final_url) {
             self.mark_session_expired(
                 "follow_security_otp_redirect",
                 &format!("VTOP returned login page after OTP redirect at {final_url}"),
@@ -891,63 +890,37 @@ impl VtopClient {
     }
 
     async fn validate_authenticated_session(&mut self) -> VtopResult<bool> {
+        self.log_cookie_store_state("validate_authenticated_session.before_request");
         let url = format!("{}/vtop/content", self.config.base_url);
         log_network_request("validate_authenticated_session.send", "GET", &url);
-        let response =
-            self.client.get(&url).send().await.map_err(|error| {
-                reqwest_network_error("validate_authenticated_session.send", error)
-            })?;
+        let mut request = self.client.get(&url);
+        if let Some(raw_cookie_header) = self.session.get_external_cookie_header() {
+            request = request.header("Cookie", raw_cookie_header);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|error| reqwest_network_error("validate_authenticated_session.send", error))?;
         let final_url = response.url().to_string();
         let status = response.status();
-
-        if Self::is_login_url(&final_url) {
+        if Self::is_login_url(&final_url) || status.is_redirection() {
             self.mark_session_expired(
                 "validate_authenticated_session",
-                &format!("VTOP redirected to {final_url}"),
+                &format!("VTOP returned the login page at {final_url}"),
             );
             return Ok(false);
-        }
-
-        let text = response
-            .text()
-            .await
-            .map_err(|error| reqwest_network_error("validate_authenticated_session.text", error))?;
-
-        if Self::looks_like_login_page(&text) {
-            self.mark_session_expired(
-                "validate_authenticated_session",
-                "VTOP returned the login page",
-            );
-            return Ok(false);
-        }
-
-        if !status.is_success() {
+        } else if !status.is_success() {
             return Err(vtop_server_error(
                 "validate_authenticated_session",
                 format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
             ));
         }
+        let page = response
+            .text()
+            .await
+            .map_err(|error| reqwest_network_error("validate_authenticated_session.text", error))?;
+        self.current_page = Some(page);
 
-        if !Self::is_content_url(&final_url) {
-            log_auth_event(
-                "WARN",
-                &format!(
-                    "validate_authenticated_session: expected /vtop/content but landed at {final_url}"
-                ),
-            );
-            return Ok(false);
-        }
-
-        self.current_page = Some(text);
-        if let Err(error) = self.extract_csrf_token() {
-            log_auth_event(
-                "WARN",
-                &format!(
-                    "validate_authenticated_session: session reached content but CSRF refresh failed: {error}"
-                ),
-            );
-        }
-        self.session.set_cookie_external(false);
         Ok(true)
     }
 
@@ -1031,13 +1004,9 @@ impl VtopClient {
     }
 
     async fn try_restore_existing_session(&mut self) -> VtopResult<bool> {
-        let cookie = self.get_cookie(false).await?;
-        if cookie.is_empty() {
-            self.session.clear();
-            return Ok(false);
-        }
-
         if matches!(self.validate_authenticated_session().await, Ok(true)) {
+            self.extract_csrf_token()?;
+            self.get_regno()?;
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
             log_auth_event("INFO", "restored session validation succeeded");
@@ -1048,6 +1017,7 @@ impl VtopClient {
             "WARN",
             "restored session was not accepted by VTOP; keeping cookies available for the next login attempt",
         );
+        self.session.clear();
         Ok(false)
     }
 
@@ -1056,30 +1026,6 @@ impl VtopClient {
             .ok()
             .map(|parsed| parsed.path().starts_with("/vtop/login"))
             .unwrap_or_else(|| url.to_lowercase().contains("/vtop/login"))
-    }
-
-    fn is_content_url(url: &str) -> bool {
-        Url::parse(url)
-            .ok()
-            .map(|parsed| parsed.path().trim_end_matches('/') == "/vtop/content")
-            .unwrap_or_else(|| {
-                url.split('?')
-                    .next()
-                    .unwrap_or(url)
-                    .trim_end_matches('/')
-                    .ends_with("/vtop/content")
-            })
-    }
-
-    fn looks_like_login_page(text: &str) -> bool {
-        let lower = text.to_lowercase();
-        (lower.contains("/vtop/login")
-            || lower.contains("action=\"/vtop/login\"")
-            || lower.contains("action='/vtop/login'")
-            || lower.contains("id=\"vtoploginform\"")
-            || lower.contains("id='vtoploginform'"))
-            && (lower.contains("name=\"username\"") || lower.contains("name='username'"))
-            && (lower.contains("name=\"password\"") || lower.contains("name='password'"))
     }
 
     fn extract_captcha_data(&mut self) -> VtopResult<()> {
@@ -1275,16 +1221,16 @@ impl VtopClient {
     ) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let client =
-                Self::make_client(session.get_cookie_store(), session.get_persisted_headers());
+            let client = Self::make_client(session.get_cookie_store());
             Self {
                 client: client,
                 config: config,
                 session: session,
                 current_page: None,
-                username: username,
+                username: username.clone(),
                 password: password,
                 captcha_data: None,
+                real_username: username,
             }
         }
         #[cfg(target_arch = "wasm32")]
@@ -1310,29 +1256,36 @@ impl VtopClient {
         }
     }
     #[cfg(not(target_arch = "wasm32"))]
-    fn make_client(cookie_store: Arc<Jar>, persisted_headers: Vec<PersistedHeader>) -> Client {
+    fn make_client(cookie_store: Arc<Jar>) -> Client {
         use std::time::Duration;
-
         let mut headers = HeaderMap::new();
 
-        for header in persisted_headers {
-            let Ok(name) = header.name.parse::<reqwest::header::HeaderName>() else {
-                continue;
-            };
-            let Ok(value) = HeaderValue::from_str(&header.value) else {
-                continue;
-            };
-            headers.insert(name, value);
-        }
-
-        if !headers.contains_key(USER_AGENT) {
-            headers.insert(
-                USER_AGENT,
-                HeaderValue::from_static(
-                    "Mozilla/5.0 (Linux; U; Linux x86_64; en-US) Gecko/20100101 Firefox/130.5",
-                ),
-            );
-        }
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_static(
+                "Mozilla/5.0 (Linux; U; Linux x86_64; en-US) Gecko/20100101 Firefox/130.5",
+            ),
+        );
+        headers.insert(
+            "Accept",
+            HeaderValue::from_static(
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ),
+        );
+        headers.insert(
+            "Accept-Language",
+            HeaderValue::from_static("en-US,en;q=0.5"),
+        );
+        headers.insert(
+            "Content-Type",
+            HeaderValue::from_static("application/x-www-form-urlencoded"),
+        );
+        headers.insert("Upgrade-Insecure-Requests", HeaderValue::from_static("1"));
+        headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("document"));
+        headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("navigate"));
+        headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
+        headers.insert("Sec-Fetch-User", HeaderValue::from_static("?1"));
+        headers.insert("Priority", HeaderValue::from_static("u=0, i"));
 
         let mut client_builder = reqwest::Client::builder()
             .default_headers(headers)

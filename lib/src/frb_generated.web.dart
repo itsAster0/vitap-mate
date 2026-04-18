@@ -317,9 +317,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  BigInt dco_decode_box_autoadd_u_64(dynamic raw);
-
-  @protected
   VtopConfig dco_decode_box_autoadd_vtop_config(dynamic raw);
 
   @protected
@@ -405,12 +402,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  List<PersistedCookie> dco_decode_list_persisted_cookie(dynamic raw);
-
-  @protected
-  List<PersistedHeader> dco_decode_list_persisted_header(dynamic raw);
-
-  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -437,16 +428,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
-
-  @protected
   PerExamScheduleRecord dco_decode_per_exam_schedule_record(dynamic raw);
-
-  @protected
-  PersistedCookie dco_decode_persisted_cookie(dynamic raw);
-
-  @protected
-  PersistedHeader dco_decode_persisted_header(dynamic raw);
 
   @protected
   PersistedVtopSession dco_decode_persisted_vtop_session(dynamic raw);
@@ -703,9 +685,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
-
-  @protected
   VtopConfig sse_decode_box_autoadd_vtop_config(SseDeserializer deserializer);
 
   @protected
@@ -819,16 +798,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  List<PersistedCookie> sse_decode_list_persisted_cookie(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  List<PersistedHeader> sse_decode_list_persisted_header(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -859,18 +828,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
-
-  @protected
   PerExamScheduleRecord sse_decode_per_exam_schedule_record(
     SseDeserializer deserializer,
   );
-
-  @protected
-  PersistedCookie sse_decode_persisted_cookie(SseDeserializer deserializer);
-
-  @protected
-  PersistedHeader sse_decode_persisted_header(SseDeserializer deserializer);
 
   @protected
   PersistedVtopSession sse_decode_persisted_vtop_session(
@@ -1173,9 +1133,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
-
-  @protected
   void sse_encode_box_autoadd_vtop_config(
     VtopConfig self,
     SseSerializer serializer,
@@ -1329,18 +1286,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_list_persisted_cookie(
-    List<PersistedCookie> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_persisted_header(
-    List<PersistedHeader> self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -1380,23 +1325,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
-
-  @protected
   void sse_encode_per_exam_schedule_record(
     PerExamScheduleRecord self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_persisted_cookie(
-    PersistedCookie self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_persisted_header(
-    PersistedHeader self,
     SseSerializer serializer,
   );
 
