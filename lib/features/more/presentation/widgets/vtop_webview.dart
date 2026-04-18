@@ -21,20 +21,6 @@ class VtopWebview extends HookConsumerWidget {
 
   static final _baseUrl = WebUri('https://vtop.vitap.ac.in');
   static final _initialUrl = WebUri('https://vtop.vitap.ac.in/vtop/content?');
-  static WebUri _menuFallbackUri(String rawPath) {
-    final trimmed = rawPath.trim();
-    final withoutLeadingSlash = trimmed.replaceFirst(RegExp(r'^/+'), '');
-    final normalized = withoutLeadingSlash.startsWith('vtop/')
-        ? withoutLeadingSlash.substring(5)
-        : withoutLeadingSlash;
-    return WebUri('https://vtop.vitap.ac.in/vtop/$normalized');
-  }
-
-  static String? _normalizeMenuPath(String? value) {
-    final trimmed = value?.trim();
-    if (trimmed == null || trimmed.isEmpty) return null;
-    return trimmed;
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,7 +40,7 @@ class VtopWebview extends HookConsumerWidget {
 
     final setupError = useState<Object?>(null);
     final isLoginRedirectPromptOpen = useRef(false);
-    final pendingInitialMenuUrl = useState(_normalizeMenuPath(initialMenuUrl));
+    final pendingInitialMenuUrl = useState(initialMenuUrl);
     final forceLoginCounter = useRef(0);
     final redirectForceAttempts = useRef(0);
 
@@ -115,19 +101,6 @@ class VtopWebview extends HookConsumerWidget {
         final force = forceLoginCounter.value.clamp(1, 2);
         final didPrepare = await prepareSession(force: force);
         if (!didPrepare) return;
-
-        final controller = webController.value;
-        if (controller != null) {
-          final refreshUrl = pendingInitialMenuUrl.value != null
-              ? _menuFallbackUri(pendingInitialMenuUrl.value!)
-              : _initialUrl;
-          await controller.loadUrl(
-            urlRequest: URLRequest(
-              url: refreshUrl,
-              headers: webviewSession.value?.headers,
-            ),
-          );
-        }
       } catch (error) {
         if (context.mounted) {
           disCommonToast(context, error);
@@ -179,19 +152,8 @@ class VtopWebview extends HookConsumerWidget {
     }
 
     Future<bool> goTo(String url) async {
-      final controller = webController.value;
-      if (controller == null) return false;
-
-      final result = await controller.clickVtopMenuLink(url);
-      if (result == true) return true;
-
-      await controller.loadUrl(
-        urlRequest: URLRequest(
-          url: _menuFallbackUri(url),
-          headers: webviewSession.value?.headers,
-        ),
-      );
-      return true;
+      final result = await webController.value?.clickVtopMenuLink(url);
+      return result == true;
     }
 
     useEffect(() {
@@ -252,9 +214,7 @@ class VtopWebview extends HookConsumerWidget {
         ],
       ),
       child: VtopWebviewBody(
-        initialUrl: pendingInitialMenuUrl.value != null
-            ? _menuFallbackUri(pendingInitialMenuUrl.value!)
-            : _initialUrl,
+        initialUrl: _initialUrl,
         requestHeaders: webviewSession.value!.headers,
         userAgent: webviewSession.value!.userAgent,
         isCompactMode: isCompactMode.value,

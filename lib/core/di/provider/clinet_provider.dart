@@ -68,7 +68,11 @@ class VClient extends _$VClient {
     if (!force) {
       if (await fetchIsAuth(client: client)) return;
     }
-    if (!user.isValid) throw VtopError.invalidCredentials();
+    if (!user.isValid) {
+      throw const VtopError.authenticationFailed(
+        'Your saved VTOP credentials need attention. Check them in Settings.',
+      );
+    }
     final featureFlags = await ref.read(featureFlagsControllerProvider.future);
     if (!await featureFlags.isEnabled("try-login")) {
       throw FeatureDisabledException("Login is Disabled");

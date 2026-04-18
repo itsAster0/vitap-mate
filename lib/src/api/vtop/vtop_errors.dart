@@ -15,7 +15,8 @@ sealed class VtopError with _$VtopError implements FrbException {
   const VtopError._();
 
   const factory VtopError.networkError() = VtopError_NetworkError;
-  const factory VtopError.vtopServerError() = VtopError_VtopServerError;
+  const factory VtopError.vtopServerError(String field0) =
+      VtopError_VtopServerError;
   const factory VtopError.authenticationFailed(String field0) =
       VtopError_AuthenticationFailed;
   const factory VtopError.registrationParsingError() =

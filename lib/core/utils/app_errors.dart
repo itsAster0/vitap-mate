@@ -51,10 +51,10 @@ enum AppErrorType {
     );
   }
 
-  if (error == VtopError.vtopServerError()) {
+  if (error is VtopError_VtopServerError) {
     return (
       AppErrorType.server,
-      'VTOP is not responding properly right now. Try again in a bit.',
+      'VTOP is not responding properly right now. ${error.field0}',
     );
   }
 

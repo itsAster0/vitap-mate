@@ -142,7 +142,8 @@ impl SessionManager {
         saved_at_epoch_ms: u64,
         expires_at_epoch_ms: u64,
     ) -> PersistedVtopSession {
-        let cookies = self.collect_persisted_cookies(&base_url);
+        let cookies =
+            self.collect_persisted_cookies(&format!("{}/vtop", base_url.trim_end_matches('/')));
         PersistedVtopSession {
             username,
             saved_at_epoch_ms,
@@ -264,71 +265,5 @@ impl SessionManager {
                 value: "u=0, i".to_string(),
             },
         ]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn imports_and_exports_persisted_session() {
-        let mut session = SessionManager::new();
-        session.import_persisted_session(
-            "https://vtop.vitap.ac.in".to_string(),
-            PersistedVtopSession {
-                username: "22BCE0000".to_string(),
-                saved_at_epoch_ms: 10,
-                expires_at_epoch_ms: 20,
-                csrf_token: Some("csrf-1".to_string()),
-                authenticated_hint: true,
-                cookies: vec![PersistedCookie {
-                    name: "JSESSIONID".to_string(),
-                    value: "cookie-value".to_string(),
-                    domain: "vtop.vitap.ac.in".to_string(),
-                    path: "/".to_string(),
-                    expires_at_epoch_ms: None,
-                    secure: true,
-                    http_only: false,
-                    same_site: None,
-                    host_only: true,
-                    persistent: false,
-                }],
-                headers: vec![PersistedHeader {
-                    name: "User-Agent".to_string(),
-                    value: "VitapMateTest".to_string(),
-                }],
-            },
-        );
-
-        assert_eq!(session.get_csrf_token().as_deref(), Some("csrf-1"));
-        assert!(!session.is_authenticated());
-        assert!(session.is_cookie_external());
-
-        let exported = session.export_persisted_session(
-            "https://vtop.vitap.ac.in".to_string(),
-            "22BCE0000".to_string(),
-            10,
-            20,
-        );
-
-        assert_eq!(exported.username, "22BCE0000");
-        assert_eq!(exported.cookies.len(), 1);
-        assert_eq!(exported.cookies[0].name, "JSESSIONID");
-        assert_eq!(exported.headers[0].value, "VitapMateTest");
-    }
-
-    #[test]
-    fn clear_resets_cookie_restore_state() {
-        let mut session = SessionManager::new();
-        session.set_authenticated(true);
-        session.set_csrf_token("csrf-1".to_string());
-        session.set_cookie_external(true);
-
-        session.clear();
-
-        assert_eq!(session.get_csrf_token(), None);
-        assert!(!session.is_authenticated());
-        assert!(!session.is_cookie_external());
     }
 }

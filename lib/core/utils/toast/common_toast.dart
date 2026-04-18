@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,12 @@ String _authFailedMessage(Object e) {
       },
       otpRequired: (_) {
         return 'We need to verify this sign-in with the OTP sent to your registered email.';
+      },
+      vtopServerError: (message) {
+        final trimmed = message.trim();
+        return trimmed.isNotEmpty
+            ? 'VTOP server error: $trimmed'
+            : 'VTOP is not responding properly right now. Try again in a bit.';
       },
       sessionExpired: () => 'Your saved session expired. Please sign in again.',
       orElse: () => 'We could not complete your sign-in. Please try again.',
@@ -47,13 +55,13 @@ void disCommonToast(BuildContext context, Object e) {
   if (e == VtopError.invalidCredentials()) {
     _showAppToast(
       context,
-      title: 'Password Changed',
+      title: 'VTOP Sign-In Failed',
       description:
-          'It looks like you changed your VTOP password. Please update it in settings -> VTOP Account.',
+          'VTOP rejected the saved username or password. Check your VTOP account details in Settings.',
       onDismiss: () {
         final router = GoRouter.maybeOf(context);
         if (router != null) {
-          router.goNamed(Paths.vtopUserManagement);
+          router.goNamed(Paths.settings);
         }
       },
     );
@@ -68,6 +76,7 @@ void disCommonToast(BuildContext context, Object e) {
       e.maybeWhen(
         authenticationFailed: (_) => true,
         otpRequired: (_) => true,
+        vtopServerError: (_) => true,
         sessionExpired: () => true,
         orElse: () => false,
       )) {
@@ -83,6 +92,7 @@ void disCommonToast(BuildContext context, Object e) {
       description: 'Please try again in a while Or Update the app',
     );
   } else {
+    log('Unexpected error in disCommonToast: $e');
     _showAppToast(
       context,
       title: 'Error occurred',
@@ -110,6 +120,7 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       e.maybeWhen(
         authenticationFailed: (_) => true,
         otpRequired: (_) => true,
+        vtopServerError: (_) => true,
         sessionExpired: () => true,
         orElse: () => false,
       )) {

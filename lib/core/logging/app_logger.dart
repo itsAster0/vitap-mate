@@ -94,6 +94,18 @@ class AppLogger extends ChangeNotifier {
       source: source,
       message: message,
     );
+    developer.log(
+      entry.toLine(),
+      name: source,
+      level: switch (level) {
+        AppLogLevel.debug => 500,
+        AppLogLevel.info => 800,
+        AppLogLevel.warning => 900,
+        AppLogLevel.error => 1000,
+      },
+      time: entry.timestamp,
+    );
+
     _entries.insert(0, entry);
     if (_entries.length > _maxEntries) {
       _entries.removeRange(_maxEntries, _entries.length);

@@ -4759,7 +4759,8 @@ impl SseDecode for crate::api::vtop::vtop_errors::VtopError {
                 return crate::api::vtop::vtop_errors::VtopError::NetworkError;
             }
             1 => {
-                return crate::api::vtop::vtop_errors::VtopError::VtopServerError;
+                let mut var_field0 = <String>::sse_decode(deserializer);
+                return crate::api::vtop::vtop_errors::VtopError::VtopServerError(var_field0);
             }
             2 => {
                 let mut var_field0 = <String>::sse_decode(deserializer);
@@ -6179,8 +6180,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::vtop::vtop_errors::VtopError 
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
             crate::api::vtop::vtop_errors::VtopError::NetworkError => [0.into_dart()].into_dart(),
-            crate::api::vtop::vtop_errors::VtopError::VtopServerError => {
-                [1.into_dart()].into_dart()
+            crate::api::vtop::vtop_errors::VtopError::VtopServerError(field0) => {
+                [1.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
             crate::api::vtop::vtop_errors::VtopError::AuthenticationFailed(field0) => {
                 [2.into_dart(), field0.into_into_dart().into_dart()].into_dart()
@@ -7150,8 +7151,9 @@ impl SseEncode for crate::api::vtop::vtop_errors::VtopError {
             crate::api::vtop::vtop_errors::VtopError::NetworkError => {
                 <i32>::sse_encode(0, serializer);
             }
-            crate::api::vtop::vtop_errors::VtopError::VtopServerError => {
+            crate::api::vtop::vtop_errors::VtopError::VtopServerError(field0) => {
                 <i32>::sse_encode(1, serializer);
+                <String>::sse_encode(field0, serializer);
             }
             crate::api::vtop::vtop_errors::VtopError::AuthenticationFailed(field0) => {
                 <i32>::sse_encode(2, serializer);

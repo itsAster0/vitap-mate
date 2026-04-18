@@ -117,9 +117,9 @@ class SettingsPage extends HookConsumerWidget {
                   onChange: (value) {
                     final selected = value.isEmpty ? null : value.first;
                     if (selected != null) {
-                      ref
-                          .read(backgroundSyncProvider.notifier)
-                          .updateFreq(selected);
+                      // ref
+                      //     .read(backgroundSyncProvider.notifier)
+                      //     .updateFreq(selected);
                     }
                   },
                 ),

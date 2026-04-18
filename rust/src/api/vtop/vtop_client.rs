@@ -13,7 +13,7 @@ use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 pub use reqwest::cookie::{CookieStore, Jar};
 use reqwest::{
     header::{HeaderMap, HeaderValue, USER_AGENT},
-    multipart, Certificate, Client, Url,
+    multipart, Certificate, Client, Response, Url,
 };
 
 use scraper::{Html, Selector};
@@ -64,6 +64,16 @@ fn reqwest_network_error(context: &str, error: reqwest::Error) -> VtopError {
     VtopError::NetworkError
 }
 
+fn vtop_server_error(context: &str, detail: impl AsRef<str>) -> VtopError {
+    let message = format!("{context}: {}", detail.as_ref());
+    append_native_log(
+        "ERROR",
+        "rust.network",
+        &format!("returning VtopServerError: {message}"),
+    );
+    VtopError::VtopServerError(message)
+}
+
 fn log_network_request(context: &str, method: &str, url: &str) {
     append_native_log(
         "INFO",
@@ -74,6 +84,14 @@ fn log_network_request(context: &str, method: &str, url: &str) {
 
 fn log_auth_event(level: &str, message: &str) {
     append_native_log(level, "rust.auth", message);
+}
+
+fn missing_csrf_error(context: &str) -> VtopError {
+    log_auth_event(
+        "WARN",
+        &format!("{context}: CSRF token is missing, session needs validation"),
+    );
+    VtopError::SessionExpired
 }
 
 pub struct VtopClient {
@@ -87,6 +105,47 @@ pub struct VtopClient {
 }
 
 impl VtopClient {
+    fn mark_session_expired(&mut self, context: &str, reason: &str) {
+        self.session.set_authenticated(false);
+        log_auth_event(
+            "WARN",
+            &format!("{context}: session marked expired because {reason}"),
+        );
+    }
+
+    async fn read_authenticated_response_text(
+        &mut self,
+        context: &str,
+        response: Response,
+    ) -> VtopResult<String> {
+        let final_url = response.url().to_string();
+        let status = response.status();
+
+        if Self::is_login_url(&final_url) {
+            self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
+            return Err(VtopError::SessionExpired);
+        }
+
+        let text = response
+            .text()
+            .await
+            .map_err(|error| reqwest_network_error(&format!("{context}.text"), error))?;
+
+        if Self::looks_like_login_page(&text) {
+            self.mark_session_expired(context, "VTOP returned the login page");
+            return Err(VtopError::SessionExpired);
+        }
+
+        if !status.is_success() {
+            return Err(vtop_server_error(
+                context,
+                format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
+            ));
+        }
+
+        Ok(text)
+    }
+
     pub fn restore_session_snapshot(&mut self, session: PersistedVtopSession) {
         log_auth_event(
             "INFO",
@@ -137,7 +196,7 @@ impl VtopClient {
         self.session.set_cookie_from_external(url, cookie);
     }
     pub async fn get_semesters(&mut self, check: bool) -> VtopResult<SemesterData> {
-        if !self.session.is_authenticated() && check {
+        if check && !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -150,7 +209,7 @@ impl VtopClient {
             self.username,
             self.session
                 .get_csrf_token()
-                .ok_or(VtopError::SessionExpired)?,
+                .ok_or_else(|| missing_csrf_error("get_semesters"))?,
         );
         log_network_request("get_semesters.send", "POST", &url);
         let res = self
@@ -159,18 +218,15 @@ impl VtopClient {
             .body(body)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_semesters.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_semesters", res)
+            .await?;
         Ok(parsett::parse_semid_timetable(text))
     }
 
     pub async fn get_timetable(&mut self, semester_id: &str) -> VtopResult<TimetableData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!("{}/vtop/processViewTimeTable", self.config.base_url);
@@ -178,7 +234,7 @@ impl VtopClient {
             "_csrf={}&semesterSubId={}&authorizedID={}",
             self.session
                 .get_csrf_token()
-                .ok_or(VtopError::SessionExpired)?,
+                .ok_or_else(|| missing_csrf_error("get_timetable"))?,
             semester_id,
             self.username
         );
@@ -189,17 +245,15 @@ impl VtopClient {
             .body(body)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_timetable.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_timetable", res)
+            .await?;
         Ok(parsett::parse_timetable(text, semester_id))
     }
 
     pub async fn get_attendance(&mut self, semester_id: &str) -> VtopResult<AttendanceData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!("{}/vtop/processViewStudentAttendance", self.config.base_url);
@@ -207,7 +261,7 @@ impl VtopClient {
             "_csrf={}&semesterSubId={}&authorizedID={}",
             self.session
                 .get_csrf_token()
-                .ok_or(VtopError::SessionExpired)?,
+                .ok_or_else(|| missing_csrf_error("get_attendance"))?,
             semester_id,
             self.username
         );
@@ -218,12 +272,10 @@ impl VtopClient {
             .body(body)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        };
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_attendance.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_attendance", res)
+            .await?;
         Ok(parseattn::parse_attendance(text, semester_id.to_string()))
     }
 
@@ -233,7 +285,7 @@ impl VtopClient {
         course_id: &str,
         course_type: &str,
     ) -> VtopResult<FullAttendanceData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!("{}/vtop/processViewAttendanceDetail", self.config.base_url);
@@ -241,7 +293,7 @@ impl VtopClient {
             "_csrf={}&semesterSubId={}&registerNumber={}&courseId={}&courseType={}&authorizedID={}",
             self.session
                 .get_csrf_token()
-                .ok_or(VtopError::SessionExpired)?,
+                .ok_or_else(|| missing_csrf_error("get_full_attendance"))?,
             semester_id,
             self.username,
             course_id,
@@ -255,12 +307,10 @@ impl VtopClient {
             .body(body)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_full_attendance.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_full_attendance", res)
+            .await?;
         Ok(parseattn::parse_full_attendance(
             text,
             semester_id.to_string(),
@@ -270,7 +320,7 @@ impl VtopClient {
     }
 
     pub async fn get_marks(&mut self, semester_id: &str) -> VtopResult<MarksData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -284,7 +334,7 @@ impl VtopClient {
                 "_csrf",
                 self.session
                     .get_csrf_token()
-                    .ok_or(VtopError::SessionExpired)?,
+                    .ok_or_else(|| missing_csrf_error("get_marks"))?,
             );
 
         log_network_request("get_marks.send", "POST", &url);
@@ -294,19 +344,16 @@ impl VtopClient {
             .multipart(form)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_marks.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_marks", res)
+            .await?;
 
         Ok(parsemarks::parse_marks(text, semester_id.to_string()))
     }
 
     pub async fn get_grade_view(&mut self, semester_id: &str) -> VtopResult<GradeViewData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -320,7 +367,7 @@ impl VtopClient {
                 "_csrf",
                 self.session
                     .get_csrf_token()
-                    .ok_or(VtopError::SessionExpired)?,
+                    .ok_or_else(|| missing_csrf_error("get_grade_view"))?,
             );
 
         log_network_request("get_grade_view.send", "POST", &url);
@@ -330,13 +377,10 @@ impl VtopClient {
             .multipart(form)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_grade_view.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_grade_view", res)
+            .await?;
         Ok(parsegrades::parse_grade_view(text, semester_id.to_string()))
     }
 
@@ -345,7 +389,7 @@ impl VtopClient {
         semester_id: &str,
         course_id: &str,
     ) -> VtopResult<GradeDetailsData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -361,7 +405,7 @@ impl VtopClient {
                 "_csrf",
                 self.session
                     .get_csrf_token()
-                    .ok_or(VtopError::SessionExpired)?,
+                    .ok_or_else(|| missing_csrf_error("get_grade_view_details"))?,
             ),
         ];
 
@@ -372,13 +416,10 @@ impl VtopClient {
             .form(&params)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_grade_view_details.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_grade_view_details", res)
+            .await?;
         Ok(parsegrades::parse_grade_view_details(
             text,
             semester_id.to_string(),
@@ -387,7 +428,7 @@ impl VtopClient {
     }
 
     pub async fn get_grade_history(&mut self) -> VtopResult<GradeHistoryData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -399,7 +440,7 @@ impl VtopClient {
             self.username,
             self.session
                 .get_csrf_token()
-                .ok_or(VtopError::SessionExpired)?,
+                .ok_or_else(|| missing_csrf_error("get_grade_history"))?,
         );
         log_network_request("get_grade_history.send", "POST", &url);
         let res = self
@@ -408,17 +449,15 @@ impl VtopClient {
             .body(body)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_grade_history.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_grade_history", res)
+            .await?;
         Ok(parsegradehistory::parse_grade_history(text))
     }
 
     pub async fn get_exam_schedule(&mut self, semester_id: &str) -> VtopResult<ExamScheduleData> {
-        if !self.session.is_authenticated() {
+        if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
         let url = format!(
@@ -432,7 +471,7 @@ impl VtopClient {
                 "_csrf",
                 self.session
                     .get_csrf_token()
-                    .ok_or(VtopError::SessionExpired)?,
+                    .ok_or_else(|| missing_csrf_error("get_exam_schedule"))?,
             );
         log_network_request("get_exam_schedule.send", "POST", &url);
         let res = self
@@ -441,18 +480,17 @@ impl VtopClient {
             .multipart(form)
             .send()
             .await
-            .map_err(|_| VtopError::NetworkError)?;
-        if !res.status().is_success() || res.url().to_string().contains("login") {
-            self.session.set_authenticated(false);
-            return Err(VtopError::SessionExpired);
-        }
-        let text = res.text().await.map_err(|_| VtopError::VtopServerError)?;
+            .map_err(|error| reqwest_network_error("get_exam_schedule.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_exam_schedule", res)
+            .await?;
         Ok(parsesched::parse_schedule(text, semester_id.to_string()))
     }
     pub fn is_authenticated(&mut self) -> bool {
         self.session.is_authenticated()
     }
 }
+
 // for login
 impl VtopClient {
     pub async fn login(&mut self) -> VtopResult<()> {
@@ -520,7 +558,7 @@ impl VtopClient {
         let csrf = self
             .session
             .get_csrf_token()
-            .ok_or(VtopError::SessionExpired)?;
+            .ok_or_else(|| missing_csrf_error("perform_login"))?;
 
         let login_data = format!(
             "_csrf={}&username={}&password={}&captchaStr={}",
@@ -550,13 +588,7 @@ impl VtopClient {
                 return Err(VtopError::AuthenticationFailed(
                     "Invalid Captcha".to_string(),
                 ));
-            } else if response_text
-                .to_lowercase()
-                .contains(&"Invalid LoginId/Password".to_lowercase())
-                || response_text
-                    .to_lowercase()
-                    .contains(&"Invalid  Username/Password".to_lowercase())
-            {
+            } else if Self::is_invalid_credentials_response(&response_text) {
                 log_auth_event("WARN", "login rejected due to invalid credentials");
                 return Err(VtopError::InvalidCredentials);
             } else if Self::is_security_otp_required_response(&response_text) {
@@ -586,7 +618,7 @@ impl VtopClient {
         let csrf = self
             .session
             .get_csrf_token()
-            .ok_or(VtopError::SessionExpired)?;
+            .ok_or_else(|| missing_csrf_error("submit_security_otp"))?;
         let url = format!("{}/vtop/validateSecurityOtp", self.config.base_url);
         let referer = format!("{}/vtop/login/error", self.config.base_url);
 
@@ -616,23 +648,29 @@ impl VtopClient {
             .await
             .map_err(|error| reqwest_network_error("submit_security_otp.text", error))?;
 
-        let otp_status = serde_json::from_str::<serde_json::Value>(&response_text)
-            .ok()
-            .and_then(|json| {
-                json.get("status")
-                    .and_then(|status| status.as_str())
-                    .map(|status| status.to_uppercase())
-            });
+        let otp_response_json = serde_json::from_str::<serde_json::Value>(&response_text).ok();
+        let otp_status = otp_response_json
+            .as_ref()
+            .and_then(|json| json.get("status"))
+            .and_then(|status| status.as_str())
+            .map(|status| status.to_uppercase());
+        let otp_message = otp_response_json
+            .as_ref()
+            .and_then(|json| json.get("message"))
+            .and_then(|message| message.as_str())
+            .map(|message| message.to_string());
+        let redirect_url = otp_response_json
+            .as_ref()
+            .and_then(|json| json.get("redirectUrl"))
+            .and_then(|redirect_url| redirect_url.as_str())
+            .filter(|redirect_url| !redirect_url.trim().is_empty())
+            .map(|redirect_url| redirect_url.to_string());
+        let response_text_lower = response_text.to_lowercase();
 
-        if matches!(otp_status.as_deref(), Some("INVALID")) {
-            let message = serde_json::from_str::<serde_json::Value>(&response_text)
-                .ok()
-                .and_then(|json| {
-                    json.get("message")
-                        .and_then(|value| value.as_str())
-                        .map(|value| value.to_string())
-                })
-                .unwrap_or("Invalid OTP. Please try again.".to_string());
+        if matches!(otp_status.as_deref(), Some("INVALID"))
+            || response_text_lower.contains("invalid otp")
+        {
+            let message = otp_message.unwrap_or("Invalid OTP. Please try again.".to_string());
             log_auth_event(
                 "WARN",
                 "OTP verification failed because the code was invalid",
@@ -640,14 +678,40 @@ impl VtopClient {
             return Err(VtopError::AuthenticationFailed(message));
         }
 
-        if let Some(status) = otp_status {
+        if matches!(otp_status.as_deref(), Some("EXPIRED")) {
+            let message = otp_message.unwrap_or("OTP has expired. Please resend.".to_string());
+            log_auth_event("WARN", "OTP verification failed because the code expired");
+            return Err(VtopError::AuthenticationFailed(message));
+        }
+
+        if matches!(otp_status.as_deref(), Some("SUCCESS")) {
+            if let Some(redirect_url) = redirect_url {
+                if self.follow_security_otp_redirect(&redirect_url).await? {
+                    return Ok(());
+                }
+            } else {
+                log_auth_event(
+                    "WARN",
+                    "OTP verification returned SUCCESS without redirectUrl",
+                );
+            }
+        }
+
+        if let Some(status) = otp_status.as_deref() {
             if status != "VALID" && status != "SUCCESS" && status != "OK" {
                 log_auth_event("WARN", "OTP verification returned a non-success status");
                 return Err(VtopError::AuthenticationFailed(
-                    "We could not verify that OTP. Please try again.".to_string(),
+                    otp_message.unwrap_or("Verification failed. Please try again.".to_string()),
                 ));
             }
         }
+
+        let response_text_trimmed = response_text.trim().to_uppercase();
+        let response_declares_success =
+            matches!(
+                otp_status.as_deref(),
+                Some("VALID") | Some("SUCCESS") | Some("OK")
+            ) || matches!(response_text_trimmed.as_str(), "VALID" | "SUCCESS" | "OK");
 
         let landed_on_content =
             status_code.is_success() && final_url.trim_end_matches('/').ends_with("/vtop/content");
@@ -677,17 +741,85 @@ impl VtopClient {
             return Ok(());
         }
 
+        if response_declares_success {
+            log_auth_event(
+                "WARN",
+                &format!(
+                    "OTP endpoint reported success, but session validation failed after landing at {final_url}"
+                ),
+            );
+            return Err(VtopError::AuthenticationFailed(
+                "VTOP accepted the OTP, but did not open a signed-in session. Please try again."
+                    .to_string(),
+            ));
+        }
+
+        log_auth_event(
+            "WARN",
+            &format!(
+                "OTP verification did not return a success response: HTTP {status_code} at {final_url}"
+            ),
+        );
         Err(VtopError::AuthenticationFailed(
-            "We verified the OTP, but your session could not be confirmed. Please sign in again."
-                .to_string(),
+            "We could not verify that OTP. Please try again.".to_string(),
         ))
+    }
+
+    async fn follow_security_otp_redirect(&mut self, redirect_url: &str) -> VtopResult<bool> {
+        let url = self.resolve_vtop_url(redirect_url)?;
+        log_network_request("follow_security_otp_redirect.send", "GET", &url);
+        let response = self
+            .client
+            .get(&url)
+            .header("Accept", "*/*")
+            .send()
+            .await
+            .map_err(|error| reqwest_network_error("follow_security_otp_redirect.send", error))?;
+        let final_url = response.url().to_string();
+        let status = response.status();
+        let text = response
+            .text()
+            .await
+            .map_err(|error| reqwest_network_error("follow_security_otp_redirect.text", error))?;
+
+        if Self::is_login_url(&final_url) || Self::looks_like_login_page(&text) {
+            self.mark_session_expired(
+                "follow_security_otp_redirect",
+                &format!("VTOP returned login page after OTP redirect at {final_url}"),
+            );
+            return Ok(false);
+        }
+
+        if !status.is_success() {
+            return Err(vtop_server_error(
+                "follow_security_otp_redirect",
+                format!("VTOP returned HTTP {status} at {final_url}"),
+            ));
+        }
+
+        self.current_page = Some(text);
+        let _ = self.extract_csrf_token();
+        if self.get_regno().is_err() {
+            self.username = self.username.to_uppercase();
+        }
+
+        if matches!(self.validate_authenticated_session().await, Ok(true)) {
+            self.session.set_authenticated(true);
+            self.session.set_cookie_external(false);
+            self.current_page = None;
+            self.captcha_data = None;
+            log_auth_event("INFO", "OTP redirect followed and session confirmed");
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     pub async fn resend_security_otp(&mut self) -> VtopResult<()> {
         let csrf = self
             .session
             .get_csrf_token()
-            .ok_or(VtopError::SessionExpired)?;
+            .ok_or_else(|| missing_csrf_error("resend_security_otp"))?;
         let resend_paths = ["/vtop/resendSecurityOtp", "/vtop/resendSecurityOTP"];
         let referer = format!("{}/vtop/login/error", self.config.base_url);
 
@@ -767,21 +899,75 @@ impl VtopClient {
             })?;
         let final_url = response.url().to_string();
         let status = response.status();
-        let is_same_url = final_url.trim_end_matches('/') == url.trim_end_matches('/');
-        let redirected = !is_same_url || status.is_redirection();
-        if !status.is_success() || redirected {
-            self.session.set_authenticated(false);
+
+        if Self::is_login_url(&final_url) {
+            self.mark_session_expired(
+                "validate_authenticated_session",
+                &format!("VTOP redirected to {final_url}"),
+            );
             return Ok(false);
         }
-        self.current_page = Some(
-            response
-                .text()
-                .await
-                .map_err(|error| reqwest_network_error("get_csrf_for_cookie_set.text", error))?,
-        );
-        let _ = self.extract_csrf_token();
+
+        let text = response
+            .text()
+            .await
+            .map_err(|error| reqwest_network_error("validate_authenticated_session.text", error))?;
+
+        if Self::looks_like_login_page(&text) {
+            self.mark_session_expired(
+                "validate_authenticated_session",
+                "VTOP returned the login page",
+            );
+            return Ok(false);
+        }
+
+        if !status.is_success() {
+            return Err(vtop_server_error(
+                "validate_authenticated_session",
+                format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
+            ));
+        }
+
+        if !Self::is_content_url(&final_url) {
+            log_auth_event(
+                "WARN",
+                &format!(
+                    "validate_authenticated_session: expected /vtop/content but landed at {final_url}"
+                ),
+            );
+            return Ok(false);
+        }
+
+        self.current_page = Some(text);
+        if let Err(error) = self.extract_csrf_token() {
+            log_auth_event(
+                "WARN",
+                &format!(
+                    "validate_authenticated_session: session reached content but CSRF refresh failed: {error}"
+                ),
+            );
+        }
         self.session.set_cookie_external(false);
         Ok(true)
+    }
+
+    async fn ensure_authenticated_session(&mut self) -> VtopResult<bool> {
+        if self.session.is_authenticated() {
+            if self.session.get_csrf_token().is_some() {
+                return Ok(true);
+            }
+            log_auth_event(
+                "INFO",
+                "authenticated session is missing CSRF token, refreshing from VTOP content",
+            );
+            return self.validate_authenticated_session().await;
+        }
+
+        if !self.session.is_cookie_external() {
+            return Ok(false);
+        }
+
+        self.try_restore_existing_session().await
     }
 
     async fn load_login_page(&mut self, k: bool) -> VtopResult<()> {
@@ -794,10 +980,11 @@ impl VtopClient {
         let csrf = self
             .session
             .get_csrf_token()
-            .ok_or(VtopError::SessionExpired)?;
+            .ok_or_else(|| missing_csrf_error("load_login_page"))?;
         let url = format!("{}/vtop/prelogin/setup", self.config.base_url);
         let body = format!("_csrf={}&flag=VTOP", csrf);
-        for _ in 0..Max_RELOAD_ATTEMPTS {
+        self.captcha_data = None;
+        for attempt in 0..Max_RELOAD_ATTEMPTS {
             log_network_request("load_login_page.send", "POST", &url);
             let response = self
                 .client
@@ -807,7 +994,13 @@ impl VtopClient {
                 .await
                 .map_err(|error| reqwest_network_error("load_login_page.send", error))?;
             if !response.status().is_success() {
-                return Err(VtopError::VtopServerError);
+                return Err(vtop_server_error(
+                    "load_login_page",
+                    format!(
+                        "VTOP returned HTTP {} while preparing captcha",
+                        response.status()
+                    ),
+                ));
             }
             let text = response
                 .text()
@@ -820,8 +1013,19 @@ impl VtopClient {
             }
             log_auth_event(
                 "WARN",
-                "captcha payload was missing, retrying login page load",
+                &format!(
+                    "captcha payload was missing on attempt {} of {}, retrying login page load",
+                    attempt + 1,
+                    Max_RELOAD_ATTEMPTS
+                ),
             );
+        }
+        if self.captcha_data.is_none() {
+            log_auth_event(
+                "ERROR",
+                "captcha payload was missing after all login page reload attempts",
+            );
+            return Err(VtopError::CaptchaRequired);
         }
         Ok(())
     }
@@ -840,8 +1044,42 @@ impl VtopClient {
             return Ok(true);
         }
 
-        self.session.clear();
+        log_auth_event(
+            "WARN",
+            "restored session was not accepted by VTOP; keeping cookies available for the next login attempt",
+        );
         Ok(false)
+    }
+
+    fn is_login_url(url: &str) -> bool {
+        Url::parse(url)
+            .ok()
+            .map(|parsed| parsed.path().starts_with("/vtop/login"))
+            .unwrap_or_else(|| url.to_lowercase().contains("/vtop/login"))
+    }
+
+    fn is_content_url(url: &str) -> bool {
+        Url::parse(url)
+            .ok()
+            .map(|parsed| parsed.path().trim_end_matches('/') == "/vtop/content")
+            .unwrap_or_else(|| {
+                url.split('?')
+                    .next()
+                    .unwrap_or(url)
+                    .trim_end_matches('/')
+                    .ends_with("/vtop/content")
+            })
+    }
+
+    fn looks_like_login_page(text: &str) -> bool {
+        let lower = text.to_lowercase();
+        (lower.contains("/vtop/login")
+            || lower.contains("action=\"/vtop/login\"")
+            || lower.contains("action='/vtop/login'")
+            || lower.contains("id=\"vtoploginform\"")
+            || lower.contains("id='vtoploginform'"))
+            && (lower.contains("name=\"username\"") || lower.contains("name='username'"))
+            && (lower.contains("name=\"password\"") || lower.contains("name='password'"))
     }
 
     fn extract_captcha_data(&mut self) -> VtopResult<()> {
@@ -865,14 +1103,16 @@ impl VtopClient {
     }
 
     fn get_regno(&mut self) -> VtopResult<()> {
-        let document = Html::parse_document(&self.current_page.as_ref().ok_or(
-            VtopError::ParseError("Current page not found at captcha extration".into()),
-        )?);
+        let current_page = self.current_page.as_ref().ok_or(VtopError::ParseError(
+            "Current page not found at captcha extration".into(),
+        ))?;
+        let document = Html::parse_document(current_page);
         let selector = Selector::parse("input[type=hidden][name=authorizedIDX]").unwrap();
         let k = document
             .select(&selector)
             .next()
             .and_then(|element| element.value().attr("value").map(|value| value.to_string()))
+            .or_else(|| Self::extract_javascript_var(current_page, "id"))
             .ok_or(VtopError::RegistrationParsingError)?;
 
         self.username = k;
@@ -908,18 +1148,48 @@ impl VtopClient {
             .map_err(|error| reqwest_network_error("solve_captcha.text", error))
     }
     fn extract_csrf_token(&mut self) -> VtopResult<()> {
-        let document = Html::parse_document(&self.current_page.as_ref().ok_or(
-            VtopError::ParseError("Current page not found at csrf extration".into()),
-        )?);
+        let current_page = self.current_page.as_ref().ok_or(VtopError::ParseError(
+            "Current page not found at csrf extration".into(),
+        ))?;
+        let document = Html::parse_document(current_page);
         let selector = Selector::parse("input[name='_csrf']").unwrap();
         let csrf_token = document
             .select(&selector)
             .next()
             .and_then(|element| element.value().attr("value"))
+            .map(|value| value.to_string())
+            .or_else(|| Self::extract_javascript_var(current_page, "csrfValue"))
             .ok_or(VtopError::ParseError("CSRF token not found".to_string()))?;
         self.session.set_csrf_token(csrf_token.to_string());
         Ok(())
     }
+
+    fn extract_javascript_var(data: &str, name: &str) -> Option<String> {
+        let marker = format!("var {name}");
+        let after_marker = data.split(&marker).nth(1)?;
+        let after_equals = after_marker.split_once('=')?.1.trim_start();
+        let quote = after_equals.chars().next()?;
+        if quote != '"' && quote != '\'' {
+            return None;
+        }
+        after_equals[quote.len_utf8()..]
+            .split_once(quote)
+            .map(|(value, _)| value.to_string())
+    }
+
+    fn resolve_vtop_url(&self, path_or_url: &str) -> VtopResult<String> {
+        if Url::parse(path_or_url).is_ok() {
+            return Ok(path_or_url.to_string());
+        }
+
+        let base_url = Url::parse(&self.config.base_url)
+            .map_err(|error| VtopError::ConfigurationError(error.to_string()))?;
+        base_url
+            .join(path_or_url)
+            .map(|url| url.to_string())
+            .map_err(|error| VtopError::ConfigurationError(error.to_string()))
+    }
+
     async fn load_initial_page(&mut self) -> VtopResult<()> {
         let url = format!("{}/vtop/open/page", self.config.base_url);
         log_network_request("load_initial_page.send", "GET", &url);
@@ -931,7 +1201,10 @@ impl VtopClient {
             .map_err(|error| reqwest_network_error("load_initial_page.send", error))?;
 
         if !response.status().is_success() {
-            return Err(VtopError::VtopServerError);
+            return Err(vtop_server_error(
+                "load_initial_page",
+                format!("VTOP returned HTTP {} at {url}", response.status()),
+            ));
         }
         self.current_page = Some(
             response
@@ -943,20 +1216,48 @@ impl VtopClient {
         Ok(())
     }
     fn get_login_page_error(data: &str) -> String {
-        let ptext = r#"span.text-danger.text-center[role="alert"]"#;
-        let document = Html::parse_document(data);
-        let selector = Selector::parse(&ptext).unwrap();
-        if let Some(element) = document.select(&selector).next() {
-            let error_message = element.text().collect::<Vec<_>>().join(" ");
-            let trimmed = error_message.trim();
-            if trimmed.is_empty() {
+        if let Some(message) = Self::login_alert_message(data) {
+            if message.is_empty() {
                 "We could not sign you in. Please try again.".into()
             } else {
-                trimmed.into()
+                message
             }
         } else {
             "We could not sign you in because VTOP returned an unexpected response.".into()
         }
+    }
+
+    fn login_alert_message(data: &str) -> Option<String> {
+        let ptext = r#"span.text-danger.text-center[role="alert"]"#;
+        let document = Html::parse_document(data);
+        let selector = Selector::parse(&ptext).unwrap();
+        document.select(&selector).next().map(|element| {
+            element
+                .text()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+    }
+
+    fn normalize_login_alert_message(message: &str) -> String {
+        message
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .to_lowercase()
+    }
+
+    fn is_invalid_credentials_response(data: &str) -> bool {
+        let Some(message) = Self::login_alert_message(data) else {
+            return false;
+        };
+        matches!(
+            Self::normalize_login_alert_message(&message).as_str(),
+            "invalid username/password" | "invalid loginid/password"
+        )
     }
 
     fn is_security_otp_required_response(data: &str) -> bool {

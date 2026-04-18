@@ -63,6 +63,11 @@ class ShellLayout extends HookConsumerWidget {
 
     return FScaffold(
       childPad: false,
+      scaffoldStyle: FScaffoldStyleDelta.delta(
+        footerDecoration: DecorationDelta.value(
+          BoxDecoration(color: context.theme.colors.background),
+        ),
+      ),
       header: headers[selected.value],
       footer: SafeArea(
         top: false,
@@ -71,6 +76,11 @@ class ShellLayout extends HookConsumerWidget {
         bottom: true,
         child: FBottomNavigationBar(
           index: selected.value,
+          style: FBottomNavigationBarStyleDelta.delta(
+            decoration: DecorationDelta.value(
+              BoxDecoration(color: context.theme.colors.background),
+            ),
+          ),
           onChange: (index) {
             selected.value = index;
             switch (selected.value) {

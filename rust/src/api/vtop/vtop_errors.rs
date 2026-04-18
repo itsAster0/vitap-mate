@@ -5,7 +5,7 @@ use serde::Serialize;
 #[frb(non_opaque)]
 pub enum VtopError {
     NetworkError,
-    VtopServerError,
+    VtopServerError(String),
     AuthenticationFailed(String),
     RegistrationParsingError,
     InvalidCredentials,
@@ -21,7 +21,7 @@ impl std::fmt::Display for VtopError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             VtopError::NetworkError => write!(f, "Network connection error"),
-            VtopError::VtopServerError => write!(f, "VTOP server error"),
+            VtopError::VtopServerError(msg) => write!(f, "VTOP server error: {}", msg),
             VtopError::AuthenticationFailed(msg) => write!(f, "Authentication failed: {}", msg),
             VtopError::RegistrationParsingError => write!(f, "Failed to parse registration number"),
             VtopError::InvalidCredentials => write!(f, "Invalid username or password"),

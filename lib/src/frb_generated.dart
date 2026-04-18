@@ -4089,7 +4089,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 0:
         return VtopError_NetworkError();
       case 1:
-        return VtopError_VtopServerError();
+        return VtopError_VtopServerError(dco_decode_String(raw[1]));
       case 2:
         return VtopError_AuthenticationFailed(dco_decode_String(raw[1]));
       case 3:
@@ -5393,7 +5393,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 0:
         return VtopError_NetworkError();
       case 1:
-        return VtopError_VtopServerError();
+        var var_field0 = sse_decode_String(deserializer);
+        return VtopError_VtopServerError(var_field0);
       case 2:
         var var_field0 = sse_decode_String(deserializer);
         return VtopError_AuthenticationFailed(var_field0);
@@ -6544,8 +6545,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     switch (self) {
       case VtopError_NetworkError():
         sse_encode_i_32(0, serializer);
-      case VtopError_VtopServerError():
+      case VtopError_VtopServerError(field0: final field0):
         sse_encode_i_32(1, serializer);
+        sse_encode_String(field0, serializer);
       case VtopError_AuthenticationFailed(field0: final field0):
         sse_encode_i_32(2, serializer);
         sse_encode_String(field0, serializer);

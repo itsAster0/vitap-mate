@@ -8,13 +8,13 @@ part 'controller.g.dart';
 
 @Riverpod(keepAlive: true)
 class BackgroundSync extends _$BackgroundSync {
-  final _keySync = "background_sync_key_v2";
+  final _keySync = "background_sync_key_v3";
   @override
   Future<SyncState> build() async {
     final prefs = await SharedPreferences.getInstance();
     final syncjsonstr = prefs.getString(_keySync);
     if (syncjsonstr == null) {
-      final freq = Duration(hours: 12);
+      final freq = Duration(hours: 0);
       final k = SyncState(freq: freq);
 
       _save(k);
