@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/vtop_otp_overlay.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
 
@@ -42,7 +43,10 @@ class MyApp extends HookConsumerWidget {
       routeInformationProvider: goRouter.routeInformationProvider,
       routeInformationParser: goRouter.routeInformationParser,
       routerDelegate: goRouter.routerDelegate,
-      builder: (context, child) => FTheme(data: fTheme, child: FToaster(child:  child!)),
+      builder: (context, child) => FTheme(
+        data: fTheme,
+        child: FToaster(child: VtopOtpOverlay(child: child!)),
+      ),
     );
   }
 }

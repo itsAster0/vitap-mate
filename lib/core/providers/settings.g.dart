@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'f13baee0041c2097d28ebee586cf94192b242d78';
+String _$settingsHash() => r'8da12a0fb629d512f79199851da92eb2463633ba';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();
@@ -90,39 +90,6 @@ final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
 
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
 
-@ProviderFor(toggleMergeTT)
-final toggleMergeTTProvider = ToggleMergeTTProvider._();
-
-final class ToggleMergeTTProvider
-    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
-    with $FutureModifier<void>, $FutureProvider<void> {
-  ToggleMergeTTProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'toggleMergeTTProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$toggleMergeTTHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<void> create(Ref ref) {
-    return toggleMergeTT(ref);
-  }
-}
-
-String _$toggleMergeTTHash() => r'4089aa249c098148ae172a46690855636c7370b8';
-
 @ProviderFor(btwExams)
 final btwExamsProvider = BtwExamsProvider._();
 
@@ -163,38 +130,45 @@ final class BtwExamsProvider extends $FunctionalProvider<bool, bool, bool>
 
 String _$btwExamsHash() => r'77cc43c21a5b8dbd6ef2e949431fa4abf5d24a1b';
 
-@ProviderFor(toggleBTWExams)
-final toggleBTWExamsProvider = ToggleBTWExamsProvider._();
+@ProviderFor(autoRefresh)
+final autoRefreshProvider = AutoRefreshProvider._();
 
-final class ToggleBTWExamsProvider
-    extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
-    with $FutureModifier<void>, $FutureProvider<void> {
-  ToggleBTWExamsProvider._()
+final class AutoRefreshProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  AutoRefreshProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'toggleBTWExamsProvider',
+        name: r'autoRefreshProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$toggleBTWExamsHash();
+  String debugGetCreateSourceHash() => _$autoRefreshHash();
 
   @$internal
   @override
-  $FutureProviderElement<void> $createElement($ProviderPointer pointer) =>
-      $FutureProviderElement(pointer);
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
 
   @override
-  FutureOr<void> create(Ref ref) {
-    return toggleBTWExams(ref);
+  bool create(Ref ref) {
+    return autoRefresh(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
   }
 }
 
-String _$toggleBTWExamsHash() => r'd6f29e77007ef71042f30310115986286dd5522c';
+String _$autoRefreshHash() => r'e5ae73c61bbae9b20882fda9e592bd0c6ec00d4f';
 
 @ProviderFor(studentProjectPinnedIds)
 final studentProjectPinnedIdsProvider = StudentProjectPinnedIdsProvider._();

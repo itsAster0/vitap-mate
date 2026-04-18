@@ -2,8 +2,16 @@ package com.vitap_pal.app
 
 import android.Manifest
 import android.content.ContentValues
+import android.app.DownloadManager
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Environment
 import android.provider.CalendarContract
+import android.webkit.URLUtil
+import android.webkit.CookieManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -14,14 +22,15 @@ import java.util.TimeZone
 
 class MainActivity : FlutterFragmentActivity() {
     companion object {
-        private const val CHANNEL = "vitapmate/google_calendar_sync"
+        private const val CALENDAR_CHANNEL = "vitapmate/google_calendar_sync"
+        private const val DOWNLOAD_CHANNEL = "vitapmate/download_manager"
         private const val SYNC_TAG = "[VitapMateTimetable]"
         private const val TAG_PREFIX = "vitapmate-"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CALENDAR_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getWritableCalendars" -> getWritableCalendars(result)
@@ -30,6 +39,96 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DOWNLOAD_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "enqueueDownload" -> enqueueDownload(call, result)
+                    "openDownloadsFolder" -> openDownloadsFolder(result)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    private fun enqueueDownload(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url")?.trim().orEmpty()
+        if (url.isEmpty()) {
+            result.error("invalid_url", "Download URL is required", null)
+            return
+        }
+
+        val request = DownloadManager.Request(Uri.parse(url))
+        val nativeCookie = CookieManager.getInstance().getCookie(url)?.trim().orEmpty()
+        val fallbackCookie = call.argument<String>("cookie")?.trim().orEmpty()
+        val cookie = nativeCookie.ifEmpty { fallbackCookie }
+        if (cookie.isNotEmpty()) {
+            request.addRequestHeader("Cookie", cookie)
+        }
+        val userAgent = call.argument<String>("userAgent")?.trim().orEmpty()
+        if (userAgent.isNotEmpty()) {
+            request.addRequestHeader("User-Agent", userAgent)
+        }
+        val referer = call.argument<String>("referer")?.trim().orEmpty()
+        if (referer.isNotEmpty()) {
+            request.addRequestHeader("Referer", referer)
+        }
+        val mimeType = call.argument<String>("mimeType")?.trim().orEmpty()
+        if (mimeType.isNotEmpty()) {
+            request.setMimeType(mimeType)
+        }
+
+        val contentDisposition = call.argument<String>("contentDisposition")?.trim()
+        val suggestedFilename = call.argument<String>("suggestedFilename")?.trim()
+        val fileName = suggestedFilename?.takeIf { it.isNotEmpty() }
+            ?: URLUtil.guessFileName(
+                url,
+                contentDisposition?.takeIf { it.isNotEmpty() },
+                mimeType.ifEmpty { null }
+            )
+
+        request.setTitle(fileName)
+        request.setDescription("Downloading file")
+        request.setNotificationVisibility(
+            DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+        )
+        request.setAllowedOverMetered(true)
+        request.setAllowedOverRoaming(true)
+        request.setVisibleInDownloadsUi(true)
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+
+        try {
+            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as? DownloadManager
+            if (manager == null) {
+                result.error("download_manager_unavailable", "Download manager unavailable", null)
+                return
+            }
+            result.success(manager.enqueue(request))
+        } catch (e: Exception) {
+            result.error("download_enqueue_failed", e.message, null)
+        }
+    }
+
+    private fun openDownloadsFolder(result: MethodChannel.Result) {
+        val intents = listOf(
+            Intent(DownloadManager.ACTION_VIEW_DOWNLOADS),
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(
+                    Uri.parse("content://downloads/public_downloads"),
+                    "vnd.android.cursor.dir/download"
+                )
+            }
+        )
+
+        for (intent in intents) {
+            try {
+                startActivity(intent.apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                result.success(null)
+                return
+            } catch (_: ActivityNotFoundException) {
+            } catch (_: Exception) {
+            }
+        }
+
+        result.error("downloads_folder_unavailable", "Unable to open downloads folder", null)
     }
 
     private fun getWritableCalendars(result: MethodChannel.Result) {

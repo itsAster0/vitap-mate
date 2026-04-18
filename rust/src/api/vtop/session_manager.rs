@@ -1,30 +1,32 @@
+use super::types::{PersistedCookie, PersistedHeader, PersistedVtopSession};
 use std::sync::Arc;
 
 #[cfg(not(target_arch = "wasm32"))]
-use reqwest::cookie::Jar;
+use reqwest::cookie::{CookieStore, Jar};
 use reqwest::Url;
-#[derive(Debug)]
 
+#[derive(Debug)]
 pub struct SessionManager {
     csrf_token: Option<String>,
     #[cfg(not(target_arch = "wasm32"))]
     cookie_store: Arc<Jar>,
     is_authenticated: bool,
     is_cookie_external: bool,
+    persisted_headers: Vec<PersistedHeader>,
 }
 
 impl SessionManager {
     pub fn new() -> Self {
         #[cfg(not(target_arch = "wasm32"))]
-        let jar = Jar::default();
-        #[cfg(not(target_arch = "wasm32"))]
-        let cookie_store = Arc::new(jar);
+        let cookie_store = Arc::new(Jar::default());
+
         Self {
             csrf_token: None,
             #[cfg(not(target_arch = "wasm32"))]
             cookie_store,
             is_authenticated: false,
             is_cookie_external: false,
+            persisted_headers: Self::default_persisted_headers(),
         }
     }
 
@@ -35,6 +37,7 @@ impl SessionManager {
     pub fn get_csrf_token(&self) -> Option<String> {
         self.csrf_token.clone()
     }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub fn get_cookie_store(&self) -> Arc<Jar> {
         self.cookie_store.clone()
@@ -51,21 +54,281 @@ impl SessionManager {
     pub fn is_cookie_external(&self) -> bool {
         self.is_cookie_external
     }
-    pub fn set_cookie_external(&mut self, bool: bool) {
-        self.is_cookie_external = bool;
+
+    pub fn set_cookie_external(&mut self, value: bool) {
+        self.is_cookie_external = value;
+    }
+
+    pub fn get_persisted_headers(&self) -> Vec<PersistedHeader> {
+        if self.persisted_headers.is_empty() {
+            Self::default_persisted_headers()
+        } else {
+            self.persisted_headers.clone()
+        }
+    }
+
+    pub fn set_persisted_headers(&mut self, headers: Vec<PersistedHeader>) {
+        self.persisted_headers = if headers.is_empty() {
+            Self::default_persisted_headers()
+        } else {
+            headers
+        };
     }
 
     pub fn clear(&mut self) {
         self.csrf_token = None;
         self.is_authenticated = false;
+        self.is_cookie_external = false;
+        self.persisted_headers = Self::default_persisted_headers();
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.cookie_store = Arc::new(Jar::default());
+        }
     }
 
     pub fn set_csrf_from_external(&mut self, token: String) {
         self.csrf_token = Some(token);
     }
+
     pub fn set_cookie_from_external(&mut self, url: String, cookie: String) {
-        self.cookie_store
-            .add_cookie_str(&cookie, &Url::parse(&url).unwrap());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Ok(parsed_url) = Url::parse(&url) {
+                self.cookie_store.add_cookie_str(&cookie, &parsed_url);
+                self.is_cookie_external = true;
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = (url, cookie);
+            self.is_cookie_external = true;
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn import_persisted_session(&mut self, base_url: String, snapshot: PersistedVtopSession) {
+        self.clear();
+        self.set_persisted_headers(snapshot.headers);
+
+        if let Some(token) = snapshot.csrf_token {
+            self.csrf_token = Some(token);
+        }
+
+        let Ok(parsed_base_url) = Url::parse(&base_url) else {
+            return;
+        };
+
+        for cookie in snapshot.cookies {
+            self.add_persisted_cookie(&parsed_base_url, &cookie);
+        }
+
+        self.is_authenticated = false;
         self.is_cookie_external = true;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn import_persisted_session(&mut self, _base_url: String, snapshot: PersistedVtopSession) {
+        self.clear();
+        self.set_persisted_headers(snapshot.headers);
+        self.csrf_token = snapshot.csrf_token;
+        self.is_authenticated = false;
+        self.is_cookie_external = true;
+    }
+
+    pub fn export_persisted_session(
+        &self,
+        base_url: String,
+        username: String,
+        saved_at_epoch_ms: u64,
+        expires_at_epoch_ms: u64,
+    ) -> PersistedVtopSession {
+        let cookies = self.collect_persisted_cookies(&base_url);
+        PersistedVtopSession {
+            username,
+            saved_at_epoch_ms,
+            expires_at_epoch_ms,
+            csrf_token: self.csrf_token.clone(),
+            authenticated_hint: self.is_authenticated,
+            cookies,
+            headers: self.get_persisted_headers(),
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn add_persisted_cookie(&mut self, base_url: &Url, cookie: &PersistedCookie) {
+        let mut cookie_line = format!("{}={}", cookie.name, cookie.value);
+        if !cookie.domain.is_empty() {
+            cookie_line.push_str(&format!("; Domain={}", cookie.domain));
+        }
+        if !cookie.path.is_empty() {
+            cookie_line.push_str(&format!("; Path={}", cookie.path));
+        }
+        if cookie.secure {
+            cookie_line.push_str("; Secure");
+        }
+        if cookie.http_only {
+            cookie_line.push_str("; HttpOnly");
+        }
+        self.cookie_store.add_cookie_str(&cookie_line, base_url);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn collect_persisted_cookies(&self, base_url: &str) -> Vec<PersistedCookie> {
+        let Ok(parsed_url) = Url::parse(base_url) else {
+            return Vec::new();
+        };
+        let Some(cookie_header) = self.cookie_store.cookies(&parsed_url) else {
+            return Vec::new();
+        };
+
+        let domain = parsed_url.host_str().unwrap_or_default().to_string();
+        let secure = parsed_url.scheme().eq_ignore_ascii_case("https");
+
+        cookie_header
+            .to_str()
+            .ok()
+            .map(|raw_cookie| {
+                raw_cookie
+                    .split(';')
+                    .filter_map(|part| {
+                        let trimmed = part.trim();
+                        if trimmed.is_empty() {
+                            return None;
+                        }
+                        let (name, value) = trimmed.split_once('=')?;
+                        Some(PersistedCookie {
+                            name: name.trim().to_string(),
+                            value: value.trim().to_string(),
+                            domain: domain.clone(),
+                            path: "/".to_string(),
+                            expires_at_epoch_ms: None,
+                            secure,
+                            http_only: false,
+                            same_site: None,
+                            host_only: true,
+                            persistent: false,
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn collect_persisted_cookies(&self, _base_url: &str) -> Vec<PersistedCookie> {
+        Vec::new()
+    }
+
+    fn default_persisted_headers() -> Vec<PersistedHeader> {
+        vec![
+            PersistedHeader {
+                name: "User-Agent".to_string(),
+                value: "Mozilla/5.0 (Linux; U; Linux x86_64; en-US) Gecko/20100101 Firefox/130.5"
+                    .to_string(),
+            },
+            PersistedHeader {
+                name: "Accept".to_string(),
+                value: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                    .to_string(),
+            },
+            PersistedHeader {
+                name: "Accept-Language".to_string(),
+                value: "en-US,en;q=0.5".to_string(),
+            },
+            PersistedHeader {
+                name: "Content-Type".to_string(),
+                value: "application/x-www-form-urlencoded".to_string(),
+            },
+            PersistedHeader {
+                name: "Upgrade-Insecure-Requests".to_string(),
+                value: "1".to_string(),
+            },
+            PersistedHeader {
+                name: "Sec-Fetch-Dest".to_string(),
+                value: "document".to_string(),
+            },
+            PersistedHeader {
+                name: "Sec-Fetch-Mode".to_string(),
+                value: "navigate".to_string(),
+            },
+            PersistedHeader {
+                name: "Sec-Fetch-Site".to_string(),
+                value: "same-origin".to_string(),
+            },
+            PersistedHeader {
+                name: "Sec-Fetch-User".to_string(),
+                value: "?1".to_string(),
+            },
+            PersistedHeader {
+                name: "Priority".to_string(),
+                value: "u=0, i".to_string(),
+            },
+        ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn imports_and_exports_persisted_session() {
+        let mut session = SessionManager::new();
+        session.import_persisted_session(
+            "https://vtop.vitap.ac.in".to_string(),
+            PersistedVtopSession {
+                username: "22BCE0000".to_string(),
+                saved_at_epoch_ms: 10,
+                expires_at_epoch_ms: 20,
+                csrf_token: Some("csrf-1".to_string()),
+                authenticated_hint: true,
+                cookies: vec![PersistedCookie {
+                    name: "JSESSIONID".to_string(),
+                    value: "cookie-value".to_string(),
+                    domain: "vtop.vitap.ac.in".to_string(),
+                    path: "/".to_string(),
+                    expires_at_epoch_ms: None,
+                    secure: true,
+                    http_only: false,
+                    same_site: None,
+                    host_only: true,
+                    persistent: false,
+                }],
+                headers: vec![PersistedHeader {
+                    name: "User-Agent".to_string(),
+                    value: "VitapMateTest".to_string(),
+                }],
+            },
+        );
+
+        assert_eq!(session.get_csrf_token().as_deref(), Some("csrf-1"));
+        assert!(!session.is_authenticated());
+        assert!(session.is_cookie_external());
+
+        let exported = session.export_persisted_session(
+            "https://vtop.vitap.ac.in".to_string(),
+            "22BCE0000".to_string(),
+            10,
+            20,
+        );
+
+        assert_eq!(exported.username, "22BCE0000");
+        assert_eq!(exported.cookies.len(), 1);
+        assert_eq!(exported.cookies[0].name, "JSESSIONID");
+        assert_eq!(exported.headers[0].value, "VitapMateTest");
+    }
+
+    #[test]
+    fn clear_resets_cookie_restore_state() {
+        let mut session = SessionManager::new();
+        session.set_authenticated(true);
+        session.set_csrf_token("csrf-1".to_string());
+        session.set_cookie_external(true);
+
+        session.clear();
+
+        assert_eq!(session.get_csrf_token(), None);
+        assert!(!session.is_authenticated());
+        assert!(!session.is_cookie_external());
     }
 }

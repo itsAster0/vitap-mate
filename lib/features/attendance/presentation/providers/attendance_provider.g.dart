@@ -33,7 +33,7 @@ final class AttendanceProvider
   Attendance create() => Attendance();
 }
 
-String _$attendanceHash() => r'0208fc7218c494e25ed0c460e4fda8e7b782d9f6';
+String _$attendanceHash() => r'b4c831a0b9fb5ec82666eae6ad5751bdf51865c2';
 
 abstract class _$Attendance extends $AsyncNotifier<AttendanceData> {
   FutureOr<AttendanceData> build();

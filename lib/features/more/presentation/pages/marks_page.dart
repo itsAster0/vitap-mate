@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -16,22 +16,21 @@ class MarksPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final autoRefresh = ref.watch(autoRefreshProvider);
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          await ref.read(marksProvider.notifier).updatemarks();
-        } catch (e, _) {
-          ();
-        }
+      if (!autoRefresh) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(marksProvider.notifier).updatemarks().catchError((e, st) {
+          log('auto refresh failed: $e', stackTrace: st);
+        });
       });
       return null;
-    }, []);
+    }, [autoRefresh]);
     Future<void> update() async {
       try {
         await ref.read(marksProvider.notifier).updatemarks();
       } catch (e) {
         log("$e");
-        if (context.mounted) disCommonToast(context, e);
       }
     }
 

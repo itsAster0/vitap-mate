@@ -10,12 +10,18 @@ String _authFailedMessage(Object e) {
     return e.maybeWhen(
       authenticationFailed: (message) {
         final trimmed = message.trim();
-        return trimmed.isNotEmpty ? trimmed : 'Authentication failed';
+        return trimmed.isNotEmpty
+            ? trimmed
+            : 'We could not complete your sign-in. Please try again.';
       },
-      orElse: () => 'Authentication failed',
+      otpRequired: (_) {
+        return 'We need to verify this sign-in with the OTP sent to your registered email.';
+      },
+      sessionExpired: () => 'Your saved session expired. Please sign in again.',
+      orElse: () => 'We could not complete your sign-in. Please try again.',
     );
   }
-  return 'Authentication failed';
+  return 'We could not complete your sign-in. Please try again.';
 }
 
 void _showAppToast(
@@ -43,7 +49,7 @@ void disCommonToast(BuildContext context, Object e) {
       context,
       title: 'Password Changed',
       description:
-          'It looks like you changed your VTOP password. Please update it in settings -> Vtop Details .',
+          'It looks like you changed your VTOP password. Please update it in settings -> VTOP Account.',
       onDismiss: () {
         final router = GoRouter.maybeOf(context);
         if (router != null) {
@@ -55,13 +61,19 @@ void disCommonToast(BuildContext context, Object e) {
     _showAppToast(
       context,
       title: 'No Internet Connection',
-      description: "You're offline. Please check your connection and try again",
+      description:
+          "We couldn't reach VTOP. Check your internet connection and try again.",
     );
   } else if (e is VtopError &&
-      e.maybeWhen(authenticationFailed: (_) => true, orElse: () => false)) {
+      e.maybeWhen(
+        authenticationFailed: (_) => true,
+        otpRequired: (_) => true,
+        sessionExpired: () => true,
+        orElse: () => false,
+      )) {
     _showAppToast(
       context,
-      title: 'Authentication Failed',
+      title: 'Sign-In Problem',
       description: _authFailedMessage(e),
     );
   } else if (e is FeatureDisabledException) {
@@ -91,13 +103,19 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
     _showAppToast(
       context,
       title: 'No Internet Connection',
-      description: "You're offline. Please check your connection and try again",
+      description:
+          "We couldn't reach VTOP. Check your internet connection and try again.",
     );
   } else if (e is VtopError &&
-      e.maybeWhen(authenticationFailed: (_) => true, orElse: () => false)) {
+      e.maybeWhen(
+        authenticationFailed: (_) => true,
+        otpRequired: (_) => true,
+        sessionExpired: () => true,
+        orElse: () => false,
+      )) {
     _showAppToast(
       context,
-      title: 'Authentication Failed',
+      title: 'Login Problem',
       description: _authFailedMessage(e),
     );
   } else if (e is FeatureDisabledException) {

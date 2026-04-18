@@ -49,4 +49,4 @@ final class TimetableRepositoryProvider
 }
 
 String _$timetableRepositoryHash() =>
-    r'160daf2f6ab634a266522b46eb1ddbb1ed1dddca';
+    r'42c01e78a6ea3faee1f247ddcc57d41dc629cfb2';

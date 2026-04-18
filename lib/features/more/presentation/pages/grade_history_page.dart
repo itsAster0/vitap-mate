@@ -5,7 +5,6 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -22,7 +21,6 @@ class GradeHistoryPage extends HookConsumerWidget {
         await ref.read(gradeHistoryProvider.notifier).refresh();
       } catch (e) {
         log("$e");
-        if (context.mounted) disCommonToast(context, e);
       }
     }
 

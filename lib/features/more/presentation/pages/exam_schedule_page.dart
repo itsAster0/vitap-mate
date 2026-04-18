@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/widgets/exam_schedule_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -15,28 +15,30 @@ class ExamSchedulePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final autoRefresh = ref.watch(autoRefreshProvider);
     Future<void> update() async {
       try {
         await ref.read(examScheduleProvider.notifier).updatexamschedule();
       } catch (e) {
         log("$e");
-        if (context.mounted) disCommonToast(context, e);
       }
     }
 
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          await ref.read(examScheduleProvider.notifier).updatexamschedule();
-        } catch (e, _) {
-          ();
-        }
+      if (!autoRefresh) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(examScheduleProvider.notifier).updatexamschedule().catchError((
+          e,
+          st,
+        ) {
+          log('auto refresh failed: $e', stackTrace: st);
+        });
       });
 
       return null;
-    }, []);
+    }, [autoRefresh]);
     var examData = ref.watch(examScheduleProvider);
     return RefreshIndicator(
       onRefresh: () async {

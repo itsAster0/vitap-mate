@@ -41,7 +41,7 @@ final class VtopusersutilsProvider
   }
 }
 
-String _$vtopusersutilsHash() => r'6117c04197b59242d0ee6996fe32cf557d4ef942';
+String _$vtopusersutilsHash() => r'6da8912fd457d1e5e2809ade2e850369eeefc5e5';
 
 abstract class _$Vtopusersutils extends $Notifier<FlutterSecureStorage> {
   FlutterSecureStorage build();

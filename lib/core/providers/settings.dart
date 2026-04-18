@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 part 'settings.g.dart';
@@ -11,6 +12,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         "settings_merge_tt",
         "settings_btw_atten",
+        "settings_auto_refresh",
         "settings_class_notifications_enabled",
         "settings_class_notify_before_minutes",
         "settings_class_pause_until_millis",
@@ -30,13 +32,9 @@ bool mergeTT(Ref ref) {
   return prefs?.getBool("settings_merge_tt") ?? true;
 }
 
-@riverpod
-Future<void> toggleMergeTT(Ref ref) async {
+Future<void> setMergeTT(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
-
-  final current = prefs.getBool("settings_merge_tt") ?? true;
-  await prefs.setBool("settings_merge_tt", !current);
-
+  await prefs.setBool("settings_merge_tt", value);
   ref.invalidate(mergeTTProvider);
 }
 
@@ -46,14 +44,22 @@ bool btwExams(Ref ref) {
   return prefs?.getBool("settings_btw_atten") ?? false;
 }
 
-@riverpod
-Future<void> toggleBTWExams(Ref ref) async {
+Future<void> setbtwExam(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
-
-  final current = prefs.getBool("settings_btw_atten") ?? false;
-  await prefs.setBool("settings_btw_atten", !current);
-
+  await prefs.setBool("settings_btw_atten", value);
   ref.invalidate(btwExamsProvider);
+}
+
+@riverpod
+bool autoRefresh(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool("settings_auto_refresh") ?? false;
+}
+
+Future<void> setautoRefresh(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool("settings_auto_refresh", value);
+  ref.invalidate(autoRefreshProvider);
 }
 
 @riverpod

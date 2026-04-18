@@ -8,6 +8,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/background/controller.dart';
+import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -41,156 +42,152 @@ class SettingsPage extends HookConsumerWidget {
       });
       return null;
     }, [initialValSync]);
-    return Container(
-      decoration: BoxDecoration(color: context.theme.colors.background),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  spacing: 8,
-                  children: [
-                    FTileGroup(
-                      label: const Text('Vtop'),
-                      children: [
-                        FTile(
-                          prefix: Icon(FIcons.user),
-                          title: const Text('Vtop Details'),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress: () {
-                            GoRouter.of(
-                              context,
-                            ).pushNamed(Paths.vtopUserManagement);
-                          },
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.calendarDays),
-                          title: const Text('Merge Labs'),
-                          suffix: FSwitch(
-                            value: ref.watch(mergeTTProvider),
-                            onChange: (value) {
-                              ref.read(toggleMergeTTProvider);
-                            },
-                          ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.userCheck),
-                          title: const Text('Show b/w Exams'),
-                          suffix: FSwitch(
-                            value: ref.watch(btwExamsProvider),
-                            onChange: (value) {
-                              ref.read(toggleBTWExamsProvider);
-                            },
-                          ),
-                        ),
-                        FSelectMenuTile(
-                          prefix: Icon(FIcons.folderSync),
-                          title: FTappable(
-                            onLongPress: () {
-                              showFDialog(
-                                context: context,
-                                builder: (context, style, animation) => FDialog(
-                                  animation: animation,
-                                  direction: Axis.horizontal,
-                                  title: const Text('Are you absolutely sure?'),
-                                  body: FTextField(
-                                    control: FTextFieldControl.managed(
-                                      controller: field15e,
-                                    ),
-                                  ),
-                                  actions: [
-                                    FButton(
-                                      child: const Text('Continue'),
-                                      onPress: () {
-                                        if (field15e.text
-                                                .trim()
-                                                .toLowerCase() ==
-                                            "why") {
-                                          show15.value = true;
-                                        }
-
-                                        Navigator.of(context).pop();
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                            child: Text('Background Sync'),
-                          ),
-
-                          selectControl: FMultiValueControl.managedRadio(
-                            initial: initialValSync,
-                            onChange: (value) {
-                              final selected = value.isEmpty
-                                  ? null
-                                  : value.first;
-                              if (selected != null) {
-                                ref
-                                    .read(backgroundSyncProvider.notifier)
-                                    .updateFreq(selected);
-                              }
-                            },
-                          ),
-                          menu: backgroundSync,
-                        ),
-                      ],
-                    ),
-
-                    FTileGroup(
-                      divider: FItemDivider.indented,
-                      label: const Text('App Settings'),
-                      children: [
-                        FTile(
-                          prefix: Icon(FIcons.moon),
-                          title: const Text('Dark Mode'),
-
-                          suffix: FSwitch(
-                            value: ref.watch(themeProvider) == ThemeMode.dark,
-                            onChange: (value) {
-                              ref.read(themeProvider.notifier).toggleTheme();
-                            },
-                          ),
-                        ),
-                        FTile(
-                          prefix: Icon(FIcons.bell),
-                          title: const Text("Notification Management"),
-                          suffix: Icon(FIcons.chevronRight),
-                          onPress: () {
-                            GoRouter.of(
-                              context,
-                            ).pushNamed(Paths.notificationManagement);
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+    return SingleChildScrollView(
+      child: Column(
+        spacing: 8,
+        children: [
+          FTileGroup(
+            label: const Text('Vtop'),
+            children: [
+              FTile(
+                prefix: Icon(FIcons.calendarDays),
+                title: const Text('Merge Labs'),
+                suffix: FSwitch(
+                  value: ref.watch(mergeTTProvider),
+                  onChange: (value) {
+                    setMergeTT(ref, value);
+                  },
                 ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                IconButton(
-                  icon: Icon(FIcons.github),
-                  onPressed: () {
-                    launchUrl(
-                      Uri.parse("https://github.com/itsKryxen/vitap-mate"),
+              FTile(
+                prefix: Icon(FIcons.userCheck),
+                title: const Text('Show b/w Exams'),
+                suffix: FSwitch(
+                  value: ref.watch(btwExamsProvider),
+                  onChange: (value) {
+                    setbtwExam(ref, value);
+                  },
+                ),
+              ),
+              FTile(
+                prefix: Icon(FIcons.refreshCcw),
+                title: const Text('Auto Refresh'),
+                suffix: FSwitch(
+                  value: ref.watch(autoRefreshProvider),
+                  onChange: (value) {
+                    setautoRefresh(ref, value);
+                  },
+                ),
+              ),
+              FSelectMenuTile(
+                prefix: Icon(FIcons.folderSync),
+                title: FTappable(
+                  onLongPress: () {
+                    showFDialog(
+                      context: context,
+                      builder: (context, style, animation) => FDialog(
+                        animation: animation,
+                        direction: Axis.horizontal,
+                        title: const Text('Are you absolutely sure?'),
+                        body: FTextField(
+                          control: FTextFieldControl.managed(
+                            controller: field15e,
+                          ),
+                        ),
+                        actions: [
+                          FButton(
+                            child: const Text('Continue'),
+                            onPress: () {
+                              if (field15e.text.trim().toLowerCase() == "why") {
+                                show15.value = true;
+                              }
+
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        ],
+                      ),
                     );
                   },
+                  child: Text('Background Sync'),
                 ),
-                IconButton(
-                  icon: Icon(FIcons.contact),
-                  onPressed: () {
-                    launchUrl(Uri.parse("https://bio.link/synaptic"));
+
+                selectControl: FMultiValueControl.managedRadio(
+                  initial: initialValSync,
+                  onChange: (value) {
+                    final selected = value.isEmpty ? null : value.first;
+                    if (selected != null) {
+                      ref
+                          .read(backgroundSyncProvider.notifier)
+                          .updateFreq(selected);
+                    }
                   },
                 ),
-              ],
-            ),
-          ],
-        ),
+                menu: backgroundSync,
+              ),
+            ],
+          ),
+          const UserBox(),
+
+          FTileGroup(
+            divider: FItemDivider.indented,
+            label: const Text('App Settings'),
+            children: [
+              FTile(
+                prefix: Icon(FIcons.moon),
+                title: const Text('Dark Mode'),
+
+                suffix: FSwitch(
+                  value: ref.watch(themeProvider) == ThemeMode.dark,
+                  onChange: (value) {
+                    ref.read(themeProvider.notifier).toggleTheme();
+                  },
+                ),
+              ),
+              FTile(
+                prefix: Icon(FIcons.bell),
+                title: const Text("Notification Management"),
+                suffix: Icon(FIcons.chevronRight),
+                onPress: () {
+                  GoRouter.of(context).pushNamed(Paths.notificationManagement);
+                },
+              ),
+              FTile(
+                prefix: const Icon(Icons.receipt_long_outlined),
+                title: const Text("Logs"),
+                suffix: Icon(FIcons.chevronRight),
+                onPress: () {
+                  GoRouter.of(context).pushNamed(Paths.logs);
+                },
+              ),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                icon: Icon(FIcons.github),
+                onPressed: () {
+                  launchUrl(
+                    Uri.parse("https://github.com/itsKryxen/vitap-mate"),
+                  );
+                },
+              ),
+              IconButton(
+                icon: Icon(FIcons.contact),
+                onPressed: () {
+                  launchUrl(Uri.parse("https://bio.link/synaptic"));
+                },
+              ),
+              IconButton(
+                icon: Icon(FIcons.instagram),
+                onPressed: () {
+                  launchUrl(Uri.parse("https://www.instagram.com/itsKryxen"));
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -20,7 +20,7 @@ final class SemesterIdProvider
         argument: null,
         retry: null,
         name: r'semesterIdProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -33,7 +33,7 @@ final class SemesterIdProvider
   SemesterId create() => SemesterId();
 }
 
-String _$semesterIdHash() => r'58848ffd590275026b2651024ae7186f5b9756ea';
+String _$semesterIdHash() => r'f4e02676cbf291ec9547df94f795b2f50eb5bc60';
 
 abstract class _$SemesterId extends $AsyncNotifier<SemesterData> {
   FutureOr<SemesterData> build();

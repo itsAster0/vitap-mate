@@ -3,9 +3,7 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_grades.dart';
-import 'package:vitapmate/features/more/domine/repositories/grades_repo.dart';
-import 'package:vitapmate/features/more/domine/usecases/update_grades.dart';
+import 'package:vitapmate/features/more/data/repositories/grades_repo.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -104,11 +102,11 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     state = AsyncData(current.copyWith(loadingDetailsFor: loadingSet));
 
     try {
-      await ref.read(vClientProvider.notifier).tryLogin();
+      await ref.read(vClientProvider.notifier).ensureLogin();
       final repo = await ref.read(
         gradesRepositoryForSemProvider(current.selectedSemesterId).future,
       );
-      final details = await FetchGradeDetailsUsecase(repo).call(courseId);
+      final details = await repo.fetchGradeDetailsRemote(courseId: courseId);
 
       final now = state.value ?? current;
       final nextMap = {...now.detailsByCourseId, courseId: details};
@@ -144,17 +142,17 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
       gradesRepositoryForSemProvider(selected).future,
     );
 
-    var view = await GetGradeViewUsecase(repo).call();
-    final details = await GetGradeDetailsMapUsecase(repo).call();
+    var view = await repo.getGradeViewFromStorage();
+    final details = await repo.getGradeDetailsFromStorage();
 
     if (forceRemote) {
       await _updateView(repo, hasLocalData: view.courses.isNotEmpty);
-      view = await GetGradeViewUsecase(repo).call();
+      view = await repo.getGradeViewFromStorage();
     }
 
     if (view.courses.isEmpty) {
       await _updateView(repo, hasLocalData: false);
-      view = await GetGradeViewUsecase(repo).call();
+      view = await repo.getGradeViewFromStorage();
     }
 
     return GradesUiState(
@@ -172,8 +170,8 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }) async {
     final featureFlags = await ref.read(featureFlagsControllerProvider.future);
     if (await featureFlags.isEnabled("fetch-grades")) {
-      await ref.read(vClientProvider.notifier).tryLogin();
-      await UpdateGradeViewUsecase(repo).call();
+      await ref.read(vClientProvider.notifier).ensureLogin();
+      await repo.updateGradeView();
       return true;
     } else {
       if (hasLocalData) {

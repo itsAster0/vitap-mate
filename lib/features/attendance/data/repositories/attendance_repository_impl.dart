@@ -1,70 +1,59 @@
-import 'package:vitapmate/features/attendance/data/datasources/local_data_source.dart';
-import 'package:vitapmate/features/attendance/data/datasources/remote_data_source.dart';
-import 'package:vitapmate/features/attendance/domine/repositories/attendance_repository.dart';
+import 'package:vitapmate/core/utils/cached_repository.dart';
+import 'package:vitapmate/features/attendance/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class AttendanceRepositoryImpl extends AttendanceRepository {
-  AttendanceLocalDataSource localDataSource;
-  AttendanceRemoteDataSource remoteDataSource;
-  String semid;
-  AttendanceRepositoryImpl({
+class AttendanceRepository extends CachedRepository<AttendanceData> {
+  final AttendanceDataSource _dataSource;
+  final String semid;
+
+  AttendanceRepository({
     required this.semid,
-    required this.remoteDataSource,
-    required this.localDataSource,
-  });
+    required AttendanceDataSource dataSource,
+  }) : _dataSource = dataSource;
 
   @override
-  Future<AttendanceData> getAttendanceFromStorage() async {
-    var attendance = await localDataSource.getAttendance(semid);
+  Future<AttendanceData?> loadCache() async {
+    final attendance = await _dataSource.getAttendance(semid);
+    if (attendance.semesterId.isEmpty) return null;
     return attendance;
   }
 
   @override
+  Future<void> saveCache(AttendanceData data) async {
+    await _dataSource.saveAttendance(data, semid);
+  }
+
+  @override
+  Future<AttendanceData> fetchRemote() async {
+    return _dataSource.fetchAttendance(semid);
+  }
+
   Future<FullAttendanceData> getFullAttendanceFromStorage(
     String courseType,
     String courseId,
-  ) async {
-    var attendance = await localDataSource.getFullAttendance(
-      semid,
-      courseType,
-      courseId,
-    );
-    return attendance;
+  ) {
+    return _dataSource.getFullAttendance(semid, courseId, courseType);
   }
 
-  @override
-  Future<void> saveAttendanceToStoarge(AttendanceData attendanceEntity) async {
-    await localDataSource.saveAttendance(attendanceEntity, semid);
-  }
-
-  @override
-  Future<void> saveFullAttendanceToStoarge(
-    FullAttendanceData fullattendanceEntity,
+  Future<void> saveFullAttendanceToStorage(
+    FullAttendanceData fullAttendance,
     String courseType,
     String courseId,
-  ) async {
-    await localDataSource.saveFullAttendance(
-      fullattendanceEntity,
+  ) {
+    return _dataSource.saveFullAttendance(
+      fullAttendance,
       semid,
       courseType,
       courseId,
     );
   }
 
-  @override
-  Future<void> updateAttendance() async {
-    var attendance = await remoteDataSource.fetchAttendanceFromRemote(semid);
-    if (attendance.records.isEmpty) return;
-    saveAttendanceToStoarge(attendance);
-  }
-
-  @override
   Future<void> updateFullAttendance(String courseType, String courseId) async {
-    var attendance = await remoteDataSource.fetchFullAttendanceFromRemote(
+    final attendance = await _dataSource.fetchFullAttendance(
       semid,
       courseType,
       courseId,
     );
-    saveFullAttendanceToStoarge(attendance, courseId, courseType);
+    await saveFullAttendanceToStorage(attendance, courseType, courseId);
   }
 }

@@ -5,7 +5,6 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -37,8 +36,6 @@ class GradesPage extends HookConsumerWidget {
         await ref.read(gradesProvider.notifier).refresh();
       } catch (e) {
         log("$e");
-
-        if (context.mounted) disCommonToast(context, e);
       }
     }
 
@@ -98,7 +95,7 @@ class GradesPage extends HookConsumerWidget {
                                 .read(gradesProvider.notifier)
                                 .selectSemester(selected);
                           } catch (e) {
-                            if (context.mounted) disCommonToast(context, e);
+                            log("$e");
                           }
                         },
                       ),
@@ -251,7 +248,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
               .read(gradesProvider.notifier)
               .loadDetails(widget.course.courseId);
         } catch (e) {
-          if (mounted) disCommonToast(context, e);
+          log("$e");
         }
       } else if (has && hasMarkerRange && !loading) {
         try {
@@ -259,7 +256,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
               .read(gradesProvider.notifier)
               .loadDetails(widget.course.courseId, force: true);
         } catch (e) {
-          if (mounted) disCommonToast(context, e);
+          log("$e");
         }
       }
     } else {
@@ -417,7 +414,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                                   );
                             } catch (e) {
                               if (!mounted) return;
-                              disCommonToast(this.context, e);
+                              log("$e");
                             }
                           },
                         ),

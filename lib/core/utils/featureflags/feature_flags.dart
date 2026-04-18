@@ -77,7 +77,9 @@ class FeatureFlagsController extends _$FeatureFlagsController {
       Trait(key: "appVersionCode", value: appVersionCode),
       Trait(key: "buildNumber", value: buildNumberTraitValue),
     ];
-    final identity = Identity(identifier: username ?? "uninitialized_user");
+    final identity = Identity(
+      identifier: username?.toUpperCase() ?? "uninitialized_user".toUpperCase(),
+    );
 
     await flagsmithClient.getFeatureFlags(
       user: identity,

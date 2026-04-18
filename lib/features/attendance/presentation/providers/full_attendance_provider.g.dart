@@ -50,7 +50,7 @@ final class FullAttendanceProvider
   }
 }
 
-String _$fullAttendanceHash() => r'faf39669deff471a033adce7dd60b45e3e13e147';
+String _$fullAttendanceHash() => r'a5b419bb80079f861c0477e079ce174b653253b0';
 
 final class FullAttendanceFamily extends $Family
     with

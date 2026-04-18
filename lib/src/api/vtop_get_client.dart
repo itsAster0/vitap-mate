@@ -13,15 +13,28 @@ import 'vtop/vtop_errors.dart';
 VtopClient getVtopClient({
   required String username,
   required String password,
-  String? cookie,
+  PersistedVtopSession? persistedSession,
 }) => RustLib.instance.api.crateApiVtopGetClientGetVtopClient(
   username: username,
   password: password,
-  cookie: cookie,
+  persistedSession: persistedSession,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientVtopClientLogin(client: client);
+
+Future<void> vtopClientSubmitSecurityOtp({
+  required VtopClient client,
+  required String otpCode,
+}) => RustLib.instance.api.crateApiVtopGetClientVtopClientSubmitSecurityOtp(
+  client: client,
+  otpCode: otpCode,
+);
+
+Future<void> vtopClientResendSecurityOtp({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientVtopClientResendSecurityOtp(
+      client: client,
+    );
 
 Future<SemesterData> fetchSemesters({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchSemesters(client: client);
@@ -93,6 +106,16 @@ Future<GradeHistoryData> fetchGradeHistory({required VtopClient client}) =>
 
 Future<Uint8List> fetchCookies({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchCookies(client: client);
+
+PersistedVtopSession exportSessionSnapshot({
+  required VtopClient client,
+  required BigInt savedAtEpochMs,
+  required BigInt expiresAtEpochMs,
+}) => RustLib.instance.api.crateApiVtopGetClientExportSessionSnapshot(
+  client: client,
+  savedAtEpochMs: savedAtEpochMs,
+  expiresAtEpochMs: expiresAtEpochMs,
+);
 
 Future<bool> fetchIsAuth({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchIsAuth(client: client);

@@ -5,6 +5,7 @@ import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 
 part 'vtop_users_utils.g.dart';
 
+const _singleUserKey = 'vtopUser';
 const _defaultUserKey = 'defaultUser';
 
 @riverpod
@@ -18,23 +19,27 @@ class Vtopusersutils extends _$Vtopusersutils {
   }
 
   Future<VtopUserEntity?> vtopUserDefault() async {
-    final defaultUsername = await _storage.read(key: _defaultUserKey);
-    if (defaultUsername == null) return null;
+    final singleRaw = await _storage.read(key: _singleUserKey);
+    if (singleRaw != null && singleRaw.isNotEmpty) {
+      try {
+        return VtopUserEntity.fromJson(jsonDecode(singleRaw));
+      } catch (_) {
+        await _storage.delete(key: _singleUserKey);
+      }
+    }
 
-    final rawJson = await _storage.read(key: "username_$defaultUsername");
-    if (rawJson == null) return null;
-
-    final userJson = jsonDecode(rawJson);
-    return VtopUserEntity.fromJson(userJson);
+    return _migrateLegacyUsersToSingleUser();
   }
 
   Future<void> vtopUserSave(VtopUserEntity user) async {
     final jsonString = jsonEncode(user.toJson());
-    await _storage.write(key: "username_${user.username!}", value: jsonString);
+    await _storage.write(key: _singleUserKey, value: jsonString);
+    await _cleanupLegacyUserKeys();
   }
 
   Future<void> vtopSetDefault(String username) async {
-    await _storage.write(key: _defaultUserKey, value: username);
+    // Deprecated in single-user mode; kept for backward compatibility.
+    await _cleanupLegacyUserKeys();
   }
 
   Future<void> vtopUserInitialData(VtopUserEntity user) async {
@@ -43,40 +48,58 @@ class Vtopusersutils extends _$Vtopusersutils {
   }
 
   Future<(List<VtopUserEntity>, String?)> getAllUsers() async {
-    var all = await _storage.readAll();
-    String? defaultUser;
-    List<VtopUserEntity> users = [];
-    for (final i in all.entries) {
-      try {
-        if (i.key.startsWith("username_")) {
-          final userJson = jsonDecode(i.value);
-          users.add(VtopUserEntity.fromJson(userJson));
-        } else if (i.key == _defaultUserKey) {
-          defaultUser = i.value;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-    return (users, defaultUser);
+    final user = await vtopUserDefault();
+    if (user == null) return (<VtopUserEntity>[], null);
+    return ([user], user.username);
   }
 
   Future<void> vtopUserDelete(String username) async {
-    await _storage.delete(key: "username_$username");
-    final defaultUsername = await _storage.read(key: _defaultUserKey);
-    if (defaultUsername != username) return;
+    final existing = await vtopUserDefault();
+    if (existing?.username == username) {
+      await _storage.delete(key: _singleUserKey);
+    }
+    await _cleanupLegacyUserKeys();
+  }
 
-    final all = await getAllUsers();
-    if (all.$1.isEmpty) {
-      await _storage.delete(key: _defaultUserKey);
-      return;
+  Future<VtopUserEntity?> _migrateLegacyUsersToSingleUser() async {
+    final all = await _storage.readAll();
+    final defaultUsername = all[_defaultUserKey];
+
+    String? raw;
+    if (defaultUsername != null) {
+      raw = all["username_$defaultUsername"];
+    }
+    raw ??= all.entries
+        .firstWhere(
+          (entry) => entry.key.startsWith("username_"),
+          orElse: () => const MapEntry('', ''),
+        )
+        .value;
+    if (raw.isEmpty) {
+      await _cleanupLegacyUserKeys();
+      return null;
     }
 
-    final next = all.$1.first.username;
-    if (next != null && next.isNotEmpty) {
-      await vtopSetDefault(next);
-    } else {
-      await _storage.delete(key: _defaultUserKey);
+    try {
+      final user = VtopUserEntity.fromJson(jsonDecode(raw));
+      await _storage.write(
+        key: _singleUserKey,
+        value: jsonEncode(user.toJson()),
+      );
+      await _cleanupLegacyUserKeys();
+      return user;
+    } catch (_) {
+      await _cleanupLegacyUserKeys();
+      return null;
+    }
+  }
+
+  Future<void> _cleanupLegacyUserKeys() async {
+    final all = await _storage.readAll();
+    for (final key in all.keys) {
+      if (key == _defaultUserKey || key.startsWith("username_")) {
+        await _storage.delete(key: key);
+      }
     }
   }
 

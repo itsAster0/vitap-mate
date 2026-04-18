@@ -3,8 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/attendance/domine/usecases/get_full_attendance_usecase.dart';
-import 'package:vitapmate/features/attendance/domine/usecases/update_ful_attendance.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 part 'full_attendance_provider.g.dart';
@@ -20,13 +18,10 @@ class FullAttendance extends _$FullAttendance {
     var attendanceRepository = await ref.watch(
       attendanceRepositoryProvider.future,
     );
-    FullAttendanceData attendance = await GetFullAttendanceUsecase(
-      attendanceRepository,
-      _courseType,
-      _courseId,
-    ).call();
+    FullAttendanceData attendance = await attendanceRepository
+        .getFullAttendanceFromStorage(_courseType, _courseId);
     if (attendance.semesterId.isEmpty) {
-      await ref.read(vClientProvider.notifier).tryLogin();
+      await ref.read(vClientProvider.notifier).ensureLogin();
 
       attendance = await _update();
     }
@@ -35,7 +30,7 @@ class FullAttendance extends _$FullAttendance {
   }
 
   Future<void> updateAttendance() async {
-    await ref.read(vClientProvider.notifier).tryLogin();
+    await ref.read(vClientProvider.notifier).ensureLogin();
     var data = await _update();
     state = AsyncData(data);
   }
@@ -44,11 +39,11 @@ class FullAttendance extends _$FullAttendance {
     var repo = await ref.read(attendanceRepositoryProvider.future);
     final featureFlags = await ref.read(featureFlagsControllerProvider.future);
     if (await featureFlags.isEnabled("fetch-full-attendance")) {
-      var data = await UpdateFullAttendanceUsecase(
-        repo,
+      await repo.updateFullAttendance(_courseType, _courseId);
+      var data = await repo.getFullAttendanceFromStorage(
         _courseType,
         _courseId,
-      ).call();
+      );
       return data;
     } else {
       throw FeatureDisabledException("Full Attendance Feature Disabled");

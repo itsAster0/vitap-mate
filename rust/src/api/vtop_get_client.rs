@@ -1,19 +1,21 @@
 use crate::api::vtop::{
     types::{
-        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeViewData,
-        GradeHistoryData, MarksData, SemesterData, TimetableData,
+        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeHistoryData,
+        GradeViewData, MarksData, PersistedVtopSession, SemesterData, TimetableData,
     },
     vtop_client::{VtopClient, VtopError},
     vtop_config::VtopClientBuilder,
 };
 
 #[flutter_rust_bridge::frb(sync)]
-pub fn get_vtop_client(username: String, password: String, cookie: Option<String>) -> VtopClient {
+pub fn get_vtop_client(
+    username: String,
+    password: String,
+    persisted_session: Option<PersistedVtopSession>,
+) -> VtopClient {
     let mut client = VtopClientBuilder::new().build(username, password);
-    if let Some(cookie) = cookie {
-        if (!cookie.is_empty()) {
-            client.set_cookie(cookie);
-        }
+    if let Some(session) = persisted_session {
+        client.restore_session_snapshot(session);
     }
     return client;
 }
@@ -21,6 +23,19 @@ pub fn get_vtop_client(username: String, password: String, cookie: Option<String
 #[flutter_rust_bridge::frb()]
 pub async fn vtop_client_login(client: &mut VtopClient) -> Result<(), VtopError> {
     client.login().await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn vtop_client_submit_security_otp(
+    client: &mut VtopClient,
+    otp_code: String,
+) -> Result<(), VtopError> {
+    client.submit_security_otp(&otp_code).await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn vtop_client_resend_security_otp(client: &mut VtopClient) -> Result<(), VtopError> {
+    client.resend_security_otp().await
 }
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_semesters(client: &mut VtopClient) -> Result<SemesterData, VtopError> {
@@ -98,6 +113,15 @@ pub async fn fetch_grade_history(client: &mut VtopClient) -> Result<GradeHistory
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn fetch_cookies(client: &mut VtopClient) -> Result<Vec<u8>, VtopError> {
     client.get_cookie(true).await.clone()
+}
+
+#[flutter_rust_bridge::frb(sync)]
+pub fn export_session_snapshot(
+    client: &VtopClient,
+    saved_at_epoch_ms: u64,
+    expires_at_epoch_ms: u64,
+) -> PersistedVtopSession {
+    client.export_session_snapshot(saved_at_epoch_ms, expires_at_epoch_ms)
 }
 
 #[flutter_rust_bridge::frb()]

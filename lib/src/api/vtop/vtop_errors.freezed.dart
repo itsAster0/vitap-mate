@@ -55,7 +55,7 @@ extension VtopErrorPatterns on VtopError {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( VtopError_NetworkError value)?  networkError,TResult Function( VtopError_VtopServerError value)?  vtopServerError,TResult Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult Function( VtopError_SessionExpired value)?  sessionExpired,TResult Function( VtopError_ParseError value)?  parseError,TResult Function( VtopError_ConfigurationError value)?  configurationError,TResult Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult Function( VtopError_InvalidResponse value)?  invalidResponse,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( VtopError_NetworkError value)?  networkError,TResult Function( VtopError_VtopServerError value)?  vtopServerError,TResult Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult Function( VtopError_SessionExpired value)?  sessionExpired,TResult Function( VtopError_ParseError value)?  parseError,TResult Function( VtopError_ConfigurationError value)?  configurationError,TResult Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult Function( VtopError_InvalidResponse value)?  invalidResponse,TResult Function( VtopError_OTPRequired value)?  otpRequired,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
@@ -68,7 +68,8 @@ return sessionExpired(_that);case VtopError_ParseError() when parseError != null
 return parseError(_that);case VtopError_ConfigurationError() when configurationError != null:
 return configurationError(_that);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired(_that);case VtopError_InvalidResponse() when invalidResponse != null:
-return invalidResponse(_that);case _:
+return invalidResponse(_that);case VtopError_OTPRequired() when otpRequired != null:
+return otpRequired(_that);case _:
   return orElse();
 
 }
@@ -86,7 +87,7 @@ return invalidResponse(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( VtopError_NetworkError value)  networkError,required TResult Function( VtopError_VtopServerError value)  vtopServerError,required TResult Function( VtopError_AuthenticationFailed value)  authenticationFailed,required TResult Function( VtopError_RegistrationParsingError value)  registrationParsingError,required TResult Function( VtopError_InvalidCredentials value)  invalidCredentials,required TResult Function( VtopError_SessionExpired value)  sessionExpired,required TResult Function( VtopError_ParseError value)  parseError,required TResult Function( VtopError_ConfigurationError value)  configurationError,required TResult Function( VtopError_CaptchaRequired value)  captchaRequired,required TResult Function( VtopError_InvalidResponse value)  invalidResponse,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( VtopError_NetworkError value)  networkError,required TResult Function( VtopError_VtopServerError value)  vtopServerError,required TResult Function( VtopError_AuthenticationFailed value)  authenticationFailed,required TResult Function( VtopError_RegistrationParsingError value)  registrationParsingError,required TResult Function( VtopError_InvalidCredentials value)  invalidCredentials,required TResult Function( VtopError_SessionExpired value)  sessionExpired,required TResult Function( VtopError_ParseError value)  parseError,required TResult Function( VtopError_ConfigurationError value)  configurationError,required TResult Function( VtopError_CaptchaRequired value)  captchaRequired,required TResult Function( VtopError_InvalidResponse value)  invalidResponse,required TResult Function( VtopError_OTPRequired value)  otpRequired,}){
 final _that = this;
 switch (_that) {
 case VtopError_NetworkError():
@@ -99,7 +100,8 @@ return sessionExpired(_that);case VtopError_ParseError():
 return parseError(_that);case VtopError_ConfigurationError():
 return configurationError(_that);case VtopError_CaptchaRequired():
 return captchaRequired(_that);case VtopError_InvalidResponse():
-return invalidResponse(_that);}
+return invalidResponse(_that);case VtopError_OTPRequired():
+return otpRequired(_that);}
 }
 /// A variant of `map` that fallback to returning `null`.
 ///
@@ -113,7 +115,7 @@ return invalidResponse(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( VtopError_NetworkError value)?  networkError,TResult? Function( VtopError_VtopServerError value)?  vtopServerError,TResult? Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult? Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult? Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult? Function( VtopError_SessionExpired value)?  sessionExpired,TResult? Function( VtopError_ParseError value)?  parseError,TResult? Function( VtopError_ConfigurationError value)?  configurationError,TResult? Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult? Function( VtopError_InvalidResponse value)?  invalidResponse,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( VtopError_NetworkError value)?  networkError,TResult? Function( VtopError_VtopServerError value)?  vtopServerError,TResult? Function( VtopError_AuthenticationFailed value)?  authenticationFailed,TResult? Function( VtopError_RegistrationParsingError value)?  registrationParsingError,TResult? Function( VtopError_InvalidCredentials value)?  invalidCredentials,TResult? Function( VtopError_SessionExpired value)?  sessionExpired,TResult? Function( VtopError_ParseError value)?  parseError,TResult? Function( VtopError_ConfigurationError value)?  configurationError,TResult? Function( VtopError_CaptchaRequired value)?  captchaRequired,TResult? Function( VtopError_InvalidResponse value)?  invalidResponse,TResult? Function( VtopError_OTPRequired value)?  otpRequired,}){
 final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
@@ -126,7 +128,8 @@ return sessionExpired(_that);case VtopError_ParseError() when parseError != null
 return parseError(_that);case VtopError_ConfigurationError() when configurationError != null:
 return configurationError(_that);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired(_that);case VtopError_InvalidResponse() when invalidResponse != null:
-return invalidResponse(_that);case _:
+return invalidResponse(_that);case VtopError_OTPRequired() when otpRequired != null:
+return otpRequired(_that);case _:
   return null;
 
 }
@@ -143,7 +146,7 @@ return invalidResponse(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  networkError,TResult Function()?  vtopServerError,TResult Function( String field0)?  authenticationFailed,TResult Function()?  registrationParsingError,TResult Function()?  invalidCredentials,TResult Function()?  sessionExpired,TResult Function( String field0)?  parseError,TResult Function( String field0)?  configurationError,TResult Function()?  captchaRequired,TResult Function()?  invalidResponse,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  networkError,TResult Function()?  vtopServerError,TResult Function( String field0)?  authenticationFailed,TResult Function()?  registrationParsingError,TResult Function()?  invalidCredentials,TResult Function()?  sessionExpired,TResult Function( String field0)?  parseError,TResult Function( String field0)?  configurationError,TResult Function()?  captchaRequired,TResult Function()?  invalidResponse,TResult Function( String field0)?  otpRequired,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
 return networkError();case VtopError_VtopServerError() when vtopServerError != null:
@@ -155,7 +158,8 @@ return sessionExpired();case VtopError_ParseError() when parseError != null:
 return parseError(_that.field0);case VtopError_ConfigurationError() when configurationError != null:
 return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
-return invalidResponse();case _:
+return invalidResponse();case VtopError_OTPRequired() when otpRequired != null:
+return otpRequired(_that.field0);case _:
   return orElse();
 
 }
@@ -173,7 +177,7 @@ return invalidResponse();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  networkError,required TResult Function()  vtopServerError,required TResult Function( String field0)  authenticationFailed,required TResult Function()  registrationParsingError,required TResult Function()  invalidCredentials,required TResult Function()  sessionExpired,required TResult Function( String field0)  parseError,required TResult Function( String field0)  configurationError,required TResult Function()  captchaRequired,required TResult Function()  invalidResponse,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  networkError,required TResult Function()  vtopServerError,required TResult Function( String field0)  authenticationFailed,required TResult Function()  registrationParsingError,required TResult Function()  invalidCredentials,required TResult Function()  sessionExpired,required TResult Function( String field0)  parseError,required TResult Function( String field0)  configurationError,required TResult Function()  captchaRequired,required TResult Function()  invalidResponse,required TResult Function( String field0)  otpRequired,}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError():
 return networkError();case VtopError_VtopServerError():
@@ -185,7 +189,8 @@ return sessionExpired();case VtopError_ParseError():
 return parseError(_that.field0);case VtopError_ConfigurationError():
 return configurationError(_that.field0);case VtopError_CaptchaRequired():
 return captchaRequired();case VtopError_InvalidResponse():
-return invalidResponse();}
+return invalidResponse();case VtopError_OTPRequired():
+return otpRequired(_that.field0);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -199,7 +204,7 @@ return invalidResponse();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  networkError,TResult? Function()?  vtopServerError,TResult? Function( String field0)?  authenticationFailed,TResult? Function()?  registrationParsingError,TResult? Function()?  invalidCredentials,TResult? Function()?  sessionExpired,TResult? Function( String field0)?  parseError,TResult? Function( String field0)?  configurationError,TResult? Function()?  captchaRequired,TResult? Function()?  invalidResponse,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  networkError,TResult? Function()?  vtopServerError,TResult? Function( String field0)?  authenticationFailed,TResult? Function()?  registrationParsingError,TResult? Function()?  invalidCredentials,TResult? Function()?  sessionExpired,TResult? Function( String field0)?  parseError,TResult? Function( String field0)?  configurationError,TResult? Function()?  captchaRequired,TResult? Function()?  invalidResponse,TResult? Function( String field0)?  otpRequired,}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
 return networkError();case VtopError_VtopServerError() when vtopServerError != null:
@@ -211,7 +216,8 @@ return sessionExpired();case VtopError_ParseError() when parseError != null:
 return parseError(_that.field0);case VtopError_ConfigurationError() when configurationError != null:
 return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
-return invalidResponse();case _:
+return invalidResponse();case VtopError_OTPRequired() when otpRequired != null:
+return otpRequired(_that.field0);case _:
   return null;
 
 }
@@ -640,5 +646,71 @@ String toString() {
 
 
 
+
+/// @nodoc
+
+
+class VtopError_OTPRequired extends VtopError {
+  const VtopError_OTPRequired(this.field0): super._();
+  
+
+ final  String field0;
+
+/// Create a copy of VtopError
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$VtopError_OTPRequiredCopyWith<VtopError_OTPRequired> get copyWith => _$VtopError_OTPRequiredCopyWithImpl<VtopError_OTPRequired>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is VtopError_OTPRequired&&(identical(other.field0, field0) || other.field0 == field0));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,field0);
+
+@override
+String toString() {
+  return 'VtopError.otpRequired(field0: $field0)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $VtopError_OTPRequiredCopyWith<$Res> implements $VtopErrorCopyWith<$Res> {
+  factory $VtopError_OTPRequiredCopyWith(VtopError_OTPRequired value, $Res Function(VtopError_OTPRequired) _then) = _$VtopError_OTPRequiredCopyWithImpl;
+@useResult
+$Res call({
+ String field0
+});
+
+
+
+
+}
+/// @nodoc
+class _$VtopError_OTPRequiredCopyWithImpl<$Res>
+    implements $VtopError_OTPRequiredCopyWith<$Res> {
+  _$VtopError_OTPRequiredCopyWithImpl(this._self, this._then);
+
+  final VtopError_OTPRequired _self;
+  final $Res Function(VtopError_OTPRequired) _then;
+
+/// Create a copy of VtopError
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? field0 = null,}) {
+  return _then(VtopError_OTPRequired(
+null == field0 ? _self.field0 : field0 // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
 
 // dart format on

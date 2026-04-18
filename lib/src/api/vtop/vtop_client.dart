@@ -5,13 +5,20 @@
 
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'package:meta/meta.dart' as meta;
 import 'session_manager.dart';
+import 'types.dart';
 import 'vtop_config.dart';
 
-// These functions are ignored because they are not marked as `pub`: `extract_captcha_data`, `extract_csrf_token`, `get_login_page_error`, `get_regno`, `load_initial_page`, `load_login_page`, `make_client`, `perform_login`, `reqwest_network_error`, `solve_captcha`, `validate_authenticated_session`
+// These functions are ignored because they are not marked as `pub`: `extract_captcha_data`, `extract_csrf_token`, `get_login_page_error`, `get_regno`, `is_security_otp_required_response`, `load_initial_page`, `load_login_page`, `log_auth_event`, `log_network_request`, `make_client`, `perform_login`, `reqwest_network_error`, `solve_captcha`, `try_restore_existing_session`, `validate_authenticated_session`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>
 abstract class VtopClient implements RustOpaqueInterface {
+  Future<PersistedVtopSession> exportSessionSnapshot({
+    required BigInt savedAtEpochMs,
+    required BigInt expiresAtEpochMs,
+  });
+
   Future<VtopResultAttendanceData> getAttendance({required String semesterId});
 
   Future<VtopResultVecU8> getCookie({required bool check});
@@ -45,7 +52,13 @@ abstract class VtopClient implements RustOpaqueInterface {
 
   Future<VtopResult> login();
 
+  Future<VtopResult> resendSecurityOtp();
+
+  Future<void> restoreSessionSnapshot({required PersistedVtopSession session});
+
   Future<void> setCookie({required String cookie});
+
+  Future<VtopResult> submitSecurityOtp({required String otpCode});
 
   static Future<VtopClient> withConfig({
     required VtopConfig config,

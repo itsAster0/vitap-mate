@@ -49,4 +49,4 @@ final class AttendanceRepositoryProvider
 }
 
 String _$attendanceRepositoryHash() =>
-    r'3f7500ed77eb89c75454ad2a632bd5b5b93baf3b';
+    r'8cb5b96decd4d8201f33be851afefb05eba6a97f';

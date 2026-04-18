@@ -5600,6 +5600,837 @@ as String,
 
 
 /// @nodoc
+mixin _$PersistedCookie {
+
+ String get name; String get value; String get domain; String get path; BigInt? get expiresAtEpochMs; bool get secure; bool get httpOnly; String? get sameSite; bool get hostOnly; bool get persistent;
+/// Create a copy of PersistedCookie
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PersistedCookieCopyWith<PersistedCookie> get copyWith => _$PersistedCookieCopyWithImpl<PersistedCookie>(this as PersistedCookie, _$identity);
+
+  /// Serializes this PersistedCookie to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PersistedCookie&&(identical(other.name, name) || other.name == name)&&(identical(other.value, value) || other.value == value)&&(identical(other.domain, domain) || other.domain == domain)&&(identical(other.path, path) || other.path == path)&&(identical(other.expiresAtEpochMs, expiresAtEpochMs) || other.expiresAtEpochMs == expiresAtEpochMs)&&(identical(other.secure, secure) || other.secure == secure)&&(identical(other.httpOnly, httpOnly) || other.httpOnly == httpOnly)&&(identical(other.sameSite, sameSite) || other.sameSite == sameSite)&&(identical(other.hostOnly, hostOnly) || other.hostOnly == hostOnly)&&(identical(other.persistent, persistent) || other.persistent == persistent));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,value,domain,path,expiresAtEpochMs,secure,httpOnly,sameSite,hostOnly,persistent);
+
+@override
+String toString() {
+  return 'PersistedCookie(name: $name, value: $value, domain: $domain, path: $path, expiresAtEpochMs: $expiresAtEpochMs, secure: $secure, httpOnly: $httpOnly, sameSite: $sameSite, hostOnly: $hostOnly, persistent: $persistent)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PersistedCookieCopyWith<$Res>  {
+  factory $PersistedCookieCopyWith(PersistedCookie value, $Res Function(PersistedCookie) _then) = _$PersistedCookieCopyWithImpl;
+@useResult
+$Res call({
+ String name, String value, String domain, String path, BigInt? expiresAtEpochMs, bool secure, bool httpOnly, String? sameSite, bool hostOnly, bool persistent
+});
+
+
+
+
+}
+/// @nodoc
+class _$PersistedCookieCopyWithImpl<$Res>
+    implements $PersistedCookieCopyWith<$Res> {
+  _$PersistedCookieCopyWithImpl(this._self, this._then);
+
+  final PersistedCookie _self;
+  final $Res Function(PersistedCookie) _then;
+
+/// Create a copy of PersistedCookie
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? value = null,Object? domain = null,Object? path = null,Object? expiresAtEpochMs = freezed,Object? secure = null,Object? httpOnly = null,Object? sameSite = freezed,Object? hostOnly = null,Object? persistent = null,}) {
+  return _then(_self.copyWith(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,domain: null == domain ? _self.domain : domain // ignore: cast_nullable_to_non_nullable
+as String,path: null == path ? _self.path : path // ignore: cast_nullable_to_non_nullable
+as String,expiresAtEpochMs: freezed == expiresAtEpochMs ? _self.expiresAtEpochMs : expiresAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt?,secure: null == secure ? _self.secure : secure // ignore: cast_nullable_to_non_nullable
+as bool,httpOnly: null == httpOnly ? _self.httpOnly : httpOnly // ignore: cast_nullable_to_non_nullable
+as bool,sameSite: freezed == sameSite ? _self.sameSite : sameSite // ignore: cast_nullable_to_non_nullable
+as String?,hostOnly: null == hostOnly ? _self.hostOnly : hostOnly // ignore: cast_nullable_to_non_nullable
+as bool,persistent: null == persistent ? _self.persistent : persistent // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PersistedCookie].
+extension PersistedCookiePatterns on PersistedCookie {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PersistedCookie value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PersistedCookie() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PersistedCookie value)  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedCookie():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PersistedCookie value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedCookie() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String value,  String domain,  String path,  BigInt? expiresAtEpochMs,  bool secure,  bool httpOnly,  String? sameSite,  bool hostOnly,  bool persistent)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PersistedCookie() when $default != null:
+return $default(_that.name,_that.value,_that.domain,_that.path,_that.expiresAtEpochMs,_that.secure,_that.httpOnly,_that.sameSite,_that.hostOnly,_that.persistent);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String value,  String domain,  String path,  BigInt? expiresAtEpochMs,  bool secure,  bool httpOnly,  String? sameSite,  bool hostOnly,  bool persistent)  $default,) {final _that = this;
+switch (_that) {
+case _PersistedCookie():
+return $default(_that.name,_that.value,_that.domain,_that.path,_that.expiresAtEpochMs,_that.secure,_that.httpOnly,_that.sameSite,_that.hostOnly,_that.persistent);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String value,  String domain,  String path,  BigInt? expiresAtEpochMs,  bool secure,  bool httpOnly,  String? sameSite,  bool hostOnly,  bool persistent)?  $default,) {final _that = this;
+switch (_that) {
+case _PersistedCookie() when $default != null:
+return $default(_that.name,_that.value,_that.domain,_that.path,_that.expiresAtEpochMs,_that.secure,_that.httpOnly,_that.sameSite,_that.hostOnly,_that.persistent);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PersistedCookie implements PersistedCookie {
+  const _PersistedCookie({required this.name, required this.value, required this.domain, required this.path, this.expiresAtEpochMs, required this.secure, required this.httpOnly, this.sameSite, required this.hostOnly, required this.persistent});
+  factory _PersistedCookie.fromJson(Map<String, dynamic> json) => _$PersistedCookieFromJson(json);
+
+@override final  String name;
+@override final  String value;
+@override final  String domain;
+@override final  String path;
+@override final  BigInt? expiresAtEpochMs;
+@override final  bool secure;
+@override final  bool httpOnly;
+@override final  String? sameSite;
+@override final  bool hostOnly;
+@override final  bool persistent;
+
+/// Create a copy of PersistedCookie
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PersistedCookieCopyWith<_PersistedCookie> get copyWith => __$PersistedCookieCopyWithImpl<_PersistedCookie>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PersistedCookieToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PersistedCookie&&(identical(other.name, name) || other.name == name)&&(identical(other.value, value) || other.value == value)&&(identical(other.domain, domain) || other.domain == domain)&&(identical(other.path, path) || other.path == path)&&(identical(other.expiresAtEpochMs, expiresAtEpochMs) || other.expiresAtEpochMs == expiresAtEpochMs)&&(identical(other.secure, secure) || other.secure == secure)&&(identical(other.httpOnly, httpOnly) || other.httpOnly == httpOnly)&&(identical(other.sameSite, sameSite) || other.sameSite == sameSite)&&(identical(other.hostOnly, hostOnly) || other.hostOnly == hostOnly)&&(identical(other.persistent, persistent) || other.persistent == persistent));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,value,domain,path,expiresAtEpochMs,secure,httpOnly,sameSite,hostOnly,persistent);
+
+@override
+String toString() {
+  return 'PersistedCookie(name: $name, value: $value, domain: $domain, path: $path, expiresAtEpochMs: $expiresAtEpochMs, secure: $secure, httpOnly: $httpOnly, sameSite: $sameSite, hostOnly: $hostOnly, persistent: $persistent)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PersistedCookieCopyWith<$Res> implements $PersistedCookieCopyWith<$Res> {
+  factory _$PersistedCookieCopyWith(_PersistedCookie value, $Res Function(_PersistedCookie) _then) = __$PersistedCookieCopyWithImpl;
+@override @useResult
+$Res call({
+ String name, String value, String domain, String path, BigInt? expiresAtEpochMs, bool secure, bool httpOnly, String? sameSite, bool hostOnly, bool persistent
+});
+
+
+
+
+}
+/// @nodoc
+class __$PersistedCookieCopyWithImpl<$Res>
+    implements _$PersistedCookieCopyWith<$Res> {
+  __$PersistedCookieCopyWithImpl(this._self, this._then);
+
+  final _PersistedCookie _self;
+  final $Res Function(_PersistedCookie) _then;
+
+/// Create a copy of PersistedCookie
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? value = null,Object? domain = null,Object? path = null,Object? expiresAtEpochMs = freezed,Object? secure = null,Object? httpOnly = null,Object? sameSite = freezed,Object? hostOnly = null,Object? persistent = null,}) {
+  return _then(_PersistedCookie(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,domain: null == domain ? _self.domain : domain // ignore: cast_nullable_to_non_nullable
+as String,path: null == path ? _self.path : path // ignore: cast_nullable_to_non_nullable
+as String,expiresAtEpochMs: freezed == expiresAtEpochMs ? _self.expiresAtEpochMs : expiresAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt?,secure: null == secure ? _self.secure : secure // ignore: cast_nullable_to_non_nullable
+as bool,httpOnly: null == httpOnly ? _self.httpOnly : httpOnly // ignore: cast_nullable_to_non_nullable
+as bool,sameSite: freezed == sameSite ? _self.sameSite : sameSite // ignore: cast_nullable_to_non_nullable
+as String?,hostOnly: null == hostOnly ? _self.hostOnly : hostOnly // ignore: cast_nullable_to_non_nullable
+as bool,persistent: null == persistent ? _self.persistent : persistent // ignore: cast_nullable_to_non_nullable
+as bool,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$PersistedHeader {
+
+ String get name; String get value;
+/// Create a copy of PersistedHeader
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PersistedHeaderCopyWith<PersistedHeader> get copyWith => _$PersistedHeaderCopyWithImpl<PersistedHeader>(this as PersistedHeader, _$identity);
+
+  /// Serializes this PersistedHeader to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PersistedHeader&&(identical(other.name, name) || other.name == name)&&(identical(other.value, value) || other.value == value));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,value);
+
+@override
+String toString() {
+  return 'PersistedHeader(name: $name, value: $value)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PersistedHeaderCopyWith<$Res>  {
+  factory $PersistedHeaderCopyWith(PersistedHeader value, $Res Function(PersistedHeader) _then) = _$PersistedHeaderCopyWithImpl;
+@useResult
+$Res call({
+ String name, String value
+});
+
+
+
+
+}
+/// @nodoc
+class _$PersistedHeaderCopyWithImpl<$Res>
+    implements $PersistedHeaderCopyWith<$Res> {
+  _$PersistedHeaderCopyWithImpl(this._self, this._then);
+
+  final PersistedHeader _self;
+  final $Res Function(PersistedHeader) _then;
+
+/// Create a copy of PersistedHeader
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? value = null,}) {
+  return _then(_self.copyWith(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PersistedHeader].
+extension PersistedHeaderPatterns on PersistedHeader {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PersistedHeader value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PersistedHeader() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PersistedHeader value)  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedHeader():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PersistedHeader value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedHeader() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String value)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PersistedHeader() when $default != null:
+return $default(_that.name,_that.value);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String value)  $default,) {final _that = this;
+switch (_that) {
+case _PersistedHeader():
+return $default(_that.name,_that.value);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String value)?  $default,) {final _that = this;
+switch (_that) {
+case _PersistedHeader() when $default != null:
+return $default(_that.name,_that.value);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PersistedHeader implements PersistedHeader {
+  const _PersistedHeader({required this.name, required this.value});
+  factory _PersistedHeader.fromJson(Map<String, dynamic> json) => _$PersistedHeaderFromJson(json);
+
+@override final  String name;
+@override final  String value;
+
+/// Create a copy of PersistedHeader
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PersistedHeaderCopyWith<_PersistedHeader> get copyWith => __$PersistedHeaderCopyWithImpl<_PersistedHeader>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PersistedHeaderToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PersistedHeader&&(identical(other.name, name) || other.name == name)&&(identical(other.value, value) || other.value == value));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,value);
+
+@override
+String toString() {
+  return 'PersistedHeader(name: $name, value: $value)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PersistedHeaderCopyWith<$Res> implements $PersistedHeaderCopyWith<$Res> {
+  factory _$PersistedHeaderCopyWith(_PersistedHeader value, $Res Function(_PersistedHeader) _then) = __$PersistedHeaderCopyWithImpl;
+@override @useResult
+$Res call({
+ String name, String value
+});
+
+
+
+
+}
+/// @nodoc
+class __$PersistedHeaderCopyWithImpl<$Res>
+    implements _$PersistedHeaderCopyWith<$Res> {
+  __$PersistedHeaderCopyWithImpl(this._self, this._then);
+
+  final _PersistedHeader _self;
+  final $Res Function(_PersistedHeader) _then;
+
+/// Create a copy of PersistedHeader
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? value = null,}) {
+  return _then(_PersistedHeader(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$PersistedVtopSession {
+
+ String get username; BigInt get savedAtEpochMs; BigInt get expiresAtEpochMs; String? get csrfToken; bool get authenticatedHint; List<PersistedCookie> get cookies; List<PersistedHeader> get headers;
+/// Create a copy of PersistedVtopSession
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$PersistedVtopSessionCopyWith<PersistedVtopSession> get copyWith => _$PersistedVtopSessionCopyWithImpl<PersistedVtopSession>(this as PersistedVtopSession, _$identity);
+
+  /// Serializes this PersistedVtopSession to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.expiresAtEpochMs, expiresAtEpochMs) || other.expiresAtEpochMs == expiresAtEpochMs)&&(identical(other.csrfToken, csrfToken) || other.csrfToken == csrfToken)&&(identical(other.authenticatedHint, authenticatedHint) || other.authenticatedHint == authenticatedHint)&&const DeepCollectionEquality().equals(other.cookies, cookies)&&const DeepCollectionEquality().equals(other.headers, headers));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,expiresAtEpochMs,csrfToken,authenticatedHint,const DeepCollectionEquality().hash(cookies),const DeepCollectionEquality().hash(headers));
+
+@override
+String toString() {
+  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, expiresAtEpochMs: $expiresAtEpochMs, csrfToken: $csrfToken, authenticatedHint: $authenticatedHint, cookies: $cookies, headers: $headers)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $PersistedVtopSessionCopyWith<$Res>  {
+  factory $PersistedVtopSessionCopyWith(PersistedVtopSession value, $Res Function(PersistedVtopSession) _then) = _$PersistedVtopSessionCopyWithImpl;
+@useResult
+$Res call({
+ String username, BigInt savedAtEpochMs, BigInt expiresAtEpochMs, String? csrfToken, bool authenticatedHint, List<PersistedCookie> cookies, List<PersistedHeader> headers
+});
+
+
+
+
+}
+/// @nodoc
+class _$PersistedVtopSessionCopyWithImpl<$Res>
+    implements $PersistedVtopSessionCopyWith<$Res> {
+  _$PersistedVtopSessionCopyWithImpl(this._self, this._then);
+
+  final PersistedVtopSession _self;
+  final $Res Function(PersistedVtopSession) _then;
+
+/// Create a copy of PersistedVtopSession
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? expiresAtEpochMs = null,Object? csrfToken = freezed,Object? authenticatedHint = null,Object? cookies = null,Object? headers = null,}) {
+  return _then(_self.copyWith(
+username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String,savedAtEpochMs: null == savedAtEpochMs ? _self.savedAtEpochMs : savedAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt,expiresAtEpochMs: null == expiresAtEpochMs ? _self.expiresAtEpochMs : expiresAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt,csrfToken: freezed == csrfToken ? _self.csrfToken : csrfToken // ignore: cast_nullable_to_non_nullable
+as String?,authenticatedHint: null == authenticatedHint ? _self.authenticatedHint : authenticatedHint // ignore: cast_nullable_to_non_nullable
+as bool,cookies: null == cookies ? _self.cookies : cookies // ignore: cast_nullable_to_non_nullable
+as List<PersistedCookie>,headers: null == headers ? _self.headers : headers // ignore: cast_nullable_to_non_nullable
+as List<PersistedHeader>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [PersistedVtopSession].
+extension PersistedVtopSessionPatterns on PersistedVtopSession {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _PersistedVtopSession value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _PersistedVtopSession() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _PersistedVtopSession value)  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedVtopSession():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _PersistedVtopSession value)?  $default,){
+final _that = this;
+switch (_that) {
+case _PersistedVtopSession() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  BigInt expiresAtEpochMs,  String? csrfToken,  bool authenticatedHint,  List<PersistedCookie> cookies,  List<PersistedHeader> headers)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _PersistedVtopSession() when $default != null:
+return $default(_that.username,_that.savedAtEpochMs,_that.expiresAtEpochMs,_that.csrfToken,_that.authenticatedHint,_that.cookies,_that.headers);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  BigInt expiresAtEpochMs,  String? csrfToken,  bool authenticatedHint,  List<PersistedCookie> cookies,  List<PersistedHeader> headers)  $default,) {final _that = this;
+switch (_that) {
+case _PersistedVtopSession():
+return $default(_that.username,_that.savedAtEpochMs,_that.expiresAtEpochMs,_that.csrfToken,_that.authenticatedHint,_that.cookies,_that.headers);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String username,  BigInt savedAtEpochMs,  BigInt expiresAtEpochMs,  String? csrfToken,  bool authenticatedHint,  List<PersistedCookie> cookies,  List<PersistedHeader> headers)?  $default,) {final _that = this;
+switch (_that) {
+case _PersistedVtopSession() when $default != null:
+return $default(_that.username,_that.savedAtEpochMs,_that.expiresAtEpochMs,_that.csrfToken,_that.authenticatedHint,_that.cookies,_that.headers);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _PersistedVtopSession implements PersistedVtopSession {
+  const _PersistedVtopSession({required this.username, required this.savedAtEpochMs, required this.expiresAtEpochMs, this.csrfToken, required this.authenticatedHint, required final  List<PersistedCookie> cookies, required final  List<PersistedHeader> headers}): _cookies = cookies,_headers = headers;
+  factory _PersistedVtopSession.fromJson(Map<String, dynamic> json) => _$PersistedVtopSessionFromJson(json);
+
+@override final  String username;
+@override final  BigInt savedAtEpochMs;
+@override final  BigInt expiresAtEpochMs;
+@override final  String? csrfToken;
+@override final  bool authenticatedHint;
+ final  List<PersistedCookie> _cookies;
+@override List<PersistedCookie> get cookies {
+  if (_cookies is EqualUnmodifiableListView) return _cookies;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_cookies);
+}
+
+ final  List<PersistedHeader> _headers;
+@override List<PersistedHeader> get headers {
+  if (_headers is EqualUnmodifiableListView) return _headers;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_headers);
+}
+
+
+/// Create a copy of PersistedVtopSession
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$PersistedVtopSessionCopyWith<_PersistedVtopSession> get copyWith => __$PersistedVtopSessionCopyWithImpl<_PersistedVtopSession>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$PersistedVtopSessionToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.expiresAtEpochMs, expiresAtEpochMs) || other.expiresAtEpochMs == expiresAtEpochMs)&&(identical(other.csrfToken, csrfToken) || other.csrfToken == csrfToken)&&(identical(other.authenticatedHint, authenticatedHint) || other.authenticatedHint == authenticatedHint)&&const DeepCollectionEquality().equals(other._cookies, _cookies)&&const DeepCollectionEquality().equals(other._headers, _headers));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,expiresAtEpochMs,csrfToken,authenticatedHint,const DeepCollectionEquality().hash(_cookies),const DeepCollectionEquality().hash(_headers));
+
+@override
+String toString() {
+  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, expiresAtEpochMs: $expiresAtEpochMs, csrfToken: $csrfToken, authenticatedHint: $authenticatedHint, cookies: $cookies, headers: $headers)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$PersistedVtopSessionCopyWith<$Res> implements $PersistedVtopSessionCopyWith<$Res> {
+  factory _$PersistedVtopSessionCopyWith(_PersistedVtopSession value, $Res Function(_PersistedVtopSession) _then) = __$PersistedVtopSessionCopyWithImpl;
+@override @useResult
+$Res call({
+ String username, BigInt savedAtEpochMs, BigInt expiresAtEpochMs, String? csrfToken, bool authenticatedHint, List<PersistedCookie> cookies, List<PersistedHeader> headers
+});
+
+
+
+
+}
+/// @nodoc
+class __$PersistedVtopSessionCopyWithImpl<$Res>
+    implements _$PersistedVtopSessionCopyWith<$Res> {
+  __$PersistedVtopSessionCopyWithImpl(this._self, this._then);
+
+  final _PersistedVtopSession _self;
+  final $Res Function(_PersistedVtopSession) _then;
+
+/// Create a copy of PersistedVtopSession
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? expiresAtEpochMs = null,Object? csrfToken = freezed,Object? authenticatedHint = null,Object? cookies = null,Object? headers = null,}) {
+  return _then(_PersistedVtopSession(
+username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
+as String,savedAtEpochMs: null == savedAtEpochMs ? _self.savedAtEpochMs : savedAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt,expiresAtEpochMs: null == expiresAtEpochMs ? _self.expiresAtEpochMs : expiresAtEpochMs // ignore: cast_nullable_to_non_nullable
+as BigInt,csrfToken: freezed == csrfToken ? _self.csrfToken : csrfToken // ignore: cast_nullable_to_non_nullable
+as String?,authenticatedHint: null == authenticatedHint ? _self.authenticatedHint : authenticatedHint // ignore: cast_nullable_to_non_nullable
+as bool,cookies: null == cookies ? _self._cookies : cookies // ignore: cast_nullable_to_non_nullable
+as List<PersistedCookie>,headers: null == headers ? _self._headers : headers // ignore: cast_nullable_to_non_nullable
+as List<PersistedHeader>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$SemesterData {
 
  List<SemesterInfo> get semesters; BigInt get updateTime;

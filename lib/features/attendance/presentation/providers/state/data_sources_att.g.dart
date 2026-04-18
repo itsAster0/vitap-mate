@@ -9,87 +9,44 @@ part of 'data_sources_att.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(attendanceLocalDataSource)
-final attendanceLocalDataSourceProvider = AttendanceLocalDataSourceProvider._();
+@ProviderFor(attendanceDataSource)
+final attendanceDataSourceProvider = AttendanceDataSourceProvider._();
 
-final class AttendanceLocalDataSourceProvider
+final class AttendanceDataSourceProvider
     extends
         $FunctionalProvider<
-          AsyncValue<AttendanceLocalDataSource>,
-          AttendanceLocalDataSource,
-          FutureOr<AttendanceLocalDataSource>
+          AsyncValue<AttendanceDataSource>,
+          AttendanceDataSource,
+          FutureOr<AttendanceDataSource>
         >
     with
-        $FutureModifier<AttendanceLocalDataSource>,
-        $FutureProvider<AttendanceLocalDataSource> {
-  AttendanceLocalDataSourceProvider._()
+        $FutureModifier<AttendanceDataSource>,
+        $FutureProvider<AttendanceDataSource> {
+  AttendanceDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'attendanceLocalDataSourceProvider',
+        name: r'attendanceDataSourceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$attendanceLocalDataSourceHash();
+  String debugGetCreateSourceHash() => _$attendanceDataSourceHash();
 
   @$internal
   @override
-  $FutureProviderElement<AttendanceLocalDataSource> $createElement(
+  $FutureProviderElement<AttendanceDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<AttendanceLocalDataSource> create(Ref ref) {
-    return attendanceLocalDataSource(ref);
+  FutureOr<AttendanceDataSource> create(Ref ref) {
+    return attendanceDataSource(ref);
   }
 }
 
-String _$attendanceLocalDataSourceHash() =>
-    r'026993068306340d63b9357612b14da1da72e21f';
-
-@ProviderFor(attendanceRemoteDataSource)
-final attendanceRemoteDataSourceProvider =
-    AttendanceRemoteDataSourceProvider._();
-
-final class AttendanceRemoteDataSourceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<AttendanceRemoteDataSource>,
-          AttendanceRemoteDataSource,
-          FutureOr<AttendanceRemoteDataSource>
-        >
-    with
-        $FutureModifier<AttendanceRemoteDataSource>,
-        $FutureProvider<AttendanceRemoteDataSource> {
-  AttendanceRemoteDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'attendanceRemoteDataSourceProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$attendanceRemoteDataSourceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<AttendanceRemoteDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<AttendanceRemoteDataSource> create(Ref ref) {
-    return attendanceRemoteDataSource(ref);
-  }
-}
-
-String _$attendanceRemoteDataSourceHash() =>
-    r'5c35b6c8311aa2da2c4598c9b7509f32c93dcde5';
+String _$attendanceDataSourceHash() =>
+    r'0c80fe426b8be64e49d39e4d9d353fc403629684';

@@ -15,7 +15,7 @@ import 'package:vitapmate/features/more/presentation/pages/student_projects_page
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
-import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/settings/presentation/pages/logs_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
 part 'router.g.dart';
@@ -41,7 +41,7 @@ GoRouter router(Ref ref) {
         pageBuilder: (context, state) {
           return NoTransitionPage<void>(
             key: state.pageKey,
-            child: VtopWebview(),
+            child: VtopWebview(initialMenuUrl: state.extra as String?),
           );
         },
       ),
@@ -173,13 +173,12 @@ GoRouter router(Ref ref) {
                     },
                   ),
                   GoRoute(
-                    path: '/vtopUserManagement',
-                    name: Paths.vtopUserManagement,
-
+                    path: 'logs',
+                    name: Paths.logs,
                     pageBuilder: (context, state) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
-                        child: UserManagementPage(),
+                        child: LogsPage(),
                       );
                     },
                   ),

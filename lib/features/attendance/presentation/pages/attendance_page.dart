@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 
@@ -13,27 +13,27 @@ class AttendancePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final autoRefresh = ref.watch(autoRefreshProvider);
     Future<void> update() async {
       try {
         await ref.read(attendanceProvider.notifier).updateAttendance();
       } catch (e) {
         log("$e");
-        if (context.mounted) {
-          try {
-            disCommonToast(context, e);
-          } catch (_) {}
-        }
       }
     }
 
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          await ref.read(attendanceProvider.notifier).updateAttendance();
-        } catch (_) {}
+      if (!autoRefresh) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(attendanceProvider.notifier).updateAttendance().catchError((
+          e,
+          st,
+        ) {
+          log('auto refresh failed: $e', stackTrace: st);
+        });
       });
       return null;
-    }, []);
+    }, [autoRefresh]);
 
     final attendanceData = ref.watch(attendanceProvider);
 

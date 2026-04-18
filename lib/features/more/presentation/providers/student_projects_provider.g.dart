@@ -33,7 +33,7 @@ final class StudentProjectsProvider
   StudentProjects create() => StudentProjects();
 }
 
-String _$studentProjectsHash() => r'7efaa9ba702a680f270b99155e40b218e4c27185';
+String _$studentProjectsHash() => r'4819b10f8f8517a5d706eb173ced4ce7b303f5a3';
 
 abstract class _$StudentProjects extends $AsyncNotifier<StudentProjectsData> {
   FutureOr<StudentProjectsData> build();

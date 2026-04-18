@@ -167,6 +167,43 @@ pub struct SemesterData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
+pub struct PersistedHeader {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct PersistedCookie {
+    pub name: String,
+    pub value: String,
+    pub domain: String,
+    pub path: String,
+    pub expires_at_epoch_ms: Option<u64>,
+    pub secure: bool,
+    pub http_only: bool,
+    pub same_site: Option<String>,
+    pub host_only: bool,
+    pub persistent: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct PersistedVtopSession {
+    pub username: String,
+    pub saved_at_epoch_ms: u64,
+    pub expires_at_epoch_ms: u64,
+    pub csrf_token: Option<String>,
+    pub authenticated_hint: bool,
+    pub cookies: Vec<PersistedCookie>,
+    pub headers: Vec<PersistedHeader>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
 pub struct GradeCourseRecord {
     pub serial: String,
     pub course_code: String,

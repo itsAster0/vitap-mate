@@ -10,7 +10,7 @@ import 'package:meta/meta.dart' as meta;
 part 'types.freezed.dart';
 part 'types.g.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 @freezed
 @meta.immutable
@@ -341,6 +341,53 @@ sealed class PerExamScheduleRecord with _$PerExamScheduleRecord {
 
   factory PerExamScheduleRecord.fromJson(Map<String, dynamic> json) =>
       _$PerExamScheduleRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class PersistedCookie with _$PersistedCookie {
+  const factory PersistedCookie({
+    required String name,
+    required String value,
+    required String domain,
+    required String path,
+    BigInt? expiresAtEpochMs,
+    required bool secure,
+    required bool httpOnly,
+    String? sameSite,
+    required bool hostOnly,
+    required bool persistent,
+  }) = _PersistedCookie;
+
+  factory PersistedCookie.fromJson(Map<String, dynamic> json) =>
+      _$PersistedCookieFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class PersistedHeader with _$PersistedHeader {
+  const factory PersistedHeader({required String name, required String value}) =
+      _PersistedHeader;
+
+  factory PersistedHeader.fromJson(Map<String, dynamic> json) =>
+      _$PersistedHeaderFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class PersistedVtopSession with _$PersistedVtopSession {
+  const factory PersistedVtopSession({
+    required String username,
+    required BigInt savedAtEpochMs,
+    required BigInt expiresAtEpochMs,
+    String? csrfToken,
+    required bool authenticatedHint,
+    required List<PersistedCookie> cookies,
+    required List<PersistedHeader> headers,
+  }) = _PersistedVtopSession;
+
+  factory PersistedVtopSession.fromJson(Map<String, dynamic> json) =>
+      _$PersistedVtopSessionFromJson(json);
 }
 
 @freezed

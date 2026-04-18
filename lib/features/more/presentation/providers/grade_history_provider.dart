@@ -1,9 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/exceptions.dart';
-import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_grade_history.dart';
-import 'package:vitapmate/features/more/domine/usecases/update_grade_history.dart';
+import 'package:vitapmate/core/utils/vtop_controller.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -11,39 +7,29 @@ part 'grade_history_provider.g.dart';
 
 @riverpod
 class GradeHistory extends _$GradeHistory {
+  Future<GradeHistoryData> _runLoad() async {
+    final repo = await ref.watch(gradeHistoryRepositoryProvider.future);
+    final controller = VtopController<GradeHistoryData>(
+      ref: ref,
+      repository: repo,
+      featureName: "fetch-grade-history",
+    );
+    return controller.load();
+  }
+
   @override
   Future<GradeHistoryData> build() async {
-    final repo = await ref.watch(gradeHistoryRepositoryProvider.future);
-    var data = await GetGradeHistoryUsecase(repo).call();
-    if (data.records.isEmpty) {
-      data = (await _update(hasLocalData: false)).$1;
-    }
-    return data;
+    return _runLoad();
   }
 
   Future<void> refresh() async {
     final repo = await ref.read(gradeHistoryRepositoryProvider.future);
-    final cached = await GetGradeHistoryUsecase(repo).call();
-    final result = await _update(hasLocalData: cached.records.isNotEmpty);
-    final data = result.$1;
-    final didFetchRemote = result.$2;
-    state = AsyncData(data);
-    if (!didFetchRemote) {
-      throw FeatureDisabledException("Grade History Feature Disabled");
-    }
-  }
-
-  Future<(GradeHistoryData, bool)> _update({required bool hasLocalData}) async {
-    final repo = await ref.read(gradeHistoryRepositoryProvider.future);
-    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
-    if (await featureFlags.isEnabled("fetch-grade-history")) {
-      await ref.read(vClientProvider.notifier).tryLogin();
-      return (await UpdateGradeHistoryUsecase(repo).call(), true);
-    } else {
-      if (hasLocalData) {
-        return (await GetGradeHistoryUsecase(repo).call(), false);
-      }
-      throw FeatureDisabledException("Grade History Feature Disabled");
-    }
+    final controller = VtopController<GradeHistoryData>(
+      ref: ref,
+      repository: repo,
+      featureName: "fetch-grade-history",
+    );
+    final gradeHistory = await controller.refresh();
+    state = AsyncData(gradeHistory);
   }
 }

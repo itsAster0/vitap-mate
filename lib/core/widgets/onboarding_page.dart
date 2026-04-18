@@ -9,6 +9,7 @@ import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
@@ -24,50 +25,70 @@ class OnboardingPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stepTwo = useState(false);
+
     return FScaffold(
-      header: FHeader.nested(title: Text("Vitap Mate")),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(right: 50, left: 50, top: 10),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.black,
-                  minRadius: 25,
-                  child: const Text("1", style: TextStyle(color: Colors.white)),
-                ),
-                Expanded(
-                  child: Container(
-                    height: 4,
-                    color: !stepTwo.value ? Colors.grey : Colors.black,
-                  ),
-                ),
-                CircleAvatar(
-                  minRadius: 25,
-                  backgroundColor: !stepTwo.value ? Colors.grey : Colors.black,
-                  child: Text(
-                    "2",
-                    style: TextStyle(
-                      color: stepTwo.value ? Colors.white : Colors.black,
+      resizeToAvoidBottomInset: true,
+      header: FHeader.nested(title: const Text("Vitap Mate")),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 50, left: 50, top: 10),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.black,
+                    minRadius: 25,
+                    child: const Text(
+                      "1",
+                      style: TextStyle(color: Colors.white),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(12, 10, 12, 0),
-            child: FAlert(
-              variant: FAlertVariant.primary,
-              title: Text('Heads Up!'),
-              subtitle: Text(
-                'Please install or update the app from Play Store.',
+                  Expanded(
+                    child: Container(
+                      height: 4,
+                      color: !stepTwo.value ? Colors.grey : Colors.black,
+                    ),
+                  ),
+                  CircleAvatar(
+                    minRadius: 25,
+                    backgroundColor: !stepTwo.value
+                        ? Colors.grey
+                        : Colors.black,
+                    child: Text(
+                      "2",
+                      style: TextStyle(
+                        color: stepTwo.value ? Colors.white : Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Expanded(child: !stepTwo.value ? Step1(two: stepTwo) : Step2()),
-        ],
+
+            const SizedBox(height: 16),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: !stepTwo.value ? Step1(two: stepTwo) : const Step2(),
+            ),
+
+            const SizedBox(height: 20),
+
+            const Padding(
+              padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: FAlert(
+                variant: FAlertVariant.primary,
+                title: Text('Heads Up!'),
+                subtitle: Text(
+                  'Please install or update the app from Play Store only.',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -90,7 +111,7 @@ class Step1 extends HookConsumerWidget {
           username: username.text,
           password: password.text,
         );
-        await vtopClientLogin(client: client);
+        await loginWithSecurityOtpPrompt(context: context, client: client);
         _globalUsername = username.text;
         _globalPassword = password.text;
         _globalClient = client;
@@ -222,8 +243,9 @@ class Step2 extends HookConsumerWidget {
                     await ref
                         .read(vtopusersutilsProvider.notifier)
                         .vtopUserInitialData(user);
-                await  ref.refresh(vtopUserProvider);
-                  
+                    ref.invalidate(vtopUserProvider);
+                    await ref.read(vtopUserProvider.future);
+
                     await ref.read(vClientProvider.future);
                     if (context.mounted) {
                       GoRouter.of(context).goNamed(Paths.timetable);

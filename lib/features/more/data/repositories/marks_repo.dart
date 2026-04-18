@@ -1,33 +1,28 @@
-import 'package:vitapmate/features/more/data/datasources/local_data_sources.dart';
-import 'package:vitapmate/features/more/data/datasources/remote_data_sources.dart';
-import 'package:vitapmate/features/more/domine/repositories/marks_repo.dart';
+import 'package:vitapmate/core/utils/cached_repository.dart';
+import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class MarksRepoImpl implements MarksRepository {
+class MarksRepository extends CachedRepository<MarksData> {
   final String semid;
-  final MarksRemoteDataSource remoteDataSource;
-  final MarksLocalDataSource localDataSource;
+  final MarksDataSource _dataSource;
 
-  MarksRepoImpl({
-    required this.semid,
-    required this.remoteDataSource,
-    required this.localDataSource,
-  });
+  MarksRepository({required this.semid, required MarksDataSource dataSource})
+    : _dataSource = dataSource;
+
   @override
-  Future<MarksData> getMarksFromStorage() async {
-    var data = await localDataSource.getMarks(semid);
+  Future<MarksData?> loadCache() async {
+    final data = await _dataSource.getMarks(semid);
+    if (data.semesterId.isEmpty) return null;
     return data;
   }
 
   @override
-  Future<void> saveMarksToStorage({required MarksData data}) async {
-    await localDataSource.saveMarks(data, semid);
+  Future<void> saveCache(MarksData data) {
+    return _dataSource.saveMarks(data, semid);
   }
 
   @override
-  Future<void> updateMarks() async {
-    var data = await remoteDataSource.fetchMarksFromRemote(semid);
-    if (data.records.isEmpty) return;
-    saveMarksToStorage(data: data);
+  Future<MarksData> fetchRemote() {
+    return _dataSource.fetchMarks(semid);
   }
 }

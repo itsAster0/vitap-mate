@@ -1,53 +1,39 @@
-import 'package:vitapmate/features/more/data/datasources/local_data_sources.dart';
-import 'package:vitapmate/features/more/data/datasources/remote_data_sources.dart';
-import 'package:vitapmate/features/more/domine/repositories/grades_repo.dart';
+import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class GradesRepoImpl implements GradesRepository {
+class GradesRepository {
   final String semid;
-  final GradesRemoteDataSource remoteDataSource;
-  final GradesLocalDataSource localDataSource;
+  final GradesDataSource _dataSource;
 
-  GradesRepoImpl({
-    required this.semid,
-    required this.remoteDataSource,
-    required this.localDataSource,
-  });
+  GradesRepository({required this.semid, required GradesDataSource dataSource})
+    : _dataSource = dataSource;
 
-  @override
-  Future<GradeViewData> getGradeViewFromStorage() async {
-    return localDataSource.getGradeView(semid);
+  Future<GradeViewData> getGradeViewFromStorage() {
+    return _dataSource.getGradeView(semid);
   }
 
-  @override
-  Future<Map<String, GradeDetailsData>> getGradeDetailsFromStorage() async {
-    return localDataSource.getGradeDetailsMap(semid);
+  Future<Map<String, GradeDetailsData>> getGradeDetailsFromStorage() {
+    return _dataSource.getGradeDetailsMap(semid);
   }
 
-  @override
-  Future<void> saveGradeViewToStorage({required GradeViewData data}) async {
-    await localDataSource.saveGradeView(data, semid);
+  Future<void> saveGradeViewToStorage({required GradeViewData data}) {
+    return _dataSource.saveGradeView(data, semid);
   }
 
-  @override
-  Future<void> saveGradeDetailsToStorage({
-    required GradeDetailsData data,
-  }) async {
-    await localDataSource.saveGradeDetails(data, semid);
+  Future<void> saveGradeDetailsToStorage({required GradeDetailsData data}) {
+    return _dataSource.saveGradeDetails(data, semid);
   }
 
-  @override
   Future<void> updateGradeView() async {
-    final data = await remoteDataSource.fetchGradeViewFromRemote(semid);
+    final data = await _dataSource.fetchGradeView(semid);
     if (data.courses.isEmpty) return;
     await saveGradeViewToStorage(data: data);
   }
 
-  @override
   Future<GradeDetailsData> fetchGradeDetailsRemote({
     required String courseId,
   }) async {
-    final data = await remoteDataSource.fetchGradeDetailsFromRemote(
+    final data = await _dataSource.fetchGradeDetails(
       semid: semid,
       courseId: courseId,
     );

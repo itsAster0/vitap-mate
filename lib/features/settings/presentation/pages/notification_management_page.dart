@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -160,20 +162,27 @@ class NotificationManagementPage extends HookConsumerWidget {
                     control: FSliderControl.managedContinuous(
                       controller: classController,
                       onChange: (selection) async {
-                        final minutes = (5 + (selection.max * 55).round())
-                            .clamp(5, 60)
-                            .toInt();
-                        if (minutes ==
-                            classReminderSettings.notifyBeforeMinutes) {
-                          return;
-                        }
-                        await ref
-                            .read(classReminderSettingsControllerProvider)
-                            .setNotifyBeforeMinutes(minutes);
-                        if (ref.read(classReminderSettingsProvider).enabled) {
+                        try {
+                          final minutes = (5 + (selection.max * 55).round())
+                              .clamp(5, 60)
+                              .toInt();
+                          if (minutes ==
+                              classReminderSettings.notifyBeforeMinutes) {
+                            return;
+                          }
                           await ref
-                              .read(timetableProvider.notifier)
-                              .updateTimetable();
+                              .read(classReminderSettingsControllerProvider)
+                              .setNotifyBeforeMinutes(minutes);
+                          if (ref.read(classReminderSettingsProvider).enabled) {
+                            await ref
+                                .read(timetableProvider.notifier)
+                                .updateTimetable();
+                          }
+                        } catch (e, st) {
+                          log(
+                            'Error updating class reminder notify before: $e',
+                            stackTrace: st,
+                          );
                         }
                       },
                     ),

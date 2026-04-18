@@ -3,20 +3,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/attendance/domine/usecases/get_attendance_usecase.dart';
-import 'package:vitapmate/features/attendance/domine/usecases/get_full_attendance_usecase.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_exam_schedule.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_marks.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
-import 'package:vitapmate/features/settings/domine/usecases/get_semester_id.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
-import 'package:vitapmate/features/timetable/domine/usecases/get_timetable.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -60,9 +54,9 @@ Future<bool> _syncData({String? task}) async {
     }
     final List<Future<bool>> futures = [];
 
-    final timetable = await GetTimetableUsecase(
-      await container.read(timetableRepositoryProvider.future),
-    ).call();
+    final timetable = await (await container.read(
+      timetableRepositoryProvider.future,
+    )).load();
     if (!_isUpdatedWithinBacksyncWindow(timetable.updateTime)) {
       futures.add(
         _retryer(
@@ -71,18 +65,18 @@ Future<bool> _syncData({String? task}) async {
       );
     }
 
-    final marks = await GetMarksUsecase(
-      await container.read(marksRepositoryProvider.future),
-    ).call();
+    final marks = await (await container.read(
+      marksRepositoryProvider.future,
+    )).load();
     if (!_isUpdatedWithinBacksyncWindow(marks.updateTime)) {
       futures.add(
         _retryer(() => container.read(marksProvider.notifier).updatemarks()),
       );
     }
 
-    final examSchedule = await GetExamScheduleUsecase(
-      await container.read(examScheduleRepositoryProvider.future),
-    ).call();
+    final examSchedule = await (await container.read(
+      examScheduleRepositoryProvider.future,
+    )).load();
     if (!_isUpdatedWithinBacksyncWindow(examSchedule.updateTime)) {
       futures.add(
         _retryer(
@@ -92,9 +86,9 @@ Future<bool> _syncData({String? task}) async {
       );
     }
 
-    final semids = await GetSemidsUsecase(
-      await container.read(semidRepositoryProvider.future),
-    ).call();
+    final semids = await (await container.read(
+      semidRepositoryProvider.future,
+    )).getSemidsFromStorage();
     if (!_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
       futures.add(
         _retryer(
@@ -158,7 +152,7 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
     final attendanceRepo = await container.read(
       attendanceRepositoryProvider.future,
     );
-    var att = await GetAttendanceUsecase(attendanceRepo).call();
+    var att = await attendanceRepo.load();
     var ok = true;
     if (!_isUpdatedWithinBacksyncWindow(att.updateTime)) {
       ok = await _retryer(
@@ -172,11 +166,8 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
     final k = await Future.wait([
       for (final i in att.records)
         () async {
-          final fullAttendance = await GetFullAttendanceUsecase(
-            attendanceRepo,
-            i.courseType,
-            i.courseId,
-          ).call();
+          final fullAttendance = await attendanceRepo
+              .getFullAttendanceFromStorage(i.courseType, i.courseId);
           if (_isUpdatedWithinBacksyncWindow(fullAttendance.updateTime)) {
             return true;
           }

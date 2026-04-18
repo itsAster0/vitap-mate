@@ -26,7 +26,7 @@ final class SemidRepositoryProvider
         argument: null,
         retry: null,
         name: r'semidRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -46,4 +46,4 @@ final class SemidRepositoryProvider
   }
 }
 
-String _$semidRepositoryHash() => r'c4d7918822009843b6689cee98077dbb5a093ab4';
+String _$semidRepositoryHash() => r'42a36fca77ebf2c9f21052c347aa38240b69ecb4';

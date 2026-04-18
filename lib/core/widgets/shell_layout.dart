@@ -155,11 +155,11 @@ Widget? getSidewidget(
               ? context.theme.typography.sm
               : context.theme.typography.lg,
         ),
-        if(newsem)
-        Text(
-          "New semester data available!",
-          style: context.theme.typography.sm,
-        ),
+        if (newsem)
+          Text(
+            "New semester data available!",
+            style: context.theme.typography.sm,
+          ),
       ],
     ),
 

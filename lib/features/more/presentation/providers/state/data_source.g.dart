@@ -9,342 +9,164 @@ part of 'data_source.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(examScheduleRemoteDataSource)
-final examScheduleRemoteDataSourceProvider =
-    ExamScheduleRemoteDataSourceProvider._();
+@ProviderFor(examScheduleDataSource)
+final examScheduleDataSourceProvider = ExamScheduleDataSourceProvider._();
 
-final class ExamScheduleRemoteDataSourceProvider
+final class ExamScheduleDataSourceProvider
     extends
         $FunctionalProvider<
-          AsyncValue<ExamScheduleRemoteDataSource>,
-          ExamScheduleRemoteDataSource,
-          FutureOr<ExamScheduleRemoteDataSource>
+          AsyncValue<ExamScheduleDataSource>,
+          ExamScheduleDataSource,
+          FutureOr<ExamScheduleDataSource>
         >
     with
-        $FutureModifier<ExamScheduleRemoteDataSource>,
-        $FutureProvider<ExamScheduleRemoteDataSource> {
-  ExamScheduleRemoteDataSourceProvider._()
+        $FutureModifier<ExamScheduleDataSource>,
+        $FutureProvider<ExamScheduleDataSource> {
+  ExamScheduleDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'examScheduleRemoteDataSourceProvider',
+        name: r'examScheduleDataSourceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$examScheduleRemoteDataSourceHash();
+  String debugGetCreateSourceHash() => _$examScheduleDataSourceHash();
 
   @$internal
   @override
-  $FutureProviderElement<ExamScheduleRemoteDataSource> $createElement(
+  $FutureProviderElement<ExamScheduleDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<ExamScheduleRemoteDataSource> create(Ref ref) {
-    return examScheduleRemoteDataSource(ref);
+  FutureOr<ExamScheduleDataSource> create(Ref ref) {
+    return examScheduleDataSource(ref);
   }
 }
 
-String _$examScheduleRemoteDataSourceHash() =>
-    r'04467ee64ff7f0f88711bcad71e7be0eed2a5a2b';
+String _$examScheduleDataSourceHash() =>
+    r'47750bdb55aca4c291e157a755f3a31b32e5102e';
 
-@ProviderFor(examScheduleLocalDataSource)
-final examScheduleLocalDataSourceProvider =
-    ExamScheduleLocalDataSourceProvider._();
+@ProviderFor(marksDataSource)
+final marksDataSourceProvider = MarksDataSourceProvider._();
 
-final class ExamScheduleLocalDataSourceProvider
+final class MarksDataSourceProvider
     extends
         $FunctionalProvider<
-          AsyncValue<ExamScheduleLocalDataSource>,
-          ExamScheduleLocalDataSource,
-          FutureOr<ExamScheduleLocalDataSource>
+          AsyncValue<MarksDataSource>,
+          MarksDataSource,
+          FutureOr<MarksDataSource>
         >
-    with
-        $FutureModifier<ExamScheduleLocalDataSource>,
-        $FutureProvider<ExamScheduleLocalDataSource> {
-  ExamScheduleLocalDataSourceProvider._()
+    with $FutureModifier<MarksDataSource>, $FutureProvider<MarksDataSource> {
+  MarksDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'examScheduleLocalDataSourceProvider',
+        name: r'marksDataSourceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$examScheduleLocalDataSourceHash();
+  String debugGetCreateSourceHash() => _$marksDataSourceHash();
 
   @$internal
   @override
-  $FutureProviderElement<ExamScheduleLocalDataSource> $createElement(
+  $FutureProviderElement<MarksDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<ExamScheduleLocalDataSource> create(Ref ref) {
-    return examScheduleLocalDataSource(ref);
+  FutureOr<MarksDataSource> create(Ref ref) {
+    return marksDataSource(ref);
   }
 }
 
-String _$examScheduleLocalDataSourceHash() =>
-    r'31fa9238f36fce81912de4fa5c59f61680d5b169';
+String _$marksDataSourceHash() => r'8279cabb850813680e991006c1dba242907e6894';
 
-@ProviderFor(marksLocalDataSource)
-final marksLocalDataSourceProvider = MarksLocalDataSourceProvider._();
+@ProviderFor(gradesDataSource)
+final gradesDataSourceProvider = GradesDataSourceProvider._();
 
-final class MarksLocalDataSourceProvider
+final class GradesDataSourceProvider
     extends
         $FunctionalProvider<
-          AsyncValue<MarksLocalDataSource>,
-          MarksLocalDataSource,
-          FutureOr<MarksLocalDataSource>
+          AsyncValue<GradesDataSource>,
+          GradesDataSource,
+          FutureOr<GradesDataSource>
         >
-    with
-        $FutureModifier<MarksLocalDataSource>,
-        $FutureProvider<MarksLocalDataSource> {
-  MarksLocalDataSourceProvider._()
+    with $FutureModifier<GradesDataSource>, $FutureProvider<GradesDataSource> {
+  GradesDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'marksLocalDataSourceProvider',
+        name: r'gradesDataSourceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$marksLocalDataSourceHash();
+  String debugGetCreateSourceHash() => _$gradesDataSourceHash();
 
   @$internal
   @override
-  $FutureProviderElement<MarksLocalDataSource> $createElement(
+  $FutureProviderElement<GradesDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<MarksLocalDataSource> create(Ref ref) {
-    return marksLocalDataSource(ref);
+  FutureOr<GradesDataSource> create(Ref ref) {
+    return gradesDataSource(ref);
   }
 }
 
-String _$marksLocalDataSourceHash() =>
-    r'dd022247cadca43f6918e97bfcf1e086cbc25bab';
+String _$gradesDataSourceHash() => r'849b1d4dda9b5168957c2bf444b981d0d3b47830';
 
-@ProviderFor(marksRemoteDataSource)
-final marksRemoteDataSourceProvider = MarksRemoteDataSourceProvider._();
+@ProviderFor(gradeHistoryDataSource)
+final gradeHistoryDataSourceProvider = GradeHistoryDataSourceProvider._();
 
-final class MarksRemoteDataSourceProvider
+final class GradeHistoryDataSourceProvider
     extends
         $FunctionalProvider<
-          AsyncValue<MarksRemoteDataSource>,
-          MarksRemoteDataSource,
-          FutureOr<MarksRemoteDataSource>
+          AsyncValue<GradeHistoryDataSource>,
+          GradeHistoryDataSource,
+          FutureOr<GradeHistoryDataSource>
         >
     with
-        $FutureModifier<MarksRemoteDataSource>,
-        $FutureProvider<MarksRemoteDataSource> {
-  MarksRemoteDataSourceProvider._()
+        $FutureModifier<GradeHistoryDataSource>,
+        $FutureProvider<GradeHistoryDataSource> {
+  GradeHistoryDataSourceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'marksRemoteDataSourceProvider',
+        name: r'gradeHistoryDataSourceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$marksRemoteDataSourceHash();
+  String debugGetCreateSourceHash() => _$gradeHistoryDataSourceHash();
 
   @$internal
   @override
-  $FutureProviderElement<MarksRemoteDataSource> $createElement(
+  $FutureProviderElement<GradeHistoryDataSource> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<MarksRemoteDataSource> create(Ref ref) {
-    return marksRemoteDataSource(ref);
+  FutureOr<GradeHistoryDataSource> create(Ref ref) {
+    return gradeHistoryDataSource(ref);
   }
 }
 
-String _$marksRemoteDataSourceHash() =>
-    r'fbe24a9408d6d9871ac8730ca4389e666f25c455';
-
-@ProviderFor(gradesLocalDataSource)
-final gradesLocalDataSourceProvider = GradesLocalDataSourceProvider._();
-
-final class GradesLocalDataSourceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<GradesLocalDataSource>,
-          GradesLocalDataSource,
-          FutureOr<GradesLocalDataSource>
-        >
-    with
-        $FutureModifier<GradesLocalDataSource>,
-        $FutureProvider<GradesLocalDataSource> {
-  GradesLocalDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'gradesLocalDataSourceProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$gradesLocalDataSourceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<GradesLocalDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<GradesLocalDataSource> create(Ref ref) {
-    return gradesLocalDataSource(ref);
-  }
-}
-
-String _$gradesLocalDataSourceHash() =>
-    r'2a3dac0b74ded7208e131a1aaa2776cb20a25008';
-
-@ProviderFor(gradesRemoteDataSource)
-final gradesRemoteDataSourceProvider = GradesRemoteDataSourceProvider._();
-
-final class GradesRemoteDataSourceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<GradesRemoteDataSource>,
-          GradesRemoteDataSource,
-          FutureOr<GradesRemoteDataSource>
-        >
-    with
-        $FutureModifier<GradesRemoteDataSource>,
-        $FutureProvider<GradesRemoteDataSource> {
-  GradesRemoteDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'gradesRemoteDataSourceProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$gradesRemoteDataSourceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<GradesRemoteDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<GradesRemoteDataSource> create(Ref ref) {
-    return gradesRemoteDataSource(ref);
-  }
-}
-
-String _$gradesRemoteDataSourceHash() =>
-    r'561067eb1d3746ef37468639884697ec92d9ce6b';
-
-@ProviderFor(gradeHistoryLocalDataSource)
-final gradeHistoryLocalDataSourceProvider =
-    GradeHistoryLocalDataSourceProvider._();
-
-final class GradeHistoryLocalDataSourceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<GradeHistoryLocalDataSource>,
-          GradeHistoryLocalDataSource,
-          FutureOr<GradeHistoryLocalDataSource>
-        >
-    with
-        $FutureModifier<GradeHistoryLocalDataSource>,
-        $FutureProvider<GradeHistoryLocalDataSource> {
-  GradeHistoryLocalDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'gradeHistoryLocalDataSourceProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$gradeHistoryLocalDataSourceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<GradeHistoryLocalDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<GradeHistoryLocalDataSource> create(Ref ref) {
-    return gradeHistoryLocalDataSource(ref);
-  }
-}
-
-String _$gradeHistoryLocalDataSourceHash() =>
-    r'9bdd29c63ed7b49f233197b83bf327da18752487';
-
-@ProviderFor(gradeHistoryRemoteDataSource)
-final gradeHistoryRemoteDataSourceProvider =
-    GradeHistoryRemoteDataSourceProvider._();
-
-final class GradeHistoryRemoteDataSourceProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<GradeHistoryRemoteDataSource>,
-          GradeHistoryRemoteDataSource,
-          FutureOr<GradeHistoryRemoteDataSource>
-        >
-    with
-        $FutureModifier<GradeHistoryRemoteDataSource>,
-        $FutureProvider<GradeHistoryRemoteDataSource> {
-  GradeHistoryRemoteDataSourceProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'gradeHistoryRemoteDataSourceProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$gradeHistoryRemoteDataSourceHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<GradeHistoryRemoteDataSource> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<GradeHistoryRemoteDataSource> create(Ref ref) {
-    return gradeHistoryRemoteDataSource(ref);
-  }
-}
-
-String _$gradeHistoryRemoteDataSourceHash() =>
-    r'48002118984d6e8297d36e93d0a6144e61b81954';
+String _$gradeHistoryDataSourceHash() =>
+    r'bec66087aa5b860ef54a39edc87b2cf37fd8b5db';

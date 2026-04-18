@@ -27,4 +27,5 @@ sealed class VtopError with _$VtopError implements FrbException {
       VtopError_ConfigurationError;
   const factory VtopError.captchaRequired() = VtopError_CaptchaRequired;
   const factory VtopError.invalidResponse() = VtopError_InvalidResponse;
+  const factory VtopError.otpRequired(String field0) = VtopError_OTPRequired;
 }

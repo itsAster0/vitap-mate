@@ -49,7 +49,7 @@ final class ExamScheduleRepositoryProvider
 }
 
 String _$examScheduleRepositoryHash() =>
-    r'8f539bd7a2f87d8c59861bd8daf50d7b477abbc4';
+    r'c128ff1dbc3518d5f33f01daa285945b18eccf42';
 
 @ProviderFor(marksRepository)
 final marksRepositoryProvider = MarksRepositoryProvider._();
@@ -88,7 +88,7 @@ final class MarksRepositoryProvider
   }
 }
 
-String _$marksRepositoryHash() => r'62be906347e2a23f1bf20fdbb23f2797874de780';
+String _$marksRepositoryHash() => r'c1a285f9af8d8d42d7712ca47358518fd8583065';
 
 @ProviderFor(gradesRepository)
 final gradesRepositoryProvider = GradesRepositoryProvider._();
@@ -127,7 +127,7 @@ final class GradesRepositoryProvider
   }
 }
 
-String _$gradesRepositoryHash() => r'e8d4f5b2a020eb5eface9448a9dff7d060836b33';
+String _$gradesRepositoryHash() => r'e49a0f21a3f99d9628772975b2a668ea58a8e01b';
 
 @ProviderFor(gradesRepositoryForSem)
 final gradesRepositoryForSemProvider = GradesRepositoryForSemFamily._();
@@ -186,7 +186,7 @@ final class GradesRepositoryForSemProvider
 }
 
 String _$gradesRepositoryForSemHash() =>
-    r'4e4999017cc5a31c627bfec5f9b55cdb4f291132';
+    r'c9779ab465bea137e111a7b8b644f149097393a2';
 
 final class GradesRepositoryForSemFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<GradesRepository>, String> {
@@ -246,4 +246,4 @@ final class GradeHistoryRepositoryProvider
 }
 
 String _$gradeHistoryRepositoryHash() =>
-    r'bae07314b22cd54c4a25a9910c64361d27bede99';
+    r'e4598c86e6622320fc042454c244b1a6a364609f';

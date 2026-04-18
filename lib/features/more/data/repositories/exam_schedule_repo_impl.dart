@@ -1,35 +1,30 @@
-import 'package:vitapmate/features/more/data/datasources/local_data_sources.dart';
-import 'package:vitapmate/features/more/data/datasources/remote_data_sources.dart';
-import 'package:vitapmate/features/more/domine/repositories/exam_schedule.dart';
+import 'package:vitapmate/core/utils/cached_repository.dart';
+import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class ExamScheduleRepoImpl implements ExamScheduleRepository {
+class ExamScheduleRepository extends CachedRepository<ExamScheduleData> {
   final String semid;
-  final ExamScheduleRemoteDataSource remoteDataSource;
-  final ExamScheduleLocalDataSource localDataSource;
+  final ExamScheduleDataSource _dataSource;
 
-  ExamScheduleRepoImpl({
+  ExamScheduleRepository({
     required this.semid,
-    required this.remoteDataSource,
-    required this.localDataSource,
-  });
+    required ExamScheduleDataSource dataSource,
+  }) : _dataSource = dataSource;
+
   @override
-  Future<ExamScheduleData> getExamScheduleFromStorage() async {
-    var data = await localDataSource.getExamSchedule(semid);
+  Future<ExamScheduleData?> loadCache() async {
+    final data = await _dataSource.getExamSchedule(semid);
+    if (data.semesterId.isEmpty) return null;
     return data;
   }
 
   @override
-  Future<void> saveExamScheduleToStorage({
-    required ExamScheduleData data,
-  }) async {
-    await localDataSource.saveExamSchedule(data, semid);
+  Future<void> saveCache(ExamScheduleData data) {
+    return _dataSource.saveExamSchedule(data, semid);
   }
 
   @override
-  Future<void> updateExamSchedule() async {
-    var data = await remoteDataSource.fetchScheduleeFromRemote(semid);
-    if (data.exams.isEmpty) return;
-    saveExamScheduleToStorage(data: data);
+  Future<ExamScheduleData> fetchRemote() {
+    return _dataSource.fetchExamSchedule(semid);
   }
 }

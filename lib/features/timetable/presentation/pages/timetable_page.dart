@@ -26,18 +26,21 @@ class TimetablePage extends HookConsumerWidget {
     final scrollController = useScrollController();
     final scrollOffset = useState<double>(0);
     final timetableData = ref.watch(timetableProvider);
+    final autoRefresh = ref.watch(autoRefreshProvider);
     final startX = useState<double?>(null);
     useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        try {
-          await ref.read(timetableProvider.notifier).updateTimetable();
-        } catch (e, _) {
-          log("$e");
-        }
+      if (!autoRefresh) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(timetableProvider.notifier).updateTimetable().catchError((
+          e,
+          st,
+        ) {
+          log('auto refresh failed: $e', stackTrace: st);
+        });
       });
 
       return null;
-    }, []);
+    }, [autoRefresh]);
     final mergeLabs = ref.watch(mergeTTProvider);
 
     Future<void> update() async {
@@ -133,7 +136,6 @@ class TimetablePage extends HookConsumerWidget {
                       );
                     },
                     error: (e, stackTrace) {
-                      disCommonToast(context, e);
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,

@@ -1,49 +1,50 @@
 import 'dart:developer';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/exceptions.dart';
-import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/more/domine/usecases/get_exam_schedule.dart';
-import 'package:vitapmate/features/more/domine/usecases/update_exam_schedule.dart';
+import 'package:vitapmate/core/utils/vtop_controller.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+
 part 'exam_schedule.g.dart';
 
 @riverpod
 class ExamSchedule extends _$ExamSchedule {
+  Future<ExamScheduleData> _runLoad() async {
+    final repo = await ref.watch(examScheduleRepositoryProvider.future);
+    final controller = VtopController<ExamScheduleData>(
+      ref: ref,
+      repository: repo,
+      featureName: "fetch-exam-schedule",
+      hooks: VtopHooks(
+        onSuccess: (data, {required fromCache}) async {
+          await ExamReminderNotificationService.syncFromExamSchedule(data);
+        },
+      ),
+    );
+    return controller.load();
+  }
+
   @override
   Future<ExamScheduleData> build() async {
-    var repo = await ref.watch(examScheduleRepositoryProvider.future);
-    ExamScheduleData data = await GetExamScheduleUsecase(repo).call();
-    if (data.semesterId.isEmpty) {
-      await ref.read(vClientProvider.notifier).tryLogin();
-      data = await _update();
-    }
-    await ExamReminderNotificationService.syncFromExamSchedule(data);
-    log("exam schedule Build done");
+    final data = await _runLoad();
+    log("exam schedule build done");
     return data;
   }
 
   Future<void> updatexamschedule() async {
-    log("[ExamSchedule] updatexamschedule: start");
-    await ref.read(vClientProvider.notifier).tryLogin();
-    ExamScheduleData data = await _update();
-    state = AsyncData(data);
-    await ExamReminderNotificationService.syncFromExamSchedule(data);
-    log(
-      "[ExamSchedule] updatexamschedule: end sem=${data.semesterId} groups=${data.exams.length}",
+    final repo = await ref.read(examScheduleRepositoryProvider.future);
+    final controller = VtopController<ExamScheduleData>(
+      ref: ref,
+      repository: repo,
+      featureName: "fetch-exam-schedule",
+      hooks: VtopHooks(
+        onSuccess: (data, {required fromCache}) async {
+          await ExamReminderNotificationService.syncFromExamSchedule(data);
+        },
+      ),
     );
-  }
-
-  Future<ExamScheduleData> _update() async {
-    var repo = await ref.read(examScheduleRepositoryProvider.future);
-    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
-    if (await featureFlags.isEnabled("fetch-exam-schedule")) {
-      var data = await UpdateExamScheduleUsecase(repo).call();
-      return data;
-    } else {
-      throw FeatureDisabledException("Exan schedule Feature Disabled");
-    }
+    final examSchedule = await controller.refresh();
+    state = AsyncData(examSchedule);
   }
 }
