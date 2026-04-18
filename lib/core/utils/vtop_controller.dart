@@ -66,14 +66,8 @@ class VtopController<T> {
   Future<T> _refreshCore() async {
     final featureFlags = await ref.read(featureFlagsControllerProvider.future);
     if (!await featureFlags.isEnabled(featureName)) {
-      final cached = await repository.loadCache();
-      if (cached != null) {
-        await hooks.onSuccess?.call(cached, fromCache: true);
-        return cached;
-      }
       throw FeatureDisabledException("$featureName Feature Disabled");
     }
-
     await ref.read(vClientProvider.notifier).ensureLogin();
     final data = await repository.refresh();
     AppLogger.instance.info('client.$featureName', 'refresh complete');

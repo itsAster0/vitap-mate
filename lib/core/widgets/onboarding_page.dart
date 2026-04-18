@@ -76,12 +76,21 @@ class OnboardingPage extends HookConsumerWidget {
             ),
 
             const SizedBox(height: 20),
-
             const Padding(
               padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
               child: FAlert(
                 variant: FAlertVariant.primary,
-                title: Text('Heads Up!'),
+                title: Text('Login failed?'),
+                subtitle: Text(
+                  'Try logging in on the VTOP website, then try again here.',
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
+              child: FAlert(
+                variant: FAlertVariant.destructive,
+                title: Text('NOTE!'),
                 subtitle: Text(
                   'Please install or update the app from Play Store only.',
                 ),
