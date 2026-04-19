@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/widgets/exam_schedule_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -108,18 +109,10 @@ class ExamSchedulePage extends HookConsumerWidget {
                     spacing: 4,
                     children: [
                       for (final i in data.exams) ExamScheduleCard(record: i),
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 20),
-                          child: Text(
-                            "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: ExamColors.tertiaryText,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
+                      DataUpdatedFooter(
+                        updateTime: data.updateTime.toInt(),
+                        fontSize: 14,
+                        color: ExamColors.tertiaryText,
                       ),
                     ],
                   ),

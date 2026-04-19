@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
@@ -115,23 +116,7 @@ class TimetablePage extends HookConsumerWidget {
 
                           ...daySlots.map((slot) => TimetableCard(slot: slot)),
 
-                          Container(
-                            margin: const EdgeInsets.all(16),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: context.theme.colors.primaryForeground,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              "Last updated: ${formatUnixTimestamp(data.updateTime.toInt())}",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.theme.colors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                          DataUpdatedFooter(updateTime: data.updateTime.toInt()),
                         ],
                       );
                     },

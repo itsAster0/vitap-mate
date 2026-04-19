@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/weightage_totals.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
@@ -148,20 +149,10 @@ class GradesPage extends HookConsumerWidget {
                         )
                       else
                         ...sorted.map((c) => _GradeCard(course: c)),
-                      if (data.gradeView.updateTime > BigInt.zero)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: Text(
-                              "Data updated on ${formatUnixTimestamp(data.gradeView.updateTime.toInt())}",
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: context.theme.colors.mutedForeground,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ),
-                        ),
+                      DataUpdatedFooter(
+                        updateTime: data.gradeView.updateTime.toInt(),
+                        padding: const EdgeInsets.only(top: 12),
+                      ),
                     ],
                   );
                 },

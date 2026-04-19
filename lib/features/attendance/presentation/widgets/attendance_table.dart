@@ -8,6 +8,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_cal.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
@@ -414,16 +415,11 @@ class AttendanceTable extends HookConsumerWidget {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-            "Data updated on ${formatUnixTimestamp(data.updateTime.toInt())}",
-            style: const TextStyle(
-              fontSize: 12,
-              color: AttendanceColors.tertiaryText,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
+        DataUpdatedFooter(
+          updateTime: data.updateTime.toInt(),
+          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          fontSize: 12,
+          color: AttendanceColors.tertiaryText,
         ),
       ],
     );

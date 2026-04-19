@@ -7,6 +7,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -160,18 +161,10 @@ class MarksPage extends HookConsumerWidget {
   }
 
   Widget _buildFooter(int updateTime) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 20),
-        child: Text(
-          "Data updated on ${formatUnixTimestamp(updateTime)}",
-          style: TextStyle(
-            fontSize: 14,
-            color: MarksColors.tertiaryText,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ),
+    return DataUpdatedFooter(
+      updateTime: updateTime,
+      fontSize: 14,
+      color: MarksColors.tertiaryText,
     );
   }
 }

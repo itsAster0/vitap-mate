@@ -95,7 +95,7 @@ pub struct VtopClient {
     session: SessionManager,
     current_page: Option<String>,
     real_username: String,
-    username: String,
+   pub username: String,
     password: String,
     captcha_data: Option<String>,
 }

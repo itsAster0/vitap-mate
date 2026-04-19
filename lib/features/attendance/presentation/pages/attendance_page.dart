@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -212,13 +213,7 @@ class _AttendanceRecordsList extends StatelessWidget {
                   record: i.value,
                   index: i.key,
                 ),
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 20),
-              child: Text(
-                "Data updated on ${formatUnixTimestamp(updateTime)}",
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-              ),
-            ),
+            DataUpdatedFooter(updateTime: updateTime, fontSize: 14),
           ],
         ),
       ),

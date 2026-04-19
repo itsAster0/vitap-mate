@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -67,20 +68,10 @@ class GradeHistoryPage extends HookConsumerWidget {
                   )
                 else
                   ...gradeHistory.records.map((r) => _HistoryCard(record: r)),
-                if (gradeHistory.updateTime > BigInt.zero)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        "Data updated on ${formatUnixTimestamp(gradeHistory.updateTime.toInt())}",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: context.theme.colors.mutedForeground,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-                  ),
+                DataUpdatedFooter(
+                  updateTime: gradeHistory.updateTime.toInt(),
+                  padding: const EdgeInsets.only(top: 12),
+                ),
               ],
             );
           },

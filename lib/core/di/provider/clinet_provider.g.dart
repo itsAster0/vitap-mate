@@ -33,7 +33,7 @@ final class VClientProvider
   VClient create() => VClient();
 }
 
-String _$vClientHash() => r'0b41d0a427951e7ba11b9b03f6cb1eb2c084c160';
+String _$vClientHash() => r'606e6887d326d3816d729e46e9ee7310f307515e';
 
 abstract class _$VClient extends $AsyncNotifier<VtopClient> {
   FutureOr<VtopClient> build();

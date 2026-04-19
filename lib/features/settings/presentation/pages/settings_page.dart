@@ -1,23 +1,111 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
 
+  String _cookieEditorJsonFromHeader(String cookieHeader) {
+    const domain = 'vtop.vitap.ac.in';
+    final parts = cookieHeader.split(';');
+    final cookies = <Map<String, dynamic>>[];
+
+    for (var i = 0; i < parts.length; i++) {
+      final part = parts[i].trim();
+      if (part.isEmpty) continue;
+      final eq = part.indexOf('=');
+      if (eq <= 0) continue;
+      final name = part.substring(0, eq).trim();
+      final value = part.substring(eq + 1).trim();
+      if (name.isEmpty) continue;
+
+      cookies.add({
+        'domain': domain,
+        'hostOnly': true,
+        'httpOnly': false,
+        'name': name,
+        'path': '/',
+        'sameSite': 'unspecified',
+        'secure': true,
+        'session': true,
+        'storeId': '0',
+        'value': value,
+        'id': i + 1,
+      });
+    }
+
+    return const JsonEncoder.withIndent('  ').convert(cookies);
+  }
+
+  Future<void> _copySavedCookies(BuildContext context, WidgetRef ref) async {
+    try {
+      final user = await ref.read(vtopUserProvider.future);
+      final username = user.username;
+      if (username == null || username.isEmpty) {
+        if (context.mounted) {
+          dispToast(context, "No Account", "Sign in first to copy cookies.");
+        }
+        return;
+      }
+
+      final stored = await loadStoredVtopSession(username);
+      final cookies = stored?.snapshot.cookies?.trim() ?? '';
+      if (cookies.isEmpty) {
+        if (context.mounted) {
+          dispToast(
+            context,
+            "No Saved Cookies",
+            "No saved session cookies found. Refresh data once and try again.",
+          );
+        }
+        return;
+      }
+
+      final cookieEditorJson = _cookieEditorJsonFromHeader(cookies);
+      if (cookieEditorJson == '[]') {
+        if (context.mounted) {
+          dispToast(
+            context,
+            "Invalid Cookie Data",
+            "Saved cookie header could not be converted for Cookie-Editor.",
+          );
+        }
+        return;
+      }
+
+      await Clipboard.setData(ClipboardData(text: cookieEditorJson));
+      if (context.mounted) {
+        dispToast(
+          context,
+          "Copied",
+          "Cookie-Editor JSON copied to clipboard.",
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        dispToast(context, "Failed", "Could not copy cookies right now.");
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final show15 = useState(false);
     final field15e = useTextEditingController();
-
+final showDebugFeastures = useState(false);
     final backgroundSync = [
       FSelectTile(title: Text("Disable"), value: Duration(seconds: 0)),
       if (show15.value)
@@ -79,6 +167,12 @@ class SettingsPage extends HookConsumerWidget {
                   },
                 ),
               ),
+            if(showDebugFeastures.value)  FTile(
+                prefix: const Icon(FIcons.copy),
+                title: const Text('Copy Saved Cookies'),
+                suffix: const Icon(FIcons.chevronRight),
+                onPress: () => _copySavedCookies(context, ref),
+              ),
               FSelectMenuTile(
                 prefix: Icon(FIcons.folderSync),
                 title: FTappable(
@@ -136,7 +230,7 @@ class SettingsPage extends HookConsumerWidget {
               FTile(
                 prefix: Icon(FIcons.moon),
                 title: const Text('Dark Mode'),
-
+                onLongPress: () => showDebugFeastures.value = !showDebugFeastures.value,
                 suffix: FSwitch(
                   value: ref.watch(themeProvider) == ThemeMode.dark,
                   onChange: (value) {
@@ -152,7 +246,7 @@ class SettingsPage extends HookConsumerWidget {
                   GoRouter.of(context).pushNamed(Paths.notificationManagement);
                 },
               ),
-              FTile(
+           if(showDebugFeastures.value)   FTile(
                 prefix: const Icon(Icons.receipt_long_outlined),
                 title: const Text("Logs"),
                 suffix: Icon(FIcons.chevronRight),

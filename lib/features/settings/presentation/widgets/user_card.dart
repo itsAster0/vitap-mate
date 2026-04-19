@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
+import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 
-class UserCard extends HookWidget {
+class UserCard extends HookConsumerWidget {
   final VtopUserEntity user;
 
   const UserCard({super.key, required this.user});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final auth = useMemoized(() => LocalAuthentication());
     final canUseBiometric =
         useFuture(() async {
@@ -93,11 +100,62 @@ class UserCard extends HookWidget {
                   ),
               ],
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 10,
+              runSpacing: 10,
               children: [
                 UserSemChange(user: user),
                 if (!user.isValid) UserPassChange(user: user),
+                FButton(
+                  variant: FButtonVariant.destructive,
+                  onPress: () {
+                    showAdaptiveDialog(
+                      context: context,
+                      builder: (dialogContext) => FDialog(
+                        title: const Text("Sign out"),
+                        body: const Text(
+                          "You will be signed out and returned to onboarding.",
+                        ),
+                        actions: [
+                          FButton(
+                            variant: FButtonVariant.outline,
+                            onPress: () => Navigator.of(dialogContext).pop(),
+                            child: const Text("Cancel"),
+                          ),
+                          FButton(
+                            variant: FButtonVariant.destructive,
+                            onPress: () async {
+                              try {
+                                final username = user.username;
+                                if (username != null && username.isNotEmpty) {
+                                  await clearStoredVtopSession(username);
+                                  await ref
+                                      .read(vtopusersutilsProvider.notifier)
+                                      .vtopUserDelete(username);
+                                }
+                                ref.invalidate(vtopUserProvider);
+                                ref.invalidate(vClientProvider);
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                }
+                                if (context.mounted) {
+                                  context.go('/onboarding');
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  disCommonToast(context, e);
+                                }
+                              }
+                            },
+                            child: const Text("Sign out"),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Text("Sign out"),
+                ),
               ],
             ),
           ],

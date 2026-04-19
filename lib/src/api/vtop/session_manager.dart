@@ -9,6 +9,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:meta/meta.dart' as meta;
 import 'types.dart';
 
+// These functions are ignored because they are not marked as `pub`: `is_cookie_attribute_name`, `parse_cookie_pairs`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `fmt`
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<SessionManager>>
@@ -26,6 +27,8 @@ abstract class SessionManager implements RustOpaqueInterface {
   Future<ArcJar> getCookieStore();
 
   Future<String?> getCsrfToken();
+
+  Future<String?> getExternalCookieHeader();
 
   Future<void> importPersistedSession({
     required String url,

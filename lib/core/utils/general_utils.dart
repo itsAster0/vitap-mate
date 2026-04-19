@@ -12,7 +12,11 @@ const _downloadManagerChannel = MethodChannel('vitapmate/download_manager');
 String formatUnixTimestamp(int timestamp) {
   final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   final formatter = DateFormat("MMM dd, yyyy hh:mm a");
-  return formatter.format(date).toLowerCase();
+  final formatted = formatter.format(date);
+  return formatted.replaceFirstMapped(
+    RegExp(r'^[A-Za-z]{3}'),
+    (match) => match.group(0)!.toUpperCase(),
+  );
 }
 
 String commonErrorMessage(Object e) {
