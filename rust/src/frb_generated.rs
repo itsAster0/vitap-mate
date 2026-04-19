@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -282554092;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1745436509;
 
 // Section: executor
 
@@ -2997,6 +2997,38 @@ fn wire__crate__api__native_logs__native_logs_get_entries_impl(
         },
     )
 }
+fn wire__crate__api__vtop__vtop_client__now_unix_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "now_unix",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::vtop::vtop_client::now_unix())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__vtop__paraser__parseattn__parse_attendance_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -4763,7 +4795,10 @@ impl SseDecode for crate::api::vtop::vtop_errors::VtopError {
             }
             10 => {
                 let mut var_field0 = <String>::sse_decode(deserializer);
-                return crate::api::vtop::vtop_errors::VtopError::OTPRequired(var_field0);
+                let mut var_field1 = <u64>::sse_decode(deserializer);
+                return crate::api::vtop::vtop_errors::VtopError::OTPRequired(
+                    var_field0, var_field1,
+                );
             }
             _ => {
                 unimplemented!("");
@@ -5063,79 +5098,80 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         53 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        56 => wire__crate__api__vtop__paraser__parseattn__parse_attendance_impl(
+        56 => wire__crate__api__vtop__vtop_client__now_unix_impl(port, ptr, rust_vec_len, data_len),
+        57 => wire__crate__api__vtop__paraser__parseattn__parse_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        57 => wire__crate__api__vtop__paraser__parseattn__parse_full_attendance_impl(
+        58 => wire__crate__api__vtop__paraser__parseattn__parse_full_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        58 => wire__crate__api__vtop__paraser__parsegradehistory__parse_grade_history_impl(
+        59 => wire__crate__api__vtop__paraser__parsegradehistory__parse_grade_history_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        59 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_impl(
+        60 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        60 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_details_impl(
+        61 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_details_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        61 => wire__crate__api__vtop__paraser__parsemarks__parse_marks_impl(
+        62 => wire__crate__api__vtop__paraser__parsemarks__parse_marks_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        62 => wire__crate__api__vtop__paraser__parsesched__parse_schedule_impl(
+        63 => wire__crate__api__vtop__paraser__parsesched__parse_schedule_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        63 => wire__crate__api__vtop__paraser__parsett__parse_semid_timetable_impl(
+        64 => wire__crate__api__vtop__paraser__parsett__parse_semid_timetable_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        64 => wire__crate__api__vtop__paraser__parsett__parse_timetable_impl(
+        65 => wire__crate__api__vtop__paraser__parsett__parse_timetable_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        65 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        66 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        66 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        67 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        67 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        68 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        68 => wire__crate__api__vtop__vtop_config__vtop_config_default_impl(
+        69 => wire__crate__api__vtop__vtop_config__vtop_config_default_impl(
             port,
             ptr,
             rust_vec_len,
@@ -6135,9 +6171,12 @@ impl flutter_rust_bridge::IntoDart for crate::api::vtop::vtop_errors::VtopError 
             crate::api::vtop::vtop_errors::VtopError::InvalidResponse => {
                 [9.into_dart()].into_dart()
             }
-            crate::api::vtop::vtop_errors::VtopError::OTPRequired(field0) => {
-                [10.into_dart(), field0.into_into_dart().into_dart()].into_dart()
-            }
+            crate::api::vtop::vtop_errors::VtopError::OTPRequired(field0, field1) => [
+                10.into_dart(),
+                field0.into_into_dart().into_dart(),
+                field1.into_into_dart().into_dart(),
+            ]
+            .into_dart(),
             _ => {
                 unimplemented!("");
             }
@@ -7054,9 +7093,10 @@ impl SseEncode for crate::api::vtop::vtop_errors::VtopError {
             crate::api::vtop::vtop_errors::VtopError::InvalidResponse => {
                 <i32>::sse_encode(9, serializer);
             }
-            crate::api::vtop::vtop_errors::VtopError::OTPRequired(field0) => {
+            crate::api::vtop::vtop_errors::VtopError::OTPRequired(field0, field1) => {
                 <i32>::sse_encode(10, serializer);
                 <String>::sse_encode(field0, serializer);
+                <u64>::sse_encode(field1, serializer);
             }
             _ => {
                 unimplemented!("");

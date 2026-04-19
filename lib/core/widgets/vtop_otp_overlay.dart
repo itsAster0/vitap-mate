@@ -86,6 +86,14 @@ class VtopOtpOverlay extends HookConsumerWidget {
                             hint: '6-digit OTP',
                             label: const Text('OTP'),
                           ),
+                          if (state.isAutoFetchingEmail)
+                            Text(
+                              state.autoFetchMessage ??
+                                  'We are trying to get OTP from email...',
+                              style: context.theme.typography.sm.copyWith(
+                                color: context.theme.colors.mutedForeground,
+                              ),
+                            ),
                           if (state.errorMessage != null &&
                               state.errorMessage!.trim().isNotEmpty)
                             Text(

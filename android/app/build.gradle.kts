@@ -36,6 +36,8 @@ dependencies {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appAuthRedirectScheme"] =
+            "com.googleusercontent.apps.95428715364-4f11adlt9kjaubvc3jif86cectghm448"
     }
     signingConfigs {
     create("release") {
@@ -53,6 +55,9 @@ dependencies {
     }
 
     buildTypes {
+         debug {
+            signingConfig = signingConfigs.getByName("release")
+        }
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.

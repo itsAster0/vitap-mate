@@ -116,7 +116,9 @@ class TimetablePage extends HookConsumerWidget {
 
                           ...daySlots.map((slot) => TimetableCard(slot: slot)),
 
-                          DataUpdatedFooter(updateTime: data.updateTime.toInt()),
+                          DataUpdatedFooter(
+                            updateTime: data.updateTime.toInt(),
+                          ),
                         ],
                       );
                     },

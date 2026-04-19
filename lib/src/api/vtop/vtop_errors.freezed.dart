@@ -146,7 +146,7 @@ return otpRequired(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  networkError,TResult Function( String field0)?  vtopServerError,TResult Function( String field0)?  authenticationFailed,TResult Function()?  registrationParsingError,TResult Function()?  invalidCredentials,TResult Function()?  sessionExpired,TResult Function( String field0)?  parseError,TResult Function( String field0)?  configurationError,TResult Function()?  captchaRequired,TResult Function()?  invalidResponse,TResult Function( String field0)?  otpRequired,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  networkError,TResult Function( String field0)?  vtopServerError,TResult Function( String field0)?  authenticationFailed,TResult Function()?  registrationParsingError,TResult Function()?  invalidCredentials,TResult Function()?  sessionExpired,TResult Function( String field0)?  parseError,TResult Function( String field0)?  configurationError,TResult Function()?  captchaRequired,TResult Function()?  invalidResponse,TResult Function( String field0,  BigInt field1)?  otpRequired,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
 return networkError();case VtopError_VtopServerError() when vtopServerError != null:
@@ -159,7 +159,7 @@ return parseError(_that.field0);case VtopError_ConfigurationError() when configu
 return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
 return invalidResponse();case VtopError_OTPRequired() when otpRequired != null:
-return otpRequired(_that.field0);case _:
+return otpRequired(_that.field0,_that.field1);case _:
   return orElse();
 
 }
@@ -177,7 +177,7 @@ return otpRequired(_that.field0);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  networkError,required TResult Function( String field0)  vtopServerError,required TResult Function( String field0)  authenticationFailed,required TResult Function()  registrationParsingError,required TResult Function()  invalidCredentials,required TResult Function()  sessionExpired,required TResult Function( String field0)  parseError,required TResult Function( String field0)  configurationError,required TResult Function()  captchaRequired,required TResult Function()  invalidResponse,required TResult Function( String field0)  otpRequired,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  networkError,required TResult Function( String field0)  vtopServerError,required TResult Function( String field0)  authenticationFailed,required TResult Function()  registrationParsingError,required TResult Function()  invalidCredentials,required TResult Function()  sessionExpired,required TResult Function( String field0)  parseError,required TResult Function( String field0)  configurationError,required TResult Function()  captchaRequired,required TResult Function()  invalidResponse,required TResult Function( String field0,  BigInt field1)  otpRequired,}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError():
 return networkError();case VtopError_VtopServerError():
@@ -190,7 +190,7 @@ return parseError(_that.field0);case VtopError_ConfigurationError():
 return configurationError(_that.field0);case VtopError_CaptchaRequired():
 return captchaRequired();case VtopError_InvalidResponse():
 return invalidResponse();case VtopError_OTPRequired():
-return otpRequired(_that.field0);}
+return otpRequired(_that.field0,_that.field1);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -204,7 +204,7 @@ return otpRequired(_that.field0);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  networkError,TResult? Function( String field0)?  vtopServerError,TResult? Function( String field0)?  authenticationFailed,TResult? Function()?  registrationParsingError,TResult? Function()?  invalidCredentials,TResult? Function()?  sessionExpired,TResult? Function( String field0)?  parseError,TResult? Function( String field0)?  configurationError,TResult? Function()?  captchaRequired,TResult? Function()?  invalidResponse,TResult? Function( String field0)?  otpRequired,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  networkError,TResult? Function( String field0)?  vtopServerError,TResult? Function( String field0)?  authenticationFailed,TResult? Function()?  registrationParsingError,TResult? Function()?  invalidCredentials,TResult? Function()?  sessionExpired,TResult? Function( String field0)?  parseError,TResult? Function( String field0)?  configurationError,TResult? Function()?  captchaRequired,TResult? Function()?  invalidResponse,TResult? Function( String field0,  BigInt field1)?  otpRequired,}) {final _that = this;
 switch (_that) {
 case VtopError_NetworkError() when networkError != null:
 return networkError();case VtopError_VtopServerError() when vtopServerError != null:
@@ -217,7 +217,7 @@ return parseError(_that.field0);case VtopError_ConfigurationError() when configu
 return configurationError(_that.field0);case VtopError_CaptchaRequired() when captchaRequired != null:
 return captchaRequired();case VtopError_InvalidResponse() when invalidResponse != null:
 return invalidResponse();case VtopError_OTPRequired() when otpRequired != null:
-return otpRequired(_that.field0);case _:
+return otpRequired(_that.field0,_that.field1);case _:
   return null;
 
 }
@@ -685,10 +685,11 @@ String toString() {
 
 
 class VtopError_OTPRequired extends VtopError {
-  const VtopError_OTPRequired(this.field0): super._();
+  const VtopError_OTPRequired(this.field0, this.field1): super._();
   
 
  final  String field0;
+ final  BigInt field1;
 
 /// Create a copy of VtopError
 /// with the given fields replaced by the non-null parameter values.
@@ -700,16 +701,16 @@ $VtopError_OTPRequiredCopyWith<VtopError_OTPRequired> get copyWith => _$VtopErro
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is VtopError_OTPRequired&&(identical(other.field0, field0) || other.field0 == field0));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is VtopError_OTPRequired&&(identical(other.field0, field0) || other.field0 == field0)&&(identical(other.field1, field1) || other.field1 == field1));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,field0);
+int get hashCode => Object.hash(runtimeType,field0,field1);
 
 @override
 String toString() {
-  return 'VtopError.otpRequired(field0: $field0)';
+  return 'VtopError.otpRequired(field0: $field0, field1: $field1)';
 }
 
 
@@ -720,7 +721,7 @@ abstract mixin class $VtopError_OTPRequiredCopyWith<$Res> implements $VtopErrorC
   factory $VtopError_OTPRequiredCopyWith(VtopError_OTPRequired value, $Res Function(VtopError_OTPRequired) _then) = _$VtopError_OTPRequiredCopyWithImpl;
 @useResult
 $Res call({
- String field0
+ String field0, BigInt field1
 });
 
 
@@ -737,10 +738,11 @@ class _$VtopError_OTPRequiredCopyWithImpl<$Res>
 
 /// Create a copy of VtopError
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? field0 = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? field0 = null,Object? field1 = null,}) {
   return _then(VtopError_OTPRequired(
 null == field0 ? _self.field0 : field0 // ignore: cast_nullable_to_non_nullable
-as String,
+as String,null == field1 ? _self.field1 : field1 // ignore: cast_nullable_to_non_nullable
+as BigInt,
   ));
 }
 

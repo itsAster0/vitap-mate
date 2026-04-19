@@ -7,12 +7,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 final _androidCookieManager = WebViewCookieManager();
 
 class VtopWebviewSession {
-  const VtopWebviewSession({
-    required this.cookies
-  });
+  const VtopWebviewSession({required this.cookies});
 
   final List<VtopWebviewCookie> cookies;
-
 
   String get cookieHeader => cookies.map((cookie) => cookie.header).join('; ');
 }
@@ -64,7 +61,7 @@ Future<VtopWebviewSession?> loadVtopWebviewSession({
     if (parsedCookie == null) continue;
     parsedCookies.add(parsedCookie);
   }
-final path = '/vtop';
+  final path = '/vtop';
   final cookies = parsedCookies
       .map(
         (cookie) => VtopWebviewCookie(
@@ -104,9 +101,7 @@ final path = '/vtop';
     }
   }
 
-  return VtopWebviewSession(
-    cookies: cookies,
-  );
+  return VtopWebviewSession(cookies: cookies);
 }
 
 ({String name, String value})? parseCookiePair(String cookieHeader) {

@@ -14,7 +14,7 @@ pub enum VtopError {
     ConfigurationError(String),
     CaptchaRequired,
     InvalidResponse,
-    OTPRequired(String),
+    OTPRequired(String, u64),
 }
 
 impl std::fmt::Display for VtopError {
@@ -29,7 +29,7 @@ impl std::fmt::Display for VtopError {
             VtopError::ParseError(msg) => write!(f, "Parse error: {}", msg),
             VtopError::ConfigurationError(msg) => write!(f, "Configuration error: {}", msg),
             VtopError::CaptchaRequired => write!(f, "Captcha verification required"),
-            VtopError::OTPRequired(msg) => write!(f, "OTP required: {}", msg),
+            VtopError::OTPRequired(msg, time) => write!(f, "OTP required: {} at {}", msg, time),
             VtopError::InvalidResponse => write!(f, "Invalid response from server"),
         }
     }

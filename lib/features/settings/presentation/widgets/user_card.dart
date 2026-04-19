@@ -14,7 +14,6 @@ import 'package:vitapmate/features/settings/presentation/pages/user_management.d
 
 class UserCard extends HookConsumerWidget {
   final VtopUserEntity user;
-
   const UserCard({super.key, required this.user});
 
   @override

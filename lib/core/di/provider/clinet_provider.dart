@@ -91,6 +91,7 @@ class VClient extends _$VClient {
                   client: client,
                   message:
                       'Additional verification required. OTP sent to your registered email.',
+                  otpRequiredAt: securityOtpRequiredAt(e),
                 );
           }
         },

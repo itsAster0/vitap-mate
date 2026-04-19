@@ -93,10 +93,10 @@ class ShellLayout extends HookConsumerWidget {
               case 2:
                 GoRouter.of(context).goNamed(Paths.more);
                 break;
+              // case 3:
+              //   GoRouter.of(context).goNamed(Paths.studentProjects);
+              //   break;
               case 3:
-                GoRouter.of(context).goNamed(Paths.studentProjects);
-                break;
-              case 4:
                 GoRouter.of(context).goNamed(Paths.settings);
                 break;
             }
@@ -114,10 +114,10 @@ class ShellLayout extends HookConsumerWidget {
               icon: Icon(FIcons.libraryBig),
               label: const Text('More'),
             ),
-            FBottomNavigationBarItem(
-              icon: Icon(FIcons.rocket),
-              label: const Text('Projects'),
-            ),
+            // FBottomNavigationBarItem(
+            //   icon: Icon(FIcons.rocket),
+            //   label: const Text('Projects'),
+            // ),
             FBottomNavigationBarItem(
               icon: Icon(FIcons.settings),
               label: const Text('Settings'),

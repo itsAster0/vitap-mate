@@ -16,7 +16,7 @@ String _authFailedMessage(Object e) {
             ? trimmed
             : 'We could not complete your sign-in. Please try again.';
       },
-      otpRequired: (_) {
+      otpRequired: (_, _) {
         return 'We need to verify this sign-in with the OTP sent to your registered email.';
       },
       vtopServerError: (message) {
@@ -75,7 +75,7 @@ void disCommonToast(BuildContext context, Object e) {
   } else if (e is VtopError &&
       e.maybeWhen(
         authenticationFailed: (_) => true,
-        otpRequired: (_) => true,
+        otpRequired: (_, _) => true,
         vtopServerError: (_) => true,
         sessionExpired: () => true,
         orElse: () => false,
@@ -119,7 +119,7 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
   } else if (e is VtopError &&
       e.maybeWhen(
         authenticationFailed: (_) => true,
-        otpRequired: (_) => true,
+        otpRequired: (_, _) => true,
         vtopServerError: (_) => true,
         sessionExpired: () => true,
         orElse: () => false,

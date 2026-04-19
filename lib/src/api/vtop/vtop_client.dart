@@ -12,6 +12,9 @@ import 'vtop_config.dart';
 
 // These functions are ignored because they are not marked as `pub`: `ensure_authenticated_session`, `extract_captcha_data`, `extract_csrf_token`, `extract_javascript_var`, `follow_security_otp_redirect`, `get_login_page_error`, `get_regno`, `is_invalid_credentials_response`, `is_login_url`, `is_security_otp_required_response`, `load_initial_page`, `load_login_page`, `log_auth_event`, `log_cookie_store_state`, `log_network_request`, `login_alert_message`, `make_client`, `mark_session_expired`, `missing_csrf_error`, `normalize_login_alert_message`, `perform_login`, `read_authenticated_response_text`, `reqwest_network_error`, `resolve_vtop_url`, `solve_captcha`, `try_restore_existing_session`, `validate_authenticated_session`, `vtop_server_error`
 
+Future<BigInt> nowUnix() =>
+    RustLib.instance.api.crateApiVtopVtopClientNowUnix();
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>
 abstract class VtopClient implements RustOpaqueInterface {
   String get username;

@@ -74,7 +74,7 @@ class FeatureFlagsController extends _$FeatureFlagsController {
     final parsedBuildNumber = int.tryParse(info.buildNumber);
     final buildNumberTraitValue = parsedBuildNumber ?? info.buildNumber.trim();
     final traits = <Trait>[
-      Trait(key: "appVersionCode", value: appVersionCode),
+      Trait(key: "appVersion", value: info.version.trim()),
       Trait(key: "buildNumber", value: buildNumberTraitValue),
     ];
     final identity = Identity(

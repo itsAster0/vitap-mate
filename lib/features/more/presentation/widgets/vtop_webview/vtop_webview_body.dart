@@ -59,10 +59,7 @@ class VtopWebviewBody extends StatelessWidget {
                 isInspectable: kDebugMode,
                 useOnDownloadStart: true,
               ),
-              initialUrlRequest: URLRequest(
-                url: initialUrl,
-         
-              ),
+              initialUrlRequest: URLRequest(url: initialUrl),
               onWebViewCreated: onWebViewCreated,
               onDownloadStartRequest: (controller, request) async {
                 final cookieHeader = await loadLatestVtopCookieHeader(

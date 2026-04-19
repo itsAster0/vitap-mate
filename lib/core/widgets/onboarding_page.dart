@@ -11,6 +11,7 @@ import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -86,7 +87,7 @@ class OnboardingPage extends HookConsumerWidget {
                 ),
               ),
             ),
-               const SizedBox(height: 8),
+            const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
               child: FAlert(
@@ -253,6 +254,11 @@ class Step2 extends HookConsumerWidget {
                     await ref
                         .read(vtopusersutilsProvider.notifier)
                         .vtopUserInitialData(user);
+                    final snapshot = createPersistedVtopSessionSnapshot(
+                      client: _globalClient,
+                      ttl: vtopSessionReuseTtl,
+                    );
+                    await saveStoredVtopSession(snapshot);
                     ref.invalidate(vtopUserProvider);
                     await ref.read(vtopUserProvider.future);
 

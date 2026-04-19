@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:developer' show log;
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -15,8 +18,10 @@ class VtopOtpChallengeState {
     required this.isMinimized,
     required this.isSubmitting,
     required this.isResending,
+    required this.isAutoFetchingEmail,
     required this.remainingSeconds,
     required this.message,
+    this.autoFetchMessage,
     this.errorMessage,
   });
 
@@ -25,16 +30,20 @@ class VtopOtpChallengeState {
       isMinimized = false,
       isSubmitting = false,
       isResending = false,
+      isAutoFetchingEmail = false,
       remainingSeconds = 0,
       message = '',
+      autoFetchMessage = null,
       errorMessage = null;
 
   final bool isActive;
   final bool isMinimized;
   final bool isSubmitting;
   final bool isResending;
+  final bool isAutoFetchingEmail;
   final int remainingSeconds;
   final String message;
+  final String? autoFetchMessage;
   final String? errorMessage;
 
   VtopOtpChallengeState copyWith({
@@ -42,9 +51,12 @@ class VtopOtpChallengeState {
     bool? isMinimized,
     bool? isSubmitting,
     bool? isResending,
+    bool? isAutoFetchingEmail,
     int? remainingSeconds,
     String? message,
+    String? autoFetchMessage,
     String? errorMessage,
+    bool clearAutoFetchMessage = false,
     bool clearError = false,
   }) {
     return VtopOtpChallengeState(
@@ -52,8 +64,12 @@ class VtopOtpChallengeState {
       isMinimized: isMinimized ?? this.isMinimized,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isResending: isResending ?? this.isResending,
+      isAutoFetchingEmail: isAutoFetchingEmail ?? this.isAutoFetchingEmail,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       message: message ?? this.message,
+      autoFetchMessage: clearAutoFetchMessage
+          ? null
+          : (autoFetchMessage ?? this.autoFetchMessage),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
   }
@@ -64,6 +80,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   Timer? _ticker;
   Completer<void>? _completer;
   VtopClient? _client;
+  DateTime? _otpRequiredAt;
+  int _autoFetchRunId = 0;
 
   @override
   VtopOtpChallengeState build() {
@@ -77,12 +95,19 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     required VtopClient client,
     String message =
         'Additional verification required. OTP sent to your registered email.',
-  }) {
+    DateTime? otpRequiredAt,
+  }) async {
     _client = client;
+    _otpRequiredAt = otpRequiredAt?.toUtc();
+    final canAutoFetchFromEmail = await _canAutoFetchFromEmail();
     if (state.isActive && _completer != null && !_completer!.isCompleted) {
       state = state.copyWith(
         isMinimized: false,
         message: message,
+        isAutoFetchingEmail: canAutoFetchFromEmail,
+        autoFetchMessage: canAutoFetchFromEmail
+            ? 'Trying to get OTP from email...'
+            : null,
         clearError: true,
       );
       return _completer!.future;
@@ -91,13 +116,21 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     _completer = Completer<void>();
     state = VtopOtpChallengeState(
       isActive: true,
-      isMinimized: false,
+      isMinimized: canAutoFetchFromEmail,
       isSubmitting: false,
       isResending: false,
+      isAutoFetchingEmail: canAutoFetchFromEmail,
       remainingSeconds: _otpChallengeTimeout.inSeconds,
       message: message,
+      autoFetchMessage: canAutoFetchFromEmail
+          ? 'Trying to get OTP from email...'
+          : null,
     );
     _startTicker();
+    if (canAutoFetchFromEmail) {
+      final runId = ++_autoFetchRunId;
+      unawaited(_runEmailAutoFetch(runId: runId));
+    }
     return _completer!.future;
   }
 
@@ -158,6 +191,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     state = state.copyWith(isResending: true, clearError: true);
     try {
       await vtopClientResendSecurityOtp(client: _client!);
+      _otpRequiredAt = DateTime.now().toUtc();
       state = state.copyWith(
         isResending: false,
         remainingSeconds: _otpChallengeTimeout.inSeconds,
@@ -165,6 +199,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         clearError: true,
       );
       _startTicker();
+      if (state.isAutoFetchingEmail) {
+        final runId = ++_autoFetchRunId;
+        unawaited(_runEmailAutoFetch(runId: runId));
+      }
     } catch (error) {
       state = state.copyWith(
         isResending: false,
@@ -181,11 +219,14 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       final next = state.remainingSeconds - 1;
       if (next <= 0) {
         _ticker?.cancel();
+        final autoFetchPending = state.isAutoFetchingEmail;
         state = state.copyWith(
           remainingSeconds: 0,
           message:
               'OTP expired. Tap resend to get a new OTP and continue verification.',
-          errorMessage: 'OTP expired. Please resend OTP.',
+          errorMessage: autoFetchPending
+              ? null
+              : 'OTP expired. Please resend OTP.',
           clearError: false,
         );
         return;
@@ -228,10 +269,90 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   }
 
   void _reset() {
+    _autoFetchRunId++;
     _ticker?.cancel();
     _ticker = null;
     _client = null;
+    _otpRequiredAt = null;
     _completer = null;
     state = const VtopOtpChallengeState.idle();
+  }
+
+  Future<bool> _canAutoFetchFromEmail() async {
+    try {
+      final featureFlags = await ref.read(
+        featureFlagsControllerProvider.future,
+      );
+      if (!await featureFlags.isEnabled('2fa-email')) return false;
+      final oauth = ref.read(googleEmailOtpAuthServiceProvider);
+      return oauth.isReady();
+    } catch (error, stackTrace) {
+      log(
+        'Failed to evaluate 2fa-email autofetch availability',
+        name: 'email_otp.autofetch',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
+  Future<void> _runEmailAutoFetch({required int runId}) async {
+    final oauth = ref.read(googleEmailOtpAuthServiceProvider);
+    final startedAt =
+        _otpRequiredAt ?? DateTime.now().subtract(Duration(seconds: 2)).toUtc();
+    log(
+      'Email OTP autofetch using lower-bound timestamp: ${startedAt.toIso8601String()}',
+      name: 'email_otp.autofetch',
+    );
+    final attempts = 8;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      if (!_shouldContinueAutoFetch(runId)) return;
+      if (!state.isAutoFetchingEmail) return;
+      if (state.isSubmitting) return;
+
+      state = state.copyWith(
+        autoFetchMessage:
+            'Trying to get OTP from email... (${attempts - attempt} attempts left)',
+      );
+      try {
+        final otp = await oauth.fetchLatestOtpSince(sinceUtc: startedAt);
+        if (otp != null && otp.isNotEmpty) {
+          await submitOtp(otp);
+          return;
+        }
+      } catch (error, stackTrace) {
+        log(
+          'Email OTP autofetch attempt failed',
+          name: 'email_otp.autofetch',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (!_shouldContinueAutoFetch(runId)) return;
+        state = state.copyWith(
+          isAutoFetchingEmail: false,
+          isMinimized: false,
+          autoFetchMessage: null,
+          message:
+              'Could not read OTP from email. Enter OTP manually to continue.',
+          clearError: true,
+        );
+        return;
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+
+    if (!_shouldContinueAutoFetch(runId)) return;
+    state = state.copyWith(
+      isAutoFetchingEmail: false,
+      isMinimized: false,
+      autoFetchMessage: null,
+      message: 'Could not find OTP in email. Enter it manually to continue.',
+      clearError: true,
+    );
+  }
+
+  bool _shouldContinueAutoFetch(int runId) {
+    return runId == _autoFetchRunId && state.isActive && _client != null;
   }
 }

@@ -16,7 +16,13 @@ use reqwest::{
 use scraper::{Html, Selector};
 use serde::Serialize;
 use std::sync::Arc;
-
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+pub fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::new(1, 0))
+        .as_secs()
+}
 const VITAP_CUSTOM_CERT_PEM: &str = r#"-----BEGIN CERTIFICATE-----
 MIIGTDCCBDSgAwIBAgIQOXpmzCdWNi4NqofKbqvjsTANBgkqhkiG9w0BAQwFADBf
 MQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTYwNAYDVQQD
@@ -95,7 +101,7 @@ pub struct VtopClient {
     session: SessionManager,
     current_page: Option<String>,
     real_username: String,
-   pub username: String,
+    pub username: String,
     password: String,
     captcha_data: Option<String>,
 }
@@ -569,6 +575,7 @@ impl VtopClient {
         let url = format!("{}/vtop/login", self.config.base_url);
 
         log_network_request("perform_login.send", "POST", &url);
+        let time_after = now_unix();
         let response = self
             .client
             .post(&url)
@@ -596,6 +603,7 @@ impl VtopClient {
                 log_auth_event("INFO", "security OTP verification is required");
                 return Err(VtopError::OTPRequired(
                     "Additional verification is required.".to_string(),
+                    time_after,
                 ));
             } else {
                 return Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
