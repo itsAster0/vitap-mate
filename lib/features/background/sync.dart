@@ -1,7 +1,11 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
+import 'package:vitapmate/core/utils/app_errors.dart';
+import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
@@ -13,7 +17,6 @@ import 'package:vitapmate/features/settings/presentation/providers/semester_id_p
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
-import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -52,6 +55,9 @@ Future<bool> _syncData({String? task}) async {
     if (!await featureFlags.isEnabled("background-sync")) {
       return true;
     }
+    await container
+        .read(vClientProvider.notifier)
+        .ensureLogin(promptForOtp: false);
     final List<Future<bool>> futures = [];
 
     final timetable = await (await container.read(
@@ -61,6 +67,7 @@ Future<bool> _syncData({String? task}) async {
       futures.add(
         _retryer(
           () => container.read(timetableProvider.notifier).updateTimetable(),
+          container: container,
         ),
       );
     }
@@ -70,7 +77,10 @@ Future<bool> _syncData({String? task}) async {
     )).load();
     if (!_isUpdatedWithinBacksyncWindow(marks.updateTime)) {
       futures.add(
-        _retryer(() => container.read(marksProvider.notifier).updatemarks()),
+        _retryer(
+          () => container.read(marksProvider.notifier).updatemarks(),
+          container: container,
+        ),
       );
     }
 
@@ -82,6 +92,7 @@ Future<bool> _syncData({String? task}) async {
         _retryer(
           () =>
               container.read(examScheduleProvider.notifier).updatexamschedule(),
+          container: container,
         ),
       );
     }
@@ -93,6 +104,7 @@ Future<bool> _syncData({String? task}) async {
       futures.add(
         _retryer(
           () => container.read(semesterIdProvider.notifier).updatesemids(),
+          container: container,
         ),
       );
     }
@@ -102,7 +114,7 @@ Future<bool> _syncData({String? task}) async {
     await prefs.setString('${task}_val_end', DateTime.now().toString());
     return atLeastHalfTrue(k);
   } catch (e) {
-    return false;
+    return _shouldIgnoreBackgroundError(e, container);
   } finally {
     container.dispose();
   }
@@ -126,7 +138,10 @@ bool atLeastHalfTrue(List<bool> k) {
   return trueCount * 2 >= k.length;
 }
 
-Future<bool> _retryer(Future<void> Function() func) async {
+Future<bool> _retryer(
+  Future<void> Function() func, {
+  required ProviderContainer container,
+}) async {
   // ignore: non_constant_identifier_names
   final int MAX_TRY = 3;
   int runs = 0;
@@ -139,10 +154,28 @@ Future<bool> _retryer(Future<void> Function() func) async {
       if (e is FeatureDisabledException) {
         return true;
       }
-      if (runs == MAX_TRY && e is VtopError) return true;
+      final shouldIgnore = await _shouldIgnoreBackgroundError(e, container);
+      if (!shouldIgnore) return false;
+      if (runs == MAX_TRY) return true;
       if (runs == MAX_TRY) break;
       await Future.delayed(Duration(milliseconds: 400 * (runs + 1)));
     }
+  }
+  return false;
+}
+
+Future<bool> _shouldIgnoreBackgroundError(
+  Object error,
+  ProviderContainer container,
+) async {
+  if (isSecurityOtpRequiredError(error)) {
+    return container
+        .read(vtopOtpChallengeProvider.notifier)
+        .canAutoFetchFromEmail();
+  }
+  final (type, _) = appError(error);
+  if (type == AppErrorType.network || type == AppErrorType.sessionExpired) {
+    return true;
   }
   return false;
 }
@@ -157,8 +190,13 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
     if (!_isUpdatedWithinBacksyncWindow(att.updateTime)) {
       ok = await _retryer(
         () => container.read(attendanceProvider.notifier).updateAttendance(),
+        container: container,
       );
-      att = await container.read(attendanceProvider.future);
+      try {
+        att = await container.read(attendanceProvider.future);
+      } catch (e) {
+        if (!await _shouldIgnoreBackgroundError(e, container)) rethrow;
+      }
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val', att.toString());
@@ -175,12 +213,13 @@ Future<bool> _attendanceSync(ProviderContainer container, String? task) async {
             () => container
                 .read(fullAttendanceProvider(i.courseType, i.courseId).notifier)
                 .updateAttendance(),
+            container: container,
           );
         }(),
     ]);
     return atLeastHalfTrue(k) && ok;
   } catch (e) {
-    return false;
+    return _shouldIgnoreBackgroundError(e, container);
   }
 }
 

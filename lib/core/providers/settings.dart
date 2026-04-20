@@ -134,6 +134,57 @@ ClassReminderSettings classReminderSettings(Ref ref) {
   );
 }
 
+Future<void> setClassReminderEnabled(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.setBool("settings_class_notifications_enabled", value);
+  await legacyPrefs.setBool("settings_class_notifications_enabled", value);
+  if (!value) {
+    await ClassReminderNotificationService.cancelAll();
+  }
+  if (!ref.context.mounted) return;
+  ref.invalidate(classReminderSettingsProvider);
+}
+
+Future<void> setClassReminderNotifyBeforeMinutes(
+  WidgetRef ref,
+  int value,
+) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.setInt("settings_class_notify_before_minutes", value);
+  await legacyPrefs.setInt("settings_class_notify_before_minutes", value);
+  if (!ref.context.mounted) return;
+  ref.invalidate(classReminderSettingsProvider);
+}
+
+Future<void> pauseClassRemindersForDays(WidgetRef ref, int days) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  final now = DateTime.now();
+  final until = DateTime(now.year, now.month, now.day + days, 23, 59, 59);
+  await prefs.setInt(
+    "settings_class_pause_until_millis",
+    until.millisecondsSinceEpoch,
+  );
+  await legacyPrefs.setInt(
+    "settings_class_pause_until_millis",
+    until.millisecondsSinceEpoch,
+  );
+  await ClassReminderNotificationService.cancelAll();
+  if (!ref.context.mounted) return;
+  ref.invalidate(classReminderSettingsProvider);
+}
+
+Future<void> clearClassReminderPause(WidgetRef ref) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.remove("settings_class_pause_until_millis");
+  await legacyPrefs.remove("settings_class_pause_until_millis");
+  if (!ref.context.mounted) return;
+  ref.invalidate(classReminderSettingsProvider);
+}
+
 @riverpod
 ClassReminderSettingsController classReminderSettingsController(Ref ref) {
   return ClassReminderSettingsController(ref);
@@ -206,6 +257,30 @@ ExamReminderSettings examReminderSettings(Ref ref) {
     notifyBeforeMinutes:
         prefs?.getInt("settings_exam_notify_before_minutes") ?? 10,
   );
+}
+
+Future<void> setExamReminderEnabled(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.setBool("settings_exam_notifications_enabled", value);
+  await legacyPrefs.setBool("settings_exam_notifications_enabled", value);
+  if (!value) {
+    await ExamReminderNotificationService.cancelAll();
+  }
+  if (!ref.context.mounted) return;
+  ref.invalidate(examReminderSettingsProvider);
+}
+
+Future<void> setExamReminderNotifyBeforeMinutes(
+  WidgetRef ref,
+  int value,
+) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.setInt("settings_exam_notify_before_minutes", value);
+  await legacyPrefs.setInt("settings_exam_notify_before_minutes", value);
+  if (!ref.context.mounted) return;
+  ref.invalidate(examReminderSettingsProvider);
 }
 
 @riverpod

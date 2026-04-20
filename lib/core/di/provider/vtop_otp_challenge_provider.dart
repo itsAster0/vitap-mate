@@ -134,6 +134,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     return _completer!.future;
   }
 
+  Future<bool> canAutoFetchFromEmail() => _canAutoFetchFromEmail();
+
   void minimize() {
     if (!state.isActive) return;
     state = state.copyWith(isMinimized: true);

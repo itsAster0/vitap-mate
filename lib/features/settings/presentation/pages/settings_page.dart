@@ -421,8 +421,6 @@ class SettingsPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final show15 = useState(false);
-    final field15e = useTextEditingController();
     final showDebugFeatures = useState(false);
     final isEmailOtpReady = useState<bool?>(null);
     final isEmailOtpBusy = useState(false);
@@ -458,11 +456,7 @@ class SettingsPage extends HookConsumerWidget {
       return null;
     }, const []);
     final backgroundSync = [
-      FSelectTile(title: Text("Disable"), value: Duration(seconds: 0)),
-      if (show15.value)
-        FSelectTile(title: Text("15 Minutes"), value: Duration(minutes: 15)),
-      if (show15.value)
-        FSelectTile(title: Text("1 hour"), value: Duration(hours: 1)),
+      FSelectTile(title: Text("1 hour"), value: Duration(hours: 1)),
       FSelectTile(title: Text("3 hours"), value: Duration(hours: 3)),
       FSelectTile(title: Text("6 hours"), value: Duration(hours: 6)),
       FSelectTile(title: Text("12 hours"), value: Duration(hours: 12)),
@@ -470,17 +464,7 @@ class SettingsPage extends HookConsumerWidget {
     ];
     final initialValSync =
         ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);
-    useEffect(() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (initialValSync == Duration(minutes: 15) ||
-            initialValSync == Duration(hours: 1)) {
-          show15.value = true;
-        } else {
-          show15.value = false;
-        }
-      });
-      return null;
-    }, [initialValSync]);
+
     return SingleChildScrollView(
       child: Column(
         spacing: 8,
@@ -583,45 +567,16 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               FSelectMenuTile(
                 prefix: Icon(FIcons.folderSync),
-                title: FTappable(
-                  onLongPress: () {
-                    showFDialog(
-                      context: context,
-                      builder: (context, style, animation) => FDialog(
-                        animation: animation,
-                        direction: Axis.horizontal,
-                        title: const Text('Are you absolutely sure?'),
-                        body: FTextField(
-                          control: FTextFieldControl.managed(
-                            controller: field15e,
-                          ),
-                        ),
-                        actions: [
-                          FButton(
-                            child: const Text('Continue'),
-                            onPress: () {
-                              if (field15e.text.trim().toLowerCase() == "why") {
-                                show15.value = true;
-                              }
-
-                              Navigator.of(context).pop();
-                            },
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: Text('Background Sync'),
-                ),
+                title: FTappable(child: Text('Background Sync')),
 
                 selectControl: FMultiValueControl.managedRadio(
                   initial: initialValSync,
                   onChange: (value) {
                     final selected = value.isEmpty ? null : value.first;
                     if (selected != null) {
-                      // ref
-                      //     .read(backgroundSyncProvider.notifier)
-                      //     .updateFreq(selected);
+                      ref
+                          .read(backgroundSyncProvider.notifier)
+                          .updateFreq(selected);
                     }
                   },
                 ),

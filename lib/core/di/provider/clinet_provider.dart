@@ -60,7 +60,10 @@ class VClient extends _$VClient {
     state = AsyncData(vclinet);
   }
 
-  Future<void> ensureLogin({bool force = false}) async {
+  Future<void> ensureLogin({
+    bool force = false,
+    bool promptForOtp = true,
+  }) async {
     VtopClient client = await future;
     VtopUserEntity user = await ref.watch(vtopUserProvider.future);
     if (!force) {
@@ -85,6 +88,12 @@ class VClient extends _$VClient {
             await vtopClientLogin(client: client);
           } catch (e) {
             if (!isSecurityOtpRequiredError(e)) rethrow;
+            if (!promptForOtp &&
+                !await ref
+                    .read(vtopOtpChallengeProvider.notifier)
+                    .canAutoFetchFromEmail()) {
+              rethrow;
+            }
             await ref
                 .read(vtopOtpChallengeProvider.notifier)
                 .requestOtp(

@@ -5,7 +5,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
-const vtopSessionReuseTtl = Duration(minutes: 30);
+const vtopSessionReuseTtl = Duration(minutes: 120);
 
 class StoredVtopSession {
   const StoredVtopSession({
