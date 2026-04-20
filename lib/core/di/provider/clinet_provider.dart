@@ -18,6 +18,8 @@ part 'clinet_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 class VClient extends _$VClient {
+  int _loginFlowCounter = 0;
+
   @override
   Future<VtopClient> build() async {
     String? username = await ref.watch(
@@ -60,38 +62,92 @@ class VClient extends _$VClient {
     state = AsyncData(vclinet);
   }
 
+  Future<void> _persistCurrentSession(
+    VtopClient client, {
+    String? flowLabel,
+  }) async {
+    final snapshot = createPersistedVtopSessionSnapshot(client: client);
+    if (snapshot.cookies?.trim().isEmpty ?? true) {
+      AppLogger.instance.warning(
+        'client.session',
+        '${flowLabel ?? 'session.persist'} skipped because cookie header was empty',
+      );
+      return;
+    }
+    await saveStoredVtopSession(snapshot);
+    AppLogger.instance.info(
+      'client.session',
+      '${flowLabel ?? 'session.persist'} saved snapshot for ${snapshot.username} (cookieHeaderLength=${snapshot.cookies?.length ?? 0})',
+    );
+  }
+
   Future<void> ensureLogin({
     bool force = false,
     bool promptForOtp = true,
   }) async {
     VtopClient client = await future;
     VtopUserEntity user = await ref.watch(vtopUserProvider.future);
+    final flowId = ++_loginFlowCounter;
+    final flowLabel = 'auth.flow#$flowId';
     if (!force) {
-      if (await fetchIsAuth(client: client)) return;
+      if (await fetchIsAuth(client: client)) {
+        AppLogger.instance.info(
+          'client.auth',
+          '$flowLabel reused an authenticated in-memory session',
+        );
+        await _persistCurrentSession(
+          client,
+          flowLabel: '$flowLabel session.persist',
+        );
+        return;
+      }
     }
     if (!user.isValid) {
+      AppLogger.instance.warning(
+        'client.auth',
+        '$flowLabel blocked because stored credentials are marked invalid',
+      );
       throw const VtopError.authenticationFailed(
         'Your saved VTOP credentials need attention. Check them in Settings.',
       );
     }
     final featureFlags = await ref.read(featureFlagsControllerProvider.future);
     if (!await featureFlags.isEnabled("try-login")) {
+      AppLogger.instance.warning(
+        'client.auth',
+        '$flowLabel blocked because try-login feature flag is disabled',
+      );
       throw FeatureDisabledException("Login is Disabled");
     }
-    AppLogger.instance.info('client.auth', 'login attempt started');
+    AppLogger.instance.info(
+      'client.auth',
+      '$flowLabel started (force=$force, promptForOtp=$promptForOtp, user=${user.username?.toUpperCase() ?? '<unknown>'})',
+    );
 
     try {
       await ref.read(globalAsyncQueueProvider.notifier).run(
         "vtop_login_${user.username}",
         () async {
+          AppLogger.instance.info(
+            'client.auth',
+            '$flowLabel entered serialized login queue',
+          );
           try {
             await vtopClientLogin(client: client);
           } catch (e) {
             if (!isSecurityOtpRequiredError(e)) rethrow;
+            AppLogger.instance.info(
+              'client.auth',
+              '$flowLabel requires OTP verification',
+            );
             if (!promptForOtp &&
                 !await ref
                     .read(vtopOtpChallengeProvider.notifier)
                     .canAutoFetchFromEmail()) {
+              AppLogger.instance.warning(
+                'client.auth',
+                '$flowLabel cannot continue because OTP prompt is disabled and email autofetch is unavailable',
+              );
               rethrow;
             }
             await ref
@@ -101,23 +157,29 @@ class VClient extends _$VClient {
                   message:
                       'Additional verification required. OTP sent to your registered email.',
                   otpRequiredAt: securityOtpRequiredAt(e),
+                  logContext: flowLabel,
                 );
+            AppLogger.instance.info(
+              'client.auth',
+              '$flowLabel OTP verification completed',
+            );
           }
         },
       );
-      final snapshot = createPersistedVtopSessionSnapshot(client: client);
-      await saveStoredVtopSession(snapshot);
-      AppLogger.instance.info(
-        'client.session',
-        'saved refreshed session for ${snapshot.username} with ${snapshot.cookies} cookies',
+      await _persistCurrentSession(
+        client,
+        flowLabel: '$flowLabel session.persist',
       );
-      AppLogger.instance.info('client.auth', 'login attempt finished');
+      AppLogger.instance.info(
+        'client.auth',
+        '$flowLabel finished successfully',
+      );
     } catch (e) {
       final uname = user.username;
       if (e == VtopError.invalidCredentials()) {
         AppLogger.instance.warning(
           'client.auth',
-          'credentials rejected; marking stored user as invalid',
+          '$flowLabel credentials rejected; marking stored user as invalid',
         );
         await ref
             .read(vtopusersutilsProvider.notifier)
@@ -131,11 +193,11 @@ class VClient extends _$VClient {
         await clearStoredVtopSession(uname);
         AppLogger.instance.warning(
           'client.session',
-          'cleared saved session after a terminal authentication failure',
+          '$flowLabel cleared saved session after a terminal authentication failure',
         );
       }
 
-      AppLogger.instance.error('client.auth', 'login failed: $e');
+      AppLogger.instance.error('client.auth', '$flowLabel failed: $e');
 
       rethrow;
     }

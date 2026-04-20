@@ -100,6 +100,7 @@ pub struct VtopClient {
     config: VtopConfig,
     session: SessionManager,
     current_page: Option<String>,
+    auth_flow_id: u64,
     real_username: String,
     pub username: String,
     password: String,
@@ -107,6 +108,31 @@ pub struct VtopClient {
 }
 
 impl VtopClient {
+    fn auth_log(&self, level: &str, stage: &str, message: impl AsRef<str>) {
+        log_auth_event(
+            level,
+            &format!(
+                "auth.flow#{} {} {}",
+                self.auth_flow_id,
+                stage,
+                message.as_ref()
+            ),
+        );
+    }
+
+    fn network_auth_log(&self, stage: &str, method: &str, url: &str) {
+        log_network_request(
+            &format!("auth.flow#{}.{}", self.auth_flow_id, stage),
+            method,
+            url,
+        );
+    }
+
+    fn begin_auth_flow(&mut self, reason: &str) {
+        self.auth_flow_id = self.auth_flow_id.saturating_add(1);
+        self.auth_log("INFO", "start", reason);
+    }
+
     fn log_cookie_store_state(&self, context: &str) {
         let url = format!("{}/vtop", self.config.base_url);
         let cookie_header = self
@@ -120,16 +146,29 @@ impl VtopClient {
         log_auth_event(
             "INFO",
             &format!(
-                "{context}: cookie store = {cookie_header}; external cookie header = {external_cookie_header}"
+                "auth.flow#{} {}: cookie store = {cookie_header}; external cookie header = {external_cookie_header}",
+                self.auth_flow_id, context
             ),
         );
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
+    fn reset_session_state(&mut self) {
+        self.session.clear();
+        self.client = Self::make_client(self.session.get_cookie_store());
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn reset_session_state(&mut self) {
+        self.session.clear();
+    }
+
     fn mark_session_expired(&mut self, context: &str, reason: &str) {
-        self.session.set_authenticated(false);
-        log_auth_event(
+        self.reset_session_state();
+        self.auth_log(
             "WARN",
-            &format!("{context}: session marked expired because {reason}"),
+            context,
+            format!("session marked expired because {reason}"),
         );
     }
 
@@ -152,15 +191,14 @@ impl VtopClient {
             .map_err(|error| reqwest_network_error(&format!("{context}.text"), error))?;
 
         if !status.is_success() {
-            if status.as_u16() == 404 {
-                self.mark_session_expired(
-                    context,
-                    &format!("VTOP returned HTTP {status} at {final_url}"),
-                );
-            }
+            self.mark_session_expired(
+                context,
+                &format!("VTOP returned HTTP {status} at {final_url}"),
+            );
+
             return Err(vtop_server_error(
                 context,
-                format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
+                format!("VTOP returned HTTP {status}"),
             ));
         }
 
@@ -168,9 +206,10 @@ impl VtopClient {
     }
 
     pub fn restore_session_snapshot(&mut self, session: PersistedVtopSession) {
-        log_auth_event(
+        self.auth_log(
             "INFO",
-            &format!("restoring persisted session for {} ", session.username,),
+            "session.restore",
+            format!("restoring persisted session for {}", session.username),
         );
         let url = format!("{}/vtop", self.config.base_url);
         self.session.import_persisted_session(url, session);
@@ -505,20 +544,27 @@ impl VtopClient {
 // for login
 impl VtopClient {
     pub async fn login(&mut self) -> VtopResult<()> {
+        self.begin_auth_flow("login requested");
         if self.session.is_cookie_external() {
-            log_auth_event("INFO", "validating restored session before fresh login");
+            self.auth_log(
+                "INFO",
+                "session.restore",
+                "validating restored session before fresh login",
+            );
             match self.try_restore_existing_session().await {
                 Ok(true) => return Ok(()),
                 Ok(false) => {
-                    log_auth_event(
+                    self.auth_log(
                         "WARN",
+                        "session.restore",
                         "restored session could not be verified, falling back to full login",
                     );
                 }
                 Err(error) => {
-                    log_auth_event(
+                    self.auth_log(
                         "WARN",
-                        &format!(
+                        "session.restore",
+                        format!(
                             "restored session validation failed, falling back to fresh login: {}",
                             error
                         ),
@@ -530,9 +576,10 @@ impl VtopClient {
         #[allow(non_snake_case)]
         let MAX_CAP_TRY = 40;
         for i in 0..MAX_CAP_TRY {
-            log_auth_event(
+            self.auth_log(
                 "INFO",
-                &format!("starting login attempt {} of {}", i + 1, MAX_CAP_TRY),
+                "login.attempt",
+                format!("starting login attempt {} of {}", i + 1, MAX_CAP_TRY),
             );
             if i == 0 {
                 self.load_login_page(true).await?;
@@ -549,16 +596,25 @@ impl VtopClient {
                 Ok(_) => {
                     self.session.set_authenticated(true);
                     self.session.set_cookie_external(false);
-                    log_auth_event("INFO", "login completed successfully");
+                    self.auth_log("INFO", "finish", "login completed successfully");
                     return Ok(());
                 }
                 Err(VtopError::AuthenticationFailed(msg)) if msg.contains("Invalid Captcha") => {
-                    log_auth_event("WARN", "captcha answer was rejected, retrying login");
+                    self.auth_log(
+                        "WARN",
+                        "captcha",
+                        "captcha answer was rejected, retrying login",
+                    );
                     continue;
                 }
                 Err(e) => return Err(e),
             }
         }
+        self.auth_log(
+            "ERROR",
+            "finish",
+            "exhausted captcha attempts without completing sign-in",
+        );
         Err(VtopError::AuthenticationFailed(
             "We could not complete sign-in after several captcha attempts. Please try again."
                 .to_string(),
@@ -580,7 +636,7 @@ impl VtopClient {
         );
         let url = format!("{}/vtop/login", self.config.base_url);
 
-        log_network_request("perform_login.send", "POST", &url);
+        self.network_auth_log("perform_login.send", "POST", &url);
         let time_after = now_unix();
         let response = self
             .client
@@ -600,17 +656,17 @@ impl VtopClient {
                 return Err(VtopError::AuthenticationFailed(
                     "Invalid Captcha".to_string(),
                 ));
-            } else if Self::is_invalid_credentials_response(&response_text) {
-                log_auth_event("WARN", "login rejected due to invalid credentials");
-                return Err(VtopError::InvalidCredentials);
             } else if Self::is_security_otp_required_response(&response_text) {
                 self.current_page = Some(response_text);
                 let _ = self.extract_csrf_token();
-                log_auth_event("INFO", "security OTP verification is required");
+                self.auth_log("INFO", "otp", "security OTP verification is required");
                 return Err(VtopError::OTPRequired(
                     "Additional verification is required.".to_string(),
                     time_after,
                 ));
+            } else if Self::is_invalid_credentials_response(&response_text) {
+                self.auth_log("WARN", "login", "login rejected due to invalid credentials");
+                return Err(VtopError::InvalidCredentials);
             } else {
                 return Err(VtopError::AuthenticationFailed(Self::get_login_page_error(
                     &response_text,
@@ -623,6 +679,11 @@ impl VtopClient {
 
             self.current_page = None;
             self.captcha_data = None;
+            self.auth_log(
+                "INFO",
+                "login",
+                "credentials accepted and session page loaded",
+            );
             Ok(())
         }
     }
@@ -639,7 +700,7 @@ impl VtopClient {
             .text("otpCode", otp_code.trim().to_string())
             .text("_csrf", csrf);
 
-        log_network_request("submit_security_otp.send", "POST", &url);
+        self.network_auth_log("submit_security_otp.send", "POST", &url);
         let response = self
             .client
             .post(&url)
@@ -684,8 +745,9 @@ impl VtopClient {
             || response_text_lower.contains("invalid otp")
         {
             let message = otp_message.unwrap_or("Invalid OTP. Please try again.".to_string());
-            log_auth_event(
+            self.auth_log(
                 "WARN",
+                "otp",
                 "OTP verification failed because the code was invalid",
             );
             return Err(VtopError::AuthenticationFailed(message));
@@ -693,7 +755,11 @@ impl VtopClient {
 
         if matches!(otp_status.as_deref(), Some("EXPIRED")) {
             let message = otp_message.unwrap_or("OTP has expired. Please resend.".to_string());
-            log_auth_event("WARN", "OTP verification failed because the code expired");
+            self.auth_log(
+                "WARN",
+                "otp",
+                "OTP verification failed because the code expired",
+            );
             return Err(VtopError::AuthenticationFailed(message));
         }
 
@@ -703,8 +769,9 @@ impl VtopClient {
                     return Ok(());
                 }
             } else {
-                log_auth_event(
+                self.auth_log(
                     "WARN",
+                    "otp",
                     "OTP verification returned SUCCESS without redirectUrl",
                 );
             }
@@ -712,7 +779,11 @@ impl VtopClient {
 
         if let Some(status) = otp_status.as_deref() {
             if status != "VALID" && status != "SUCCESS" && status != "OK" {
-                log_auth_event("WARN", "OTP verification returned a non-success status");
+                self.auth_log(
+                    "WARN",
+                    "otp",
+                    "OTP verification returned a non-success status",
+                );
                 return Err(VtopError::AuthenticationFailed(
                     otp_message.unwrap_or("Verification failed. Please try again.".to_string()),
                 ));
@@ -738,7 +809,7 @@ impl VtopClient {
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
-            log_auth_event("INFO", "OTP verified and session confirmed");
+            self.auth_log("INFO", "finish", "OTP verified and session confirmed");
             return Ok(());
         }
 
@@ -750,14 +821,15 @@ impl VtopClient {
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
-            log_auth_event("INFO", "OTP verified and session confirmed");
+            self.auth_log("INFO", "finish", "OTP verified and session confirmed");
             return Ok(());
         }
 
         if response_declares_success {
-            log_auth_event(
+            self.auth_log(
                 "WARN",
-                &format!(
+                "otp",
+                format!(
                     "OTP endpoint reported success, but session validation failed after landing at {final_url}"
                 ),
             );
@@ -767,9 +839,10 @@ impl VtopClient {
             ));
         }
 
-        log_auth_event(
+        self.auth_log(
             "WARN",
-            &format!(
+            "otp",
+            format!(
                 "OTP verification did not return a success response: HTTP {status_code} at {final_url}"
             ),
         );
@@ -780,7 +853,7 @@ impl VtopClient {
 
     async fn follow_security_otp_redirect(&mut self, redirect_url: &str) -> VtopResult<bool> {
         let url = self.resolve_vtop_url(redirect_url)?;
-        log_network_request("follow_security_otp_redirect.send", "GET", &url);
+        self.network_auth_log("follow_security_otp_redirect.send", "GET", &url);
         let response = self
             .client
             .get(&url)
@@ -821,7 +894,11 @@ impl VtopClient {
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
-            log_auth_event("INFO", "OTP redirect followed and session confirmed");
+            self.auth_log(
+                "INFO",
+                "finish",
+                "OTP redirect followed and session confirmed",
+            );
             return Ok(true);
         }
 
@@ -906,7 +983,7 @@ impl VtopClient {
     async fn validate_authenticated_session(&mut self) -> VtopResult<bool> {
         self.log_cookie_store_state("validate_authenticated_session.before_request");
         let url = format!("{}/vtop/content", self.config.base_url);
-        log_network_request("validate_authenticated_session.send", "GET", &url);
+        self.network_auth_log("validate_authenticated_session.send", "GET", &url);
         let mut request = self.client.get(&url);
         if let Some(raw_cookie_header) = self.session.get_external_cookie_header() {
             request = request.header("Cookie", raw_cookie_header);
@@ -967,7 +1044,7 @@ impl VtopClient {
         let body = format!("_csrf={}&flag=VTOP", csrf);
         self.captcha_data = None;
         for attempt in 0..Max_RELOAD_ATTEMPTS {
-            log_network_request("load_login_page.send", "POST", &url);
+            self.network_auth_log("load_login_page.send", "POST", &url);
             let response = self
                 .client
                 .post(&url)
@@ -993,9 +1070,10 @@ impl VtopClient {
                 self.extract_captcha_data()?;
                 break;
             }
-            log_auth_event(
+            self.auth_log(
                 "WARN",
-                &format!(
+                "captcha",
+                format!(
                     "captcha payload was missing on attempt {} of {}, retrying login page load",
                     attempt + 1,
                     Max_RELOAD_ATTEMPTS
@@ -1003,8 +1081,9 @@ impl VtopClient {
             );
         }
         if self.captcha_data.is_none() {
-            log_auth_event(
+            self.auth_log(
                 "ERROR",
+                "captcha",
                 "captcha payload was missing after all login page reload attempts",
             );
             return Err(VtopError::CaptchaRequired);
@@ -1018,15 +1097,21 @@ impl VtopClient {
             self.get_regno()?;
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
-            log_auth_event("INFO", "restored session validation succeeded");
+            self.auth_log(
+                "INFO",
+                "session.restore",
+                "restored session validation succeeded",
+            );
             return Ok(true);
         }
 
-        log_auth_event(
+        self.auth_log(
             "WARN",
+            "session.restore",
             "restored session was not accepted by VTOP; keeping cookies available for the next login attempt",
         );
-        self.session.clear();
+        self.reset_session_state();
+        self.session.set_cookie_external(false);
         Ok(false)
     }
 
@@ -1209,10 +1294,9 @@ impl VtopClient {
         let Some(message) = Self::login_alert_message(data) else {
             return false;
         };
-        matches!(
-            Self::normalize_login_alert_message(&message).as_str(),
-            "invalid username/password" | "invalid loginid/password"
-        )
+        let msg = Self::normalize_login_alert_message(&message).to_lowercase();
+
+        msg.contains("invalid username/password") || msg.contains("invalid loginid/password")
     }
 
     fn is_security_otp_required_response(data: &str) -> bool {
@@ -1236,6 +1320,7 @@ impl VtopClient {
                 config: config,
                 session: session,
                 current_page: None,
+                auth_flow_id: 0,
                 username: username.clone(),
                 password: password,
                 captcha_data: None,
@@ -1258,6 +1343,7 @@ impl VtopClient {
                 config: config,
                 session: session,
                 current_page: None,
+                auth_flow_id: 0,
                 username: username,
                 password: password,
                 captcha_data: None,

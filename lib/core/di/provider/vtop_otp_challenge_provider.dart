@@ -1,7 +1,6 @@
 import 'dart:async';
-import 'dart:developer' show log;
-
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
@@ -82,6 +81,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   VtopClient? _client;
   DateTime? _otpRequiredAt;
   int _autoFetchRunId = 0;
+  int _challengeCounter = 0;
+  String _logContext = 'otp.flow';
 
   @override
   VtopOtpChallengeState build() {
@@ -96,11 +97,17 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     String message =
         'Additional verification required. OTP sent to your registered email.',
     DateTime? otpRequiredAt,
+    String? logContext,
   }) async {
     _client = client;
     _otpRequiredAt = otpRequiredAt?.toUtc();
+    _logContext = logContext ?? 'otp.flow#${++_challengeCounter}';
     final canAutoFetchFromEmail = await _canAutoFetchFromEmail();
     if (state.isActive && _completer != null && !_completer!.isCompleted) {
+      AppLogger.instance.info(
+        'client.otp',
+        '$_logContext challenge already active; refreshing prompt state',
+      );
       state = state.copyWith(
         isMinimized: false,
         message: message,
@@ -114,6 +121,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
 
     _completer = Completer<void>();
+    AppLogger.instance.info(
+      'client.otp',
+      '$_logContext challenge started (emailAutofetch=$canAutoFetchFromEmail)',
+    );
     state = VtopOtpChallengeState(
       isActive: true,
       isMinimized: canAutoFetchFromEmail,
@@ -147,6 +158,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   }
 
   void cancel() {
+    AppLogger.instance.warning(
+      'client.otp',
+      '$_logContext challenge cancelled',
+    );
     _finishWithError(
       VtopError.authenticationFailed('OTP verification cancelled'),
     );
@@ -156,6 +171,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     if (!state.isActive || _client == null) return;
     final sanitizedOtp = otp.replaceAll(RegExp(r'\D'), '');
     if (sanitizedOtp.length != 6) {
+      AppLogger.instance.warning(
+        'client.otp',
+        '$_logContext rejected OTP submit because the code was not 6 digits',
+      );
       state = state.copyWith(
         errorMessage: 'Please enter a valid 6-digit OTP.',
         clearError: false,
@@ -163,16 +182,22 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       return;
     }
 
+    AppLogger.instance.info('client.otp', '$_logContext submitting OTP code');
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
       await vtopClientSubmitSecurityOtp(
         client: _client!,
         otpCode: sanitizedOtp,
       );
+      AppLogger.instance.info('client.otp', '$_logContext OTP accepted');
       _finishSuccess();
     } catch (error) {
       final message = _authMessage(error);
       if (_isInvalidOtp(message)) {
+        AppLogger.instance.warning(
+          'client.otp',
+          '$_logContext OTP rejected as invalid',
+        );
         state = state.copyWith(
           isSubmitting: false,
           isMinimized: false,
@@ -180,6 +205,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         );
         return;
       }
+      AppLogger.instance.error(
+        'client.otp',
+        '$_logContext OTP submission failed: $error',
+      );
       _finishWithError(error);
     }
   }
@@ -191,9 +220,11 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
 
     state = state.copyWith(isResending: true, clearError: true);
+    AppLogger.instance.info('client.otp', '$_logContext requesting OTP resend');
     try {
       await vtopClientResendSecurityOtp(client: _client!);
       _otpRequiredAt = DateTime.now().toUtc();
+      AppLogger.instance.info('client.otp', '$_logContext resend completed');
       state = state.copyWith(
         isResending: false,
         remainingSeconds: _otpChallengeTimeout.inSeconds,
@@ -206,6 +237,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         unawaited(_runEmailAutoFetch(runId: runId));
       }
     } catch (error) {
+      AppLogger.instance.error(
+        'client.otp',
+        '$_logContext resend failed: $error',
+      );
       state = state.copyWith(
         isResending: false,
         errorMessage: _authMessage(error),
@@ -256,6 +291,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
   void _finishSuccess() {
     final completer = _completer;
+    AppLogger.instance.info('client.otp', '$_logContext challenge completed');
     _reset();
     if (completer != null && !completer.isCompleted) {
       completer.complete();
@@ -264,6 +300,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
   void _finishWithError(Object error) {
     final completer = _completer;
+    AppLogger.instance.warning(
+      'client.otp',
+      '$_logContext challenge finished with error: $error',
+    );
     _reset();
     if (completer != null && !completer.isCompleted) {
       completer.completeError(error);
@@ -289,12 +329,11 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       final oauth = ref.read(googleEmailOtpAuthServiceProvider);
       return oauth.isReady();
     } catch (error, stackTrace) {
-      log(
-        'Failed to evaluate 2fa-email autofetch availability',
-        name: 'email_otp.autofetch',
-        error: error,
-        stackTrace: stackTrace,
+      AppLogger.instance.error(
+        'client.otp',
+        '$_logContext failed to evaluate email OTP autofetch availability: $error',
       );
+      Zone.current.handleUncaughtError(error, stackTrace);
       return false;
     }
   }
@@ -303,9 +342,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     final oauth = ref.read(googleEmailOtpAuthServiceProvider);
     final startedAt =
         _otpRequiredAt ?? DateTime.now().subtract(Duration(seconds: 2)).toUtc();
-    log(
-      'Email OTP autofetch using lower-bound timestamp: ${startedAt.toIso8601String()}',
-      name: 'email_otp.autofetch',
+    AppLogger.instance.info(
+      'client.otp',
+      '$_logContext email autofetch started from ${startedAt.toIso8601String()}',
     );
     final attempts = 8;
     for (var attempt = 0; attempt < attempts; attempt++) {
@@ -320,16 +359,19 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       try {
         final otp = await oauth.fetchLatestOtpSince(sinceUtc: startedAt);
         if (otp != null && otp.isNotEmpty) {
+          AppLogger.instance.info(
+            'client.otp',
+            '$_logContext email autofetch found an OTP on attempt ${attempt + 1} of $attempts',
+          );
           await submitOtp(otp);
           return;
         }
       } catch (error, stackTrace) {
-        log(
-          'Email OTP autofetch attempt failed',
-          name: 'email_otp.autofetch',
-          error: error,
-          stackTrace: stackTrace,
+        AppLogger.instance.error(
+          'client.otp',
+          '$_logContext email autofetch failed on attempt ${attempt + 1} of $attempts: $error',
         );
+        Zone.current.handleUncaughtError(error, stackTrace);
         if (!_shouldContinueAutoFetch(runId)) return;
         state = state.copyWith(
           isAutoFetchingEmail: false,
@@ -345,6 +387,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
 
     if (!_shouldContinueAutoFetch(runId)) return;
+    AppLogger.instance.warning(
+      'client.otp',
+      '$_logContext email autofetch exhausted all attempts without finding an OTP',
+    );
     state = state.copyWith(
       isAutoFetchingEmail: false,
       isMinimized: false,

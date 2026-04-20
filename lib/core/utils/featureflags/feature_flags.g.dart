@@ -38,7 +38,7 @@ final class FeatureFlagsControllerProvider
 }
 
 String _$featureFlagsControllerHash() =>
-    r'd295f4e2b6e69a0086e3bb3ee926556455afa557';
+    r'56ce9185580fa5cffc66ad64af5067f7c8ead1f9';
 
 abstract class _$FeatureFlagsController
     extends $AsyncNotifier<FeatureFlagPodController> {

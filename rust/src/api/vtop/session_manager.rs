@@ -107,7 +107,9 @@ impl SessionManager {
     pub fn clear(&mut self) {
         self.csrf_token = None;
         self.is_authenticated = false;
+        self.is_cookie_external = false;
         self.external_cookie_header = None;
+        self.cookie_store = Arc::new(Jar::default());
     }
 
     pub fn set_csrf_from_external(&mut self, token: String) {
