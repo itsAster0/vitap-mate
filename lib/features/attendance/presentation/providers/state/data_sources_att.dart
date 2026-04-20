@@ -10,7 +10,7 @@ part 'data_sources_att.g.dart';
 Future<AttendanceDataSource> attendanceDataSource(Ref ref) async {
   return AttendanceDataSource(
     await ref.read(jsonFileStorageProvider.future),
-    await ref.watch(vClientProvider.future),
+    () => ref.read(vClientProvider.future),
     ref.read(globalAsyncQueueProvider.notifier),
   );
 }

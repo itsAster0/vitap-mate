@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
 class AttendanceDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final AsyncQueue _globalAsyncQueue;
 
   AttendanceDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -84,7 +84,10 @@ class AttendanceDataSource {
       action: 'fetchAttendance semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_attendance_$semid',
-        () => vtop_api.fetchAttendance(client: _client, semesterId: semid),
+        () async => vtop_api.fetchAttendance(
+          client: await _client(),
+          semesterId: semid,
+        ),
       ),
     );
   }
@@ -99,8 +102,8 @@ class AttendanceDataSource {
       action: 'fetchFullAttendance semid=$semid courseId=$courseId',
       run: () => _globalAsyncQueue.run(
         'vtop_fullattendance_${semid}_${courseType}_$courseId',
-        () => vtop_api.fetchFullAttendance(
-          client: _client,
+        () async => vtop_api.fetchFullAttendance(
+          client: await _client(),
           semesterId: semid,
           courseId: courseId,
           courseType: courseType,

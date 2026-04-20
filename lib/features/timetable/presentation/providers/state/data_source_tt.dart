@@ -10,7 +10,7 @@ part 'data_source_tt.g.dart';
 Future<TimetableDataSource> timetableDataSource(Ref ref) async {
   return TimetableDataSource(
     await ref.read(jsonFileStorageProvider.future),
-    await ref.watch(vClientProvider.future),
+    () => ref.read(vClientProvider.future),
     ref.read(globalAsyncQueueProvider.notifier),
   );
 }

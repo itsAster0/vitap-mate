@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
 class SemesterIdDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   SemesterIdDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -35,7 +35,7 @@ class SemesterIdDataSource {
       action: 'fetchSemesters',
       run: () => _globalAsyncQueue.run(
         'vtop_semidsfrom_timetabel',
-        () => vtop_api.fetchSemesters(client: _client),
+        () async => vtop_api.fetchSemesters(client: await _client()),
       ),
     );
   }

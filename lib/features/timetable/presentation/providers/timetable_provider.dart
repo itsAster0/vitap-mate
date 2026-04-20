@@ -16,7 +16,9 @@ class Timetable extends _$Timetable {
       featureName: "fetch-timetable",
       hooks: VtopHooks(
         onSuccess: (data, {required fromCache}) async {
-          await ClassReminderNotificationService.syncFromTimetable(data);
+          if (!fromCache) {
+            await ClassReminderNotificationService.syncFromTimetable(data);
+          }
         },
       ),
     );
@@ -37,7 +39,9 @@ class Timetable extends _$Timetable {
       featureName: "fetch-timetable",
       hooks: VtopHooks(
         onSuccess: (data, {required fromCache}) async {
-          await ClassReminderNotificationService.syncFromTimetable(data);
+          if (!fromCache) {
+            await ClassReminderNotificationService.syncFromTimetable(data);
+          }
         },
       ),
     );

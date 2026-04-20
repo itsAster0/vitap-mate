@@ -597,7 +597,7 @@ class SettingsPage extends HookConsumerWidget {
       return null;
     }, const []);
     final backgroundSync = [
-      FSelectTile(title: Text("1 hour"), value: Duration(hours: 1)),
+      FSelectTile(title: Text("Disable"), value: Duration(hours: 0)),
       FSelectTile(title: Text("3 hours"), value: Duration(hours: 3)),
       FSelectTile(title: Text("6 hours"), value: Duration(hours: 6)),
       FSelectTile(title: Text("12 hours"), value: Duration(hours: 12)),

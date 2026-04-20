@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
 class TimetableDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final AsyncQueue _globalAsyncQueue;
 
   TimetableDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -39,7 +39,8 @@ class TimetableDataSource {
       action: 'fetchTimetable semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_timetable_$semid',
-        () => vtop_api.fetchTimetable(client: _client, semesterId: semid),
+        () async =>
+            vtop_api.fetchTimetable(client: await _client(), semesterId: semid),
       ),
     );
   }

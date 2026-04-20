@@ -10,7 +10,7 @@ part 'data_sources.g.dart';
 Future<SemesterIdDataSource> semidDataSource(Ref ref) async {
   return SemesterIdDataSource(
     await ref.read(jsonFileStorageProvider.future),
-    await ref.watch(vClientProvider.future),
+    () => ref.read(vClientProvider.future),
     ref.read(globalAsyncQueueProvider.notifier),
   );
 }

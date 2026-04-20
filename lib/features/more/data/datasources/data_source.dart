@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
 class ExamScheduleDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   ExamScheduleDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -42,7 +42,10 @@ class ExamScheduleDataSource {
       action: 'fetchExamSchedule semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_fetchSchedule_$semid',
-        () => vtop_api.fetchExamShedule(client: _client, semesterId: semid),
+        () async => vtop_api.fetchExamShedule(
+          client: await _client(),
+          semesterId: semid,
+        ),
       ),
     );
   }
@@ -50,7 +53,7 @@ class ExamScheduleDataSource {
 
 class MarksDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   MarksDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -81,7 +84,8 @@ class MarksDataSource {
       action: 'fetchMarks semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_marks_$semid',
-        () => vtop_api.fetchMarks(client: _client, semesterId: semid),
+        () async =>
+            vtop_api.fetchMarks(client: await _client(), semesterId: semid),
       ),
     );
   }
@@ -89,7 +93,7 @@ class MarksDataSource {
 
 class GradesDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   GradesDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -150,7 +154,8 @@ class GradesDataSource {
       action: 'fetchGradeView semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_grades_$semid',
-        () => vtop_api.fetchGradeView(client: _client, semesterId: semid),
+        () async =>
+            vtop_api.fetchGradeView(client: await _client(), semesterId: semid),
       ),
     );
   }
@@ -164,8 +169,8 @@ class GradesDataSource {
       action: 'fetchGradeDetails semid=$semid courseId=$courseId',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_details_${semid}_$courseId',
-        () => vtop_api.fetchGradeViewDetails(
-          client: _client,
+        () async => vtop_api.fetchGradeViewDetails(
+          client: await _client(),
           semesterId: semid,
           courseId: courseId,
         ),
@@ -176,7 +181,7 @@ class GradesDataSource {
 
 class GradeHistoryDataSource {
   final JsonFileStorage _storage;
-  final VtopClient _client;
+  final Future<VtopClient> Function() _client;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   GradeHistoryDataSource(this._storage, this._client, this._globalAsyncQueue);
@@ -235,7 +240,7 @@ class GradeHistoryDataSource {
       action: 'fetchGradeHistory',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_history',
-        () => vtop_api.fetchGradeHistory(client: _client),
+        () async => vtop_api.fetchGradeHistory(client: await _client()),
       ),
     );
   }
