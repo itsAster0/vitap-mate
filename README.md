@@ -5,9 +5,12 @@
 
 This app is archived.
 
-- There will be **no further updates published to the Google Play Store**
+> ⚠️ **Note**
+>
+> There will be **no further updates published to the Google Play Store**.
+> I may still add features or fix issues in my free time, but those changes will **not** be pushed to the Play Store.
+
 - Source code remains available for reference and community forks
-- No official feature development is planned
 
 ## ✨ Features
 

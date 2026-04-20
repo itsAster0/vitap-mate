@@ -152,6 +152,12 @@ impl VtopClient {
             .map_err(|error| reqwest_network_error(&format!("{context}.text"), error))?;
 
         if !status.is_success() {
+            if status.as_u16() == 404 {
+                self.mark_session_expired(
+                    context,
+                    &format!("VTOP returned HTTP {status} at {final_url}"),
+                );
+            }
             return Err(vtop_server_error(
                 context,
                 format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
@@ -911,24 +917,19 @@ impl VtopClient {
             .map_err(|error| reqwest_network_error("validate_authenticated_session.send", error))?;
         let final_url = response.url().to_string();
         let status = response.status();
-        if Self::is_login_url(&final_url) || status.is_redirection() {
+        if Self::is_login_url(&final_url) || !status.is_success() {
             self.mark_session_expired(
                 "validate_authenticated_session",
-                &format!("VTOP returned the login page at {final_url}"),
+                &format!("VTOP returned HTTP {status} at {final_url}"),
             );
             return Ok(false);
-        } else if !status.is_success() {
-            return Err(vtop_server_error(
-                "validate_authenticated_session",
-                format!("VTOP returned HTTP {status} at {final_url}; keeping session for reuse"),
-            ));
         }
         let page = response
             .text()
             .await
             .map_err(|error| reqwest_network_error("validate_authenticated_session.text", error))?;
         self.current_page = Some(page);
-
+        self.session.set_authenticated(true);
         Ok(true)
     }
 
