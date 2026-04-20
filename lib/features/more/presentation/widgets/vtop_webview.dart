@@ -49,15 +49,13 @@ class VtopWebview extends HookConsumerWidget {
       setupError.value = null;
 
       try {
-        final client = await ref.read(vClientProvider.future);
         await ref.read(vClientProvider.notifier).ensureLogin(force: force > 0);
+        final client = await ref.read(vClientProvider.future);
         final user = await ref.read(vtopUserProvider.future);
-        final snapshot =
-            (await loadStoredVtopSession(user.username!))?.snapshot ??
-            createPersistedVtopSessionSnapshot(
-              client: client,
-              ttl: vtopSessionReuseTtl,
-            );
+        final storedSession = await loadStoredVtopSession(user.username!);
+        final snapshot = storedSession?.isExpired == false
+            ? storedSession!.snapshot
+            : createPersistedVtopSessionSnapshot(client: client);
         if (snapshot.cookies?.isEmpty ?? true) {
           throw Exception('Could not prepare VTOP session for webview.');
         }

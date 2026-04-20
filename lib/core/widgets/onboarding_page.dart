@@ -256,7 +256,6 @@ class Step2 extends HookConsumerWidget {
                         .vtopUserInitialData(user);
                     final snapshot = createPersistedVtopSessionSnapshot(
                       client: _globalClient,
-                      ttl: vtopSessionReuseTtl,
                     );
                     await saveStoredVtopSession(snapshot);
                     ref.invalidate(vtopUserProvider);

@@ -32,7 +32,7 @@ class VClient extends _$VClient {
     if (storedSession != null) {
       AppLogger.instance.info(
         'client.session',
-        'found saved session for $uname (age=${storedSession.age.inMinutes}m, ttl=${vtopSessionReuseTtl.inMinutes}m)',
+        'found saved session for $uname (age=${storedSession.age.inMinutes}m, ttl=${storedSession.ttl.inMinutes}m)',
       );
       if (storedSession.isExpired) {
         AppLogger.instance.info(
@@ -105,10 +105,7 @@ class VClient extends _$VClient {
           }
         },
       );
-      final snapshot = createPersistedVtopSessionSnapshot(
-        client: client,
-        ttl: vtopSessionReuseTtl,
-      );
+      final snapshot = createPersistedVtopSessionSnapshot(client: client);
       await saveStoredVtopSession(snapshot);
       AppLogger.instance.info(
         'client.session',

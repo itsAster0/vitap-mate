@@ -3,7 +3,7 @@ update_priority  =4;
 platform :android do
   desc "Deploy a new version to the Internal track only"
   lane :deploy_internal do
-    #sh "flutter build appbundle --release"
+    #sh flutter build appbundle --release --dart-define-from-file=.env.json --dart-define=APP_TRACK=internal
     upload_to_play_store(
       track: "internal",
       aab: "../build/app/outputs/bundle/release/app-release.aab",

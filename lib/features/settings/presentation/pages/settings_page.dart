@@ -7,6 +7,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
@@ -25,6 +26,11 @@ import 'package:vitapmate/features/more/presentation/providers/marks_provider.da
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+
+const _appTrack = String.fromEnvironment(
+  'APP_TRACK',
+  defaultValue: 'production',
+);
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -168,6 +174,85 @@ class SettingsPage extends HookConsumerWidget {
         dispToast(context, "Failed", "Could not clear cookies right now.");
       }
     }
+  }
+
+  Future<void> _openVtopSessionReuseTtlDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final currentTtl = ref.read(vtopSessionReuseTtlProvider);
+
+    await showAdaptiveDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return HookBuilder(
+          builder: (dialogContext) {
+            final controller = useTextEditingController(
+              text: currentTtl.inMinutes.toString(),
+            );
+            final errorText = useState<String?>(null);
+
+            return FDialog(
+              title: const Text('VTOP Session Reuse'),
+              body: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Enter how long saved cookies can be reused.'),
+                  const SizedBox(height: 8),
+                  FTextField(
+                    control: FTextFieldControl.managed(controller: controller),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  if (errorText.value != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      errorText.value!,
+                      style: dialogContext.theme.typography.sm.copyWith(
+                        color: dialogContext.theme.colors.destructive,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FButton(
+                  onPress: () async {
+                    final minutes = int.tryParse(controller.text.trim());
+                    if (minutes == null || minutes <= 0) {
+                      errorText.value = 'Enter minutes greater than 0.';
+                      return;
+                    }
+
+                    await setVtopSessionReuseTtl(
+                      ref,
+                      Duration(minutes: minutes),
+                    );
+                    if (!dialogContext.mounted) return;
+                    Navigator.of(dialogContext).pop();
+                    if (context.mounted) {
+                      dispToast(
+                        context,
+                        'Saved',
+                        'VTOP sessions will be reused for $minutes minutes.',
+                      );
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _openEmailOtpSetupDialog(
@@ -474,6 +559,14 @@ class SettingsPage extends HookConsumerWidget {
     final isEmailOtpTestBusy = useState(false);
     final isEmailOtpFeatureEnabled = useState(false);
     final isVtopSyncing = useState(false);
+    final packageInfoSnapshot = useFuture(
+      useMemoized(PackageInfo.fromPlatform, const []),
+    );
+    final packageInfo = packageInfoSnapshot.data;
+    final appVersion = packageInfo == null
+        ? null
+        : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
+    final showLowMaintenanceNotice = _appTrack == 'production';
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -512,11 +605,23 @@ class SettingsPage extends HookConsumerWidget {
     ];
     final initialValSync =
         ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);
+    final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
 
     return SingleChildScrollView(
       child: Column(
         spacing: 8,
         children: [
+          if (showLowMaintenanceNotice)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: FAlert(
+                variant: FAlertVariant.primary,
+                title: Text('Low maintenance mode'),
+                subtitle: Text(
+                  'This app is in low maintenance mode and might not receive future updates.',
+                ),
+              ),
+            ),
           FTileGroup(
             label: const Text('Vtop'),
             children: [
@@ -620,6 +725,16 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               if (showDebugFeatures.value)
                 FTile(
+                  prefix: const Icon(FIcons.timer),
+                  title: const Text('VTOP Session Reuse'),
+                  subtitle: Text(
+                    'Reuse saved cookies for ${initialVtopSessionReuseTtl.inMinutes} minutes',
+                  ),
+                  suffix: const Icon(FIcons.chevronRight),
+                  onPress: () => _openVtopSessionReuseTtlDialog(context, ref),
+                ),
+              if (showDebugFeatures.value)
+                FTile(
                   prefix: const Icon(FIcons.copy),
                   title: const Text('Copy Saved Cookies'),
                   suffix: const Icon(FIcons.chevronRight),
@@ -714,6 +829,16 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
+          if (appVersion != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 16),
+              child: Text(
+                appVersion,
+                style: context.theme.typography.sm.copyWith(
+                  color: context.theme.colors.mutedForeground,
+                ),
+              ),
+            ),
         ],
       ),
     );

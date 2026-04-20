@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'8da12a0fb629d512f79199851da92eb2463633ba';
+String _$settingsHash() => r'632739a7b1665d2e07800b2202308fea914b1ccd';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();
@@ -169,6 +169,48 @@ final class AutoRefreshProvider extends $FunctionalProvider<bool, bool, bool>
 }
 
 String _$autoRefreshHash() => r'e5ae73c61bbae9b20882fda9e592bd0c6ec00d4f';
+
+@ProviderFor(vtopSessionReuseTtl)
+final vtopSessionReuseTtlProvider = VtopSessionReuseTtlProvider._();
+
+final class VtopSessionReuseTtlProvider
+    extends $FunctionalProvider<Duration, Duration, Duration>
+    with $Provider<Duration> {
+  VtopSessionReuseTtlProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'vtopSessionReuseTtlProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$vtopSessionReuseTtlHash();
+
+  @$internal
+  @override
+  $ProviderElement<Duration> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Duration create(Ref ref) {
+    return vtopSessionReuseTtl(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Duration value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Duration>(value),
+    );
+  }
+}
+
+String _$vtopSessionReuseTtlHash() =>
+    r'32275c9b29c9ed3ba43b5a67b7c1e0e14836ed68';
 
 @ProviderFor(studentProjectPinnedIds)
 final studentProjectPinnedIdsProvider = StudentProjectPinnedIdsProvider._();

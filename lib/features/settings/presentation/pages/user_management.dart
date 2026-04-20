@@ -11,6 +11,7 @@ import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/user_card.dart';
@@ -259,34 +260,51 @@ class UserPassChange extends HookConsumerWidget {
               builder: (dialogContext) {
                 return HookBuilder(
                   builder: (context) {
-                    final controller = useTextEditingController();
+                    final usernameController = useTextEditingController(
+                      text: user.username ?? '',
+                    );
+                    final passwordController = useTextEditingController(
+                      text: user.password ?? '',
+                    );
                     final isLoading = useState(false);
 
                     return FDialog(
-                      title: const Text('Update Password'),
-                      body: Container(
-                        decoration: BoxDecoration(
-                          color: context.theme.colors.secondary,
-                        ),
-                        child: FTextField.password(
-                          control: FTextFieldControl.managed(
-                            controller: controller,
+                      title: const Text('Update Credentials'),
+                      body: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 12,
+                        children: [
+                          FTextField(
+                            control: FTextFieldControl.managed(
+                              controller: usernameController,
+                            ),
+                            label: const Text("Username"),
                           ),
-                          obscuringCharacter: '*',
-                          label: const Text("New Password"),
-                        ),
+                          FTextField.password(
+                            control: FTextFieldControl.managed(
+                              controller: passwordController,
+                            ),
+                            obscuringCharacter: '*',
+                            label: const Text("New Password"),
+                          ),
+                        ],
                       ),
                       actions: [
                         if (!isLoading.value)
                           FButton(
                             onPress: () async {
-                              final newPassword = controller.text.trim();
-                              if (newPassword.isEmpty) return;
+                              final newUsername = usernameController.text
+                                  .trim();
+                              final newPassword = passwordController.text
+                                  .trim();
+                              if (newUsername.isEmpty || newPassword.isEmpty) {
+                                return;
+                              }
 
                               isLoading.value = true;
                               try {
                                 final client = getVtopClient(
-                                  username: user.username!,
+                                  username: newUsername,
                                   password: newPassword,
                                 );
                                 await loginWithSecurityOtpPrompt(
@@ -297,10 +315,15 @@ class UserPassChange extends HookConsumerWidget {
                                     .read(vtopusersutilsProvider.notifier)
                                     .vtopUserSave(
                                       user.copyWith(
+                                        username: newUsername,
                                         password: newPassword,
                                         isValid: true,
                                       ),
                                     );
+                                if (user.username != null &&
+                                    user.username != newUsername) {
+                                  await clearStoredVtopSession(user.username!);
+                                }
                                 ref.invalidate(vtopUserProvider);
                                 ref.invalidate(vClientProvider);
                               } catch (e) {

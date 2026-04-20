@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
+import 'package:vitapmate/core/utils/vtop_session_store.dart';
 part 'settings.g.dart';
 
 @riverpod
@@ -18,6 +19,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_class_pause_until_millis",
         "settings_exam_notifications_enabled",
         "settings_exam_notify_before_minutes",
+        vtopSessionReuseTtlSettingKey,
         "settings_student_projects_pinned_ids",
         "settings_student_projects_json",
         "settings_student_projects_rotation_seed",
@@ -60,6 +62,22 @@ Future<void> setautoRefresh(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool("settings_auto_refresh", value);
   ref.invalidate(autoRefreshProvider);
+}
+
+@riverpod
+Duration vtopSessionReuseTtl(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return vtopSessionReuseTtlFromMinutes(
+    prefs?.getInt(vtopSessionReuseTtlSettingKey),
+  );
+}
+
+Future<void> setVtopSessionReuseTtl(WidgetRef ref, Duration value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  final legacyPrefs = await SharedPreferences.getInstance();
+  await prefs.setInt(vtopSessionReuseTtlSettingKey, value.inMinutes);
+  await legacyPrefs.setInt(vtopSessionReuseTtlSettingKey, value.inMinutes);
+  ref.invalidate(vtopSessionReuseTtlProvider);
 }
 
 @riverpod

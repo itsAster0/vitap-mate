@@ -37,127 +37,159 @@ class UserCard extends HookConsumerWidget {
         false;
     final showPasswords = useState(false);
 
-    return FCard(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          spacing: 8,
-          children: [
-            const Row(
-              spacing: 10,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(FIcons.idCard),
-                Text(
-                  "VTOP Credential",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                const Text(
-                  "Username : ",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Expanded(child: Text(user.username ?? "")),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Text(
-                        "Password : ",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: FCard(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            spacing: 12,
+            children: [
+              Row(
+                spacing: 12,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: context.theme.colors.primary.withValues(
+                        alpha: 0.1,
                       ),
-                      Text(
-                        showPasswords.value
-                            ? user.password ?? ""
-                            : "**********",
-                      ),
-                    ],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(FIcons.idCard),
+                    ),
                   ),
-                ),
-                if (canUseBiometric)
-                  FButton.icon(
-                    onPress: () async {
-                      final availableBiometrics = await auth
-                          .getAvailableBiometrics();
-                      if (availableBiometrics.isNotEmpty &&
-                          !showPasswords.value) {
-                        final didAuthenticate = await auth.authenticate(
-                          localizedReason:
-                              'Please authenticate to show Password',
-                        );
-                        if (!didAuthenticate) return;
-                      }
-                      showPasswords.value = !showPasswords.value;
-                    },
-                    child: const Icon(FIcons.eye),
-                  ),
-              ],
-            ),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                UserSemChange(user: user),
-                if (!user.isValid) UserPassChange(user: user),
-                FButton(
-                  variant: FButtonVariant.destructive,
-                  onPress: () {
-                    showAdaptiveDialog(
-                      context: context,
-                      builder: (dialogContext) => FDialog(
-                        title: const Text("Sign out"),
-                        body: const Text(
-                          "You will be signed out and returned to onboarding.",
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "VTOP Credential",
+                          style: context.theme.typography.md.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                        actions: [
-                          FButton(
-                            variant: FButtonVariant.outline,
-                            onPress: () => Navigator.of(dialogContext).pop(),
-                            child: const Text("Cancel"),
+                        Text(
+                          user.isValid
+                              ? "Account is connected"
+                              : "Password needs attention",
+                          style: context.theme.typography.sm.copyWith(
+                            color: user.isValid
+                                ? context.theme.colors.mutedForeground
+                                : context.theme.colors.destructive,
                           ),
-                          FButton(
-                            variant: FButtonVariant.destructive,
-                            onPress: () async {
-                              try {
-                                final username = user.username;
-                                if (username != null && username.isNotEmpty) {
-                                  await clearStoredVtopSession(username);
-                                  await ref
-                                      .read(vtopusersutilsProvider.notifier)
-                                      .vtopUserDelete(username);
-                                }
-                                ref.invalidate(vtopUserProvider);
-                                ref.invalidate(vClientProvider);
-                                if (dialogContext.mounted) {
-                                  Navigator.of(dialogContext).pop();
-                                }
-                                if (context.mounted) {
-                                  context.go('/onboarding');
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  disCommonToast(context, e);
-                                }
-                              }
-                            },
-                            child: const Text("Sign out"),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Text(
+                    "Username : ",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Expanded(child: Text(user.username ?? "")),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Text(
+                          "Password : ",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          showPasswords.value
+                              ? user.password ?? ""
+                              : "**********",
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (canUseBiometric)
+                    FButton.icon(
+                      onPress: () async {
+                        final availableBiometrics = await auth
+                            .getAvailableBiometrics();
+                        if (availableBiometrics.isNotEmpty &&
+                            !showPasswords.value) {
+                          final didAuthenticate = await auth.authenticate(
+                            localizedReason:
+                                'Please authenticate to show Password',
+                          );
+                          if (!didAuthenticate) return;
+                        }
+                        showPasswords.value = !showPasswords.value;
+                      },
+                      child: const Icon(FIcons.eye),
+                    ),
+                ],
+              ),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  UserSemChange(user: user),
+                  if (!user.isValid) UserPassChange(user: user),
+                  FButton(
+                    variant: FButtonVariant.destructive,
+                    onPress: () {
+                      showAdaptiveDialog(
+                        context: context,
+                        builder: (dialogContext) => FDialog(
+                          title: const Text("Sign out"),
+                          body: const Text(
+                            "You will be signed out and returned to onboarding.",
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text("Sign out"),
-                ),
-              ],
-            ),
-          ],
+                          actions: [
+                            FButton(
+                              variant: FButtonVariant.outline,
+                              onPress: () => Navigator.of(dialogContext).pop(),
+                              child: const Text("Cancel"),
+                            ),
+                            FButton(
+                              variant: FButtonVariant.destructive,
+                              onPress: () async {
+                                try {
+                                  final username = user.username;
+                                  if (username != null && username.isNotEmpty) {
+                                    await clearStoredVtopSession(username);
+                                    await ref
+                                        .read(vtopusersutilsProvider.notifier)
+                                        .vtopUserDelete(username);
+                                  }
+                                  ref.invalidate(vtopUserProvider);
+                                  ref.invalidate(vClientProvider);
+                                  if (dialogContext.mounted) {
+                                    Navigator.of(dialogContext).pop();
+                                  }
+                                  if (context.mounted) {
+                                    context.go('/onboarding');
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    disCommonToast(context, e);
+                                  }
+                                }
+                              },
+                              child: const Text("Sign out"),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: const Text("Sign out"),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
