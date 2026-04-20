@@ -17,8 +17,14 @@ import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/background/controller.dart';
+import 'package:vitapmate/features/background/sync.dart';
+import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
+import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -419,6 +425,47 @@ class SettingsPage extends HookConsumerWidget {
     }
   }
 
+  void _invalidateVtopDataProviders(WidgetRef ref) {
+    ref.invalidate(attendanceProvider);
+    ref.invalidate(examScheduleProvider);
+    ref.invalidate(marksProvider);
+    ref.invalidate(semesterIdProvider);
+    ref.invalidate(timetableProvider);
+  }
+
+  Future<void> _refreshAllVtopData(BuildContext context, WidgetRef ref) async {
+    try {
+      final success = await syncVtopData(
+        read: ref.read,
+        task: 'manual_vtop_sync',
+        force: true,
+        promptForOtp: true,
+        ignoreRecoverableErrors: false,
+      );
+      _invalidateVtopDataProviders(ref);
+      if (!context.mounted) return;
+      if (success) {
+        dispToast(context, "Updated", "All VTOP data is up to date.");
+      } else {
+        dispToast(
+          context,
+          "Partially Updated",
+          "Some VTOP data could not be refreshed. Try again in a bit.",
+        );
+      }
+    } catch (error, stackTrace) {
+      log(
+        'Manual VTOP data refresh failed',
+        name: 'settings.vtop_sync',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (context.mounted) {
+        disCommonToast(context, error);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final showDebugFeatures = useState(false);
@@ -426,6 +473,7 @@ class SettingsPage extends HookConsumerWidget {
     final isEmailOtpBusy = useState(false);
     final isEmailOtpTestBusy = useState(false);
     final isEmailOtpFeatureEnabled = useState(false);
+    final isVtopSyncing = useState(false);
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -501,6 +549,25 @@ class SettingsPage extends HookConsumerWidget {
                     setautoRefresh(ref, value);
                   },
                 ),
+              ),
+              FTile(
+                prefix: const Icon(FIcons.cloudDownload),
+                title: const Text('Update VTOP Data'),
+                subtitle: const Text(
+                  'Fetch attendance, timetable, marks, exams and semesters',
+                ),
+                suffix: isVtopSyncing.value
+                    ? const FCircularProgress.pinwheel()
+                    : const Icon(FIcons.chevronRight),
+                onPress: isVtopSyncing.value
+                    ? null
+                    : () async {
+                        isVtopSyncing.value = true;
+                        await _refreshAllVtopData(context, ref);
+                        if (context.mounted) {
+                          isVtopSyncing.value = false;
+                        }
+                      },
               ),
               if (isEmailOtpFeatureEnabled.value)
                 FTile(

@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
@@ -36,14 +37,17 @@ class ShellLayout extends HookConsumerWidget {
           int.tryParse(sem.semid!.toLowerCase().replaceAll("ap", "")) ?? 0;
       return currentSemID < max;
     }, [sem?.semid, sems?.semesters.length]);
+    final runningTasks = ref.watch(
+      globalAsyncQueueProvider.select((value) => value.running.keys.toList()),
+    );
 
     var k = GoRouter.of(context).routeInformationProvider.value.uri.toString();
     final headers = [
-      getSidewidget(context, "Timetable", k, newSemExist),
-      getSidewidget(context, "Attendance", k, newSemExist),
-      getSidewidget(context, "More", k, newSemExist),
-      getSidewidget(context, "Projects", k, newSemExist),
-      getSidewidget(context, "Settings", k, newSemExist),
+      getSidewidget(context, "Timetable", k, newSemExist, runningTasks),
+      getSidewidget(context, "Attendance", k, newSemExist, runningTasks),
+      getSidewidget(context, "More", k, newSemExist, runningTasks),
+      getSidewidget(context, "Projects", k, newSemExist, runningTasks),
+      getSidewidget(context, "Settings", k, newSemExist, runningTasks),
     ];
     final selected = useState(0);
     useEffect(() {
@@ -139,7 +143,9 @@ Widget? getSidewidget(
   String data,
   String path,
   bool newsem,
+  List<String> runningTasks,
 ) {
+  final queueStatus = _queueStatusText(runningTasks);
   if (path.split('/').length - 1 > 1) {
     switch (path.split("/")[2]) {
       case "marks":
@@ -151,30 +157,113 @@ Widget? getSidewidget(
     }
 
     return FHeader.nested(
-      title: Text(data),
+      title: _HeaderTitle(
+        title: data,
+        subtitle: queueStatus,
+        titleStyle: DefaultTextStyle.of(context).style,
+      ),
       prefixes: [FHeaderAction.back(onPress: () => GoRouter.of(context).pop())],
     );
   }
 
+  final subtitle =
+      queueStatus ?? (newsem ? "New semester data available!" : null);
+  final hasTimetableAction = path.contains("timetable");
   return FHeader.nested(
-    title: Column(
-      children: [
-        Text(
-          data,
-          style: newsem
-              ? context.theme.typography.sm
-              : context.theme.typography.lg,
-        ),
-        if (newsem)
-          Text(
-            "New semester data available!",
-            style: context.theme.typography.sm,
-          ),
-      ],
+    title: _HeaderTitle(
+      title: data,
+      subtitle: subtitle,
+      titleStyle: subtitle != null
+          ? context.theme.typography.sm
+          : context.theme.typography.lg,
     ),
 
-    prefixes: [],
+    prefixes: [
+      if (hasTimetableAction)
+        Visibility(
+          visible: false,
+          maintainAnimation: true,
+          maintainSize: true,
+          maintainState: true,
+          child: SyncGoogleCalendarButton(),
+        ),
+    ],
 
-    suffixes: [if (path.contains("timetable")) SyncGoogleCalendarButton()],
+    suffixes: [if (hasTimetableAction) SyncGoogleCalendarButton()],
   );
+}
+
+class _HeaderTitle extends StatelessWidget {
+  const _HeaderTitle({
+    required this.title,
+    required this.subtitle,
+    required this.titleStyle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final TextStyle titleStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: titleStyle,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (subtitle != null)
+            Text(
+              subtitle!,
+              style: context.theme.typography.sm.copyWith(
+                color: context.theme.colors.mutedForeground,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String? _queueStatusText(List<String> runningTasks) {
+  if (runningTasks.isEmpty) return null;
+
+  final visibleTasks = runningTasks.map(_taskLabel).toSet().toList();
+  final firstTask = visibleTasks.first;
+  final extraCount = visibleTasks.length - 1;
+
+  if (extraCount <= 0) return firstTask;
+  return '$firstTask + $extraCount more';
+}
+
+String _taskLabel(String id) {
+  if (id.startsWith('vtop_login')) return 'Logging in to VTOP...';
+  if (id.startsWith('vtop_attendance')) return 'Fetching attendance...';
+  if (id.startsWith('vtop_fullattendance')) {
+    return 'Fetching attendance details...';
+  }
+  if (id.startsWith('vtop_timetable')) return 'Fetching timetable...';
+  if (id.startsWith('vtop_fetchSchedule')) return 'Fetching exam schedule...';
+  if (id.startsWith('vtop_marks')) return 'Fetching marks...';
+  if (id.startsWith('vtop_grades')) return 'Fetching grades...';
+  if (id.startsWith('vtop_grade_details')) return 'Fetching grade details...';
+  if (id.startsWith('vtop_grade_history')) return 'Fetching grade history...';
+  if (id.startsWith('vtop_semids')) return 'Fetching semesters...';
+
+  if (id.startsWith('toStorage')) return 'Saving data...';
+  if (id.startsWith('fromStorage') || id == 'get_semids_storage') {
+    return 'Loading data...';
+  }
+
+  return 'Working...';
 }
