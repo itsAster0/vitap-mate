@@ -6,7 +6,7 @@ import 'package:vitapmate/features/settings/data/datasources/data_source.dart';
 
 part 'data_sources.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<SemesterIdDataSource> semidDataSource(Ref ref) async {
   return SemesterIdDataSource(
     await ref.read(jsonFileStorageProvider.future),

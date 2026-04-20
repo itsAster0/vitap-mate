@@ -20,7 +20,7 @@ final class ExamScheduleProvider
         argument: null,
         retry: null,
         name: r'examScheduleProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -33,7 +33,7 @@ final class ExamScheduleProvider
   ExamSchedule create() => ExamSchedule();
 }
 
-String _$examScheduleHash() => r'523b058bd1055177656a7b975772c98fcb8223bd';
+String _$examScheduleHash() => r'2354e596f9f2f5537f892b683072eed59e8aa610';
 
 abstract class _$ExamSchedule extends $AsyncNotifier<ExamScheduleData> {
   FutureOr<ExamScheduleData> build();

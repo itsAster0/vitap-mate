@@ -28,7 +28,7 @@ final class TimetableRepositoryProvider
         argument: null,
         retry: null,
         name: r'timetableRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,4 +49,4 @@ final class TimetableRepositoryProvider
 }
 
 String _$timetableRepositoryHash() =>
-    r'42c01e78a6ea3faee1f247ddcc57d41dc629cfb2';
+    r'547d02e257679cbfffec1cd34eb5d8396a39bb91';

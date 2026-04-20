@@ -20,7 +20,7 @@ final class FullAttendanceProvider
   }) : super(
          retry: null,
          name: r'fullAttendanceProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -50,7 +50,7 @@ final class FullAttendanceProvider
   }
 }
 
-String _$fullAttendanceHash() => r'a5b419bb80079f861c0477e079ce174b653253b0';
+String _$fullAttendanceHash() => r'e7ed4a7e8673f3b5f0388bef3170b3b994495e2f';
 
 final class FullAttendanceFamily extends $Family
     with
@@ -67,7 +67,7 @@ final class FullAttendanceFamily extends $Family
         name: r'fullAttendanceProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   FullAttendanceProvider call(String courseType, String courseId) =>

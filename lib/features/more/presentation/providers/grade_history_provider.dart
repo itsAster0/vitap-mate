@@ -5,7 +5,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'grade_history_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class GradeHistory extends _$GradeHistory {
   Future<GradeHistoryData> _runLoad() async {
     final repo = await ref.watch(gradeHistoryRepositoryProvider.future);

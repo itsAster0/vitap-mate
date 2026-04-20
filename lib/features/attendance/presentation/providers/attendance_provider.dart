@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'attendance_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class Attendance extends _$Attendance {
   Future<AttendanceData> _runLoad() async {
     final repo = await ref.watch(attendanceRepositoryProvider.future);

@@ -8,7 +8,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'exam_schedule.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class ExamSchedule extends _$ExamSchedule {
   Future<ExamScheduleData> _runLoad() async {
     final repo = await ref.watch(examScheduleRepositoryProvider.future);

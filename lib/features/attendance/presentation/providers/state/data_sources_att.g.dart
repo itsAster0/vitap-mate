@@ -28,7 +28,7 @@ final class AttendanceDataSourceProvider
         argument: null,
         retry: null,
         name: r'attendanceDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,4 +49,4 @@ final class AttendanceDataSourceProvider
 }
 
 String _$attendanceDataSourceHash() =>
-    r'0c80fe426b8be64e49d39e4d9d353fc403629684';
+    r'80e04974e670252515b582006e213483be35e104';

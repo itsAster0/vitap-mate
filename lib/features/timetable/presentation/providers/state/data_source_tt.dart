@@ -6,7 +6,7 @@ import 'package:vitapmate/features/timetable/data/datasources/data_source.dart';
 
 part 'data_source_tt.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<TimetableDataSource> timetableDataSource(Ref ref) async {
   return TimetableDataSource(
     await ref.read(jsonFileStorageProvider.future),

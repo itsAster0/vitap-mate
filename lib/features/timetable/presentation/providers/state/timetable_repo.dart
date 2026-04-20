@@ -5,7 +5,7 @@ import 'package:vitapmate/features/timetable/presentation/providers/state/data_s
 
 part 'timetable_repo.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<TimetableRepository> timetableRepository(Ref ref) async {
   return TimetableRepository(
     semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),

@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'marks_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class Marks extends _$Marks {
   Future<MarksData> _runLoad() async {
     final repo = await ref.watch(marksRepositoryProvider.future);

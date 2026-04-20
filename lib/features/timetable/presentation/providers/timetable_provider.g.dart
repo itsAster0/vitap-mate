@@ -20,7 +20,7 @@ final class TimetableProvider
         argument: null,
         retry: null,
         name: r'timetableProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -33,7 +33,7 @@ final class TimetableProvider
   Timetable create() => Timetable();
 }
 
-String _$timetableHash() => r'85c74e985c8109cfdee29fa4620a11600e202d88';
+String _$timetableHash() => r'a0ca5ae755f8a315662dfbf483eb7a3652823cb0';
 
 abstract class _$Timetable extends $AsyncNotifier<TimetableData> {
   FutureOr<TimetableData> build();

@@ -6,7 +6,7 @@ import 'package:vitapmate/features/attendance/data/datasources/data_source.dart'
 
 part 'data_sources_att.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<AttendanceDataSource> attendanceDataSource(Ref ref) async {
   return AttendanceDataSource(
     await ref.read(jsonFileStorageProvider.future),

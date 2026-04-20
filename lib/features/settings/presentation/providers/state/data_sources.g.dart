@@ -28,7 +28,7 @@ final class SemidDataSourceProvider
         argument: null,
         retry: null,
         name: r'semidDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -48,4 +48,4 @@ final class SemidDataSourceProvider
   }
 }
 
-String _$semidDataSourceHash() => r'6228aa8ac742892dd9cdec005eab741e1e9f5208';
+String _$semidDataSourceHash() => r'dfacbc100551b80c945f8931f7f10c839ebb5f98';

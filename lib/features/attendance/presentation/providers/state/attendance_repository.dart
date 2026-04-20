@@ -5,7 +5,7 @@ import 'package:vitapmate/features/attendance/presentation/providers/state/data_
 
 part 'attendance_repository.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<AttendanceRepository> attendanceRepository(Ref ref) async {
   return AttendanceRepository(
     semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),

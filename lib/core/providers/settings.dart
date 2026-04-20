@@ -6,7 +6,7 @@ import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 part 'settings.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
   return SharedPreferencesWithCache.create(
     cacheOptions: SharedPreferencesWithCacheOptions(
@@ -99,7 +99,7 @@ class StudentProjectsPinnedOnlySession
   }
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 StudentProjectsSettingsController studentProjectsSettingsController(Ref ref) {
   return StudentProjectsSettingsController(ref);
 }
@@ -203,7 +203,7 @@ Future<void> clearClassReminderPause(WidgetRef ref) async {
   ref.invalidate(classReminderSettingsProvider);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 ClassReminderSettingsController classReminderSettingsController(Ref ref) {
   return ClassReminderSettingsController(ref);
 }
@@ -301,7 +301,7 @@ Future<void> setExamReminderNotifyBeforeMinutes(
   ref.invalidate(examReminderSettingsProvider);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 ExamReminderSettingsController examReminderSettingsController(Ref ref) {
   return ExamReminderSettingsController(ref);
 }

@@ -28,7 +28,7 @@ final class ExamScheduleRepositoryProvider
         argument: null,
         retry: null,
         name: r'examScheduleRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,7 +49,7 @@ final class ExamScheduleRepositoryProvider
 }
 
 String _$examScheduleRepositoryHash() =>
-    r'c128ff1dbc3518d5f33f01daa285945b18eccf42';
+    r'87635289299a6c0a9abe71ea28c4b97f1260c716';
 
 @ProviderFor(marksRepository)
 final marksRepositoryProvider = MarksRepositoryProvider._();
@@ -68,7 +68,7 @@ final class MarksRepositoryProvider
         argument: null,
         retry: null,
         name: r'marksRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -88,7 +88,7 @@ final class MarksRepositoryProvider
   }
 }
 
-String _$marksRepositoryHash() => r'c1a285f9af8d8d42d7712ca47358518fd8583065';
+String _$marksRepositoryHash() => r'16712ab1a32cadc528e4c46c312d8b062a1a7735';
 
 @ProviderFor(gradesRepository)
 final gradesRepositoryProvider = GradesRepositoryProvider._();
@@ -107,7 +107,7 @@ final class GradesRepositoryProvider
         argument: null,
         retry: null,
         name: r'gradesRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -127,7 +127,7 @@ final class GradesRepositoryProvider
   }
 }
 
-String _$gradesRepositoryHash() => r'e49a0f21a3f99d9628772975b2a668ea58a8e01b';
+String _$gradesRepositoryHash() => r'37656783c4563faaa511e6b78f60bacb2be3539f';
 
 @ProviderFor(gradesRepositoryForSem)
 final gradesRepositoryForSemProvider = GradesRepositoryForSemFamily._();
@@ -146,7 +146,7 @@ final class GradesRepositoryForSemProvider
   }) : super(
          retry: null,
          name: r'gradesRepositoryForSemProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -186,7 +186,7 @@ final class GradesRepositoryForSemProvider
 }
 
 String _$gradesRepositoryForSemHash() =>
-    r'c9779ab465bea137e111a7b8b644f149097393a2';
+    r'b2ef361488ac2f7fcfd9be5ebad43f5d18773749';
 
 final class GradesRepositoryForSemFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<GradesRepository>, String> {
@@ -196,7 +196,7 @@ final class GradesRepositoryForSemFamily extends $Family
         name: r'gradesRepositoryForSemProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   GradesRepositoryForSemProvider call(String semid) =>
@@ -225,7 +225,7 @@ final class GradeHistoryRepositoryProvider
         argument: null,
         retry: null,
         name: r'gradeHistoryRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -246,4 +246,4 @@ final class GradeHistoryRepositoryProvider
 }
 
 String _$gradeHistoryRepositoryHash() =>
-    r'e4598c86e6622320fc042454c244b1a6a364609f';
+    r'1ef387cca4b42f6f19b7973c375c3c308fa1c2f1';

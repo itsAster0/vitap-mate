@@ -19,7 +19,7 @@ final class MarksProvider extends $AsyncNotifierProvider<Marks, MarksData> {
         argument: null,
         retry: null,
         name: r'marksProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -32,7 +32,7 @@ final class MarksProvider extends $AsyncNotifierProvider<Marks, MarksData> {
   Marks create() => Marks();
 }
 
-String _$marksHash() => r'491a71b015bcee6a0a953fd2466064f0759a70a1';
+String _$marksHash() => r'b52acc309cf97b05725e698d6df7f1a25df6d572';
 
 abstract class _$Marks extends $AsyncNotifier<MarksData> {
   FutureOr<MarksData> build();

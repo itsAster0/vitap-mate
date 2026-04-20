@@ -28,7 +28,7 @@ final class ExamScheduleDataSourceProvider
         argument: null,
         retry: null,
         name: r'examScheduleDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,7 +49,7 @@ final class ExamScheduleDataSourceProvider
 }
 
 String _$examScheduleDataSourceHash() =>
-    r'47750bdb55aca4c291e157a755f3a31b32e5102e';
+    r'5a1732d4fb8218b0442d9af85b4fd18d557054cb';
 
 @ProviderFor(marksDataSource)
 final marksDataSourceProvider = MarksDataSourceProvider._();
@@ -68,7 +68,7 @@ final class MarksDataSourceProvider
         argument: null,
         retry: null,
         name: r'marksDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -88,7 +88,7 @@ final class MarksDataSourceProvider
   }
 }
 
-String _$marksDataSourceHash() => r'8279cabb850813680e991006c1dba242907e6894';
+String _$marksDataSourceHash() => r'2935f3cea59fc1c6c277cb8101c3f3d18b604f55';
 
 @ProviderFor(gradesDataSource)
 final gradesDataSourceProvider = GradesDataSourceProvider._();
@@ -107,7 +107,7 @@ final class GradesDataSourceProvider
         argument: null,
         retry: null,
         name: r'gradesDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -127,7 +127,7 @@ final class GradesDataSourceProvider
   }
 }
 
-String _$gradesDataSourceHash() => r'849b1d4dda9b5168957c2bf444b981d0d3b47830';
+String _$gradesDataSourceHash() => r'1ce7df45145d16d13f64201f14fc49070b64886f';
 
 @ProviderFor(gradeHistoryDataSource)
 final gradeHistoryDataSourceProvider = GradeHistoryDataSourceProvider._();
@@ -148,7 +148,7 @@ final class GradeHistoryDataSourceProvider
         argument: null,
         retry: null,
         name: r'gradeHistoryDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -169,4 +169,4 @@ final class GradeHistoryDataSourceProvider
 }
 
 String _$gradeHistoryDataSourceHash() =>
-    r'bec66087aa5b860ef54a39edc87b2cf37fd8b5db';
+    r'cd917311ca90addd0d2b36eaf1ca5493f4c330ce';

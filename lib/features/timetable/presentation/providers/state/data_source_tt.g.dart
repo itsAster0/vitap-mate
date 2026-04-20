@@ -28,7 +28,7 @@ final class TimetableDataSourceProvider
         argument: null,
         retry: null,
         name: r'timetableDataSourceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,4 +49,4 @@ final class TimetableDataSourceProvider
 }
 
 String _$timetableDataSourceHash() =>
-    r'c3c6062c80ebf1009bbebe54bae65da0704eac96';
+    r'07f7aa3ba0eff0a5d7ff879b61b9c8f107dd8856';

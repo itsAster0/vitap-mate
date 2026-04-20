@@ -6,7 +6,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'timetable_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class Timetable extends _$Timetable {
   Future<TimetableData> _runLoad() async {
     final repo = await ref.watch(timetableRepositoryProvider.future);

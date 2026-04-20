@@ -20,7 +20,7 @@ final class AttendanceProvider
         argument: null,
         retry: null,
         name: r'attendanceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -33,7 +33,7 @@ final class AttendanceProvider
   Attendance create() => Attendance();
 }
 
-String _$attendanceHash() => r'b4c831a0b9fb5ec82666eae6ad5751bdf51865c2';
+String _$attendanceHash() => r'e242251f037fa7b81e2f0a4d093cd40c20022984';
 
 abstract class _$Attendance extends $AsyncNotifier<AttendanceData> {
   FutureOr<AttendanceData> build();

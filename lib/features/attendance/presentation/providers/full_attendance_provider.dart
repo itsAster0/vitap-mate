@@ -7,7 +7,7 @@ import 'package:vitapmate/features/attendance/presentation/providers/state/atten
 import 'package:vitapmate/src/api/vtop/types.dart';
 part 'full_attendance_provider.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 class FullAttendance extends _$FullAttendance {
   late String _courseType;
   late String _courseId;

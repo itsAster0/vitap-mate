@@ -28,7 +28,7 @@ final class SettingsProvider
         argument: null,
         retry: null,
         name: r'settingsProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'632739a7b1665d2e07800b2202308fea914b1ccd';
+String _$settingsHash() => r'd8e317b84d5a02edf339e89952b380d60f0519d8';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();
@@ -327,7 +327,7 @@ final class StudentProjectsSettingsControllerProvider
         argument: null,
         retry: null,
         name: r'studentProjectsSettingsControllerProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -359,7 +359,7 @@ final class StudentProjectsSettingsControllerProvider
 }
 
 String _$studentProjectsSettingsControllerHash() =>
-    r'725ff06cf1a7669349581d7f30979b934f19806a';
+    r'019e40b28dfa09889d3088a245789e386fde9c49';
 
 @ProviderFor(classReminderSettings)
 final classReminderSettingsProvider = ClassReminderSettingsProvider._();
@@ -427,7 +427,7 @@ final class ClassReminderSettingsControllerProvider
         argument: null,
         retry: null,
         name: r'classReminderSettingsControllerProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -458,7 +458,7 @@ final class ClassReminderSettingsControllerProvider
 }
 
 String _$classReminderSettingsControllerHash() =>
-    r'3248a7f45836dbb0a55b1125234d569e107d7a1e';
+    r'8bfd4bc5e7f0e0ca582931a183103a446e6ff273';
 
 @ProviderFor(examReminderSettings)
 final examReminderSettingsProvider = ExamReminderSettingsProvider._();
@@ -526,7 +526,7 @@ final class ExamReminderSettingsControllerProvider
         argument: null,
         retry: null,
         name: r'examReminderSettingsControllerProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -557,4 +557,4 @@ final class ExamReminderSettingsControllerProvider
 }
 
 String _$examReminderSettingsControllerHash() =>
-    r'2df8f91ec2e0cc1b1a8d32fd66d66e70705c672b';
+    r'307386b85a678b5bdb9faecf2dac3740efc17dcd';

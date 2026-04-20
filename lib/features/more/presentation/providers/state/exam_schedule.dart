@@ -8,7 +8,7 @@ import 'package:vitapmate/features/more/presentation/providers/state/data_source
 
 part 'exam_schedule.g.dart';
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<ExamScheduleRepository> examScheduleRepository(Ref ref) async {
   return ExamScheduleRepository(
     semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),
@@ -16,7 +16,7 @@ Future<ExamScheduleRepository> examScheduleRepository(Ref ref) async {
   );
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<MarksRepository> marksRepository(Ref ref) async {
   return MarksRepository(
     semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),
@@ -24,7 +24,7 @@ Future<MarksRepository> marksRepository(Ref ref) async {
   );
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<GradesRepository> gradesRepository(Ref ref) async {
   return GradesRepository(
     semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),
@@ -32,7 +32,7 @@ Future<GradesRepository> gradesRepository(Ref ref) async {
   );
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<GradesRepository> gradesRepositoryForSem(Ref ref, String semid) async {
   return GradesRepository(
     semid: semid,
@@ -40,7 +40,7 @@ Future<GradesRepository> gradesRepositoryForSem(Ref ref, String semid) async {
   );
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<GradeHistoryRepository> gradeHistoryRepository(Ref ref) async {
   return GradeHistoryRepository(
     dataSource: await ref.watch(gradeHistoryDataSourceProvider.future),

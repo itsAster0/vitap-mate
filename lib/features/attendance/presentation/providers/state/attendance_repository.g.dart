@@ -28,7 +28,7 @@ final class AttendanceRepositoryProvider
         argument: null,
         retry: null,
         name: r'attendanceRepositoryProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,4 +49,4 @@ final class AttendanceRepositoryProvider
 }
 
 String _$attendanceRepositoryHash() =>
-    r'8cb5b96decd4d8201f33be851afefb05eba6a97f';
+    r'2f83321e68da0c1e895334015d73a0c1a471062a';
