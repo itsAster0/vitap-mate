@@ -24,28 +24,37 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
       log("already contains $id", level: 400);
       return current[id] as Future<T>;
     }
-    if (id.startsWith("vtop")) {
-      final mainFutures = state.running.entries
-          .where((entry) => entry.key.startsWith('vtop_login'))
-          .map((entry) => entry.value)
-          .toList();
-      if (mainFutures.isNotEmpty) {
-        log("waiting for the on start run code ", level: 400);
-        await Future.wait(mainFutures);
-      }
-    }
-    final future = task();
-    final current1 = state.running;
-    final before = {...current1, id: future};
+    final completer = Completer<T>();
+    final future = completer.future;
+    final before = {...current, id: future};
     state = state.copyWith(running: before);
     _taskEvents.add(before.keys.toSet());
-    future.whenComplete(() {
-      final before1 = state.running;
-      final after = {...before1}..remove(id);
-      state = state.copyWith(running: after);
-      _taskEvents.add(after.keys.toSet());
-      log("$state");
-    });
+
+    unawaited(() async {
+      try {
+        if (id.startsWith("vtop")) {
+          final mainFutures = current.entries
+              .where(
+                (entry) => entry.key.startsWith('vtop_login') && entry.key != id,
+              )
+              .map((entry) => entry.value)
+              .toList();
+          if (mainFutures.isNotEmpty) {
+            log("waiting for the on start run code ", level: 400);
+            await Future.wait(mainFutures);
+          }
+        }
+        completer.complete(await task());
+      } catch (e, st) {
+        completer.completeError(e, st);
+      } finally {
+        final before1 = state.running;
+        final after = {...before1}..remove(id);
+        state = state.copyWith(running: after);
+        _taskEvents.add(after.keys.toSet());
+        log("$state");
+      }
+    }());
 
     return future;
   }

@@ -5,32 +5,32 @@
     
     
       
-      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.00018">
+      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.000165">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="1: Switch to android deploy_internal lane" time="6.2e-05">
+      <testcase classname="fastlane.lanes" name="1: Switch to android deploy_internal lane" time="5.9e-05">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="2: upload_to_play_store" time="114.248752">
+      <testcase classname="fastlane.lanes" name="2: upload_to_play_store" time="124.431249">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="3: Switch to android promote_all lane" time="0.000428">
+      <testcase classname="fastlane.lanes" name="3: Switch to android promote_all lane" time="0.000303">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="4: upload_to_play_store" time="6.752659">
+      <testcase classname="fastlane.lanes" name="4: upload_to_play_store" time="5.516783">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="5: upload_to_play_store" time="6.758401">
+      <testcase classname="fastlane.lanes" name="5: upload_to_play_store" time="5.847883">
         
       </testcase>
     

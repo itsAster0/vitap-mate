@@ -132,6 +132,13 @@ class VClient extends _$VClient {
             'client.auth',
             '$flowLabel entered serialized login queue',
           );
+          if (!force && await fetchIsAuth(client: client)) {
+            AppLogger.instance.info(
+              'client.auth',
+              '$flowLabel skipped full login because the session became authenticated while waiting for the queue',
+            );
+            return;
+          }
           try {
             await vtopClientLogin(client: client);
           } catch (e) {
