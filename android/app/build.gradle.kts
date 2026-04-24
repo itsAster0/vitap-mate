@@ -1,5 +1,47 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.util.Base64
+import org.gradle.api.GradleException
+
+fun dartDefine(name: String): String? {
+    val dartDefines =
+        (project.findProperty("dart-defines") as String?) ?: System.getenv("DART_DEFINES")
+    if (dartDefines.isNullOrBlank()) return null
+
+    return dartDefines
+        .split(",")
+        .asSequence()
+        .mapNotNull { encoded ->
+            runCatching {
+                String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            }.getOrNull()
+        }
+        .mapNotNull { entry ->
+            val separatorIndex = entry.indexOf('=')
+            if (separatorIndex <= 0) {
+                null
+            } else {
+                entry.substring(0, separatorIndex) to entry.substring(separatorIndex + 1)
+            }
+        }
+        .firstOrNull { (key, _) -> key == name }
+        ?.second
+}
+
+val googleOauthClientId =
+    dartDefine("GOOGLE_OAUTH_CLIENT_ID")
+        ?: throw GradleException(
+            "Missing GOOGLE_OAUTH_CLIENT_ID. Pass it with --dart-define or --dart-define-from-file.",
+        )
+
+if (!googleOauthClientId.endsWith(".apps.googleusercontent.com")) {
+    throw GradleException(
+        "GOOGLE_OAUTH_CLIENT_ID must end with .apps.googleusercontent.com.",
+    )
+}
+
+val googleOauthRedirectScheme =
+    "com.googleusercontent.apps.${googleOauthClientId.removeSuffix(".apps.googleusercontent.com")}"
 
 plugins {
     id("com.android.application")
@@ -36,8 +78,7 @@ dependencies {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["appAuthRedirectScheme"] =
-            "com.googleusercontent.apps.95428715364-4f11adlt9kjaubvc3jif86cectghm448"
+        manifestPlaceholders["appAuthRedirectScheme"] = googleOauthRedirectScheme
     }
     signingConfigs {
     create("release") {

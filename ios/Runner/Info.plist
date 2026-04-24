@@ -31,7 +31,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.95428715364-4f11adlt9kjaubvc3jif86cectghm448</string>
+				<string>__GOOGLE_OAUTH_REDIRECT_SCHEME__</string>
 			</array>
 		</dict>
 	</array>

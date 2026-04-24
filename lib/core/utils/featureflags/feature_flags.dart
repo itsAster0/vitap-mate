@@ -15,15 +15,18 @@ class FeatureFlagPodController {
     this._client, {
     this.identity,
     this.traits = const <Trait>[],
+    this.enableAllFlags = false,
   });
 
-  final FlagsmithClient _client;
+  final FlagsmithClient? _client;
   final Identity? identity;
   final List<Trait> traits;
+  final bool enableAllFlags;
 
-  FlagsmithClient get sdk => _client;
+  FlagsmithClient get sdk => _client!;
 
   Future<void> refresh({bool reload = true}) async {
+    if (enableAllFlags || _client == null) return;
     await _client.getFeatureFlags(
       user: identity,
       traits: traits,
@@ -32,16 +35,19 @@ class FeatureFlagPodController {
   }
 
   Future<bool> has(String key) async {
+    if (enableAllFlags || _client == null) return true;
     return _client.hasFeatureFlag(key, user: identity);
   }
 
   Future<bool> isEnabled(String key) async {
+    if (enableAllFlags || _client == null) return true;
     final exists = await has(key);
     if (!exists) return false;
     return _client.isFeatureFlagEnabled(key, user: identity);
   }
 
   Future<dynamic> value(String key) async {
+    if (enableAllFlags || _client == null) return true;
     return _client.getFeatureFlagValue(key, user: identity);
   }
 }
@@ -133,9 +139,16 @@ class FeatureFlagsController extends _$FeatureFlagsController {
     const prodApiKey = String.fromEnvironment('FLAGSMITH_ENV_API_KEY_PROD');
     const envBaseUri = String.fromEnvironment('FLAGSMITH_BASE_URI');
     final apiKey = kDebugMode ? devApiKey : prodApiKey;
-    if (apiKey.isEmpty || envBaseUri.isEmpty) {
+    if (envBaseUri.isEmpty) {
+      AppLogger.instance.info(
+        'client.feature_flags',
+        'FLAGSMITH_BASE_URI is empty, enabling all feature flags by default.',
+      );
+      return const FeatureFlagPodController(null, enableAllFlags: true);
+    }
+    if (apiKey.isEmpty) {
       throw StateError(
-        'Missing Flagsmith API key or base URI. Provide FLAGSMITH_ENV_API_KEY_DEV/PROD and FLAGSMITH_BASE_URI via --dart-define or --dart-define-from-file.',
+        'Missing Flagsmith API key. Provide FLAGSMITH_ENV_API_KEY_DEV/PROD via --dart-define or --dart-define-from-file.',
       );
     }
     final config = FlagsmithConfig(

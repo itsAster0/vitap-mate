@@ -6,11 +6,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-const googleOauthClientId =
-    '95428715364-4f11adlt9kjaubvc3jif86cectghm448.apps.googleusercontent.com';
-const googleOauthRedirectScheme =
-    'com.googleusercontent.apps.95428715364-4f11adlt9kjaubvc3jif86cectghm448';
-const googleOauthRedirectUrl = '$googleOauthRedirectScheme:/oauthredirect';
+const googleOauthClientId = String.fromEnvironment('GOOGLE_OAUTH_CLIENT_ID');
+final googleOauthRedirectScheme =
+    'com.googleusercontent.apps.${googleOauthClientId.replaceFirst('.apps.googleusercontent.com', '')}';
+final googleOauthRedirectUrl = '$googleOauthRedirectScheme:/oauthredirect';
 
 const googleEmailScopes = <String>[
   'openid',
@@ -190,6 +189,13 @@ class GoogleEmailOtpAuthService {
   Future<EmailOtpSetupResult> setupIdentityStep({
     required String expectedUsername,
   }) async {
+    if (googleOauthClientId.isEmpty) {
+      return const EmailOtpSetupResult(
+        success: false,
+        message:
+            'Missing GOOGLE_OAUTH_CLIENT_ID. Pass it with --dart-define or --dart-define-from-file before using Google sign-in.',
+      );
+    }
     try {
       log(
         'Starting identity OAuth request with scopes: ${googleEmailScopes.join(', ')}',
@@ -262,6 +268,13 @@ class GoogleEmailOtpAuthService {
   Future<EmailOtpSetupResult> setupGmailTokenStep({
     required String email,
   }) async {
+    if (googleOauthClientId.isEmpty) {
+      return const EmailOtpSetupResult(
+        success: false,
+        message:
+            'Missing GOOGLE_OAUTH_CLIENT_ID. Pass it with --dart-define or --dart-define-from-file before using Google sign-in.',
+      );
+    }
     try {
       log(
         'Starting Gmail token OAuth request for $email with scopes: ${gmailOauthScopes.join(', ')}',

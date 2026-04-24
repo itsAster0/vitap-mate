@@ -35,3 +35,91 @@ We take your privacy seriously:
 - We do **not** collect or store your user ID or password — not now, not ever  
 
 Your data is **your** data.
+
+## Build Setup
+
+Before compiling, replace the project-specific secrets and OAuth values with
+your own.
+
+### Google OAuth
+
+In Google Cloud Console:
+
+1. Enable the `Gmail API` for your project. This app reads OTP emails through
+   Gmail readonly access.
+2. Configure the OAuth consent screen.
+3. Create an `Android` OAuth client with package name `com.vitap_pal.app`.
+4. Add your app signing SHA fingerprints to that Android client.
+5. In the Android OAuth client, enable `Custom URI scheme` even though Google
+   shows a warning saying it is not recommended for Android clients. This app
+   uses that redirect flow.
+6. Use the generated client ID in the Flutter build.
+
+To get your SHA fingerprints, you can use one of these:
+
+Debug keystore:
+
+```bash
+keytool -list -v \
+  -alias androiddebugkey \
+  -keystore ~/.android/debug.keystore \
+  -storepass android \
+  -keypass android
+```
+
+Release keystore:
+
+```bash
+keytool -list -v -keystore /path/to/your-upload-keystore.jks -alias your-key-alias
+```
+
+Look for `SHA1` in the output and add it to the Android OAuth
+client .
+
+After that, use the generated mobile client ID in the Flutter build:
+
+
+```bash
+flutter run --dart-define-from-file=.env.json
+```
+
+Example `.env.json`:
+
+```json
+{
+  "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com"
+}
+```
+
+Use the Android client ID here, not the web client ID.
+
+
+
+### Native OAuth Redirects
+
+Android and iOS derives from the native redirect scheme automatically from
+`GOOGLE_OAUTH_CLIENT_ID` during the build, so `.env.json` is the only value you
+need to update for OAuth.
+
+
+## How To Compile
+
+Typical local flow:
+
+```bash
+flutter pub get
+flutter run --dart-define-from-file=.env.json
+```
+
+Release APK / App Bundle:
+
+```bash
+flutter build apk --release --dart-define-from-file=.env.json
+flutter build appbundle --release --dart-define-from-file=.env.json
+```
+
+Release iOS build:
+
+```bash
+flutter build ios --release --dart-define-from-file=.env.json
+```
