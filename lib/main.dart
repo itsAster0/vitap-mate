@@ -8,7 +8,6 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/widgets/vtop_otp_overlay.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
-
 import 'package:vitapmate/services/update_service.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
@@ -31,7 +30,6 @@ class MyApp extends HookConsumerWidget {
       Future(() async {
         ref.read(backgroundSyncProvider);
         await Future.delayed(Duration(milliseconds: 500));
-
         UpdateService.checkForFlexibleUpdate();
       });
       return null;
