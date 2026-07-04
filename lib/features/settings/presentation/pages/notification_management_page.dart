@@ -86,9 +86,9 @@ class NotificationManagementPage extends HookConsumerWidget {
           label: const Text("Notification Management"),
           children: [
             FTile(
-              prefix: Icon(FIcons.bell),
+              prefix: Icon(FLucideIcons.bell),
               title: const Text("System Notification Settings"),
-              suffix: Icon(FIcons.chevronRight),
+              suffix: Icon(FLucideIcons.chevronRight),
               onPress: () async {
                 await Permission.notification.request();
                 AppSettings.openAppSettings(type: AppSettingsType.notification);
@@ -96,7 +96,7 @@ class NotificationManagementPage extends HookConsumerWidget {
             ),
             if (kDebugMode)
               FTile(
-                prefix: Icon(FIcons.bug),
+                prefix: Icon(FLucideIcons.bug),
                 title: const Text("Test Notification (Debug)"),
                 suffix: const Text("Send"),
                 onPress: () async {
@@ -148,7 +148,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                 },
               ),
             FTile(
-              prefix: Icon(FIcons.bell),
+              prefix: Icon(FLucideIcons.bell),
               title: const Text("Class Reminders"),
 
               suffix: FSwitch(
@@ -178,7 +178,7 @@ class NotificationManagementPage extends HookConsumerWidget {
             ),
 
             FTile(
-              prefix: Icon(FIcons.calendarDays),
+              prefix: Icon(FLucideIcons.calendarDays),
               title: const Text("Notify Before"),
               details: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,10 +222,10 @@ class NotificationManagementPage extends HookConsumerWidget {
               ),
             ),
             FTile(
-              prefix: Icon(FIcons.userCheck),
+              prefix: Icon(FLucideIcons.userCheck),
               title: const Text("Pause Class Reminders"),
 
-              suffix: Icon(FIcons.chevronRight),
+              suffix: Icon(FLucideIcons.chevronRight),
               onPress: () {
                 showFDialog(
                   context: context,
@@ -281,7 +281,7 @@ class NotificationManagementPage extends HookConsumerWidget {
               },
             ),
             FTile(
-              prefix: Icon(FIcons.bell),
+              prefix: Icon(FLucideIcons.bell),
               title: const Text("Exam Reminders"),
 
               suffix: FSwitch(
@@ -310,7 +310,7 @@ class NotificationManagementPage extends HookConsumerWidget {
               ),
             ),
             FTile(
-              prefix: Icon(FIcons.calendarDays),
+              prefix: Icon(FLucideIcons.calendarDays),
               title: const Text("Exam Notify Before"),
               details: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

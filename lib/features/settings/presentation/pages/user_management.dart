@@ -169,7 +169,7 @@ class SemesterDialog extends HookConsumerWidget {
               if (!isRefreshing.value)
                 FTappable(
                   onPress: handleRefresh,
-                  child: const Icon(FIcons.rotateCcw),
+                  child: const Icon(FLucideIcons.rotateCcw),
                 )
               else
                 const FCircularProgress.pinwheel(),

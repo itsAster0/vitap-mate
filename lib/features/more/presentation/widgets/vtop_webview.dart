@@ -185,7 +185,7 @@ class VtopWebview extends HookConsumerWidget {
       header: FHeader.nested(
         title: Text(
           showHeading.value,
-          style: TextStyle(fontSize: context.theme.typography.sm.fontSize),
+          style: TextStyle(fontSize: context.theme.typography.body.sm.fontSize),
         ),
         prefixes: [
           FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),

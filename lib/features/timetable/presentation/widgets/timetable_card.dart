@@ -189,7 +189,9 @@ class TimetableCard extends HookConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    slot.islab() ? FIcons.flaskConical : FIcons.libraryBig,
+                    slot.islab()
+                        ? FLucideIcons.flaskConical
+                        : FLucideIcons.libraryBig,
                     size: 16,
                     color: slot.islab()
                         ? const Color(0xFF0277BD)
@@ -250,7 +252,7 @@ class TimetableCard extends HookConsumerWidget {
               child: _buildDetailChip(
                 isDark,
                 context,
-                icon: FIcons.mapPin,
+                icon: FLucideIcons.mapPin,
                 text: "${slot.block} - ${slot.roomNo}",
                 color: isDark
                     ? context.theme.colors.primary
@@ -261,7 +263,7 @@ class TimetableCard extends HookConsumerWidget {
             _buildDetailChip(
               isDark,
               context,
-              icon: FIcons.hash,
+              icon: FLucideIcons.hash,
               text: slot.courseCode,
               color: isDark
                   ? context.theme.colors.primary
@@ -277,7 +279,7 @@ class TimetableCard extends HookConsumerWidget {
               child: _buildDetailChip(
                 isDark,
                 context,
-                icon: FIcons.clock,
+                icon: FLucideIcons.clock,
                 text:
                     "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
                 color: isDark
@@ -290,7 +292,7 @@ class TimetableCard extends HookConsumerWidget {
             _buildDetailChip(
               isDark,
               context,
-              icon: FIcons.calendar,
+              icon: FLucideIcons.calendar,
               text: slot.slot,
               color: isDark
                   ? context.theme.colors.primary
@@ -301,7 +303,7 @@ class TimetableCard extends HookConsumerWidget {
 
         SizeTransition(
           sizeFactor: animation,
-          axisAlignment: -1.0,
+          alignment: const AlignmentDirectional(-1.0, -1.0),
           child: Column(
             children: [
               const SizedBox(height: 8),
@@ -311,7 +313,7 @@ class TimetableCard extends HookConsumerWidget {
                     child: _buildDetailChip(
                       isDark,
                       context,
-                      icon: FIcons.contact,
+                      icon: FLucideIcons.contact,
                       text: formateFaculityName(slot.faculty),
                       color: isDark
                           ? context.theme.colors.primary
@@ -342,7 +344,11 @@ class TimetableCard extends HookConsumerWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(FIcons.hourglass, size: 16, color: Color(0xFFE65100)),
+                  Icon(
+                    FLucideIcons.hourglass,
+                    size: 16,
+                    color: Color(0xFFE65100),
+                  ),
                   SizedBox(width: 4),
                   Text(
                     'FREE TIME',
@@ -365,7 +371,7 @@ class TimetableCard extends HookConsumerWidget {
               child: _buildDetailChip(
                 isDark,
                 context,
-                icon: FIcons.clock,
+                icon: FLucideIcons.clock,
                 text:
                     "${to12H(slot.startTime, context)} - ${to12H(slot.endTime, context)}",
                 color: isDark
@@ -378,7 +384,7 @@ class TimetableCard extends HookConsumerWidget {
             _buildDetailChip(
               isDark,
               context,
-              icon: FIcons.timer,
+              icon: FLucideIcons.timer,
               text: slot.slot == "1"
                   ? "${slot.slot} hour"
                   : "${slot.slot} hours",

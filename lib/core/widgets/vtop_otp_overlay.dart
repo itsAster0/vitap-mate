@@ -57,14 +57,14 @@ class VtopOtpOverlay extends HookConsumerWidget {
                           Expanded(
                             child: Text(
                               'VTOP OTP Verification',
-                              style: context.theme.typography.md.copyWith(
+                              style: context.theme.typography.body.md.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
                           FButton.icon(
                             onPress: notifier.minimize,
-                            child: const Icon(FIcons.minimize2),
+                            child: const Icon(FLucideIcons.minimize2),
                           ),
                         ],
                       ),
@@ -90,7 +90,7 @@ class VtopOtpOverlay extends HookConsumerWidget {
                             Text(
                               state.autoFetchMessage ??
                                   'We are trying to get OTP from email...',
-                              style: context.theme.typography.sm.copyWith(
+                              style: context.theme.typography.body.sm.copyWith(
                                 color: context.theme.colors.mutedForeground,
                               ),
                             ),
@@ -98,7 +98,7 @@ class VtopOtpOverlay extends HookConsumerWidget {
                               state.errorMessage!.trim().isNotEmpty)
                             Text(
                               state.errorMessage!,
-                              style: context.theme.typography.sm.copyWith(
+                              style: context.theme.typography.body.sm.copyWith(
                                 color: context.theme.colors.destructive,
                               ),
                             ),
@@ -126,10 +126,13 @@ class VtopOtpOverlay extends HookConsumerWidget {
                                     state.remainingSeconds > 0
                                         ? 'available in ${formatSeconds(state.remainingSeconds)}'
                                         : 'resend available now',
-                                    style: context.theme.typography.sm.copyWith(
-                                      color:
-                                          context.theme.colors.mutedForeground,
-                                    ),
+                                    style: context.theme.typography.body.sm
+                                        .copyWith(
+                                          color: context
+                                              .theme
+                                              .colors
+                                              .mutedForeground,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -183,7 +186,7 @@ class VtopOtpOverlay extends HookConsumerWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        FIcons.shieldCheck,
+                        FLucideIcons.shieldCheck,
                         color: context.theme.colors.primaryForeground,
                         size: 18,
                       ),
@@ -192,7 +195,7 @@ class VtopOtpOverlay extends HookConsumerWidget {
                         state.remainingSeconds > 0
                             ? 'OTP ${formatSeconds(state.remainingSeconds)}'
                             : 'OTP',
-                        style: context.theme.typography.md.copyWith(
+                        style: context.theme.typography.body.md.copyWith(
                           color: context.theme.colors.primaryForeground,
                           fontWeight: FontWeight.w600,
                         ),

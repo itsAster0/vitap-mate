@@ -179,7 +179,7 @@ class AttendanceCard extends HookConsumerWidget {
         ],
       ),
       child: Icon(
-        isLab ? FIcons.flaskConical : FIcons.libraryBig,
+        isLab ? FLucideIcons.flaskConical : FLucideIcons.libraryBig,
         size: 20,
         color: iconColor,
       ),
@@ -261,7 +261,7 @@ class AttendanceCard extends HookConsumerWidget {
         context,
         "Total",
         record.attendancePercentage,
-        FIcons.percent,
+        FLucideIcons.percent,
         AttendanceColors.totalStatColor,
       ),
     ];
@@ -273,7 +273,7 @@ class AttendanceCard extends HookConsumerWidget {
           context,
           "b/w exams",
           record.attendenceFatCat,
-          FIcons.calendar,
+          FLucideIcons.calendar,
           AttendanceColors.examStatColor,
         ),
       );
@@ -285,7 +285,7 @@ class AttendanceCard extends HookConsumerWidget {
         context,
         "Present",
         "${record.classesAttended}/${record.totalClasses}",
-        FIcons.check,
+        FLucideIcons.check,
         AttendanceColors.presentStatColor,
       ),
     );

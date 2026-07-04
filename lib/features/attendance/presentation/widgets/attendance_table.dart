@@ -242,7 +242,7 @@ class AttendanceTable extends HookConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  FIcons.rotateCcw,
+                  FLucideIcons.rotateCcw,
                   size: 16,
                   color: isDark
                       ? context.theme.colors.primary

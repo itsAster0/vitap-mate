@@ -57,19 +57,19 @@ class GradesPage extends HookConsumerWidget {
                 children: [
                   if (semLoading)
                     FTile(
-                      prefix: const Icon(FIcons.calendarDays),
+                      prefix: const Icon(FLucideIcons.calendarDays),
                       title: const Text("Semester"),
                       subtitle: const Text("Loading semesters..."),
-                      suffix: const Icon(FIcons.loaderCircle),
+                      suffix: const Icon(FLucideIcons.loaderCircle),
                     )
                   else if (semLoadError)
                     FTile(
-                      prefix: const Icon(FIcons.calendarDays),
+                      prefix: const Icon(FLucideIcons.calendarDays),
                       title: const Text("Semester"),
                       subtitle: const Text(
                         "Unable to load semesters. Tap to retry",
                       ),
-                      suffix: const Icon(FIcons.rotateCw),
+                      suffix: const Icon(FLucideIcons.rotateCw),
                       onPress: () {
                         ref.invalidate(semesterIdProvider);
                       },
@@ -79,7 +79,7 @@ class GradesPage extends HookConsumerWidget {
                       key: ValueKey(
                         "grade_sem_${selectedSemesterId}_${semesters.length}",
                       ),
-                      prefix: const Icon(FIcons.calendarDays),
+                      prefix: const Icon(FLucideIcons.calendarDays),
                       title: const Text("Semester"),
                       details: Text(
                         _semesterNameFromList(semesters, selectedSemesterId),
@@ -116,7 +116,7 @@ class GradesPage extends HookConsumerWidget {
                   height: MediaQuery.of(context).size.height * 0.7,
                   child: const _CenterInfo(
                     title: "Loading grades...",
-                    icon: FIcons.loaderCircle,
+                    icon: FLucideIcons.loaderCircle,
                   ),
                 ),
                 error: (e, _) => SizedBox(
@@ -124,7 +124,7 @@ class GradesPage extends HookConsumerWidget {
                   child: _CenterInfo(
                     title: "Unable to load grades",
                     subtitle: commonErrorMessage(e),
-                    icon: FIcons.triangleAlert,
+                    icon: FLucideIcons.triangleAlert,
                   ),
                 ),
                 data: (data) {
@@ -144,7 +144,7 @@ class GradesPage extends HookConsumerWidget {
                           child: const _CenterInfo(
                             title: "No grades found",
                             subtitle: "Try a different semester.",
-                            icon: FIcons.school,
+                            icon: FLucideIcons.school,
                           ),
                         )
                       else
@@ -311,7 +311,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
-                            FIcons.graduationCap,
+                            FLucideIcons.graduationCap,
                             color: MarksColors.theoryIcon,
                             size: 20,
                           ),
@@ -451,7 +451,7 @@ class _CardReloadAction extends StatelessWidget {
           border: Border.all(color: context.theme.colors.border),
         ),
         child: Icon(
-          loading ? FIcons.loaderCircle : FIcons.rotateCw,
+          loading ? FLucideIcons.loaderCircle : FLucideIcons.rotateCw,
           size: 14,
           color: context.theme.colors.primary,
         ),
@@ -477,7 +477,7 @@ class _GradeDetailsPanel extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Center(
           child: Icon(
-            FIcons.loaderCircle,
+            FLucideIcons.loaderCircle,
             size: 22,
             color: context.theme.colors.mutedForeground,
           ),

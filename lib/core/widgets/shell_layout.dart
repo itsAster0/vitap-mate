@@ -107,23 +107,23 @@ class ShellLayout extends HookConsumerWidget {
           },
           children: [
             FBottomNavigationBarItem(
-              icon: Icon(FIcons.calendarDays),
+              icon: Icon(FLucideIcons.calendarDays),
               label: const Text('Timetable'),
             ),
             FBottomNavigationBarItem(
-              icon: Icon(FIcons.userCheck),
+              icon: Icon(FLucideIcons.userCheck),
               label: const Text('Attendance'),
             ),
             FBottomNavigationBarItem(
-              icon: Icon(FIcons.libraryBig),
+              icon: Icon(FLucideIcons.libraryBig),
               label: const Text('More'),
             ),
             // FBottomNavigationBarItem(
-            //   icon: Icon(FIcons.rocket),
+            //   icon: Icon(FLucideIcons.rocket),
             //   label: const Text('Projects'),
             // ),
             FBottomNavigationBarItem(
-              icon: Icon(FIcons.settings),
+              icon: Icon(FLucideIcons.settings),
               label: const Text('Settings'),
             ),
           ],
@@ -174,8 +174,8 @@ Widget? getSidewidget(
       title: data,
       subtitle: subtitle,
       titleStyle: subtitle != null
-          ? context.theme.typography.sm
-          : context.theme.typography.lg,
+          ? context.theme.typography.body.sm
+          : context.theme.typography.body.lg,
     ),
 
     prefixes: [
@@ -221,7 +221,7 @@ class _HeaderTitle extends StatelessWidget {
           if (subtitle != null)
             Text(
               subtitle!,
-              style: context.theme.typography.sm.copyWith(
+              style: context.theme.typography.body.sm.copyWith(
                 color: context.theme.colors.mutedForeground,
                 fontWeight: FontWeight.w500,
               ),

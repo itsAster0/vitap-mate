@@ -57,7 +57,7 @@ class UserCard extends HookConsumerWidget {
                     ),
                     child: const Padding(
                       padding: EdgeInsets.all(10),
-                      child: Icon(FIcons.idCard),
+                      child: Icon(FLucideIcons.idCard),
                     ),
                   ),
                   Expanded(
@@ -66,7 +66,7 @@ class UserCard extends HookConsumerWidget {
                       children: [
                         Text(
                           "VTOP Credential",
-                          style: context.theme.typography.md.copyWith(
+                          style: context.theme.typography.body.md.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -74,7 +74,7 @@ class UserCard extends HookConsumerWidget {
                           user.isValid
                               ? "Account is connected"
                               : "Password needs attention",
-                          style: context.theme.typography.sm.copyWith(
+                          style: context.theme.typography.body.sm.copyWith(
                             color: user.isValid
                                 ? context.theme.colors.mutedForeground
                                 : context.theme.colors.destructive,
@@ -126,7 +126,7 @@ class UserCard extends HookConsumerWidget {
                         }
                         showPasswords.value = !showPasswords.value;
                       },
-                      child: const Icon(FIcons.eye),
+                      child: const Icon(FLucideIcons.eye),
                     ),
                 ],
               ),

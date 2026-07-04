@@ -47,7 +47,7 @@ class VtopWebviewLoading extends StatelessWidget {
                     child: Center(
                       child: hasError
                           ? Icon(
-                              FIcons.circleAlert,
+                              FLucideIcons.circleAlert,
                               color: colors.destructive,
                               size: 30,
                             )
@@ -68,7 +68,7 @@ class VtopWebviewLoading extends StatelessWidget {
                 Text(
                   hasError ? 'Could not open VTOP' : 'Opening VTOP',
                   textAlign: TextAlign.center,
-                  style: typography.lg.copyWith(
+                  style: typography.body.lg.copyWith(
                     color: colors.foreground,
                     fontWeight: FontWeight.w600,
                   ),
@@ -79,7 +79,7 @@ class VtopWebviewLoading extends StatelessWidget {
                       ? 'Something went wrong while preparing your session.'
                       : 'Preparing your login session securely.',
                   textAlign: TextAlign.center,
-                  style: typography.sm.copyWith(
+                  style: typography.body.sm.copyWith(
                     color: colors.mutedForeground,
                     height: 1.35,
                   ),

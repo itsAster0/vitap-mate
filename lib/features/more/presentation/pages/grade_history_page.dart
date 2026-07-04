@@ -38,7 +38,7 @@ class GradeHistoryPage extends HookConsumerWidget {
             height: MediaQuery.of(context).size.height * 0.7,
             child: const _CenterInfo(
               title: "Loading grade history...",
-              icon: FIcons.loaderCircle,
+              icon: FLucideIcons.loaderCircle,
             ),
           ),
           error: (e, _) => SizedBox(
@@ -46,7 +46,7 @@ class GradeHistoryPage extends HookConsumerWidget {
             child: _CenterInfo(
               title: "Unable to load grade history",
               subtitle: commonErrorMessage(e),
-              icon: FIcons.triangleAlert,
+              icon: FLucideIcons.triangleAlert,
             ),
           ),
           data: (gradeHistory) {
@@ -63,7 +63,7 @@ class GradeHistoryPage extends HookConsumerWidget {
                     child: const _CenterInfo(
                       title: "No grade history found",
                       subtitle: "Pull to refresh and try again.",
-                      icon: FIcons.fileX,
+                      icon: FLucideIcons.fileX,
                     ),
                   )
                 else
@@ -321,7 +321,7 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(
-                            FIcons.bookOpen,
+                            FLucideIcons.bookOpen,
                             color: MarksColors.theoryIcon,
                             size: 20,
                           ),
@@ -387,7 +387,7 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                             context,
                             "Exam",
                             r.examMonth,
-                            icon: FIcons.calendarDays,
+                            icon: FLucideIcons.calendarDays,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -396,7 +396,7 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                             context,
                             "Declared",
                             r.resultDeclared,
-                            icon: FIcons.calendarCheck,
+                            icon: FLucideIcons.calendarCheck,
                           ),
                         ),
                       ],
@@ -410,7 +410,7 @@ class _HistoryCardState extends ConsumerState<_HistoryCard>
                             context,
                             "Distribution",
                             r.courseDistribution,
-                            icon: FIcons.bookOpen,
+                            icon: FLucideIcons.bookOpen,
                           ),
                         ),
                       ),

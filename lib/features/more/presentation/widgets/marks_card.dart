@@ -129,7 +129,9 @@ class MarksCard extends HookConsumerWidget {
                             ],
                           ),
                           child: Icon(
-                            isLab ? FIcons.flaskConical : FIcons.libraryBig,
+                            isLab
+                                ? FLucideIcons.flaskConical
+                                : FLucideIcons.libraryBig,
 
                             color: isLab
                                 ? MarksColors.labIcon

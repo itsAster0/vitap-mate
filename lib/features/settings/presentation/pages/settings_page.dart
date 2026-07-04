@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +14,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
@@ -34,38 +34,6 @@ const _appTrack = String.fromEnvironment(
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
-
-  String _cookieEditorJsonFromHeader(String cookieHeader) {
-    const domain = 'vtop.vitap.ac.in';
-    final parts = cookieHeader.split(';');
-    final cookies = <Map<String, dynamic>>[];
-
-    for (var i = 0; i < parts.length; i++) {
-      final part = parts[i].trim();
-      if (part.isEmpty) continue;
-      final eq = part.indexOf('=');
-      if (eq <= 0) continue;
-      final name = part.substring(0, eq).trim();
-      final value = part.substring(eq + 1).trim();
-      if (name.isEmpty) continue;
-
-      cookies.add({
-        'domain': domain,
-        'hostOnly': true,
-        'httpOnly': false,
-        'name': name,
-        'path': '/',
-        'sameSite': 'unspecified',
-        'secure': true,
-        'session': true,
-        'storeId': '0',
-        'value': value,
-        'id': i + 1,
-      });
-    }
-
-    return const JsonEncoder.withIndent('  ').convert(cookies);
-  }
 
   Future<void> _copySavedCookies(BuildContext context, WidgetRef ref) async {
     try {
@@ -91,7 +59,7 @@ class SettingsPage extends HookConsumerWidget {
         return;
       }
 
-      final cookieEditorJson = _cookieEditorJsonFromHeader(cookies);
+      final cookieEditorJson = cookieEditorJsonFromHeader(cookies);
       if (cookieEditorJson == '[]') {
         if (context.mounted) {
           dispToast(
@@ -116,6 +84,37 @@ class SettingsPage extends HookConsumerWidget {
       );
       if (context.mounted) {
         dispToast(context, "Failed", "Could not copy cookies right now.");
+      }
+    }
+  }
+
+  Future<void> _copyFcmToken(BuildContext context) async {
+    try {
+      final token = await getFcmTokenForCopy();
+      if (token == null || token.trim().isEmpty) {
+        if (context.mounted) {
+          dispToast(
+            context,
+            "No FCM Token",
+            "Could not get a Firebase Messaging token.",
+          );
+        }
+        return;
+      }
+
+      await Clipboard.setData(ClipboardData(text: token));
+      if (context.mounted) {
+        dispToast(context, "Copied", "FCM token copied to clipboard.");
+      }
+    } catch (error, stackTrace) {
+      log(
+        'Failed to copy FCM token',
+        name: 'settings.fcm',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (context.mounted) {
+        dispToast(context, "Failed", "Could not copy FCM token right now.");
       }
     }
   }
@@ -210,7 +209,7 @@ class SettingsPage extends HookConsumerWidget {
                     const SizedBox(height: 8),
                     Text(
                       errorText.value!,
-                      style: dialogContext.theme.typography.sm.copyWith(
+                      style: dialogContext.theme.typography.body.sm.copyWith(
                         color: dialogContext.theme.colors.destructive,
                       ),
                     ),
@@ -299,13 +298,13 @@ class SettingsPage extends HookConsumerWidget {
                     const SizedBox(height: 12),
                     Text(
                       '1) Verify email',
-                      style: dialogContext.theme.typography.sm.copyWith(
+                      style: dialogContext.theme.typography.body.sm.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       stepOneMessage.value,
-                      style: dialogContext.theme.typography.sm,
+                      style: dialogContext.theme.typography.body.sm,
                     ),
                     const SizedBox(height: 8),
                     FButton(
@@ -333,19 +332,19 @@ class SettingsPage extends HookConsumerWidget {
                     const SizedBox(height: 14),
                     Text(
                       '2) Get tokens for email read',
-                      style: dialogContext.theme.typography.sm.copyWith(
+                      style: dialogContext.theme.typography.body.sm.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
                       stepTwoMessage.value,
-                      style: dialogContext.theme.typography.sm,
+                      style: dialogContext.theme.typography.body.sm,
                     ),
                     if (verifiedEmail.value != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         'Verified email: ${verifiedEmail.value}',
-                        style: dialogContext.theme.typography.xs.copyWith(
+                        style: dialogContext.theme.typography.body.xs.copyWith(
                           color: dialogContext.theme.colors.mutedForeground,
                         ),
                       ),
@@ -626,7 +625,7 @@ class SettingsPage extends HookConsumerWidget {
             label: const Text('Vtop'),
             children: [
               FTile(
-                prefix: Icon(FIcons.calendarDays),
+                prefix: Icon(FLucideIcons.calendarDays),
                 title: const Text('Merge Labs'),
                 suffix: FSwitch(
                   value: ref.watch(mergeTTProvider),
@@ -636,7 +635,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: Icon(FIcons.userCheck),
+                prefix: Icon(FLucideIcons.userCheck),
                 title: const Text('Show b/w Exams'),
                 suffix: FSwitch(
                   value: ref.watch(btwExamsProvider),
@@ -646,7 +645,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: Icon(FIcons.refreshCcw),
+                prefix: Icon(FLucideIcons.refreshCcw),
                 title: const Text('Auto Refresh'),
                 suffix: FSwitch(
                   value: ref.watch(autoRefreshProvider),
@@ -656,14 +655,14 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: const Icon(FIcons.cloudDownload),
+                prefix: const Icon(FLucideIcons.cloudDownload),
                 title: const Text('Update VTOP Data'),
                 subtitle: const Text(
                   'Fetch attendance, timetable, marks, exams and semesters',
                 ),
                 suffix: isVtopSyncing.value
                     ? const FCircularProgress.pinwheel()
-                    : const Icon(FIcons.chevronRight),
+                    : const Icon(FLucideIcons.chevronRight),
                 onPress: isVtopSyncing.value
                     ? null
                     : () async {
@@ -676,7 +675,7 @@ class SettingsPage extends HookConsumerWidget {
               ),
               if (isEmailOtpFeatureEnabled.value)
                 FTile(
-                  prefix: const Icon(FIcons.mail),
+                  prefix: const Icon(FLucideIcons.mail),
                   title: const Text('Email OTP Autofetch'),
                   subtitle: Text(
                     isEmailOtpReady.value == true
@@ -687,8 +686,8 @@ class SettingsPage extends HookConsumerWidget {
                       ? const FCircularProgress.pinwheel()
                       : Icon(
                           isEmailOtpReady.value == true
-                              ? FIcons.chevronRight
-                              : FIcons.link,
+                              ? FLucideIcons.chevronRight
+                              : FLucideIcons.link,
                         ),
                   onPress: isEmailOtpBusy.value
                       ? null
@@ -707,14 +706,14 @@ class SettingsPage extends HookConsumerWidget {
                   isEmailOtpReady.value == true &&
                   showDebugFeatures.value)
                 FTile(
-                  prefix: const Icon(FIcons.mailCheck),
+                  prefix: const Icon(FLucideIcons.mailCheck),
                   title: const Text('Test Latest OTP Email'),
                   subtitle: const Text(
                     'Fetch latest email from info1@vitap.ac.in',
                   ),
                   suffix: isEmailOtpTestBusy.value
                       ? const FCircularProgress.pinwheel()
-                      : const Icon(FIcons.chevronRight),
+                      : const Icon(FLucideIcons.chevronRight),
                   onPress: isEmailOtpTestBusy.value
                       ? null
                       : () async {
@@ -725,30 +724,35 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               if (showDebugFeatures.value)
                 FTile(
-                  prefix: const Icon(FIcons.timer),
+                  prefix: const Icon(FLucideIcons.timer),
                   title: const Text('VTOP Session Reuse'),
                   subtitle: Text(
                     'Reuse saved cookies for ${initialVtopSessionReuseTtl.inMinutes} minutes',
                   ),
-                  suffix: const Icon(FIcons.chevronRight),
+                  suffix: const Icon(FLucideIcons.chevronRight),
                   onPress: () => _openVtopSessionReuseTtlDialog(context, ref),
                 ),
+              FTile(
+                prefix: const Icon(FLucideIcons.radio),
+                title: const Text('Copy FCM Token'),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () => _copyFcmToken(context),
+              ),
+              FTile(
+                prefix: const Icon(FLucideIcons.copy),
+                title: const Text('Copy Saved Cookies'),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () => _copySavedCookies(context, ref),
+              ),
               if (showDebugFeatures.value)
                 FTile(
-                  prefix: const Icon(FIcons.copy),
-                  title: const Text('Copy Saved Cookies'),
-                  suffix: const Icon(FIcons.chevronRight),
-                  onPress: () => _copySavedCookies(context, ref),
-                ),
-              if (showDebugFeatures.value)
-                FTile(
-                  prefix: const Icon(FIcons.trash2),
+                  prefix: const Icon(FLucideIcons.trash2),
                   title: const Text('Clear Saved Cookies'),
-                  suffix: const Icon(FIcons.chevronRight),
+                  suffix: const Icon(FLucideIcons.chevronRight),
                   onPress: () => _clearSavedCookies(context, ref),
                 ),
               FSelectMenuTile(
-                prefix: Icon(FIcons.folderSync),
+                prefix: Icon(FLucideIcons.folderSync),
                 title: FTappable(child: Text('Background Sync')),
 
                 selectControl: FMultiValueControl.managedRadio(
@@ -773,7 +777,7 @@ class SettingsPage extends HookConsumerWidget {
             label: const Text('App Settings'),
             children: [
               FTile(
-                prefix: Icon(FIcons.moon),
+                prefix: Icon(FLucideIcons.moon),
                 title: const Text('Dark Mode'),
                 onLongPress: () {
                   showDebugFeatures.value = !showDebugFeatures.value;
@@ -786,9 +790,9 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: Icon(FIcons.bell),
+                prefix: Icon(FLucideIcons.bell),
                 title: const Text("Notification Management"),
-                suffix: Icon(FIcons.chevronRight),
+                suffix: Icon(FLucideIcons.chevronRight),
                 onPress: () {
                   GoRouter.of(context).pushNamed(Paths.notificationManagement);
                 },
@@ -797,7 +801,7 @@ class SettingsPage extends HookConsumerWidget {
                 FTile(
                   prefix: const Icon(Icons.receipt_long_outlined),
                   title: const Text("Logs"),
-                  suffix: Icon(FIcons.chevronRight),
+                  suffix: Icon(FLucideIcons.chevronRight),
                   onPress: () {
                     GoRouter.of(context).pushNamed(Paths.logs);
                   },
@@ -808,7 +812,7 @@ class SettingsPage extends HookConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
-                icon: Icon(FIcons.github),
+                icon: const Icon(Icons.code),
                 onPressed: () {
                   launchUrl(
                     Uri.parse("https://github.com/itsKryxen/vitap-mate"),
@@ -816,13 +820,13 @@ class SettingsPage extends HookConsumerWidget {
                 },
               ),
               IconButton(
-                icon: Icon(FIcons.contact),
+                icon: Icon(FLucideIcons.contact),
                 onPressed: () {
                   launchUrl(Uri.parse("https://bio.link/synaptic"));
                 },
               ),
               IconButton(
-                icon: Icon(FIcons.instagram),
+                icon: const Icon(Icons.camera_alt_outlined),
                 onPressed: () {
                   launchUrl(Uri.parse("https://www.instagram.com/itsKryxen"));
                 },
@@ -834,7 +838,7 @@ class SettingsPage extends HookConsumerWidget {
               padding: const EdgeInsets.only(top: 4, bottom: 16),
               child: Text(
                 appVersion,
-                style: context.theme.typography.sm.copyWith(
+                style: context.theme.typography.body.sm.copyWith(
                   color: context.theme.colors.mutedForeground,
                 ),
               ),

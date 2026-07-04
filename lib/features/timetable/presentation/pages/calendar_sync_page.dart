@@ -432,7 +432,7 @@ class CalendarSyncPage extends HookConsumerWidget {
           children: [
             Text(
               "Calendar Sync",
-              style: context.theme.typography.xl.copyWith(
+              style: context.theme.typography.body.xl.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -442,7 +442,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             const FDivider(),
             Text(
               "Date Range",
-              style: context.theme.typography.md.copyWith(
+              style: context.theme.typography.body.md.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -475,14 +475,23 @@ class CalendarSyncPage extends HookConsumerWidget {
             ),
             const SizedBox(height: 8),
             Center(
-              child: FCalendar(
+              child: FCalendar.grid(
                 key: ValueKey(
                   "${selectingDate.value.name}-${calendarFocusDate.year}-${calendarFocusDate.month}",
                 ),
-                control: FCalendarControl.managedDate(
+                control: FGridCalendarControl(
+                  start: DateTime(now.year - 1, 1, 1),
+                  end: DateTime(now.year + 3, 1, 1),
                   initial: calendarFocusDate,
                 ),
-                onPress: (selected) {
+                selectionControl: FDateSelectionControl.lifted(
+                  selected: (date) =>
+                      date.year == calendarFocusDate.year &&
+                      date.month == calendarFocusDate.month &&
+                      date.day == calendarFocusDate.day,
+                  select: (_) {},
+                ),
+                onDayPress: (selected) {
                   final pickedStart = DateTime(
                     selected.year,
                     selected.month,
@@ -511,22 +520,19 @@ class CalendarSyncPage extends HookConsumerWidget {
                     }
                   }
                 },
-                start: DateTime(now.year - 1, 1, 1),
-                end: DateTime(now.year + 3, 1, 1),
-                initialMonth: calendarFocusDate,
               ),
             ),
             if (endDate.value.isBefore(startDate.value))
               Text(
                 "End date must be on or after start date.",
-                style: context.theme.typography.sm,
+                style: context.theme.typography.body.sm,
               ),
             const FDivider(),
             if (timetableChangedSinceLastSync.value)
               FCard(
                 title: Text(
                   "Timetable Changed",
-                  style: context.theme.typography.md.copyWith(
+                  style: context.theme.typography.body.md.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -540,7 +546,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             FCard(
               title: Text(
                 "Calendar Setup",
-                style: context.theme.typography.md.copyWith(
+                style: context.theme.typography.body.md.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -629,7 +635,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             FCard(
               title: Text(
                 "Event Layout",
-                style: context.theme.typography.md.copyWith(
+                style: context.theme.typography.body.md.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -692,7 +698,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                   const SizedBox(height: 8),
                   Text(
                     "Placeholders: {name} {courseCode} {courseType} {faculty} {slot} {day} {startTime} {endTime} {block} {roomNo}",
-                    style: context.theme.typography.sm,
+                    style: context.theme.typography.body.sm,
                   ),
                 ],
               ),
@@ -719,7 +725,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                     children: [
                       Text(
                         "Clear only removes events tagged by this app for the current semester.",
-                        style: context.theme.typography.sm,
+                        style: context.theme.typography.body.sm,
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
@@ -739,7 +745,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             const SizedBox(height: 4),
             Text(
               "Note: Calendar apps may take a few minutes to display updates.",
-              style: context.theme.typography.sm,
+              style: context.theme.typography.body.sm,
               textAlign: TextAlign.center,
             ),
           ],

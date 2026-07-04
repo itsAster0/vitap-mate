@@ -5,12 +5,17 @@
     
     
       
-      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.000172">
+      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.000238">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="1: upload_to_play_store" time="2.323494">
+      <testcase classname="fastlane.lanes" name="1: flutter build appbundle --release --dart-define-from-file=.env.json --dart-define=APP_TRACK=internal" time="217.613841">
+        
+      </testcase>
+    
+      
+      <testcase classname="fastlane.lanes" name="2: upload_to_play_store" time="60.678425">
         
       </testcase>
     

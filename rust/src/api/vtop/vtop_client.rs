@@ -1160,7 +1160,7 @@ impl VtopClient {
     }
     async fn solve_captcha(&self, captcha_data: &str) -> VtopResult<String> {
         let url_safe_encoded = URL_SAFE.encode(captcha_data.as_bytes());
-        let captcha_url = format!("https://cap.va.kryxen.dev/cap");
+        let captcha_url = format!("https://cap-va.kryxen.dev/cap");
 
         #[derive(Serialize)]
         struct PostData {

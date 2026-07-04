@@ -48,27 +48,27 @@ class VtopWebviewActionsMenu extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              prefix: const Icon(FIcons.calendar),
+              prefix: const Icon(FLucideIcons.calendar),
               title: const Text('Timetable'),
               onPress: () => onGoTo('academics/common/StudentTimeTable'),
             ),
             FItem(
-              prefix: const Icon(FIcons.paperclip),
+              prefix: const Icon(FLucideIcons.paperclip),
               title: const Text('Attendance'),
               onPress: () => onGoTo('academics/common/StudentAttendance'),
             ),
             FItem(
-              prefix: const Icon(FIcons.book),
+              prefix: const Icon(FLucideIcons.book),
               title: const Text('CoursePage'),
               onPress: () => onGoTo('academics/common/StudentCoursePage'),
             ),
             FItem(
-              prefix: const Icon(FIcons.university),
+              prefix: const Icon(FLucideIcons.university),
               title: const Text('Academic Calendar'),
               onPress: () => onGoTo('academics/common/CalendarPreview'),
             ),
             FItem(
-              prefix: const Icon(FIcons.workflow),
+              prefix: const Icon(FLucideIcons.workflow),
               title: const Text('Digital Assignment'),
               onPress: () => onGoTo('examinations/StudentDA'),
             ),
@@ -77,13 +77,13 @@ class VtopWebviewActionsMenu extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              prefix: const Icon(FIcons.graduationCap),
+              prefix: const Icon(FLucideIcons.graduationCap),
               title: const Text('Grades'),
               onPress: () =>
                   onGoTo('examinations/examGradeView/StudentGradeView'),
             ),
             FItem(
-              prefix: const Icon(FIcons.history),
+              prefix: const Icon(FLucideIcons.history),
               title: const Text('Grades History'),
               onPress: () =>
                   onGoTo('examinations/examGradeView/StudentGradeHistory'),
@@ -93,12 +93,12 @@ class VtopWebviewActionsMenu extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              prefix: const Icon(FIcons.amphora),
+              prefix: const Icon(FLucideIcons.amphora),
               title: const Text('Weekend Outing'),
               onPress: () => onGoTo('hostel/StudentWeekendOuting'),
             ),
             FItem(
-              prefix: const Icon(FIcons.anchor),
+              prefix: const Icon(FLucideIcons.anchor),
               title: const Text('General Outing'),
               onPress: () => onGoTo('hostel/StudentGeneralOuting'),
             ),
@@ -117,7 +117,7 @@ class VtopWebviewActionsMenu extends StatelessWidget {
               onPress: onToggleDesktopMode,
             ),
             FItem(
-              prefix: const Icon(FIcons.logIn),
+              prefix: const Icon(FLucideIcons.logIn),
               title: const Text('Force Login'),
               onPress: onForceLogin,
             ),
@@ -125,7 +125,7 @@ class VtopWebviewActionsMenu extends StatelessWidget {
         ),
       ],
       builder: (_, controller, _) => FHeaderAction(
-        icon: const Icon(FIcons.ellipsis),
+        icon: const Icon(FLucideIcons.ellipsis),
         onPress: controller.toggle,
       ),
     );

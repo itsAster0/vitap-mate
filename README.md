@@ -87,11 +87,14 @@ Example `.env.json`:
 
 ```json
 {
-  "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com"
+  "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+  "FCM_COOKIE_CALLBACK_URL": "https://your-public-backend.example.com/cookie/callback"
 }
 ```
 
 Use the Android client ID here, not the web client ID.
+`FCM_COOKIE_CALLBACK_URL` must point to the Fiber backend callback endpoint
+reachable by the mobile device.
 
 
 

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:developer' show log;
 
@@ -21,7 +22,7 @@ const gmailOauthScopes = <String>[
   'openid',
   'email',
   'profile',
-  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.modify',
 ];
 const _googleServiceConfiguration = AuthorizationServiceConfiguration(
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -81,7 +82,7 @@ class EmailOtpOAuthSession {
   final int accessTokenExpiryEpochMs;
 
   bool get hasGmailScope =>
-      scopes.contains('https://www.googleapis.com/auth/gmail.readonly');
+      scopes.contains('https://www.googleapis.com/auth/gmail.modify');
 
   bool get isExpired {
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -379,7 +380,7 @@ class GoogleEmailOtpAuthService {
 
     final listResponse = await _http.get(
       Uri.parse(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&q=from:info1@vitap.ac.in',
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&q=from:noreply.sdc@vitap.ac.in',
       ),
       headers: {'Authorization': 'Bearer ${session.accessToken}'},
     );
@@ -410,7 +411,11 @@ class GoogleEmailOtpAuthService {
 
     final combinedText = _extractMessageText(message);
     final match = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(combinedText);
-    return match?.group(1);
+    final otp = match?.group(1);
+    if (otp != null) {
+      unawaited(_markMessageAsRead(message, session.accessToken));
+    }
+    return otp;
   }
 
   Future<LatestInfoEmail?> fetchLatestInfoEmail() async {
@@ -421,7 +426,7 @@ class GoogleEmailOtpAuthService {
 
     final listResponse = await _http.get(
       Uri.parse(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&q=from:info1@vitap.ac.in',
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&q=from:noreply.sdc@vitap.ac.in',
       ),
       headers: {'Authorization': 'Bearer ${session.accessToken}'},
     );
@@ -452,6 +457,9 @@ class GoogleEmailOtpAuthService {
         ? '${collapsed.substring(0, 500)}...'
         : collapsed;
     final otp = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(text)?.group(1);
+    if (otp != null) {
+      unawaited(_markMessageAsRead(latest, session.accessToken));
+    }
 
     return LatestInfoEmail(
       receivedAt: receivedAt,
@@ -483,6 +491,41 @@ class GoogleEmailOtpAuthService {
     final message = jsonDecode(res.body);
     if (message is! Map<String, dynamic>) return null;
     return message;
+  }
+
+  Future<void> _markMessageAsRead(
+    Map<String, dynamic> message,
+    String accessToken,
+  ) async {
+    final id = message['id'] as String?;
+    if (id == null || id.isEmpty) return;
+    try {
+      final response = await _http.post(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id/modify',
+        ),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'removeLabelIds': ['UNREAD'],
+        }),
+      );
+      if (response.statusCode != 200) {
+        log(
+          'Failed to mark OTP email as read (status ${response.statusCode}).',
+          name: 'email_otp.gmail',
+        );
+      }
+    } catch (error, stackTrace) {
+      log(
+        'Failed to mark OTP email as read',
+        name: 'email_otp.gmail',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Future<String?> _resolveAccountEmail({
@@ -538,7 +581,7 @@ class GoogleEmailOtpAuthService {
       final name = '${item['name']}'.toLowerCase();
       if (name != 'from') continue;
       final value = '${item['value']}'.toLowerCase();
-      if (value.contains('info1@vitap.ac.in')) return true;
+      if (value.contains('noreply.sdc@vitap.ac.in')) return true;
     }
     return false;
   }

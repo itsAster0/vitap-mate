@@ -1,2 +1,3 @@
 [tools]
+firebase = "latest"
 flutter = "latest"

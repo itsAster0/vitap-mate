@@ -34,6 +34,10 @@ class VtopWebviewBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final webViewBackground = isDarkMode
+        ? context.theme.colors.background
+        : MoreColors.tableBackground;
+
     return SafeArea(
       bottom: true,
       top: false,
@@ -43,7 +47,7 @@ class VtopWebviewBody extends StatelessWidget {
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height * 0.8,
         decoration: BoxDecoration(
-          color: MoreColors.tableBackground,
+          color: webViewBackground,
           boxShadow: [
             BoxShadow(
               color: MoreColors.cardShadow,
@@ -56,7 +60,11 @@ class VtopWebviewBody extends StatelessWidget {
           children: [
             InAppWebView(
               initialSettings: InAppWebViewSettings(
+                forceDark: null,
+                forceDarkStrategy: null,
                 isInspectable: kDebugMode,
+                transparentBackground: isDarkMode,
+                underPageBackgroundColor: webViewBackground,
                 useOnDownloadStart: true,
               ),
               initialUrlRequest: URLRequest(url: initialUrl),
@@ -142,6 +150,8 @@ class VtopWebviewBody extends StatelessWidget {
                 await onPageReady(controller);
               },
             ),
+            if (isDarkMode && loading)
+              Positioned.fill(child: ColoredBox(color: webViewBackground)),
             if (loading)
               const Positioned(left: 0, right: 0, top: 0, child: FProgress()),
           ],
