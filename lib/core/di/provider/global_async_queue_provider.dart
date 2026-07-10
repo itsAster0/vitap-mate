@@ -35,7 +35,8 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
         if (id.startsWith("vtop")) {
           final mainFutures = current.entries
               .where(
-                (entry) => entry.key.startsWith('vtop_login') && entry.key != id,
+                (entry) =>
+                    entry.key.startsWith('vtop_login') && entry.key != id,
               )
               .map((entry) => entry.value)
               .toList();

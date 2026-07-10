@@ -101,8 +101,22 @@ class UserCard extends HookConsumerWidget {
                   subtitle: Text('Update your VTOP password to continue.'),
                 ),
               ],
-              UserPassChange(user: user),
               Row(
+                spacing: 6,
+                children: [
+                  Expanded(child: UserPassChange(user: user)),
+                  Semantics(
+                    label: 'Sign out',
+                    button: true,
+                    child: FButton.icon(
+                      onPress: () => _confirmSignOut(context, ref),
+                      child: const Icon(FLucideIcons.logOut),
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                spacing: 6,
                 children: [
                   Expanded(
                     child: FButton(
@@ -116,7 +130,6 @@ class UserCard extends HookConsumerWidget {
                     ),
                   ),
                   if (hasEnrolledBiometrics) ...[
-                    const SizedBox(width: 10),
                     Tooltip(
                       message: 'View saved password',
                       child: Semantics(
@@ -129,15 +142,6 @@ class UserCard extends HookConsumerWidget {
                       ),
                     ),
                   ],
-                  const SizedBox(width: 10),
-                  Semantics(
-                    label: 'Sign out',
-                    button: true,
-                    child: FButton.icon(
-                      onPress: () => _confirmSignOut(context, ref),
-                      child: const Icon(FLucideIcons.logOut),
-                    ),
-                  ),
                 ],
               ),
             ],

@@ -108,6 +108,7 @@ class SemesterDialog extends HookConsumerWidget {
     final controller = useMemoized(
       () => FMultiValueNotifier<String>.radio(user.semid),
     );
+    final disableCanecel = useState(false);
     useEffect(() => controller.dispose, [controller]);
 
     final isRefreshing = useState(false);
@@ -136,25 +137,30 @@ class SemesterDialog extends HookConsumerWidget {
       final selected = values.isEmpty ? null : values.first;
       if (selected == null) return;
 
-      await ref
-          .read(vtopusersutilsProvider.notifier)
-          .vtopUserSave(user.copyWith(semid: selected));
+      disableCanecel.value = true;
+      try {
+        await ref
+            .read(vtopusersutilsProvider.notifier)
+            .vtopUserSave(user.copyWith(semid: selected));
 
-      ref.invalidate(vtopUserProvider);
-      ref.invalidate(vClientProvider);
+        ref.invalidate(vtopUserProvider);
+        ref.invalidate(vClientProvider);
 
-      final notifSetting = ref.read(classReminderSettingsProvider);
-      if (notifSetting.enabled) {
-        await ref.read(timetableProvider.notifier).updateTimetable();
-      }
+        final notifSetting = ref.read(classReminderSettingsProvider);
+        if (notifSetting.enabled) {
+          await ref.read(timetableProvider.notifier).updateTimetable();
+        }
 
-      final examNotifSetting = ref.read(examReminderSettingsProvider);
-      if (examNotifSetting.enabled) {
-        await ref.read(examScheduleProvider.notifier).updatexamschedule();
-      }
+        final examNotifSetting = ref.read(examReminderSettingsProvider);
+        if (examNotifSetting.enabled) {
+          await ref.read(examScheduleProvider.notifier).updatexamschedule();
+        }
 
-      if (context.mounted) {
-        Navigator.of(context).pop();
+        if (context.mounted) {
+          Navigator.of(context).pop();
+        }
+      } finally {
+        disableCanecel.value = false;
       }
     }
 
@@ -203,6 +209,7 @@ class SemesterDialog extends HookConsumerWidget {
             ),
           ),
           actions: [
+          if (!disableCanecel.value)
             FButton(
               variant: FButtonVariant.outline,
               onPress: () => Navigator.of(context).pop(),

@@ -113,9 +113,7 @@ class TimetablePage extends HookConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: 72),
-
                           ...daySlots.map((slot) => TimetableCard(slot: slot)),
-
                           DataUpdatedFooter(
                             updateTime: data.updateTime.toInt(),
                           ),
@@ -245,14 +243,14 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
     final cClass = t[i].endTime;
     final nClass = t[i + 1].startTime;
     int diff = getdiff(cClass, nClass);
-    int mod = (diff / 60).toInt();
+    int mod = (diff / 30).toInt();
 
     if (mod > 0) {
       r.add(
         TimetableSlot(
           serial: "-1",
           day: "-",
-          slot: "$mod",
+          slot: "${mod / 2 < 1 ? 1 : (mod / 2).toInt()}",
           courseCode: "-",
           courseType: "-",
           roomNo: "-",

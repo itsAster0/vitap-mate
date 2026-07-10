@@ -644,8 +644,8 @@ class SettingsPage extends HookConsumerWidget {
               ),
               FTile(
                 prefix: Icon(FLucideIcons.userCheck),
-                title: const Text('Classes Between Exams'),
-                subtitle: const Text('Include classes scheduled between exams'),
+                title: const Text('B/W exams'),
+                subtitle: const Text('Between exams attendance'),
                 suffix: FSwitch(
                   value: ref.watch(btwExamsProvider),
                   onChange: (value) {
