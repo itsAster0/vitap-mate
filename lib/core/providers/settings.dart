@@ -6,6 +6,9 @@ import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 part 'settings.g.dart';
 
+const emailOtpDeleteAfterReadingSettingKey =
+    'settings_email_otp_delete_after_reading';
+
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
   return SharedPreferencesWithCache.create(
@@ -14,6 +17,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_merge_tt",
         "settings_btw_atten",
         "settings_auto_refresh",
+        emailOtpDeleteAfterReadingSettingKey,
         "settings_class_notifications_enabled",
         "settings_class_notify_before_minutes",
         "settings_class_pause_until_millis",
@@ -62,6 +66,18 @@ Future<void> setautoRefresh(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool("settings_auto_refresh", value);
   ref.invalidate(autoRefreshProvider);
+}
+
+@riverpod
+bool emailOtpDeleteAfterReading(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool(emailOtpDeleteAfterReadingSettingKey) ?? true;
+}
+
+Future<void> setEmailOtpDeleteAfterReading(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool(emailOtpDeleteAfterReadingSettingKey, value);
+  ref.invalidate(emailOtpDeleteAfterReadingProvider);
 }
 
 @riverpod

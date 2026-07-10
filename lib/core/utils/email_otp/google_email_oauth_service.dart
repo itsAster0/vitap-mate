@@ -1,4 +1,3 @@
-import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:developer' show log;
 
@@ -374,7 +373,10 @@ class GoogleEmailOtpAuthService {
     return refreshed;
   }
 
-  Future<String?> fetchLatestOtpSince({required DateTime sinceUtc}) async {
+  Future<String?> fetchLatestOtpSince({
+    required DateTime sinceUtc,
+    bool deleteAfterReading = true,
+  }) async {
     final session = await refreshIfNeeded();
     if (session == null) return null;
 
@@ -413,12 +415,18 @@ class GoogleEmailOtpAuthService {
     final match = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(combinedText);
     final otp = match?.group(1);
     if (otp != null) {
-      unawaited(_markMessageAsRead(message, session.accessToken));
+      await _handleReadOtpMessage(
+        message,
+        session.accessToken,
+        deleteAfterReading: deleteAfterReading,
+      );
     }
     return otp;
   }
 
-  Future<LatestInfoEmail?> fetchLatestInfoEmail() async {
+  Future<LatestInfoEmail?> fetchLatestInfoEmail({
+    bool deleteAfterReading = true,
+  }) async {
     final session = await refreshIfNeeded();
     if (session == null) {
       throw StateError('Email OTP OAuth is not connected.');
@@ -458,7 +466,11 @@ class GoogleEmailOtpAuthService {
         : collapsed;
     final otp = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(text)?.group(1);
     if (otp != null) {
-      unawaited(_markMessageAsRead(latest, session.accessToken));
+      await _handleReadOtpMessage(
+        latest,
+        session.accessToken,
+        deleteAfterReading: deleteAfterReading,
+      );
     }
 
     return LatestInfoEmail(
@@ -521,6 +533,41 @@ class GoogleEmailOtpAuthService {
     } catch (error, stackTrace) {
       log(
         'Failed to mark OTP email as read',
+        name: 'email_otp.gmail',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _handleReadOtpMessage(
+    Map<String, dynamic> message,
+    String accessToken, {
+    required bool deleteAfterReading,
+  }) async {
+    if (!deleteAfterReading) {
+      await _markMessageAsRead(message, accessToken);
+      return;
+    }
+
+    final id = message['id'] as String?;
+    if (id == null || id.isEmpty) return;
+    try {
+      final response = await _http.post(
+        Uri.parse(
+          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id/trash',
+        ),
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+      if (response.statusCode != 200) {
+        log(
+          'Failed to move OTP email to Trash (status ${response.statusCode}).',
+          name: 'email_otp.gmail',
+        );
+      }
+    } catch (error, stackTrace) {
+      log(
+        'Failed to move OTP email to Trash',
         name: 'email_otp.gmail',
         error: error,
         stackTrace: stackTrace,

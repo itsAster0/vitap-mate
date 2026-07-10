@@ -46,7 +46,6 @@ class ShellLayout extends HookConsumerWidget {
       getSidewidget(context, "Timetable", k, newSemExist, runningTasks),
       getSidewidget(context, "Attendance", k, newSemExist, runningTasks),
       getSidewidget(context, "More", k, newSemExist, runningTasks),
-      getSidewidget(context, "Projects", k, newSemExist, runningTasks),
       getSidewidget(context, "Settings", k, newSemExist, runningTasks),
     ];
     final selected = useState(0);
@@ -60,7 +59,7 @@ class ShellLayout extends HookConsumerWidget {
       } else if (k.startsWith("/student-projects")) {
         selected.value = 3;
       } else if (k.startsWith("/settings")) {
-        selected.value = 4;
+        selected.value = 3;
       }
       return null;
     }, [k]);

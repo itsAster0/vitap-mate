@@ -11,6 +11,7 @@ import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 
 class UserCard extends HookConsumerWidget {
   final VtopUserEntity user;
@@ -18,32 +19,38 @@ class UserCard extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = useMemoized(() => LocalAuthentication());
-    final canUseBiometric =
-        useFuture(() async {
-          final localAuth = LocalAuthentication();
-          final canAuthenticateWithBiometrics =
-              await localAuth.canCheckBiometrics;
-          final canAuthenticate =
-              canAuthenticateWithBiometrics ||
-              await localAuth.isDeviceSupported();
-          if (canAuthenticate) {
-            final availableBiometrics = await localAuth
-                .getAvailableBiometrics();
-            return availableBiometrics.isNotEmpty;
-          }
-          return false;
-        }(), initialData: false).data ??
+    final hasEnrolledBiometrics =
+        useFuture(
+          useMemoized(() async {
+            try {
+              return (await LocalAuthentication().getAvailableBiometrics())
+                  .isNotEmpty;
+            } catch (_) {
+              return false;
+            }
+          }, const []),
+          initialData: false,
+        ).data ??
         false;
-    final showPasswords = useState(false);
+    final username = user.username?.trim().toUpperCase() ?? '';
+    final semesterId = user.semid?.trim();
+    final semesters =
+        ref.watch(semesterIdProvider).value?.semesters ?? const [];
+    String? semesterName;
+    for (final semester in semesters) {
+      if (semester.id.trim() == semesterId) {
+        semesterName = semester.name.trim();
+        break;
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: FCard(
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            spacing: 12,
+            spacing: 16,
             children: [
               Row(
                 spacing: 12,
@@ -65,15 +72,17 @@ class UserCard extends HookConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "VTOP Credential",
+                          'VTOP Account',
                           style: context.theme.typography.body.md.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          user.isValid
-                              ? "Account is connected"
-                              : "Password needs attention",
+                          [
+                            username,
+                            if (semesterName != null && semesterName.isNotEmpty)
+                              semesterName,
+                          ].join('  •  '),
                           style: context.theme.typography.body.sm.copyWith(
                             color: user.isValid
                                 ? context.theme.colors.mutedForeground
@@ -85,112 +94,138 @@ class UserCard extends HookConsumerWidget {
                   ),
                 ],
               ),
-              Row(
-                children: [
-                  const Text(
-                    "Username : ",
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Expanded(child: Text(user.username ?? "")),
-                ],
-              ),
+              if (!user.isValid) ...[
+                const FAlert(
+                  variant: FAlertVariant.destructive,
+                  title: Text('Credentials need attention'),
+                  subtitle: Text('Update your VTOP password to continue.'),
+                ),
+              ],
+              UserPassChange(user: user),
               Row(
                 children: [
                   Expanded(
-                    child: Row(
-                      children: [
-                        const Text(
-                          "Password : ",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          showPasswords.value
-                              ? user.password ?? ""
-                              : "**********",
-                        ),
-                      ],
+                    child: FButton(
+                      variant: FButtonVariant.outline,
+                      onPress: () => showAdaptiveDialog(
+                        context: context,
+                        builder: (_) =>
+                            SemesterDialog(user: user, outerContext: context),
+                      ),
+                      child: const Text('Change semester'),
                     ),
                   ),
-                  if (canUseBiometric)
-                    FButton.icon(
-                      onPress: () async {
-                        final availableBiometrics = await auth
-                            .getAvailableBiometrics();
-                        if (availableBiometrics.isNotEmpty &&
-                            !showPasswords.value) {
-                          final didAuthenticate = await auth.authenticate(
-                            localizedReason:
-                                'Please authenticate to show Password',
-                          );
-                          if (!didAuthenticate) return;
-                        }
-                        showPasswords.value = !showPasswords.value;
-                      },
-                      child: const Icon(FLucideIcons.eye),
-                    ),
-                ],
-              ),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  UserSemChange(user: user),
-                  if (!user.isValid) UserPassChange(user: user),
-                  FButton(
-                    variant: FButtonVariant.destructive,
-                    onPress: () {
-                      showAdaptiveDialog(
-                        context: context,
-                        builder: (dialogContext) => FDialog(
-                          title: const Text("Sign out"),
-                          body: const Text(
-                            "You will be signed out and returned to onboarding.",
-                          ),
-                          actions: [
-                            FButton(
-                              variant: FButtonVariant.outline,
-                              onPress: () => Navigator.of(dialogContext).pop(),
-                              child: const Text("Cancel"),
-                            ),
-                            FButton(
-                              variant: FButtonVariant.destructive,
-                              onPress: () async {
-                                try {
-                                  final username = user.username;
-                                  if (username != null && username.isNotEmpty) {
-                                    await clearStoredVtopSession(username);
-                                    await ref
-                                        .read(vtopusersutilsProvider.notifier)
-                                        .vtopUserDelete(username);
-                                  }
-                                  ref.invalidate(vtopUserProvider);
-                                  ref.invalidate(vClientProvider);
-                                  if (dialogContext.mounted) {
-                                    Navigator.of(dialogContext).pop();
-                                  }
-                                  if (context.mounted) {
-                                    context.go('/onboarding');
-                                  }
-                                } catch (e) {
-                                  if (context.mounted) {
-                                    disCommonToast(context, e);
-                                  }
-                                }
-                              },
-                              child: const Text("Sign out"),
-                            ),
-                          ],
+                  if (hasEnrolledBiometrics) ...[
+                    const SizedBox(width: 10),
+                    Tooltip(
+                      message: 'View saved password',
+                      child: Semantics(
+                        label: 'View saved password',
+                        button: true,
+                        child: FButton.icon(
+                          onPress: () => _showPassword(context),
+                          child: const Icon(FLucideIcons.eye),
                         ),
-                      );
-                    },
-                    child: const Text("Sign out"),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 10),
+                  Semantics(
+                    label: 'Sign out',
+                    button: true,
+                    child: FButton.icon(
+                      onPress: () => _confirmSignOut(context, ref),
+                      child: const Icon(FLucideIcons.logOut),
+                    ),
                   ),
                 ],
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showPassword(BuildContext context) async {
+    final password = user.password;
+    if (password == null || password.isEmpty) {
+      dispToast(context, 'Unavailable', 'No saved password was found.');
+      return;
+    }
+
+    try {
+      final auth = LocalAuthentication();
+      if ((await auth.getAvailableBiometrics()).isEmpty) {
+        if (context.mounted) {
+          dispToast(
+            context,
+            'Authentication Required',
+            'Set up biometric authentication first.',
+          );
+        }
+        return;
+      }
+
+      final authenticated = await auth.authenticate(
+        localizedReason: 'Authenticate to view your saved VTOP password',
+      );
+      if (!authenticated || !context.mounted) return;
+
+      await showAdaptiveDialog<void>(
+        context: context,
+        builder: (dialogContext) => FDialog(
+          title: const Text('Saved VTOP Password'),
+          body: SelectableText(password),
+          actions: [
+            FButton(
+              onPress: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (context.mounted) disCommonToast(context, error);
+    }
+  }
+
+  void _confirmSignOut(BuildContext context, WidgetRef ref) {
+    showAdaptiveDialog(
+      context: context,
+      builder: (dialogContext) => FDialog(
+        title: const Text('Sign out?'),
+        body: const Text('You will be signed out and returned to onboarding.'),
+        actions: [
+          FButton(
+            variant: FButtonVariant.outline,
+            onPress: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FButton(
+            variant: FButtonVariant.destructive,
+            onPress: () async {
+              try {
+                final username = user.username;
+                if (username != null && username.isNotEmpty) {
+                  await clearStoredVtopSession(username);
+                  await ref
+                      .read(vtopusersutilsProvider.notifier)
+                      .vtopUserDelete(username);
+                }
+                ref.invalidate(vtopUserProvider);
+                ref.invalidate(vClientProvider);
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                }
+                if (context.mounted) context.go('/onboarding');
+              } catch (error) {
+                if (context.mounted) disCommonToast(context, error);
+              }
+            },
+            child: const Text('Sign out'),
+          ),
+        ],
       ),
     );
   }

@@ -361,7 +361,7 @@ class UserPassChange extends HookConsumerWidget {
               },
             );
           },
-          child: const Text("Update Password"),
+          child: const Text('Update account details'),
         ),
       ],
     );

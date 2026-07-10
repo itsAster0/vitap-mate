@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'd8e317b84d5a02edf339e89952b380d60f0519d8';
+String _$settingsHash() => r'c3b8dd7ce407d74e4c997381e5ee5f845b49ccc9';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();
@@ -169,6 +169,49 @@ final class AutoRefreshProvider extends $FunctionalProvider<bool, bool, bool>
 }
 
 String _$autoRefreshHash() => r'e5ae73c61bbae9b20882fda9e592bd0c6ec00d4f';
+
+@ProviderFor(emailOtpDeleteAfterReading)
+final emailOtpDeleteAfterReadingProvider =
+    EmailOtpDeleteAfterReadingProvider._();
+
+final class EmailOtpDeleteAfterReadingProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  EmailOtpDeleteAfterReadingProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'emailOtpDeleteAfterReadingProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$emailOtpDeleteAfterReadingHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return emailOtpDeleteAfterReading(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$emailOtpDeleteAfterReadingHash() =>
+    r'64a529c0ea1d3c31f67033805e75c5cef5b1a827';
 
 @ProviderFor(vtopSessionReuseTtl)
 final vtopSessionReuseTtlProvider = VtopSessionReuseTtlProvider._();

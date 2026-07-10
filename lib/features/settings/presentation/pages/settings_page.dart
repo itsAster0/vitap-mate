@@ -452,7 +452,9 @@ class SettingsPage extends HookConsumerWidget {
     try {
       final latest = await ref
           .read(googleEmailOtpAuthServiceProvider)
-          .fetchLatestInfoEmail();
+          .fetchLatestInfoEmail(
+            deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
+          );
       if (!context.mounted) return;
 
       await showAdaptiveDialog<void>(
@@ -604,6 +606,9 @@ class SettingsPage extends HookConsumerWidget {
     ];
     final initialValSync =
         ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);
+    final backgroundSyncLabel = initialValSync == Duration.zero
+        ? 'Disabled'
+        : 'Every ${initialValSync.inHours} hours';
     final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
 
     return SingleChildScrollView(
@@ -621,12 +626,15 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
             ),
+          const UserBox(),
           FTileGroup(
-            label: const Text('Vtop'),
+            divider: FItemDivider.indented,
+            label: const Text('VTOP Data'),
             children: [
               FTile(
                 prefix: Icon(FLucideIcons.calendarDays),
                 title: const Text('Merge Labs'),
+                subtitle: const Text('Combine consecutive lab slots'),
                 suffix: FSwitch(
                   value: ref.watch(mergeTTProvider),
                   onChange: (value) {
@@ -636,7 +644,8 @@ class SettingsPage extends HookConsumerWidget {
               ),
               FTile(
                 prefix: Icon(FLucideIcons.userCheck),
-                title: const Text('Show b/w Exams'),
+                title: const Text('Classes Between Exams'),
+                subtitle: const Text('Include classes scheduled between exams'),
                 suffix: FSwitch(
                   value: ref.watch(btwExamsProvider),
                   onChange: (value) {
@@ -645,21 +654,9 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: Icon(FLucideIcons.refreshCcw),
-                title: const Text('Auto Refresh'),
-                suffix: FSwitch(
-                  value: ref.watch(autoRefreshProvider),
-                  onChange: (value) {
-                    setautoRefresh(ref, value);
-                  },
-                ),
-              ),
-              FTile(
                 prefix: const Icon(FLucideIcons.cloudDownload),
                 title: const Text('Update VTOP Data'),
-                subtitle: const Text(
-                  'Fetch attendance, timetable, marks, exams and semesters',
-                ),
+                subtitle: const Text('Refresh all VTOP data now'),
                 suffix: isVtopSyncing.value
                     ? const FCircularProgress.pinwheel()
                     : const Icon(FLucideIcons.chevronRight),
@@ -673,14 +670,20 @@ class SettingsPage extends HookConsumerWidget {
                         }
                       },
               ),
-              if (isEmailOtpFeatureEnabled.value)
+            ],
+          ),
+          if (isEmailOtpFeatureEnabled.value)
+            FTileGroup(
+              divider: FItemDivider.indented,
+              label: const Text('Email OTP'),
+              children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.mail),
-                  title: const Text('Email OTP Autofetch'),
+                  title: const Text('Gmail Autofetch'),
                   subtitle: Text(
                     isEmailOtpReady.value == true
-                        ? 'Connected'
-                        : 'Not connected',
+                        ? 'Connected · tap to manage'
+                        : 'Connect Gmail for automatic OTPs',
                   ),
                   suffix: isEmailOtpBusy.value
                       ? const FCircularProgress.pinwheel()
@@ -702,59 +705,56 @@ class SettingsPage extends HookConsumerWidget {
                           isEmailOtpBusy.value = false;
                         },
                 ),
-              if (isEmailOtpFeatureEnabled.value &&
-                  isEmailOtpReady.value == true &&
-                  showDebugFeatures.value)
-                FTile(
-                  prefix: const Icon(FLucideIcons.mailCheck),
-                  title: const Text('Test Latest OTP Email'),
-                  subtitle: const Text(
-                    'Fetch latest email from info1@vitap.ac.in',
+                if (isEmailOtpReady.value == true)
+                  FTile(
+                    prefix: const Icon(FLucideIcons.trash2),
+                    title: const Text('Delete After Reading'),
+                    subtitle: const Text(
+                      'Move fetched OTP emails to Gmail Trash',
+                    ),
+                    suffix: FSwitch(
+                      value: ref.watch(emailOtpDeleteAfterReadingProvider),
+                      onChange: (value) {
+                        setEmailOtpDeleteAfterReading(ref, value);
+                      },
+                    ),
                   ),
-                  suffix: isEmailOtpTestBusy.value
-                      ? const FCircularProgress.pinwheel()
-                      : const Icon(FLucideIcons.chevronRight),
-                  onPress: isEmailOtpTestBusy.value
-                      ? null
-                      : () async {
-                          isEmailOtpTestBusy.value = true;
-                          await _testLatestInfoEmail(context, ref);
-                          isEmailOtpTestBusy.value = false;
-                        },
-                ),
-              if (showDebugFeatures.value)
-                FTile(
-                  prefix: const Icon(FLucideIcons.timer),
-                  title: const Text('VTOP Session Reuse'),
-                  subtitle: Text(
-                    'Reuse saved cookies for ${initialVtopSessionReuseTtl.inMinutes} minutes',
+                if (isEmailOtpReady.value == true && showDebugFeatures.value)
+                  FTile(
+                    prefix: const Icon(FLucideIcons.mailCheck),
+                    title: const Text('Test Latest OTP Email'),
+                    subtitle: const Text('Fetch the latest VTOP OTP email'),
+                    suffix: isEmailOtpTestBusy.value
+                        ? const FCircularProgress.pinwheel()
+                        : const Icon(FLucideIcons.chevronRight),
+                    onPress: isEmailOtpTestBusy.value
+                        ? null
+                        : () async {
+                            isEmailOtpTestBusy.value = true;
+                            await _testLatestInfoEmail(context, ref);
+                            isEmailOtpTestBusy.value = false;
+                          },
                   ),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _openVtopSessionReuseTtlDialog(context, ref),
-                ),
+              ],
+            ),
+          FTileGroup(
+            divider: FItemDivider.indented,
+            label: const Text('Sync'),
+            children: [
               FTile(
-                prefix: const Icon(FLucideIcons.radio),
-                title: const Text('Copy FCM Token'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => _copyFcmToken(context),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.copy),
-                title: const Text('Copy Saved Cookies'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => _copySavedCookies(context, ref),
-              ),
-              if (showDebugFeatures.value)
-                FTile(
-                  prefix: const Icon(FLucideIcons.trash2),
-                  title: const Text('Clear Saved Cookies'),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _clearSavedCookies(context, ref),
+                prefix: Icon(FLucideIcons.refreshCcw),
+                title: const Text('Auto Refresh'),
+                suffix: FSwitch(
+                  value: ref.watch(autoRefreshProvider),
+                  onChange: (value) {
+                    setautoRefresh(ref, value);
+                  },
                 ),
+              ),
               FSelectMenuTile(
                 prefix: Icon(FLucideIcons.folderSync),
                 title: FTappable(child: Text('Background Sync')),
-
+                subtitle: Text(backgroundSyncLabel),
                 selectControl: FMultiValueControl.managedRadio(
                   initial: initialValSync,
                   onChange: (value) {
@@ -770,8 +770,6 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
-          const UserBox(),
-
           FTileGroup(
             divider: FItemDivider.indented,
             label: const Text('App Settings'),
@@ -791,27 +789,62 @@ class SettingsPage extends HookConsumerWidget {
               ),
               FTile(
                 prefix: Icon(FLucideIcons.bell),
-                title: const Text("Notification Management"),
+                title: const Text('Notifications'),
+                subtitle: const Text('Manage class and exam reminders'),
                 suffix: Icon(FLucideIcons.chevronRight),
                 onPress: () {
                   GoRouter.of(context).pushNamed(Paths.notificationManagement);
                 },
               ),
-              if (showDebugFeatures.value)
+            ],
+          ),
+          if (showDebugFeatures.value)
+            FTileGroup(
+              divider: FItemDivider.indented,
+              label: const Text('Developer Tools'),
+              children: [
+                FTile(
+                  prefix: const Icon(FLucideIcons.timer),
+                  title: const Text('VTOP Session Reuse'),
+                  subtitle: Text(
+                    'Reuse saved cookies for ${initialVtopSessionReuseTtl.inMinutes} minutes',
+                  ),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _openVtopSessionReuseTtlDialog(context, ref),
+                ),
+                FTile(
+                  prefix: const Icon(FLucideIcons.radio),
+                  title: const Text('Copy FCM Token'),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _copyFcmToken(context),
+                ),
+                FTile(
+                  prefix: const Icon(FLucideIcons.copy),
+                  title: const Text('Copy Saved Cookies'),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _copySavedCookies(context, ref),
+                ),
+                FTile(
+                  prefix: const Icon(FLucideIcons.trash2),
+                  title: const Text('Clear Saved Cookies'),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _clearSavedCookies(context, ref),
+                ),
                 FTile(
                   prefix: const Icon(Icons.receipt_long_outlined),
-                  title: const Text("Logs"),
+                  title: const Text('Logs'),
                   suffix: Icon(FLucideIcons.chevronRight),
                   onPress: () {
                     GoRouter.of(context).pushNamed(Paths.logs);
                   },
                 ),
-            ],
-          ),
+              ],
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               IconButton(
+                tooltip: 'Source code',
                 icon: const Icon(Icons.code),
                 onPressed: () {
                   launchUrl(
@@ -820,12 +853,14 @@ class SettingsPage extends HookConsumerWidget {
                 },
               ),
               IconButton(
+                tooltip: 'Developer profile',
                 icon: Icon(FLucideIcons.contact),
                 onPressed: () {
                   launchUrl(Uri.parse("https://bio.link/synaptic"));
                 },
               ),
               IconButton(
+                tooltip: 'Instagram',
                 icon: const Icon(Icons.camera_alt_outlined),
                 onPressed: () {
                   launchUrl(Uri.parse("https://www.instagram.com/itsKryxen"));

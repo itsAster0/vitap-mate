@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
@@ -357,7 +358,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
             'Trying to get OTP from email... (${attempts - attempt} attempts left)',
       );
       try {
-        final otp = await oauth.fetchLatestOtpSince(sinceUtc: startedAt);
+        final otp = await oauth.fetchLatestOtpSince(
+          sinceUtc: startedAt,
+          deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
+        );
         if (otp != null && otp.isNotEmpty) {
           AppLogger.instance.info(
             'client.otp',
