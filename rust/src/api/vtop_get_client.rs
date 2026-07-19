@@ -1,7 +1,8 @@
 use crate::api::vtop::{
     types::{
-        AttendanceData, ExamScheduleData, FullAttendanceData, GradeDetailsData, GradeHistoryData,
-        GradeViewData, MarksData, PersistedVtopSession, SemesterData, TimetableData,
+        AttendanceData, BiometricData, ExamScheduleData, FullAttendanceData, GradeDetailsData,
+        GradeHistoryData, GradeViewData, MarksData, PersistedVtopSession, SemesterData,
+        TimetableData,
     },
     vtop_client::{VtopClient, VtopError},
     vtop_config::VtopClientBuilder,
@@ -47,6 +48,14 @@ pub async fn fetch_attendance(
     semester_id: String,
 ) -> Result<AttendanceData, VtopError> {
     client.get_attendance(&semester_id).await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_biometric_history(
+    client: &mut VtopClient,
+    date: String,
+) -> Result<BiometricData, VtopError> {
+    client.get_biometric_history(&date).await
 }
 
 #[flutter_rust_bridge::frb()]

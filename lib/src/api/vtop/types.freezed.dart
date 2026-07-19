@@ -572,6 +572,541 @@ as String,
 
 
 /// @nodoc
+mixin _$BiometricData {
+
+ List<BiometricRecord> get records; String get requestedDate; BigInt get updateTime;
+/// Create a copy of BiometricData
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$BiometricDataCopyWith<BiometricData> get copyWith => _$BiometricDataCopyWithImpl<BiometricData>(this as BiometricData, _$identity);
+
+  /// Serializes this BiometricData to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is BiometricData&&const DeepCollectionEquality().equals(other.records, records)&&(identical(other.requestedDate, requestedDate) || other.requestedDate == requestedDate)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(records),requestedDate,updateTime);
+
+@override
+String toString() {
+  return 'BiometricData(records: $records, requestedDate: $requestedDate, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $BiometricDataCopyWith<$Res>  {
+  factory $BiometricDataCopyWith(BiometricData value, $Res Function(BiometricData) _then) = _$BiometricDataCopyWithImpl;
+@useResult
+$Res call({
+ List<BiometricRecord> records, String requestedDate, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class _$BiometricDataCopyWithImpl<$Res>
+    implements $BiometricDataCopyWith<$Res> {
+  _$BiometricDataCopyWithImpl(this._self, this._then);
+
+  final BiometricData _self;
+  final $Res Function(BiometricData) _then;
+
+/// Create a copy of BiometricData
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? records = null,Object? requestedDate = null,Object? updateTime = null,}) {
+  return _then(_self.copyWith(
+records: null == records ? _self.records : records // ignore: cast_nullable_to_non_nullable
+as List<BiometricRecord>,requestedDate: null == requestedDate ? _self.requestedDate : requestedDate // ignore: cast_nullable_to_non_nullable
+as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [BiometricData].
+extension BiometricDataPatterns on BiometricData {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _BiometricData value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _BiometricData() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _BiometricData value)  $default,){
+final _that = this;
+switch (_that) {
+case _BiometricData():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _BiometricData value)?  $default,){
+final _that = this;
+switch (_that) {
+case _BiometricData() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<BiometricRecord> records,  String requestedDate,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _BiometricData() when $default != null:
+return $default(_that.records,_that.requestedDate,_that.updateTime);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<BiometricRecord> records,  String requestedDate,  BigInt updateTime)  $default,) {final _that = this;
+switch (_that) {
+case _BiometricData():
+return $default(_that.records,_that.requestedDate,_that.updateTime);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<BiometricRecord> records,  String requestedDate,  BigInt updateTime)?  $default,) {final _that = this;
+switch (_that) {
+case _BiometricData() when $default != null:
+return $default(_that.records,_that.requestedDate,_that.updateTime);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _BiometricData implements BiometricData {
+  const _BiometricData({required final  List<BiometricRecord> records, required this.requestedDate, required this.updateTime}): _records = records;
+  factory _BiometricData.fromJson(Map<String, dynamic> json) => _$BiometricDataFromJson(json);
+
+ final  List<BiometricRecord> _records;
+@override List<BiometricRecord> get records {
+  if (_records is EqualUnmodifiableListView) return _records;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_records);
+}
+
+@override final  String requestedDate;
+@override final  BigInt updateTime;
+
+/// Create a copy of BiometricData
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$BiometricDataCopyWith<_BiometricData> get copyWith => __$BiometricDataCopyWithImpl<_BiometricData>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$BiometricDataToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _BiometricData&&const DeepCollectionEquality().equals(other._records, _records)&&(identical(other.requestedDate, requestedDate) || other.requestedDate == requestedDate)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_records),requestedDate,updateTime);
+
+@override
+String toString() {
+  return 'BiometricData(records: $records, requestedDate: $requestedDate, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$BiometricDataCopyWith<$Res> implements $BiometricDataCopyWith<$Res> {
+  factory _$BiometricDataCopyWith(_BiometricData value, $Res Function(_BiometricData) _then) = __$BiometricDataCopyWithImpl;
+@override @useResult
+$Res call({
+ List<BiometricRecord> records, String requestedDate, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class __$BiometricDataCopyWithImpl<$Res>
+    implements _$BiometricDataCopyWith<$Res> {
+  __$BiometricDataCopyWithImpl(this._self, this._then);
+
+  final _BiometricData _self;
+  final $Res Function(_BiometricData) _then;
+
+/// Create a copy of BiometricData
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? records = null,Object? requestedDate = null,Object? updateTime = null,}) {
+  return _then(_BiometricData(
+records: null == records ? _self._records : records // ignore: cast_nullable_to_non_nullable
+as List<BiometricRecord>,requestedDate: null == requestedDate ? _self.requestedDate : requestedDate // ignore: cast_nullable_to_non_nullable
+as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$BiometricRecord {
+
+ String get serial; String get punchDate; String get punchTime; String get venue;
+/// Create a copy of BiometricRecord
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$BiometricRecordCopyWith<BiometricRecord> get copyWith => _$BiometricRecordCopyWithImpl<BiometricRecord>(this as BiometricRecord, _$identity);
+
+  /// Serializes this BiometricRecord to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is BiometricRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.punchDate, punchDate) || other.punchDate == punchDate)&&(identical(other.punchTime, punchTime) || other.punchTime == punchTime)&&(identical(other.venue, venue) || other.venue == venue));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,serial,punchDate,punchTime,venue);
+
+@override
+String toString() {
+  return 'BiometricRecord(serial: $serial, punchDate: $punchDate, punchTime: $punchTime, venue: $venue)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $BiometricRecordCopyWith<$Res>  {
+  factory $BiometricRecordCopyWith(BiometricRecord value, $Res Function(BiometricRecord) _then) = _$BiometricRecordCopyWithImpl;
+@useResult
+$Res call({
+ String serial, String punchDate, String punchTime, String venue
+});
+
+
+
+
+}
+/// @nodoc
+class _$BiometricRecordCopyWithImpl<$Res>
+    implements $BiometricRecordCopyWith<$Res> {
+  _$BiometricRecordCopyWithImpl(this._self, this._then);
+
+  final BiometricRecord _self;
+  final $Res Function(BiometricRecord) _then;
+
+/// Create a copy of BiometricRecord
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? serial = null,Object? punchDate = null,Object? punchTime = null,Object? venue = null,}) {
+  return _then(_self.copyWith(
+serial: null == serial ? _self.serial : serial // ignore: cast_nullable_to_non_nullable
+as String,punchDate: null == punchDate ? _self.punchDate : punchDate // ignore: cast_nullable_to_non_nullable
+as String,punchTime: null == punchTime ? _self.punchTime : punchTime // ignore: cast_nullable_to_non_nullable
+as String,venue: null == venue ? _self.venue : venue // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [BiometricRecord].
+extension BiometricRecordPatterns on BiometricRecord {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _BiometricRecord value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _BiometricRecord() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _BiometricRecord value)  $default,){
+final _that = this;
+switch (_that) {
+case _BiometricRecord():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _BiometricRecord value)?  $default,){
+final _that = this;
+switch (_that) {
+case _BiometricRecord() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String serial,  String punchDate,  String punchTime,  String venue)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _BiometricRecord() when $default != null:
+return $default(_that.serial,_that.punchDate,_that.punchTime,_that.venue);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String serial,  String punchDate,  String punchTime,  String venue)  $default,) {final _that = this;
+switch (_that) {
+case _BiometricRecord():
+return $default(_that.serial,_that.punchDate,_that.punchTime,_that.venue);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String serial,  String punchDate,  String punchTime,  String venue)?  $default,) {final _that = this;
+switch (_that) {
+case _BiometricRecord() when $default != null:
+return $default(_that.serial,_that.punchDate,_that.punchTime,_that.venue);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _BiometricRecord implements BiometricRecord {
+  const _BiometricRecord({required this.serial, required this.punchDate, required this.punchTime, required this.venue});
+  factory _BiometricRecord.fromJson(Map<String, dynamic> json) => _$BiometricRecordFromJson(json);
+
+@override final  String serial;
+@override final  String punchDate;
+@override final  String punchTime;
+@override final  String venue;
+
+/// Create a copy of BiometricRecord
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$BiometricRecordCopyWith<_BiometricRecord> get copyWith => __$BiometricRecordCopyWithImpl<_BiometricRecord>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$BiometricRecordToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _BiometricRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.punchDate, punchDate) || other.punchDate == punchDate)&&(identical(other.punchTime, punchTime) || other.punchTime == punchTime)&&(identical(other.venue, venue) || other.venue == venue));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,serial,punchDate,punchTime,venue);
+
+@override
+String toString() {
+  return 'BiometricRecord(serial: $serial, punchDate: $punchDate, punchTime: $punchTime, venue: $venue)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$BiometricRecordCopyWith<$Res> implements $BiometricRecordCopyWith<$Res> {
+  factory _$BiometricRecordCopyWith(_BiometricRecord value, $Res Function(_BiometricRecord) _then) = __$BiometricRecordCopyWithImpl;
+@override @useResult
+$Res call({
+ String serial, String punchDate, String punchTime, String venue
+});
+
+
+
+
+}
+/// @nodoc
+class __$BiometricRecordCopyWithImpl<$Res>
+    implements _$BiometricRecordCopyWith<$Res> {
+  __$BiometricRecordCopyWithImpl(this._self, this._then);
+
+  final _BiometricRecord _self;
+  final $Res Function(_BiometricRecord) _then;
+
+/// Create a copy of BiometricRecord
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? serial = null,Object? punchDate = null,Object? punchTime = null,Object? venue = null,}) {
+  return _then(_BiometricRecord(
+serial: null == serial ? _self.serial : serial // ignore: cast_nullable_to_non_nullable
+as String,punchDate: null == punchDate ? _self.punchDate : punchDate // ignore: cast_nullable_to_non_nullable
+as String,punchTime: null == punchTime ? _self.punchTime : punchTime // ignore: cast_nullable_to_non_nullable
+as String,venue: null == venue ? _self.venue : venue // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$ExamScheduleData {
 
  List<PerExamScheduleRecord> get exams; String get semesterId; BigInt get updateTime;

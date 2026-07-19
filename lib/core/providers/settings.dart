@@ -59,7 +59,7 @@ Future<void> setbtwExam(WidgetRef ref, bool value) async {
 @riverpod
 bool autoRefresh(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_auto_refresh") ?? false;
+  return prefs?.getBool("settings_auto_refresh") ?? true;
 }
 
 Future<void> setautoRefresh(WidgetRef ref, bool value) async {

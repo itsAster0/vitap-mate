@@ -41,7 +41,11 @@ class ShellLayout extends HookConsumerWidget {
       globalAsyncQueueProvider.select((value) => value.running.keys.toList()),
     );
 
-    var k = GoRouter.of(context).routeInformationProvider.value.uri.toString();
+    final routeInformationProvider = GoRouter.of(
+      context,
+    ).routeInformationProvider;
+    useListenable(routeInformationProvider);
+    var k = routeInformationProvider.value.uri.toString();
     final headers = [
       getSidewidget(context, "Timetable", k, newSemExist, runningTasks),
       getSidewidget(context, "Attendance", k, newSemExist, runningTasks),
@@ -152,6 +156,9 @@ Widget? getSidewidget(
         break;
       case "exam_schedule":
         data = "Exam Schedule";
+        break;
+      case "chrome-extension":
+        data = "Chrome Extension";
         break;
     }
 

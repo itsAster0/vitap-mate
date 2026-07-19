@@ -9,6 +9,7 @@
 import 'api/native_logs.dart';
 import 'api/simple.dart';
 import 'api/vtop/paraser/parseattn.dart';
+import 'api/vtop/paraser/parsebiometric.dart';
 import 'api/vtop/paraser/parsegradehistory.dart';
 import 'api/vtop/paraser/parsegrades.dart';
 import 'api/vtop/paraser/parsemarks.dart';
@@ -58,6 +59,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_VtopResultAttendanceDataPtr => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultAttendanceData;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_VtopResultBiometricDataPtr => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData;
 
   CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_VtopResultExamScheduleDataPtr => wire
@@ -128,6 +133,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   VtopResultAttendanceData
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultAttendanceData(
+    dynamic raw,
+  );
+
+  @protected
+  VtopResultBiometricData
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
     dynamic raw,
   );
 
@@ -246,6 +257,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  VtopResultBiometricData
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    dynamic raw,
+  );
+
+  @protected
   VtopResultExamScheduleData
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     dynamic raw,
@@ -309,6 +326,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AttendanceRecord dco_decode_attendance_record(dynamic raw);
 
   @protected
+  BiometricData dco_decode_biometric_data(dynamic raw);
+
+  @protected
+  BiometricRecord dco_decode_biometric_record(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
@@ -366,6 +389,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AttendanceRecord> dco_decode_list_attendance_record(dynamic raw);
+
+  @protected
+  List<BiometricRecord> dco_decode_list_biometric_record(dynamic raw);
 
   @protected
   List<ExamScheduleRecord> dco_decode_list_exam_schedule_record(dynamic raw);
@@ -500,6 +526,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  VtopResultBiometricData
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   VtopResultExamScheduleData
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     SseDeserializer deserializer,
@@ -614,6 +646,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  VtopResultBiometricData
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   VtopResultExamScheduleData
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     SseDeserializer deserializer,
@@ -675,6 +713,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AttendanceRecord sse_decode_attendance_record(SseDeserializer deserializer);
+
+  @protected
+  BiometricData sse_decode_biometric_data(SseDeserializer deserializer);
+
+  @protected
+  BiometricRecord sse_decode_biometric_record(SseDeserializer deserializer);
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -748,6 +792,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AttendanceRecord> sse_decode_list_attendance_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<BiometricRecord> sse_decode_list_biometric_record(
     SseDeserializer deserializer,
   );
 
@@ -914,6 +963,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    VtopResultBiometricData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     VtopResultExamScheduleData self,
     SseSerializer serializer,
@@ -1047,6 +1103,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    VtopResultBiometricData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     VtopResultExamScheduleData self,
     SseSerializer serializer,
@@ -1120,6 +1183,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_attendance_record(
     AttendanceRecord self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_biometric_data(BiometricData self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_biometric_record(
+    BiometricRecord self,
     SseSerializer serializer,
   );
 
@@ -1222,6 +1294,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_attendance_record(
     List<AttendanceRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_biometric_record(
+    List<BiometricRecord> self,
     SseSerializer serializer,
   );
 
@@ -1472,6 +1550,22 @@ class RustLibWire implements BaseWire {
       );
 
   void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+        ptr,
+      );
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    int ptr,
+  ) => wasmModule
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+        ptr,
+      );
+
+  void
   rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultExamScheduleData(
     int ptr,
   ) => wasmModule
@@ -1679,6 +1773,16 @@ extension type RustLibWasmModule._(JSObject _) implements JSObject {
 
   external void
   rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultAttendanceData(
+    int ptr,
+  );
+
+  external void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
+    int ptr,
+  );
+
+  external void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopResultBiometricData(
     int ptr,
   );
 

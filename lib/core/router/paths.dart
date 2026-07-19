@@ -11,6 +11,8 @@ class Paths {
   static final grades = "grades";
   static final gradeHistory = "gradeHistory";
   static final examSchedule = "examSchedule";
+  static final biometricHistory = "biometricHistory";
+  static final chromeExtension = "chromeExtension";
   static final vtopweb = "vtopweb";
   static final notificationManagement = "notificationManagement";
   static final calendarSync = "calendarSync";

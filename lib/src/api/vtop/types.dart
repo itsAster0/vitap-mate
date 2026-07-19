@@ -11,7 +11,7 @@ part 'types.freezed.dart';
 part 'types.g.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PersistedCookie`, `PersistedHeader`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 @freezed
 @meta.immutable
@@ -46,6 +46,33 @@ sealed class AttendanceRecord with _$AttendanceRecord {
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
       _$AttendanceRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class BiometricData with _$BiometricData {
+  const factory BiometricData({
+    required List<BiometricRecord> records,
+    required String requestedDate,
+    required BigInt updateTime,
+  }) = _BiometricData;
+
+  factory BiometricData.fromJson(Map<String, dynamic> json) =>
+      _$BiometricDataFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class BiometricRecord with _$BiometricRecord {
+  const factory BiometricRecord({
+    required String serial,
+    required String punchDate,
+    required String punchTime,
+    required String venue,
+  }) = _BiometricRecord;
+
+  factory BiometricRecord.fromJson(Map<String, dynamic> json) =>
+      _$BiometricRecordFromJson(json);
 }
 
 @freezed

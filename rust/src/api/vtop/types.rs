@@ -53,6 +53,25 @@ pub struct AttendanceData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
+pub struct BiometricRecord {
+    pub serial: String,
+    pub punch_date: String,
+    pub punch_time: String,
+    pub venue: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct BiometricData {
+    pub records: Vec<BiometricRecord>,
+    pub requested_date: String,
+    pub update_time: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
 pub struct TimetableSlot {
     pub serial: String,
     pub day: String,

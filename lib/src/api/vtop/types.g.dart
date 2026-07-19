@@ -54,6 +54,38 @@ Map<String, dynamic> _$AttendanceRecordToJson(_AttendanceRecord instance) =>
       'courseId': instance.courseId,
     };
 
+_BiometricData _$BiometricDataFromJson(Map<String, dynamic> json) =>
+    _BiometricData(
+      records: (json['records'] as List<dynamic>)
+          .map((e) => BiometricRecord.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      requestedDate: json['requestedDate'] as String,
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$BiometricDataToJson(_BiometricData instance) =>
+    <String, dynamic>{
+      'records': instance.records,
+      'requestedDate': instance.requestedDate,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_BiometricRecord _$BiometricRecordFromJson(Map<String, dynamic> json) =>
+    _BiometricRecord(
+      serial: json['serial'] as String,
+      punchDate: json['punchDate'] as String,
+      punchTime: json['punchTime'] as String,
+      venue: json['venue'] as String,
+    );
+
+Map<String, dynamic> _$BiometricRecordToJson(_BiometricRecord instance) =>
+    <String, dynamic>{
+      'serial': instance.serial,
+      'punchDate': instance.punchDate,
+      'punchTime': instance.punchTime,
+      'venue': instance.venue,
+    };
+
 _ExamScheduleData _$ExamScheduleDataFromJson(Map<String, dynamic> json) =>
     _ExamScheduleData(
       exams: (json['exams'] as List<dynamic>)

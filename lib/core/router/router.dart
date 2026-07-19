@@ -7,10 +7,12 @@ import 'package:vitapmate/core/widgets/onboarding_page.dart';
 import 'package:vitapmate/core/widgets/shell_layout.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/exam_schedule_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/chrome_extension_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/grades_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/grade_history_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/biometric_history_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
@@ -136,6 +138,24 @@ GoRouter router(Ref ref) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: ExamSchedulePage(),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'biometric-history',
+                    name: Paths.biometricHistory,
+                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                      key: state.pageKey,
+                      child: const BiometricHistoryPage(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'chrome-extension',
+                    name: Paths.chromeExtension,
+                    pageBuilder: (context, state) {
+                      return NoTransitionPage<void>(
+                        key: state.pageKey,
+                        child: const ChromeExtensionPage(),
                       );
                     },
                   ),

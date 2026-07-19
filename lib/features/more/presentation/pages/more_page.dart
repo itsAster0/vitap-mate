@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -57,6 +59,14 @@ class MorePage extends HookConsumerWidget {
                 onPress: () =>
                     GoRouter.of(context).pushNamed(Paths.examSchedule),
               ),
+              FTile(
+                prefix: const Icon(Icons.fingerprint_rounded),
+                title: const Text('Biometric History'),
+                subtitle: const Text('View face and biometric entry logs'),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () =>
+                    GoRouter.of(context).pushNamed(Paths.biometricHistory),
+              ),
             ],
           ),
           FTileGroup(
@@ -92,6 +102,22 @@ class MorePage extends HookConsumerWidget {
               ),
             ],
           ),
+          if (Platform.isAndroid)
+            FTileGroup(
+              label: const Text("Browser Extension"),
+              children: [
+                FTile(
+                  prefix: const Icon(FLucideIcons.puzzle),
+                  title: const Text("Chrome Extension"),
+                  subtitle: const Text(
+                    "Install VITAP Mate auto login on your computer",
+                  ),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () =>
+                      GoRouter.of(context).pushNamed(Paths.chromeExtension),
+                ),
+              ],
+            ),
         ],
       ),
     );

@@ -329,6 +329,47 @@ impl VtopClient {
         Ok(parseattn::parse_attendance(text, semester_id.to_string()))
     }
 
+    pub async fn get_biometric_history(&mut self, date: &str) -> VtopResult<BiometricData> {
+        if !self.ensure_authenticated_session().await? {
+            return Err(VtopError::SessionExpired);
+        }
+        let parts = date.split('/').collect::<Vec<_>>();
+        if parts.len() != 3
+            || parts[0].len() != 2
+            || parts[1].len() != 2
+            || parts[2].len() != 4
+            || parts.iter().any(|part| part.parse::<u32>().is_err())
+        {
+            return Err(vtop_server_error(
+                "get_biometric_history",
+                "date must use DD/MM/YYYY format",
+            ));
+        }
+
+        let url = format!("{}/vtop/getStudBioHistory", self.config.base_url);
+        let csrf = self
+            .session
+            .get_csrf_token()
+            .ok_or_else(|| missing_csrf_error("get_biometric_history"))?;
+        let form = [
+            ("_csrf", csrf.as_str()),
+            ("fromDate", date),
+            ("authorizedID", self.username.as_str()),
+        ];
+        log_network_request("get_biometric_history.send", "POST", &url);
+        let response = self
+            .client
+            .post(&url)
+            .form(&form)
+            .send()
+            .await
+            .map_err(|error| reqwest_network_error("get_biometric_history.send", error))?;
+        let text = self
+            .read_authenticated_response_text("get_biometric_history", response)
+            .await?;
+        Ok(parsebiometric::parse_biometric(text, date.to_string()))
+    }
+
     pub async fn get_full_attendance(
         &mut self,
         semester_id: &str,

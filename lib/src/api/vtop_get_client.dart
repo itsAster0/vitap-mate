@@ -47,6 +47,14 @@ Future<AttendanceData> fetchAttendance({
   semesterId: semesterId,
 );
 
+Future<BiometricData> fetchBiometricHistory({
+  required VtopClient client,
+  required String date,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchBiometricHistory(
+  client: client,
+  date: date,
+);
+
 Future<FullAttendanceData> fetchFullAttendance({
   required VtopClient client,
   required String semesterId,

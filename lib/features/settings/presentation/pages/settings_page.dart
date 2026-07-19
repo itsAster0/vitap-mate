@@ -93,18 +93,14 @@ class SettingsPage extends HookConsumerWidget {
       final token = await getFcmTokenForCopy();
       if (token == null || token.trim().isEmpty) {
         if (context.mounted) {
-          dispToast(
-            context,
-            "No FCM Token",
-            "Could not get a Firebase Messaging token.",
-          );
+          dispToast(context, "No Token", "Could not get your Token right now.");
         }
         return;
       }
 
       await Clipboard.setData(ClipboardData(text: token));
       if (context.mounted) {
-        dispToast(context, "Copied", "FCM token copied to clipboard.");
+        dispToast(context, "Copied", "Token copied to clipboard.");
       }
     } catch (error, stackTrace) {
       log(
@@ -114,7 +110,7 @@ class SettingsPage extends HookConsumerWidget {
         stackTrace: stackTrace,
       );
       if (context.mounted) {
-        dispToast(context, "Failed", "Could not copy FCM token right now.");
+        dispToast(context, "Failed", "Could not copy your Token right now.");
       }
     }
   }
@@ -814,7 +810,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
                 FTile(
                   prefix: const Icon(FLucideIcons.radio),
-                  title: const Text('Copy FCM Token'),
+                  title: const Text('Copy Token'),
                   suffix: const Icon(FLucideIcons.chevronRight),
                   onPress: () => _copyFcmToken(context),
                 ),

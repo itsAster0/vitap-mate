@@ -60,6 +60,14 @@ Future<String?> getFcmTokenForCopy() async {
   return messaging.getToken();
 }
 
+Future<String?> resetFcmTokenForCopy() async {
+  if (!await ensureFirebaseReady()) return null;
+  final messaging = FirebaseMessaging.instance;
+  await messaging.requestPermission();
+  await messaging.deleteToken();
+  return messaging.getToken();
+}
+
 void startVtopCookieBridgeListener() {
   if (_foregroundListenerStarted) return;
   _foregroundListenerStarted = true;
