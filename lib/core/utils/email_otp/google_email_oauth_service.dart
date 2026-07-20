@@ -3,8 +3,11 @@ import 'dart:developer' show log;
 
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
+
+part 'google_email_oauth_service.g.dart';
 
 const googleOauthClientId = String.fromEnvironment('GOOGLE_OAUTH_CLIENT_ID');
 final googleOauthRedirectScheme =
@@ -29,15 +32,26 @@ const _googleServiceConfiguration = AuthorizationServiceConfiguration(
 );
 const _oauthStorageKey = 'email_otp_oauth_session_v1';
 
-final googleEmailOtpAuthServiceProvider = Provider<GoogleEmailOtpAuthService>((
-  ref,
-) {
+@Riverpod(keepAlive: true)
+GoogleEmailOtpAuthService googleEmailOtpAuthService(Ref ref) {
   return GoogleEmailOtpAuthService(
     appAuth: const FlutterAppAuth(),
     storage: const FlutterSecureStorage(),
     httpClient: http.Client(),
   );
-});
+}
+
+@Riverpod(keepAlive: true)
+Future<bool> emailOtpReady(Ref ref) {
+  return ref.watch(googleEmailOtpAuthServiceProvider).isReady();
+}
+
+@Riverpod(keepAlive: true)
+Future<bool> emailOtpSetupNeeded(Ref ref) async {
+  final flags = await ref.watch(featureFlagsControllerProvider.future);
+  if (!await flags.isEnabled('2fa-email')) return false;
+  return !await ref.watch(emailOtpReadyProvider.future);
+}
 
 class EmailOtpSetupResult {
   const EmailOtpSetupResult({

@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 
@@ -40,17 +41,29 @@ class ShellLayout extends HookConsumerWidget {
     final runningTasks = ref.watch(
       globalAsyncQueueProvider.select((value) => value.running.keys.toList()),
     );
+    final shouldEnableEmailOtp =
+        ref.watch(emailOtpSetupNeededProvider).value ?? false;
 
     final routeInformationProvider = GoRouter.of(
       context,
     ).routeInformationProvider;
     useListenable(routeInformationProvider);
     var k = routeInformationProvider.value.uri.toString();
+    final queueStatus = _queueStatusText(runningTasks);
+    final isNestedRoute = k.split('/').length - 1 > 1;
+    final headerSubtitle = isNestedRoute
+        ? queueStatus
+        : queueStatus ??
+              (newSemExist
+                  ? "New semester data available!"
+                  : shouldEnableEmailOtp
+                  ? "Enable Email OTP in Settings"
+                  : null);
     final headers = [
-      getSidewidget(context, "Timetable", k, newSemExist, runningTasks),
-      getSidewidget(context, "Attendance", k, newSemExist, runningTasks),
-      getSidewidget(context, "More", k, newSemExist, runningTasks),
-      getSidewidget(context, "Settings", k, newSemExist, runningTasks),
+      _buildHeader(context, "Timetable", k, headerSubtitle),
+      _buildHeader(context, "Attendance", k, headerSubtitle),
+      _buildHeader(context, "More", k, headerSubtitle),
+      _buildHeader(context, "Settings", k, headerSubtitle),
     ];
     final selected = useState(0);
     useEffect(() {
@@ -141,14 +154,12 @@ class ShellLayout extends HookConsumerWidget {
   }
 }
 
-Widget? getSidewidget(
+Widget _buildHeader(
   BuildContext context,
   String data,
   String path,
-  bool newsem,
-  List<String> runningTasks,
+  String? subtitle,
 ) {
-  final queueStatus = _queueStatusText(runningTasks);
   if (path.split('/').length - 1 > 1) {
     switch (path.split("/")[2]) {
       case "marks":
@@ -165,15 +176,13 @@ Widget? getSidewidget(
     return FHeader.nested(
       title: _HeaderTitle(
         title: data,
-        subtitle: queueStatus,
+        subtitle: subtitle,
         titleStyle: DefaultTextStyle.of(context).style,
       ),
       prefixes: [FHeaderAction.back(onPress: () => GoRouter.of(context).pop())],
     );
   }
 
-  final subtitle =
-      queueStatus ?? (newsem ? "New semester data available!" : null);
   final hasTimetableAction = path.contains("timetable");
   return FHeader.nested(
     title: _HeaderTitle(

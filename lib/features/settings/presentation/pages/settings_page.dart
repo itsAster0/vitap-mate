@@ -378,6 +378,7 @@ class SettingsPage extends HookConsumerWidget {
           );
         },
       );
+      ref.invalidate(emailOtpReadyProvider);
     } catch (error, stackTrace) {
       log(
         'Failed to open Email OTP setup dialog',
@@ -424,6 +425,7 @@ class SettingsPage extends HookConsumerWidget {
 
     try {
       await ref.read(googleEmailOtpAuthServiceProvider).clearSession();
+      ref.invalidate(emailOtpReadyProvider);
       if (context.mounted) {
         dispToast(
           context,
@@ -680,6 +682,9 @@ class SettingsPage extends HookConsumerWidget {
                     isEmailOtpReady.value == true
                         ? 'Connected · tap to manage'
                         : 'Connect Gmail for automatic OTPs',
+                    style: isEmailOtpReady.value == true
+                        ? null
+                        : TextStyle(color: context.theme.colors.destructive),
                   ),
                   suffix: isEmailOtpBusy.value
                       ? const FCircularProgress.pinwheel()
