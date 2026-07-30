@@ -67,9 +67,9 @@ class DaysStack extends HookWidget {
                             ),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: selectedDay.value != i
-                                  ? context.theme.colors.primary
-                                  : context.theme.colors.background,
+                              color: selectedDay.value == i
+                                  ? context.theme.colors.primaryForeground
+                                  : context.theme.colors.foreground,
                             ),
                           ),
                         ),
@@ -82,9 +82,9 @@ class DaysStack extends HookWidget {
                             ),
                             style: TextStyle(
                               fontSize: 14,
-                              color: selectedDay.value != i
-                                  ? context.theme.colors.primary
-                                  : context.theme.colors.background,
+                              color: selectedDay.value == i
+                                  ? context.theme.colors.primaryForeground
+                                  : context.theme.colors.foreground,
                             ),
                           ),
                         ),

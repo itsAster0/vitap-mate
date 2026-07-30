@@ -29,6 +29,7 @@ class TimetablePage extends HookConsumerWidget {
     final timetableData = ref.watch(timetableProvider);
     final autoRefresh = ref.watch(autoRefreshProvider);
     final startX = useState<double?>(null);
+    final initialSummaryPositioned = useRef(false);
     useEffect(() {
       if (!autoRefresh) return null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -43,6 +44,21 @@ class TimetablePage extends HookConsumerWidget {
       return null;
     }, [autoRefresh]);
     final mergeLabs = ref.watch(mergeTTProvider);
+
+    useEffect(() {
+      if (!timetableData.hasValue || initialSummaryPositioned.value) {
+        return null;
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!scrollController.hasClients || initialSummaryPositioned.value) {
+          return;
+        }
+        initialSummaryPositioned.value = true;
+        scrollController.jumpTo(72);
+      });
+      return null;
+    }, [timetableData.hasValue]);
 
     Future<void> update() async {
       try {
@@ -65,6 +81,7 @@ class TimetablePage extends HookConsumerWidget {
             strokeWidth: 2.5,
             onRefresh: update,
             child: SingleChildScrollView(
+              controller: scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               child: GestureDetector(
                 onHorizontalDragStart: (details) {
@@ -113,6 +130,7 @@ class TimetablePage extends HookConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: 72),
+                          TimetableDaySummary(slots: tempdays),
                           ...daySlots.map((slot) => TimetableCard(slot: slot)),
                           DataUpdatedFooter(
                             updateTime: data.updateTime.toInt(),
@@ -250,7 +268,7 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
         TimetableSlot(
           serial: "-1",
           day: "-",
-          slot: "${mod / 2 < 1 ? 1 : (mod / 2).toInt()}",
+          slot: _formatHours(mod * 30),
           courseCode: "-",
           courseType: "-",
           roomNo: "-",
@@ -266,6 +284,116 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
   }
   r.add(t[t.length - 1]);
   return r;
+}
+
+String _formatHours(int minutes) {
+  final hours = minutes / 60;
+  return hours == hours.roundToDouble()
+      ? hours.toInt().toString()
+      : hours.toStringAsFixed(1);
+}
+
+class TimetableDaySummary extends StatelessWidget {
+  const TimetableDaySummary({super.key, required this.slots});
+
+  final List<TimetableSlot> slots;
+
+  @override
+  Widget build(BuildContext context) {
+    final classSlots = slots.where((slot) => slot.serial != "-1").toList();
+    final scheduledHours = classSlots.fold<int>(
+      0,
+      (total, slot) => total + _scheduledHours(slot),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: context.theme.colors.background,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.theme.colors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _summaryMetric(
+                context,
+                FLucideIcons.clock,
+                scheduledHours.toString(),
+                "scheduled hours",
+              ),
+            ),
+            Container(width: 1, height: 42, color: context.theme.colors.border),
+            Expanded(
+              child: _summaryMetric(
+                context,
+                FLucideIcons.bookOpen,
+                classSlots.length.toString(),
+                classSlots.length == 1 ? "class" : "classes",
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryMetric(
+    BuildContext context,
+    IconData icon,
+    String value,
+    String label,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: context.theme.colors.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 16, color: context.theme.colors.primary),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 17,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  color: context.theme.colors.foreground,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: context.theme.colors.foreground.withValues(
+                    alpha: 0.65,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+int _scheduledHours(TimetableSlot slot) {
+  if (!slot.isLab) return 1;
+  return slot.slot.split('+').length;
 }
 
 int getdiff(String a, String b) {
