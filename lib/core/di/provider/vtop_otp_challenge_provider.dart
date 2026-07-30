@@ -19,6 +19,7 @@ class VtopOtpChallengeState {
     required this.isSubmitting,
     required this.isResending,
     required this.isAutoFetchingEmail,
+    required this.canRetryEmailAutoFetch,
     required this.remainingSeconds,
     required this.message,
     this.autoFetchMessage,
@@ -31,6 +32,7 @@ class VtopOtpChallengeState {
       isSubmitting = false,
       isResending = false,
       isAutoFetchingEmail = false,
+      canRetryEmailAutoFetch = false,
       remainingSeconds = 0,
       message = '',
       autoFetchMessage = null,
@@ -41,6 +43,7 @@ class VtopOtpChallengeState {
   final bool isSubmitting;
   final bool isResending;
   final bool isAutoFetchingEmail;
+  final bool canRetryEmailAutoFetch;
   final int remainingSeconds;
   final String message;
   final String? autoFetchMessage;
@@ -52,6 +55,7 @@ class VtopOtpChallengeState {
     bool? isSubmitting,
     bool? isResending,
     bool? isAutoFetchingEmail,
+    bool? canRetryEmailAutoFetch,
     int? remainingSeconds,
     String? message,
     String? autoFetchMessage,
@@ -65,6 +69,8 @@ class VtopOtpChallengeState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isResending: isResending ?? this.isResending,
       isAutoFetchingEmail: isAutoFetchingEmail ?? this.isAutoFetchingEmail,
+      canRetryEmailAutoFetch:
+          canRetryEmailAutoFetch ?? this.canRetryEmailAutoFetch,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       message: message ?? this.message,
       autoFetchMessage: clearAutoFetchMessage
@@ -113,6 +119,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         isMinimized: false,
         message: message,
         isAutoFetchingEmail: canAutoFetchFromEmail,
+        canRetryEmailAutoFetch: false,
         autoFetchMessage: canAutoFetchFromEmail
             ? 'Trying to get OTP from email...'
             : null,
@@ -132,6 +139,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       isSubmitting: false,
       isResending: false,
       isAutoFetchingEmail: canAutoFetchFromEmail,
+      canRetryEmailAutoFetch: false,
       remainingSeconds: _otpChallengeTimeout.inSeconds,
       message: message,
       autoFetchMessage: canAutoFetchFromEmail
@@ -147,6 +155,33 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   }
 
   Future<bool> canAutoFetchFromEmail() => _canAutoFetchFromEmail();
+
+  void retryEmailAutoFetch() {
+    if (!state.isActive ||
+        _client == null ||
+        !state.canRetryEmailAutoFetch ||
+        state.isAutoFetchingEmail ||
+        state.isSubmitting ||
+        state.isResending ||
+        state.remainingSeconds == 0) {
+      return;
+    }
+
+    AppLogger.instance.info(
+      'client.otp',
+      '$_logContext retrying email autofetch',
+    );
+    state = state.copyWith(
+      isAutoFetchingEmail: true,
+      canRetryEmailAutoFetch: false,
+      message:
+          'Trying to get OTP from email again. You can still enter it manually.',
+      autoFetchMessage: 'Trying to get OTP from email...',
+      clearError: true,
+    );
+    final runId = ++_autoFetchRunId;
+    unawaited(_runEmailAutoFetch(runId: runId));
+  }
 
   void minimize() {
     if (!state.isActive) return;
@@ -379,8 +414,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         if (!_shouldContinueAutoFetch(runId)) return;
         state = state.copyWith(
           isAutoFetchingEmail: false,
+          canRetryEmailAutoFetch: true,
           isMinimized: false,
-          autoFetchMessage: null,
+          clearAutoFetchMessage: true,
           message:
               'Could not read OTP from email. Enter OTP manually to continue.',
           clearError: true,
@@ -397,8 +433,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     );
     state = state.copyWith(
       isAutoFetchingEmail: false,
+      canRetryEmailAutoFetch: true,
       isMinimized: false,
-      autoFetchMessage: null,
+      clearAutoFetchMessage: true,
       message: 'Could not find OTP in email. Enter it manually to continue.',
       clearError: true,
     );

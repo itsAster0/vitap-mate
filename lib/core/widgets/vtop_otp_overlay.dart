@@ -94,6 +94,17 @@ class VtopOtpOverlay extends HookConsumerWidget {
                                 color: context.theme.colors.mutedForeground,
                               ),
                             ),
+                          if (state.canRetryEmailAutoFetch)
+                            FButton(
+                              variant: FButtonVariant.outline,
+                              onPress:
+                                  state.remainingSeconds > 0 &&
+                                      !state.isSubmitting &&
+                                      !state.isResending
+                                  ? notifier.retryEmailAutoFetch
+                                  : null,
+                              child: const Text('Try again'),
+                            ),
                           if (state.errorMessage != null &&
                               state.errorMessage!.trim().isNotEmpty)
                             Text(

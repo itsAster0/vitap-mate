@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -17,8 +19,8 @@ class TimetableCard extends HookConsumerWidget {
     String startTimeStr,
     String endTimeStr,
     String classWeekday,
+    DateTime now,
   ) {
-    final now = DateTime.now();
     final currentTime = Duration(hours: now.hour, minutes: now.minute);
 
     Duration parseTime(String timeStr) {
@@ -108,6 +110,14 @@ class TimetableCard extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final now = useState(DateTime.now());
+    useEffect(() {
+      final timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        now.value = DateTime.now();
+      });
+      return timer.cancel;
+    }, const []);
+
     final controller = useAnimationController(
       duration: const Duration(milliseconds: 300),
     );
@@ -120,10 +130,14 @@ class TimetableCard extends HookConsumerWidget {
     final isExpanded = useState(false);
 
     final status = slot.serial != "-1"
-        ? getClassStatus(slot.startTime, slot.endTime, slot.day)
+        ? getClassStatus(slot.startTime, slot.endTime, slot.day, now.value)
         : null;
 
     final statusStyle = status != null ? getStatusStyle(status) : null;
+    final countdown =
+        status == ClassStatus.upcoming || status == ClassStatus.nextClass
+        ? _countdownUntilStart(now.value)
+        : null;
     final isHighlighted =
         status == ClassStatus.ongoing || status == ClassStatus.nextClass;
 
@@ -158,7 +172,13 @@ class TimetableCard extends HookConsumerWidget {
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: slot.serial != "-1"
-                ? _buildClassCard(darkMode, context, statusStyle, animation)
+                ? _buildClassCard(
+                    darkMode,
+                    context,
+                    statusStyle,
+                    countdown,
+                    animation,
+                  )
                 : _buildFreeTimeCard(darkMode, context),
           ),
         ),
@@ -166,10 +186,24 @@ class TimetableCard extends HookConsumerWidget {
     );
   }
 
+  String? _countdownUntilStart(DateTime now) {
+    final parts = slot.startTime.split(':').map(int.parse).toList();
+    final start = DateTime(now.year, now.month, now.day, parts[0], parts[1]);
+    final remaining = start.difference(now);
+    if (remaining.isNegative || remaining == Duration.zero) return null;
+
+    if (remaining.inHours > 0) {
+      return '${remaining.inHours.toString().padLeft(2, '0')}h ${remaining.inMinutes.remainder(60).toString().padLeft(2, '0')}m';
+    }
+
+    return '${remaining.inMinutes.toString().padLeft(2, '0')}m ${remaining.inSeconds.remainder(60).toString().padLeft(2, '0')}s';
+  }
+
   Widget _buildClassCard(
     bool isDark,
     BuildContext context,
     (Color, Color, Color, String)? statusStyle,
+    String? countdown,
     CurvedAnimation animation,
   ) {
     return Column(
@@ -212,6 +246,21 @@ class TimetableCard extends HookConsumerWidget {
               ),
             ),
             const Spacer(),
+            if (countdown != null) ...[
+              _buildDetailChip(
+                isDark,
+                context,
+                icon: FLucideIcons.timer,
+                text: countdown,
+                color:
+                    statusStyle?.$3 ??
+                    (isDark
+                        ? context.theme.colors.primary
+                        : const Color(0xFF6B7280)),
+                isBold: true,
+              ),
+              const SizedBox(width: 8),
+            ],
             if (statusStyle != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
