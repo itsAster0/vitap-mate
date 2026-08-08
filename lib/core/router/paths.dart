@@ -17,4 +17,7 @@ class Paths {
   static final notificationManagement = "notificationManagement";
   static final calendarSync = "calendarSync";
   static final logs = "logs";
+  static final gpaCalculator = "gpaCalculator";
+  static final docs = "docs";
+  static final docView = "docView";
 }

@@ -9,6 +9,7 @@ import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_view_toggle_button.dart';
 
@@ -44,6 +45,7 @@ class ShellLayout extends HookConsumerWidget {
     );
     final shouldEnableEmailOtp =
         ref.watch(emailOtpSetupNeededProvider).value ?? false;
+    final activeDocumentTitle = ref.watch(activeDocumentTitleProvider);
 
     final routeInformationProvider = GoRouter.of(
       context,
@@ -64,6 +66,12 @@ class ShellLayout extends HookConsumerWidget {
       _buildHeader(context, "Timetable", k, headerSubtitle),
       _buildHeader(context, "Attendance", k, headerSubtitle),
       _buildHeader(context, "More", k, headerSubtitle),
+      _buildHeader(
+        context,
+        k.startsWith('/docs/view') ? activeDocumentTitle ?? 'Document' : 'Docs',
+        k,
+        headerSubtitle,
+      ),
       _buildHeader(context, "Settings", k, headerSubtitle),
     ];
     final selected = useState(0);
@@ -74,10 +82,12 @@ class ShellLayout extends HookConsumerWidget {
         selected.value = 1;
       } else if (k.startsWith("/more")) {
         selected.value = 2;
+      } else if (k.startsWith("/docs")) {
+        selected.value = 3;
       } else if (k.startsWith("/student-projects")) {
         selected.value = 3;
       } else if (k.startsWith("/settings")) {
-        selected.value = 3;
+        selected.value = 4;
       }
       return null;
     }, [k]);
@@ -114,10 +124,13 @@ class ShellLayout extends HookConsumerWidget {
               case 2:
                 GoRouter.of(context).goNamed(Paths.more);
                 break;
-              // case 3:
+              case 3:
+                GoRouter.of(context).goNamed(Paths.docs);
+                break;
+              // case 4:
               //   GoRouter.of(context).goNamed(Paths.studentProjects);
               //   break;
-              case 3:
+              case 4:
                 GoRouter.of(context).goNamed(Paths.settings);
                 break;
             }
@@ -134,6 +147,10 @@ class ShellLayout extends HookConsumerWidget {
             FBottomNavigationBarItem(
               icon: Icon(FLucideIcons.libraryBig),
               label: const Text('More'),
+            ),
+            FBottomNavigationBarItem(
+              icon: Icon(FLucideIcons.files),
+              label: const Text('Docs'),
             ),
             // FBottomNavigationBarItem(
             //   icon: Icon(FLucideIcons.rocket),
@@ -214,6 +231,7 @@ class _HeaderTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
+      widthFactor: 1,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,

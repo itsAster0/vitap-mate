@@ -51,6 +51,14 @@ class MorePage extends HookConsumerWidget {
                 onPress: () =>
                     GoRouter.of(context).pushNamed(Paths.gradeHistory),
               ),
+              // FTile(
+              //   prefix: const Icon(FLucideIcons.calculator),
+              //   title: const Text('GPA / CGPA Calculator'),
+              //   subtitle: const Text('Plan your grades and project CGPA'),
+              //   suffix: const Icon(FLucideIcons.chevronRight),
+              //   onPress: () =>
+              //       GoRouter.of(context).pushNamed(Paths.gpaCalculator),
+              // ),
               FTile(
                 prefix: const Icon(FLucideIcons.calendarDays),
                 title: const Text('Exam Schedule'),

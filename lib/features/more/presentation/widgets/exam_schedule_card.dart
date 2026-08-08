@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:forui/theme.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/features/more/presentation/widgets/exam_countdown_strip.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -24,6 +25,7 @@ class ExamScheduleCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final upcomingCount = _getUpcomingExamsCount();
+    final nearest = nearestUpcoming([record]);
 
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
@@ -132,6 +134,31 @@ class ExamScheduleCard extends ConsumerWidget {
                           label: "$upcomingCount upcoming",
                           color: ExamColors.upcomingText,
                         ),
+                      if (nearest != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: nearest.color.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: nearest.color.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            nearest.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                              color: nearest.color,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],

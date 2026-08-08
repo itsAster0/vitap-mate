@@ -6,6 +6,9 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/widgets/onboarding_page.dart';
 import 'package:vitapmate/core/widgets/shell_layout.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
+import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
+import 'package:vitapmate/features/docs/presentation/pages/docs_page.dart';
+import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/more/presentation/pages/exam_schedule_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/chrome_extension_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/grades_page.dart';
@@ -13,6 +16,7 @@ import 'package:vitapmate/features/more/presentation/pages/grade_history_page.da
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/biometric_history_page.dart';
+import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
@@ -156,6 +160,76 @@ GoRouter router(Ref ref) {
                       return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: const ChromeExtensionPage(),
+                      );
+                    },
+                  ),
+                  GoRoute(
+                    path: 'gpa_calculator',
+                    name: Paths.gpaCalculator,
+                    pageBuilder: (context, state) {
+                      return CustomTransitionPage<void>(
+                        key: state.pageKey,
+                        child: const GpaCalculatorPage(),
+                        transitionsBuilder:
+                            (context, animation, secondary, child) {
+                          final curved = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                          );
+                          return FadeTransition(
+                            opacity: curved,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.02),
+                                end: Offset.zero,
+                              ).animate(curved),
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 220),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            navigatorKey: GlobalKey<NavigatorState>(),
+            routes: [
+              GoRoute(
+                path: '/docs',
+                name: Paths.docs,
+                builder: (context, state) => const DocsPage(),
+                routes: [
+                  GoRoute(
+                    path: 'view',
+                    name: Paths.docView,
+                    pageBuilder: (context, state) {
+                      return CustomTransitionPage<void>(
+                        key: state.pageKey,
+                        child: DocumentViewerPage(
+                          doc: state.extra as DocWindow,
+                        ),
+                        transitionsBuilder:
+                            (context, animation, secondary, child) {
+                          final curved = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                          );
+                          return FadeTransition(
+                            opacity: curved,
+                            child: ScaleTransition(
+                              scale: Tween<double>(
+                                begin: 0.97,
+                                end: 1,
+                              ).animate(curved),
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 220),
                       );
                     },
                   ),

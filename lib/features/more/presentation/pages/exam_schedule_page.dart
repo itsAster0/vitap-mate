@@ -8,6 +8,7 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
+import 'package:vitapmate/features/more/presentation/widgets/exam_countdown_strip.dart';
 import 'package:vitapmate/features/more/presentation/widgets/exam_schedule_card.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 
@@ -108,6 +109,10 @@ class ExamSchedulePage extends HookConsumerWidget {
                   child: Column(
                     spacing: 4,
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: ExamCountdownStrip(exams: data.exams),
+                      ),
                       for (final i in data.exams) ExamScheduleCard(record: i),
                       DataUpdatedFooter(
                         updateTime: data.updateTime.toInt(),

@@ -76,4 +76,27 @@ class JsonFileStorage {
       await file.delete();
     }
   }
+
+  Future<Directory> userDir(String name, {bool create = true}) {
+    return _getUserDir(name, create: create);
+  }
+
+  Future<String> copyIntoUserDir(
+    String subDir,
+    String sourcePath, {
+    String? fileName,
+  }) async {
+    final dir = await _getUserDir(subDir);
+    final safeName = _normalize(fileName ?? sourcePath.split('/').last);
+    final target = File('${dir.path}/$safeName');
+    await File(sourcePath).copy(target.path);
+    return target.path;
+  }
+
+  Future<void> deleteUserFile(String absoluteOrRelativePath) async {
+    final file = File(absoluteOrRelativePath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
 }
