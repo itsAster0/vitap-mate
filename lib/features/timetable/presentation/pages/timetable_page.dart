@@ -10,10 +10,12 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/weekly_timetable_view.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetablePage extends HookConsumerWidget {
@@ -27,6 +29,7 @@ class TimetablePage extends HookConsumerWidget {
     final scrollController = useScrollController();
     final scrollOffset = useState<double>(0);
     final timetableData = ref.watch(timetableProvider);
+    final viewMode = ref.watch(timetableViewModeProvider);
     final autoRefresh = ref.watch(autoRefreshProvider);
     final startX = useState<double?>(null);
     final initialSummaryPositioned = useRef(false);
@@ -60,6 +63,21 @@ class TimetablePage extends HookConsumerWidget {
       return null;
     }, [timetableData.hasValue]);
 
+    useEffect(() {
+      if (!timetableData.hasValue) return null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!scrollController.hasClients) return;
+        final targetOffset = viewMode == TimetableViewMode.weekly ? 0.0 : 72.0;
+        scrollController.jumpTo(
+          targetOffset
+              .clamp(0.0, scrollController.position.maxScrollExtent)
+              .toDouble(),
+        );
+      });
+      return null;
+    }, [viewMode]);
+
     Future<void> update() async {
       try {
         await ref.read(timetableProvider.notifier).updateTimetable();
@@ -84,24 +102,31 @@ class TimetablePage extends HookConsumerWidget {
               controller: scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               child: GestureDetector(
-                onHorizontalDragStart: (details) {
-                  startX.value = details.globalPosition.dx;
-                },
-                onHorizontalDragUpdate: (details) {
-                  if (finalDay.value.isEmpty) return;
-                  final currentX = details.globalPosition.dx;
-                  final deltaX = currentX - (startX.value ?? currentX);
+                onHorizontalDragStart: viewMode == TimetableViewMode.daily
+                    ? (details) {
+                        startX.value = details.globalPosition.dx;
+                      }
+                    : null,
+                onHorizontalDragUpdate: viewMode == TimetableViewMode.daily
+                    ? (details) {
+                        if (finalDay.value.isEmpty) return;
+                        final currentX = details.globalPosition.dx;
+                        final deltaX = currentX - (startX.value ?? currentX);
 
-                  if (deltaX > 80 && finalDay.value.first < selectedDay.value) {
-                    selectedDay.value -= 1;
-                    startX.value = currentX;
-                  } else if (deltaX < -80 &&
-                      finalDay.value.last > selectedDay.value) {
-                    selectedDay.value += 1;
-                    startX.value = currentX;
-                  }
-                },
-                onHorizontalDragEnd: (_) => startX.value = null,
+                        if (deltaX > 80 &&
+                            finalDay.value.first < selectedDay.value) {
+                          selectedDay.value -= 1;
+                          startX.value = currentX;
+                        } else if (deltaX < -80 &&
+                            finalDay.value.last > selectedDay.value) {
+                          selectedDay.value += 1;
+                          startX.value = currentX;
+                        }
+                      }
+                    : null,
+                onHorizontalDragEnd: viewMode == TimetableViewMode.daily
+                    ? (_) => startX.value = null
+                    : null,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: MediaQuery.of(context).size.height * 0.8,
@@ -114,11 +139,36 @@ class TimetablePage extends HookConsumerWidget {
                       if (!tempList.contains(selectedDay.value)) {
                         selectedDay.value = tempList.first;
                       }
-                      var tempdays = getDaySlotList(data, selectedDay.value);
-
-                      if (mergeLabs) {
-                        tempdays = mergeLabsSloths(tempdays);
+                      List<TimetableSlot> slotsForDay(int day) {
+                        var slots = getDaySlotList(data, day);
+                        if (mergeLabs) {
+                          slots = mergeLabsSloths(slots);
+                        }
+                        slots.sort((a, b) {
+                          final t1 = _parseTime(a.startTime);
+                          final t2 = _parseTime(b.startTime);
+                          return t1.compareTo(t2);
+                        });
+                        return slots;
                       }
+
+                      if (viewMode == TimetableViewMode.weekly) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            WeeklyTimetableView(
+                              days: tempList,
+                              slotsForDay: slotsForDay,
+                            ),
+                            DataUpdatedFooter(
+                              updateTime: data.updateTime.toInt(),
+                            ),
+                          ],
+                        );
+                      }
+
+                      final tempdays = slotsForDay(selectedDay.value);
+
                       final daySlots = addFreeSlots(tempdays);
 
                       daySlots.sort((a, b) {
@@ -192,7 +242,7 @@ class TimetablePage extends HookConsumerWidget {
               ),
             ),
           ),
-          if (timetableData.hasValue)
+          if (timetableData.hasValue && viewMode == TimetableViewMode.daily)
             Positioned(
               top: 0,
               left: 0,

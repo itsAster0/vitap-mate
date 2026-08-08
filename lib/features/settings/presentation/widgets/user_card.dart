@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
@@ -178,7 +179,7 @@ class UserCard extends HookConsumerWidget {
 
       await showAdaptiveDialog<void>(
         context: context,
-        builder: (dialogContext) => FDialog(
+        builder: (dialogContext) => AppDialog(
           title: const Text('Saved VTOP Password'),
           body: SelectableText(password),
           actions: [
@@ -197,7 +198,7 @@ class UserCard extends HookConsumerWidget {
   void _confirmSignOut(BuildContext context, WidgetRef ref) {
     showAdaptiveDialog(
       context: context,
-      builder: (dialogContext) => FDialog(
+      builder: (dialogContext) => AppDialog(
         title: const Text('Sign out?'),
         body: const Text('You will be signed out and returned to onboarding.'),
         actions: [

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
+import 'package:vitapmate/core/widgets/app_card.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -255,7 +257,7 @@ class CalendarSyncPage extends HookConsumerWidget {
             barrierDismissible: false,
             builder: (_) => PopScope(
               canPop: false,
-              child: FDialog(
+              child: AppDialog(
                 direction: Axis.horizontal,
                 title: const Text("Syncing"),
                 body: const Row(
@@ -356,7 +358,7 @@ class CalendarSyncPage extends HookConsumerWidget {
       final confirmed = await showAdaptiveDialog<bool>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => FDialog(
+        builder: (_) => AppDialog(
           title: const Text("Clear Synced Events"),
           body: Text(
             "This removes only events synced by this app for semester ${timetable.semesterId} in the selected calendar.",
@@ -484,12 +486,9 @@ class CalendarSyncPage extends HookConsumerWidget {
                   end: DateTime(now.year + 3, 1, 1),
                   initial: calendarFocusDate,
                 ),
-                selectionControl: FDateSelectionControl.lifted(
-                  selected: (date) =>
-                      date.year == calendarFocusDate.year &&
-                      date.month == calendarFocusDate.month &&
-                      date.day == calendarFocusDate.day,
-                  select: (_) {},
+                selectionControl: FDateSelectionControl.liftedSingle(
+                  value: calendarFocusDate,
+                  onChange: (_) {},
                 ),
                 onDayPress: (selected) {
                   final pickedStart = DateTime(
@@ -529,7 +528,7 @@ class CalendarSyncPage extends HookConsumerWidget {
               ),
             const FDivider(),
             if (timetableChangedSinceLastSync.value)
-              FCard(
+              AppCard(
                 title: Text(
                   "Timetable Changed",
                   style: context.theme.typography.body.md.copyWith(
@@ -543,7 +542,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                   "Please sync again to update your calendar with latest classes.",
                 ),
               ),
-            FCard(
+            AppCard(
               title: Text(
                 "Calendar Setup",
                 style: context.theme.typography.body.md.copyWith(
@@ -632,7 +631,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                       ],
                     ),
             ),
-            FCard(
+            AppCard(
               title: Text(
                 "Event Layout",
                 style: context.theme.typography.body.md.copyWith(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_card.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 
@@ -51,7 +52,7 @@ class VtopOtpOverlay extends HookConsumerWidget {
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Padding(
                     padding: const EdgeInsets.all(20),
-                    child: FCard(
+                    child: AppCard(
                       title: Row(
                         children: [
                           Expanded(

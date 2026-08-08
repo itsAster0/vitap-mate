@@ -168,7 +168,7 @@ final class AutoRefreshProvider extends $FunctionalProvider<bool, bool, bool>
   }
 }
 
-String _$autoRefreshHash() => r'e5ae73c61bbae9b20882fda9e592bd0c6ec00d4f';
+String _$autoRefreshHash() => r'4c2d0a94323a07048e4d82a634ec36e46afd5ad6';
 
 @ProviderFor(emailOtpDeleteAfterReading)
 final emailOtpDeleteAfterReadingProvider =

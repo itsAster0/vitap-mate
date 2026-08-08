@@ -10,6 +10,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/timetable_view_toggle_button.dart';
 
 class ShellLayout extends HookConsumerWidget {
   final Widget child;
@@ -193,18 +194,9 @@ Widget _buildHeader(
           : context.theme.typography.body.lg,
     ),
 
-    prefixes: [
-      if (hasTimetableAction)
-        Visibility(
-          visible: false,
-          maintainAnimation: true,
-          maintainSize: true,
-          maintainState: true,
-          child: SyncGoogleCalendarButton(),
-        ),
-    ],
+    prefixes: [if (hasTimetableAction) const SyncGoogleCalendarButton()],
 
-    suffixes: [if (hasTimetableAction) SyncGoogleCalendarButton()],
+    suffixes: [if (hasTimetableAction) const TimetableViewToggleButton()],
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -130,7 +131,7 @@ class SettingsPage extends HookConsumerWidget {
       final confirmed = await showAdaptiveDialog<bool>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => FDialog(
+        builder: (_) => AppDialog(
           title: const Text('Clear Saved Cookies?'),
           body: const Text(
             'This removes the saved VTOP session cookies for your account. You may need to sign in again.',
@@ -188,7 +189,7 @@ class SettingsPage extends HookConsumerWidget {
             );
             final errorText = useState<String?>(null);
 
-            return FDialog(
+            return AppDialog(
               title: const Text('VTOP Session Reuse'),
               body: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -282,7 +283,7 @@ class SettingsPage extends HookConsumerWidget {
               final stepOneBusy = useState(false);
               final stepTwoBusy = useState(false);
 
-              return FDialog(
+              return AppDialog(
                 title: const Text('Email OTP Setup'),
                 body: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -402,7 +403,7 @@ class SettingsPage extends HookConsumerWidget {
   ) async {
     final confirm = await showAdaptiveDialog<bool>(
       context: context,
-      builder: (dialogContext) => FDialog(
+      builder: (dialogContext) => AppDialog(
         title: const Text('Disconnect Email OTP?'),
         body: const Text(
           'This removes the saved Gmail token. You can connect it again later.',
@@ -459,7 +460,7 @@ class SettingsPage extends HookConsumerWidget {
         context: context,
         builder: (dialogContext) {
           if (latest == null) {
-            return FDialog(
+            return AppDialog(
               title: const Text('Latest OTP Email'),
               body: const Text('No emails from info1@vitap.ac.in were found.'),
               actions: [
@@ -472,7 +473,7 @@ class SettingsPage extends HookConsumerWidget {
           }
 
           final localTime = latest.receivedAt.toLocal().toString();
-          return FDialog(
+          return AppDialog(
             title: const Text('Latest OTP Email'),
             body: Column(
               mainAxisSize: MainAxisSize.min,

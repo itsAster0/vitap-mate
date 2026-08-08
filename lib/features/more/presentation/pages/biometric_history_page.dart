@@ -62,12 +62,11 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
               end: DateTime.now().add(const Duration(days: 1)),
               initial: _selectedDate,
             ),
-            selectionControl: FDateSelectionControl.lifted(
-              selected: (date) =>
-                  date.year == candidate.year &&
-                  date.month == candidate.month &&
-                  date.day == candidate.day,
-              select: (date) => candidate = date,
+            selectionControl: FDateSelectionControl.liftedSingle(
+              value: candidate,
+              onChange: (date) {
+                if (date != null) candidate = date;
+              },
             ),
             onDayPress: (date) {
               Navigator.of(dialogContext).pop(date);

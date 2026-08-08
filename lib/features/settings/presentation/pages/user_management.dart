@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
@@ -166,7 +167,7 @@ class SemesterDialog extends HookConsumerWidget {
 
     return semester.when(
       data: (data) {
-        return FDialog(
+        return AppDialog(
           title: Row(
             mainAxisSize: MainAxisSize.max,
             children: [
@@ -209,16 +210,16 @@ class SemesterDialog extends HookConsumerWidget {
             ),
           ),
           actions: [
-          if (!disableCanecel.value)
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
+            if (!disableCanecel.value)
+              FButton(
+                variant: FButtonVariant.outline,
+                onPress: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
           ],
         );
       },
-      error: (e, _) => FDialog(
+      error: (e, _) => AppDialog(
         title: const Text('Semesters'),
         body: Container(
           decoration: BoxDecoration(color: context.theme.colors.secondary),
@@ -232,7 +233,7 @@ class SemesterDialog extends HookConsumerWidget {
           ),
         ],
       ),
-      loading: () => FDialog(
+      loading: () => AppDialog(
         title: const Text('Semesters'),
         body: Container(
           decoration: BoxDecoration(color: context.theme.colors.secondary),
@@ -275,7 +276,7 @@ class UserPassChange extends HookConsumerWidget {
                     );
                     final isLoading = useState(false);
 
-                    return FDialog(
+                    return AppDialog(
                       title: const Text('Update Credentials'),
                       body: Column(
                         mainAxisSize: MainAxisSize.min,

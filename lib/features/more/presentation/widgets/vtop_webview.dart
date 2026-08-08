@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
@@ -120,7 +121,7 @@ class VtopWebview extends HookConsumerWidget {
       try {
         final shouldLoginAgain = await showFDialog<bool>(
           context: context,
-          builder: (context, style, animation) => FDialog(
+          builder: (context, style, animation) => AppDialog(
             animation: animation,
             direction: Axis.horizontal,
             title: const Text('Login expired'),

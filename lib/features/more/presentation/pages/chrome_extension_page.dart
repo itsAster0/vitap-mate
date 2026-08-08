@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
@@ -67,7 +68,7 @@ class ChromeExtensionPage extends HookConsumerWidget {
       if (resetting.value) return;
       final confirmed = await showAdaptiveDialog<bool>(
         context: context,
-        builder: (dialogContext) => FDialog(
+        builder: (dialogContext) => AppDialog(
           title: const Text('Reset Token?'),
           body: const Text(
             'Your current Token will stop working. You must paste the new Token into the Chrome extension.',

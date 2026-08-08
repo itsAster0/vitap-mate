@@ -12,7 +12,7 @@ void main() {
       ProviderScope(
         child: MaterialApp(
           builder: (context, child) => FTheme(
-            data: FThemes.zinc.light.touch,
+            data: FTheme.neutral.light.touch,
             child: FToaster(child: child!),
           ),
           home: const Scaffold(body: ChromeExtensionPage()),

@@ -46,14 +46,14 @@ FThemeData fTheme(Ref ref) {
 
   switch (themeMode) {
     case ThemeMode.dark:
-      return FThemes.zinc.dark.touch;
+      return FTheme.neutral.dark.touch;
     case ThemeMode.light:
-      return FThemes.zinc.light.touch;
+      return FTheme.neutral.light.touch;
     case ThemeMode.system:
       final brightness =
           WidgetsBinding.instance.platformDispatcher.platformBrightness;
       return brightness == Brightness.dark
-          ? FThemes.zinc.dark.touch
-          : FThemes.zinc.light.touch;
+          ? FTheme.neutral.dark.touch
+          : FTheme.neutral.light.touch;
   }
 }
