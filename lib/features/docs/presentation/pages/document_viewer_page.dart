@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
+import 'package:vitapmate/features/docs/domain/document_transform.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 
 class DocumentViewerPage extends HookConsumerWidget {
@@ -348,7 +349,7 @@ class _DocSurface extends HookConsumerWidget {
           bottom: 12,
           child: FTappable(
             onPress: () {
-              transform.value = Matrix4.identity();
+              transform.value = resetHorizontalOffset(transform.value);
               persist();
             },
             child: Container(

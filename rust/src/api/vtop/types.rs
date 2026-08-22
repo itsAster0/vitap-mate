@@ -85,6 +85,18 @@ pub struct TimetableSlot {
     pub name: String,
     pub is_lab: bool,
     pub faculty: String,
+    #[serde(default)]
+    pub credits: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+#[frb]
+pub struct TimetableCourse {
+    pub course_code: String,
+    pub name: String,
+    pub course_type: String,
+    pub credits: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,6 +104,8 @@ pub struct TimetableSlot {
 #[frb]
 pub struct TimetableData {
     pub slots: Vec<TimetableSlot>,
+    #[serde(default)]
+    pub courses: Vec<TimetableCourse>,
     pub semester_id: String,
     pub update_time: u64,
 }

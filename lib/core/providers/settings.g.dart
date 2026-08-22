@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'c3b8dd7ce407d74e4c997381e5ee5f845b49ccc9';
+String _$settingsHash() => r'425847f708202eea25e7224efd30cecb5e9d73ba';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();
@@ -601,3 +601,102 @@ final class ExamReminderSettingsControllerProvider
 
 String _$examReminderSettingsControllerHash() =>
     r'307386b85a678b5bdb9faecf2dac3740efc17dcd';
+
+@ProviderFor(changeAlertsSettings)
+final changeAlertsSettingsProvider = ChangeAlertsSettingsProvider._();
+
+final class ChangeAlertsSettingsProvider
+    extends
+        $FunctionalProvider<
+          ChangeAlertsSettings,
+          ChangeAlertsSettings,
+          ChangeAlertsSettings
+        >
+    with $Provider<ChangeAlertsSettings> {
+  ChangeAlertsSettingsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'changeAlertsSettingsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$changeAlertsSettingsHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChangeAlertsSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChangeAlertsSettings create(Ref ref) {
+    return changeAlertsSettings(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChangeAlertsSettings value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChangeAlertsSettings>(value),
+    );
+  }
+}
+
+String _$changeAlertsSettingsHash() =>
+    r'3032c32317f1539c6519671fb187de2fc46a32a8';
+
+@ProviderFor(changeAlertsSettingsController)
+final changeAlertsSettingsControllerProvider =
+    ChangeAlertsSettingsControllerProvider._();
+
+final class ChangeAlertsSettingsControllerProvider
+    extends
+        $FunctionalProvider<
+          ChangeAlertsSettingsController,
+          ChangeAlertsSettingsController,
+          ChangeAlertsSettingsController
+        >
+    with $Provider<ChangeAlertsSettingsController> {
+  ChangeAlertsSettingsControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'changeAlertsSettingsControllerProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$changeAlertsSettingsControllerHash();
+
+  @$internal
+  @override
+  $ProviderElement<ChangeAlertsSettingsController> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ChangeAlertsSettingsController create(Ref ref) {
+    return changeAlertsSettingsController(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ChangeAlertsSettingsController value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ChangeAlertsSettingsController>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$changeAlertsSettingsControllerHash() =>
+    r'c154099aeb8618a8a36244942950de479a6a7258';

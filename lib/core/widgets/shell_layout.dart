@@ -189,6 +189,9 @@ Widget _buildHeader(
       case "chrome-extension":
         data = "Chrome Extension";
         break;
+      case "gpa_calculator":
+        data = "GPA / CGPA Calculator";
+        break;
     }
 
     return FHeader.nested(

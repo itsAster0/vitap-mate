@@ -11,7 +11,7 @@ part 'types.freezed.dart';
 part 'types.g.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PersistedCookie`, `PersistedHeader`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 @freezed
 @meta.immutable
@@ -408,9 +408,24 @@ sealed class SemesterInfo with _$SemesterInfo {
 
 @freezed
 @meta.immutable
+sealed class TimetableCourse with _$TimetableCourse {
+  const factory TimetableCourse({
+    required String courseCode,
+    required String name,
+    required String courseType,
+    required String credits,
+  }) = _TimetableCourse;
+
+  factory TimetableCourse.fromJson(Map<String, dynamic> json) =>
+      _$TimetableCourseFromJson(json);
+}
+
+@freezed
+@meta.immutable
 sealed class TimetableData with _$TimetableData {
   const factory TimetableData({
     required List<TimetableSlot> slots,
+    required List<TimetableCourse> courses,
     required String semesterId,
     required BigInt updateTime,
   }) = _TimetableData;
@@ -435,6 +450,7 @@ sealed class TimetableSlot with _$TimetableSlot {
     required String name,
     required bool isLab,
     required String faculty,
+    required String credits,
   }) = _TimetableSlot;
 
   factory TimetableSlot.fromJson(Map<String, dynamic> json) =>

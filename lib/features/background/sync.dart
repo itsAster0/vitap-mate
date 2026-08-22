@@ -6,12 +6,14 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
+import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/utils/app_errors.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
+import 'package:vitapmate/features/background/change_detection/change_detector.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
@@ -19,6 +21,8 @@ import 'package:vitapmate/features/settings/presentation/providers/semester_id_p
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
+import 'package:vitapmate/services/change_alert_notification_service.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -135,15 +139,27 @@ Future<bool> syncVtopData({
       );
     }
 
+    AttendanceData? previousAttendance;
     futures.add(
       _attendanceSync(
         read,
         task,
         force: force,
         ignoreRecoverableErrors: ignoreRecoverableErrors,
-      ),
+      ).then((result) {
+        previousAttendance = result.$2;
+        return result.$1;
+      }),
     );
     final k = await Future.wait(futures);
+    await _runChangeDetection(
+      read,
+      task,
+      previousTimetable: timetable,
+      previousMarks: marks,
+      previousExamSchedule: examSchedule,
+      previousAttendance: previousAttendance,
+    );
     await prefs.setString('${task}_val_end', DateTime.now().toString());
     return atLeastHalfTrue(k);
   } catch (e) {
@@ -216,7 +232,7 @@ Future<bool> _shouldIgnoreBackgroundError(
   return false;
 }
 
-Future<bool> _attendanceSync(
+Future<(bool, AttendanceData?)> _attendanceSync(
   ProviderReader read,
   String? task, {
   required bool force,
@@ -225,6 +241,7 @@ Future<bool> _attendanceSync(
   try {
     final attendanceRepo = await read(attendanceRepositoryProvider.future);
     var att = await attendanceRepo.load();
+    final previousAttendance = att;
     var ok = true;
     if (force || !_isUpdatedWithinBacksyncWindow(att.updateTime)) {
       ok = await _retryer(
@@ -260,12 +277,86 @@ Future<bool> _attendanceSync(
           );
         }(),
     ]);
-    return atLeastHalfTrue(k) && ok;
+    return (atLeastHalfTrue(k) && ok, previousAttendance);
   } catch (e) {
     if (ignoreRecoverableErrors) {
-      return _shouldIgnoreBackgroundError(e, read);
+      return (await _shouldIgnoreBackgroundError(e, read), null);
     }
     rethrow;
+  }
+}
+
+const _backgroundSyncTaskName = 'sync_vtop';
+
+Future<void> _runChangeDetection(
+  ProviderReader read,
+  String? task, {
+  TimetableData? previousTimetable,
+  MarksData? previousMarks,
+  ExamScheduleData? previousExamSchedule,
+  AttendanceData? previousAttendance,
+}) async {
+  if (task != _backgroundSyncTaskName) return;
+  try {
+    final featureFlags = await read(featureFlagsControllerProvider.future);
+    if (!await featureFlags.isEnabled('change-alerts')) return;
+
+    final timetableRepo = await read(timetableRepositoryProvider.future);
+    final freshTimetable = await timetableRepo.loadCache();
+    if (freshTimetable != null && previousTimetable != null) {
+      final summary = compareTimetable(previousTimetable, freshTimetable);
+      if (summary != null) {
+        await ChangeAlertNotificationService.showDataChange(
+          type: ChangeAlertType.timetable,
+          semesterId: freshTimetable.semesterId,
+          summary: summary,
+        );
+      }
+    }
+
+    final marksRepo = await read(marksRepositoryProvider.future);
+    final freshMarks = await marksRepo.loadCache();
+    if (freshMarks != null && previousMarks != null) {
+      final summary = compareMarks(previousMarks, freshMarks);
+      if (summary != null) {
+        await ChangeAlertNotificationService.showDataChange(
+          type: ChangeAlertType.marks,
+          semesterId: freshMarks.semesterId,
+          summary: summary,
+        );
+      }
+    }
+
+    final examScheduleRepo = await read(examScheduleRepositoryProvider.future);
+    final freshExamSchedule = await examScheduleRepo.loadCache();
+    if (freshExamSchedule != null && previousExamSchedule != null) {
+      final summary = compareExamSchedule(previousExamSchedule, freshExamSchedule);
+      if (summary != null) {
+        await ChangeAlertNotificationService.showDataChange(
+          type: ChangeAlertType.examSchedule,
+          semesterId: freshExamSchedule.semesterId,
+          summary: summary,
+        );
+      }
+    }
+
+    final attendanceRepo = await read(attendanceRepositoryProvider.future);
+    final freshAttendance = await attendanceRepo.loadCache();
+    if (freshAttendance != null && previousAttendance != null) {
+      final summary = compareAttendance(previousAttendance, freshAttendance);
+      if (summary != null) {
+        await ChangeAlertNotificationService.showDataChange(
+          type: ChangeAlertType.attendance,
+          semesterId: freshAttendance.semesterId,
+          summary: summary,
+        );
+      }
+    }
+  } catch (e) {
+    AppLogger.instance.warning(
+      'background.change_detection',
+      'Change detection failed: $e',
+    );
   }
 }
 

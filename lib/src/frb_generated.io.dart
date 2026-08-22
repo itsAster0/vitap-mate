@@ -432,6 +432,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SemesterInfo> dco_decode_list_semester_info(dynamic raw);
 
   @protected
+  List<TimetableCourse> dco_decode_list_timetable_course(dynamic raw);
+
+  @protected
   List<TimetableSlot> dco_decode_list_timetable_slot(dynamic raw);
 
   @protected
@@ -462,6 +465,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SemesterInfo dco_decode_semester_info(dynamic raw);
+
+  @protected
+  TimetableCourse dco_decode_timetable_course(dynamic raw);
 
   @protected
   TimetableData dco_decode_timetable_data(dynamic raw);
@@ -853,6 +859,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<TimetableCourse> sse_decode_list_timetable_course(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<TimetableSlot> sse_decode_list_timetable_slot(
     SseDeserializer deserializer,
   );
@@ -889,6 +900,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SemesterInfo sse_decode_semester_info(SseDeserializer deserializer);
+
+  @protected
+  TimetableCourse sse_decode_timetable_course(SseDeserializer deserializer);
 
   @protected
   TimetableData sse_decode_timetable_data(SseDeserializer deserializer);
@@ -1374,6 +1388,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_timetable_course(
+    List<TimetableCourse> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_timetable_slot(
     List<TimetableSlot> self,
     SseSerializer serializer,
@@ -1417,6 +1437,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_semester_info(SemesterInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_timetable_course(
+    TimetableCourse self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_timetable_data(TimetableData self, SseSerializer serializer);

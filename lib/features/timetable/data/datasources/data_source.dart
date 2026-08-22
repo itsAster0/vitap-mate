@@ -18,12 +18,25 @@ class TimetableDataSource {
       () async {
         final payload = await _storage.readJson('timetable_$semid');
         if (payload == null) return null;
+        payload.putIfAbsent('courses', () => <dynamic>[]);
+        // Timetables cached before course-credit support do not contain this
+        // field. Keep those caches readable until the next refresh.
+        for (final slot in (payload['slots'] as List<dynamic>? ?? const [])) {
+          if (slot is Map<String, dynamic>) {
+            slot.putIfAbsent('credits', () => '');
+          }
+        }
         return TimetableData.fromJson(payload);
       },
     );
 
     return data ??
-        TimetableData(slots: const [], semesterId: '', updateTime: BigInt.zero);
+        TimetableData(
+          slots: const [],
+          courses: const [],
+          semesterId: '',
+          updateTime: BigInt.zero,
+        );
   }
 
   Future<void> saveTimetable(TimetableData timetable, String semid) async {

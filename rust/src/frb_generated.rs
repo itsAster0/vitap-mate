@@ -4750,6 +4750,20 @@ impl SseDecode for Vec<crate::api::vtop::types::SemesterInfo> {
     }
 }
 
+impl SseDecode for Vec<crate::api::vtop::types::TimetableCourse> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::TimetableCourse>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::vtop::types::TimetableSlot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4901,14 +4915,33 @@ impl SseDecode for crate::api::vtop::types::SemesterInfo {
     }
 }
 
+impl SseDecode for crate::api::vtop::types::TimetableCourse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_courseCode = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_courseType = <String>::sse_decode(deserializer);
+        let mut var_credits = <String>::sse_decode(deserializer);
+        return crate::api::vtop::types::TimetableCourse {
+            course_code: var_courseCode,
+            name: var_name,
+            course_type: var_courseType,
+            credits: var_credits,
+        };
+    }
+}
+
 impl SseDecode for crate::api::vtop::types::TimetableData {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_slots = <Vec<crate::api::vtop::types::TimetableSlot>>::sse_decode(deserializer);
+        let mut var_courses =
+            <Vec<crate::api::vtop::types::TimetableCourse>>::sse_decode(deserializer);
         let mut var_semesterId = <String>::sse_decode(deserializer);
         let mut var_updateTime = <u64>::sse_decode(deserializer);
         return crate::api::vtop::types::TimetableData {
             slots: var_slots,
+            courses: var_courses,
             semester_id: var_semesterId,
             update_time: var_updateTime,
         };
@@ -4930,6 +4963,7 @@ impl SseDecode for crate::api::vtop::types::TimetableSlot {
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_isLab = <bool>::sse_decode(deserializer);
         let mut var_faculty = <String>::sse_decode(deserializer);
+        let mut var_credits = <String>::sse_decode(deserializer);
         return crate::api::vtop::types::TimetableSlot {
             serial: var_serial,
             day: var_day,
@@ -4943,6 +4977,7 @@ impl SseDecode for crate::api::vtop::types::TimetableSlot {
             name: var_name,
             is_lab: var_isLab,
             faculty: var_faculty,
+            credits: var_credits,
         };
     }
 }
@@ -6383,10 +6418,34 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::SemesterInfo>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableCourse {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.course_code.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.course_type.into_into_dart().into_dart(),
+            self.credits.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::vtop::types::TimetableCourse
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::TimetableCourse>
+    for crate::api::vtop::types::TimetableCourse
+{
+    fn into_into_dart(self) -> crate::api::vtop::types::TimetableCourse {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableData {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.slots.into_into_dart().into_dart(),
+            self.courses.into_into_dart().into_dart(),
             self.semester_id.into_into_dart().into_dart(),
             self.update_time.into_into_dart().into_dart(),
         ]
@@ -6420,6 +6479,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableSlot {
             self.name.into_into_dart().into_dart(),
             self.is_lab.into_into_dart().into_dart(),
             self.faculty.into_into_dart().into_dart(),
+            self.credits.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -7261,6 +7321,16 @@ impl SseEncode for Vec<crate::api::vtop::types::SemesterInfo> {
     }
 }
 
+impl SseEncode for Vec<crate::api::vtop::types::TimetableCourse> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::TimetableCourse>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::vtop::types::TimetableSlot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7360,10 +7430,21 @@ impl SseEncode for crate::api::vtop::types::SemesterInfo {
     }
 }
 
+impl SseEncode for crate::api::vtop::types::TimetableCourse {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.course_code, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.course_type, serializer);
+        <String>::sse_encode(self.credits, serializer);
+    }
+}
+
 impl SseEncode for crate::api::vtop::types::TimetableData {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <Vec<crate::api::vtop::types::TimetableSlot>>::sse_encode(self.slots, serializer);
+        <Vec<crate::api::vtop::types::TimetableCourse>>::sse_encode(self.courses, serializer);
         <String>::sse_encode(self.semester_id, serializer);
         <u64>::sse_encode(self.update_time, serializer);
     }
@@ -7384,6 +7465,7 @@ impl SseEncode for crate::api::vtop::types::TimetableSlot {
         <String>::sse_encode(self.name, serializer);
         <bool>::sse_encode(self.is_lab, serializer);
         <String>::sse_encode(self.faculty, serializer);
+        <String>::sse_encode(self.credits, serializer);
     }
 }
 

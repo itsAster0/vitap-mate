@@ -6924,9 +6924,275 @@ as String,
 
 
 /// @nodoc
+mixin _$TimetableCourse {
+
+ String get courseCode; String get name; String get courseType; String get credits;
+/// Create a copy of TimetableCourse
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$TimetableCourseCopyWith<TimetableCourse> get copyWith => _$TimetableCourseCopyWithImpl<TimetableCourse>(this as TimetableCourse, _$identity);
+
+  /// Serializes this TimetableCourse to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableCourse&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.name, name) || other.name == name)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.credits, credits) || other.credits == credits));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,courseCode,name,courseType,credits);
+
+@override
+String toString() {
+  return 'TimetableCourse(courseCode: $courseCode, name: $name, courseType: $courseType, credits: $credits)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $TimetableCourseCopyWith<$Res>  {
+  factory $TimetableCourseCopyWith(TimetableCourse value, $Res Function(TimetableCourse) _then) = _$TimetableCourseCopyWithImpl;
+@useResult
+$Res call({
+ String courseCode, String name, String courseType, String credits
+});
+
+
+
+
+}
+/// @nodoc
+class _$TimetableCourseCopyWithImpl<$Res>
+    implements $TimetableCourseCopyWith<$Res> {
+  _$TimetableCourseCopyWithImpl(this._self, this._then);
+
+  final TimetableCourse _self;
+  final $Res Function(TimetableCourse) _then;
+
+/// Create a copy of TimetableCourse
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? courseCode = null,Object? name = null,Object? courseType = null,Object? credits = null,}) {
+  return _then(_self.copyWith(
+courseCode: null == courseCode ? _self.courseCode : courseCode // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,courseType: null == courseType ? _self.courseType : courseType // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [TimetableCourse].
+extension TimetableCoursePatterns on TimetableCourse {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _TimetableCourse value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _TimetableCourse() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _TimetableCourse value)  $default,){
+final _that = this;
+switch (_that) {
+case _TimetableCourse():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _TimetableCourse value)?  $default,){
+final _that = this;
+switch (_that) {
+case _TimetableCourse() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String courseCode,  String name,  String courseType,  String credits)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _TimetableCourse() when $default != null:
+return $default(_that.courseCode,_that.name,_that.courseType,_that.credits);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String courseCode,  String name,  String courseType,  String credits)  $default,) {final _that = this;
+switch (_that) {
+case _TimetableCourse():
+return $default(_that.courseCode,_that.name,_that.courseType,_that.credits);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String courseCode,  String name,  String courseType,  String credits)?  $default,) {final _that = this;
+switch (_that) {
+case _TimetableCourse() when $default != null:
+return $default(_that.courseCode,_that.name,_that.courseType,_that.credits);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _TimetableCourse implements TimetableCourse {
+  const _TimetableCourse({required this.courseCode, required this.name, required this.courseType, required this.credits});
+  factory _TimetableCourse.fromJson(Map<String, dynamic> json) => _$TimetableCourseFromJson(json);
+
+@override final  String courseCode;
+@override final  String name;
+@override final  String courseType;
+@override final  String credits;
+
+/// Create a copy of TimetableCourse
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$TimetableCourseCopyWith<_TimetableCourse> get copyWith => __$TimetableCourseCopyWithImpl<_TimetableCourse>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$TimetableCourseToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableCourse&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.name, name) || other.name == name)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.credits, credits) || other.credits == credits));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,courseCode,name,courseType,credits);
+
+@override
+String toString() {
+  return 'TimetableCourse(courseCode: $courseCode, name: $name, courseType: $courseType, credits: $credits)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$TimetableCourseCopyWith<$Res> implements $TimetableCourseCopyWith<$Res> {
+  factory _$TimetableCourseCopyWith(_TimetableCourse value, $Res Function(_TimetableCourse) _then) = __$TimetableCourseCopyWithImpl;
+@override @useResult
+$Res call({
+ String courseCode, String name, String courseType, String credits
+});
+
+
+
+
+}
+/// @nodoc
+class __$TimetableCourseCopyWithImpl<$Res>
+    implements _$TimetableCourseCopyWith<$Res> {
+  __$TimetableCourseCopyWithImpl(this._self, this._then);
+
+  final _TimetableCourse _self;
+  final $Res Function(_TimetableCourse) _then;
+
+/// Create a copy of TimetableCourse
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? courseCode = null,Object? name = null,Object? courseType = null,Object? credits = null,}) {
+  return _then(_TimetableCourse(
+courseCode: null == courseCode ? _self.courseCode : courseCode // ignore: cast_nullable_to_non_nullable
+as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,courseType: null == courseType ? _self.courseType : courseType // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$TimetableData {
 
- List<TimetableSlot> get slots; String get semesterId; BigInt get updateTime;
+ List<TimetableSlot> get slots; List<TimetableCourse> get courses; String get semesterId; BigInt get updateTime;
 /// Create a copy of TimetableData
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -6939,16 +7205,16 @@ $TimetableDataCopyWith<TimetableData> get copyWith => _$TimetableDataCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableData&&const DeepCollectionEquality().equals(other.slots, slots)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableData&&const DeepCollectionEquality().equals(other.slots, slots)&&const DeepCollectionEquality().equals(other.courses, courses)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(slots),semesterId,updateTime);
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(slots),const DeepCollectionEquality().hash(courses),semesterId,updateTime);
 
 @override
 String toString() {
-  return 'TimetableData(slots: $slots, semesterId: $semesterId, updateTime: $updateTime)';
+  return 'TimetableData(slots: $slots, courses: $courses, semesterId: $semesterId, updateTime: $updateTime)';
 }
 
 
@@ -6959,7 +7225,7 @@ abstract mixin class $TimetableDataCopyWith<$Res>  {
   factory $TimetableDataCopyWith(TimetableData value, $Res Function(TimetableData) _then) = _$TimetableDataCopyWithImpl;
 @useResult
 $Res call({
- List<TimetableSlot> slots, String semesterId, BigInt updateTime
+ List<TimetableSlot> slots, List<TimetableCourse> courses, String semesterId, BigInt updateTime
 });
 
 
@@ -6976,10 +7242,11 @@ class _$TimetableDataCopyWithImpl<$Res>
 
 /// Create a copy of TimetableData
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? slots = null,Object? semesterId = null,Object? updateTime = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? slots = null,Object? courses = null,Object? semesterId = null,Object? updateTime = null,}) {
   return _then(_self.copyWith(
 slots: null == slots ? _self.slots : slots // ignore: cast_nullable_to_non_nullable
-as List<TimetableSlot>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
+as List<TimetableSlot>,courses: null == courses ? _self.courses : courses // ignore: cast_nullable_to_non_nullable
+as List<TimetableCourse>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
 as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
 as BigInt,
   ));
@@ -7063,10 +7330,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<TimetableSlot> slots,  String semesterId,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<TimetableSlot> slots,  List<TimetableCourse> courses,  String semesterId,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TimetableData() when $default != null:
-return $default(_that.slots,_that.semesterId,_that.updateTime);case _:
+return $default(_that.slots,_that.courses,_that.semesterId,_that.updateTime);case _:
   return orElse();
 
 }
@@ -7084,10 +7351,10 @@ return $default(_that.slots,_that.semesterId,_that.updateTime);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<TimetableSlot> slots,  String semesterId,  BigInt updateTime)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<TimetableSlot> slots,  List<TimetableCourse> courses,  String semesterId,  BigInt updateTime)  $default,) {final _that = this;
 switch (_that) {
 case _TimetableData():
-return $default(_that.slots,_that.semesterId,_that.updateTime);}
+return $default(_that.slots,_that.courses,_that.semesterId,_that.updateTime);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -7101,10 +7368,10 @@ return $default(_that.slots,_that.semesterId,_that.updateTime);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<TimetableSlot> slots,  String semesterId,  BigInt updateTime)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<TimetableSlot> slots,  List<TimetableCourse> courses,  String semesterId,  BigInt updateTime)?  $default,) {final _that = this;
 switch (_that) {
 case _TimetableData() when $default != null:
-return $default(_that.slots,_that.semesterId,_that.updateTime);case _:
+return $default(_that.slots,_that.courses,_that.semesterId,_that.updateTime);case _:
   return null;
 
 }
@@ -7116,7 +7383,7 @@ return $default(_that.slots,_that.semesterId,_that.updateTime);case _:
 @JsonSerializable()
 
 class _TimetableData implements TimetableData {
-  const _TimetableData({required final  List<TimetableSlot> slots, required this.semesterId, required this.updateTime}): _slots = slots;
+  const _TimetableData({required final  List<TimetableSlot> slots, required final  List<TimetableCourse> courses, required this.semesterId, required this.updateTime}): _slots = slots,_courses = courses;
   factory _TimetableData.fromJson(Map<String, dynamic> json) => _$TimetableDataFromJson(json);
 
  final  List<TimetableSlot> _slots;
@@ -7124,6 +7391,13 @@ class _TimetableData implements TimetableData {
   if (_slots is EqualUnmodifiableListView) return _slots;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_slots);
+}
+
+ final  List<TimetableCourse> _courses;
+@override List<TimetableCourse> get courses {
+  if (_courses is EqualUnmodifiableListView) return _courses;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_courses);
 }
 
 @override final  String semesterId;
@@ -7142,16 +7416,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableData&&const DeepCollectionEquality().equals(other._slots, _slots)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableData&&const DeepCollectionEquality().equals(other._slots, _slots)&&const DeepCollectionEquality().equals(other._courses, _courses)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_slots),semesterId,updateTime);
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_slots),const DeepCollectionEquality().hash(_courses),semesterId,updateTime);
 
 @override
 String toString() {
-  return 'TimetableData(slots: $slots, semesterId: $semesterId, updateTime: $updateTime)';
+  return 'TimetableData(slots: $slots, courses: $courses, semesterId: $semesterId, updateTime: $updateTime)';
 }
 
 
@@ -7162,7 +7436,7 @@ abstract mixin class _$TimetableDataCopyWith<$Res> implements $TimetableDataCopy
   factory _$TimetableDataCopyWith(_TimetableData value, $Res Function(_TimetableData) _then) = __$TimetableDataCopyWithImpl;
 @override @useResult
 $Res call({
- List<TimetableSlot> slots, String semesterId, BigInt updateTime
+ List<TimetableSlot> slots, List<TimetableCourse> courses, String semesterId, BigInt updateTime
 });
 
 
@@ -7179,10 +7453,11 @@ class __$TimetableDataCopyWithImpl<$Res>
 
 /// Create a copy of TimetableData
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? slots = null,Object? semesterId = null,Object? updateTime = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? slots = null,Object? courses = null,Object? semesterId = null,Object? updateTime = null,}) {
   return _then(_TimetableData(
 slots: null == slots ? _self._slots : slots // ignore: cast_nullable_to_non_nullable
-as List<TimetableSlot>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
+as List<TimetableSlot>,courses: null == courses ? _self._courses : courses // ignore: cast_nullable_to_non_nullable
+as List<TimetableCourse>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
 as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
 as BigInt,
   ));
@@ -7195,7 +7470,7 @@ as BigInt,
 /// @nodoc
 mixin _$TimetableSlot {
 
- String get serial; String get day; String get slot; String get courseCode; String get courseType; String get roomNo; String get block; String get startTime; String get endTime; String get name; bool get isLab; String get faculty;
+ String get serial; String get day; String get slot; String get courseCode; String get courseType; String get roomNo; String get block; String get startTime; String get endTime; String get name; bool get isLab; String get faculty; String get credits;
 /// Create a copy of TimetableSlot
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -7208,16 +7483,16 @@ $TimetableSlotCopyWith<TimetableSlot> get copyWith => _$TimetableSlotCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab)&&(identical(other.faculty, faculty) || other.faculty == faculty));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.credits, credits) || other.credits == credits));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab,faculty);
+int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab,faculty,credits);
 
 @override
 String toString() {
-  return 'TimetableSlot(serial: $serial, day: $day, slot: $slot, courseCode: $courseCode, courseType: $courseType, roomNo: $roomNo, block: $block, startTime: $startTime, endTime: $endTime, name: $name, isLab: $isLab, faculty: $faculty)';
+  return 'TimetableSlot(serial: $serial, day: $day, slot: $slot, courseCode: $courseCode, courseType: $courseType, roomNo: $roomNo, block: $block, startTime: $startTime, endTime: $endTime, name: $name, isLab: $isLab, faculty: $faculty, credits: $credits)';
 }
 
 
@@ -7228,7 +7503,7 @@ abstract mixin class $TimetableSlotCopyWith<$Res>  {
   factory $TimetableSlotCopyWith(TimetableSlot value, $Res Function(TimetableSlot) _then) = _$TimetableSlotCopyWithImpl;
 @useResult
 $Res call({
- String serial, String day, String slot, String courseCode, String courseType, String roomNo, String block, String startTime, String endTime, String name, bool isLab, String faculty
+ String serial, String day, String slot, String courseCode, String courseType, String roomNo, String block, String startTime, String endTime, String name, bool isLab, String faculty, String credits
 });
 
 
@@ -7245,7 +7520,7 @@ class _$TimetableSlotCopyWithImpl<$Res>
 
 /// Create a copy of TimetableSlot
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? serial = null,Object? day = null,Object? slot = null,Object? courseCode = null,Object? courseType = null,Object? roomNo = null,Object? block = null,Object? startTime = null,Object? endTime = null,Object? name = null,Object? isLab = null,Object? faculty = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? serial = null,Object? day = null,Object? slot = null,Object? courseCode = null,Object? courseType = null,Object? roomNo = null,Object? block = null,Object? startTime = null,Object? endTime = null,Object? name = null,Object? isLab = null,Object? faculty = null,Object? credits = null,}) {
   return _then(_self.copyWith(
 serial: null == serial ? _self.serial : serial // ignore: cast_nullable_to_non_nullable
 as String,day: null == day ? _self.day : day // ignore: cast_nullable_to_non_nullable
@@ -7259,6 +7534,7 @@ as String,endTime: null == endTime ? _self.endTime : endTime // ignore: cast_nul
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,isLab: null == isLab ? _self.isLab : isLab // ignore: cast_nullable_to_non_nullable
 as bool,faculty: null == faculty ? _self.faculty : faculty // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }
@@ -7341,10 +7617,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty,  String credits)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TimetableSlot() when $default != null:
-return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty);case _:
+return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty,_that.credits);case _:
   return orElse();
 
 }
@@ -7362,10 +7638,10 @@ return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseT
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty,  String credits)  $default,) {final _that = this;
 switch (_that) {
 case _TimetableSlot():
-return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty);}
+return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty,_that.credits);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -7379,10 +7655,10 @@ return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseT
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String serial,  String day,  String slot,  String courseCode,  String courseType,  String roomNo,  String block,  String startTime,  String endTime,  String name,  bool isLab,  String faculty,  String credits)?  $default,) {final _that = this;
 switch (_that) {
 case _TimetableSlot() when $default != null:
-return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty);case _:
+return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseType,_that.roomNo,_that.block,_that.startTime,_that.endTime,_that.name,_that.isLab,_that.faculty,_that.credits);case _:
   return null;
 
 }
@@ -7394,7 +7670,7 @@ return $default(_that.serial,_that.day,_that.slot,_that.courseCode,_that.courseT
 @JsonSerializable()
 
 class _TimetableSlot implements TimetableSlot {
-  const _TimetableSlot({required this.serial, required this.day, required this.slot, required this.courseCode, required this.courseType, required this.roomNo, required this.block, required this.startTime, required this.endTime, required this.name, required this.isLab, required this.faculty});
+  const _TimetableSlot({required this.serial, required this.day, required this.slot, required this.courseCode, required this.courseType, required this.roomNo, required this.block, required this.startTime, required this.endTime, required this.name, required this.isLab, required this.faculty, required this.credits});
   factory _TimetableSlot.fromJson(Map<String, dynamic> json) => _$TimetableSlotFromJson(json);
 
 @override final  String serial;
@@ -7409,6 +7685,7 @@ class _TimetableSlot implements TimetableSlot {
 @override final  String name;
 @override final  bool isLab;
 @override final  String faculty;
+@override final  String credits;
 
 /// Create a copy of TimetableSlot
 /// with the given fields replaced by the non-null parameter values.
@@ -7423,16 +7700,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab)&&(identical(other.faculty, faculty) || other.faculty == faculty));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TimetableSlot&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.day, day) || other.day == day)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.roomNo, roomNo) || other.roomNo == roomNo)&&(identical(other.block, block) || other.block == block)&&(identical(other.startTime, startTime) || other.startTime == startTime)&&(identical(other.endTime, endTime) || other.endTime == endTime)&&(identical(other.name, name) || other.name == name)&&(identical(other.isLab, isLab) || other.isLab == isLab)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.credits, credits) || other.credits == credits));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab,faculty);
+int get hashCode => Object.hash(runtimeType,serial,day,slot,courseCode,courseType,roomNo,block,startTime,endTime,name,isLab,faculty,credits);
 
 @override
 String toString() {
-  return 'TimetableSlot(serial: $serial, day: $day, slot: $slot, courseCode: $courseCode, courseType: $courseType, roomNo: $roomNo, block: $block, startTime: $startTime, endTime: $endTime, name: $name, isLab: $isLab, faculty: $faculty)';
+  return 'TimetableSlot(serial: $serial, day: $day, slot: $slot, courseCode: $courseCode, courseType: $courseType, roomNo: $roomNo, block: $block, startTime: $startTime, endTime: $endTime, name: $name, isLab: $isLab, faculty: $faculty, credits: $credits)';
 }
 
 
@@ -7443,7 +7720,7 @@ abstract mixin class _$TimetableSlotCopyWith<$Res> implements $TimetableSlotCopy
   factory _$TimetableSlotCopyWith(_TimetableSlot value, $Res Function(_TimetableSlot) _then) = __$TimetableSlotCopyWithImpl;
 @override @useResult
 $Res call({
- String serial, String day, String slot, String courseCode, String courseType, String roomNo, String block, String startTime, String endTime, String name, bool isLab, String faculty
+ String serial, String day, String slot, String courseCode, String courseType, String roomNo, String block, String startTime, String endTime, String name, bool isLab, String faculty, String credits
 });
 
 
@@ -7460,7 +7737,7 @@ class __$TimetableSlotCopyWithImpl<$Res>
 
 /// Create a copy of TimetableSlot
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? serial = null,Object? day = null,Object? slot = null,Object? courseCode = null,Object? courseType = null,Object? roomNo = null,Object? block = null,Object? startTime = null,Object? endTime = null,Object? name = null,Object? isLab = null,Object? faculty = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? serial = null,Object? day = null,Object? slot = null,Object? courseCode = null,Object? courseType = null,Object? roomNo = null,Object? block = null,Object? startTime = null,Object? endTime = null,Object? name = null,Object? isLab = null,Object? faculty = null,Object? credits = null,}) {
   return _then(_TimetableSlot(
 serial: null == serial ? _self.serial : serial // ignore: cast_nullable_to_non_nullable
 as String,day: null == day ? _self.day : day // ignore: cast_nullable_to_non_nullable
@@ -7474,6 +7751,7 @@ as String,endTime: null == endTime ? _self.endTime : endTime // ignore: cast_nul
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,isLab: null == isLab ? _self.isLab : isLab // ignore: cast_nullable_to_non_nullable
 as bool,faculty: null == faculty ? _self.faculty : faculty // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

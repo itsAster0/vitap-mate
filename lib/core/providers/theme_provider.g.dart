@@ -101,4 +101,4 @@ final class FThemeProvider
   }
 }
 
-String _$fThemeHash() => r'ef36abc8d4f6ec90a323eaed0801dd04926b7824';
+String _$fThemeHash() => r'32f13a7dc0cc48ba99c4c10b3d5a351407a12560';

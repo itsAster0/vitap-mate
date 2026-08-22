@@ -23,6 +23,11 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_class_pause_until_millis",
         "settings_exam_notifications_enabled",
         "settings_exam_notify_before_minutes",
+        "settings_change_alerts_enabled",
+        "settings_change_alerts_attendance",
+        "settings_change_alerts_marks",
+        "settings_change_alerts_timetable",
+        "settings_change_alerts_exam_schedule",
         vtopSessionReuseTtlSettingKey,
         "settings_student_projects_pinned_ids",
         "settings_student_projects_json",
@@ -343,5 +348,80 @@ class ExamReminderSettingsController {
     await prefs.setInt("settings_exam_notify_before_minutes", value);
     await legacyPrefs.setInt("settings_exam_notify_before_minutes", value);
     ref.invalidate(examReminderSettingsProvider);
+  }
+}
+
+enum ChangeAlertTypeSetting { attendance, marks, timetable, examSchedule }
+
+extension ChangeAlertTypeSettingKey on ChangeAlertTypeSetting {
+  String get prefKey => switch (this) {
+    ChangeAlertTypeSetting.attendance =>
+      "settings_change_alerts_attendance",
+    ChangeAlertTypeSetting.marks => "settings_change_alerts_marks",
+    ChangeAlertTypeSetting.timetable => "settings_change_alerts_timetable",
+    ChangeAlertTypeSetting.examSchedule =>
+      "settings_change_alerts_exam_schedule",
+  };
+}
+
+class ChangeAlertsSettings {
+  final bool enabled;
+  final bool attendance;
+  final bool marks;
+  final bool timetable;
+  final bool examSchedule;
+
+  const ChangeAlertsSettings({
+    required this.enabled,
+    required this.attendance,
+    required this.marks,
+    required this.timetable,
+    required this.examSchedule,
+  });
+
+  bool isEnabled(ChangeAlertTypeSetting type) => switch (type) {
+    ChangeAlertTypeSetting.attendance => attendance,
+    ChangeAlertTypeSetting.marks => marks,
+    ChangeAlertTypeSetting.timetable => timetable,
+    ChangeAlertTypeSetting.examSchedule => examSchedule,
+  };
+}
+
+@riverpod
+ChangeAlertsSettings changeAlertsSettings(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return ChangeAlertsSettings(
+    enabled: prefs?.getBool("settings_change_alerts_enabled") ?? true,
+    attendance: prefs?.getBool("settings_change_alerts_attendance") ?? true,
+    marks: prefs?.getBool("settings_change_alerts_marks") ?? true,
+    timetable: prefs?.getBool("settings_change_alerts_timetable") ?? true,
+    examSchedule:
+        prefs?.getBool("settings_change_alerts_exam_schedule") ?? true,
+  );
+}
+
+@Riverpod(keepAlive: true)
+ChangeAlertsSettingsController changeAlertsSettingsController(Ref ref) {
+  return ChangeAlertsSettingsController(ref);
+}
+
+class ChangeAlertsSettingsController {
+  final Ref ref;
+  ChangeAlertsSettingsController(this.ref);
+
+  Future<void> _write(String key, bool value) async {
+    final prefs = await ref.read(settingsProvider.future);
+    final legacyPrefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+    await legacyPrefs.setBool(key, value);
+    ref.invalidate(changeAlertsSettingsProvider);
+  }
+
+  Future<void> setEnabled(bool value) async {
+    await _write("settings_change_alerts_enabled", value);
+  }
+
+  Future<void> setTypeEnabled(ChangeAlertTypeSetting type, bool value) async {
+    await _write(type.prefKey, value);
   }
 }

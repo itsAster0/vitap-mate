@@ -328,6 +328,7 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
           name: "-",
           isLab: false,
           faculty: '',
+          credits: '',
         ),
       );
     }

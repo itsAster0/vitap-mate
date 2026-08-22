@@ -525,10 +525,29 @@ _SemesterInfo _$SemesterInfoFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$SemesterInfoToJson(_SemesterInfo instance) =>
     <String, dynamic>{'id': instance.id, 'name': instance.name};
 
+_TimetableCourse _$TimetableCourseFromJson(Map<String, dynamic> json) =>
+    _TimetableCourse(
+      courseCode: json['courseCode'] as String,
+      name: json['name'] as String,
+      courseType: json['courseType'] as String,
+      credits: json['credits'] as String,
+    );
+
+Map<String, dynamic> _$TimetableCourseToJson(_TimetableCourse instance) =>
+    <String, dynamic>{
+      'courseCode': instance.courseCode,
+      'name': instance.name,
+      'courseType': instance.courseType,
+      'credits': instance.credits,
+    };
+
 _TimetableData _$TimetableDataFromJson(Map<String, dynamic> json) =>
     _TimetableData(
       slots: (json['slots'] as List<dynamic>)
           .map((e) => TimetableSlot.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      courses: (json['courses'] as List<dynamic>)
+          .map((e) => TimetableCourse.fromJson(e as Map<String, dynamic>))
           .toList(),
       semesterId: json['semesterId'] as String,
       updateTime: BigInt.parse(json['updateTime'] as String),
@@ -537,6 +556,7 @@ _TimetableData _$TimetableDataFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$TimetableDataToJson(_TimetableData instance) =>
     <String, dynamic>{
       'slots': instance.slots,
+      'courses': instance.courses,
       'semesterId': instance.semesterId,
       'updateTime': instance.updateTime.toString(),
     };
@@ -555,6 +575,7 @@ _TimetableSlot _$TimetableSlotFromJson(Map<String, dynamic> json) =>
       name: json['name'] as String,
       isLab: json['isLab'] as bool,
       faculty: json['faculty'] as String,
+      credits: json['credits'] as String,
     );
 
 Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
@@ -571,4 +592,5 @@ Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
       'name': instance.name,
       'isLab': instance.isLab,
       'faculty': instance.faculty,
+      'credits': instance.credits,
     };

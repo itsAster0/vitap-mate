@@ -167,27 +167,9 @@ GoRouter router(Ref ref) {
                     path: 'gpa_calculator',
                     name: Paths.gpaCalculator,
                     pageBuilder: (context, state) {
-                      return CustomTransitionPage<void>(
+                      return NoTransitionPage<void>(
                         key: state.pageKey,
                         child: const GpaCalculatorPage(),
-                        transitionsBuilder:
-                            (context, animation, secondary, child) {
-                          final curved = CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutCubic,
-                          );
-                          return FadeTransition(
-                            opacity: curved,
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0, 0.02),
-                                end: Offset.zero,
-                              ).animate(curved),
-                              child: child,
-                            ),
-                          );
-                        },
-                        transitionDuration: const Duration(milliseconds: 220),
                       );
                     },
                   ),
@@ -214,21 +196,21 @@ GoRouter router(Ref ref) {
                         ),
                         transitionsBuilder:
                             (context, animation, secondary, child) {
-                          final curved = CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutCubic,
-                          );
-                          return FadeTransition(
-                            opacity: curved,
-                            child: ScaleTransition(
-                              scale: Tween<double>(
-                                begin: 0.97,
-                                end: 1,
-                              ).animate(curved),
-                              child: child,
-                            ),
-                          );
-                        },
+                              final curved = CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                              );
+                              return FadeTransition(
+                                opacity: curved,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: 0.97,
+                                    end: 1,
+                                  ).animate(curved),
+                                  child: child,
+                                ),
+                              );
+                            },
                         transitionDuration: const Duration(milliseconds: 220),
                       );
                     },
