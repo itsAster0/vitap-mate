@@ -19,6 +19,8 @@ import 'package:vitapmate/features/more/presentation/pages/biometric_history_pag
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/logs_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
@@ -227,6 +229,22 @@ GoRouter router(Ref ref) {
                 name: Paths.settings,
                 builder: (context, state) => SettingsPage(),
                 routes: [
+                  GoRoute(
+                    path: 'gmail-otp-setup',
+                    name: Paths.gmailOtpSetup,
+                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                      key: state.pageKey,
+                      child: const GmailOtpSetupPage(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'gmail-oauth-guide',
+                    name: Paths.gmailOauthGuide,
+                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                      key: state.pageKey,
+                      child: const GmailOAuthGuidePage(),
+                    ),
+                  ),
                   GoRoute(
                     path: 'notification-management',
                     name: Paths.notificationManagement,

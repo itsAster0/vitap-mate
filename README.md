@@ -38,91 +38,101 @@ Your data is **your** data.
 
 ## Build Setup
 
-Before compiling, replace the project-specific secrets and OAuth values with
-your own.
+No environment file is required. The app compiles and runs with every optional integration disabled or using its local default behavior.
 
-### Google OAuth
+### 1. Install Flutter
 
-In Google Cloud Console:
+Follow the official [Flutter installation guide](https://docs.flutter.dev/get-started/install) for your operating system. Install the Android SDK/Android Studio as described there if you plan to build for Android.
 
-1. Enable the `Gmail API` for your project. This app reads OTP emails through
-   Gmail readonly access.
-2. Configure the OAuth consent screen.
-3. Create an `Android` OAuth client with package name `com.vitap_pal.app`.
-4. Add your app signing SHA fingerprints to that Android client.
-5. In the Android OAuth client, enable `Custom URI scheme` even though Google
-   shows a warning saying it is not recommended for Android clients. This app
-   uses that redirect flow.
-6. Use the generated client ID in the Flutter build.
-
-To get your SHA fingerprints, you can use one of these:
-
-Debug keystore:
+After installation, confirm that Flutter and the required platform tools are available:
 
 ```bash
-keytool -list -v \
-  -alias androiddebugkey \
-  -keystore ~/.android/debug.keystore \
-  -storepass android \
-  -keypass android
+flutter doctor
 ```
 
-Release keystore:
+Resolve the issues reported by `flutter doctor`, especially the Flutter, Android toolchain, and connected-device checks, before continuing.
+
+### 2. Install project dependencies
+
+From the repository directory, run:
 
 ```bash
-keytool -list -v -keystore /path/to/your-upload-keystore.jks -alias your-key-alias
+flutter pub get
 ```
 
-Look for `SHA1` in the output and add it to the Android OAuth
-client .
+### 3. Run or build without an environment file
 
-After that, use the generated mobile client ID in the Flutter build:
-
+Run the app on a connected device or emulator:
 
 ```bash
-flutter run --dart-define-from-file=.env.json
+flutter run
 ```
 
-Example `.env.json`:
+Create release builds:
+
+```bash
+flutter build apk --release
+flutter build appbundle --release
+flutter build ios --release
+```
+
+The iOS command requires macOS with Xcode configured.
+
+### Optional configuration
+
+Create a local `.env.json` only when you want one or more optional integrations. The file is ignored by Git. Omit unused fields rather than adding empty values.
+
+| Field | Enables | Behavior when omitted |
+| --- | --- | --- |
+| `GOOGLE_OAUTH_CLIENT_ID` | Shared-key Gmail OAuth fallback | The shared fallback is hidden. Android users can still use the preferred local BYOK flow. |
+| `FCM_COOKIE_CALLBACK_URL` | FCM cookie bridge and Chrome extension setup | The listener is not started and the Chrome Extension section is hidden. |
+
+Example with every optional integration configured:
 
 ```json
 {
-  "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+  "GOOGLE_OAUTH_CLIENT_ID": "your-android-client-id.apps.googleusercontent.com",
   "FCM_COOKIE_CALLBACK_URL": "https://your-public-backend.example.com/cookie/callback"
 }
 ```
 
-Use the Android client ID here, not the web client ID.
-`FCM_COOKIE_CALLBACK_URL` must point to the Fiber backend callback endpoint
-reachable by the mobile device.
-
-
-
-### Native OAuth Redirects
-
-Android and iOS derives from the native redirect scheme automatically from
-`GOOGLE_OAUTH_CLIENT_ID` during the build, so `.env.json` is the only value you
-need to update for OAuth.
-
-
-## How To Compile
-
-Typical local flow:
+Run or build with optional configuration:
 
 ```bash
-flutter pub get
 flutter run --dart-define-from-file=.env.json
-```
-
-Release APK / App Bundle:
-
-```bash
 flutter build apk --release --dart-define-from-file=.env.json
-flutter build appbundle --release --dart-define-from-file=.env.json
 ```
 
-Release iOS build:
+### Optional shared Gmail OAuth fallback
+
+Local BYOK is the preferred Gmail setup and does not require a build-time environment value. To additionally ship the shared fallback:
+
+1. Enable the Gmail API in Google Cloud.
+2. Configure the OAuth consent screen with the `gmail.modify` scope.
+3. Create an Android OAuth client for package `com.vitap_pal.app`.
+4. Add the signing SHA fingerprints and enable the custom URI scheme.
+5. Put its client ID in `GOOGLE_OAUTH_CLIENT_ID`.
+
+The Android and iOS builds derive the native redirect scheme only when this value is present. Without it, they use an inert placeholder scheme and the shared option is not shown.
+
+### Personal Gmail BYOK (Android)
+
+No environment value or hosted backend is needed for personal BYOK. The app contains a **How to get OAuth credentials** guide that links directly to the relevant Google Cloud pages. In summary, the user creates a Google Cloud project, enables Gmail API, configures the OAuth audience as **External** with publishing status **Testing**, adds every connecting `@vitapstudent.ac.in` address as a test user, then creates and imports a **Desktop app** OAuth JSON file.
+
+A trusted friend’s Desktop OAuth JSON can also be imported, but the friend’s project must list the connecting college email as a test user. The project owner controls that OAuth client and can revoke it or inspect aggregate usage, so credentials should only be accepted from someone trusted. OAuth access and refresh tokens must never be shared.
+
+Testing authorizations normally expire after seven days. Google may display an unverified-app warning and a broadly worded Gmail permission screen because the app requests `gmail.modify`; the app uses it to read VTOP OTP messages and optionally move a read OTP message to Trash.
+
+While personal authorization is active, the setup page checks secure storage once per second for up to five minutes and updates as soon as the validated token is saved. The loopback listener stays in the app process; it is intentionally not moved to WorkManager because an Android background worker runs separately from the interactive OAuth request and is not a reliable owner for a temporary localhost callback server.
+
+To inspect an Android signing fingerprint:
 
 ```bash
-flutter build ios --release --dart-define-from-file=.env.json
+keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android -keypass android
 ```
+
+For a release keystore, replace the keystore path and alias with your release signing values.
+
+### Optional FCM extension bridge
+
+Set `FCM_COOKIE_CALLBACK_URL` only if you operate the cookie callback service used by the Chrome extension. When absent, the app skips the FCM cookie listener, token-copy feature, and extension UI entirely.

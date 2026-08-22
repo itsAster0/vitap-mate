@@ -9,7 +9,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
@@ -251,202 +250,6 @@ class SettingsPage extends HookConsumerWidget {
     );
   }
 
-  Future<void> _openEmailOtpSetupDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    try {
-      await ref.read(vClientProvider.notifier).ensureLogin();
-      final client = await ref.read(vClientProvider.future);
-      final expectedUsername = client.username.trim();
-      if (expectedUsername.isEmpty) {
-        if (context.mounted) {
-          dispToast(
-            context,
-            "Setup Failed",
-            "Could not resolve VTOP username from current client.",
-          );
-        }
-        return;
-      }
-      final oauth = ref.read(googleEmailOtpAuthServiceProvider);
-      if (!context.mounted) return;
-
-      await showAdaptiveDialog(
-        context: context,
-        builder: (dialogContext) {
-          return HookBuilder(
-            builder: (dialogContext) {
-              final verifiedEmail = useState<String?>(null);
-              final stepOneMessage = useState('Step 1 pending');
-              final stepTwoMessage = useState('Step 2 pending');
-              final stepOneBusy = useState(false);
-              final stepTwoBusy = useState(false);
-
-              return AppDialog(
-                title: const Text('Email OTP Setup'),
-                body: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Complete both steps to enable OTP autofetch from Gmail.',
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '1) Verify email',
-                      style: dialogContext.theme.typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      stepOneMessage.value,
-                      style: dialogContext.theme.typography.body.sm,
-                    ),
-                    const SizedBox(height: 8),
-                    FButton(
-                      onPress: stepOneBusy.value || verifiedEmail.value != null
-                          ? null
-                          : () async {
-                              stepOneBusy.value = true;
-                              final result = await oauth.setupIdentityStep(
-                                expectedUsername: expectedUsername,
-                              );
-                              stepOneMessage.value = result.message;
-                              verifiedEmail.value = result.success
-                                  ? result.email
-                                  : null;
-                              stepOneBusy.value = false;
-                            },
-                      child: stepOneBusy.value
-                          ? const FCircularProgress.pinwheel()
-                          : Text(
-                              verifiedEmail.value == null
-                                  ? 'Run Step 1'
-                                  : 'Step 1 Done',
-                            ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      '2) Get tokens for email read',
-                      style: dialogContext.theme.typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      stepTwoMessage.value,
-                      style: dialogContext.theme.typography.body.sm,
-                    ),
-                    if (verifiedEmail.value != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Verified email: ${verifiedEmail.value}',
-                        style: dialogContext.theme.typography.body.xs.copyWith(
-                          color: dialogContext.theme.colors.mutedForeground,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    FButton(
-                      onPress: stepTwoBusy.value || verifiedEmail.value == null
-                          ? null
-                          : () async {
-                              stepTwoBusy.value = true;
-                              final result = await oauth.setupGmailTokenStep(
-                                email: verifiedEmail.value!,
-                              );
-                              stepTwoMessage.value = result.message;
-                              stepTwoBusy.value = false;
-                              if (result.success && dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
-                            },
-                      child: stepTwoBusy.value
-                          ? const FCircularProgress.pinwheel()
-                          : const Text('Run Step 2'),
-                    ),
-                  ],
-                ),
-                actions: [
-                  FButton(
-                    variant: FButtonVariant.outline,
-                    onPress: () => Navigator.of(dialogContext).pop(),
-                    child: const Text('Close'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-      ref.invalidate(emailOtpReadyProvider);
-    } catch (error, stackTrace) {
-      log(
-        'Failed to open Email OTP setup dialog',
-        name: 'settings.email_otp',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(
-          context,
-          "Setup Failed",
-          "Could not start setup. Please try again.",
-        );
-      }
-    }
-  }
-
-  Future<void> _disconnectEmailOtpAutofetch(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final confirm = await showAdaptiveDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AppDialog(
-        title: const Text('Disconnect Email OTP?'),
-        body: const Text(
-          'This removes the saved Gmail token. You can connect it again later.',
-        ),
-        actions: [
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FButton(
-            variant: FButtonVariant.destructive,
-            onPress: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Disconnect'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-
-    try {
-      await ref.read(googleEmailOtpAuthServiceProvider).clearSession();
-      ref.invalidate(emailOtpReadyProvider);
-      if (context.mounted) {
-        dispToast(
-          context,
-          "Disconnected",
-          "Email OTP autofetch has been reset.",
-        );
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to clear Email OTP session',
-        name: 'settings.email_otp',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(context, "Failed", "Could not clear Email OTP autofetch.");
-      }
-    }
-  }
-
   Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
     try {
       final latest = await ref
@@ -566,7 +369,8 @@ class SettingsPage extends HookConsumerWidget {
     final appVersion = packageInfo == null
         ? null
         : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
-    final showLowMaintenanceNotice = _appTrack == 'production';
+    // final showLowMaintenanceNotice = _appTrack == 'production';
+    final showLowMaintenanceNotice = false;
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -697,14 +501,8 @@ class SettingsPage extends HookConsumerWidget {
                   onPress: isEmailOtpBusy.value
                       ? null
                       : () async {
-                          isEmailOtpBusy.value = true;
-                          if (isEmailOtpReady.value == true) {
-                            await _disconnectEmailOtpAutofetch(context, ref);
-                          } else {
-                            await _openEmailOtpSetupDialog(context, ref);
-                          }
+                          await context.pushNamed(Paths.gmailOtpSetup);
                           await refreshEmailOtpReady();
-                          isEmailOtpBusy.value = false;
                         },
                 ),
                 if (isEmailOtpReady.value == true)

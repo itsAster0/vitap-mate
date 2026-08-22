@@ -139,17 +139,12 @@ class FeatureFlagsController extends _$FeatureFlagsController {
     const prodApiKey = String.fromEnvironment('FLAGSMITH_ENV_API_KEY_PROD');
     const envBaseUri = String.fromEnvironment('FLAGSMITH_BASE_URI');
     final apiKey = kDebugMode ? devApiKey : prodApiKey;
-    if (envBaseUri.isEmpty) {
+    if (envBaseUri.isEmpty || apiKey.isEmpty) {
       AppLogger.instance.info(
         'client.feature_flags',
-        'FLAGSMITH_BASE_URI is empty, enabling all feature flags by default.',
+        'Flagsmith configuration is absent or incomplete; enabling all feature flags by default.',
       );
       return const FeatureFlagPodController(null, enableAllFlags: true);
-    }
-    if (apiKey.isEmpty) {
-      throw StateError(
-        'Missing Flagsmith API key. Provide FLAGSMITH_ENV_API_KEY_DEV/PROD via --dart-define or --dart-define-from-file.',
-      );
     }
     final config = FlagsmithConfig(
       baseURI: envBaseUri,

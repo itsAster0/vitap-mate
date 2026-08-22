@@ -192,6 +192,12 @@ Widget _buildHeader(
       case "gpa_calculator":
         data = "GPA / CGPA Calculator";
         break;
+      case "gmail-otp-setup":
+        data = "Gmail OTP Setup";
+        break;
+      case "gmail-oauth-guide":
+        data = "Google OAuth Guide";
+        break;
     }
 
     return FHeader.nested(

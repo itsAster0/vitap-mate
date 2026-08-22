@@ -29,19 +29,20 @@ fun dartDefine(name: String): String? {
 }
 
 val googleOauthClientId =
-    dartDefine("GOOGLE_OAUTH_CLIENT_ID")
-        ?: throw GradleException(
-            "Missing GOOGLE_OAUTH_CLIENT_ID. Pass it with --dart-define or --dart-define-from-file.",
-        )
+    dartDefine("GOOGLE_OAUTH_CLIENT_ID")?.trim().orEmpty()
 
-if (!googleOauthClientId.endsWith(".apps.googleusercontent.com")) {
+if (googleOauthClientId.isNotEmpty() && !googleOauthClientId.endsWith(".apps.googleusercontent.com")) {
     throw GradleException(
-        "GOOGLE_OAUTH_CLIENT_ID must end with .apps.googleusercontent.com.",
+        "When provided, GOOGLE_OAUTH_CLIENT_ID must end with .apps.googleusercontent.com.",
     )
 }
 
 val googleOauthRedirectScheme =
-    "com.googleusercontent.apps.${googleOauthClientId.removeSuffix(".apps.googleusercontent.com")}"
+    if (googleOauthClientId.isEmpty()) {
+        "com.vitapmate.oauth.disabled"
+    } else {
+        "com.googleusercontent.apps.${googleOauthClientId.removeSuffix(".apps.googleusercontent.com")}"
+    }
 
 plugins {
     id("com.android.application")

@@ -6,6 +6,8 @@ class Paths {
   static final onbaording = "onbaording";
   static final vtopUserManagement = "vtopUsermanagement";
   static final settings = "settings";
+  static final gmailOtpSetup = "gmailOtpSetup";
+  static final gmailOauthGuide = "gmailOauthGuide";
   static final studentProjects = "studentProjects";
   static final marks = "marks";
   static final grades = "grades";

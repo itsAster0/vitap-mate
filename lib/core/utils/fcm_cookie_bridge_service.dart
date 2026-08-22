@@ -19,6 +19,8 @@ const _cookieRequestType = 'vtop_cookie_request';
 const _vtopDomain = 'vtop.vitap.ac.in';
 const _envCookieCallbackUrl = String.fromEnvironment('FCM_COOKIE_CALLBACK_URL');
 
+bool get fcmCookieBridgeEnabled => _envCookieCallbackUrl.trim().isNotEmpty;
+
 bool _foregroundListenerStarted = false;
 
 Future<bool> ensureFirebaseReady() async {
@@ -54,6 +56,7 @@ Future<bool> ensureFirebaseReady() async {
 }
 
 Future<String?> getFcmTokenForCopy() async {
+  if (!fcmCookieBridgeEnabled) return null;
   if (!await ensureFirebaseReady()) return null;
   final messaging = FirebaseMessaging.instance;
   await messaging.requestPermission();
@@ -61,6 +64,7 @@ Future<String?> getFcmTokenForCopy() async {
 }
 
 Future<String?> resetFcmTokenForCopy() async {
+  if (!fcmCookieBridgeEnabled) return null;
   if (!await ensureFirebaseReady()) return null;
   final messaging = FirebaseMessaging.instance;
   await messaging.requestPermission();
@@ -69,6 +73,7 @@ Future<String?> resetFcmTokenForCopy() async {
 }
 
 void startVtopCookieBridgeListener() {
+  if (!fcmCookieBridgeEnabled) return;
   if (_foregroundListenerStarted) return;
   _foregroundListenerStarted = true;
   unawaited(_startVtopCookieBridgeListener());
@@ -88,6 +93,7 @@ Future<void> _startVtopCookieBridgeListener() async {
 
 @pragma('vm:entry-point')
 Future<void> vtopCookieBridgeBackgroundHandler(RemoteMessage message) async {
+  if (!fcmCookieBridgeEnabled) return;
   WidgetsFlutterBinding.ensureInitialized();
   if (!await ensureFirebaseReady()) return;
   await RustLib.init();

@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 
 class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
@@ -110,7 +111,7 @@ class MorePage extends HookConsumerWidget {
               ),
             ],
           ),
-          if (Platform.isAndroid)
+          if (Platform.isAndroid && fcmCookieBridgeEnabled)
             FTileGroup(
               label: const Text("Browser Extension"),
               children: [
