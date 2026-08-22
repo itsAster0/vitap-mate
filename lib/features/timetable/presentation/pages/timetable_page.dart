@@ -13,6 +13,7 @@ import 'package:vitapmate/features/timetable/presentation/providers/timetable_pr
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
+import 'package:vitapmate/features/timetable/presentation/widgets/agenda_timetable_view.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_colors.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/weekly_timetable_view.dart';
@@ -32,7 +33,6 @@ class TimetablePage extends HookConsumerWidget {
     final viewMode = ref.watch(timetableViewModeProvider);
     final autoRefresh = ref.watch(autoRefreshProvider);
     final startX = useState<double?>(null);
-    final initialSummaryPositioned = useRef(false);
     useEffect(() {
       if (!autoRefresh) return null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -49,26 +49,12 @@ class TimetablePage extends HookConsumerWidget {
     final mergeLabs = ref.watch(mergeTTProvider);
 
     useEffect(() {
-      if (!timetableData.hasValue || initialSummaryPositioned.value) {
-        return null;
-      }
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!scrollController.hasClients || initialSummaryPositioned.value) {
-          return;
-        }
-        initialSummaryPositioned.value = true;
-        scrollController.jumpTo(72);
-      });
-      return null;
-    }, [timetableData.hasValue]);
-
-    useEffect(() {
       if (!timetableData.hasValue) return null;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!scrollController.hasClients) return;
-        final targetOffset = viewMode == TimetableViewMode.weekly ? 0.0 : 72.0;
+        final activeMode = ref.read(timetableViewModeProvider);
+        final targetOffset = activeMode == TimetableViewMode.daily ? 72.0 : 0.0;
         scrollController.jumpTo(
           targetOffset
               .clamp(0.0, scrollController.position.maxScrollExtent)
@@ -76,7 +62,7 @@ class TimetablePage extends HookConsumerWidget {
         );
       });
       return null;
-    }, [viewMode]);
+    }, [viewMode, timetableData.hasValue]);
 
     Future<void> update() async {
       try {
@@ -102,12 +88,12 @@ class TimetablePage extends HookConsumerWidget {
               controller: scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               child: GestureDetector(
-                onHorizontalDragStart: viewMode == TimetableViewMode.daily
+                onHorizontalDragStart: viewMode != TimetableViewMode.weekly
                     ? (details) {
                         startX.value = details.globalPosition.dx;
                       }
                     : null,
-                onHorizontalDragUpdate: viewMode == TimetableViewMode.daily
+                onHorizontalDragUpdate: viewMode != TimetableViewMode.weekly
                     ? (details) {
                         if (finalDay.value.isEmpty) return;
                         final currentX = details.globalPosition.dx;
@@ -124,7 +110,7 @@ class TimetablePage extends HookConsumerWidget {
                         }
                       }
                     : null,
-                onHorizontalDragEnd: viewMode == TimetableViewMode.daily
+                onHorizontalDragEnd: viewMode != TimetableViewMode.weekly
                     ? (_) => startX.value = null
                     : null,
                 child: ConstrainedBox(
@@ -136,8 +122,11 @@ class TimetablePage extends HookConsumerWidget {
                       final tempList = getDayList(data);
                       finalDay.value = tempList;
 
-                      if (!tempList.contains(selectedDay.value)) {
-                        selectedDay.value = tempList.first;
+                      if (viewMode == TimetableViewMode.daily &&
+                          !tempList.contains(selectedDay.value)) {
+                        selectedDay.value = tempList.isEmpty
+                            ? DateTime.now().weekday
+                            : tempList.first;
                       }
                       List<TimetableSlot> slotsForDay(int day) {
                         var slots = getDaySlotList(data, day);
@@ -159,6 +148,22 @@ class TimetablePage extends HookConsumerWidget {
                             WeeklyTimetableView(
                               days: tempList,
                               slotsForDay: slotsForDay,
+                            ),
+                            DataUpdatedFooter(
+                              updateTime: data.updateTime.toInt(),
+                            ),
+                          ],
+                        );
+                      }
+
+                      if (viewMode == TimetableViewMode.agenda) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            AgendaTimetableView(
+                              selectedDay: selectedDay,
+                              classDays: tempList.toSet(),
+                              slots: slotsForDay(selectedDay.value),
                             ),
                             DataUpdatedFooter(
                               updateTime: data.updateTime.toInt(),

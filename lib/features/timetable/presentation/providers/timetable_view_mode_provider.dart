@@ -1,20 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 
-enum TimetableViewMode { daily, weekly }
+enum TimetableViewMode { daily, agenda, weekly }
 
 class TimetableViewModeController extends Notifier<TimetableViewMode> {
   @override
-  TimetableViewMode build() => TimetableViewMode.daily;
+  TimetableViewMode build() {
+    final savedMode = ref
+        .watch(settingsProvider)
+        .value
+        ?.getString(timetableViewModeSettingKey);
+    return TimetableViewMode.values.firstWhere(
+      (mode) => mode.name == savedMode,
+      orElse: () => TimetableViewMode.daily,
+    );
+  }
 
-  void toggle() {
-    state = state == TimetableViewMode.daily
-        ? TimetableViewMode.weekly
-        : TimetableViewMode.daily;
+  Future<void> showNext() async {
+    final nextMode = switch (state) {
+      TimetableViewMode.daily => TimetableViewMode.agenda,
+      TimetableViewMode.agenda => TimetableViewMode.weekly,
+      TimetableViewMode.weekly => TimetableViewMode.daily,
+    };
+    state = nextMode;
+    final prefs = await ref.read(settingsProvider.future);
+    await prefs.setString(timetableViewModeSettingKey, nextMode.name);
   }
 }
 
 final timetableViewModeProvider =
-    NotifierProvider.autoDispose<
-      TimetableViewModeController,
-      TimetableViewMode
-    >(TimetableViewModeController.new);
+    NotifierProvider<TimetableViewModeController, TimetableViewMode>(
+      TimetableViewModeController.new,
+    );

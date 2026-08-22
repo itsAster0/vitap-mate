@@ -8,6 +8,7 @@ part 'settings.g.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
+const timetableViewModeSettingKey = 'settings_timetable_view_mode';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -32,6 +33,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_student_projects_pinned_ids",
         "settings_student_projects_json",
         "settings_student_projects_rotation_seed",
+        timetableViewModeSettingKey,
       },
     ),
   );
@@ -355,8 +357,7 @@ enum ChangeAlertTypeSetting { attendance, marks, timetable, examSchedule }
 
 extension ChangeAlertTypeSettingKey on ChangeAlertTypeSetting {
   String get prefKey => switch (this) {
-    ChangeAlertTypeSetting.attendance =>
-      "settings_change_alerts_attendance",
+    ChangeAlertTypeSetting.attendance => "settings_change_alerts_attendance",
     ChangeAlertTypeSetting.marks => "settings_change_alerts_marks",
     ChangeAlertTypeSetting.timetable => "settings_change_alerts_timetable",
     ChangeAlertTypeSetting.examSchedule =>

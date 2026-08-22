@@ -9,17 +9,26 @@ class TimetableViewToggleButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final viewMode = ref.watch(timetableViewModeProvider);
-    final isWeekly = viewMode == TimetableViewMode.weekly;
+    final (label, icon) = switch (viewMode) {
+      TimetableViewMode.daily => (
+        'Show agenda timetable',
+        Icons.view_agenda_outlined,
+      ),
+      TimetableViewMode.agenda => (
+        'Show weekly timetable',
+        Icons.view_week_outlined,
+      ),
+      TimetableViewMode.weekly => (
+        'Show classic daily timetable',
+        Icons.view_day_outlined,
+      ),
+    };
 
     return FButton.icon(
-      semanticsLabel: isWeekly
-          ? 'Show daily timetable'
-          : 'Show weekly timetable',
-      selected: isWeekly,
-      onPress: () => ref.read(timetableViewModeProvider.notifier).toggle(),
-      child: Icon(
-        isWeekly ? Icons.view_day_outlined : Icons.view_week_outlined,
-      ),
+      semanticsLabel: label,
+      selected: viewMode == TimetableViewMode.agenda,
+      onPress: () => ref.read(timetableViewModeProvider.notifier).showNext(),
+      child: Icon(icon),
     );
   }
 }
