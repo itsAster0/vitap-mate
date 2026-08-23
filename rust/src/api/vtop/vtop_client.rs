@@ -156,12 +156,14 @@ impl VtopClient {
     #[cfg(not(target_arch = "wasm32"))]
     fn reset_session_state(&mut self) {
         self.session.clear();
+        self.username = self.real_username.clone();
         self.client = Self::make_client(self.session.get_cookie_store());
     }
 
     #[cfg(target_arch = "wasm32")]
     fn reset_session_state(&mut self) {
         self.session.clear();
+        self.username = self.real_username.clone();
     }
 
     fn mark_session_expired(&mut self, context: &str, reason: &str) {
@@ -1398,10 +1400,11 @@ impl VtopClient {
                 session: session,
                 current_page: None,
                 auth_flow_id: 0,
-                username: username,
+                username: username.clone(),
                 password: password,
                 captcha_data: None,
                 in_app_captcha_solver_enabled: false,
+                real_username: username,
             }
         }
     }
