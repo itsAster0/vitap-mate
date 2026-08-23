@@ -596,6 +596,19 @@ class SettingsPage extends HookConsumerWidget {
                   GoRouter.of(context).pushNamed(Paths.notificationManagement);
                 },
               ),
+              FTile(
+                prefix: const Icon(FLucideIcons.scanText),
+                title: const Text('In-app CAPTCHA Solver'),
+                subtitle: const Text(
+                  'Solve VTOP CAPTCHAs locally instead of using the hosted solver',
+                ),
+                suffix: FSwitch(
+                  value: ref.watch(inAppCaptchaSolverProvider),
+                  onChange: (value) {
+                    setInAppCaptchaSolver(ref, value);
+                  },
+                ),
+              ),
             ],
           ),
           if (showDebugFeatures.value)

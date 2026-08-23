@@ -105,6 +105,7 @@ pub struct VtopClient {
     pub username: String,
     password: String,
     captcha_data: Option<String>,
+    in_app_captcha_solver_enabled: bool,
 }
 
 impl VtopClient {
@@ -1200,8 +1201,15 @@ impl VtopClient {
         Ok(())
     }
     async fn solve_captcha(&self, captcha_data: &str) -> VtopResult<String> {
+        if self.in_app_captcha_solver_enabled {
+            return super::captcha_solver::solve_data_url(captcha_data).map_err(|error| {
+                self.auth_log("ERROR", "captcha.local", &error);
+                VtopError::ConfigurationError(error)
+            });
+        }
+
         let url_safe_encoded = URL_SAFE.encode(captcha_data.as_bytes());
-        let captcha_url = format!("https://va.kryxen.dev/cap");
+        let captcha_url = "https://va.kryxen.dev/cap";
 
         #[derive(Serialize)]
         struct PostData {
@@ -1212,9 +1220,9 @@ impl VtopClient {
         let post_data = PostData {
             imgstring: url_safe_encoded,
         };
-        log_network_request("solve_captcha.send", "POST", &captcha_url);
+        log_network_request("solve_captcha.send", "POST", captcha_url);
         let response = client_for_post
-            .post(&captcha_url)
+            .post(captcha_url)
             .json(&post_data)
             .send()
             .await
@@ -1347,6 +1355,10 @@ impl VtopClient {
 }
 // for building
 impl VtopClient {
+    pub(crate) fn set_in_app_captcha_solver_enabled(&mut self, enabled: bool) {
+        self.in_app_captcha_solver_enabled = enabled;
+    }
+
     pub fn with_config(
         config: VtopConfig,
         session: SessionManager,
@@ -1365,6 +1377,7 @@ impl VtopClient {
                 username: username.clone(),
                 password: password,
                 captcha_data: None,
+                in_app_captcha_solver_enabled: false,
                 real_username: username,
             }
         }
@@ -1388,6 +1401,7 @@ impl VtopClient {
                 username: username,
                 password: password,
                 captcha_data: None,
+                in_app_captcha_solver_enabled: false,
             }
         }
     }

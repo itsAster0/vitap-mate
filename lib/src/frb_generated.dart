@@ -356,6 +356,7 @@ abstract class RustLibApi extends BaseApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
+    required bool inAppCaptchaSolverEnabled,
   });
 
   String crateApiSimpleGreet({required String name});
@@ -2572,6 +2573,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
+    required bool inAppCaptchaSolverEnabled,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -2583,6 +2585,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             persistedSession,
             serializer,
           );
+          sse_encode_bool(inAppCaptchaSolverEnabled, serializer);
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 53)!;
         },
         codec: SseCodec(
@@ -2591,7 +2594,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiVtopGetClientGetVtopClientConstMeta,
-        argValues: [username, password, persistedSession],
+        argValues: [
+          username,
+          password,
+          persistedSession,
+          inAppCaptchaSolverEnabled,
+        ],
         apiImpl: this,
       ),
     );
@@ -2600,7 +2608,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientGetVtopClientConstMeta =>
       const TaskConstMeta(
         debugName: "get_vtop_client",
-        argNames: ["username", "password", "persistedSession"],
+        argNames: [
+          "username",
+          "password",
+          "persistedSession",
+          "inAppCaptchaSolverEnabled",
+        ],
       );
 
   @override

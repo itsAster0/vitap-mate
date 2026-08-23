@@ -48,7 +48,49 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'425847f708202eea25e7224efd30cecb5e9d73ba';
+String _$settingsHash() => r'83fe13cd2a050045d92da228d8cadb851d84d969';
+
+@ProviderFor(inAppCaptchaSolver)
+final inAppCaptchaSolverProvider = InAppCaptchaSolverProvider._();
+
+final class InAppCaptchaSolverProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  InAppCaptchaSolverProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inAppCaptchaSolverProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inAppCaptchaSolverHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return inAppCaptchaSolver(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$inAppCaptchaSolverHash() =>
+    r'54cbebd84901af6c0a20feb1231c88233f73ce08';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();

@@ -13,8 +13,10 @@ pub fn get_vtop_client(
     username: String,
     password: String,
     persisted_session: Option<PersistedVtopSession>,
+    in_app_captcha_solver_enabled: bool,
 ) -> VtopClient {
     let mut client = VtopClientBuilder::new().build(username, password);
+    client.set_in_app_captcha_solver_enabled(in_app_captcha_solver_enabled);
     if let Some(session) = persisted_session {
         client.restore_session_snapshot(session);
     }

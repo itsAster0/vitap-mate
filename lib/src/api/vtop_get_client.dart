@@ -14,10 +14,12 @@ VtopClient getVtopClient({
   required String username,
   required String password,
   PersistedVtopSession? persistedSession,
+  required bool inAppCaptchaSolverEnabled,
 }) => RustLib.instance.api.crateApiVtopGetClientGetVtopClient(
   username: username,
   password: password,
   persistedSession: persistedSession,
+  inAppCaptchaSolverEnabled: inAppCaptchaSolverEnabled,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>

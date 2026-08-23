@@ -2984,12 +2984,14 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
                 <Option<crate::api::vtop::types::PersistedVtopSession>>::sse_decode(
                     &mut deserializer,
                 );
+            let api_in_app_captcha_solver_enabled = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             transform_result_sse::<_, ()>((move || {
                 let output_ok = Result::<_, ()>::Ok(crate::api::vtop_get_client::get_vtop_client(
                     api_username,
                     api_password,
                     api_persisted_session,
+                    api_in_app_captcha_solver_enabled,
                 ))?;
                 Ok(output_ok)
             })())

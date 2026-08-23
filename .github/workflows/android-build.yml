@@ -1,0 +1,131 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Configure app environment
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -z "$ENV_JSON" ]; then
+            echo "ENV_JSON secret is not configured."
+            exit 1
+          fi
+
+          printf '%s' "$ENV_JSON" > .env.json
+          jq -e '
+            . as $env |
+            all([
+              "FCM_COOKIE_CALLBACK_URL",
+              "FIREBASE_ANDROID_API_KEY",
+              "FIREBASE_ANDROID_APP_ID",
+              "FIREBASE_MESSAGING_SENDER_ID",
+              "FIREBASE_PROJECT_ID",
+              "FIREBASE_STORAGE_BUCKET"
+            ][]; ($env[.] // "") != "")
+          ' .env.json
+
+      - name: Configure Android signing
+        env:
+          KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEY_STORE }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.UPLOAD_RELEASE }}
+        run: |
+          if [ -z "$KEYSTORE_PROPERTIES_BASE64" ] || \
+             [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "KEY_STORE and UPLOAD_RELEASE secrets are not configured."
+            exit 1
+          fi
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > android/keystore.properties
+
+      - name: Build universal release APK
+        run: |
+          flutter build apk --release \
+            --dart-define-from-file=.env.json
+          mkdir -p build/artifacts
+          cp build/app/outputs/flutter-apk/app-release.apk \
+            build/artifacts/vitapmate-universal.apk
+
+      - name: Build release APKs for each architecture
+        run: |
+          flutter build apk --release --split-per-abi \
+            --dart-define-from-file=.env.json
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/artifacts/vitapmate-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            build/artifacts/vitapmate-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk \
+            build/artifacts/vitapmate-x86_64.apk
+
+      - name: Remove app environment
+        if: always()
+        run: rm -f .env.json
+
+      - name: Upload universal APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-universal-apk
+          path: build/artifacts/vitapmate-universal.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload ARM 64-bit APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-arm64-v8a-apk
+          path: build/artifacts/vitapmate-arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload ARM 32-bit APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-armeabi-v7a-apk
+          path: build/artifacts/vitapmate-armeabi-v7a.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload x86-64 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-x86_64-apk
+          path: build/artifacts/vitapmate-x86_64.apk
+          if-no-files-found: error
+          retention-days: 30

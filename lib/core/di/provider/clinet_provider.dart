@@ -5,6 +5,7 @@ import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
@@ -29,6 +30,7 @@ class VClient extends _$VClient {
       vtopUserProvider.selectAsync((user) => user.password),
     );
     final uname = username!.toUpperCase();
+    final inAppCaptchaSolverEnabled = ref.watch(inAppCaptchaSolverProvider);
     final StoredVtopSession? storedSession = await loadStoredVtopSession(uname);
     PersistedVtopSession? persistedSession;
     if (storedSession != null) {
@@ -55,6 +57,7 @@ class VClient extends _$VClient {
       username: uname,
       password: password!,
       persistedSession: persistedSession,
+      inAppCaptchaSolverEnabled: inAppCaptchaSolverEnabled,
     );
   }
 

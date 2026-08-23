@@ -1,138 +1,167 @@
+<p align="center">
+  <img src="assets/icon/icon.png" width="140" alt="vitapmate app icon">
+</p>
+
 # vitapmate
-**vitapmate** is a companion app designed to simplify and enhance student life at VIT-AP University.
 
-## Archive Notice
+vitapmate is an unofficial Android app for students at VIT-AP University. Use it to check attendance, marks, exam schedules, and VTOP without opening the VTOP website each time.
 
-This app is archived.
+> [!WARNING]
+> This project is archived. The Google Play Store version will not receive more updates. New Android builds may still appear here when the source code changes.
 
-> ⚠️ **Note**
->
-> There will be **no further updates published to the Google Play Store**.
-> I may still add features or fix issues in my free time, but those changes will **not** be pushed to the Play Store.
+## Download
 
-- Source code remains available for reference and community forks
+[Open the latest Android builds](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain)
 
-## ✨ Features
+1. Open the newest build with a green check mark.
+2. Scroll to the **Artifacts** section.
+3. Download `vitapmate-universal-apk`.
+4. Extract the ZIP file and open the APK on your Android device.
+5. Allow installation from your browser or file manager if Android asks.
 
-- View your **attendance**, **marks**, and **exam schedules**  
-- Open **VTOP instantly** inside the app  
-- Say goodbye to **Wi-Fi login limits**  
-- Fast and offline-friendly
-- Clean, responsive UI with **native performance**
+GitHub may require you to sign in before downloading an artifact.
 
-## 🛠️ Tech Stack
+### Which APK should I download?
 
-- 🖼️ **Flutter** – for building a beautiful, cross-platform UI  
-- ⚙️ **Rust** – for fast and secure scraping of student data from VTOP
+Use `vitapmate-universal-apk` unless you know your device architecture. It works on all supported devices.
 
+| APK | Intended device |
+| --- | --- |
+| `vitapmate-universal-apk` | Any supported Android device |
+| `vitapmate-arm64-v8a-apk` | Most modern Android phones |
+| `vitapmate-armeabi-v7a-apk` | Older 32-bit Android phones |
+| `vitapmate-x86_64-apk` | Android emulators and Intel devices |
 
-## 🔐 Privacy First
+## Getting started
 
-We take your privacy seriously:
-- The app is compiled in GitHub Actions and uploaded to the Play Store within the action itself for transparency.
-- **No data leaves your device**  
-- All scraping is done locally — even your login credentials stay on your phone  
-- We do **not** collect or store your user ID or password — not now, not ever  
+1. Install and open vitapmate.
+2. Sign in with your VTOP account.
+3. Let the first refresh finish. Your attendance, marks, and schedules will then appear in the app.
+4. Open Settings if you want to set up Gmail OTP reading.
 
-Your data is **your** data.
+## What you can do
 
-## Build Setup
+- Check attendance and course details
+- View marks and exam schedules
+- Open VTOP inside the app
+- Read recently loaded information without refreshing
+- Read VTOP OTP emails through an optional Gmail connection
 
-No environment file is required. The app compiles and runs with every optional integration disabled or using its local default behavior.
+## Gmail OTP reading
 
-### 1. Install Flutter
+Gmail access is optional. The app has a **How to get OAuth credentials** guide that walks you through creating and importing your own Google OAuth client.
 
-Follow the official [Flutter installation guide](https://docs.flutter.dev/get-started/install) for your operating system. Install the Android SDK/Android Studio as described there if you plan to build for Android.
+Google may show an unverified app warning because vitapmate requests the `gmail.modify` permission. The app uses it to read VTOP OTP messages and to move a read OTP message to Trash when you ask it to.
 
-After installation, confirm that Flutter and the required platform tools are available:
+If your Google project is in Testing mode, Gmail authorization usually expires after seven days. Open the Gmail setup in vitapmate and authorize it again.
 
-```bash
-flutter doctor
-```
+Do not share OAuth access tokens, refresh tokens, or imported credentials.
 
-Resolve the issues reported by `flutter doctor`, especially the Flutter, Android toolchain, and connected-device checks, before continuing.
+## Privacy
 
-### 2. Install project dependencies
+vitapmate processes VTOP pages on your device. It does not send your VTOP user ID or password to a vitapmate server, and it does not store those credentials outside your device.
 
-From the repository directory, run:
+The app still connects to services you choose to use. These include VTOP, Google for optional Gmail access, and Firebase services used by the app.
+
+## Troubleshooting
+
+### Android says the app cannot be installed
+
+Make sure you extracted the ZIP before opening the APK. You may also need to allow installs from your browser or file manager in Android settings.
+
+If Android reports a signature conflict, uninstall the Play Store version and install the GitHub build again. Uninstalling removes the app's local data.
+
+### The artifact has expired
+
+GitHub keeps these artifacts for 30 days. Return to the [Android builds page](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain) and use the newest successful build.
+
+### I downloaded the wrong APK
+
+Download `vitapmate-universal-apk`. The other packages are smaller builds made for specific processor types.
+
+### Gmail stopped reading OTP messages
+
+Open the Gmail setup in vitapmate and connect the account again. Testing-mode Google authorizations usually expire after seven days.
+
+## Project status
+
+vitapmate is no longer maintained as a published Play Store app. The source remains available for reference and community forks, but updates and support are not guaranteed.
+
+vitapmate is an independent project and is not affiliated with VIT-AP University.
+
+## For developers
+
+The app uses Flutter for the interface and Rust for VTOP processing.
+
+Install the required tools:
+
+- [Install Flutter](https://docs.flutter.dev/install)
+- [Set up Flutter for Android](https://docs.flutter.dev/platform-integration/android/setup)
+- [Install Rust](https://rust-lang.org/tools/install/)
+
+From the project directory, install packages and run the app:
 
 ```bash
 flutter pub get
-```
-
-### 3. Run or build without an environment file
-
-Run the app on a connected device or emulator:
-
-```bash
 flutter run
 ```
 
-Create release builds:
+Android release builds need a signing key. Follow Flutter's [Android release guide](https://docs.flutter.dev/deployment/android), then build the APK:
 
 ```bash
 flutter build apk --release
-flutter build appbundle --release
-flutter build ios --release
 ```
 
-The iOS command requires macOS with Xcode configured.
+### Optional integrations
 
-### Optional configuration
-
-Create a local `.env.json` only when you want one or more optional integrations. The file is ignored by Git. Omit unused fields rather than adding empty values.
-
-| Field | Enables | Behavior when omitted |
-| --- | --- | --- |
-| `GOOGLE_OAUTH_CLIENT_ID` | Shared-key Gmail OAuth fallback | The shared fallback is hidden. Android users can still use the preferred local BYOK flow. |
-| `FCM_COOKIE_CALLBACK_URL` | FCM cookie bridge and Chrome extension setup | The listener is not started and the Chrome Extension section is hidden. |
-
-Example with every optional integration configured:
+Create `.env.json` in the project directory when you need the cookie bridge or the shared Gmail login:
 
 ```json
 {
+  "FCM_COOKIE_CALLBACK_URL": "https://your-server.example.com/cookie/callback",
   "GOOGLE_OAUTH_CLIENT_ID": "your-android-client-id.apps.googleusercontent.com",
-  "FCM_COOKIE_CALLBACK_URL": "https://your-public-backend.example.com/cookie/callback"
+  "FIREBASE_ANDROID_API_KEY": "your-firebase-api-key",
+  "FIREBASE_ANDROID_APP_ID": "your-firebase-android-app-id",
+  "FIREBASE_MESSAGING_SENDER_ID": "your-firebase-sender-id",
+  "FIREBASE_PROJECT_ID": "your-firebase-project-id",
+  "FIREBASE_STORAGE_BUCKET": "your-firebase-storage-bucket"
 }
 ```
 
-Run or build with optional configuration:
+Use it when running or building:
 
 ```bash
 flutter run --dart-define-from-file=.env.json
 flutter build apk --release --dart-define-from-file=.env.json
 ```
 
-### Optional shared Gmail OAuth fallback
+`FCM_COOKIE_CALLBACK_URL` enables the FCM cookie bridge and its extension controls. Leave it out if you do not run a compatible callback server.
 
-Local BYOK is the preferred Gmail setup and does not require a build-time environment value. To additionally ship the shared fallback:
+`GOOGLE_OAUTH_CLIENT_ID` enables the shared Gmail OAuth option. It must be an Android OAuth client ID ending in `.apps.googleusercontent.com`. Configure it for package `com.vitap_pal.app` and add the signing key's SHA fingerprints. Android users can still import their own Desktop OAuth file when this value is absent.
 
-1. Enable the Gmail API in Google Cloud.
-2. Configure the OAuth consent screen with the `gmail.modify` scope.
-3. Create an Android OAuth client for package `com.vitap_pal.app`.
-4. Add the signing SHA fingerprints and enable the custom URI scheme.
-5. Put its client ID in `GOOGLE_OAUTH_CLIENT_ID`.
+The app stores Gmail access tokens, refresh tokens, and personal OAuth credentials in device secure storage. Do not put tokens in `.env.json`, source control, or GitHub Actions secrets.
 
-The Android and iOS builds derive the native redirect scheme only when this value is present. Without it, they use an inert placeholder scheme and the shared option is not shown.
+The tracked `lib/firebase_options.dart` reads Firebase client settings from these Dart defines. `android/app/google-services.json` remains optional and is ignored by Git.
 
-### Personal Gmail BYOK (Android)
+#### Getting the Firebase values
 
-No environment value or hosted backend is needed for personal BYOK. The app contains a **How to get OAuth credentials** guide that links directly to the relevant Google Cloud pages. In summary, the user creates a Google Cloud project, enables Gmail API, configures the OAuth audience as **External** with publishing status **Testing**, adds every connecting `@vitapstudent.ac.in` address as a test user, then creates and imports a **Desktop app** OAuth JSON file.
-
-A trusted friend’s Desktop OAuth JSON can also be imported, but the friend’s project must list the connecting college email as a test user. The project owner controls that OAuth client and can revoke it or inspect aggregate usage, so credentials should only be accepted from someone trusted. OAuth access and refresh tokens must never be shared.
-
-Testing authorizations normally expire after seven days. Google may display an unverified-app warning and a broadly worded Gmail permission screen because the app requests `gmail.modify`; the app uses it to read VTOP OTP messages and optionally move a read OTP message to Trash.
-
-While personal authorization is active, the setup page checks secure storage once per second for up to five minutes and updates as soon as the validated token is saved. The loopback listener stays in the app process; it is intentionally not moved to WorkManager because an Android background worker runs separately from the interactive OAuth request and is not a reliable owner for a temporary localhost callback server.
-
-To inspect an Android signing fingerprint:
+Run the FlutterFire CLI for your Firebase project:
 
 ```bash
-keytool -list -v -alias androiddebugkey -keystore ~/.android/debug.keystore -storepass android -keypass android
+flutterfire configure
 ```
 
-For a release keystore, replace the keystore path and alias with your release signing values.
+The CLI generates `lib/firebase_options.dart`. You can use it in either of these ways:
 
-### Optional FCM extension bridge
+1. Copy the Android values from the generated `FirebaseOptions` into `.env.json`:
 
-Set `FCM_COOKIE_CALLBACK_URL` only if you operate the cookie callback service used by the Chrome extension. When absent, the app skips the FCM cookie listener, token-copy feature, and extension UI entirely.
+   - `apiKey` becomes `FIREBASE_ANDROID_API_KEY`
+   - `appId` becomes `FIREBASE_ANDROID_APP_ID`
+   - `messagingSenderId` becomes `FIREBASE_MESSAGING_SENDER_ID`
+   - `projectId` becomes `FIREBASE_PROJECT_ID`
+   - `storageBucket` becomes `FIREBASE_STORAGE_BUCKET`
+
+   Restore the repository version of `lib/firebase_options.dart` if the CLI replaced it, then run or build with `--dart-define-from-file=.env.json`.
+
+2. Keep the complete `lib/firebase_options.dart` generated by the CLI. It contains the Firebase values directly, so the Firebase Dart defines are not needed. The file will appear as a local Git modification unless you commit it.
+

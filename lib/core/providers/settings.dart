@@ -9,6 +9,7 @@ part 'settings.g.dart';
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
 const timetableViewModeSettingKey = 'settings_timetable_view_mode';
+const inAppCaptchaSolverSettingKey = 'settings_in_app_captcha_solver';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -34,9 +35,22 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_student_projects_json",
         "settings_student_projects_rotation_seed",
         timetableViewModeSettingKey,
+        inAppCaptchaSolverSettingKey,
       },
     ),
   );
+}
+
+@riverpod
+bool inAppCaptchaSolver(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool(inAppCaptchaSolverSettingKey) ?? false;
+}
+
+Future<void> setInAppCaptchaSolver(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool(inAppCaptchaSolverSettingKey, value);
+  ref.invalidate(inAppCaptchaSolverProvider);
 }
 
 @riverpod

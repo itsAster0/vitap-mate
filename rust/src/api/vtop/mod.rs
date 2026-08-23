@@ -1,3 +1,4 @@
+mod captcha_solver;
 pub mod paraser;
 pub mod session_manager;
 pub mod types;
