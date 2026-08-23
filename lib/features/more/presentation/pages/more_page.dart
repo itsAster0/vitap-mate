@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +14,14 @@ class MorePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final cookieBridgeAvailable = ref
+        .watch(fcmCookieBridgeAvailableProvider)
+        .when(
+          data: (available) => available,
+          loading: () => false,
+          error: (_, _) => false,
+        );
+
     void openVtop([String? menuUrl]) {
       GoRouter.of(context).pushNamed(Paths.vtopweb, extra: menuUrl);
     }
@@ -111,7 +117,7 @@ class MorePage extends HookConsumerWidget {
               ),
             ],
           ),
-          if (Platform.isAndroid && fcmCookieBridgeEnabled)
+          if (cookieBridgeAvailable == true)
             FTileGroup(
               label: const Text("Browser Extension"),
               children: [

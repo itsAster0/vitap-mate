@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
+import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/features/more/presentation/pages/chrome_extension_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
@@ -294,6 +295,29 @@ void main() {
 
     expect(find.text('GPA / CGPA Calculator'), findsOneWidget);
     expect(find.text('Chrome Extension'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('More page exposes Chrome Extension when Firebase is ready', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fcmCookieBridgeAvailableProvider.overrideWith((ref) async => true),
+        ],
+        child: MaterialApp(
+          builder: (context, child) => FTheme(
+            data: FTheme.neutral.light.touch,
+            child: FToaster(child: child!),
+          ),
+          home: const Scaffold(body: MorePage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chrome Extension'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

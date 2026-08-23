@@ -16,7 +16,7 @@ import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final firebaseReady = fcmCookieBridgeEnabled && await ensureFirebaseReady();
+  final firebaseReady = await ensureFirebaseReady();
   if (firebaseReady) {
     FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
   }

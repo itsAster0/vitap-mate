@@ -84,7 +84,7 @@ class VClient extends _$VClient {
     );
   }
 
-  Future<void> ensureLogin({
+  Future<VtopClient> ensureLogin({
     bool force = false,
     bool promptForOtp = true,
   }) async {
@@ -102,7 +102,7 @@ class VClient extends _$VClient {
           client,
           flowLabel: '$flowLabel session.persist',
         );
-        return;
+        return client;
       }
     }
     if (!user.isValid) {
@@ -184,6 +184,7 @@ class VClient extends _$VClient {
         'client.auth',
         '$flowLabel finished successfully',
       );
+      return client;
     } catch (e) {
       final uname = user.username;
       if (e == VtopError.invalidCredentials()) {

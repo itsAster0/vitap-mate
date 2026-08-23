@@ -4,6 +4,7 @@ import 'dart:developer' show log;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -17,9 +18,14 @@ import 'package:vitapmate/src/frb_generated.dart';
 
 const _cookieRequestType = 'vtop_cookie_request';
 const _vtopDomain = 'vtop.vitap.ac.in';
-const _envCookieCallbackUrl = String.fromEnvironment('FCM_COOKIE_CALLBACK_URL');
 
-bool get fcmCookieBridgeEnabled => _envCookieCallbackUrl.trim().isNotEmpty;
+bool get fcmCookieBridgePlatformSupported =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+final fcmCookieBridgeAvailableProvider = FutureProvider<bool>((ref) async {
+  if (!fcmCookieBridgePlatformSupported) return false;
+  return ensureFirebaseReady();
+});
 
 bool _foregroundListenerStarted = false;
 
@@ -56,7 +62,6 @@ Future<bool> ensureFirebaseReady() async {
 }
 
 Future<String?> getFcmTokenForCopy() async {
-  if (!fcmCookieBridgeEnabled) return null;
   if (!await ensureFirebaseReady()) return null;
   final messaging = FirebaseMessaging.instance;
   await messaging.requestPermission();
@@ -64,7 +69,6 @@ Future<String?> getFcmTokenForCopy() async {
 }
 
 Future<String?> resetFcmTokenForCopy() async {
-  if (!fcmCookieBridgeEnabled) return null;
   if (!await ensureFirebaseReady()) return null;
   final messaging = FirebaseMessaging.instance;
   await messaging.requestPermission();
@@ -73,7 +77,6 @@ Future<String?> resetFcmTokenForCopy() async {
 }
 
 void startVtopCookieBridgeListener() {
-  if (!fcmCookieBridgeEnabled) return;
   if (_foregroundListenerStarted) return;
   _foregroundListenerStarted = true;
   unawaited(_startVtopCookieBridgeListener());
@@ -93,7 +96,6 @@ Future<void> _startVtopCookieBridgeListener() async {
 
 @pragma('vm:entry-point')
 Future<void> vtopCookieBridgeBackgroundHandler(RemoteMessage message) async {
-  if (!fcmCookieBridgeEnabled) return;
   WidgetsFlutterBinding.ensureInitialized();
   if (!await ensureFirebaseReady()) return;
   await RustLib.init();
@@ -113,35 +115,46 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
   }
 
   await FcmCookieNotificationService.showProgress();
+  List<Map<String, dynamic>>? cookies;
+  String? callbackError;
   try {
-    final cookies = await _authenticatedCookieEditorCookies();
-    await _postCookieCallback(
-      callbackUrl: callbackUrl,
-      requestId: requestId,
-      responseToken: responseToken,
-      cookies: cookies,
-    );
+    cookies = await _authenticatedCookieEditorCookies();
   } catch (error, stackTrace) {
+    callbackError = '$error';
     log(
-      'Failed to resolve FCM cookie request',
+      'Failed to prepare cookie request $requestId',
       name: 'fcm.cookie',
       error: error,
       stackTrace: stackTrace,
     );
-    await _postCookieCallback(
+  }
+
+  try {
+    await postCookieCallbackWithRetry(
       callbackUrl: callbackUrl,
       requestId: requestId,
       responseToken: responseToken,
-      error: '$error',
+      cookies: cookies,
+      error: callbackError,
     );
-  } finally {
+    log('Completed cookie request $requestId', name: 'fcm.cookie');
     await FcmCookieNotificationService.cancel();
+  } catch (error, stackTrace) {
+    log(
+      'Cookie callback failed for request $requestId',
+      name: 'fcm.cookie',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    await FcmCookieNotificationService.showFailure();
   }
 }
 
 String _resolveCookieCallbackUrl(Map<String, dynamic> data) {
-  final envCallbackUrl = _envCookieCallbackUrl.trim();
-  if (envCallbackUrl.isNotEmpty) return envCallbackUrl;
+  return resolveCookieCallbackUrlForTest(data);
+}
+
+String resolveCookieCallbackUrlForTest(Map<String, dynamic> data) {
   return '${data['callbackUrl'] ?? ''}'.trim();
 }
 
@@ -154,10 +167,9 @@ Future<List<Map<String, dynamic>>> _authenticatedCookieEditorCookies() async {
       throw StateError('No VTOP account is configured on this device.');
     }
 
-    await container
+    final client = await container
         .read(vClientProvider.notifier)
         .ensureLogin(force: false, promptForOtp: false);
-    final client = await container.read(vClientProvider.future);
     if (!await fetchIsAuth(client: client)) {
       throw StateError('VTOP session is not authenticated after login.');
     }
@@ -215,30 +227,77 @@ String cookieEditorJsonFromHeader(String cookieHeader) {
   ).convert(cookieEditorCookiesFromHeader(cookieHeader));
 }
 
-Future<void> _postCookieCallback({
+class CookieCallbackException implements Exception {
+  const CookieCallbackException(this.statusCode, {required this.retryable});
+
+  final int statusCode;
+  final bool retryable;
+
+  @override
+  String toString() => 'Cookie callback failed with HTTP $statusCode.';
+}
+
+bool isRetryableCookieCallbackStatus(int statusCode) =>
+    statusCode == 408 || statusCode == 429 || statusCode >= 500;
+
+Future<void> postCookieCallbackWithRetry({
   required String callbackUrl,
   required String requestId,
   required String responseToken,
   List<Map<String, dynamic>>? cookies,
   String? error,
+  http.Client? client,
+  Future<void> Function(Duration duration)? delay,
 }) async {
-  final response = await http
-      .post(
-        Uri.parse(callbackUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'requestId': requestId,
-          'responseToken': responseToken,
-          ...?(cookies == null ? null : {'cookies': cookies}),
-          ...?((error?.trim().isEmpty ?? true) ? null : {'error': error}),
-        }),
-      )
-      .timeout(const Duration(seconds: 15));
+  final ownedClient = client == null;
+  final httpClient = client ?? http.Client();
+  final wait = delay ?? Future<void>.delayed;
+  final body = jsonEncode({
+    'requestId': requestId,
+    'responseToken': responseToken,
+    ...?(cookies == null ? null : {'cookies': cookies}),
+    ...?((error?.trim().isEmpty ?? true) ? null : {'error': error}),
+  });
 
-  if (response.statusCode < 200 || response.statusCode >= 300) {
-    throw StateError(
-      'Cookie callback failed with HTTP ${response.statusCode}: ${response.body}',
-    );
+  try {
+    Object? lastError;
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        final response = await httpClient
+            .post(
+              Uri.parse(callbackUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: body,
+            )
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+        final exception = CookieCallbackException(
+          response.statusCode,
+          retryable: isRetryableCookieCallbackStatus(response.statusCode),
+        );
+        if (!exception.retryable) throw exception;
+        lastError = exception;
+      } on CookieCallbackException catch (exception) {
+        if (!exception.retryable) rethrow;
+        lastError = exception;
+      } on TimeoutException catch (exception) {
+        lastError = exception;
+      } on http.ClientException catch (exception) {
+        lastError = exception;
+      }
+
+      if (attempt < 3) {
+        log(
+          'Retrying cookie callback for request $requestId after attempt $attempt',
+          name: 'fcm.cookie',
+        );
+        await wait(Duration(seconds: 1 << (attempt - 1)));
+      }
+    }
+    throw StateError('Cookie callback failed after 3 attempts: $lastError');
+  } finally {
+    if (ownedClient) httpClient.close();
   }
 }
 
@@ -306,5 +365,24 @@ class FcmCookieNotificationService {
   static Future<void> cancel() async {
     await ensureInitialized();
     await _notifications.cancel(id: _notificationId);
+  }
+
+  static Future<void> showFailure() async {
+    await ensureInitialized();
+    await _notifications.show(
+      id: _notificationId,
+      title: 'Browser sign-in failed',
+      body: 'Open VITAP Mate, copy a fresh Token, and try again.',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channelId,
+          'Cookie bridge',
+          channelDescription: 'VTOP cookie bridge requests',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          autoCancel: true,
+        ),
+      ),
+    );
   }
 }
