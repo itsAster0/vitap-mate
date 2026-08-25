@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
@@ -16,18 +17,18 @@ class AttendancePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
     Future<void> update() async {
       try {
         await ref.read(attendanceProvider.notifier).updateAttendance();
       } catch (e) {
         log("$e");
+        if (context.mounted) disCommonToast(context, e);
       }
     }
 
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(attendanceProvider.notifier).updateAttendance().catchError((
           e,
           st,
@@ -36,7 +37,7 @@ class AttendancePage extends HookConsumerWidget {
         });
       });
       return null;
-    }, [autoRefresh]);
+    }, const []);
 
     final attendanceData = ref.watch(attendanceProvider);
 

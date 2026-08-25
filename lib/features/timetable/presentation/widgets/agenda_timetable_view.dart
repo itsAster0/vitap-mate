@@ -584,7 +584,7 @@ class _AgendaClassCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            slot.isLab ? 'LAB' : 'THEORY',
+                            slot.kind == ClassKind.lab ? 'LAB' : 'THEORY',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,

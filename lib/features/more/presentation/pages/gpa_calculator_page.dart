@@ -101,7 +101,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
         for (final course in courses)
           _Row(
             id: uid++,
-            credits: course.credits,
+            credits: course.credits.value,
             courseCode: course.courseCode,
             courseName: courseNames[course.courseCode] ?? '',
           ),
@@ -111,24 +111,25 @@ class GpaCalculatorPage extends HookConsumerWidget {
 
     final courses = [
       for (final row in rows.value)
-        GpaCourse(credits: row.credits, grade: row.grade),
+        GpaCourse(
+          credits: Credits(row.credits),
+          grade: Grade.tryParse(row.grade)!,
+        ),
     ];
     final sumCredits = courses.fold<double>(
       0,
-      (total, course) => total + course.credits,
+      (total, course) => total + course.credits.value,
     );
     final semesterGpa = calculateSemesterGpa(courses);
 
-    final currentCgpa =
-        (double.tryParse(cgpaController.text.replaceAll(',', '.')) ?? 0.0)
-            .clamp(0.0, 10.0);
-    final earned = parseCredits(earnedController.text) ?? 0.0;
+    final currentCgpa = Cgpa.tryParse(cgpaController.text) ?? Cgpa(0);
+    final earned = parseCredits(earnedController.text)?.value ?? 0.0;
     final projected = calculateProjectedCgpa(
       currentCgpa: currentCgpa,
       completedCredits: earned,
       plannedCourses: courses,
     );
-    final delta = projected - currentCgpa;
+    final delta = projected - currentCgpa.value;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -164,7 +165,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.easeOutCubic,
                 builder: (context, d, _) {
-                  if (d.abs() < 0.005 || currentCgpa <= 0) {
+                  if (d.abs() < 0.005 || currentCgpa.value <= 0) {
                     return const SizedBox.shrink();
                   }
                   final up = d > 0;
@@ -193,7 +194,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '${up ? '+' : ''}${d.toStringAsFixed(2)} from current ${currentCgpa.toStringAsFixed(2)}',
+                          '${up ? '+' : ''}${d.toStringAsFixed(2)} from current ${currentCgpa.value.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
@@ -456,8 +457,8 @@ class _CourseRowTile extends StatelessWidget {
                   child: FSelect<String>(
                     size: .sm,
                     items: {
-                      for (final g in gradePoints.keys)
-                        '$g (${gradePoints[g]})': g,
+                      for (final grade in Grade.values)
+                        '${grade.label} (${grade.points})': grade.label,
                     },
                     control: FSelectControl.lifted(
                       value: row.grade,

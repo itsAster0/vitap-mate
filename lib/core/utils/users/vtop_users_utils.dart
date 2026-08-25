@@ -43,7 +43,11 @@ class Vtopusersutils extends _$Vtopusersutils {
   }
 
   Future<void> vtopUserInitialData(VtopUserEntity user) async {
-    await vtopSetDefault(user.username!);
+    if (user case StoredVtopUser(:final username)) {
+      await vtopSetDefault(username);
+    } else {
+      throw StateError('Cannot persist an unconfigured VTOP user.');
+    }
     await vtopUserSave(user);
   }
 

@@ -52,70 +52,113 @@ fn parse_cookie_pairs(cookie_header: &str) -> Vec<(String, String)> {
 }
 
 #[derive(Debug)]
+enum SessionState {
+    Anonymous { csrf_token: Option<String> },
+    Restored { csrf_token: Option<String> },
+    Authenticated { csrf_token: String },
+}
+
+impl SessionState {
+    fn csrf_token(&self) -> Option<&str> {
+        match self {
+            Self::Anonymous { csrf_token } | Self::Restored { csrf_token } => csrf_token.as_deref(),
+            Self::Authenticated { csrf_token } => Some(csrf_token),
+        }
+    }
+
+    fn with_csrf(self, token: String) -> Self {
+        match self {
+            Self::Anonymous { .. } => Self::Anonymous {
+                csrf_token: Some(token),
+            },
+            Self::Restored { .. } => Self::Restored {
+                csrf_token: Some(token),
+            },
+            Self::Authenticated { .. } => Self::Authenticated { csrf_token: token },
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct SessionManager {
-    csrf_token: Option<String>,
+    state: SessionState,
     #[cfg(not(target_arch = "wasm32"))]
     cookie_store: Arc<Jar>,
-    is_authenticated: bool,
-    is_cookie_external: bool,
     external_cookie_header: Option<String>,
 }
 
 impl SessionManager {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         let jar = Jar::default();
         #[cfg(not(target_arch = "wasm32"))]
         let cookie_store = Arc::new(jar);
         Self {
-            csrf_token: None,
+            state: SessionState::Anonymous { csrf_token: None },
             #[cfg(not(target_arch = "wasm32"))]
             cookie_store,
-            is_authenticated: false,
-            is_cookie_external: false,
             external_cookie_header: None,
         }
     }
 
-    pub fn set_csrf_token(&mut self, token: String) {
-        self.csrf_token = Some(token);
+    pub(crate) fn set_csrf_token(&mut self, token: String) {
+        let state = std::mem::replace(
+            &mut self.state,
+            SessionState::Anonymous { csrf_token: None },
+        );
+        self.state = state.with_csrf(token);
     }
 
-    pub fn get_csrf_token(&self) -> Option<String> {
-        self.csrf_token.clone()
+    pub(crate) fn get_csrf_token(&self) -> Option<String> {
+        self.state.csrf_token().map(str::to_owned)
     }
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn get_cookie_store(&self) -> Arc<Jar> {
+    pub(crate) fn get_cookie_store(&self) -> Arc<Jar> {
         self.cookie_store.clone()
     }
 
-    pub fn set_authenticated(&mut self, authenticated: bool) {
-        self.is_authenticated = authenticated;
+    pub(crate) fn set_authenticated(&mut self, authenticated: bool) {
+        let csrf_token = self.state.csrf_token().map(str::to_owned);
+        self.state = if authenticated {
+            match csrf_token {
+                Some(csrf_token) => SessionState::Authenticated { csrf_token },
+                None => SessionState::Anonymous { csrf_token: None },
+            }
+        } else {
+            SessionState::Anonymous { csrf_token }
+        };
     }
 
-    pub fn is_authenticated(&self) -> bool {
-        self.is_authenticated
+    pub(crate) fn is_authenticated(&self) -> bool {
+        matches!(self.state, SessionState::Authenticated { .. })
     }
 
-    pub fn is_cookie_external(&self) -> bool {
-        self.is_cookie_external
+    pub(crate) fn is_cookie_external(&self) -> bool {
+        matches!(self.state, SessionState::Restored { .. })
     }
-    pub fn set_cookie_external(&mut self, bool: bool) {
-        self.is_cookie_external = bool;
+    pub(crate) fn set_cookie_external(&mut self, external: bool) {
+        let csrf_token = self.state.csrf_token().map(str::to_owned);
+        self.state = if external {
+            SessionState::Restored { csrf_token }
+        } else if self.is_authenticated() {
+            SessionState::Authenticated {
+                csrf_token: csrf_token.expect("authenticated session contains CSRF token"),
+            }
+        } else {
+            SessionState::Anonymous { csrf_token }
+        };
     }
 
-    pub fn clear(&mut self) {
-        self.csrf_token = None;
-        self.is_authenticated = false;
-        self.is_cookie_external = false;
+    pub(crate) fn clear(&mut self) {
+        self.state = SessionState::Anonymous { csrf_token: None };
         self.external_cookie_header = None;
         self.cookie_store = Arc::new(Jar::default());
     }
 
-    pub fn set_csrf_from_external(&mut self, token: String) {
-        self.csrf_token = Some(token);
-    }
-    pub fn set_cookie_from_external(&mut self, url: String, cookie: String) {
+    pub(crate) fn set_cookie_from_external(&mut self, url: String, cookie: String) {
+        if cookie.trim().is_empty() {
+            return;
+        }
         self.external_cookie_header = Some(cookie.clone());
         let parsed_url = Url::parse(&url).unwrap();
         let pairs = parse_cookie_pairs(&cookie);
@@ -128,13 +171,14 @@ impl SessionManager {
                     .add_cookie_str(&format!("{name}={value}"), &parsed_url);
             }
         }
-        self.is_cookie_external = true;
+        let csrf_token = self.state.csrf_token().map(str::to_owned);
+        self.state = SessionState::Restored { csrf_token };
     }
 
-    pub fn get_external_cookie_header(&self) -> Option<String> {
+    pub(crate) fn get_external_cookie_header(&self) -> Option<String> {
         self.external_cookie_header.clone()
     }
-    pub fn get_cookie(&self, url: String) -> Option<String> {
+    pub(crate) fn get_cookie(&self, url: String) -> Option<String> {
         let k = self.cookie_store.cookies(&Url::parse(&url).unwrap());
         if let Some(cookie) = k {
             let data = cookie.as_bytes();
@@ -142,7 +186,7 @@ impl SessionManager {
         }
         None
     }
-    pub fn export_persisted_session(
+    pub(crate) fn export_persisted_session(
         &self,
         url: String,
         username: String,
@@ -154,11 +198,40 @@ impl SessionManager {
             cookies: self.get_cookie(url),
         };
     }
-    pub fn import_persisted_session(&mut self, url: String, session: PersistedVtopSession) {
+    pub(crate) fn import_persisted_session(&mut self, url: String, session: PersistedVtopSession) {
         if let Some(cookie) = session.cookies {
             self.set_cookie_from_external(url, cookie);
             self.set_authenticated(false);
             self.set_cookie_external(true);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn authentication_requires_a_csrf_token() {
+        let mut session = SessionManager::new();
+        session.set_authenticated(true);
+        assert!(!session.is_authenticated());
+
+        session.set_csrf_token("csrf".to_string());
+        session.set_authenticated(true);
+        assert!(session.is_authenticated());
+    }
+
+    #[test]
+    fn restored_and_authenticated_are_distinct_states() {
+        let mut session = SessionManager::new();
+        session.set_cookie_external(true);
+        assert!(session.is_cookie_external());
+        assert!(!session.is_authenticated());
+
+        session.set_csrf_token("csrf".to_string());
+        session.set_authenticated(true);
+        assert!(session.is_authenticated());
+        assert!(!session.is_cookie_external());
     }
 }

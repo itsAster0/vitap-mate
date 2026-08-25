@@ -24,12 +24,9 @@ class UserBox extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
-
     useEffect(() {
-      if (!autoRefresh) return null;
-
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         try {
           await ref.read(semesterIdProvider.notifier).updatesemids();
           ref.invalidate(semesterIdProvider);
@@ -39,7 +36,7 @@ class UserBox extends HookConsumerWidget {
       });
 
       return null;
-    }, [autoRefresh]);
+    }, const []);
 
     final user = ref.watch(vtopUserProvider);
 
@@ -142,7 +139,7 @@ class SemesterDialog extends HookConsumerWidget {
       try {
         await ref
             .read(vtopusersutilsProvider.notifier)
-            .vtopUserSave(user.copyWith(semid: selected));
+            .vtopUserSave(user.withSemester(selected));
 
         ref.invalidate(vtopUserProvider);
         ref.invalidate(vClientProvider);
@@ -311,13 +308,14 @@ class UserPassChange extends HookConsumerWidget {
 
                               isLoading.value = true;
                               try {
-                                final client = getVtopClient(
+                                final client = await getVtopClient(
                                   username: newUsername,
                                   password: newPassword,
                                   inAppCaptchaSolverEnabled: ref.read(
                                     inAppCaptchaSolverProvider,
                                   ),
                                 );
+                                if (!context.mounted) return;
                                 await loginWithSecurityOtpPrompt(
                                   context: context,
                                   client: client,
@@ -325,10 +323,9 @@ class UserPassChange extends HookConsumerWidget {
                                 await ref
                                     .read(vtopusersutilsProvider.notifier)
                                     .vtopUserSave(
-                                      user.copyWith(
-                                        username: newUsername,
-                                        password: newPassword,
-                                        isValid: true,
+                                      user.withCredentials(
+                                        newUsername,
+                                        newPassword,
                                       ),
                                     );
                                 if (user.username != null &&

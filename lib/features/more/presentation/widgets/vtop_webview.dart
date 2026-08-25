@@ -41,6 +41,7 @@ class VtopWebview extends HookConsumerWidget {
 
     final setupError = useState<Object?>(null);
     final isLoginRedirectPromptOpen = useRef(false);
+    final isForceLoginInProgress = useRef(false);
     final pendingInitialMenuUrl = useState(initialMenuUrl);
     final forceLoginCounter = useRef(0);
     final redirectForceAttempts = useRef(0);
@@ -94,6 +95,8 @@ class VtopWebview extends HookConsumerWidget {
     }, const []);
 
     Future<void> forceLogin() async {
+      if (isForceLoginInProgress.value) return;
+      isForceLoginInProgress.value = true;
       loading.value = true;
       forceLoginCounter.value += 1;
       try {
@@ -105,12 +108,15 @@ class VtopWebview extends HookConsumerWidget {
           disCommonToast(context, error);
         }
       } finally {
+        isForceLoginInProgress.value = false;
         loading.value = false;
       }
     }
 
     Future<void> promptForceLogin() async {
-      if (isLoginRedirectPromptOpen.value || loading.value) return;
+      if (isLoginRedirectPromptOpen.value || isForceLoginInProgress.value) {
+        return;
+      }
       if (redirectForceAttempts.value < 1) {
         redirectForceAttempts.value += 1;
         await forceLogin();
@@ -224,9 +230,10 @@ class VtopWebview extends HookConsumerWidget {
           final target = pendingInitialMenuUrl.value;
           if (target == null) return;
 
+          pendingInitialMenuUrl.value = null;
           final didOpen = await goTo(target);
-          if (didOpen == true) {
-            pendingInitialMenuUrl.value = null;
+          if (!didOpen && pendingInitialMenuUrl.value == null) {
+            pendingInitialMenuUrl.value = target;
           }
         },
         onWebViewCreated: (controller) async {

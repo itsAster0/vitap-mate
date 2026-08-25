@@ -119,11 +119,12 @@ class Step1 extends HookConsumerWidget {
       isloading.value = true;
 
       try {
-        VtopClient client = getVtopClient(
+        final client = await getVtopClient(
           username: username.text,
           password: password.text,
           inAppCaptchaSolverEnabled: ref.read(inAppCaptchaSolverProvider),
         );
+        if (!context.mounted) return;
         await loginWithSecurityOtpPrompt(context: context, client: client);
         _globalUsername = username.text;
         _globalPassword = password.text;
@@ -247,11 +248,10 @@ class Step2 extends HookConsumerWidget {
               onPress: () async {
                 if (formKey.currentState!.validate()) {
                   try {
-                    var user = VtopUserEntity(
+                    final user = VtopUserEntity.configured(
                       username: _globalUsername,
                       password: _globalPassword,
-                      semid: selectedSemesterId.value!,
-                      isValid: true,
+                      semesterId: selectedSemesterId.value!,
                     );
                     await ref
                         .read(vtopusersutilsProvider.notifier)

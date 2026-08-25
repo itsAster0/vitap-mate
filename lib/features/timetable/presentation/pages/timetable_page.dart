@@ -31,11 +31,10 @@ class TimetablePage extends HookConsumerWidget {
     final scrollOffset = useState<double>(0);
     final timetableData = ref.watch(timetableProvider);
     final viewMode = ref.watch(timetableViewModeProvider);
-    final autoRefresh = ref.watch(autoRefreshProvider);
     final startX = useState<double?>(null);
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(timetableProvider.notifier).updateTimetable().catchError((
           e,
           st,
@@ -45,7 +44,7 @@ class TimetablePage extends HookConsumerWidget {
       });
 
       return null;
-    }, [autoRefresh]);
+    }, const []);
     final mergeLabs = ref.watch(mergeTTProvider);
 
     useEffect(() {
@@ -331,7 +330,7 @@ List<TimetableSlot> addFreeSlots(List<TimetableSlot> t) {
           startTime: cClass,
           endTime: nClass,
           name: "-",
-          isLab: false,
+          kind: ClassKind.theory,
           faculty: '',
           credits: '',
         ),
@@ -448,7 +447,7 @@ class TimetableDaySummary extends StatelessWidget {
 }
 
 int _scheduledHours(TimetableSlot slot) {
-  if (!slot.isLab) return 1;
+  if (slot.kind != ClassKind.lab) return 1;
   return slot.slot.split('+').length;
 }
 

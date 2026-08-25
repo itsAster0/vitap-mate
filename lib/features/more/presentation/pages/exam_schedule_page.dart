@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/widgets/exam_countdown_strip.dart';
@@ -17,20 +18,20 @@ class ExamSchedulePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
     Future<void> update() async {
       try {
         await ref.read(examScheduleProvider.notifier).updatexamschedule();
       } catch (e) {
         log("$e");
+        if (context.mounted) disCommonToast(context, e);
       }
     }
 
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
 
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(examScheduleProvider.notifier).updatexamschedule().catchError((
           e,
           st,
@@ -40,7 +41,7 @@ class ExamSchedulePage extends HookConsumerWidget {
       });
 
       return null;
-    }, [autoRefresh]);
+    }, const []);
     var examData = ref.watch(examScheduleProvider);
     return RefreshIndicator(
       onRefresh: () async {

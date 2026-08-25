@@ -573,7 +573,7 @@ _TimetableSlot _$TimetableSlotFromJson(Map<String, dynamic> json) =>
       startTime: json['startTime'] as String,
       endTime: json['endTime'] as String,
       name: json['name'] as String,
-      isLab: json['isLab'] as bool,
+      kind: $enumDecode(_$ClassKindEnumMap, json['kind']),
       faculty: json['faculty'] as String,
       credits: json['credits'] as String,
     );
@@ -590,7 +590,9 @@ Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
       'startTime': instance.startTime,
       'endTime': instance.endTime,
       'name': instance.name,
-      'isLab': instance.isLab,
+      'kind': _$ClassKindEnumMap[instance.kind]!,
       'faculty': instance.faculty,
       'credits': instance.credits,
     };
+
+const _$ClassKindEnumMap = {ClassKind.theory: 'theory', ClassKind.lab: 'lab'};

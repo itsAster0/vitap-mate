@@ -83,6 +83,11 @@ bool autoRefresh(Ref ref) {
   return prefs?.getBool("settings_auto_refresh") ?? true;
 }
 
+Future<bool> isAutoRefreshEnabled(WidgetRef ref) async {
+  await ref.read(settingsProvider.future);
+  return ref.read(autoRefreshProvider);
+}
+
 Future<void> setautoRefresh(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool("settings_auto_refresh", value);

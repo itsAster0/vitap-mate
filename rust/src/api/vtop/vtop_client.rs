@@ -1,9 +1,9 @@
 pub use super::types::*;
+use super::vtop_config::VtopConfig;
 pub use super::{
     paraser::*,
     session_manager::SessionManager,
     types::{AttendanceData, ExamScheduleData, FullAttendanceData},
-    vtop_config::VtopConfig,
     vtop_errors::{VtopError, VtopResult},
 };
 use crate::api::native_logs::append_native_log;
@@ -95,14 +95,102 @@ fn missing_csrf_error(context: &str) -> VtopError {
     VtopError::SessionExpired
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthStage {
+    Idle,
+    LoggingIn,
+    AwaitingOtp { issued_at_unix_seconds: u64 },
+}
+
+struct OtpCode(String);
+
+impl OtpCode {
+    fn parse(raw: &str) -> VtopResult<Self> {
+        let trimmed = raw.trim();
+        if trimmed.len() == 6 && trimmed.bytes().all(|byte| byte.is_ascii_digit()) {
+            Ok(Self(trimmed.to_owned()))
+        } else {
+            Err(VtopError::AuthenticationFailed(
+                "OTP must contain exactly 6 digits.".to_string(),
+            ))
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+struct BiometricDate(String);
+
+impl BiometricDate {
+    fn parse(raw: &str) -> VtopResult<Self> {
+        let parts = raw.split('/').collect::<Vec<_>>();
+        if parts.len() != 3 || parts[0].len() != 2 || parts[1].len() != 2 || parts[2].len() != 4 {
+            return Err(Self::invalid());
+        }
+        let day = parts[0].parse::<u32>().map_err(|_| Self::invalid())?;
+        let month = parts[1].parse::<u32>().map_err(|_| Self::invalid())?;
+        let year = parts[2].parse::<u32>().map_err(|_| Self::invalid())?;
+        let leap_year =
+            year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+        let days_in_month = match month {
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+            4 | 6 | 9 | 11 => 30,
+            2 if leap_year => 29,
+            2 => 28,
+            _ => return Err(Self::invalid()),
+        };
+        if day == 0 || day > days_in_month {
+            return Err(Self::invalid());
+        }
+        Ok(Self(raw.to_owned()))
+    }
+
+    fn invalid() -> VtopError {
+        VtopError::ConfigurationError(
+            "date must be a real calendar date in DD/MM/YYYY format".to_string(),
+        )
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RegistrationNumber(String);
+
+impl RegistrationNumber {
+    fn parse(raw: String) -> VtopResult<Self> {
+        let value = raw.trim();
+        if value.is_empty() {
+            Err(VtopError::RegistrationParsingError)
+        } else {
+            Ok(Self(value.to_owned()))
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for RegistrationNumber {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 pub struct VtopClient {
     client: Client,
     config: VtopConfig,
     session: SessionManager,
     current_page: Option<String>,
     auth_flow_id: u64,
-    real_username: String,
-    pub username: String,
+    auth_stage: AuthStage,
+    username: String,
+    registration_number: Option<RegistrationNumber>,
     password: String,
     captcha_data: Option<String>,
     in_app_captcha_solver_enabled: bool,
@@ -131,6 +219,7 @@ impl VtopClient {
 
     fn begin_auth_flow(&mut self, reason: &str) {
         self.auth_flow_id = self.auth_flow_id.saturating_add(1);
+        self.auth_stage = AuthStage::LoggingIn;
         self.auth_log("INFO", "start", reason);
     }
 
@@ -156,14 +245,14 @@ impl VtopClient {
     #[cfg(not(target_arch = "wasm32"))]
     fn reset_session_state(&mut self) {
         self.session.clear();
-        self.username = self.real_username.clone();
+        self.auth_stage = AuthStage::Idle;
         self.client = Self::make_client(self.session.get_cookie_store());
     }
 
     #[cfg(target_arch = "wasm32")]
     fn reset_session_state(&mut self) {
         self.session.clear();
-        self.username = self.real_username.clone();
+        self.auth_stage = AuthStage::Idle;
     }
 
     fn mark_session_expired(&mut self, context: &str, reason: &str) {
@@ -208,7 +297,7 @@ impl VtopClient {
         Ok(text)
     }
 
-    pub fn restore_session_snapshot(&mut self, session: PersistedVtopSession) {
+    pub(crate) fn restore_session_snapshot(&mut self, session: PersistedVtopSession) {
         self.auth_log(
             "INFO",
             "session.restore",
@@ -219,14 +308,14 @@ impl VtopClient {
         self.log_cookie_store_state("restore_session_snapshot");
     }
 
-    pub fn export_session_snapshot(&self, saved_at_epoch_ms: u64) -> PersistedVtopSession {
+    pub(crate) fn export_session_snapshot(&self, saved_at_epoch_ms: u64) -> PersistedVtopSession {
         let url = format!("{}/vtop", self.config.base_url);
         self.session
-            .export_persisted_session(url, self.real_username.clone(), saved_at_epoch_ms)
+            .export_persisted_session(url, self.username.clone(), saved_at_epoch_ms)
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn get_cookie(&self, check: bool) -> VtopResult<Vec<u8>> {
+    pub(crate) async fn get_cookie(&self, check: bool) -> VtopResult<Vec<u8>> {
         if !self.session.is_authenticated() && check {
             return Err(VtopError::SessionExpired);
         }
@@ -243,12 +332,7 @@ impl VtopClient {
         Ok(data)
     }
 
-    pub fn set_cookie(&mut self, cookie: String) {
-        let url = format!("{}/vtop", self.config.base_url);
-
-        self.session.set_cookie_from_external(url, cookie);
-    }
-    pub async fn get_semesters(&mut self, check: bool) -> VtopResult<SemesterData> {
+    pub(crate) async fn get_semesters(&mut self, check: bool) -> VtopResult<SemesterData> {
         if check && !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -259,7 +343,7 @@ impl VtopClient {
 
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
-            self.username,
+            self.registration_number()?,
             self.session
                 .get_csrf_token()
                 .ok_or_else(|| missing_csrf_error("get_semesters"))?,
@@ -278,7 +362,7 @@ impl VtopClient {
         Ok(parsett::parse_semid_timetable(text))
     }
 
-    pub async fn get_timetable(&mut self, semester_id: &str) -> VtopResult<TimetableData> {
+    pub(crate) async fn get_timetable(&mut self, semester_id: &str) -> VtopResult<TimetableData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -289,7 +373,7 @@ impl VtopClient {
                 .get_csrf_token()
                 .ok_or_else(|| missing_csrf_error("get_timetable"))?,
             semester_id,
-            self.username
+            self.registration_number()?
         );
         log_network_request("get_timetable.send", "POST", &url);
         let res = self
@@ -305,7 +389,7 @@ impl VtopClient {
         Ok(parsett::parse_timetable(text, semester_id))
     }
 
-    pub async fn get_attendance(&mut self, semester_id: &str) -> VtopResult<AttendanceData> {
+    pub(crate) async fn get_attendance(&mut self, semester_id: &str) -> VtopResult<AttendanceData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -316,7 +400,7 @@ impl VtopClient {
                 .get_csrf_token()
                 .ok_or_else(|| missing_csrf_error("get_attendance"))?,
             semester_id,
-            self.username
+            self.registration_number()?
         );
         log_network_request("get_attendance.send", "POST", &url);
         let res = self
@@ -332,22 +416,11 @@ impl VtopClient {
         Ok(parseattn::parse_attendance(text, semester_id.to_string()))
     }
 
-    pub async fn get_biometric_history(&mut self, date: &str) -> VtopResult<BiometricData> {
+    pub(crate) async fn get_biometric_history(&mut self, date: &str) -> VtopResult<BiometricData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
-        let parts = date.split('/').collect::<Vec<_>>();
-        if parts.len() != 3
-            || parts[0].len() != 2
-            || parts[1].len() != 2
-            || parts[2].len() != 4
-            || parts.iter().any(|part| part.parse::<u32>().is_err())
-        {
-            return Err(vtop_server_error(
-                "get_biometric_history",
-                "date must use DD/MM/YYYY format",
-            ));
-        }
+        let date = BiometricDate::parse(date)?;
 
         let url = format!("{}/vtop/getStudBioHistory", self.config.base_url);
         let csrf = self
@@ -356,8 +429,8 @@ impl VtopClient {
             .ok_or_else(|| missing_csrf_error("get_biometric_history"))?;
         let form = [
             ("_csrf", csrf.as_str()),
-            ("fromDate", date),
-            ("authorizedID", self.username.as_str()),
+            ("fromDate", date.as_str()),
+            ("authorizedID", self.registration_number()?.as_str()),
         ];
         log_network_request("get_biometric_history.send", "POST", &url);
         let response = self
@@ -370,10 +443,13 @@ impl VtopClient {
         let text = self
             .read_authenticated_response_text("get_biometric_history", response)
             .await?;
-        Ok(parsebiometric::parse_biometric(text, date.to_string()))
+        Ok(parsebiometric::parse_biometric(
+            text,
+            date.as_str().to_string(),
+        ))
     }
 
-    pub async fn get_full_attendance(
+    pub(crate) async fn get_full_attendance(
         &mut self,
         semester_id: &str,
         course_id: &str,
@@ -389,10 +465,10 @@ impl VtopClient {
                 .get_csrf_token()
                 .ok_or_else(|| missing_csrf_error("get_full_attendance"))?,
             semester_id,
-            self.username,
+            self.registration_number()?,
             course_id,
             course_type,
-            self.username
+            self.registration_number()?
         );
         log_network_request("get_full_attendance.send", "POST", &url);
         let res = self
@@ -413,7 +489,7 @@ impl VtopClient {
         ))
     }
 
-    pub async fn get_marks(&mut self, semester_id: &str) -> VtopResult<MarksData> {
+    pub(crate) async fn get_marks(&mut self, semester_id: &str) -> VtopResult<MarksData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -422,7 +498,10 @@ impl VtopClient {
             self.config.base_url
         );
         let form = multipart::Form::new()
-            .text("authorizedID", self.username.clone())
+            .text(
+                "authorizedID",
+                self.registration_number()?.as_str().to_owned(),
+            )
             .text("semesterSubId", semester_id.to_string())
             .text(
                 "_csrf",
@@ -446,7 +525,7 @@ impl VtopClient {
         Ok(parsemarks::parse_marks(text, semester_id.to_string()))
     }
 
-    pub async fn get_grade_view(&mut self, semester_id: &str) -> VtopResult<GradeViewData> {
+    pub(crate) async fn get_grade_view(&mut self, semester_id: &str) -> VtopResult<GradeViewData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -455,7 +534,10 @@ impl VtopClient {
             self.config.base_url
         );
         let form = multipart::Form::new()
-            .text("authorizedID", self.username.clone())
+            .text(
+                "authorizedID",
+                self.registration_number()?.as_str().to_owned(),
+            )
             .text("semesterSubId", semester_id.to_string())
             .text(
                 "_csrf",
@@ -478,7 +560,7 @@ impl VtopClient {
         Ok(parsegrades::parse_grade_view(text, semester_id.to_string()))
     }
 
-    pub async fn get_grade_view_details(
+    pub(crate) async fn get_grade_view_details(
         &mut self,
         semester_id: &str,
         course_id: &str,
@@ -491,7 +573,10 @@ impl VtopClient {
             self.config.base_url
         );
         let params = [
-            ("authorizedID", self.username.clone()),
+            (
+                "authorizedID",
+                self.registration_number()?.as_str().to_owned(),
+            ),
             ("x", "codex".to_string()),
             ("semesterSubId", semester_id.to_string()),
             ("courseId", course_id.to_string()),
@@ -521,7 +606,7 @@ impl VtopClient {
         ))
     }
 
-    pub async fn get_grade_history(&mut self) -> VtopResult<GradeHistoryData> {
+    pub(crate) async fn get_grade_history(&mut self) -> VtopResult<GradeHistoryData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -531,7 +616,7 @@ impl VtopClient {
         );
         let body = format!(
             "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
-            self.username,
+            self.registration_number()?,
             self.session
                 .get_csrf_token()
                 .ok_or_else(|| missing_csrf_error("get_grade_history"))?,
@@ -550,7 +635,10 @@ impl VtopClient {
         Ok(parsegradehistory::parse_grade_history(text))
     }
 
-    pub async fn get_exam_schedule(&mut self, semester_id: &str) -> VtopResult<ExamScheduleData> {
+    pub(crate) async fn get_exam_schedule(
+        &mut self,
+        semester_id: &str,
+    ) -> VtopResult<ExamScheduleData> {
         if !self.ensure_authenticated_session().await? {
             return Err(VtopError::SessionExpired);
         }
@@ -559,7 +647,10 @@ impl VtopClient {
             self.config.base_url
         );
         let form = multipart::Form::new()
-            .text("authorizedID", self.username.clone())
+            .text(
+                "authorizedID",
+                self.registration_number()?.as_str().to_owned(),
+            )
             .text("semesterSubId", semester_id.to_string())
             .text(
                 "_csrf",
@@ -580,14 +671,59 @@ impl VtopClient {
             .await?;
         Ok(parsesched::parse_schedule(text, semester_id.to_string()))
     }
-    pub fn is_authenticated(&mut self) -> bool {
+    pub(crate) fn is_authenticated(&mut self) -> bool {
         self.session.is_authenticated()
+    }
+}
+
+#[cfg(test)]
+mod validated_input_tests {
+    use super::*;
+
+    #[test]
+    fn otp_code_requires_exactly_six_digits() {
+        assert!(OtpCode::parse("123456").is_ok());
+        assert!(OtpCode::parse("12345").is_err());
+        assert!(OtpCode::parse("12345x").is_err());
+    }
+
+    #[test]
+    fn biometric_date_rejects_impossible_calendar_dates() {
+        assert!(BiometricDate::parse("29/02/2024").is_ok());
+        assert!(BiometricDate::parse("29/02/2023").is_err());
+        assert!(BiometricDate::parse("31/04/2024").is_err());
+    }
+
+    #[test]
+    fn registration_number_cannot_be_empty() {
+        assert!(RegistrationNumber::parse("22BCE0001".to_string()).is_ok());
+        assert!(RegistrationNumber::parse("   ".to_string()).is_err());
+    }
+
+    #[test]
+    fn extracted_registration_number_does_not_replace_login_username() {
+        let mut client = VtopClient::with_config(
+            VtopConfig::default(),
+            SessionManager::new(),
+            "login-name".to_string(),
+            "password".to_string(),
+        );
+
+        assert_eq!(client.username, "login-name");
+        assert!(client.registration_number.is_none());
+
+        client.current_page =
+            Some(r#"<input type="hidden" name="authorizedIDX" value="22BCE0001">"#.to_string());
+        client.extract_registration_number().unwrap();
+
+        assert_eq!(client.username, "login-name");
+        assert_eq!(client.registration_number().unwrap().as_str(), "22BCE0001");
     }
 }
 
 // for login
 impl VtopClient {
-    pub async fn login(&mut self) -> VtopResult<()> {
+    pub(crate) async fn login(&mut self) -> VtopResult<()> {
         self.begin_auth_flow("login requested");
         if self.session.is_cookie_external() {
             self.auth_log(
@@ -640,6 +776,7 @@ impl VtopClient {
                 Ok(_) => {
                     self.session.set_authenticated(true);
                     self.session.set_cookie_external(false);
+                    self.auth_stage = AuthStage::Idle;
                     self.auth_log("INFO", "finish", "login completed successfully");
                     return Ok(());
                 }
@@ -704,6 +841,9 @@ impl VtopClient {
                 self.current_page = Some(response_text);
                 let _ = self.extract_csrf_token();
                 self.auth_log("INFO", "otp", "security OTP verification is required");
+                self.auth_stage = AuthStage::AwaitingOtp {
+                    issued_at_unix_seconds: time_after,
+                };
                 return Err(VtopError::OTPRequired(
                     "Additional verification is required.".to_string(),
                     time_after,
@@ -719,10 +859,11 @@ impl VtopClient {
         } else {
             self.current_page = Some(response_text);
             self.extract_csrf_token()?;
-            self.get_regno()?;
+            self.extract_registration_number()?;
 
             self.current_page = None;
             self.captcha_data = None;
+            self.auth_stage = AuthStage::Idle;
             self.auth_log(
                 "INFO",
                 "login",
@@ -732,7 +873,13 @@ impl VtopClient {
         }
     }
 
-    pub async fn submit_security_otp(&mut self, otp_code: &str) -> VtopResult<()> {
+    pub(crate) async fn submit_security_otp(&mut self, otp_code: &str) -> VtopResult<()> {
+        if !matches!(self.auth_stage, AuthStage::AwaitingOtp { .. }) {
+            return Err(VtopError::AuthenticationFailed(
+                "No OTP challenge is active.".to_string(),
+            ));
+        }
+        let otp_code = OtpCode::parse(otp_code)?;
         let csrf = self
             .session
             .get_csrf_token()
@@ -741,7 +888,7 @@ impl VtopClient {
         let referer = format!("{}/vtop/login/error", self.config.base_url);
 
         let form = multipart::Form::new()
-            .text("otpCode", otp_code.trim().to_string())
+            .text("otpCode", otp_code.as_str().to_string())
             .text("_csrf", csrf);
 
         self.network_auth_log("submit_security_otp.send", "POST", &url);
@@ -749,7 +896,7 @@ impl VtopClient {
             .client
             .post(&url)
             .header("Accept", "*/*")
-            .header("Origin", &self.config.base_url)
+            .header("Origin", self.config.base_url.as_str())
             .header("Referer", referer)
             .header("Sec-Fetch-Dest", "empty")
             .header("Sec-Fetch-Mode", "cors")
@@ -846,25 +993,23 @@ impl VtopClient {
         if landed_on_content {
             self.current_page = Some(response_text);
             let _ = self.extract_csrf_token();
-            if self.get_regno().is_err() {
-                self.username = self.username.to_uppercase();
-            }
+            self.extract_registration_number()?;
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
+            self.auth_stage = AuthStage::Idle;
             self.auth_log("INFO", "finish", "OTP verified and session confirmed");
             return Ok(());
         }
 
         if matches!(self.validate_authenticated_session().await, Ok(true)) {
-            if self.get_regno().is_err() {
-                self.username = self.username.to_uppercase();
-            }
+            self.extract_registration_number()?;
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
+            self.auth_stage = AuthStage::Idle;
             self.auth_log("INFO", "finish", "OTP verified and session confirmed");
             return Ok(());
         }
@@ -929,15 +1074,14 @@ impl VtopClient {
 
         self.current_page = Some(text);
         let _ = self.extract_csrf_token();
-        if self.get_regno().is_err() {
-            self.username = self.username.to_uppercase();
-        }
+        self.extract_registration_number()?;
 
         if matches!(self.validate_authenticated_session().await, Ok(true)) {
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
             self.current_page = None;
             self.captcha_data = None;
+            self.auth_stage = AuthStage::Idle;
             self.auth_log(
                 "INFO",
                 "finish",
@@ -949,7 +1093,12 @@ impl VtopClient {
         Ok(false)
     }
 
-    pub async fn resend_security_otp(&mut self) -> VtopResult<()> {
+    pub(crate) async fn resend_security_otp(&mut self) -> VtopResult<()> {
+        if !matches!(self.auth_stage, AuthStage::AwaitingOtp { .. }) {
+            return Err(VtopError::AuthenticationFailed(
+                "No OTP challenge is active.".to_string(),
+            ));
+        }
         let csrf = self
             .session
             .get_csrf_token()
@@ -966,7 +1115,7 @@ impl VtopClient {
                 .client
                 .post(&url)
                 .header("Accept", "*/*")
-                .header("Origin", &self.config.base_url)
+                .header("Origin", self.config.base_url.as_str())
                 .header("Referer", &referer)
                 .header("Sec-Fetch-Dest", "empty")
                 .header("Sec-Fetch-Mode", "cors")
@@ -1138,7 +1287,7 @@ impl VtopClient {
     async fn try_restore_existing_session(&mut self) -> VtopResult<bool> {
         if matches!(self.validate_authenticated_session().await, Ok(true)) {
             self.extract_csrf_token()?;
-            self.get_regno()?;
+            self.extract_registration_number()?;
             self.session.set_authenticated(true);
             self.session.set_cookie_external(false);
             self.auth_log(
@@ -1186,7 +1335,7 @@ impl VtopClient {
         Ok(())
     }
 
-    fn get_regno(&mut self) -> VtopResult<()> {
+    fn extract_registration_number(&mut self) -> VtopResult<()> {
         let current_page = self.current_page.as_ref().ok_or(VtopError::ParseError(
             "Current page not found at captcha extration".into(),
         ))?;
@@ -1199,8 +1348,18 @@ impl VtopClient {
             .or_else(|| Self::extract_javascript_var(current_page, "id"))
             .ok_or(VtopError::RegistrationParsingError)?;
 
-        self.username = k;
+        self.registration_number = Some(RegistrationNumber::parse(k)?);
         Ok(())
+    }
+
+    fn registration_number(&self) -> VtopResult<&RegistrationNumber> {
+        self.registration_number
+            .as_ref()
+            .ok_or(VtopError::RegistrationParsingError)
+    }
+
+    pub(crate) fn registration_number_value(&self) -> VtopResult<String> {
+        Ok(self.registration_number()?.as_str().to_owned())
     }
     async fn solve_captcha(&self, captcha_data: &str) -> VtopResult<String> {
         if self.in_app_captcha_solver_enabled {
@@ -1273,7 +1432,7 @@ impl VtopClient {
             return Ok(path_or_url.to_string());
         }
 
-        let base_url = Url::parse(&self.config.base_url)
+        let base_url = Url::parse(self.config.base_url.as_str())
             .map_err(|error| VtopError::ConfigurationError(error.to_string()))?;
         base_url
             .join(path_or_url)
@@ -1361,7 +1520,7 @@ impl VtopClient {
         self.in_app_captcha_solver_enabled = enabled;
     }
 
-    pub fn with_config(
+    pub(crate) fn with_config(
         config: VtopConfig,
         session: SessionManager,
         username: String,
@@ -1371,16 +1530,17 @@ impl VtopClient {
         {
             let client = Self::make_client(session.get_cookie_store());
             Self {
-                client: client,
-                config: config,
-                session: session,
+                client,
+                config,
+                session,
                 current_page: None,
                 auth_flow_id: 0,
-                username: username.clone(),
-                password: password,
+                auth_stage: AuthStage::Idle,
+                username,
+                registration_number: None,
+                password,
                 captcha_data: None,
                 in_app_captcha_solver_enabled: false,
-                real_username: username,
             }
         }
         #[cfg(target_arch = "wasm32")]
@@ -1395,16 +1555,17 @@ impl VtopClient {
                 .build()
                 .unwrap();
             Self {
-                client: client,
-                config: config,
-                session: session,
+                client,
+                config,
+                session,
                 current_page: None,
                 auth_flow_id: 0,
-                username: username.clone(),
-                password: password,
+                auth_stage: AuthStage::Idle,
+                username,
+                registration_number: None,
+                password,
                 captcha_data: None,
                 in_app_captcha_solver_enabled: false,
-                real_username: username,
             }
         }
     }

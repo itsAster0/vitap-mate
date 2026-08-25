@@ -10,7 +10,10 @@ import 'vtop/types.dart';
 import 'vtop/vtop_client.dart';
 import 'vtop/vtop_errors.dart';
 
-VtopClient getVtopClient({
+// These functions are ignored because they are not marked as `pub`: `as_str`, `as_str`, `as_str`, `parse`, `parse`, `parse`, `parse`, `parse`, `parse`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CourseId`, `CourseType`, `Credentials`, `Password`, `SemesterId`, `Username`
+
+Future<VtopClient> getVtopClient({
   required String username,
   required String password,
   PersistedVtopSession? persistedSession,
@@ -37,6 +40,11 @@ Future<void> vtopClientResendSecurityOtp({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientVtopClientResendSecurityOtp(
       client: client,
     );
+
+String vtopClientRegistrationNumber({required VtopClient client}) => RustLib
+    .instance
+    .api
+    .crateApiVtopGetClientVtopClientRegistrationNumber(client: client);
 
 Future<SemesterData> fetchSemesters({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchSemesters(client: client);

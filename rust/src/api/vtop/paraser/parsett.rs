@@ -204,7 +204,11 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
                                         .get(&code)
                                         .unwrap_or(&"".to_string())
                                         .to_string(),
-                                    is_lab: is_lab,
+                                    kind: if is_lab {
+                                        ClassKind::Lab
+                                    } else {
+                                        ClassKind::Theory
+                                    },
                                     faculty: if is_lab {
                                         facultyname_lab_code
                                             .get(&code)
@@ -245,7 +249,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
             .iter()
             .find(|t| t.serial == timetable.serial)
         {
-            if !timetable.is_lab {
+            if timetable.kind == ClassKind::Theory {
                 timetable.start_time = times.start_time.clone();
                 timetable.end_time = times.end_time.clone();
             }
@@ -256,7 +260,7 @@ pub fn parse_timetable(html: String, sem: &str) -> TimetableData {
             .iter()
             .find(|t| t.serial == timetable.serial)
         {
-            if timetable.is_lab {
+            if timetable.kind == ClassKind::Lab {
                 timetable.start_time = times.start_time.clone();
                 timetable.end_time = times.end_time.clone();
             }
@@ -299,6 +303,7 @@ pub fn parse_semid_timetable(html: String) -> SemesterData {
 #[cfg(test)]
 mod tests {
     use super::parse_timetable;
+    use crate::api::vtop::types::ClassKind;
 
     #[test]
     fn timetable_keeps_component_credit_values() {
@@ -326,12 +331,12 @@ mod tests {
         let theory = timetable
             .slots
             .iter()
-            .find(|slot| !slot.is_lab)
+            .find(|slot| slot.kind == ClassKind::Theory)
             .expect("theory slot");
         let lab = timetable
             .slots
             .iter()
-            .find(|slot| slot.is_lab)
+            .find(|slot| slot.kind == ClassKind::Lab)
             .expect("lab slot");
 
         assert_eq!(theory.credits, "3.0");

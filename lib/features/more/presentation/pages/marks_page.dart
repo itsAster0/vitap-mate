@@ -7,6 +7,7 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_card.dart';
@@ -18,21 +19,21 @@ class MarksPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(marksProvider.notifier).updatemarks().catchError((e, st) {
           log('auto refresh failed: $e', stackTrace: st);
         });
       });
       return null;
-    }, [autoRefresh]);
+    }, const []);
     Future<void> update() async {
       try {
         await ref.read(marksProvider.notifier).updatemarks();
       } catch (e) {
         log("$e");
+        if (context.mounted) disCommonToast(context, e);
       }
     }
 

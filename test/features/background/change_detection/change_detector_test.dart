@@ -93,7 +93,7 @@ TimetableSlot slot({
     startTime: startTime,
     endTime: endTime,
     name: courseCode,
-    isLab: false,
+    kind: ClassKind.theory,
     faculty: 'FAC',
     credits: '3.0',
   );

@@ -31,13 +31,12 @@ class AttendanceTable extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dataAsync = ref.watch(fullAttendanceProvider(courseType, courseId));
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    final autoRefresh = ref.watch(autoRefreshProvider);
     final isLoading = useState(false);
     final selectedTab = useState(0);
 
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref
             .read(fullAttendanceProvider(courseType, courseId).notifier)
             .updateAttendance()
@@ -46,7 +45,7 @@ class AttendanceTable extends HookConsumerWidget {
             });
       });
       return null;
-    }, [autoRefresh, courseType, courseId]);
+    }, [courseType, courseId]);
 
     void handelClick() async {
       isLoading.value = true;

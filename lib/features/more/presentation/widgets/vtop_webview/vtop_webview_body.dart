@@ -92,11 +92,6 @@ class VtopWebviewBody extends StatelessWidget {
                 final url = uri.toString();
                 final lowerUrl = url.toLowerCase();
                 if (lowerUrl.startsWith('https://vtop.vitap.ac.in')) {
-                  if (lowerUrl.startsWith(
-                    'https://vtop.vitap.ac.in/vtop/login',
-                  )) {
-                    onLoginRedirect();
-                  }
                   return NavigationActionPolicy.ALLOW;
                 }
 
@@ -119,12 +114,6 @@ class VtopWebviewBody extends StatelessWidget {
                   );
                   return;
                 }
-
-                // if (visitedUrl.startsWith(
-                //   'https://vtop.vitap.ac.in/vtop/login',
-                // )) {
-                //   onLoginRedirect();
-                // }
               },
               onLoadStart: (controller, url) async {
                 onLoadingChanged(true);

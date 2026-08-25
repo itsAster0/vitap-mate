@@ -13,8 +13,8 @@ List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> input) {
     final current = t[i];
     final prev = r.isNotEmpty ? r.last : null;
     if (prev != null &&
-        current.isLab &&
-        prev.isLab &&
+        current.kind == ClassKind.lab &&
+        prev.kind == ClassKind.lab &&
         current.courseCode == prev.courseCode) {
       r[r.length - 1] = prev.copyWith(
         endTime: current.endTime,

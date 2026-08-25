@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
@@ -19,7 +20,6 @@ class GradesPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
     final state = ref.watch(gradesProvider);
     final semAsync = ref.watch(semesterIdProvider);
     final semData = semAsync.value;
@@ -40,12 +40,13 @@ class GradesPage extends HookConsumerWidget {
         await ref.read(gradesProvider.notifier).refresh();
       } catch (e) {
         log("$e");
+        if (context.mounted) disCommonToast(context, e);
       }
     }
 
     useEffect(() {
-      if (!autoRefresh) return null;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         try {
           await ref.read(gradesProvider.future);
           await ref.read(gradesProvider.notifier).refresh();
@@ -54,7 +55,7 @@ class GradesPage extends HookConsumerWidget {
         }
       });
       return null;
-    }, [autoRefresh]);
+    }, const []);
 
     return Container(
       color: context.theme.colors.background,

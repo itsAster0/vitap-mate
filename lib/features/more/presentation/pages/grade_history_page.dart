@@ -7,6 +7,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -17,7 +18,6 @@ class GradeHistoryPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final autoRefresh = ref.watch(autoRefreshProvider);
     final data = ref.watch(gradeHistoryProvider);
 
     Future<void> reload() async {
@@ -25,18 +25,19 @@ class GradeHistoryPage extends HookConsumerWidget {
         await ref.read(gradeHistoryProvider.notifier).refresh();
       } catch (e) {
         log("$e");
+        if (context.mounted) disCommonToast(context, e);
       }
     }
 
     useEffect(() {
-      if (!autoRefresh) return null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(gradeHistoryProvider.notifier).refresh().catchError((e, st) {
           log('auto refresh failed: $e', stackTrace: st);
         });
       });
       return null;
-    }, [autoRefresh]);
+    }, const []);
 
     return RefreshIndicator(
       onRefresh: reload,

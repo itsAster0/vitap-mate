@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/biometric_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
@@ -38,9 +39,18 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
         .refresh();
   }
 
+  Future<void> _refresh() async {
+    try {
+      await _load();
+    } catch (e) {
+      log('$e');
+      if (mounted) disCommonToast(context, e);
+    }
+  }
+
   void _scheduleAutoRefresh() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !ref.read(autoRefreshProvider)) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !await isAutoRefreshEnabled(ref)) return;
       _load().catchError((e, st) {
         log('auto refresh failed: $e', stackTrace: st);
       });
@@ -76,20 +86,17 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     );
     if (picked == null || picked == _selectedDate) return;
     setState(() => _selectedDate = picked);
-    if (ref.read(autoRefreshProvider)) await _load();
+    if (await isAutoRefreshEnabled(ref)) await _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<bool>(autoRefreshProvider, (previous, next) {
-      if (next && previous == false) _scheduleAutoRefresh();
-    });
     final colors = context.theme.colors;
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final data = ref.watch(biometricHistoryProvider(_vtopDate(_selectedDate)));
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refresh,
       displacement: 80,
       backgroundColor: colors.primary,
       color: colors.primaryForeground,
@@ -144,7 +151,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                           ),
                           onPress: () async {
                             setState(() => _selectedDate = date);
-                            if (ref.read(autoRefreshProvider)) await _load();
+                            if (await isAutoRefreshEnabled(ref)) await _load();
                           },
                         );
                       },
@@ -163,7 +170,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                 icon: FLucideIcons.cloudOff,
                 title: 'Could not load biometric history',
                 message: commonErrorMessage(error),
-                action: _load,
+                action: _refresh,
               ),
             ),
             data: (data) => data.records.isEmpty

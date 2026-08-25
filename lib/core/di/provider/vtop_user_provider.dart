@@ -16,7 +16,7 @@ class VtopUser extends _$VtopUser {
         .vtopUserDefault();
     log("VtopUser build sucessfull $user");
     if (user == null) {
-      return VtopUserEntity(username: null, password: null, semid: '');
+      return const VtopUserEntity.unconfigured();
     }
     return user;
   }

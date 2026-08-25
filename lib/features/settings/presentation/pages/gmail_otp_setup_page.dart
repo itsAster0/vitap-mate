@@ -16,6 +16,7 @@ import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
+import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 const _sharedWarning =
     'Fallback only. Shared Google access may be unavailable because of OAuth user limits, rate limits, verification status, or VIT Workspace policy. Try the personal BYOK method first.';
@@ -76,13 +77,14 @@ class GmailOtpSetupPage extends HookConsumerWidget {
     }, const []);
 
     Future<String?> expectedAccountIdentifier() async {
-      // VtopClient.username is replaced with the parsed registration number
-      // during login. Both personal and shared OAuth must validate against
-      // that value rather than the user's portal login name.
+      // Both personal and shared OAuth must validate against the registration
+      // number extracted after login, not the user's portal login name.
       var identifier = '';
       try {
         await ref.read(vClientProvider.notifier).ensureLogin();
-        identifier = (await ref.read(vClientProvider.future)).username.trim();
+        identifier = vtopClientRegistrationNumber(
+          client: await ref.read(vClientProvider.future),
+        ).trim();
       } catch (_) {
         if (context.mounted) {
           dispToast(

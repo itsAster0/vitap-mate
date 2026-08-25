@@ -23,13 +23,11 @@ class VClient extends _$VClient {
 
   @override
   Future<VtopClient> build() async {
-    String? username = await ref.watch(
-      vtopUserProvider.selectAsync((user) => user.username),
-    );
-    String? password = await ref.watch(
-      vtopUserProvider.selectAsync((user) => user.password),
-    );
-    final uname = username!.toUpperCase();
+    final user = await ref.watch(vtopUserProvider.future);
+    if (user is! StoredVtopUser) {
+      throw StateError('A configured VTOP account is required.');
+    }
+    final uname = user.username.toUpperCase();
     final inAppCaptchaSolverEnabled = ref.watch(inAppCaptchaSolverProvider);
     final StoredVtopSession? storedSession = await loadStoredVtopSession(uname);
     PersistedVtopSession? persistedSession;
@@ -55,7 +53,7 @@ class VClient extends _$VClient {
 
     return getVtopClient(
       username: uname,
-      password: password!,
+      password: user.password,
       persistedSession: persistedSession,
       inAppCaptchaSolverEnabled: inAppCaptchaSolverEnabled,
     );
@@ -194,7 +192,7 @@ class VClient extends _$VClient {
         );
         await ref
             .read(vtopusersutilsProvider.notifier)
-            .vtopUserSave(user.copyWith(isValid: false));
+            .vtopUserSave(user.rejectCredentials());
         ref.invalidate(vtopUserProvider);
       }
       if (uname != null &&

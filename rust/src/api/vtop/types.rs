@@ -1,5 +1,12 @@
 use flutter_rust_bridge::frb;
 use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[frb(non_opaque)]
+pub enum ClassKind {
+    Theory,
+    Lab,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[frb(dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 #[frb]
@@ -83,7 +90,7 @@ pub struct TimetableSlot {
     pub start_time: String,
     pub end_time: String,
     pub name: String,
-    pub is_lab: bool,
+    pub kind: ClassKind,
     pub faculty: String,
     #[serde(default)]
     pub credits: String,
