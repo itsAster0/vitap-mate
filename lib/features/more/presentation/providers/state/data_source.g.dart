@@ -170,3 +170,46 @@ final class GradeHistoryDataSourceProvider
 
 String _$gradeHistoryDataSourceHash() =>
     r'cd917311ca90addd0d2b36eaf1ca5493f4c330ce';
+
+@ProviderFor(biometricHistoryDataSource)
+final biometricHistoryDataSourceProvider =
+    BiometricHistoryDataSourceProvider._();
+
+final class BiometricHistoryDataSourceProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<BiometricHistoryDataSource>,
+          BiometricHistoryDataSource,
+          FutureOr<BiometricHistoryDataSource>
+        >
+    with
+        $FutureModifier<BiometricHistoryDataSource>,
+        $FutureProvider<BiometricHistoryDataSource> {
+  BiometricHistoryDataSourceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'biometricHistoryDataSourceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$biometricHistoryDataSourceHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<BiometricHistoryDataSource> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<BiometricHistoryDataSource> create(Ref ref) {
+    return biometricHistoryDataSource(ref);
+  }
+}
+
+String _$biometricHistoryDataSourceHash() =>
+    r'9bccbf4b40e5d316c6bb3d1abdb12b463c21e0f5';

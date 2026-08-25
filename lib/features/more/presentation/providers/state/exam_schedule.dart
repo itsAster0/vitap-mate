@@ -41,6 +41,19 @@ Future<GradesRepository> gradesRepositoryForSem(Ref ref, String semid) async {
 }
 
 @Riverpod(keepAlive: true)
+Future<GradeDetailsRepository> gradeDetailsRepository(
+  Ref ref,
+  String semid,
+  String courseId,
+) async {
+  return GradeDetailsRepository(
+    semid: semid,
+    courseId: courseId,
+    dataSource: await ref.watch(gradesDataSourceProvider.future),
+  );
+}
+
+@Riverpod(keepAlive: true)
 Future<GradeHistoryRepository> gradeHistoryRepository(Ref ref) async {
   return GradeHistoryRepository(
     dataSource: await ref.watch(gradeHistoryDataSourceProvider.future),

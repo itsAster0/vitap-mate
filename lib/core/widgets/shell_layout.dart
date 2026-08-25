@@ -186,6 +186,9 @@ Widget _buildHeader(
       case "exam_schedule":
         data = "Exam Schedule";
         break;
+      case "biometric-history":
+        data = "Biometric History";
+        break;
       case "chrome-extension":
         data = "Chrome Extension";
         break;

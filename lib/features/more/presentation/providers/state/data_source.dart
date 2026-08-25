@@ -41,3 +41,12 @@ Future<GradeHistoryDataSource> gradeHistoryDataSource(Ref ref) async {
     ref.read(globalAsyncQueueProvider.notifier),
   );
 }
+
+@Riverpod(keepAlive: true)
+Future<BiometricHistoryDataSource> biometricHistoryDataSource(Ref ref) async {
+  return BiometricHistoryDataSource(
+    await ref.read(jsonFileStorageProvider.future),
+    () => ref.read(vClientProvider.future),
+    ref.read(globalAsyncQueueProvider.notifier),
+  );
+}

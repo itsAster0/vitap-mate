@@ -1,9 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/exceptions.dart';
-import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
-import 'package:vitapmate/features/more/data/repositories/grades_repo.dart';
+import 'package:vitapmate/core/utils/vtop_controller.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -58,18 +55,12 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     final semId = current?.selectedSemesterId;
     if (semId == null || semId.isEmpty) return;
 
-    final hasLocalData = current?.gradeView.courses.isNotEmpty ?? false;
-    final repo = await ref.read(gradesRepositoryForSemProvider(semId).future);
-    final didFetchRemote = await _updateView(repo, hasLocalData: hasLocalData);
     final next = await _loadSemester(
       semId,
       current!.semesters,
-      forceRemote: false,
+      forceRemote: true,
     );
     state = AsyncData(next);
-    if (!didFetchRemote) {
-      throw FeatureDisabledException("Grades Feature Disabled");
-    }
   }
 
   Future<void> selectSemester(String semId) async {
@@ -102,11 +93,20 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     state = AsyncData(current.copyWith(loadingDetailsFor: loadingSet));
 
     try {
-      await ref.read(vClientProvider.notifier).ensureLogin();
-      final repo = await ref.read(
-        gradesRepositoryForSemProvider(current.selectedSemesterId).future,
+      final repository = await ref.read(
+        gradeDetailsRepositoryProvider(
+          current.selectedSemesterId,
+          courseId,
+        ).future,
       );
-      final details = await repo.fetchGradeDetailsRemote(courseId: courseId);
+      final controller = VtopController<GradeDetailsData>(
+        ref: ref,
+        repository: repository,
+        featureName: 'fetch-grades',
+      );
+      final details = force
+          ? await controller.refresh()
+          : await controller.load();
 
       final now = state.value ?? current;
       final nextMap = {...now.detailsByCourseId, courseId: details};
@@ -138,22 +138,18 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
       selected = semesters.first.id;
     }
 
-    final repo = await ref.read(
+    final repository = await ref.read(
       gradesRepositoryForSemProvider(selected).future,
     );
-
-    var view = await repo.getGradeViewFromStorage();
-    final details = await repo.getGradeDetailsFromStorage();
-
-    if (forceRemote) {
-      await _updateView(repo, hasLocalData: view.courses.isNotEmpty);
-      view = await repo.getGradeViewFromStorage();
-    }
-
-    if (view.courses.isEmpty) {
-      await _updateView(repo, hasLocalData: false);
-      view = await repo.getGradeViewFromStorage();
-    }
+    final controller = VtopController<GradeViewData>(
+      ref: ref,
+      repository: repository,
+      featureName: 'fetch-grades',
+    );
+    final view = forceRemote
+        ? await controller.refresh()
+        : await controller.load();
+    final details = await repository.getGradeDetailsFromStorage();
 
     return GradesUiState(
       gradeView: view,
@@ -162,22 +158,5 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
       detailsByCourseId: details,
       loadingDetailsFor: const <String>{},
     );
-  }
-
-  Future<bool> _updateView(
-    GradesRepository repo, {
-    required bool hasLocalData,
-  }) async {
-    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
-    if (await featureFlags.isEnabled("fetch-grades")) {
-      await ref.read(vClientProvider.notifier).ensureLogin();
-      await repo.updateGradeView();
-      return true;
-    } else {
-      if (hasLocalData) {
-        return false;
-      }
-      throw FeatureDisabledException("Grades Feature Disabled");
-    }
   }
 }

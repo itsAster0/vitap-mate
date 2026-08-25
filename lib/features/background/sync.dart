@@ -128,8 +128,10 @@ Future<bool> syncVtopData({
 
     final semids = await (await read(
       semidRepositoryProvider.future,
-    )).getSemidsFromStorage();
-    if (force || !_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
+    )).loadCache();
+    if (force ||
+        semids == null ||
+        !_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
       futures.add(
         _retryer(
           () => read(semesterIdProvider.notifier).updatesemids(),
@@ -262,9 +264,12 @@ Future<(bool, AttendanceData?)> _attendanceSync(
     final k = await Future.wait([
       for (final i in att.records)
         () async {
-          final fullAttendance = await attendanceRepo
-              .getFullAttendanceFromStorage(i.courseType, i.courseId);
+          final fullAttendanceRepo = await read(
+            fullAttendanceRepositoryProvider(i.courseType, i.courseId).future,
+          );
+          final fullAttendance = await fullAttendanceRepo.loadCache();
           if (!force &&
+              fullAttendance != null &&
               _isUpdatedWithinBacksyncWindow(fullAttendance.updateTime)) {
             return true;
           }
@@ -330,7 +335,10 @@ Future<void> _runChangeDetection(
     final examScheduleRepo = await read(examScheduleRepositoryProvider.future);
     final freshExamSchedule = await examScheduleRepo.loadCache();
     if (freshExamSchedule != null && previousExamSchedule != null) {
-      final summary = compareExamSchedule(previousExamSchedule, freshExamSchedule);
+      final summary = compareExamSchedule(
+        previousExamSchedule,
+        freshExamSchedule,
+      );
       if (summary != null) {
         await ChangeAlertNotificationService.showDataChange(
           type: ChangeAlertType.examSchedule,

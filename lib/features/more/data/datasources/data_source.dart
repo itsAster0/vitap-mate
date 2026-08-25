@@ -245,3 +245,47 @@ class GradeHistoryDataSource {
     );
   }
 }
+
+class BiometricHistoryDataSource {
+  BiometricHistoryDataSource(
+    this._storage,
+    this._client,
+    this._globalAsyncQueue,
+  );
+
+  final JsonFileStorage _storage;
+  final Future<VtopClient> Function() _client;
+  final GlobalAsyncQueue _globalAsyncQueue;
+
+  String _storageKey(String date) => 'biometric_history_$date';
+
+  Future<BiometricData?> getBiometricHistory(String date) {
+    return _globalAsyncQueue.run(
+      'fromStorage_biometric_history_$date',
+      () async {
+        final payload = await _storage.readJson(_storageKey(date));
+        if (payload == null) return null;
+        return BiometricData.fromJson(payload);
+      },
+    );
+  }
+
+  Future<void> saveBiometricHistory(BiometricData data, String date) {
+    return _globalAsyncQueue.run(
+      'toStorage_biometric_history_$date',
+      () => _storage.writeJson(_storageKey(date), data.toJson()),
+    );
+  }
+
+  Future<BiometricData> fetchBiometricHistory(String date) {
+    return AppLogger.instance.trackRequest(
+      source: 'client.biometric_history',
+      action: 'fetchBiometricHistory date=$date',
+      run: () => _globalAsyncQueue.run(
+        'vtop_biometric_history_$date',
+        () async =>
+            vtop_api.fetchBiometricHistory(client: await _client(), date: date),
+      ),
+    );
+  }
+}

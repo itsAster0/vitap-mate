@@ -27,33 +27,39 @@ class AttendanceRepository extends CachedRepository<AttendanceData> {
   Future<AttendanceData> fetchRemote() async {
     return _dataSource.fetchAttendance(semid);
   }
+}
 
-  Future<FullAttendanceData> getFullAttendanceFromStorage(
-    String courseType,
-    String courseId,
-  ) {
-    return _dataSource.getFullAttendance(semid, courseId, courseType);
+class FullAttendanceRepository extends CachedRepository<FullAttendanceData> {
+  FullAttendanceRepository({
+    required this.semid,
+    required this.courseType,
+    required this.courseId,
+    required AttendanceDataSource dataSource,
+  }) : _dataSource = dataSource;
+
+  final String semid;
+  final String courseType;
+  final String courseId;
+  final AttendanceDataSource _dataSource;
+
+  @override
+  Future<FullAttendanceData?> loadCache() async {
+    final attendance = await _dataSource.getFullAttendance(
+      semid,
+      courseId,
+      courseType,
+    );
+    if (attendance.semesterId.isEmpty) return null;
+    return attendance;
   }
 
-  Future<void> saveFullAttendanceToStorage(
-    FullAttendanceData fullAttendance,
-    String courseType,
-    String courseId,
-  ) {
-    return _dataSource.saveFullAttendance(
-      fullAttendance,
-      semid,
-      courseType,
-      courseId,
-    );
+  @override
+  Future<void> saveCache(FullAttendanceData data) {
+    return _dataSource.saveFullAttendance(data, semid, courseType, courseId);
   }
 
-  Future<void> updateFullAttendance(String courseType, String courseId) async {
-    final attendance = await _dataSource.fetchFullAttendance(
-      semid,
-      courseType,
-      courseId,
-    );
-    await saveFullAttendanceToStorage(attendance, courseType, courseId);
+  @override
+  Future<FullAttendanceData> fetchRemote() {
+    return _dataSource.fetchFullAttendance(semid, courseType, courseId);
   }
 }

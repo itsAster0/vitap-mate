@@ -12,3 +12,17 @@ Future<AttendanceRepository> attendanceRepository(Ref ref) async {
     dataSource: await ref.read(attendanceDataSourceProvider.future),
   );
 }
+
+@Riverpod(keepAlive: true)
+Future<FullAttendanceRepository> fullAttendanceRepository(
+  Ref ref,
+  String courseType,
+  String courseId,
+) async {
+  return FullAttendanceRepository(
+    semid: await ref.watch(vtopUserProvider.selectAsync((val) => val.semid!)),
+    courseType: courseType,
+    courseId: courseId,
+    dataSource: await ref.read(attendanceDataSourceProvider.future),
+  );
+}

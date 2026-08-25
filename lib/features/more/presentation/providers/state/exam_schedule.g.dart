@@ -206,6 +206,89 @@ final class GradesRepositoryForSemFamily extends $Family
   String toString() => r'gradesRepositoryForSemProvider';
 }
 
+@ProviderFor(gradeDetailsRepository)
+final gradeDetailsRepositoryProvider = GradeDetailsRepositoryFamily._();
+
+final class GradeDetailsRepositoryProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<GradeDetailsRepository>,
+          GradeDetailsRepository,
+          FutureOr<GradeDetailsRepository>
+        >
+    with
+        $FutureModifier<GradeDetailsRepository>,
+        $FutureProvider<GradeDetailsRepository> {
+  GradeDetailsRepositoryProvider._({
+    required GradeDetailsRepositoryFamily super.from,
+    required (String, String) super.argument,
+  }) : super(
+         retry: null,
+         name: r'gradeDetailsRepositoryProvider',
+         isAutoDispose: false,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$gradeDetailsRepositoryHash();
+
+  @override
+  String toString() {
+    return r'gradeDetailsRepositoryProvider'
+        ''
+        '$argument';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<GradeDetailsRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<GradeDetailsRepository> create(Ref ref) {
+    final argument = this.argument as (String, String);
+    return gradeDetailsRepository(ref, argument.$1, argument.$2);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is GradeDetailsRepositoryProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$gradeDetailsRepositoryHash() =>
+    r'21b53ee3355e5eaff043e8cc4cd3a3436159ec7d';
+
+final class GradeDetailsRepositoryFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<GradeDetailsRepository>,
+          (String, String)
+        > {
+  GradeDetailsRepositoryFamily._()
+    : super(
+        retry: null,
+        name: r'gradeDetailsRepositoryProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: false,
+      );
+
+  GradeDetailsRepositoryProvider call(String semid, String courseId) =>
+      GradeDetailsRepositoryProvider._(argument: (semid, courseId), from: this);
+
+  @override
+  String toString() => r'gradeDetailsRepositoryProvider';
+}
+
 @ProviderFor(gradeHistoryRepository)
 final gradeHistoryRepositoryProvider = GradeHistoryRepositoryProvider._();
 

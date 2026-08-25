@@ -1,12 +1,16 @@
-import 'dart:developer';
-import 'package:flutter/widgets.dart';
+import 'dart:developer' show log;
+
+import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
+import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/core/widgets/data_updated_footer.dart';
+import 'package:vitapmate/features/more/presentation/providers/biometric_history_provider.dart';
+import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 class BiometricHistoryPage extends ConsumerStatefulWidget {
   const BiometricHistoryPage({super.key});
@@ -18,34 +22,29 @@ class BiometricHistoryPage extends ConsumerStatefulWidget {
 
 class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
   late DateTime _selectedDate;
-  AsyncValue<BiometricData> _data = const AsyncLoading();
 
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
-    Future.microtask(_load);
+    _scheduleAutoRefresh();
   }
 
   String _vtopDate(DateTime date) => DateFormat('dd/MM/yyyy').format(date);
 
   Future<void> _load() async {
-    if (mounted) setState(() => _data = const AsyncLoading());
-    try {
-      await ref.read(vClientProvider.notifier).ensureLogin();
-      final result = await fetchBiometricHistory(
-        client: await ref.read(vClientProvider.future),
-        date: _vtopDate(_selectedDate),
-      );
-      if (mounted) setState(() => _data = AsyncData(result));
-    } catch (error, stackTrace) {
-      log(
-        'Unable to load biometric history',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (mounted) setState(() => _data = AsyncError(error, stackTrace));
-    }
+    await ref
+        .read(biometricHistoryProvider(_vtopDate(_selectedDate)).notifier)
+        .refresh();
+  }
+
+  void _scheduleAutoRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !ref.read(autoRefreshProvider)) return;
+      _load().catchError((e, st) {
+        log('auto refresh failed: $e', stackTrace: st);
+      });
+    });
   }
 
   Future<void> _pickDate() async {
@@ -77,35 +76,32 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     );
     if (picked == null || picked == _selectedDate) return;
     setState(() => _selectedDate = picked);
-    await _load();
+    if (ref.read(autoRefreshProvider)) await _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(autoRefreshProvider, (previous, next) {
+      if (next && previous == false) _scheduleAutoRefresh();
+    });
     final colors = context.theme.colors;
-    return FScaffold(
-      childPad: false,
+    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final data = ref.watch(biometricHistoryProvider(_vtopDate(_selectedDate)));
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      displacement: 80,
+      backgroundColor: colors.primary,
+      color: colors.primaryForeground,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Biometric history',
-                    style: context.theme.typography.display.xl3.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Face and biometric punches recorded by VTOP',
-                    style: TextStyle(color: colors.mutedForeground),
-                  ),
-                  const SizedBox(height: 16),
                   FTileGroup(
                     children: [
                       FTile(
@@ -148,7 +144,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                           ),
                           onPress: () async {
                             setState(() => _selectedDate = date);
-                            await _load();
+                            if (ref.read(autoRefreshProvider)) await _load();
                           },
                         );
                       },
@@ -158,7 +154,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
               ),
             ),
           ),
-          _data.when(
+          data.when(
             loading: () => const SliverFillRemaining(
               child: Center(child: SizedBox(width: 180, child: FProgress())),
             ),
@@ -171,25 +167,37 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
               ),
             ),
             data: (data) => data.records.isEmpty
-                ? const SliverFillRemaining(
-                    child: _MessageState(
-                      icon: FLucideIcons.fingerprint,
-                      title: 'No punches found',
-                      message:
-                          'There are no biometric or face logs for this date.',
+                ? SliverFillRemaining(
+                    child: Column(
+                      children: [
+                        const Expanded(
+                          child: _MessageState(
+                            icon: FLucideIcons.fingerprint,
+                            title: 'No punches found',
+                            message:
+                                'There are no biometric or face logs for this date.',
+                          ),
+                        ),
+                        DataUpdatedFooter(
+                          updateTime: data.updateTime.toInt(),
+                          padding: const EdgeInsets.only(bottom: 16),
+                        ),
+                      ],
                     ),
                   )
                 : SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
                     sliver: SliverList.list(
                       children: [
                         _Summary(records: data.records),
-                        const SizedBox(height: 14),
-                        ...data.records.map(
-                          (record) => Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _PunchCard(record: record),
-                          ),
+                        const SizedBox(height: 10),
+                        _BiometricTable(
+                          records: data.records,
+                          darkMode: darkMode,
+                        ),
+                        DataUpdatedFooter(
+                          updateTime: data.updateTime.toInt(),
+                          padding: const EdgeInsets.only(top: 12),
                         ),
                       ],
                     ),
@@ -232,7 +240,13 @@ class _Count extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: FCard(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: context.theme.colors.primaryForeground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.theme.colors.border),
+      ),
       child: Column(
         children: [
           Text(
@@ -252,52 +266,165 @@ class _Count extends StatelessWidget {
   );
 }
 
-class _PunchCard extends StatelessWidget {
-  const _PunchCard({required this.record});
-  final BiometricRecord record;
+class _BiometricTable extends StatelessWidget {
+  const _BiometricTable({required this.records, required this.darkMode});
+
+  final List<BiometricRecord> records;
+  final bool darkMode;
+
+  String _type(BiometricRecord record) {
+    final venue = record.venue.toUpperCase();
+    if (venue.contains('-OUT-')) return 'Exit';
+    if (venue.contains('-IN-')) return 'Entry';
+    return 'Punch';
+  }
+
+  String _time(String value) =>
+      value.split(':').map((part) => part.padLeft(2, '0')).join(':');
 
   @override
   Widget build(BuildContext context) {
-    final venue = record.venue.toUpperCase();
-    final isOut = venue.contains('-OUT-');
-    final label = isOut
-        ? 'Exit'
-        : venue.contains('-IN-')
-        ? 'Entry'
-        : 'Punch';
-    final time = record.punchTime
-        .split(':')
-        .map((part) => part.padLeft(2, '0'))
-        .join(':');
-    return FCard(
-      child: Row(
-        children: [
-          Icon(isOut ? FLucideIcons.logOut : FLucideIcons.logIn, size: 26),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FBadge(
-                  variant: isOut
-                      ? FBadgeVariant.outline
-                      : FBadgeVariant.secondary,
-                  child: Text(label),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  record.venue,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
+    final textColor = darkMode
+        ? context.theme.colors.primary
+        : MoreColors.secondaryText;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: darkMode
+            ? context.theme.colors.primaryForeground
+            : MoreColors.tableBackground,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: MoreColors.cardShadowSecondary,
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            dividerThickness: darkMode ? 0 : 1,
+            headingRowColor: WidgetStatePropertyAll(
+              darkMode
+                  ? context.theme.colors.primaryForeground
+                  : MoreColors.tableHeaderBackground,
+            ),
+            headingRowHeight: 56,
+            dataRowMinHeight: 48,
+            dataRowMaxHeight: 64,
+            columnSpacing: 24,
+            horizontalMargin: 16,
+            columns: [
+              _column('#', textColor, numeric: true),
+              _column('Date', textColor),
+              _column('Time', textColor),
+              _column('Type', textColor),
+              _column('Venue', textColor),
+            ],
+            rows: records.asMap().entries.map((entry) {
+              final record = entry.value;
+              final type = _type(record);
+              final isEven = entry.key.isEven;
+              return DataRow(
+                color: WidgetStatePropertyAll(
+                  darkMode || isEven
+                      ? Colors.transparent
+                      : MoreColors.tableRowAlternate,
+                ),
+                cells: [
+                  _cell(record.serial, textColor, numeric: true),
+                  _cell(record.punchDate, textColor),
+                  _cell(_time(record.punchTime), textColor, numeric: true),
+                  DataCell(_TypeBadge(type: type)),
+                  _cell(record.venue, textColor),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  DataColumn _column(String label, Color color, {bool numeric = false}) {
+    return DataColumn(
+      numeric: numeric,
+      label: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  DataCell _cell(String value, Color color, {bool numeric = false}) {
+    return DataCell(
+      Text(
+        value,
+        style: TextStyle(
+          color: color,
+          fontSize: 13,
+          fontWeight: numeric ? FontWeight.w600 : FontWeight.w400,
+          fontFeatures: numeric ? const [FontFeature.tabularFigures()] : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _TypeBadge extends StatelessWidget {
+  const _TypeBadge({required this.type});
+
+  final String type;
+
+  @override
+  Widget build(BuildContext context) {
+    final isExit = type == 'Exit';
+    final isEntry = type == 'Entry';
+    final color = isExit
+        ? MoreColors.errorText
+        : isEntry
+        ? MoreColors.successText
+        : MoreColors.infoText;
+    final background = isExit
+        ? MoreColors.errorBackground
+        : isEntry
+        ? MoreColors.successBackground
+        : MoreColors.infoBackground;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isExit
+                ? FLucideIcons.logOut
+                : isEntry
+                ? FLucideIcons.logIn
+                : FLucideIcons.fingerprint,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
           Text(
-            time,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              fontFeatures: [FontFeature.tabularFigures()],
+            type,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
