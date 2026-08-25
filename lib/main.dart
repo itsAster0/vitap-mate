@@ -24,7 +24,8 @@ Future<void> main() async {
 
   await RustLib.init();
   fileDownloaderConfig();
-  runApp(ProviderScope(child: const MyApp()));
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends HookConsumerWidget {

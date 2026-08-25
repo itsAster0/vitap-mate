@@ -27,11 +27,6 @@ import 'package:vitapmate/features/settings/presentation/pages/user_management.d
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
-const _appTrack = String.fromEnvironment(
-  'APP_TRACK',
-  defaultValue: 'production',
-);
-
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
 
@@ -369,8 +364,6 @@ class SettingsPage extends HookConsumerWidget {
     final appVersion = packageInfo == null
         ? null
         : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
-    // final showLowMaintenanceNotice = _appTrack == 'production';
-    final showLowMaintenanceNotice = false;
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -418,17 +411,6 @@ class SettingsPage extends HookConsumerWidget {
       child: Column(
         spacing: 8,
         children: [
-          if (showLowMaintenanceNotice)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(12, 0, 12, 4),
-              child: FAlert(
-                variant: FAlertVariant.primary,
-                title: Text('Low maintenance mode'),
-                subtitle: Text(
-                  'This app is in low maintenance mode and might not receive future updates.',
-                ),
-              ),
-            ),
           const UserBox(),
           FTileGroup(
             divider: FItemDivider.indented,

@@ -15,7 +15,7 @@
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="2: flutter build appbundle --release --dart-define-from-file=.env.json --dart-define=APP_TRACK=internal" time="198.413674">
+      <testcase classname="fastlane.lanes" name="2: flutter build appbundle --release --dart-define-from-file=.env.json" time="198.413674">
         
       </testcase>
     

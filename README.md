@@ -4,117 +4,137 @@
 
 # vitapmate
 
-vitapmate is an unofficial Android app for students at VIT-AP University. Use it to check attendance, marks, exam schedules, and VTOP without opening the VTOP website each time.
+vitapmate is an unofficial Android client for VIT-AP students. It reads academic data from VTOP and keeps a local copy on the device, so common information remains available between refreshes.
 
-> [!WARNING]
-> This project is archived. The Google Play Store version will not receive more updates. New Android builds may still appear here when the source code changes.
+> [!NOTE]
+> The app is in low-maintenance mode. The Play Store release is no longer updated, though source changes may still produce new GitHub builds.
 
-## Download
+## Install
 
-[Open the latest Android builds](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain)
+[Open the Android build workflow](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain), select the newest successful run, and download an artifact from its **Artifacts** section. GitHub may ask you to sign in.
 
-1. Open the newest build with a green check mark.
-2. Scroll to the **Artifacts** section.
-3. Download `vitapmate-universal-apk`.
-4. Extract the ZIP file and open the APK on your Android device.
-5. Allow installation from your browser or file manager if Android asks.
+Most people should use `vitapmate-universal-apk`. Extract the downloaded ZIP, then open the APK on the Android device.
 
-GitHub may require you to sign in before downloading an artifact.
-
-### Which APK should I download?
-
-Use `vitapmate-universal-apk` unless you know your device architecture. It works on all supported devices.
-
-| APK | Intended device |
+| Artifact | Device |
 | --- | --- |
 | `vitapmate-universal-apk` | Any supported Android device |
-| `vitapmate-arm64-v8a-apk` | Most modern Android phones |
+| `vitapmate-arm64-v8a-apk` | Most current Android phones |
 | `vitapmate-armeabi-v7a-apk` | Older 32-bit Android phones |
 | `vitapmate-x86_64-apk` | Android emulators and Intel devices |
 
-## Getting started
+Workflow artifacts expire after 30 days. If a download has expired, use a newer successful run.
 
-1. Install and open vitapmate.
-2. Sign in with your VTOP account.
-3. Let the first refresh finish. Your attendance, marks, and schedules will then appear in the app.
-4. Open Settings if you want to set up Gmail OTP reading.
+## Features
 
-## What you can do
+- Timetable with daily, agenda, and weekly views
+- Attendance tracking and attendance calculator
+- Marks, grades, grade history, and exam schedules
+- GPA and projected CGPA calculator
+- Face and biometric entry history
+- Background sync and automatic data refresh
+- Automatic VTOP OTP retrieval from Gmail
+- Class reminders, exam reminders, and VTOP change alerts
+- Android calendar sync
+- In-app VTOP browser and outing shortcuts
+- Local document viewer for PDFs, images, spreadsheets, and text files
+- Companion Chrome extension for VTOP login
 
-- Check attendance and course details
-- View marks and exam schedules
-- Open VTOP inside the app
-- Read recently loaded information without refreshing
-- Read VTOP OTP emails through an optional Gmail connection
+### Timetable
 
-## Gmail OTP reading
+- Daily, agenda, and weekly layouts
+- Course, faculty, room, block, slot, and class-time details
+- Android calendar sync with a date range, destination calendar, reminder time, and editable title, description, and location templates
 
-Gmail access is optional. The app has a **How to get OAuth credentials** guide that walks you through creating and importing your own Google OAuth client.
+### Attendance
 
-Google may show an unverified app warning because vitapmate requests the `gmail.modify` permission. The app uses it to read VTOP OTP messages and to move a read OTP message to Trash when you ask it to.
+- Attendance percentages and attended or missed class counts by course
+- A per-course calculator for checking how attending or skipping future classes changes the percentage
 
-If your Google project is in Testing mode, Gmail authorization usually expires after seven days. Open the Gmail setup in vitapmate and authorize it again.
+### Marks, grades, and exams
 
-Do not share OAuth access tokens, refresh tokens, or imported credentials.
+- Course-wise marks and assessment breakdowns
+- Semester grade view with detailed marks
+- Complete grade history
+- Exam schedules with date, time, reporting time, venue, room, and seat details when VTOP supplies them
+- Exam countdowns
+- GPA and projected CGPA calculator with course credits and planned grades
+- Face and biometric entry history by date
 
-## Privacy
+### VTOP access
 
-vitapmate processes VTOP pages on your device. It does not send your VTOP user ID or password to a vitapmate server, and it does not store those credentials outside your device.
+- VTOP inside the app, with shortcuts to the course page, general outing, and weekend outing
+- Additional web shortcuts for timetable, attendance, academic calendar, assignments, grades, and grade history
+- Compact and desktop web views
+- Optional Gmail OTP retrieval.
+- Optional deletion of an OTP email after it has been read
 
-The app still connects to services you choose to use. These include VTOP, Google for optional Gmail access, and Firebase services used by the app.
+### Documents
 
-## Troubleshooting
+- A local document shelf with a built-in Mess Menu slot
+- PDF, image, spreadsheet, text, HTML, JSON, Markdown, XML, and CSV imports
+- In-app document viewing with saved reading position and zoom state
+- Rename, delete, and recently opened document controls
 
-### Android says the app cannot be installed
+Supported image extensions are PNG, JPG, JPEG, WebP, GIF, and BMP. Spreadsheet imports accept XLSX, XLSM, XLS, and ODS, though legacy XLS files may need conversion to XLSX before they can be read.
 
-Make sure you extracted the ZIP before opening the APK. You may also need to allow installs from your browser or file manager in Android settings.
+### Sync, alerts, and app controls
 
-If Android reports a signature conflict, uninstall the Play Store version and install the GitHub build again. Uninstalling removes the app's local data.
+- Manual refresh, refresh on page load, and background refresh intervals of 3, 6, 12, or 24 hours
+- Local notifications before classes and exams, with adjustable lead times
+- Temporary pause for class reminders
+- Change alerts for attendance drops, new or revised marks, timetable changes, and exam schedule updates
 
-### The artifact has expired
+### Companion Chrome extension
 
-GitHub keeps these artifacts for 30 days. Return to the [Android builds page](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain) and use the newest successful build.
+Firebase-enabled Android builds can pair with the vitapmate Chrome extension. The app creates a token used by the extension to request a current authenticated VTOP browser session from the phone. This menu stays hidden when Firebase is unavailable.
 
-### I downloaded the wrong APK
+## First run
 
-Download `vitapmate-universal-apk`. The other packages are smaller builds made for specific processor types.
+1. Open the app and enter your VTOP username and password.
+2. Select a semester.
+3. Wait for the first VTOP refresh to finish.
+4. Open **Settings** to configure reminders, background sync, Gmail OTP retrieval, or the local CAPTCHA solver.
 
-### Gmail stopped reading OTP messages
+VTOP credentials and cached academic data are stored on the device. The app connects directly to VTOP. Google, Firebase, and Flagsmith connections are used only when the corresponding integration is configured or enabled.
 
-Open the Gmail setup in vitapmate and connect the account again. Testing-mode Google authorizations usually expire after seven days.
+vitapmate is independent of VIT-AP University.
 
-## Project status
+## Development
 
-vitapmate is no longer maintained as a published Play Store app. The source remains available for reference and community forks, but updates and support are not guaranteed.
+The UI is written in Flutter. VTOP login, CAPTCHA recognition, requests, and parsing run through Rust with `flutter_rust_bridge`.
 
-vitapmate is an independent project and is not affiliated with VIT-AP University.
+Requirements:
 
-## For developers
+- Flutter stable with Dart 3.11 or newer
+- Rust stable
+- Java 17 and the Android SDK
 
-The app uses Flutter for the interface and Rust for VTOP processing.
-
-Install the required tools:
-
-- [Install Flutter](https://docs.flutter.dev/install)
-- [Set up Flutter for Android](https://docs.flutter.dev/platform-integration/android/setup)
-- [Install Rust](https://rust-lang.org/tools/install/)
-
-From the project directory, install packages and run the app:
+Install packages and run the checks:
 
 ```bash
 flutter pub get
-flutter run
+flutter analyze
+flutter test
 ```
 
-Android release builds need a signing key. Follow Flutter's [Android release guide](https://docs.flutter.dev/deployment/android), then build the APK:
+The current Android Gradle configuration uses the `release` signing configuration for debug and release builds. Add `android/keystore.properties` and the keystore file referenced by its `storeFile` entry before running the Android app.
+
+```properties
+storeFile=../upload-keystore.jks
+keyAlias=your-key-alias
+password=your-keystore-password
+```
+
+Then run or build the app:
 
 ```bash
+flutter run
 flutter build apk --release
 ```
 
-### Optional integrations
+## Optional build configuration
 
-Create `.env.json` in the project directory when you need Firebase messaging or the shared Gmail login:
+Plain builds work without hosted integrations. Pass Dart defines through `.env.json` when developing the Gmail shared-login path, Firebase messaging and extension pairing, or remote feature flags.
 
 ```json
 {
@@ -123,41 +143,48 @@ Create `.env.json` in the project directory when you need Firebase messaging or 
   "FIREBASE_ANDROID_APP_ID": "your-firebase-android-app-id",
   "FIREBASE_MESSAGING_SENDER_ID": "your-firebase-sender-id",
   "FIREBASE_PROJECT_ID": "your-firebase-project-id",
-  "FIREBASE_STORAGE_BUCKET": "your-firebase-storage-bucket"
+  "FIREBASE_STORAGE_BUCKET": "your-firebase-storage-bucket",
+  "FLAGSMITH_ENV_API_KEY_DEV": "your-development-environment-key",
+  "FLAGSMITH_ENV_API_KEY_PROD": "your-production-environment-key",
+  "FLAGSMITH_BASE_URI": "https://your-flagsmith-host/api/v1/"
 }
 ```
-
-Use it when running or building:
 
 ```bash
 flutter run --dart-define-from-file=.env.json
 flutter build apk --release --dart-define-from-file=.env.json
 ```
 
-`GOOGLE_OAUTH_CLIENT_ID` enables the shared Gmail OAuth option. It must be an Android OAuth client ID ending in `.apps.googleusercontent.com`. Configure it for package `com.vitap_pal.app` and add the signing key's SHA fingerprints. Android users can still import their own Desktop OAuth file when this value is absent.
+`GOOGLE_OAUTH_CLIENT_ID` must be an Android OAuth client ID ending in `.apps.googleusercontent.com`. Its Android client must use package name `com.vitap_pal.app` and the certificate fingerprints for the signing key. Without this value, Android users can still import a Desktop OAuth JSON file in the Gmail setup screen.
 
-The app stores Gmail access tokens, refresh tokens, and personal OAuth credentials in device secure storage. Do not put tokens in `.env.json`, source control, or GitHub Actions secrets.
+Firebase needs all five `FIREBASE_ANDROID_*` values shown above. They can be copied from the Android `FirebaseOptions` generated by `flutterfire configure`. The app disables Firebase-dependent controls when that configuration is incomplete.
 
-The tracked `lib/firebase_options.dart` reads Firebase client settings from these Dart defines. `android/app/google-services.json` remains optional and is ignored by Git.
+Flagsmith configuration is optional. When its base URI or the matching environment key is absent, the app enables its feature-flagged screens locally.
 
-#### Getting the Firebase values
+## Troubleshooting
 
-Run the FlutterFire CLI for your Firebase project:
+### Android cannot install the APK
 
-```bash
-flutterfire configure
-```
+Extract the workflow artifact before opening the APK. Android may also ask for permission to install apps from the browser or file manager.
 
-The CLI generates `lib/firebase_options.dart`. You can use it in either of these ways:
+A GitHub build and the old Play Store build may use different signatures. If Android reports a signature conflict, removing the installed copy resolves it but also removes that copy's local app data.
 
-1. Copy the Android values from the generated `FirebaseOptions` into `.env.json`:
+### Gmail authorization stops working
 
-   - `apiKey` becomes `FIREBASE_ANDROID_API_KEY`
-   - `appId` becomes `FIREBASE_ANDROID_APP_ID`
-   - `messagingSenderId` becomes `FIREBASE_MESSAGING_SENDER_ID`
-   - `projectId` becomes `FIREBASE_PROJECT_ID`
-   - `storageBucket` becomes `FIREBASE_STORAGE_BUCKET`
+Google OAuth projects in Testing status commonly issue refresh tokens that expire after seven days. Reconnect the Gmail account from **Settings > Gmail Autofetch**.
 
-   Restore the repository version of `lib/firebase_options.dart` if the CLI replaced it, then run or build with `--dart-define-from-file=.env.json`.
+### Calendar sync is unavailable
 
-2. Keep the complete `lib/firebase_options.dart` generated by the CLI. It contains the Firebase values directly, so the Firebase Dart defines are not needed. The file will appear as a local Git modification unless you commit it.
+Calendar sync is Android-only. Grant calendar access and make sure the device has at least one writable calendar.
+
+### A document will not open
+
+Check that its extension appears in the supported document list. For an old `.xls` spreadsheet, save it as `.xlsx` and import the new file.
+
+## Project status
+
+The repository remains open for fixes, documentation work, and community forks. Updates and support are not guaranteed. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and [SECURITY.md](SECURITY.md) for private vulnerability reporting.
+
+## License
+
+This project is released under the terms in [LICENSE](LICENSE).
