@@ -16,6 +16,8 @@ import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_w
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_loading.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_scripts.dart';
 
+final _keepAlive = InAppWebViewKeepAlive();
+
 class VtopWebview extends HookConsumerWidget {
   const VtopWebview({this.initialMenuUrl, super.key});
   final String? initialMenuUrl;
@@ -220,6 +222,7 @@ class VtopWebview extends HookConsumerWidget {
       ),
       child: VtopWebviewBody(
         initialUrl: _initialUrl,
+        keepAlive: _keepAlive,
         isCompactMode: isCompactMode.value,
         isDarkMode: isDarkMode.value,
         loading: loading.value,

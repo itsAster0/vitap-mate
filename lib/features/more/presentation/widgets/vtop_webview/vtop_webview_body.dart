@@ -11,6 +11,7 @@ import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_w
 class VtopWebviewBody extends StatelessWidget {
   const VtopWebviewBody({
     required this.initialUrl,
+    required this.keepAlive,
     required this.isCompactMode,
     required this.isDarkMode,
     required this.loading,
@@ -23,6 +24,7 @@ class VtopWebviewBody extends StatelessWidget {
   });
 
   final WebUri initialUrl;
+  final InAppWebViewKeepAlive keepAlive;
   final bool isCompactMode;
   final bool isDarkMode;
   final bool loading;
@@ -59,6 +61,7 @@ class VtopWebviewBody extends StatelessWidget {
         child: Stack(
           children: [
             InAppWebView(
+              keepAlive: keepAlive,
               initialSettings: InAppWebViewSettings(
                 forceDark: null,
                 forceDarkStrategy: null,
