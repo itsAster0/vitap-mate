@@ -14,9 +14,23 @@ class VtopOtpOverlay extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(vtopOtpChallengeProvider);
     final notifier = ref.read(vtopOtpChallengeProvider.notifier);
-    final otpController = useTextEditingController();
+    final otpController = useMemoized(
+      () => FOtpController(
+        children: const [
+          FOtpItem(),
+          FOtpItem(),
+          FOtpItem(),
+          FOtpDivider(),
+          FOtpItem(),
+          FOtpItem(),
+          FOtpItem(),
+        ],
+      ),
+    );
     final otpText = useState('');
-    final isOtpValid = otpText.value.replaceAll(RegExp(r'\D'), '').length == 6;
+    final isOtpValid = RegExp(r'^\d{6}$').hasMatch(otpText.value);
+
+    useEffect(() => otpController.dispose, [otpController]);
 
     useEffect(() {
       if (!state.isActive) {
@@ -79,13 +93,15 @@ class VtopOtpOverlay extends HookConsumerWidget {
                         spacing: 8,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          FTextField(
-                            control: FTextFieldControl.managed(
-                              controller: otpController,
+                          Align(
+                            alignment: Alignment.center,
+                            child: FOtpField(
+                              control: FOtpFieldControl.managed(
+                                controller: otpController,
+                              ),
+                              keyboardType: TextInputType.number,
+                              label: const Text('OTP'),
                             ),
-                            keyboardType: TextInputType.number,
-                            hint: '6-digit OTP',
-                            label: const Text('OTP'),
                           ),
                           if (state.isAutoFetchingEmail)
                             Text(

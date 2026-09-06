@@ -1,35 +1,75 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
-import 'package:go_router/go_router.dart';
 
-class VtopWebviewLoading extends StatelessWidget {
-  const VtopWebviewLoading({this.error, this.onRetry, super.key});
+class VtopWebviewLoading extends StatefulWidget {
+  const VtopWebviewLoading({
+    this.error,
+    this.onRetry,
+    this.reconnecting = false,
+    super.key,
+  });
 
+  final bool reconnecting;
   final Object? error;
   final VoidCallback? onRetry;
 
   @override
+  State<VtopWebviewLoading> createState() => _VtopWebviewLoadingState();
+}
+
+class _VtopWebviewLoadingState extends State<VtopWebviewLoading> {
+  Timer? _timer;
+  bool _slow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _slow = false;
+    if (widget.error == null) {
+      _timer = Timer(const Duration(seconds: 15), () {
+        if (mounted) setState(() => _slow = true);
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant VtopWebviewLoading oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.error != widget.error ||
+        oldWidget.reconnecting != widget.reconnecting) {
+      _startTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final hasError = error != null;
+    final hasError = widget.error != null;
     final colors = context.theme.colors;
     final typography = context.theme.typography;
 
-    return FScaffold(
-      childPad: false,
-      header: FHeader.nested(
-        title: const Text('VTOP'),
-        prefixes: [
-          FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
-        ],
-      ),
-      child: Container(
-        width: double.infinity,
-        color: colors.background,
-        padding: const EdgeInsets.all(24),
-        child: Center(
+    return Container(
+      width: double.infinity,
+      color: colors.background,
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: SingleChildScrollView(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 340),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 DecoratedBox(
@@ -51,22 +91,19 @@ class VtopWebviewLoading extends StatelessWidget {
                               color: colors.destructive,
                               size: 30,
                             )
-                          : SizedBox.square(
-                              dimension: 30,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                color: colors.primary,
-                                backgroundColor: colors.border.withValues(
-                                  alpha: 0.35,
-                                ),
-                              ),
+                          : const FCircularProgress(
+                              semanticsLabel: 'Preparing VTOP session',
                             ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  hasError ? 'Could not open VTOP' : 'Opening VTOP',
+                  hasError
+                      ? 'Could not open VTOP'
+                      : widget.reconnecting
+                      ? 'Reconnecting to VTOP'
+                      : 'Opening VTOP',
                   textAlign: TextAlign.center,
                   style: typography.body.lg.copyWith(
                     color: colors.foreground,
@@ -77,6 +114,8 @@ class VtopWebviewLoading extends StatelessWidget {
                 Text(
                   hasError
                       ? 'Something went wrong while preparing your session.'
+                      : _slow
+                      ? 'VTOP is taking longer than usual. Please keep waiting.'
                       : 'Preparing your login session securely.',
                   textAlign: TextAlign.center,
                   style: typography.body.sm.copyWith(
@@ -84,9 +123,9 @@ class VtopWebviewLoading extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
-                if (hasError && onRetry != null) ...[
+                if (hasError && widget.onRetry != null) ...[
                   const SizedBox(height: 20),
-                  FButton(onPress: onRetry, child: const Text('Retry')),
+                  FButton(onPress: widget.onRetry, child: const Text('Retry')),
                 ],
               ],
             ),

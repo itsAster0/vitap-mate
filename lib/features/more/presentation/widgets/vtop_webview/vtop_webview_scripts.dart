@@ -1,9 +1,9 @@
+import 'dart:convert';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 const _darkModeScript = '''
 (function() {
-  const existingStyle = document.getElementById('dark-mode-style');
-  if (existingStyle) existingStyle.remove();
+  if (document.getElementById('dark-mode-style')) return;
 
   const style = document.createElement('style');
   style.id = 'dark-mode-style';
@@ -16,7 +16,7 @@ const _darkModeScript = '''
       filter: invert(1) hue-rotate(180deg) !important;
     }
   `;
-  document.head.appendChild(style);
+  (document.head || document.documentElement).appendChild(style);
 })();
 ''';
 
@@ -33,37 +33,30 @@ const _resetSpacingScript = '''
   if (customStyle) {
     customStyle.remove();
   }
-
-  document.body.style.display = 'none';
-  document.body.offsetHeight;
-  document.body.style.display = 'block';
 })();
 ''';
 
 const _resetDesktopModeScript = '''
 (function () {
-  var viewport = document.querySelector('meta[name=viewport]');
-  if (viewport) {
-    viewport.setAttribute(
-      'content',
-      'width=device-width, initial-scale=1'
-    );
-  }
+  document.querySelectorAll('meta[name=viewport]').forEach(viewport => {
+    viewport.setAttribute('content', 'width=device-width, initial-scale=1');
+  });
 })();
 ''';
 
 const _desktopModeScript = '''
 (function() {
   var viewportWidth = 1024;
-  var viewport = document.querySelector("meta[name=viewport]");
+  var viewports = document.querySelectorAll("meta[name=viewport]");
 
-  if (viewport) {
-    viewport.setAttribute('content', 'width=' + viewportWidth + ', user-scalable=yes');
+  if (viewports.length) {
+    viewports.forEach(viewport => viewport.setAttribute(
+      'content', 'width=' + viewportWidth + ', user-scalable=yes'));
   } else {
     var meta = document.createElement('meta');
     meta.name = "viewport";
     meta.content = 'width=' + viewportWidth + ', user-scalable=yes';
-    document.head.appendChild(meta);
+    (document.head || document.documentElement).appendChild(meta);
   }
 })();
 ''';
@@ -97,7 +90,7 @@ extension VtopWebviewScripts on InAppWebViewController {
 String _compactSpacingScript(int padding) {
   return '''
 (function() {
-  setTimeout(function() {
+  if (document.getElementById('custom-spacing-style')) return;
     const style = document.createElement('style');
     style.id = 'custom-spacing-style';
     style.textContent = `
@@ -150,30 +143,150 @@ String _compactSpacingScript(int padding) {
       }
     `;
 
-    const oldStyle = document.getElementById('custom-spacing-style');
-    if (oldStyle) oldStyle.remove();
-
-    document.head.appendChild(style);
-
-    document.body.style.display = 'none';
-    document.body.offsetHeight;
-    document.body.style.display = 'block';
-  }, 500);
+    (document.head || document.documentElement).appendChild(style);
 })();
 ''';
 }
 
-String _clickMenuLinkScript(String url) {
-  final escapedUrl = url.replaceAll('\\', '\\\\').replaceAll('"', r'\"');
-
-  return '''
+String _clickMenuLinkScript(String url) =>
+    """
 (function() {
-  const link = document.querySelector('a[data-url="$escapedUrl"]');
-  if (link) {
-    link.click();
-    return true;
+  const target = ${jsonEncode(url)};
+  const link = Array.from(document.querySelectorAll('a[data-url]'))
+    .find(link => link.getAttribute('data-url') === target);
+  if (!link) return false;
+  link.click();
+  return true;
+})();
+""";
+
+String vtopPreferencesScript({
+  required bool dark,
+  required bool compact,
+  required bool desktop,
+}) =>
+    """
+(function() {
+  if (location.origin !== 'https://vtop.vitap.ac.in') return;
+  function apply() {
+    if (!document.documentElement) return;
+    ${dark ? _darkModeScript : _removeDarkModeScript}
+    ${compact ? _compactSpacingScript(1) : _resetSpacingScript}
+    ${desktop ? _desktopModeScript : _resetDesktopModeScript}
   }
-  return false;
+  apply();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply, {once: true});
+  }
+})();
+""";
+
+/// Observes activity only. Request arguments, results and errors are preserved.
+const vtopActivityScript = r'''
+(function() {
+  if (location.origin !== 'https://vtop.vitap.ac.in' || window.__mateActivity) return;
+  const id = String(performance.timeOrigin);
+  window.__mateActivity = id;
+  document.addEventListener('click', function(event) {
+    const target = event.target instanceof Element
+      ? event.target : event.target?.parentElement;
+    const link = target?.closest('a[data-url]');
+    if (link) window.__mateCurrentMenu = link.getAttribute('data-url') || '';
+  }, true);
+  let active = 0;
+  function notify(type, extra) {
+    try {
+      const bridge = window.flutter_inappwebview;
+      if (bridge) bridge.callHandler('vtopActivity',
+        Object.assign({type: type, id: id, active: active}, extra || {}));
+    } catch (_) {}
+  }
+  function sameOrigin(input) {
+    try {
+      return new URL(input instanceof Request ? input.url : input,
+        location.href).origin === location.origin;
+    } catch (_) { return false; }
+  }
+  function begin() {
+    active++;
+    notify('activity');
+    let ended = false;
+    return function() {
+      if (ended) return;
+      ended = true;
+      active = Math.max(0, active - 1);
+      notify('activity');
+    };
+  }
+  const originalFetch = window.fetch;
+  if (originalFetch) window.fetch = function() {
+    const done = sameOrigin(arguments[0]) ? begin() : function() {};
+    try {
+      const result = originalFetch.apply(this, arguments);
+      result.then(done, done);
+      return result;
+    } catch (error) { done(); throw error; }
+  };
+  const open = XMLHttpRequest.prototype.open;
+  const send = XMLHttpRequest.prototype.send;
+  const tracked = new WeakMap();
+  XMLHttpRequest.prototype.open = function(method, url) {
+    const result = open.apply(this, arguments);
+    tracked.set(this, sameOrigin(url));
+    return result;
+  };
+  XMLHttpRequest.prototype.send = function() {
+    if (!tracked.get(this)) return send.apply(this, arguments);
+    const done = begin();
+    this.addEventListener('loadend', done, {once: true});
+    try { return send.apply(this, arguments); }
+    catch (error) { this.removeEventListener('loadend', done); done(); throw error; }
+  };
+  function ready() { notify('ready'); }
+  document.addEventListener('DOMContentLoaded', ready, {once: true});
+  window.addEventListener('flutterInAppWebViewPlatformReady', ready, {once: true});
+  if (document.readyState !== 'loading') ready();
+  window.addEventListener('load', function() {
+    const resources = performance.getEntriesByType('resource')
+      .filter(r => sameOrigin(r.name) &&
+        ['script', 'css', 'img', 'link'].includes(r.initiatorType));
+    notify('timing', {
+      duration: Math.round(performance.now()),
+      resources: resources.length,
+      transferBytes: resources.reduce((sum, r) => sum + (r.transferSize || 0), 0),
+      // Zero transfer is a cache candidate, not proof of a cache hit.
+      zeroTransfer: resources.filter(r => r.transferSize === 0).length
+    });
+  }, {once: true});
 })();
 ''';
-}
+
+String vtopWaitForMenuScript(String url, String requestId) =>
+    """
+(function() {
+  if (window.__mateMenuObserver) window.__mateMenuObserver();
+  const target = ${jsonEncode(url)};
+  let finished = false;
+  let timer;
+  const observer = new MutationObserver(attempt);
+  function finish(found) {
+    if (finished) return;
+    finished = true;
+    observer.disconnect();
+    clearTimeout(timer);
+    window.__mateMenuObserver = null;
+    window.flutter_inappwebview?.callHandler('vtopMenuResult',
+      ${jsonEncode(requestId)}, found);
+  }
+  function attempt() {
+    if (finished) return;
+    const link = Array.from(document.querySelectorAll('a[data-url]'))
+      .find(link => link.getAttribute('data-url') === target);
+    if (link) { finish(true); link.click(); }
+  }
+  window.__mateMenuObserver = () => { finished = true; observer.disconnect(); clearTimeout(timer); };
+  observer.observe(document.documentElement, {childList: true, subtree: true});
+  timer = setTimeout(() => finish(false), 10000);
+  attempt();
+})();
+""";

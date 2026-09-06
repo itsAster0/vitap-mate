@@ -1,4 +1,4 @@
-enum DocKind { pdf, image, spreadsheet, text, none }
+enum DocKind { pdf, image, spreadsheet, text, file, none }
 
 class DocWindow {
   final String id;
@@ -33,6 +33,7 @@ class DocWindow {
     String? name,
     String? fileName,
     DocKind? kind,
+    int? addedAt,
     int? lastOpenedAt,
     double? scale,
     double? offsetX,
@@ -45,7 +46,7 @@ class DocWindow {
       kind: kind ?? this.kind,
       fileName: fileName ?? this.fileName,
       isPreset: isPreset,
-      addedAt: addedAt,
+      addedAt: addedAt ?? this.addedAt,
       lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
       scale: scale ?? this.scale,
       offsetX: offsetX ?? this.offsetX,
@@ -112,6 +113,6 @@ DocKind docKindFromExtension(String path) {
     case 'csv':
       return DocKind.text;
     default:
-      return DocKind.none;
+      return DocKind.file;
   }
 }

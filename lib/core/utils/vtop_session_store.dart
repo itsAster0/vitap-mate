@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:vitapmate/core/utils/vtop_webview_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -78,6 +79,7 @@ Future<void> saveStoredVtopSession(PersistedVtopSession snapshot) async {
 }
 
 Future<void> clearStoredVtopSession(String username) async {
+  await vtopWebviewStore.clear(username: username);
   final storage = await SharedPreferences.getInstance();
   await storage.remove(_sessionKey(username));
 }

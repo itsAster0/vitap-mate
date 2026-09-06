@@ -37,6 +37,12 @@ DocKindVisual visualFor(DocWindow doc) {
         Color(0xFF673AB7),
         FLucideIcons.fileCode2,
       );
+    case DocKind.file:
+      return const DocKindVisual(
+        [Color(0xFFE5E7EB), Color(0xFFD1D5DB)],
+        Color(0xFF374151),
+        FLucideIcons.file,
+      );
     case DocKind.none:
       return const DocKindVisual(
         [Color(0xFFFFE8CD), Color(0xFFFFDDB3)],
@@ -56,6 +62,8 @@ String kindLabel(DocKind kind) {
       return 'SHEET';
     case DocKind.text:
       return 'TEXT';
+    case DocKind.file:
+      return 'FILE';
     case DocKind.none:
       return 'MENU';
   }
@@ -151,7 +159,9 @@ class DocCard extends ConsumerWidget {
                       fontSize: 9,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
-                      color: darkMode ? context.theme.colors.primary : visual.accent,
+                      color: darkMode
+                          ? context.theme.colors.primary
+                          : visual.accent,
                     ),
                   ),
                 ),
@@ -173,7 +183,9 @@ class DocCard extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              doc.hasFile ? lastOpenedLabel(doc.lastOpenedAt) : 'Tap to add file',
+              doc.hasFile
+                  ? lastOpenedLabel(doc.lastOpenedAt)
+                  : 'Tap to add file',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(

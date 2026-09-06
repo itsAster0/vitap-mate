@@ -17,6 +17,8 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.json.JSONObject
+import java.io.File
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -26,6 +28,8 @@ class MainActivity : FlutterFragmentActivity() {
         private const val DOWNLOAD_CHANNEL = "vitapmate/download_manager"
         private const val SYNC_TAG = "[VitapMateTimetable]"
         private const val TAG_PREFIX = "vitapmate-"
+        private const val OUTING_PREFS = "outing_downloads"
+        private const val OUTING_PREFIX = "download_"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -43,6 +47,9 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "enqueueDownload" -> enqueueDownload(call, result)
+                    "pendingOutingDownloads" -> pendingOutingDownloads(result)
+                    "copyCompletedDownload" -> copyCompletedDownload(call, result)
+                    "ackOutingDownload" -> ackOutingDownload(call, result)
                     "openDownloadsFolder" -> openDownloadsFolder(result)
                     else -> result.notImplemented()
                 }
@@ -101,10 +108,96 @@ class MainActivity : FlutterFragmentActivity() {
                 result.error("download_manager_unavailable", "Download manager unavailable", null)
                 return
             }
-            result.success(manager.enqueue(request))
+            val id = manager.enqueue(request)
+            val outing = call.argument<String>("archiveOuting")
+            val account = call.argument<String>("archiveAccount")
+            if (!outing.isNullOrBlank() && !account.isNullOrBlank()) {
+                val pending = JSONObject()
+                    .put("id", id)
+                    .put("outing", outing)
+                    .put("account", account)
+                    .put("filename", fileName ?: "outing-$id.bin")
+                getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("$OUTING_PREFIX$id", pending.toString()).commit()
+            }
+            result.success(id)
         } catch (e: Exception) {
             result.error("download_enqueue_failed", e.message, null)
         }
+    }
+
+    private fun pendingOutingDownloads(result: MethodChannel.Result) {
+        val pending = getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE).all
+            .filterKeys { it.startsWith(OUTING_PREFIX) }
+            .values.mapNotNull { raw ->
+                try {
+                    val item = JSONObject(raw as String)
+                    mapOf(
+                        "id" to item.getLong("id"),
+                        "outing" to item.getString("outing"),
+                        "account" to item.getString("account"),
+                        "filename" to item.getString("filename")
+                    )
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        result.success(pending)
+    }
+
+    private fun copyCompletedDownload(call: MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<Number>("id")?.toLong()
+        if (id == null) {
+            result.error("invalid_download_id", "Download ID is required", null)
+            return
+        }
+        Thread {
+            try {
+                val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                val cursor = manager.query(DownloadManager.Query().setFilterById(id))
+                val status = cursor?.use {
+                    if (!it.moveToFirst()) null else
+                        it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                }
+                val answer: Map<String, String> = when (status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        val raw = getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
+                            .getString("$OUTING_PREFIX$id", null)
+                        val filename = raw?.let { JSONObject(it).optString("filename") }
+                            ?.takeIf { it.isNotBlank() } ?: "outing-$id.bin"
+                        val safeName = filename.replace(Regex("[^A-Za-z0-9._ -]"), "_")
+                        val directory = File(cacheDir, "vtop-outing-$id")
+                        directory.mkdirs()
+                        val target = File(directory, safeName)
+                        val uri = manager.getUriForDownloadedFile(id)
+                            ?: throw IllegalStateException("Completed download has no file")
+                        contentResolver.openInputStream(uri)?.use { input ->
+                            target.outputStream().use { output -> input.copyTo(output) }
+                        } ?: throw IllegalStateException("Cannot read completed download")
+                        mapOf("status" to "complete", "path" to target.path)
+                    }
+                    DownloadManager.STATUS_FAILED, null -> mapOf("status" to "failed")
+                    else -> mapOf("status" to "pending")
+                }
+                runOnUiThread { result.success(answer) }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("download_copy_failed", error.message, null)
+                }
+            }
+        }.start()
+    }
+
+    private fun ackOutingDownload(call: MethodCall, result: MethodChannel.Result) {
+        val id = call.argument<Number>("id")?.toLong()
+        if (id == null) {
+            result.error("invalid_download_id", "Download ID is required", null)
+            return
+        }
+        getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
+            .edit().remove("$OUTING_PREFIX$id").commit()
+        File(cacheDir, "vtop-outing-$id").deleteRecursively()
+        result.success(null)
     }
 
     private fun openDownloadsFolder(result: MethodChannel.Result) {

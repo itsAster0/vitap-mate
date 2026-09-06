@@ -12,6 +12,14 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   errors:
     unused_local_variable: ignore
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   plugins:
     - custom_lint
 linter:

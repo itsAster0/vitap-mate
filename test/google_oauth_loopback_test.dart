@@ -12,6 +12,69 @@ import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
 
 void main() {
+  test(
+    'OTP fetch ignores older mail and never reuses a consumed message',
+    () async {
+      const session = EmailOtpOAuthSession(
+        email: 'student@example.com',
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        scopes: ['https://www.googleapis.com/auth/gmail.modify'],
+        accessTokenExpiryEpochMs: 4102444800000,
+        authSource: EmailOtpAuthSource.personalByok,
+        oauthClientId: 'personal.apps.googleusercontent.com',
+      );
+      FlutterSecureStorage.setMockInitialValues({
+        'email_otp_oauth_session_v1': jsonEncode(session.toJson()),
+      });
+      final since = DateTime.utc(2026, 9, 20);
+      var timestamp = since.subtract(const Duration(milliseconds: 1));
+      var modifications = 0;
+      final client = MockClient((request) async {
+        if (request.method == 'POST') {
+          modifications++;
+          return http.Response('{}', 200);
+        }
+        if (request.url.path.endsWith('/messages')) {
+          expect(request.url.queryParameters['q'], contains('after:'));
+          return http.Response(
+            jsonEncode({
+              'messages': [
+                {'id': 'otp-mail'},
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'id': 'otp-mail',
+            'internalDate': '${timestamp.millisecondsSinceEpoch}',
+            'snippet': 'Your OTP is 123456',
+            'payload': {
+              'headers': [
+                {'name': 'From', 'value': 'noreply.sdc@vitap.ac.in'},
+              ],
+            },
+          }),
+          200,
+        );
+      });
+      final service = GoogleEmailOtpAuthService(
+        appAuth: const FlutterAppAuth(),
+        storage: const FlutterSecureStorage(),
+        httpClient: client,
+        loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: client),
+      );
+      expect(await service.fetchLatestOtpSince(sinceUtc: since), isNull);
+      expect(modifications, 0);
+      timestamp = since.add(const Duration(seconds: 1));
+      expect(await service.fetchLatestOtpSince(sinceUtc: since), '123456');
+      expect(await service.fetchLatestOtpSince(sinceUtc: since), isNull);
+      expect(modifications, 1);
+    },
+  );
+
   group('GoogleDesktopOAuthCredentials', () {
     test(
       'parses an installed desktop credential without retaining endpoints',
