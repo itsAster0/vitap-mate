@@ -160,6 +160,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   @override
   VtopOtpChallengeState build() {
     ref.onDispose(() {
+      _autoFetchRunId++;
       _ticker?.cancel();
     });
     return const VtopOtpChallengeState.idle();
@@ -173,7 +174,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     String? logContext,
   }) async {
     _client = client;
-    _otpRequiredAt = otpRequiredAt?.toUtc();
+    _otpRequiredAt = otpRequiredAt?.toUtc() ?? DateTime.now().toUtc();
     _logContext = logContext ?? 'otp.flow#${++_challengeCounter}';
     final canAutoFetchFromEmail = await _canAutoFetchFromEmail();
     _emailAutoFetchAvailable = canAutoFetchFromEmail;
@@ -339,8 +340,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     );
     AppLogger.instance.info('client.otp', '$_logContext requesting OTP resend');
     try {
+      final requestedAt = DateTime.now().toUtc();
       await vtopClientResendSecurityOtp(client: _client!);
-      _otpRequiredAt = DateTime.now().toUtc();
+      _otpRequiredAt = requestedAt;
       AppLogger.instance.info('client.otp', '$_logContext resend completed');
       state = state.update(
         activity: _emailAutoFetchAvailable
@@ -465,31 +467,30 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
   Future<void> _runEmailAutoFetch({required int runId}) async {
     final oauth = ref.read(googleEmailOtpAuthServiceProvider);
-    final startedAt =
-        _otpRequiredAt ?? DateTime.now().subtract(Duration(seconds: 2)).toUtc();
+    final startedAt = _otpRequiredAt!;
     AppLogger.instance.info(
       'client.otp',
       '$_logContext email autofetch started from ${startedAt.toIso8601String()}',
     );
-    final attempts = 8;
-    for (var attempt = 0; attempt < attempts; attempt++) {
+    var delayMs = 1000;
+    var attempt = 0;
+    while (_shouldContinueAutoFetch(runId)) {
+      await Future<void>.delayed(Duration(milliseconds: delayMs));
+      delayMs = (delayMs * 1.5).round().clamp(1000, 10000);
+      attempt++;
       if (!_shouldContinueAutoFetch(runId)) return;
-      if (!state.isAutoFetchingEmail) return;
-      if (state.isSubmitting) return;
 
-      state = state.update(
-        autoFetchMessage:
-            'Trying to get OTP from email... (${attempts - attempt} attempts left)',
-      );
+      state = state.update(autoFetchMessage: 'Waiting for OTP email...');
       try {
         final otp = await oauth.fetchLatestOtpSince(
           sinceUtc: startedAt,
           deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
         );
+        if (!_shouldContinueAutoFetch(runId)) return;
         if (otp != null && otp.isNotEmpty) {
           AppLogger.instance.info(
             'client.otp',
-            '$_logContext email autofetch found an OTP on attempt ${attempt + 1} of $attempts',
+            '$_logContext email autofetch found an OTP on attempt $attempt',
           );
           await submitOtp(otp);
           return;
@@ -497,7 +498,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       } catch (error, stackTrace) {
         AppLogger.instance.error(
           'client.otp',
-          '$_logContext email autofetch failed on attempt ${attempt + 1} of $attempts: $error',
+          '$_logContext email autofetch failed on attempt $attempt: $error',
         );
         Zone.current.handleUncaughtError(error, stackTrace);
         if (!_shouldContinueAutoFetch(runId)) return;
@@ -512,25 +513,14 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         );
         return;
       }
-      await Future<void>.delayed(const Duration(seconds: 1));
     }
-
-    if (!_shouldContinueAutoFetch(runId)) return;
-    AppLogger.instance.warning(
-      'client.otp',
-      '$_logContext email autofetch exhausted all attempts without finding an OTP',
-    );
-    state = state.update(
-      activity: OtpChallengeActivity.waiting,
-      canRetryEmailAutoFetch: true,
-      presentation: OtpChallengePresentation.expanded,
-      clearAutoFetchMessage: true,
-      message: 'Could not find OTP in email. Enter it manually to continue.',
-      clearError: true,
-    );
   }
 
   bool _shouldContinueAutoFetch(int runId) {
-    return runId == _autoFetchRunId && state.isActive && _client != null;
+    return runId == _autoFetchRunId &&
+        state.isActive &&
+        state.isAutoFetchingEmail &&
+        state.remainingSeconds > 0 &&
+        _client != null;
   }
 }

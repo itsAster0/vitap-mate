@@ -9,6 +9,37 @@ import 'package:vitapmate/core/utils/app_errors.dart';
 
 final _androidDir = Directory('/storage/emulated/0/Download');
 const _downloadManagerChannel = MethodChannel('vitapmate/download_manager');
+
+class DownloadReceipt {
+  const DownloadReceipt({this.androidId, this.path});
+  final int? androidId;
+  final String? path;
+}
+
+Future<List<Map<String, dynamic>>> pendingOutingDownloads() async {
+  if (!Platform.isAndroid) return [];
+  final raw = await _downloadManagerChannel.invokeListMethod<dynamic>(
+    'pendingOutingDownloads',
+  );
+  return [
+    for (final item in raw ?? const [])
+      if (item is Map) Map<String, dynamic>.from(item),
+  ];
+}
+
+Future<({String status, String? path})> copyCompletedDownload(int id) async {
+  final result = await _downloadManagerChannel.invokeMapMethod<String, dynamic>(
+    'copyCompletedDownload',
+    {'id': id},
+  );
+  return (
+    status: result?['status'] as String? ?? 'failed',
+    path: result?['path'] as String?,
+  );
+}
+
+Future<void> acknowledgeOutingDownload(int id) =>
+    _downloadManagerChannel.invokeMethod<void>('ackOutingDownload', {'id': id});
 String formatUnixTimestamp(int timestamp) {
   final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   final formatter = DateFormat("MMM dd, yyyy hh:mm a");
@@ -55,7 +86,7 @@ void fileDownloaderConfig() {
   );
 }
 
-Future<void> downloadFile(
+Future<DownloadReceipt?> downloadFile(
   String url,
   String cookie, {
   String? contentDisposition,
@@ -63,12 +94,14 @@ Future<void> downloadFile(
   String? suggestedFilename,
   String? userAgent,
   String? referer,
+  String? archiveOuting,
+  String? archiveAccount,
 }) async {
   Directory? downloadsDir;
 
   if (Platform.isAndroid) {
     await Permission.notification.request();
-    final queuedInSystemDownloads = await _downloadWithAndroidDownloadManager(
+    final downloadId = await _downloadWithAndroidDownloadManager(
       url,
       cookie,
       contentDisposition: contentDisposition,
@@ -76,9 +109,11 @@ Future<void> downloadFile(
       suggestedFilename: suggestedFilename,
       userAgent: userAgent,
       referer: referer,
+      archiveOuting: archiveOuting,
+      archiveAccount: archiveAccount,
     );
-    if (queuedInSystemDownloads) {
-      return;
+    if (downloadId != null) {
+      return DownloadReceipt(androidId: downloadId);
     }
     downloadsDir = _androidDir;
   } else if (Platform.isIOS) {
@@ -86,7 +121,7 @@ Future<void> downloadFile(
   }
 
   if (downloadsDir == null || !await downloadsDir.exists()) {
-    return;
+    return null;
   }
 
   final fallbackFilename = _normalizeDownloadFilename(suggestedFilename);
@@ -100,10 +135,14 @@ Future<void> downloadFile(
     baseDirectory: BaseDirectory.root,
     allowPause: true,
   );
-  await FileDownloader().download(task);
+  final result = await FileDownloader().download(task);
+  if (result.status != TaskStatus.complete) {
+    throw StateError('Download did not complete: ${result.status.name}');
+  }
+  return DownloadReceipt(path: await task.filePath());
 }
 
-Future<bool> _downloadWithAndroidDownloadManager(
+Future<int?> _downloadWithAndroidDownloadManager(
   String url,
   String cookie, {
   String? contentDisposition,
@@ -111,6 +150,8 @@ Future<bool> _downloadWithAndroidDownloadManager(
   String? suggestedFilename,
   String? userAgent,
   String? referer,
+  String? archiveOuting,
+  String? archiveAccount,
 }) async {
   try {
     final downloadId = await _downloadManagerChannel
@@ -122,12 +163,14 @@ Future<bool> _downloadWithAndroidDownloadManager(
           'suggestedFilename': _normalizeDownloadFilename(suggestedFilename),
           'userAgent': userAgent,
           'referer': referer,
+          'archiveOuting': archiveOuting,
+          'archiveAccount': archiveAccount,
         });
-    return downloadId != null && downloadId > 0;
+    return downloadId != null && downloadId > 0 ? downloadId : null;
   } on MissingPluginException {
-    return false;
+    return null;
   } on PlatformException {
-    return false;
+    return null;
   }
 }
 

@@ -7,6 +7,8 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
+import 'package:vitapmate/features/docs/data/vtop_outing_download.dart';
+import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/core/widgets/vtop_otp_overlay.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
@@ -37,6 +39,13 @@ class MyApp extends HookConsumerWidget {
       Future(() async {
         startVtopCookieBridgeListener();
         ref.read(backgroundSyncProvider);
+        try {
+          await resumePendingOutingDownloads(
+            onImported: () => ref.invalidate(docsRegistryProvider),
+          );
+        } catch (_) {
+          // A pending local copy can be retried on the next launch.
+        }
         await Future.delayed(Duration(milliseconds: 500));
         UpdateService.checkForFlexibleUpdate();
       });

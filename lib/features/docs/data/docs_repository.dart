@@ -10,6 +10,7 @@ class DocsRepository {
   static const _messPresetId = 'mess-preset';
 
   final JsonFileStorage storage;
+  int _nextImportId = 0;
   DocsRepository(this.storage);
 
   Future<List<DocWindow>> list() async {
@@ -43,9 +44,18 @@ class DocsRepository {
   Future<DocWindow> importFile({
     required String sourcePath,
     String? name,
+    String? id,
   }) async {
+    final windows = await list();
+    if (id != null) {
+      for (final existing in windows) {
+        if (existing.id == id) return existing;
+      }
+    }
     final ext = sourcePath.split('.').last.toLowerCase();
-    final storedName = 'doc-${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final importId =
+        '${DateTime.now().microsecondsSinceEpoch}-${_nextImportId++}';
+    final storedName = 'doc-$importId.$ext';
     await storage.copyIntoUserDir(
       _fileSubDir,
       sourcePath,
@@ -54,14 +64,12 @@ class DocsRepository {
     final cleanName = (name ?? sourcePath.split('/').last).trim().isEmpty
         ? storedName
         : (name ?? storedName).trim();
-    final windows = await list();
     final doc = DocWindow(
-      id: 'doc-${DateTime.now().microsecondsSinceEpoch}',
+      id: id ?? 'doc-$importId',
       name: cleanName,
       kind: docKindFromExtension(sourcePath),
       fileName: storedName,
       addedAt: DateTime.now().millisecondsSinceEpoch,
-      lastOpenedAt: DateTime.now().millisecondsSinceEpoch,
     );
     windows.add(doc);
     await _writeAll(windows);
@@ -83,7 +91,7 @@ class DocsRepository {
     final updated = windows[idx].copyWith(
       kind: docKindFromExtension(storedPath),
       fileName: storedName,
-      lastOpenedAt: DateTime.now().millisecondsSinceEpoch,
+      addedAt: DateTime.now().millisecondsSinceEpoch,
     );
     windows[idx] = updated;
     await _writeAll(windows);

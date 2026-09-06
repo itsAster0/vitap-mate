@@ -1,253 +1,261 @@
+import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_recovery.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/logging/app_logger.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/core/utils/vtop_webview_store.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_actions.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_body.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_cookie_service.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_loading.dart';
-import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_scripts.dart';
 
-final _keepAlive = InAppWebViewKeepAlive();
-
-class VtopWebview extends HookConsumerWidget {
+class VtopWebview extends ConsumerStatefulWidget {
   const VtopWebview({this.initialMenuUrl, super.key});
   final String? initialMenuUrl;
 
-  static final _baseUrl = WebUri('https://vtop.vitap.ac.in');
-  static final _initialUrl = WebUri('https://vtop.vitap.ac.in/vtop/content?');
+  @override
+  ConsumerState<VtopWebview> createState() => _VtopWebviewState();
+}
+
+class _VtopWebviewState extends ConsumerState<VtopWebview> {
+  final _bodyKey = GlobalKey<VtopWebviewBodyState>();
+  VtopWebviewSession? _session;
+  String? _owner;
+  Object? _error;
+  bool _preparing = true;
+  bool _recovering = false;
+  bool _promptOpen = false;
+  bool? _dark;
+  int _generation = 0;
+  int _loadRevision = 0;
+  final _recovery = VtopWebviewRecovery();
+  String? _pendingMenu;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isPreparingSession = useState(true);
-    final loading = useState(false);
-    final webviewSession = useState<VtopWebviewSession?>(null);
-    final webController = useState<InAppWebViewController?>(null);
-    final showHeading = useState('VTOP');
-    final isCompactMode = useState(true);
-    final isDesktopMode = useState(false);
-    final themeMode = ref.watch(themeProvider);
-    final isDarkMode = useState(
-      themeMode == ThemeMode.dark ||
-          (themeMode == ThemeMode.system &&
-              MediaQuery.platformBrightnessOf(context) == Brightness.dark),
-    );
+  void initState() {
+    super.initState();
+    _pendingMenu = widget.initialMenuUrl;
+    Future.microtask(_prepare);
+  }
 
-    final setupError = useState<Object?>(null);
-    final isLoginRedirectPromptOpen = useRef(false);
-    final isForceLoginInProgress = useRef(false);
-    final pendingInitialMenuUrl = useState(initialMenuUrl);
-    final forceLoginCounter = useRef(0);
-    final redirectForceAttempts = useRef(0);
+  bool _current(int generation) => mounted && generation == _generation;
 
-    Future<bool> prepareSession({int force = 0}) async {
-      isPreparingSession.value = true;
-      setupError.value = null;
-
-      try {
-        await ref.read(vClientProvider.notifier).ensureLogin(force: force > 0);
-        final client = await ref.read(vClientProvider.future);
-        final user = await ref.read(vtopUserProvider.future);
-        final storedSession = await loadStoredVtopSession(user.username!);
-        final snapshot = storedSession?.isExpired == false
-            ? storedSession!.snapshot
-            : createPersistedVtopSessionSnapshot(client: client);
-        if (snapshot.cookies?.isEmpty ?? true) {
-          throw Exception('Could not prepare VTOP session for webview.');
-        }
-        await saveStoredVtopSession(snapshot);
-        final preparedSession = await loadVtopWebviewSession(
-          snapshot: snapshot,
-          baseUrl: _baseUrl,
-        );
-        if (preparedSession == null) {
-          throw Exception('Could not prepare VTOP session for webview.');
-        }
-
-        webviewSession.value = preparedSession;
-        if (force > 0) {
-          redirectForceAttempts.value = 0;
-        }
-        return true;
-      } catch (error, _) {
-        setupError.value = error;
-
-        if (context.mounted) {
-          disCommonToast(context, error);
-        }
-        return false;
-      } finally {
-        isPreparingSession.value = false;
-      }
-    }
-
-    useEffect(() {
-      Future.microtask(() async {
-        await prepareSession();
+  Future<void> _prepare({bool force = false}) async {
+    final generation = ++_generation;
+    if (mounted) {
+      setState(() {
+        _preparing = true;
+        _error = null;
       });
-      return null;
-    }, const []);
-
-    Future<void> forceLogin() async {
-      if (isForceLoginInProgress.value) return;
-      isForceLoginInProgress.value = true;
-      loading.value = true;
-      forceLoginCounter.value += 1;
-      try {
-        final force = forceLoginCounter.value.clamp(1, 2);
-        final didPrepare = await prepareSession(force: force);
-        if (!didPrepare) return;
-      } catch (error) {
-        if (context.mounted) {
-          disCommonToast(context, error);
-        }
-      } finally {
-        isForceLoginInProgress.value = false;
-        loading.value = false;
-      }
     }
-
-    Future<void> promptForceLogin() async {
-      if (isLoginRedirectPromptOpen.value || isForceLoginInProgress.value) {
+    final timer = Stopwatch()..start();
+    try {
+      await ref.read(settingsProvider.future);
+      final user = await ref.read(vtopUserProvider.future);
+      if (!_current(generation)) return;
+      final username = user.username;
+      if (username == null) throw StateError('A VTOP account is required.');
+      final client = await ref
+          .read(vClientProvider.notifier)
+          .ensureLogin(force: force);
+      if (!_current(generation)) return;
+      final snapshot = createPersistedVtopSessionSnapshot(client: client);
+      // ensureLogin already persists the current snapshot.
+      if (ref.read(vtopUserProvider).isLoading ||
+          ref.read(vtopUserProvider).value?.username != username) {
         return;
       }
-      if (redirectForceAttempts.value < 1) {
-        redirectForceAttempts.value += 1;
-        await forceLogin();
-        return;
-      }
-      isLoginRedirectPromptOpen.value = true;
-
-      try {
-        final shouldLoginAgain = await showFDialog<bool>(
-          context: context,
-          builder: (context, style, animation) => AppDialog(
-            animation: animation,
-            direction: Axis.horizontal,
-            title: const Text('Login expired'),
-            body: const Text(
-              'VTOP sent you back to the login page. Try logging in again?',
-            ),
-            actions: [
-              FButton(
-                variant: FButtonVariant.outline,
-                onPress: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FButton(
-                onPress: () => Navigator.of(context).pop(true),
-                child: const Text('Try again'),
-              ),
-            ],
-          ),
-        );
-
-        if (shouldLoginAgain == true && context.mounted) {
-          await forceLogin();
-        }
-      } finally {
-        isLoginRedirectPromptOpen.value = false;
-      }
-    }
-
-    Future<bool> goTo(String url) async {
-      final result = await webController.value?.clickVtopMenuLink(url);
-      return result == true;
-    }
-
-    useEffect(() {
-      webController.value?.setVtopDarkMode(isDarkMode.value);
-      return null;
-    }, [isDarkMode.value]);
-
-    useEffect(() {
-      webController.value?.setVtopDesktopMode(isDesktopMode.value);
-      return null;
-    }, [isDesktopMode.value]);
-
-    useEffect(() {
-      if (isCompactMode.value) {
-        webController.value?.setVtopCompactSpacing(padding: 1);
-      } else {
-        webController.value?.resetVtopSpacing();
-      }
-      return null;
-    }, [isCompactMode.value]);
-
-    if (isPreparingSession.value || webviewSession.value == null) {
-      return VtopWebviewLoading(
-        error: setupError.value,
-        onRetry: () => prepareSession(),
+      vtopWebviewStore.acquire(username);
+      final storeGeneration = vtopWebviewStore.generation;
+      bool current() =>
+          _current(generation) &&
+          storeGeneration == vtopWebviewStore.generation &&
+          !ref.read(vtopUserProvider).isLoading &&
+          ref.read(vtopUserProvider).value?.username == username;
+      final cookieTimer = Stopwatch()..start();
+      final session = await vtopWebviewStore.serialize(
+        () => loadVtopWebviewSession(
+          snapshot: snapshot,
+          baseUrl: WebUri('https://vtop.vitap.ac.in'),
+          isCurrent: current,
+        ),
       );
+      if (!current()) return;
+      if (session == null) throw StateError('Could not prepare VTOP cookies.');
+      AppLogger.instance.info(
+        'vtop.webview',
+        'prepareMs=${timer.elapsedMilliseconds} cookieSyncMs=${cookieTimer.elapsedMilliseconds}',
+      );
+      setState(() {
+        _owner = username;
+        _session = session;
+        _loadRevision++;
+        _preparing = false;
+      });
+    } catch (error) {
+      if (!_current(generation)) return;
+      setState(() {
+        _error = error;
+        _preparing = false;
+      });
     }
+  }
 
+  Future<void> _forceLogin() async {
+    if (_recovering) return;
+    _recovering = true;
+    try {
+      await _prepare(force: true);
+    } finally {
+      _recovering = false;
+    }
+  }
+
+  Future<void> _loginRedirect() async {
+    if (_recovering || _promptOpen || !mounted) return;
+    if (_recovery.beginAutomaticAttempt()) {
+      await _forceLogin();
+      return;
+    }
+    _promptOpen = true;
+    try {
+      final retry = await showFDialog<bool>(
+        context: context,
+        builder: (context, style, animation) => AppDialog(
+          animation: animation,
+          title: const Text('Login expired'),
+          body: const Text(
+            'VTOP could not restore your session. Try signing in again?',
+          ),
+          actions: [
+            FButton(
+              variant: FButtonVariant.outline,
+              onPress: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FButton(
+              onPress: () => Navigator.of(context).pop(true),
+              child: const Text('Try again'),
+            ),
+          ],
+        ),
+      );
+      if (retry == true && mounted) await _forceLogin();
+    } finally {
+      _promptOpen = false;
+    }
+  }
+
+  Future<void> _savePreference(
+    VtopViewPreference preference,
+    bool value,
+  ) async {
+    try {
+      await preference.setValue(value);
+    } catch (_) {
+      if (mounted) {
+        dispToast(
+          context,
+          'Setting not saved',
+          'Your selection applies now, but could not be saved for next time.',
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(vtopUserProvider);
+    ref.listen(vtopUserProvider, (previous, next) {
+      if (next.hasValue &&
+          !next.isLoading &&
+          (previous?.isLoading == true ||
+              previous?.value?.username != next.value?.username)) {
+        _session = null;
+        _recovery.authenticatedPageReady();
+        _prepare();
+      }
+    });
+    final compact = ref.watch(vtopCompactModeProvider);
+    final desktop = ref.watch(vtopDesktopModeProvider);
+    final theme = ref.watch(themeProvider);
+    _dark ??=
+        theme == ThemeMode.dark ||
+        (theme == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+    final ready =
+        !user.isLoading &&
+        _session != null &&
+        _owner == user.value?.username &&
+        !_preparing &&
+        _error == null;
     return FScaffold(
       childPad: false,
       header: FHeader.nested(
-        title: Text(
-          showHeading.value,
-          style: TextStyle(fontSize: context.theme.typography.body.sm.fontSize),
-        ),
+        title: const Text('VTOP'),
         prefixes: [
           FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
         ],
-        suffixes: [
-          VtopWebviewThemeAction(
-            isDarkMode: isDarkMode.value,
-            onToggle: () => isDarkMode.value = !isDarkMode.value,
-          ),
-          const SizedBox(width: 10),
-          VtopWebviewActionsMenu(
-            isCompactMode: isCompactMode.value,
-            isDesktopMode: isDesktopMode.value,
-            onGoTo: (url) {
-              pendingInitialMenuUrl.value = null;
-              goTo(url);
-            },
-            onToggleCompactMode: () =>
-                isCompactMode.value = !isCompactMode.value,
-            onToggleDesktopMode: () =>
-                isDesktopMode.value = !isDesktopMode.value,
-            onForceLogin: forceLogin,
-          ),
-        ],
+        suffixes: ready
+            ? [
+                VtopWebviewThemeAction(
+                  isDarkMode: _dark!,
+                  onToggle: () => setState(() => _dark = !_dark!),
+                ),
+                VtopWebviewActionsMenu(
+                  isCompactMode: compact,
+                  isDesktopMode: desktop,
+                  onGoTo: (url) {
+                    _pendingMenu = url;
+                    _bodyKey.currentState?.openMenu(url);
+                  },
+                  onToggleCompactMode: () => _savePreference(
+                    ref.read(vtopCompactModeProvider.notifier),
+                    !compact,
+                  ),
+                  onToggleDesktopMode: () => _savePreference(
+                    ref.read(vtopDesktopModeProvider.notifier),
+                    !desktop,
+                  ),
+                  onForceLogin: _forceLogin,
+                ),
+              ]
+            : [],
       ),
-      child: VtopWebviewBody(
-        initialUrl: _initialUrl,
-        keepAlive: _keepAlive,
-        isCompactMode: isCompactMode.value,
-        isDarkMode: isDarkMode.value,
-        loading: loading.value,
-        session: webviewSession.value,
-        onLoadingChanged: (value) => loading.value = value,
-        onLoginRedirect: promptForceLogin,
-        onPageReady: (controller) async {
-          final target = pendingInitialMenuUrl.value;
-          if (target == null) return;
-
-          pendingInitialMenuUrl.value = null;
-          final didOpen = await goTo(target);
-          if (!didOpen && pendingInitialMenuUrl.value == null) {
-            pendingInitialMenuUrl.value = target;
-          }
-        },
-        onWebViewCreated: (controller) async {
-          webController.value = controller;
-          controller.setVtopDarkMode(isDarkMode.value);
-          controller.setVtopDesktopMode(isDesktopMode.value);
-          if (isCompactMode.value) {
-            controller.setVtopCompactSpacing(padding: 1);
-          }
-        },
-      ),
+      child: ready
+          ? VtopWebviewBody(
+              key: _bodyKey,
+              initialUrl: WebUri('https://vtop.vitap.ac.in/vtop/content?'),
+              revision: _loadRevision,
+              isCompactMode: compact,
+              isDesktopMode: desktop,
+              isDarkMode: _dark!,
+              session: _session!,
+              initialMenuUrl: _pendingMenu,
+              onMenuOpened: () => _pendingMenu = null,
+              onLoginRedirect: _loginRedirect,
+              onAuthenticatedPage: _recovery.authenticatedPageReady,
+            )
+          : VtopWebviewLoading(
+              error: _error,
+              onRetry: () => _prepare(),
+              reconnecting: _recovering,
+            ),
     );
   }
 }

@@ -214,6 +214,7 @@ class GoogleEmailOtpAuthService {
   final FlutterAppAuth _appAuth;
   final FlutterSecureStorage _storage;
   final http.Client _http;
+  final Set<String> _consumedOtpMessageIds = {};
   final GoogleLoopbackOAuthCoordinator _loopbackOAuth;
 
   Future<EmailOtpOAuthSession?> loadSession() async {
@@ -660,9 +661,12 @@ class GoogleEmailOtpAuthService {
     if (session == null) return null;
 
     final listResponse = await _http.get(
-      Uri.parse(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=1&q=from:noreply.sdc@vitap.ac.in',
-      ),
+      Uri.https('gmail.googleapis.com', '/gmail/v1/users/me/messages', {
+        'maxResults': '1',
+        'q':
+            'from:noreply.sdc@vitap.ac.in '
+            'after:${sinceUtc.millisecondsSinceEpoch ~/ 1000}',
+      }),
       headers: {'Authorization': 'Bearer ${session.accessToken}'},
     );
     await _throwForGmailReadFailure(listResponse);
@@ -677,6 +681,10 @@ class GoogleEmailOtpAuthService {
       session.accessToken,
     );
     if (message == null) return null;
+    final messageId = message['id'] as String?;
+    if (messageId == null || _consumedOtpMessageIds.contains(messageId)) {
+      return null;
+    }
 
     final internalDateMs = int.tryParse('${message['internalDate']}') ?? 0;
     if (internalDateMs <= 0) return null;
@@ -691,6 +699,7 @@ class GoogleEmailOtpAuthService {
     final match = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(combinedText);
     final otp = match?.group(1);
     if (otp != null) {
+      _consumedOtpMessageIds.add(messageId);
       await _handleReadOtpMessage(
         message,
         session.accessToken,

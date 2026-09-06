@@ -3,11 +3,14 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:open_file/open_file.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
+import 'package:vitapmate/features/docs/domain/docs_query.dart';
+import 'package:vitapmate/features/docs/presentation/providers/docs_sort_provider.dart';
 import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/docs/presentation/widgets/doc_card.dart';
@@ -18,6 +21,26 @@ class DocsPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final windowsAsync = ref.watch(docsRegistryProvider);
+    final sortAsync = ref.watch(docsSortProvider);
+    final sort = sortAsync.value ?? DocSort.recentlyOpened;
+    final searchController = useTextEditingController();
+    useListenable(searchController);
+    final searching = searchController.text.trim().isNotEmpty;
+
+    Future<void> selectSort(DocSort value) async {
+      try {
+        await ref.read(docsSortProvider.notifier).select(value);
+      } catch (_) {
+        if (context.mounted) {
+          dispToast(
+            context,
+            'Unable to save sort order',
+            'Your selection applies now, but may reset next time.',
+          );
+        }
+      }
+    }
+
     final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final entrance = useAnimationController(
       duration: const Duration(milliseconds: 450),
@@ -108,56 +131,151 @@ class DocsPage extends HookConsumerWidget {
       );
     }
 
-    void openDoc(DocWindow doc) {
+    Future<void> openDoc(DocWindow doc) async {
       if (!doc.hasFile) {
-        importFlow(doc);
+        await importFlow(doc);
+        return;
+      }
+      if (doc.kind == DocKind.file) {
+        try {
+          final repo = await ref.read(docsRepositoryProvider.future);
+          final path = await repo.storedFilePathOf(doc);
+          if (path == null) throw StateError('Document file is missing.');
+          final result = await OpenFile.open(path);
+          if (result.type != ResultType.done) {
+            throw StateError(result.message);
+          }
+          if (context.mounted) {
+            await ref
+                .read(docsRegistryProvider.notifier)
+                .touchLastOpened(doc.id);
+          }
+        } catch (error) {
+          if (context.mounted) disCommonToast(context, error);
+        }
         return;
       }
       GoRouter.of(context).pushNamed(Paths.docView, extra: doc);
     }
 
-    return windowsAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(
-          color: context.theme.colors.primary,
-          strokeWidth: 3,
-        ),
-      ),
-      error: (e, _) => _CenterInfo(
-        icon: FLucideIcons.triangleAlert,
-        title: 'Unable to load documents',
-        subtitle: '$e',
-      ),
-      data: (windows) {
-        final messPreset = windows
-            .where((w) => w.isPreset && !w.hasFile)
-            .firstOrNull;
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          child: windows.isEmpty
-              ? _EmptyState(
-                  key: const ValueKey('empty'),
-                  onImport: () => importFlow(),
-                  onMess: () => importFlow(messPreset),
-                )
-              : _Grid(
-                  key: const ValueKey('grid'),
-                  windows: windows,
-                  darkMode: darkMode,
-                  entrance: entrance,
-                  onOpen: openDoc,
-                  onRename: openRename,
-                  onDelete: openDelete,
-                  onImport: () => importFlow(),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: FTextField(
+                  control: FTextFieldControl.managed(
+                    controller: searchController,
+                  ),
+                  hint: 'Search documents',
+                  prefixBuilder: (_, _, _) => Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Icon(
+                      FLucideIcons.search,
+                      size: 18,
+                      color: context.theme.colors.mutedForeground,
+                    ),
+                  ),
+                  suffixBuilder: (_, _, _) => searchController.text.isEmpty
+                      ? const SizedBox.shrink()
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          onPressed: searchController.clear,
+                          icon: Icon(
+                            FLucideIcons.x,
+                            size: 18,
+                            color: context.theme.colors.mutedForeground,
+                          ),
+                        ),
                 ),
-        );
-      },
+              ),
+              const SizedBox(width: 8),
+              FPopoverMenu(
+                menuAnchor: Alignment.topLeft,
+                childAnchor: Alignment.bottomLeft,
+                menu: [
+                  FItemGroup(
+                    children: [
+                      for (final option in DocSort.values)
+                        FItem(
+                          title: Text(option.label),
+                          prefix: Icon(
+                            option == sort
+                                ? FLucideIcons.check
+                                : FLucideIcons.arrowUpDown,
+                          ),
+                          onPress: () => selectSort(option),
+                        ),
+                    ],
+                  ),
+                ],
+                builder: (_, controller, _) => FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: sortAsync.isLoading ? null : controller.toggle,
+                  child: const Text('Sort'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: windowsAsync.when(
+            loading: () => Center(
+              child: CircularProgressIndicator(
+                color: context.theme.colors.primary,
+                strokeWidth: 3,
+              ),
+            ),
+            error: (e, _) => _CenterInfo(
+              icon: FLucideIcons.triangleAlert,
+              title: 'Unable to load documents',
+              subtitle: '$e',
+            ),
+            data: (windows) {
+              final messPreset = windows
+                  .where((w) => w.isPreset && !w.hasFile)
+                  .firstOrNull;
+              return AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: windows.isEmpty
+                    ? _EmptyState(
+                        key: const ValueKey('empty'),
+                        onImport: () => importFlow(),
+                        onMess: () => importFlow(messPreset),
+                      )
+                    : _Grid(
+                        key: const ValueKey('grid'),
+                        windows: queryDocs(
+                          windows,
+                          sort: sort,
+                          query: searchController.text,
+                        ),
+                        searching: searching,
+                        totalCount: windows.length,
+                        onClearSearch: searchController.clear,
+                        darkMode: darkMode,
+                        entrance: entrance,
+                        onOpen: openDoc,
+                        onRename: openRename,
+                        onDelete: openDelete,
+                        onImport: () => importFlow(),
+                      ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _Grid extends StatefulWidget {
   final List<DocWindow> windows;
+  final bool searching;
+  final int totalCount;
+  final VoidCallback onClearSearch;
   final bool darkMode;
   final AnimationController entrance;
   final void Function(DocWindow) onOpen;
@@ -168,6 +286,9 @@ class _Grid extends StatefulWidget {
   const _Grid({
     super.key,
     required this.windows,
+    required this.searching,
+    required this.totalCount,
+    required this.onClearSearch,
     required this.darkMode,
     required this.entrance,
     required this.onOpen,
@@ -192,14 +313,18 @@ class _GridState extends State<_Grid> {
   Widget build(BuildContext context) {
     DocWindow? recent;
     for (final window in widget.windows) {
-      if (!window.hasFile || window.lastOpenedAt == null) continue;
+      if (!window.hasFile ||
+          window.kind == DocKind.file ||
+          window.lastOpenedAt == null) {
+        continue;
+      }
       if (recent == null || window.lastOpenedAt! > (recent.lastOpenedAt ?? 0)) {
         recent = window;
       }
     }
 
     return CustomScrollView(
-      physics: _previewActive
+      physics: _previewActive && !widget.searching
           ? const NeverScrollableScrollPhysics()
           : const AlwaysScrollableScrollPhysics(),
       slivers: [
@@ -209,7 +334,9 @@ class _GridState extends State<_Grid> {
             child: Row(
               children: [
                 Text(
-                  '${widget.windows.length} document${widget.windows.length == 1 ? '' : 's'}',
+                  widget.searching
+                      ? '${widget.windows.length} of ${widget.totalCount} documents'
+                      : '${widget.windows.length} document${widget.windows.length == 1 ? '' : 's'}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -253,7 +380,7 @@ class _GridState extends State<_Grid> {
             ),
           ),
         ),
-        if (recent != null)
+        if (recent != null && !widget.searching)
           SliverPadding(
             padding: const EdgeInsets.only(bottom: 14),
             sliver: SliverToBoxAdapter(
@@ -264,6 +391,26 @@ class _GridState extends State<_Grid> {
                 onInteractionStart: () => _setPreviewActive(true),
                 onInteractionEnd: () => _setPreviewActive(false),
               ),
+            ),
+          ),
+        if (widget.windows.isEmpty)
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const _CenterInfo(
+                  icon: FLucideIcons.search,
+                  title: 'No documents found',
+                  subtitle: 'Try a different name or clear your search.',
+                ),
+                const SizedBox(height: 16),
+                FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: widget.onClearSearch,
+                  child: const Text('Clear search'),
+                ),
+              ],
             ),
           ),
         SliverGrid.builder(

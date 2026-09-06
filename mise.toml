@@ -1,3 +1,4 @@
 [tools]
 firebase = "latest"
 flutter = "latest"
+java = "17"

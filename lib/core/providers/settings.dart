@@ -36,6 +36,8 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_student_projects_rotation_seed",
         timetableViewModeSettingKey,
         inAppCaptchaSolverSettingKey,
+        vtopCompactModeSettingKey,
+        vtopDesktopModeSettingKey,
       },
     ),
   );
@@ -445,3 +447,36 @@ class ChangeAlertsSettingsController {
     await _write(type.prefKey, value);
   }
 }
+
+const vtopCompactModeSettingKey = 'settings_vtop_compact_mode';
+const vtopDesktopModeSettingKey = 'settings_vtop_desktop_mode';
+
+/// Serialize preference writes while updating the visible selection immediately.
+class VtopViewPreference extends Notifier<bool> {
+  VtopViewPreference(this.key, this.defaultValue);
+  final String key;
+  final bool defaultValue;
+  Future<void> _writes = Future.value();
+
+  @override
+  bool build() =>
+      ref.watch(settingsProvider).value?.getBool(key) ?? defaultValue;
+
+  Future<void> setValue(bool value) {
+    state = value;
+    final write = _writes.then((_) async {
+      final prefs = await ref.read(settingsProvider.future);
+      await prefs.setBool(key, value);
+    });
+    // A failed write must not prevent the next selection from being saved.
+    _writes = write.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return write;
+  }
+}
+
+final vtopCompactModeProvider = NotifierProvider<VtopViewPreference, bool>(
+  () => VtopViewPreference(vtopCompactModeSettingKey, true),
+);
+final vtopDesktopModeProvider = NotifierProvider<VtopViewPreference, bool>(
+  () => VtopViewPreference(vtopDesktopModeSettingKey, false),
+);

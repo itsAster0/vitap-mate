@@ -13,6 +13,7 @@ import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/domain/document_transform.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
+import 'package:vitapmate/features/docs/presentation/widgets/pdf_document_viewport.dart';
 
 class DocumentViewerPage extends HookConsumerWidget {
   final DocWindow doc;
@@ -272,6 +273,10 @@ class _DocSurface extends HookConsumerWidget {
           searchQuery: searchQuery.value,
         );
         break;
+      case DocKind.file:
+        content = const Center(
+          child: Text('Open this file from Docs with another app.'),
+        );
     }
 
     return Stack(
@@ -597,28 +602,20 @@ class _PdfLoaded extends HookConsumerWidget {
         ),
       );
     }
-    return InteractiveViewer(
-      transformationController: transform,
-      boundaryMargin: const EdgeInsets.all(double.infinity),
-      minScale: 0.5,
-      maxScale: 6,
-      panEnabled: true,
-      clipBehavior: Clip.none,
-      onInteractionEnd: (_) => persist(),
-      child: NotificationListener<ScrollNotification>(
-        onNotification: onScrollNotification,
-        child: ListView.builder(
-          controller: scroll,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-          itemCount: pdfDoc.pagesCount,
-          itemBuilder: (context, i) => RepaintBoundary(
-            key: ValueKey('page-$i'),
-            child: _PdfPageTile(
-              document: pdfDoc,
-              pageNumber: i + 1,
-              dpr: dpr,
-              darkMode: darkMode,
-            ),
+    return NotificationListener<ScrollNotification>(
+      onNotification: onScrollNotification,
+      child: PdfDocumentViewport(
+        transform: transform,
+        scroll: scroll,
+        pageCount: pdfDoc.pagesCount,
+        onInteractionEnd: () => persist(scrollOffset: scroll.offset),
+        pageBuilder: (context, i) => RepaintBoundary(
+          key: ValueKey('page-$i'),
+          child: _PdfPageTile(
+            document: pdfDoc,
+            pageNumber: i + 1,
+            dpr: dpr,
+            darkMode: darkMode,
           ),
         ),
       ),
