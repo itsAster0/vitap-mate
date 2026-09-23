@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Environment
+import android.util.Log
 import android.provider.CalendarContract
 import android.webkit.URLUtil
 import android.webkit.CookieManager
@@ -28,8 +29,9 @@ class MainActivity : FlutterFragmentActivity() {
         private const val DOWNLOAD_CHANNEL = "vitapmate/download_manager"
         private const val SYNC_TAG = "[VitapMateTimetable]"
         private const val TAG_PREFIX = "vitapmate-"
-        private const val OUTING_PREFS = "outing_downloads"
-        private const val OUTING_PREFIX = "download_"
+        // Preserve pending jobs saved by earlier app versions.
+        private const val DOCS_PREFS = "outing_downloads"
+        private const val DOCS_PREFIX = "download_"
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -47,9 +49,9 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "enqueueDownload" -> enqueueDownload(call, result)
-                    "pendingOutingDownloads" -> pendingOutingDownloads(result)
+                    "pendingDocsDownloads" -> pendingDocsDownloads(result)
                     "copyCompletedDownload" -> copyCompletedDownload(call, result)
-                    "ackOutingDownload" -> ackOutingDownload(call, result)
+                    "ackDocsDownload" -> ackDocsDownload(call, result)
                     "openDownloadsFolder" -> openDownloadsFolder(result)
                     else -> result.notImplemented()
                 }
@@ -109,16 +111,15 @@ class MainActivity : FlutterFragmentActivity() {
                 return
             }
             val id = manager.enqueue(request)
-            val outing = call.argument<String>("archiveOuting")
-            val account = call.argument<String>("archiveAccount")
-            if (!outing.isNullOrBlank() && !account.isNullOrBlank()) {
+            val saveToDocs = call.argument<Boolean>("saveToDocs") == true
+            val account = call.argument<String>("docsAccount")
+            if (saveToDocs && !account.isNullOrBlank()) {
                 val pending = JSONObject()
                     .put("id", id)
-                    .put("outing", outing)
                     .put("account", account)
-                    .put("filename", fileName ?: "outing-$id.bin")
-                getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
-                    .edit().putString("$OUTING_PREFIX$id", pending.toString()).commit()
+                    .put("filename", fileName ?: "download-$id.bin")
+                getSharedPreferences(DOCS_PREFS, Context.MODE_PRIVATE)
+                    .edit().putString("$DOCS_PREFIX$id", pending.toString()).commit()
             }
             result.success(id)
         } catch (e: Exception) {
@@ -126,15 +127,14 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    private fun pendingOutingDownloads(result: MethodChannel.Result) {
-        val pending = getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE).all
-            .filterKeys { it.startsWith(OUTING_PREFIX) }
+    private fun pendingDocsDownloads(result: MethodChannel.Result) {
+        val pending = getSharedPreferences(DOCS_PREFS, Context.MODE_PRIVATE).all
+            .filterKeys { it.startsWith(DOCS_PREFIX) }
             .values.mapNotNull { raw ->
                 try {
                     val item = JSONObject(raw as String)
                     mapOf(
                         "id" to item.getLong("id"),
-                        "outing" to item.getString("outing"),
                         "account" to item.getString("account"),
                         "filename" to item.getString("filename")
                     )
@@ -161,12 +161,15 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 val answer: Map<String, String> = when (status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
-                        val raw = getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
-                            .getString("$OUTING_PREFIX$id", null)
+                        val raw = getSharedPreferences(DOCS_PREFS, Context.MODE_PRIVATE)
+                            .getString("$DOCS_PREFIX$id", null)
                         val filename = raw?.let { JSONObject(it).optString("filename") }
-                            ?.takeIf { it.isNotBlank() } ?: "outing-$id.bin"
-                        val safeName = filename.replace(Regex("[^A-Za-z0-9._ -]"), "_")
-                        val directory = File(cacheDir, "vtop-outing-$id")
+                            ?.takeIf { it.isNotBlank() } ?: "download-$id.bin"
+                        val cleaned = filename.replace(Regex("[^A-Za-z0-9._ -]"), "_")
+                        val safeName = cleaned.takeUnless {
+                            it.isBlank() || it == "." || it == ".."
+                        } ?: "download-$id.bin"
+                        val directory = File(cacheDir, "docs-download-$id")
                         directory.mkdirs()
                         val target = File(directory, safeName)
                         val uri = manager.getUriForDownloadedFile(id)
@@ -181,6 +184,7 @@ class MainActivity : FlutterFragmentActivity() {
                 }
                 runOnUiThread { result.success(answer) }
             } catch (error: Exception) {
+                Log.e("VitapMateDocs", "Failed to copy completed download $id", error)
                 runOnUiThread {
                     result.error("download_copy_failed", error.message, null)
                 }
@@ -188,14 +192,15 @@ class MainActivity : FlutterFragmentActivity() {
         }.start()
     }
 
-    private fun ackOutingDownload(call: MethodCall, result: MethodChannel.Result) {
+    private fun ackDocsDownload(call: MethodCall, result: MethodChannel.Result) {
         val id = call.argument<Number>("id")?.toLong()
         if (id == null) {
             result.error("invalid_download_id", "Download ID is required", null)
             return
         }
-        getSharedPreferences(OUTING_PREFS, Context.MODE_PRIVATE)
-            .edit().remove("$OUTING_PREFIX$id").commit()
+        getSharedPreferences(DOCS_PREFS, Context.MODE_PRIVATE)
+            .edit().remove("$DOCS_PREFIX$id").commit()
+        File(cacheDir, "docs-download-$id").deleteRecursively()
         File(cacheDir, "vtop-outing-$id").deleteRecursively()
         result.success(null)
     }

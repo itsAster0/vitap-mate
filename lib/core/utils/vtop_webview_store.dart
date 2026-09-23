@@ -19,6 +19,8 @@ class VtopWebviewStore {
   }
 
   String? _owner;
+  String? _username;
+  String? get username => _username;
   int generation = 0;
 
   void acquire(String username) {
@@ -29,6 +31,7 @@ class VtopWebviewStore {
       );
     }
     _owner = owner;
+    _username = username;
   }
 
   Future<void> clearIfDifferent(String? username) async {
@@ -39,6 +42,7 @@ class VtopWebviewStore {
     if (username != null && _owner != username.toUpperCase()) return;
     if (_owner == null) return;
     _owner = null;
+    _username = null;
     generation++;
     await serialize(_clearCookies);
   }

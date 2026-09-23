@@ -5,16 +5,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_webview_store.dart';
-import 'package:vitapmate/features/docs/data/vtop_outing_download.dart';
-import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_cookie_service.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_scripts.dart';
+
+bool _isOutingDownload(Iterable<String?> values) => values.any((value) {
+  final path = value?.toLowerCase() ?? '';
+  return path.contains('studentweekendouting') ||
+      path.contains('studentgeneralouting');
+});
+
+bool _isDownloadAction(String value) =>
+    value.toLowerCase().contains('/download');
 
 class VtopWebviewBody extends StatefulWidget {
   const VtopWebviewBody({
@@ -61,6 +66,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
   int _homeRevision = 0;
   String? _menuRequest;
   String? _pendingMenu;
+  String? _currentMenu;
   int _menuSequence = 0;
   int _navigation = 0;
   Timer? _slowTimer;
@@ -91,6 +97,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
     super.initState();
     _storeGeneration = vtopWebviewStore.generation;
     _pendingMenu = widget.initialMenuUrl;
+    _currentMenu = widget.initialMenuUrl;
     _watchSlowLoad();
   }
 
@@ -148,6 +155,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
     final homeRevision = ++_homeRevision;
     _acceptActivity = false;
     _document = null;
+    _currentMenu = null;
     _menuRequest = null;
     _menuTimer?.cancel();
     setState(() {
@@ -186,6 +194,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
   Future<void> openMenu(String url) async {
     if (!_valid || _controller == null) return;
     _pendingMenu = null;
+    _currentMenu = url;
     final request = '$_instanceId:${++_menuSequence}';
     _menuTimer?.cancel();
     setState(() {
@@ -309,6 +318,15 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                     _activity(controller, args).catchError((Object _) {}),
               );
               controller.addJavaScriptHandler(
+                handlerName: 'vtopMenuChanged',
+                callback: (args) {
+                  if (_valid && args.isNotEmpty && args.first is String) {
+                    final menu = args.first as String;
+                    if (!_isDownloadAction(menu)) _currentMenu = menu;
+                  }
+                },
+              );
+              controller.addJavaScriptHandler(
                 handlerName: 'vtopMenuResult',
                 callback: (args) {
                   if (!_valid || args.length != 2 || args[0] != _menuRequest) {
@@ -336,11 +354,6 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
             },
             onDownloadStartRequest: (controller, request) async {
               if (!_valid) return;
-              final container = ProviderScope.containerOf(
-                context,
-                listen: false,
-              );
-              final storeGeneration = vtopWebviewStore.generation;
               try {
                 final cookieHeader = await loadLatestVtopCookieHeader(
                   request.url,
@@ -356,17 +369,19 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                 } catch (_) {
                   // The download still uses the original native path.
                 }
-                final outing = outingForDownload([
+                if (currentMenu != null &&
+                    currentMenu.isNotEmpty &&
+                    !_isDownloadAction(currentMenu)) {
+                  _currentMenu = currentMenu;
+                }
+                final saveToDocs = _isOutingDownload([
+                  _currentMenu,
                   currentMenu,
                   request.url.toString(),
                   referer,
                 ]);
                 if (!_valid) return;
-                final account = container
-                    .read(vtopUserProvider)
-                    .value
-                    ?.username;
-                final receipt = await downloadFile(
+                await downloadFile(
                   request.url.toString(),
                   cookieHeader,
                   contentDisposition: request.contentDisposition,
@@ -374,61 +389,15 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                   suggestedFilename: request.suggestedFilename,
                   userAgent: request.userAgent,
                   referer: referer,
-                  archiveOuting: outing?.name,
-                  archiveAccount: outing == null ? null : account,
+                  saveToDocs: saveToDocs,
                 );
-                if (receipt == null) throw StateError('Download unavailable.');
-                if (outing != null && account != null) {
-                  if (receipt.androidId != null) {
-                    unawaited(
-                      watchOutingDownload(
-                        receipt.androidId!,
-                        onImported: () {
-                          if (storeGeneration == vtopWebviewStore.generation) {
-                            container.invalidate(docsRegistryProvider);
-                          }
-                        },
-                        onFailed: () {
-                          if (context.mounted) {
-                            dispToast(
-                              context,
-                              'Outing file unavailable in Docs',
-                              'The file could not be copied into Docs.',
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  } else if (receipt.path != null) {
-                    unawaited(() async {
-                      try {
-                        final repository = await container.read(
-                          docsRepositoryProvider.future,
-                        );
-                        if (storeGeneration != vtopWebviewStore.generation)
-                          return;
-                        await saveVtopOutingDownloadToDocs(
-                          repository: repository,
-                          outing: outing,
-                          sourcePath: receipt.path!,
-                          filename:
-                              request.suggestedFilename ??
-                              receipt.path!.split('/').last,
-                        );
-                        if (storeGeneration == vtopWebviewStore.generation) {
-                          container.invalidate(docsRegistryProvider);
-                        }
-                      } catch (_) {
-                        if (context.mounted) {
-                          dispToast(
-                            context,
-                            'Saved to Downloads',
-                            'Could not add this outing file to Docs.',
-                          );
-                        }
-                      }
-                    }());
-                  }
+              } on DocsCopyException {
+                if (context.mounted) {
+                  dispToast(
+                    context,
+                    'Saved to Downloads',
+                    'Could not add this file to Docs.',
+                  );
                 }
               } catch (_) {
                 if (context.mounted && _valid) {
