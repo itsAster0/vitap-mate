@@ -191,7 +191,14 @@ const vtopActivityScript = r'''
     const target = event.target instanceof Element
       ? event.target : event.target?.parentElement;
     const link = target?.closest('a[data-url]');
-    if (link) window.__mateCurrentMenu = link.getAttribute('data-url') || '';
+    if (link) {
+      const menu = link.getAttribute('data-url') || '';
+      if (!/\/download/i.test(menu)) {
+        window.__mateCurrentMenu = menu;
+        try { window.flutter_inappwebview?.callHandler('vtopMenuChanged', menu); }
+        catch (_) {}
+      }
+    }
   }, true);
   let active = 0;
   function notify(type, extra) {

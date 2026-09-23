@@ -3,6 +3,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
+import 'package:vitapmate/features/docs/data/download_to_docs.dart';
 
 Future<String?> pickDocPath() async {
   final file = await FilePicker.pickFile(
@@ -58,6 +59,8 @@ class ActiveDocumentTitle extends Notifier<String?> {
 class DocsRegistryNotifier extends AsyncNotifier<List<DocWindow>> {
   @override
   Future<List<DocWindow>> build() async {
+    final imported = docsImportEvents.listen((_) => ref.invalidateSelf());
+    ref.onDispose(imported.cancel);
     final repo = await ref.watch(docsRepositoryProvider.future);
     return repo.list();
   }

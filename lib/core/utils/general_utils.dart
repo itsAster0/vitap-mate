@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/services.dart';
@@ -6,40 +8,19 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/core/utils/app_errors.dart';
+import 'package:vitapmate/core/utils/vtop_webview_store.dart';
+import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/features/docs/data/docs_repository.dart';
+import 'package:vitapmate/features/docs/data/download_to_docs.dart';
 
 final _androidDir = Directory('/storage/emulated/0/Download');
 const _downloadManagerChannel = MethodChannel('vitapmate/download_manager');
 
-class DownloadReceipt {
-  const DownloadReceipt({this.androidId, this.path});
-  final int? androidId;
-  final String? path;
+class DocsCopyException implements Exception {
+  const DocsCopyException(this.cause);
+  final Object cause;
 }
 
-Future<List<Map<String, dynamic>>> pendingOutingDownloads() async {
-  if (!Platform.isAndroid) return [];
-  final raw = await _downloadManagerChannel.invokeListMethod<dynamic>(
-    'pendingOutingDownloads',
-  );
-  return [
-    for (final item in raw ?? const [])
-      if (item is Map) Map<String, dynamic>.from(item),
-  ];
-}
-
-Future<({String status, String? path})> copyCompletedDownload(int id) async {
-  final result = await _downloadManagerChannel.invokeMapMethod<String, dynamic>(
-    'copyCompletedDownload',
-    {'id': id},
-  );
-  return (
-    status: result?['status'] as String? ?? 'failed',
-    path: result?['path'] as String?,
-  );
-}
-
-Future<void> acknowledgeOutingDownload(int id) =>
-    _downloadManagerChannel.invokeMethod<void>('ackOutingDownload', {'id': id});
 String formatUnixTimestamp(int timestamp) {
   final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
   final formatter = DateFormat("MMM dd, yyyy hh:mm a");
@@ -86,7 +67,7 @@ void fileDownloaderConfig() {
   );
 }
 
-Future<DownloadReceipt?> downloadFile(
+Future<void> downloadFile(
   String url,
   String cookie, {
   String? contentDisposition,
@@ -94,10 +75,10 @@ Future<DownloadReceipt?> downloadFile(
   String? suggestedFilename,
   String? userAgent,
   String? referer,
-  String? archiveOuting,
-  String? archiveAccount,
+  bool saveToDocs = false,
 }) async {
   Directory? downloadsDir;
+  final account = saveToDocs ? vtopWebviewStore.username : null;
 
   if (Platform.isAndroid) {
     await Permission.notification.request();
@@ -109,11 +90,14 @@ Future<DownloadReceipt?> downloadFile(
       suggestedFilename: suggestedFilename,
       userAgent: userAgent,
       referer: referer,
-      archiveOuting: archiveOuting,
-      archiveAccount: archiveAccount,
+      saveToDocs: saveToDocs && account != null,
+      docsAccount: account,
     );
     if (downloadId != null) {
-      return DownloadReceipt(androidId: downloadId);
+      if (saveToDocs && account != null) {
+        unawaited(watchDocsDownload(downloadId));
+      }
+      return;
     }
     downloadsDir = _androidDir;
   } else if (Platform.isIOS) {
@@ -121,7 +105,7 @@ Future<DownloadReceipt?> downloadFile(
   }
 
   if (downloadsDir == null || !await downloadsDir.exists()) {
-    return null;
+    return;
   }
 
   final fallbackFilename = _normalizeDownloadFilename(suggestedFilename);
@@ -139,7 +123,22 @@ Future<DownloadReceipt?> downloadFile(
   if (result.status != TaskStatus.complete) {
     throw StateError('Download did not complete: ${result.status.name}');
   }
-  return DownloadReceipt(path: await task.filePath());
+  if (saveToDocs) {
+    if (account == null) {
+      log('Downloaded file could not be copied to Docs: no active account');
+      return;
+    }
+    final path = await task.filePath();
+    try {
+      await saveDownloadedFileToDocs(
+        repository: DocsRepository(JsonFileStorage(username: account)),
+        sourcePath: path,
+        filename: path.split('/').last,
+      );
+    } catch (error) {
+      throw DocsCopyException(error);
+    }
+  }
 }
 
 Future<int?> _downloadWithAndroidDownloadManager(
@@ -150,8 +149,8 @@ Future<int?> _downloadWithAndroidDownloadManager(
   String? suggestedFilename,
   String? userAgent,
   String? referer,
-  String? archiveOuting,
-  String? archiveAccount,
+  bool saveToDocs = false,
+  String? docsAccount,
 }) async {
   try {
     final downloadId = await _downloadManagerChannel
@@ -163,8 +162,8 @@ Future<int?> _downloadWithAndroidDownloadManager(
           'suggestedFilename': _normalizeDownloadFilename(suggestedFilename),
           'userAgent': userAgent,
           'referer': referer,
-          'archiveOuting': archiveOuting,
-          'archiveAccount': archiveAccount,
+          'saveToDocs': saveToDocs,
+          'docsAccount': docsAccount,
         });
     return downloadId != null && downloadId > 0 ? downloadId : null;
   } on MissingPluginException {
