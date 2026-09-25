@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -45,109 +47,130 @@ class UserCard extends HookConsumerWidget {
       }
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: FCard(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            spacing: 16,
+    final studentName = ref
+        .watch(gradeHistoryProvider)
+        .value
+        ?.student
+        .name
+        .trim();
+    final displayName = (studentName?.isNotEmpty ?? false)
+        ? _titleCase(studentName!)
+        : username;
+    final initials = displayName
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0])
+        .join();
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+
+    return Surface(
+      child: Column(
+        spacing: 16,
+        children: [
+          Row(
+            spacing: 12,
             children: [
-              Row(
-                spacing: 12,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: context.theme.colors.primary.withValues(
-                        alpha: 0.1,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: Icon(FLucideIcons.idCard),
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'VTOP Account',
-                          style: context.theme.typography.body.md.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          [
-                            username,
-                            if (semesterName != null && semesterName.isNotEmpty)
-                              semesterName,
-                          ].join('  •  '),
-                          style: context.theme.typography.body.sm.copyWith(
-                            color: user.isValid
-                                ? context.theme.colors.mutedForeground
-                                : context.theme.colors.destructive,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (!user.isValid) ...[
-                const FAlert(
-                  variant: FAlertVariant.destructive,
-                  title: Text('Credentials need attention'),
-                  subtitle: Text('Update your VTOP password to continue.'),
+              Container(
+                width: 48,
+                height: 48,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colors.app.accentTone.subtle,
+                  shape: BoxShape.circle,
                 ),
-              ],
-              Row(
-                spacing: 6,
-                children: [
-                  Expanded(child: UserPassChange(user: user)),
-                  Semantics(
-                    label: 'Sign out',
-                    button: true,
-                    child: FButton.icon(
-                      onPress: () => _confirmSignOut(context, ref),
-                      child: const Icon(FLucideIcons.logOut),
-                    ),
+                child: Text(
+                  initials.toUpperCase(),
+                  style: typography.body.md.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colors.app.accentTone.onSubtle,
                   ),
-                ],
+                ),
               ),
-              Row(
-                spacing: 6,
-                children: [
-                  Expanded(
-                    child: FButton(
-                      variant: FButtonVariant.outline,
-                      onPress: () => showAdaptiveDialog(
-                        context: context,
-                        builder: (_) =>
-                            SemesterDialog(user: user, outerContext: context),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: typography.body.md.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.foreground,
                       ),
-                      child: const Text('Change semester'),
                     ),
-                  ),
-                  if (hasEnrolledBiometrics) ...[
-                    Tooltip(
-                      message: 'View saved password',
-                      child: Semantics(
-                        label: 'View saved password',
-                        button: true,
-                        child: FButton.icon(
-                          onPress: () => _showPassword(context),
-                          child: const Icon(FLucideIcons.eye),
-                        ),
+                    Text(
+                      [
+                        username,
+                        if (semesterName != null && semesterName.isNotEmpty)
+                          semesterName,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: typography.body.xs.copyWith(
+                        color: user.isValid
+                            ? colors.mutedForeground
+                            : colors.destructive,
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
             ],
           ),
-        ),
+          if (!user.isValid) ...[
+            const FAlert(
+              variant: FAlertVariant.destructive,
+              title: Text('Credentials need attention'),
+              subtitle: Text('Update your VTOP password to continue.'),
+            ),
+          ],
+          Row(
+            spacing: 6,
+            children: [
+              Expanded(child: UserPassChange(user: user)),
+              Semantics(
+                label: 'Sign out',
+                button: true,
+                child: FButton.icon(
+                  onPress: () => _confirmSignOut(context, ref),
+                  child: const Icon(FLucideIcons.logOut),
+                ),
+              ),
+            ],
+          ),
+          Row(
+            spacing: 6,
+            children: [
+              Expanded(
+                child: FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: () => showAdaptiveDialog(
+                    context: context,
+                    builder: (_) =>
+                        SemesterDialog(user: user, outerContext: context),
+                  ),
+                  child: const Text('Change semester'),
+                ),
+              ),
+              if (hasEnrolledBiometrics) ...[
+                Tooltip(
+                  message: 'View saved password',
+                  child: Semantics(
+                    label: 'View saved password',
+                    button: true,
+                    child: FButton.icon(
+                      onPress: () => _showPassword(context),
+                      child: const Icon(FLucideIcons.eye),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -235,3 +258,10 @@ class UserCard extends HookConsumerWidget {
     );
   }
 }
+
+/// "MALLIDI YASWANTH REDDY" → "Mallidi Yaswanth Reddy".
+String _titleCase(String value) => value
+    .toLowerCase()
+    .split(' ')
+    .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+    .join(' ');

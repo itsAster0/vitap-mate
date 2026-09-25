@@ -1,5 +1,7 @@
 import 'dart:developer';
-import 'package:flutter/material.dart';
+
+import 'package:flutter/material.dart' show RefreshIndicator, RefreshCallback;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -41,34 +44,39 @@ class AttendancePage extends HookConsumerWidget {
 
     final attendanceData = ref.watch(attendanceProvider);
 
-    return attendanceData.when(
-      data: (data) {
-        if (data.records.isEmpty) {
-          return _AttendanceFilterView(
-            records: const [],
-            updateTime: data.updateTime.toInt(),
-            onRefresh: update,
-          );
-        }
-
-        return _AttendanceFilterView(
+    return AnimatedSwitcher(
+      duration: Motion.medium,
+      child: attendanceData.when(
+        skipLoadingOnRefresh: true,
+        skipLoadingOnReload: true,
+        data: (data) => _AttendanceView(
+          key: const ValueKey('data'),
           records: data.records,
           updateTime: data.updateTime.toInt(),
           onRefresh: update,
-        );
-      },
-      error: (e, _) {
-        final msg = commonErrorMessage(e);
-        // try {
-        //   disCommonToast(context, e);
-        // } catch (_) {}
-        return Center(child: Text(msg));
-      },
-      loading: () => Center(
-        child: SizedBox(
-          width: 50,
-          height: 50,
-          child: CircularProgressIndicator(color: context.theme.colors.primary),
+        ),
+        error: (e, _) => EmptyState(
+          key: const ValueKey('error'),
+          icon: FLucideIcons.cloudAlert,
+          title: "Couldn't load attendance",
+          message: commonErrorMessage(e),
+          action: FButton(
+            variant: FButtonVariant.outline,
+            mainAxisSize: MainAxisSize.min,
+            onPress: update,
+            child: const Text('Try again'),
+          ),
+        ),
+        loading: () => const Padding(
+          key: ValueKey('loading'),
+          padding: EdgeInsets.all(Space.sm),
+          child: Column(
+            children: [
+              Skeleton(height: 40, radius: Radii.md),
+              SizedBox(height: Space.lg),
+              SkeletonList(count: 5, height: 104),
+            ],
+          ),
         ),
       ),
     );
@@ -77,146 +85,93 @@ class AttendancePage extends HookConsumerWidget {
 
 enum _CourseFilter { all, theory, lab }
 
-class _AttendanceFilterView extends HookWidget {
-  final List<AttendanceRecord> records;
-  final int updateTime;
-  final RefreshCallback onRefresh;
-
-  const _AttendanceFilterView({
+class _AttendanceView extends HookWidget {
+  const _AttendanceView({
+    super.key,
     required this.records,
     required this.updateTime,
     required this.onRefresh,
   });
 
+  final List<AttendanceRecord> records;
+  final int updateTime;
+  final RefreshCallback onRefresh;
+
   @override
   Widget build(BuildContext context) {
-    final selected = useState(_CourseFilter.all);
-    final filteredRecords = switch (selected.value) {
+    final filter = useState(_CourseFilter.all);
+    final theory = records.where((r) => !r.islab()).toList();
+    final labs = records.where((r) => r.islab()).toList();
+    final shown = switch (filter.value) {
       _CourseFilter.all => records,
-      _CourseFilter.theory =>
-        records.where((record) => !record.islab()).toList(),
-      _CourseFilter.lab => records.where((record) => record.islab()).toList(),
-    };
-    final emptyMessage = switch (selected.value) {
-      _CourseFilter.all => 'No Data to show yet',
-      _CourseFilter.theory => 'No theory records for this semester',
-      _CourseFilter.lab => 'No lab records for this semester',
+      _CourseFilter.theory => theory,
+      _CourseFilter.lab => labs,
     };
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: _FilterButton(
-                  label: 'All (${records.length})',
-                  selected: selected.value == _CourseFilter.all,
-                  onPress: () => selected.value = _CourseFilter.all,
-                ),
-              ),
-              Expanded(
-                child: _FilterButton(
-                  label:
-                      'Theory (${records.where((record) => !record.islab()).length})',
-                  selected: selected.value == _CourseFilter.theory,
-                  onPress: () => selected.value = _CourseFilter.theory,
-                ),
-              ),
-              Expanded(
-                child: _FilterButton(
-                  label:
-                      'Lab (${records.where((record) => record.islab()).length})',
-                  selected: selected.value == _CourseFilter.lab,
-                  onPress: () => selected.value = _CourseFilter.lab,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _AttendanceRecordsList(
-            records: filteredRecords,
-            updateTime: updateTime,
-            onRefresh: onRefresh,
-            emptyMessage: emptyMessage,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilterButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onPress;
-
-  const _FilterButton({
-    required this.label,
-    required this.selected,
-    required this.onPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FButton(
-      size: FButtonSizeVariant.sm,
-      variant: selected ? FButtonVariant.primary : FButtonVariant.outline,
-      selected: selected,
-      onPress: onPress,
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-}
-
-class _AttendanceRecordsList extends StatelessWidget {
-  final List<AttendanceRecord> records;
-  final int updateTime;
-  final RefreshCallback onRefresh;
-  final String emptyMessage;
-
-  const _AttendanceRecordsList({
-    required this.records,
-    required this.updateTime,
-    required this.onRefresh,
-    required this.emptyMessage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      backgroundColor: context.theme.colors.primary,
-      color: context.theme.colors.primaryForeground,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          spacing: 4,
-          children: [
-            if (records.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 40),
-                child: Text(emptyMessage),
-              )
-            else
-              for (final i in records.asMap().entries)
-                AttendanceCard(
-                  key: ValueKey('${i.value.courseId}_${i.key}'),
-                  record: i.value,
-                  index: i.key,
-                ),
-            DataUpdatedFooter(updateTime: updateTime, fontSize: 14),
-          ],
+      backgroundColor: context.theme.colors.background,
+      color: context.theme.colors.foreground,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          Space.sm,
+          Space.sm,
+          Space.sm,
+          Space.lg,
         ),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          if (records.isNotEmpty) ...[
+            Segmented<_CourseFilter>(
+              value: filter.value,
+              onChanged: (value) => filter.value = value,
+              segments: [
+                (_CourseFilter.all, 'All  ${records.length}'),
+                (_CourseFilter.theory, 'Theory  ${theory.length}'),
+                (_CourseFilter.lab, 'Lab  ${labs.length}'),
+              ],
+            ),
+            const SizedBox(height: Space.md),
+          ],
+          AnimatedSwitcher(
+            duration: Motion.medium,
+            switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
+            switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [...previous, ?current],
+            ),
+            child: Column(
+              key: ValueKey(filter.value),
+              children: [
+                if (shown.isEmpty)
+                  EmptyState(
+                    icon: FLucideIcons.clipboardList,
+                    title: records.isEmpty
+                        ? 'No attendance yet'
+                        : 'Nothing here',
+                    message: records.isEmpty
+                        ? 'Attendance shows up once classes begin.'
+                        : 'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} courses this semester.',
+                  )
+                else
+                  for (final (i, record) in shown.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                      child: EnterFade(
+                        index: i,
+                        child: AttendanceCard(
+                          key: ValueKey('${record.courseId}_$i'),
+                          record: record,
+                          index: i,
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+          DataUpdatedFooter(updateTime: updateTime),
+        ],
       ),
     );
   }

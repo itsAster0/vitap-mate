@@ -37,8 +37,7 @@ DataChangeSummary? compareAttendance(
     final previousPercentage = _parsePercentage(
       previousRecord.attendancePercentage,
     );
-    if (previousPercentage == null ||
-        previousPercentage == currentPercentage) {
+    if (previousPercentage == null || previousPercentage == currentPercentage) {
       continue;
     }
 
@@ -75,9 +74,7 @@ DataChangeSummary? compareMarks(MarksData? previous, MarksData current) {
   String entryKeyOf(MarksRecordEach m) =>
       m.serial.isNotEmpty ? m.serial : m.markstitle;
 
-  final previousCourses = {
-    for (final c in previous.records) courseKeyOf(c): c,
-  };
+  final previousCourses = {for (final c in previous.records) courseKeyOf(c): c};
   final lines = <String>[];
 
   for (final course in current.records) {
@@ -145,8 +142,7 @@ DataChangeSummary? compareTimetable(
     for (final s in added)
       '+ ${s.courseCode} \u00b7 ${s.day} ${s.startTime}'
           '${s.roomNo.trim().isEmpty ? '' : ' \u00b7 ${s.block}${s.roomNo}'}',
-    for (final s in removed)
-      '- ${s.courseCode} \u00b7 ${s.day} ${s.startTime}',
+    for (final s in removed) '- ${s.courseCode} \u00b7 ${s.day} ${s.startTime}',
   ];
 
   return DataChangeSummary(title: 'Timetable changed', body: _join(lines));
@@ -193,10 +189,7 @@ DataChangeSummary? compareExamSchedule(
   }
 
   if (lines.isEmpty) return null;
-  return DataChangeSummary(
-    title: 'Exam schedule updated',
-    body: _join(lines),
-  );
+  return DataChangeSummary(title: 'Exam schedule updated', body: _join(lines));
 }
 
 double? _parsePercentage(String value) {

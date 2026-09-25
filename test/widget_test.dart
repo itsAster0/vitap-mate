@@ -293,7 +293,7 @@ void main() {
       ),
     );
 
-    expect(find.text('GPA / CGPA Calculator'), findsOneWidget);
+    expect(find.text('GPA Planner'), findsOneWidget);
     expect(find.text('Chrome Extension'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -344,16 +344,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('SEMESTER GPA'), findsOneWidget);
-    expect(find.text('PROJECTED CGPA'), findsNothing);
-    expect(find.text('Current semester'), findsOneWidget);
-    expect(find.text('From history'), findsOneWidget);
-
-    await tester.ensureVisible(find.text('From history'));
-    await tester.tap(find.text('From history'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('SEMESTER GPA'), findsNothing);
     expect(find.text('PROJECTED CGPA'), findsOneWidget);
+    expect(find.text('Current semester'), findsOneWidget);
+    expect(find.text('Add course'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

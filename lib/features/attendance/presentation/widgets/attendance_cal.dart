@@ -1,510 +1,397 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/widgets/attendance_colors.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 
-class AttendanceCalculator extends HookConsumerWidget {
-  final int currentAttended;
-  final int currentTotal;
-
-  const AttendanceCalculator({
+/// "What if" planner: choose how many upcoming classes to attend or skip and
+/// see where the percentage lands. Current counts can be corrected too.
+class AttendancePlanner extends HookWidget {
+  const AttendancePlanner({
     super.key,
-    required this.currentAttended,
-    required this.currentTotal,
+    required this.attended,
+    required this.total,
   });
 
+  final int attended;
+  final int total;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    (int, int) getDefaultFuturePlan(int attended, int total) {
-      if (total <= 0) return (0, 0);
-      final currentPct = (attended / total) * 100;
-      if (currentPct >= 75) {
-        final maxSkip = ((4 * attended - 3 * total) / 3).floor();
-        return (0, maxSkip > 0 ? maxSkip : 0);
-      }
-      final needAttend = 3 * total - 4 * attended;
-      return (needAttend > 0 ? needAttend : 0, 0);
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+
+    final editCurrent = useState(false);
+    final curAttended = useState(attended);
+    final curTotal = useState(total);
+    final current = AttendanceStanding(
+      attended: curAttended.value,
+      total: curTotal.value,
+    );
+
+    final willAttend = useState(0);
+    final willSkip = useState(0);
+    void setPlan(int attend, int skip) {
+      willAttend.value = attend;
+      willSkip.value = skip;
     }
 
-    final initialPlan = useMemoized(
-      () => getDefaultFuturePlan(currentAttended, currentTotal),
-      [currentAttended, currentTotal],
-    );
-    final attended = useState(currentAttended);
-    final total = useState(currentTotal);
-    final editCurrent = useState(false);
-    final futureAttend = useState(initialPlan.$1);
-    final futureSkip = useState(initialPlan.$2);
+    // Start from the most useful plan: max skips, or the classes needed.
+    void usefulPlan() => current.isSafe
+        ? setPlan(0, current.canSkip)
+        : setPlan(current.mustAttend, 0);
 
     useEffect(() {
-      final defaultPlan = getDefaultFuturePlan(attended.value, total.value);
-      futureAttend.value = defaultPlan.$1;
-      futureSkip.value = defaultPlan.$2;
+      usefulPlan();
       return null;
-    }, [attended.value, total.value]);
+    }, [curAttended.value, curTotal.value]);
 
-    double getCurrentPercentage() {
-      if (total.value == 0) return 0.0;
-      return (attended.value / total.value) * 100;
-    }
+    final predicted = AttendanceStanding(
+      attended: curAttended.value + willAttend.value,
+      total: curTotal.value + willAttend.value + willSkip.value,
+    );
+    final tone = attendanceTone(
+      context,
+      safe: predicted.isSafe,
+      atEdge: predicted.canSkip == 0,
+    );
+    final nowTone = attendanceTone(
+      context,
+      safe: current.isSafe,
+      atEdge: current.canSkip == 0,
+    );
 
-    double getPredictedPercentage() {
-      final newTotal = total.value + futureAttend.value + futureSkip.value;
-      final newAttended = attended.value + futureAttend.value;
-      if (newTotal == 0) return 0.0;
-      return (newAttended / newTotal) * 100;
-    }
+    final presets = [
+      if (current.isSafe && current.canSkip > 0)
+        ('Max skips', 0, current.canSkip),
+      if (!current.isSafe) ('Recover', current.mustAttend, 0),
+      ('Attend 5', 5, 0),
+      ('Attend 10', 10, 0),
+      ('Skip 1', 0, 1),
+    ];
 
-    Color getPercentageColor(double percentage) {
-      if (percentage >= 75) return AttendanceColors.presentText;
-      if (percentage >= 65) return Colors.orange;
-      return AttendanceColors.absentText;
-    }
-
-    return Container(
-      height: double.infinity,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: context.theme.colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-      ),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Attendance Calculator",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: darkMode
-                    ? context.theme.colors.primary
-                    : AttendanceColors.primaryText,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Plan your attendance strategy",
-              style: TextStyle(
-                fontSize: 14,
-                color: AttendanceColors.tertiaryText,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: darkMode
-                    ? context.theme.colors.primaryForeground
-                    : AttendanceColors.tableBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: context.theme.colors.border,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.analytics_outlined,
-                                  color: AttendanceColors.theoryIcon,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Current Attendance",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: darkMode
-                                        ? context.theme.colors.primary
-                                        : AttendanceColors.primaryText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text("Edit"),
-                          FCheckbox(
-                            value: editCurrent.value,
-                            onChange: (value) => editCurrent.value = value,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInputCard(
-                          enable: editCurrent.value,
-                          context: context,
-                          darkMode: darkMode,
-                          label: "Attended",
-                          value: attended.value,
-                          onIncrement: () {
-                            attended.value++;
-                            total.value++;
-                          },
-                          onDecrement: () {
-                            if (attended.value > 0) {
-                              attended.value--;
-                              total.value--;
-                            }
-                          },
-                          color: AttendanceColors.presentText,
-                          icon: Icons.check_circle_outline,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildInputCard(
-                          enable: editCurrent.value,
-                          context: context,
-                          darkMode: darkMode,
-                          label: "Skipped",
-                          value: total.value - attended.value,
-                          onIncrement: () => total.value++,
-                          onDecrement: () {
-                            if (total.value > attended.value) total.value--;
-                          },
-                          color: AttendanceColors.absentText,
-                          icon: Icons.cancel_outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: darkMode
-                          ? context.theme.colors.background
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: context.theme.colors.border,
-                        width: 1,
+    return Padding(
+      padding: const EdgeInsets.only(top: Space.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Result: now → after the plan.
+          Surface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    _Figure(
+                      label: 'NOW',
+                      value: current.percent,
+                      color: nowTone.onSubtle,
+                    ),
+                    Expanded(
+                      child: Icon(
+                        FLucideIcons.arrowRight,
+                        size: 20,
+                        color: colors.mutedForeground,
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    _Figure(
+                      label: 'AFTER PLAN',
+                      value: predicted.percent,
+                      color: tone.onSubtle,
+                      alignEnd: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Space.md),
+                SizedBox(
+                  height: 14,
+                  child: LayoutBuilder(
+                    builder: (context, c) => Stack(
+                      clipBehavior: Clip.none,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Total Classes",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AttendanceColors.tertiaryText,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${total.value}",
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w700,
-                                color: darkMode
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.primaryText,
-                              ),
-                            ),
-                          ],
+                        Positioned.fill(
+                          child: SkipMeter(
+                            percent: predicted.percent,
+                            tone: tone,
+                          ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                        // Ghost marker where you are today.
+                        AnimatedPositioned(
+                          duration: Motion.medium,
+                          left: (c.maxWidth * current.percent / 100 - 5).clamp(
+                            0.0,
+                            c.maxWidth - 10,
                           ),
-                          decoration: BoxDecoration(
-                            color: getPercentageColor(
-                              getCurrentPercentage(),
-                            ).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: getPercentageColor(getCurrentPercentage()),
-                              width: 2,
-                            ),
-                          ),
-                          child: Text(
-                            "${getCurrentPercentage().toStringAsFixed(1)}%",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: getPercentageColor(getCurrentPercentage()),
+                          top: 2,
+                          child: Container(
+                            width: 10,
+                            height: 10,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: colors.background,
+                              border: Border.all(
+                                color: colors.mutedForeground,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: darkMode
-                    ? context.theme.colors.primaryForeground
-                    : AttendanceColors.tableBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: context.theme.colors.border,
-                  width: 1,
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calculate_outlined,
-                              color: Colors.purple,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Future Prediction",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: darkMode
-                                    ? context.theme.colors.primary
-                                    : AttendanceColors.primaryText,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      FButton(
-                        variant: FButtonVariant.outline,
-                        onPress: () {
-                          futureAttend.value = 0;
-                          futureSkip.value = 0;
-                        },
-                        child: const Text("Reset"),
-                      ),
-                    ],
+                const SizedBox(height: Space.md),
+                AnimatedSwitcher(
+                  duration: Motion.medium,
+                  child: Text(
+                    predicted.isSafe
+                        ? predicted.canSkip == 0
+                              ? 'Right on the line — no more skips after this.'
+                              : 'Still safe, with ${predicted.canSkip} more to spare.'
+                        : 'Below 75% — attend ${predicted.mustAttend} more to recover.',
+                    key: ValueKey('${predicted.attended}/${predicted.total}'),
+                    style: typography.body.sm.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: predicted.isSafe && predicted.canSkip > 0
+                          ? colors.foreground
+                          : tone.onSubtle,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInputCard(
-                          context: context,
-                          darkMode: darkMode,
-                          label: "Will Attend",
-                          value: futureAttend.value,
-                          onIncrement: () => futureAttend.value++,
-                          onDecrement: () {
-                            if (futureAttend.value > 0) futureAttend.value--;
-                          },
-                          color: AttendanceColors.presentText,
-                          icon: Icons.add_circle_outline,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildInputCard(
-                          context: context,
-                          darkMode: darkMode,
-                          label: "Will Skip",
-                          value: futureSkip.value,
-                          onIncrement: () => futureSkip.value++,
-                          onDecrement: () {
-                            if (futureSkip.value > 0) futureSkip.value--;
-                          },
-                          color: AttendanceColors.absentText,
-                          icon: Icons.remove_circle_outline,
-                        ),
-                      ),
-                    ],
+                ),
+                Text(
+                  '${predicted.attended} of ${predicted.total} classes',
+                  style: typography.body.xs.copyWith(
+                    color: colors.mutedForeground,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
-
-                  if (futureAttend.value > 0 || futureSkip.value > 0) ...[
-                    const SizedBox(height: 16),
-
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: getPercentageColor(getPredictedPercentage()),
-                          width: 2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          // Presets
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final (label, a, s) in presets)
+                  Padding(
+                    padding: const EdgeInsets.only(right: Space.sm),
+                    child: FButton(
+                      variant: willAttend.value == a && willSkip.value == s
+                          ? FButtonVariant.primary
+                          : FButtonVariant.outline,
+                      size: FButtonSizeVariant.sm,
+                      mainAxisSize: MainAxisSize.min,
+                      onPress: () => setPlan(a, s),
+                      child: Text(label),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          // Plan
+          Surface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CountStepper(
+                  label: 'Attend',
+                  caption: 'Upcoming classes you go to',
+                  value: willAttend.value,
+                  onChanged: (v) => willAttend.value = v,
+                ),
+                const SizedBox(height: Space.md),
+                CountStepper(
+                  label: 'Skip',
+                  caption: 'Upcoming classes you miss',
+                  value: willSkip.value,
+                  onChanged: (v) => willSkip.value = v,
+                ),
+                if (willAttend.value + willSkip.value > 0) ...[
+                  const SizedBox(height: Space.md),
+                  _PlanStrip(attend: willAttend.value, skip: willSkip.value),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          // Correct current counts
+          Surface(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                PressScale(
+                  scale: 0.99,
+                  onPress: () {
+                    if (editCurrent.value) {
+                      curAttended.value = attended;
+                      curTotal.value = total;
+                    }
+                    editCurrent.value = !editCurrent.value;
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(Space.lg),
+                    child: Row(
+                      children: [
+                        Icon(
+                          FLucideIcons.pencil,
+                          size: 16,
+                          color: colors.mutedForeground,
                         ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            "Predicted Attendance",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AttendanceColors.tertiaryText,
+                        const SizedBox(width: Space.sm),
+                        Expanded(
+                          child: Text(
+                            editCurrent.value
+                                ? 'Editing current counts'
+                                : 'Counts look wrong? Adjust them',
+                            style: typography.body.sm.copyWith(
+                              color: colors.foreground,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            "${getPredictedPercentage().toStringAsFixed(1)}%",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: getPercentageColor(
-                                getPredictedPercentage(),
-                              ),
-                            ),
+                        ),
+                        Text(
+                          editCurrent.value ? 'Reset' : 'Edit',
+                          style: typography.body.sm.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.app.accentTone.onSubtle,
                           ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedSize(
+                  duration: Motion.medium,
+                  curve: Curves.easeOutCubic,
+                  child: editCurrent.value
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            Space.lg,
+                            0,
+                            Space.lg,
+                            Space.lg,
+                          ),
+                          child: Column(
                             children: [
-                              Icon(
-                                getPredictedPercentage() >=
-                                        getCurrentPercentage()
-                                    ? Icons.trending_up
-                                    : Icons.trending_down,
-                                color: getPercentageColor(
-                                  getPredictedPercentage(),
-                                ),
-                                size: 16,
+                              CountStepper(
+                                label: 'Attended',
+                                value: curAttended.value,
+                                onChanged: (v) {
+                                  curTotal.value += v - curAttended.value;
+                                  curAttended.value = v;
+                                },
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "${(getPredictedPercentage() - getCurrentPercentage()).abs().toStringAsFixed(1)}%",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AttendanceColors.tertiaryText,
-                                ),
+                              const SizedBox(height: Space.md),
+                              CountStepper(
+                                label: 'Missed',
+                                value: curTotal.value - curAttended.value,
+                                onChanged: (v) =>
+                                    curTotal.value = curAttended.value + v,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            "${attended.value + futureAttend.value} / ${total.value + futureAttend.value + futureSkip.value} classes",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AttendanceColors.secondaryText,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                        )
+                      : const SizedBox(width: double.infinity),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputCard({
-    bool enable = true,
-    required BuildContext context,
-    required bool darkMode,
-    required String label,
-    required int value,
-    required VoidCallback onIncrement,
-    required VoidCallback onDecrement,
-    required Color color,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: darkMode ? context.theme.colors.background : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.theme.colors.border, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AttendanceColors.tertiaryText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (enable)
-                FTappable(
-                  onPress: onDecrement,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withValues(alpha: 0.3)),
-                    ),
-                    child: Icon(Icons.remove, size: 16, color: color),
-                  ),
-                ),
-              Text(
-                "$value",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: darkMode
-                      ? context.theme.colors.primary
-                      : AttendanceColors.primaryText,
-                ),
-              ),
-              if (enable)
-                FTappable(
-                  onPress: onIncrement,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: color.withValues(alpha: 0.3)),
-                    ),
-                    child: Icon(Icons.add, size: 16, color: color),
-                  ),
-                ),
-            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _Figure extends StatelessWidget {
+  const _Figure({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  final String label;
+  final double value;
+  final Color color;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    final typography = context.theme.typography;
+    return Column(
+      crossAxisAlignment: alignEnd
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: typography.body.xs.copyWith(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: context.theme.colors.mutedForeground,
+          ),
+        ),
+        TweenAnimationBuilder<double>(
+          tween: Tween(end: value),
+          duration: Motion.slow,
+          curve: Curves.easeOutCubic,
+          builder: (context, v, _) => Text(
+            '${v.toStringAsFixed(1)}%',
+            style: typography.display.xl2.copyWith(
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              color: color,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Upcoming classes as squares: attended first (green), then skipped (red).
+class _PlanStrip extends StatelessWidget {
+  const _PlanStrip({required this.attend, required this.skip});
+
+  final int attend;
+  final int skip;
+
+  static const _max = 24;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.theme.colors.app;
+    final total = attend + skip;
+    final shownAttend = total <= _max
+        ? attend
+        : (attend * _max / total).round();
+    final shownSkip = total <= _max ? skip : _max - shownAttend;
+    Widget square(Color color) => Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+    );
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        for (var i = 0; i < shownAttend; i++) square(palette.success.base),
+        for (var i = 0; i < shownSkip; i++) square(palette.danger.base),
+        if (total > _max)
+          Text(
+            ' $total classes',
+            style: context.theme.typography.body.xs.copyWith(
+              color: context.theme.colors.mutedForeground,
+            ),
+          ),
+      ],
     );
   }
 }

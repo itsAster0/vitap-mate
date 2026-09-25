@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/router/slide_fade_page.dart';
 import 'package:vitapmate/core/widgets/onboarding_page.dart';
 import 'package:vitapmate/core/widgets/shell_layout.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
@@ -46,7 +47,7 @@ GoRouter router(Ref ref) {
         name: Paths.vtopweb,
 
         pageBuilder: (context, state) {
-          return NoTransitionPage<void>(
+          return SlideFadePage<void>(
             key: state.pageKey,
             child: VtopWebview(initialMenuUrl: state.extra as String?),
           );
@@ -64,7 +65,10 @@ GoRouter router(Ref ref) {
               GoRoute(
                 path: '/timetable',
                 name: Paths.timetable,
-                builder: (context, state) => TimetablePage(),
+                pageBuilder: (context, state) => SlideFadePage<void>(
+                  key: state.pageKey,
+                  child: TimetablePage(),
+                ),
                 routes: [
                   GoRoute(
                     path: 'details',
@@ -74,7 +78,7 @@ GoRouter router(Ref ref) {
                     path: 'calendar-sync',
                     name: Paths.calendarSync,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: CalendarSyncPage(),
                       );
@@ -92,7 +96,10 @@ GoRouter router(Ref ref) {
                 path: '/attendance',
                 name: Paths.attendance,
 
-                builder: (context, state) => AttendancePage(),
+                pageBuilder: (context, state) => SlideFadePage<void>(
+                  key: state.pageKey,
+                  child: AttendancePage(),
+                ),
               ),
             ],
           ),
@@ -102,14 +109,15 @@ GoRouter router(Ref ref) {
               GoRoute(
                 path: '/more',
                 name: Paths.more,
-                builder: (context, state) => MorePage(),
+                pageBuilder: (context, state) =>
+                    SlideFadePage<void>(key: state.pageKey, child: MorePage()),
                 routes: [
                   GoRoute(
                     path: 'marks',
                     name: Paths.marks,
 
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: MarksPage(),
                       );
@@ -120,7 +128,7 @@ GoRouter router(Ref ref) {
                     name: Paths.grades,
 
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: GradesPage(),
                       );
@@ -130,7 +138,7 @@ GoRouter router(Ref ref) {
                     path: 'grade_history',
                     name: Paths.gradeHistory,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: GradeHistoryPage(),
                       );
@@ -141,7 +149,7 @@ GoRouter router(Ref ref) {
                     name: Paths.examSchedule,
 
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: ExamSchedulePage(),
                       );
@@ -150,7 +158,7 @@ GoRouter router(Ref ref) {
                   GoRoute(
                     path: 'biometric-history',
                     name: Paths.biometricHistory,
-                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                    pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
                       child: const BiometricHistoryPage(),
                     ),
@@ -159,7 +167,7 @@ GoRouter router(Ref ref) {
                     path: 'chrome-extension',
                     name: Paths.chromeExtension,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: const ChromeExtensionPage(),
                       );
@@ -169,7 +177,7 @@ GoRouter router(Ref ref) {
                     path: 'gpa_calculator',
                     name: Paths.gpaCalculator,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: const GpaCalculatorPage(),
                       );
@@ -185,7 +193,10 @@ GoRouter router(Ref ref) {
               GoRoute(
                 path: '/docs',
                 name: Paths.docs,
-                builder: (context, state) => const DocsPage(),
+                pageBuilder: (context, state) => SlideFadePage<void>(
+                  key: state.pageKey,
+                  child: const DocsPage(),
+                ),
                 routes: [
                   GoRoute(
                     path: 'view',
@@ -227,12 +238,15 @@ GoRouter router(Ref ref) {
               GoRoute(
                 path: '/settings',
                 name: Paths.settings,
-                builder: (context, state) => SettingsPage(),
+                pageBuilder: (context, state) => SlideFadePage<void>(
+                  key: state.pageKey,
+                  child: SettingsPage(),
+                ),
                 routes: [
                   GoRoute(
                     path: 'gmail-otp-setup',
                     name: Paths.gmailOtpSetup,
-                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                    pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
                       child: const GmailOtpSetupPage(),
                     ),
@@ -240,7 +254,7 @@ GoRouter router(Ref ref) {
                   GoRoute(
                     path: 'gmail-oauth-guide',
                     name: Paths.gmailOauthGuide,
-                    pageBuilder: (context, state) => NoTransitionPage<void>(
+                    pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
                       child: const GmailOAuthGuidePage(),
                     ),
@@ -249,7 +263,7 @@ GoRouter router(Ref ref) {
                     path: 'notification-management',
                     name: Paths.notificationManagement,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: NotificationManagementPage(),
                       );
@@ -259,7 +273,7 @@ GoRouter router(Ref ref) {
                     path: 'logs',
                     name: Paths.logs,
                     pageBuilder: (context, state) {
-                      return NoTransitionPage<void>(
+                      return SlideFadePage<void>(
                         key: state.pageKey,
                         child: LogsPage(),
                       );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -408,13 +409,14 @@ class SettingsPage extends HookConsumerWidget {
     final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(0, Space.sm, 0, Space.lg),
       child: Column(
-        spacing: 8,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const UserBox(),
+          SectionHeader(title: 'VTOP Data'),
           FTileGroup(
             divider: FItemDivider.indented,
-            label: const Text('VTOP Data'),
             children: [
               FTile(
                 prefix: Icon(FLucideIcons.calendarDays),
@@ -424,17 +426,6 @@ class SettingsPage extends HookConsumerWidget {
                   value: ref.watch(mergeTTProvider),
                   onChange: (value) {
                     setMergeTT(ref, value);
-                  },
-                ),
-              ),
-              FTile(
-                prefix: Icon(FLucideIcons.userCheck),
-                title: const Text('B/W exams'),
-                subtitle: const Text('Between exams attendance'),
-                suffix: FSwitch(
-                  value: ref.watch(btwExamsProvider),
-                  onChange: (value) {
-                    setbtwExam(ref, value);
                   },
                 ),
               ),
@@ -457,22 +448,23 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
+          if (isEmailOtpFeatureEnabled.value) SectionHeader(title: 'Email OTP'),
           if (isEmailOtpFeatureEnabled.value)
             FTileGroup(
               divider: FItemDivider.indented,
-              label: const Text('Email OTP'),
               children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.mail),
                   title: const Text('Gmail Autofetch'),
-                  subtitle: Text(
-                    isEmailOtpReady.value == true
-                        ? 'Connected · tap to manage'
-                        : 'Connect Gmail for automatic OTPs',
-                    style: isEmailOtpReady.value == true
-                        ? null
-                        : TextStyle(color: context.theme.colors.destructive),
-                  ),
+                  subtitle: isEmailOtpReady.value == true
+                      ? const Text('Connected · tap to manage')
+                      : Align(
+                          alignment: Alignment.centerLeft,
+                          child: ToneBadge(
+                            label: 'NOT CONNECTED',
+                            tone: context.theme.colors.app.warning,
+                          ),
+                        ),
                   suffix: isEmailOtpBusy.value
                       ? const FCircularProgress.pinwheel()
                       : Icon(
@@ -519,9 +511,9 @@ class SettingsPage extends HookConsumerWidget {
                   ),
               ],
             ),
+          SectionHeader(title: 'Sync'),
           FTileGroup(
             divider: FItemDivider.indented,
-            label: const Text('Sync'),
             children: [
               FTile(
                 prefix: Icon(FLucideIcons.refreshCcw),
@@ -552,21 +544,28 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
+          SectionHeader(title: 'App Settings'),
           FTileGroup(
             divider: FItemDivider.indented,
-            label: const Text('App Settings'),
             children: [
               FTile(
-                prefix: Icon(FLucideIcons.moon),
-                title: const Text('Dark Mode'),
+                prefix: Icon(FLucideIcons.sunMoon),
+                title: const Text('Appearance'),
                 onLongPress: () {
                   showDebugFeatures.value = !showDebugFeatures.value;
                 },
-                suffix: FSwitch(
-                  value: ref.watch(themeProvider) == ThemeMode.dark,
-                  onChange: (value) {
-                    ref.read(themeProvider.notifier).toggleTheme();
-                  },
+                suffix: SizedBox(
+                  width: 204,
+                  child: Segmented<ThemeMode>(
+                    value: ref.watch(themeProvider),
+                    onChanged: (mode) =>
+                        ref.read(themeProvider.notifier).setThemeMode(mode),
+                    segments: const [
+                      (ThemeMode.light, 'Light'),
+                      (ThemeMode.dark, 'Dark'),
+                      (ThemeMode.system, 'System'),
+                    ],
+                  ),
                 ),
               ),
               FTile(
@@ -593,10 +592,10 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
+          if (showDebugFeatures.value) SectionHeader(title: 'Developer Tools'),
           if (showDebugFeatures.value)
             FTileGroup(
               divider: FItemDivider.indented,
-              label: const Text('Developer Tools'),
               children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.timer),
@@ -635,45 +634,79 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ],
             ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              IconButton(
-                tooltip: 'Source code',
-                icon: const Icon(Icons.code),
-                onPressed: () {
-                  launchUrl(
-                    Uri.parse("https://github.com/itsKryxen/vitap-mate"),
-                  );
-                },
-              ),
-              IconButton(
-                tooltip: 'Developer profile',
-                icon: Icon(FLucideIcons.contact),
-                onPressed: () {
-                  launchUrl(Uri.parse("https://bio.link/synaptic"));
-                },
-              ),
-              IconButton(
-                tooltip: 'Instagram',
-                icon: const Icon(Icons.camera_alt_outlined),
-                onPressed: () {
-                  launchUrl(Uri.parse("https://www.instagram.com/itsKryxen"));
-                },
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _FooterLink(
+                  icon: Icons.code,
+                  label: 'Source',
+                  url: "https://github.com/itsKryxen/vitap-mate",
+                ),
+                _FooterLink(
+                  icon: FLucideIcons.contact,
+                  label: 'Developer',
+                  url: "https://bio.link/synaptic",
+                ),
+                _FooterLink(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Instagram',
+                  url: "https://www.instagram.com/itsKryxen",
+                ),
+              ],
+            ),
           ),
           if (appVersion != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 16),
               child: Text(
                 appVersion,
+                textAlign: TextAlign.center,
                 style: context.theme.typography.body.sm.copyWith(
                   color: context.theme.colors.mutedForeground,
                 ),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _FooterLink extends StatelessWidget {
+  const _FooterLink({
+    required this.icon,
+    required this.label,
+    required this.url,
+  });
+
+  final IconData icon;
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.theme.colors.mutedForeground;
+    return Semantics(
+      link: true,
+      label: label,
+      child: FTappable(
+        onPress: () => launchUrl(Uri.parse(url)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: muted),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: context.theme.typography.body.xs.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

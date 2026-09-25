@@ -49,16 +49,26 @@ class MyApp extends HookConsumerWidget {
       return null;
     }, []);
 
-    final fTheme = ref.watch(fThemeProvider);
+    final themeMode = ref.watch(themeProvider);
 
     return MaterialApp.router(
+      theme: _materialLight,
+      darkTheme: _materialDark,
+      themeMode: themeMode,
       routeInformationProvider: goRouter.routeInformationProvider,
       routeInformationParser: goRouter.routeInformationParser,
       routerDelegate: goRouter.routerDelegate,
+      // Follow the brightness Material resolved, so "System" tracks the
+      // phone's setting live.
       builder: (context, child) => FTheme(
-        data: fTheme,
+        data: Theme.of(context).brightness == Brightness.dark
+            ? appDarkTheme
+            : appLightTheme,
         child: FToaster(child: VtopOtpOverlay(child: child!)),
       ),
     );
   }
 }
+
+final _materialLight = appLightTheme.toApproximateMaterialTheme();
+final _materialDark = appDarkTheme.toApproximateMaterialTheme();

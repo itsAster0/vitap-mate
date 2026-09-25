@@ -1,13 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/utils/extention.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/days_stack.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/timetable_card.dart';
+import 'package:vitapmate/core/theme/app_palette.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class WeeklyTimetableView extends StatelessWidget {
+class WeeklyTimetableView extends HookWidget {
   const WeeklyTimetableView({
     super.key,
     required this.days,
@@ -52,9 +53,14 @@ class WeeklyTimetableView extends StatelessWidget {
     final calendarEnd = ((latestMinute + 59) ~/ 60) * 60;
     final calendarMinutes = math.max(60, calendarEnd - calendarStart);
     final gridHeight = calendarMinutes / 60 * _hourHeight;
-    final calendarWidth = _timeGutterWidth + days.length * _dayWidth;
+    final calendarWidth = days.length * _dayWidth;
     final totalHeight = _headerHeight + gridHeight + _bottomPadding;
     final now = DateTime.now();
+    // Open scrolled so today (or the next class day) is the first column.
+    final firstIndex = days.indexWhere((d) => d >= now.weekday);
+    final scroll = useScrollController(
+      initialScrollOffset: math.max(0, firstIndex) * _dayWidth,
+    );
 
     double minuteToY(int minute) =>
         _headerHeight + (minute - calendarStart) / 60 * _hourHeight;
@@ -65,148 +71,184 @@ class WeeklyTimetableView extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: context.theme.colors.background,
+            color: context.theme.colors.card,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: context.theme.colors.border),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: calendarWidth,
-              height: totalHeight,
-              child: Stack(
-                children: [
-                  for (var index = 0; index < days.length; index++)
-                    if (days[index] == now.weekday)
-                      Positioned(
-                        left: _timeGutterWidth + index * _dayWidth,
-                        top: _headerHeight,
-                        width: _dayWidth,
-                        height: gridHeight,
-                        child: ColoredBox(
-                          color: context.theme.colors.primary.withValues(
-                            alpha: 0.035,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Hour labels stay put while the days scroll sideways.
+              SizedBox(
+                width: _timeGutterWidth,
+                height: totalHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      bottom: totalHeight - _headerHeight,
+                      child: ColoredBox(color: context.theme.colors.secondary),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      width: _timeGutterWidth,
+                      height: _headerHeight,
+                      child: Center(
+                        child: Text(
+                          'Time',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: context.theme.colors.mutedForeground,
                           ),
                         ),
                       ),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    width: calendarWidth,
-                    height: _headerHeight,
-                    child: ColoredBox(color: context.theme.colors.secondary),
-                  ),
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    width: _timeGutterWidth,
-                    height: _headerHeight,
-                    child: Center(
-                      child: Text(
-                        'Time',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: context.theme.colors.mutedForeground,
-                        ),
-                      ),
                     ),
-                  ),
-                  for (var index = 0; index < days.length; index++)
-                    Positioned(
-                      left: _timeGutterWidth + index * _dayWidth,
-                      top: 0,
-                      width: _dayWidth,
-                      height: _headerHeight,
-                      child: _DayHeader(
-                        dayName: _dayNames[days[index] - 1],
-                        date: dates[days[index] - 1],
-                        isToday: days[index] == now.weekday,
-                      ),
-                    ),
-                  for (
-                    var minute = calendarStart;
-                    minute <= calendarEnd;
-                    minute += 30
-                  )
-                    Positioned(
-                      left: _timeGutterWidth,
-                      right: 0,
-                      top: minuteToY(minute),
-                      child: Container(
-                        height: minute % 60 == 0 ? 1 : 0.5,
-                        color: context.theme.colors.border.withValues(
-                          alpha: minute % 60 == 0 ? 0.9 : 0.45,
-                        ),
-                      ),
-                    ),
-                  for (
-                    var minute = calendarStart;
-                    minute <= calendarEnd;
-                    minute += 60
-                  )
-                    Positioned(
-                      left: 4,
-                      top: minuteToY(minute) - 8,
-                      width: _timeGutterWidth - 9,
-                      child: Text(
-                        _formatTime(context, minute),
-                        textAlign: TextAlign.right,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: context.theme.colors.mutedForeground,
-                        ),
-                      ),
-                    ),
-                  for (var index = 0; index <= days.length; index++)
-                    Positioned(
-                      left: _timeGutterWidth + index * _dayWidth,
-                      top: 0,
-                      width: 1,
-                      height: _headerHeight + gridHeight,
-                      child: ColoredBox(color: context.theme.colors.border),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: _headerHeight,
-                    child: Container(
-                      height: 1,
-                      color: context.theme.colors.border,
-                    ),
-                  ),
-                  for (var dayIndex = 0; dayIndex < days.length; dayIndex++)
-                    for (final slot in daySlots[days[dayIndex]]!)
+                    for (
+                      var minute = calendarStart;
+                      minute <= calendarEnd;
+                      minute += 60
+                    )
                       Positioned(
-                        left: _timeGutterWidth + dayIndex * _dayWidth + 5,
-                        top:
-                            minuteToY(_minutesFromMidnight(slot.startTime)) + 3,
-                        width: _dayWidth - 10,
-                        height: math.max(
-                          46,
-                          (_minutesFromMidnight(slot.endTime) -
-                                      _minutesFromMidnight(slot.startTime)) /
-                                  60 *
-                                  _hourHeight -
-                              6,
+                        left: 4,
+                        top: math.max(minuteToY(minute) - 8, _headerHeight + 3),
+                        width: _timeGutterWidth - 9,
+                        child: Text(
+                          _formatTime(context, minute),
+                          textAlign: TextAlign.right,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: context.theme.colors.mutedForeground,
+                          ),
                         ),
-                        child: _CalendarClassBlock(slot: slot),
                       ),
-                  if (days.contains(now.weekday) &&
-                      now.hour * 60 + now.minute >= calendarStart &&
-                      now.hour * 60 + now.minute <= calendarEnd)
-                    _CurrentTimeIndicator(
-                      left:
-                          _timeGutterWidth +
-                          days.indexOf(now.weekday) * _dayWidth,
-                      top: minuteToY(now.hour * 60 + now.minute),
-                      width: _dayWidth,
-                    ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scroll,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: calendarWidth,
+                    height: totalHeight,
+                    child: Stack(
+                      children: [
+                        for (var index = 0; index < days.length; index++)
+                          if (days[index] == now.weekday)
+                            Positioned(
+                              left: index * _dayWidth,
+                              top: _headerHeight,
+                              width: _dayWidth,
+                              height: gridHeight,
+                              child: ColoredBox(
+                                color: context
+                                    .theme
+                                    .colors
+                                    .app
+                                    .accentTone
+                                    .subtle
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                        Positioned(
+                          left: 0,
+                          top: 0,
+                          width: calendarWidth,
+                          height: _headerHeight,
+                          child: ColoredBox(
+                            color: context.theme.colors.secondary,
+                          ),
+                        ),
+                        for (var index = 0; index < days.length; index++)
+                          Positioned(
+                            left: index * _dayWidth,
+                            top: 0,
+                            width: _dayWidth,
+                            height: _headerHeight,
+                            child: _DayHeader(
+                              dayName: _dayNames[days[index] - 1],
+                              date: dates[days[index] - 1],
+                              isToday: days[index] == now.weekday,
+                            ),
+                          ),
+                        for (
+                          var minute = calendarStart;
+                          minute <= calendarEnd;
+                          minute += 30
+                        )
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            top: minuteToY(minute),
+                            child: Container(
+                              height: minute % 60 == 0 ? 1 : 0.5,
+                              color: context.theme.colors.border.withValues(
+                                alpha: minute % 60 == 0 ? 0.9 : 0.45,
+                              ),
+                            ),
+                          ),
+                        for (var index = 0; index <= days.length; index++)
+                          Positioned(
+                            left: index * _dayWidth,
+                            top: 0,
+                            width: 1,
+                            height: _headerHeight + gridHeight,
+                            child: ColoredBox(
+                              color: context.theme.colors.border,
+                            ),
+                          ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          top: _headerHeight,
+                          child: Container(
+                            height: 1,
+                            color: context.theme.colors.border,
+                          ),
+                        ),
+                        for (
+                          var dayIndex = 0;
+                          dayIndex < days.length;
+                          dayIndex++
+                        )
+                          for (final slot in daySlots[days[dayIndex]]!)
+                            Positioned(
+                              left: dayIndex * _dayWidth + 5,
+                              top:
+                                  minuteToY(
+                                    _minutesFromMidnight(slot.startTime),
+                                  ) +
+                                  3,
+                              width: _dayWidth - 10,
+                              height: math.max(
+                                46,
+                                (_minutesFromMidnight(slot.endTime) -
+                                            _minutesFromMidnight(
+                                              slot.startTime,
+                                            )) /
+                                        60 *
+                                        _hourHeight -
+                                    6,
+                              ),
+                              child: _CalendarClassBlock(slot: slot),
+                            ),
+                        if (days.contains(now.weekday) &&
+                            now.hour * 60 + now.minute >= calendarStart &&
+                            now.hour * 60 + now.minute <= calendarEnd)
+                          _CurrentTimeIndicator(
+                            left: days.indexOf(now.weekday) * _dayWidth,
+                            top: minuteToY(now.hour * 60 + now.minute),
+                            width: _dayWidth,
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -289,13 +331,10 @@ class _CalendarClassBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLab = slot.islab();
-    final accent = isLab
-        ? const Color(0xFF0284C7)
-        : context.theme.colors.primary;
-    final background = Color.alphaBlend(
-      accent.withValues(alpha: isLab ? 0.22 : 0.18),
-      context.theme.colors.background,
-    );
+    final palette = context.theme.colors.app;
+    final tone = isLab ? palette.lab : palette.accentTone;
+    final accent = tone.base;
+    final background = tone.subtle;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 6, 7, 6),
@@ -320,7 +359,7 @@ class _CalendarClassBlock extends StatelessWidget {
                   fontSize: 10,
                   height: 1.1,
                   fontWeight: FontWeight.w700,
-                  color: accent,
+                  color: tone.onSubtle,
                 ),
               ),
               const SizedBox(height: 4),
@@ -369,7 +408,7 @@ class _CalendarClassBlock extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w600,
-                    color: accent,
+                    color: tone.onSubtle,
                   ),
                 ),
               ],
@@ -405,12 +444,12 @@ class _CurrentTimeIndicator extends StatelessWidget {
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-              color: context.theme.colors.primary,
+              color: context.theme.colors.app.accent,
               shape: BoxShape.circle,
             ),
           ),
           Expanded(
-            child: Container(height: 2, color: context.theme.colors.primary),
+            child: Container(height: 2, color: context.theme.colors.app.accent),
           ),
         ],
       ),

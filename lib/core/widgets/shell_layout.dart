@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -7,7 +8,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
@@ -43,25 +43,19 @@ class ShellLayout extends HookConsumerWidget {
     final runningTasks = ref.watch(
       globalAsyncQueueProvider.select((value) => value.running.keys.toList()),
     );
-    final shouldEnableEmailOtp =
-        ref.watch(emailOtpSetupNeededProvider).value ?? false;
     final activeDocumentTitle = ref.watch(activeDocumentTitleProvider);
 
-    final routeInformationProvider = GoRouter.of(
-      context,
-    ).routeInformationProvider;
-    useListenable(routeInformationProvider);
-    var k = routeInformationProvider.value.uri.toString();
+    // The URL does not change on push(), so read the deepest match from the
+    // delegate instead; otherwise pushed pages keep the tab's header.
+    final routerDelegate = GoRouter.of(context).routerDelegate;
+    useListenable(routerDelegate);
+    final configuration = routerDelegate.currentConfiguration;
+    var k = configuration.lastOrNull?.matchedLocation ?? configuration.uri.path;
     final queueStatus = _queueStatusText(runningTasks);
     final isNestedRoute = k.split('/').length - 1 > 1;
     final headerSubtitle = isNestedRoute
         ? queueStatus
-        : queueStatus ??
-              (newSemExist
-                  ? "New semester data available!"
-                  : shouldEnableEmailOtp
-                  ? "Enable Email OTP in Settings"
-                  : null);
+        : queueStatus ?? (newSemExist ? "New semester data available!" : null);
     final headers = [
       _buildHeader(context, "Timetable", k, headerSubtitle),
       _buildHeader(context, "Attendance", k, headerSubtitle),
@@ -92,6 +86,28 @@ class ShellLayout extends HookConsumerWidget {
       return null;
     }, [k]);
 
+    final tabFade = useAnimationController(
+      duration: const Duration(milliseconds: 200),
+      initialValue: 1,
+    );
+    final tabOpacity = useMemoized(
+      () => Tween<double>(
+        begin: 0.3,
+        end: 1,
+      ).animate(CurvedAnimation(parent: tabFade, curve: Curves.easeOut)),
+      [tabFade],
+    );
+    final previousTab = usePrevious(selected.value);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    useEffect(() {
+      if (previousTab != null &&
+          previousTab != selected.value &&
+          !reduceMotion) {
+        tabFade.forward(from: 0);
+      }
+      return null;
+    }, [selected.value]);
+
     return FScaffold(
       childPad: false,
       scaffoldStyle: FScaffoldStyleDelta.delta(
@@ -113,6 +129,7 @@ class ShellLayout extends HookConsumerWidget {
             ),
           ),
           onChange: (index) {
+            if (index != selected.value) HapticFeedback.selectionClick();
             selected.value = index;
             switch (selected.value) {
               case 0:
@@ -166,7 +183,9 @@ class ShellLayout extends HookConsumerWidget {
 
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: child,
+        // The tabs share one navigator shell, so fade the newly shown tab in
+        // rather than cross-fading two copies of it.
+        child: FadeTransition(opacity: tabOpacity, child: child),
       ),
     );
   }
@@ -183,6 +202,21 @@ Widget _buildHeader(
       case "marks":
         data = "Marks";
         break;
+      case "grades":
+        data = "Grades";
+        break;
+      case "grade_history":
+        data = "Grade History";
+        break;
+      case "calendar-sync":
+        data = "Calendar Sync";
+        break;
+      case "notification-management":
+        data = "Notifications";
+        break;
+      case "logs":
+        data = "Logs";
+        break;
       case "exam_schedule":
         data = "Exam Schedule";
         break;
@@ -193,7 +227,7 @@ Widget _buildHeader(
         data = "Chrome Extension";
         break;
       case "gpa_calculator":
-        data = "GPA / CGPA Calculator";
+        data = "GPA Planner";
         break;
       case "gmail-otp-setup":
         data = "Gmail OTP Setup";

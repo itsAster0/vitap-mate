@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/theme/app_palette.dart';
 part 'theme_provider.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -44,16 +45,31 @@ final themeProvider = themeModeControllerProvider;
 FThemeData fTheme(Ref ref) {
   final themeMode = ref.watch(themeProvider);
 
-  switch (themeMode) {
-    case ThemeMode.dark:
-      return FTheme.neutral.dark.touch;
-    case ThemeMode.light:
-      return FTheme.neutral.light.touch;
-    case ThemeMode.system:
-      final brightness =
-          WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      return brightness == Brightness.dark
-          ? FTheme.neutral.dark.touch
-          : FTheme.neutral.light.touch;
-  }
+  final dark = switch (themeMode) {
+    ThemeMode.dark => true,
+    ThemeMode.light => false,
+    ThemeMode.system =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark,
+  };
+  return dark ? appDarkTheme : appLightTheme;
 }
+
+// A soft grey page so white cards read as surfaces instead of blending in.
+final appLightTheme = _withPalette(
+  FTheme.neutral.light.touch,
+  AppPalette.light,
+  background: const Color(0xFFF5F5F6),
+);
+final appDarkTheme = _withPalette(FTheme.neutral.dark.touch, AppPalette.dark);
+
+FThemeData _withPalette(
+  FThemeData base,
+  AppPalette palette, {
+  Color? background,
+}) => FThemeData(
+  colors: base.colors.copyWith(background: background, extensions: [palette]),
+  typography: base.typography,
+  style: base.style,
+  touch: true,
+);

@@ -5,13 +5,15 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
+import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
+import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
-import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -57,137 +59,108 @@ class GradesPage extends HookConsumerWidget {
       return null;
     }, const []);
 
-    return Container(
-      color: context.theme.colors.background,
-      child: RefreshIndicator(
-        backgroundColor: context.theme.colors.primary,
-        color: context.theme.colors.primaryForeground,
-        onRefresh: refresh,
-        displacement: 72,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              FTileGroup(
+    final history = ref.watch(gradeHistoryProvider).value;
+    final creditsByCode = {
+      for (final r in history?.records ?? const <GradeHistoryRecord>[])
+        r.courseCode.trim().toUpperCase(): double.tryParse(r.credits.trim()),
+    };
+
+    return RefreshIndicator(
+      backgroundColor: context.theme.colors.background,
+      color: context.theme.colors.foreground,
+      onRefresh: refresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          Space.sm,
+          Space.sm,
+          Space.sm,
+          Space.lg,
+        ),
+        children: [
+          if (semLoading)
+            const Skeleton(height: 36, radius: Radii.pill)
+          else if (semLoadError)
+            FButton(
+              variant: FButtonVariant.outline,
+              prefix: const Icon(FLucideIcons.rotateCw),
+              onPress: () => ref.invalidate(semesterIdProvider),
+              child: const Text("Couldn't load semesters. Retry"),
+            )
+          else
+            _SemesterChips(
+              semesters: semesters,
+              selectedId: selectedSemesterId,
+              onSelect: (id) async {
+                try {
+                  await ref.read(gradesProvider.notifier).selectSemester(id);
+                } catch (e) {
+                  log("$e");
+                }
+              },
+            ),
+          const SizedBox(height: Space.md),
+          AnimatedSwitcher(
+            duration: Motion.medium,
+            child: state.when(
+              skipLoadingOnRefresh: true,
+              loading: () => const Column(
+                key: ValueKey('loading'),
                 children: [
-                  if (semLoading)
-                    FTile(
-                      prefix: const Icon(FLucideIcons.calendarDays),
-                      title: const Text("Semester"),
-                      subtitle: const Text("Loading semesters..."),
-                      suffix: const Icon(FLucideIcons.loaderCircle),
-                    )
-                  else if (semLoadError)
-                    FTile(
-                      prefix: const Icon(FLucideIcons.calendarDays),
-                      title: const Text("Semester"),
-                      subtitle: const Text(
-                        "Unable to load semesters. Tap to retry",
-                      ),
-                      suffix: const Icon(FLucideIcons.rotateCw),
-                      onPress: () {
-                        ref.invalidate(semesterIdProvider);
-                      },
-                    )
-                  else
-                    FSelectMenuTile<String>(
-                      key: ValueKey(
-                        "grade_sem_${selectedSemesterId}_${semesters.length}",
-                      ),
-                      prefix: const Icon(FLucideIcons.calendarDays),
-                      title: const Text("Semester"),
-                      details: Text(
-                        _semesterNameFromList(semesters, selectedSemesterId),
-                      ),
-                      selectControl: FMultiValueControl.managedRadio(
-                        initial: selectedSemesterId.isEmpty
-                            ? null
-                            : selectedSemesterId,
-                        onChange: (value) async {
-                          final selected = value.firstOrNull;
-                          if (selected == null) return;
-                          try {
-                            await ref
-                                .read(gradesProvider.notifier)
-                                .selectSemester(selected);
-                          } catch (e) {
-                            log("$e");
-                          }
-                        },
-                      ),
-                      menu: [
-                        for (final sem in semesters)
-                          FSelectTile<String>(
-                            title: Text(sem.name),
-                            value: sem.id,
-                          ),
-                      ],
-                    ),
+                  Skeleton(height: 96, radius: Radii.lg),
+                  SizedBox(height: Space.md),
+                  SkeletonList(count: 5, height: 76),
                 ],
               ),
-              const SizedBox(height: 10),
-              state.when(
-                loading: () => SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  child: const _CenterInfo(
-                    title: "Loading grades...",
-                    icon: FLucideIcons.loaderCircle,
-                  ),
-                ),
-                error: (e, _) => SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.7,
-                  child: _CenterInfo(
-                    title: "Unable to load grades",
-                    subtitle: commonErrorMessage(e),
-                    icon: FLucideIcons.triangleAlert,
-                  ),
-                ),
-                data: (data) {
-                  final sorted = [...data.gradeView.courses]
-                    ..sort(
-                      (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
-                        int.tryParse(b.serial) ?? 0,
-                      ),
-                    );
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (sorted.isEmpty)
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.4,
-                          child: const _CenterInfo(
-                            title: "No grades found",
-                            subtitle: "Try a different semester.",
-                            icon: FLucideIcons.school,
-                          ),
-                        )
-                      else
-                        ...sorted.map((c) => _GradeCard(course: c)),
-                      DataUpdatedFooter(
-                        updateTime: data.gradeView.updateTime.toInt(),
-                        padding: const EdgeInsets.only(top: 12),
-                      ),
-                    ],
-                  );
-                },
+              error: (e, _) => EmptyState(
+                key: const ValueKey('error'),
+                icon: FLucideIcons.cloudAlert,
+                title: "Couldn't load grades",
+                message: commonErrorMessage(e),
               ),
-            ],
+              data: (data) {
+                final sorted = [...data.gradeView.courses]
+                  ..sort(
+                    (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
+                      int.tryParse(b.serial) ?? 0,
+                    ),
+                  );
+                return Column(
+                  key: ValueKey('data_${data.selectedSemesterId}'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (sorted.isEmpty)
+                      const EmptyState(
+                        icon: FLucideIcons.school,
+                        title: 'No grades for this semester',
+                        message: 'Grades appear after results are declared.',
+                      )
+                    else ...[
+                      _SemesterSummary(
+                        courses: sorted,
+                        creditsByCode: creditsByCode,
+                      ),
+                      const SizedBox(height: Space.md),
+                      for (final (i, c) in sorted.indexed)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: Space.sm),
+                          child: EnterFade(
+                            index: i,
+                            child: _GradeCard(course: c),
+                          ),
+                        ),
+                    ],
+                    DataUpdatedFooter(
+                      updateTime: data.gradeView.updateTime.toInt(),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
-        ),
+        ],
       ),
     );
-  }
-
-  String _semesterNameFromList(
-    List<SemesterInfo> sems,
-    String selectedSemesterId,
-  ) {
-    final selected = sems.where((e) => e.id == selectedSemesterId);
-    if (selected.isNotEmpty) return selected.first.name;
-    return "Choose Semester";
   }
 }
 
@@ -219,21 +192,6 @@ class _GradeCardState extends ConsumerState<_GradeCard>
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Color _gradeColor(String grade) {
-    switch (grade.trim().toUpperCase()) {
-      case 'S':
-      case 'A':
-        return MarksColors.excellentColor;
-      case 'B':
-      case 'C':
-        return MarksColors.averageColor;
-      case 'F':
-        return MarksColors.failedText;
-      default:
-        return MarksColors.secondaryText;
-    }
   }
 
   Future<void> _toggle() async {
@@ -274,204 +232,102 @@ class _GradeCardState extends ConsumerState<_GradeCard>
 
   @override
   Widget build(BuildContext context) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
     final state = ref.watch(gradesProvider).value;
     final detail = state?.detailsByCourseId[widget.course.courseId];
     final loading =
         state?.loadingDetailsFor.contains(widget.course.courseId) ?? false;
+    final c = widget.course;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Surface(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
-          FTappable(
+          PressScale(
+            scale: 0.99,
+            semanticsLabel: '${c.courseTitle}, grade ${c.grade}',
             onPress: _toggle,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: !darkMode
-                    ? const LinearGradient(
-                        colors: [
-                          MarksColors.theoryCardBackground,
-                          MarksColors.theoryCardSecondary,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(12),
-                color: darkMode ? context.theme.colors.primaryForeground : null,
-                boxShadow: const [
-                  BoxShadow(
-                    color: MarksColors.cardShadow,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+            child: Padding(
+              padding: const EdgeInsets.all(Space.md + 2),
+              child: Row(
+                children: [
+                  GradeBadge(grade: c.grade),
+                  const SizedBox(width: Space.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          c.courseTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: typography.body.md.copyWith(
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            color: colors.foreground,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${c.courseCode} · ${c.courseType}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: Space.md),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        c.grandTotal,
+                        style: typography.body.lg.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: colors.foreground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      Text(
+                        'total',
+                        style: typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: Space.xs),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: Motion.medium,
+                    child: Icon(
+                      FLucideIcons.chevronDown,
+                      size: 16,
+                      color: colors.mutedForeground,
+                    ),
                   ),
                 ],
-                border: Border.all(
-                  color: context.theme.colors.primaryForeground.withValues(
-                    alpha: .8,
-                  ),
-                  width: 1,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: context.theme.colors.primaryForeground
-                                .withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            FLucideIcons.graduationCap,
-                            color: MarksColors.theoryIcon,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.course.courseTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  color: darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.primaryText,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "${widget.course.courseCode} • ${widget.course.courseType}",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.secondaryText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: context.theme.colors.primaryForeground
-                                .withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _gradeColor(
-                                widget.course.grade,
-                              ).withValues(alpha: 0.4),
-                            ),
-                          ),
-                          child: Text(
-                            widget.course.grade,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: _gradeColor(widget.course.grade),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        AnimatedRotation(
-                          turns: _expanded ? 0.5 : 0,
-                          duration: const Duration(milliseconds: 250),
-                          child: const Icon(Icons.keyboard_arrow_down),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "Grand Total: ${widget.course.grandTotal}",
-                            style: TextStyle(
-                              color: darkMode
-                                  ? context.theme.colors.primary
-                                  : MarksColors.primaryText,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        _CardReloadAction(
-                          loading: loading,
-                          onPress: () async {
-                            try {
-                              await ref
-                                  .read(gradesProvider.notifier)
-                                  .loadDetails(
-                                    widget.course.courseId,
-                                    force: true,
-                                  );
-                            } catch (e) {
-                              if (!mounted) return;
-                              log("$e");
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) =>
-                FCollapsible(value: _animation.value, child: child!),
-            child: _GradeDetailsPanel(
-              detail: detail,
-              loading: loading,
-              gradingType: widget.course.gradingType,
+          SizeTransition(
+            sizeFactor: _animation,
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: EdgeInsets.zero,
+              child: _GradeDetailsPanel(
+                detail: detail,
+                loading: loading,
+                gradingType: c.gradingType,
+                grade: c.grade,
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CardReloadAction extends StatelessWidget {
-  final bool loading;
-  final Future<void> Function() onPress;
-
-  const _CardReloadAction({required this.loading, required this.onPress});
-
-  @override
-  Widget build(BuildContext context) {
-    return FTappable(
-      onPress: loading ? null : onPress,
-      child: Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: context.theme.colors.primaryForeground.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: context.theme.colors.border),
-        ),
-        child: Icon(
-          loading ? FLucideIcons.loaderCircle : FLucideIcons.rotateCw,
-          size: 14,
-          color: context.theme.colors.primary,
-        ),
       ),
     );
   }
@@ -481,167 +337,119 @@ class _GradeDetailsPanel extends StatelessWidget {
   final GradeDetailsData? detail;
   final bool loading;
   final String gradingType;
+  final String grade;
   const _GradeDetailsPanel({
     required this.detail,
     required this.loading,
     required this.gradingType,
+    required this.grade,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (detail == null && loading) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        child: Center(
-          child: Icon(
-            FLucideIcons.loaderCircle,
-            size: 22,
-            color: context.theme.colors.mutedForeground,
-          ),
-        ),
-      );
-    }
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
     if (detail == null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        child: Text(
-          "Tap card to load detailed marks",
-          style: TextStyle(color: context.theme.colors.mutedForeground),
-        ),
+      return Padding(
+        padding: const EdgeInsets.all(Space.md),
+        child: loading
+            ? const Column(
+                children: [
+                  Skeleton(height: 28, radius: Radii.md),
+                  SizedBox(height: Space.sm),
+                  Skeleton(height: 44, radius: Radii.md),
+                  SizedBox(height: Space.sm),
+                  Skeleton(height: 44, radius: Radii.md),
+                ],
+              )
+            : Text(
+                "Couldn't load the mark breakdown. Collapse and try again.",
+                style: typography.body.sm.copyWith(
+                  color: colors.mutedForeground,
+                ),
+              ),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        color: context.theme.colors.primaryForeground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.theme.colors.border),
+    final ranges = [
+      for (final r in detail!.gradeRanges)
+        if (r.range.replaceAll('#', '').trim().isNotEmpty)
+          (r.grade.trim().toUpperCase(), _shortRange(r.range)),
+    ];
+    final sections = _groupMarksBySection(detail!);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Space.md + 2,
+        Space.xs,
+        Space.md + 2,
+        Space.md,
       ),
-      padding: const EdgeInsets.all(10),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: context.theme.colors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: context.theme.colors.border),
+          if (ranges.isNotEmpty) ...[
+            _Label(
+              gradingType.trim().isEmpty
+                  ? 'GRADE CUT-OFFS'
+                  : 'GRADE CUT-OFFS · ${gradingType.trim()}',
             ),
-            child: Wrap(
-              spacing: 10,
-              runSpacing: 6,
+            const SizedBox(height: Space.sm),
+            Wrap(
+              spacing: Space.xs + 2,
+              runSpacing: Space.xs + 2,
               children: [
-                Text(
-                  "Grading Type: $gradingType",
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: context.theme.colors.primary,
+                for (final (g, range) in ranges)
+                  _CutoffChip(
+                    grade: g,
+                    range: range,
+                    achieved: g == grade.trim().toUpperCase(),
                   ),
-                ),
-                Text(
-                  _formatGradeRanges(detail!.gradeRanges),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.theme.colors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-          ..._buildMarkSectionTables(context, detail!),
+          ],
+          for (final section in sections) ...[
+            const SizedBox(height: Space.lg),
+            Row(
+              children: [
+                Expanded(child: _Label(section.sectionTitle.toUpperCase())),
+                if (section.total.isNotEmpty)
+                  Text(
+                    '${section.total} weighted',
+                    style: typography.body.xs.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.foreground,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: Space.xs),
+            for (final (i, m) in section.marks.indexed) ...[
+              if (i > 0)
+                Container(
+                  height: 1,
+                  color: colors.border.withValues(alpha: 0.6),
+                ),
+              _MarkRow(mark: m),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  List<Widget> _buildMarkSectionTables(
-    BuildContext context,
-    GradeDetailsData detail,
-  ) {
-    final sections = _groupMarksBySection(detail);
-    final out = <Widget>[];
-    for (int idx = 0; idx < sections.length; idx++) {
-      final section = sections[idx];
-      out.add(
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: context.theme.colors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.theme.colors.border),
-          ),
-          child: Text(
-            _sectionHeader(section),
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: context.theme.colors.primary,
-            ),
-          ),
-        ),
-      );
-      out.add(const SizedBox(height: 8));
-      out.add(
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: context.theme.colors.primaryForeground.withValues(
-                    alpha: 0.5,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: _row(
-                  context,
-                  "Serial Number",
-                  "Mark Title",
-                  "Scored Mark",
-                  "Maximum Mark",
-                  "Weightage (%)",
-                  "Weightage Mark",
-                  true,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (int i = 0; i < section.marks.length; i++) ...[
-                _row(
-                  context,
-                  section.marks[i].serial,
-                  section.marks[i].markTitle,
-                  section.marks[i].scoredMark,
-                  section.marks[i].maxMark,
-                  section.marks[i].weightage,
-                  section.marks[i].weightageMark,
-                  false,
-                ),
-                if (i != section.marks.length - 1)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    height: 1,
-                    width: 760,
-                    color: context.theme.colors.border.withValues(alpha: 0.7),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      );
-      if (idx != sections.length - 1) {
-        out.add(const SizedBox(height: 10));
-      }
+  /// ">=83 and <88" → "83–88", ">=88" → "≥88", "<50" → "<50".
+  static String _shortRange(String raw) {
+    final r = raw.replaceAll('#', '').trim();
+    final nums = RegExp(
+      r'\d+(?:\.\d+)?',
+    ).allMatches(r).map((m) => m[0]!).toList();
+    if (nums.length >= 2) return '${nums[0]}–${nums[1]}';
+    if (nums.length == 1) {
+      if (r.startsWith('<')) return '<${nums[0]}';
+      return '≥${nums[0]}';
     }
-    return out;
+    return r;
   }
 
   List<_MarkSection> _groupMarksBySection(GradeDetailsData detail) {
@@ -699,77 +507,157 @@ class _GradeDetailsPanel extends StatelessWidget {
       gainedOf: (m) => m.weightageMark,
       possibleOf: (m) => m.weightage,
     );
-    final sum = totals.gained;
-    if (sum == 0) return "";
-    if (sum == sum.truncateToDouble()) {
-      return sum.toStringAsFixed(0);
-    }
-    return sum.toStringAsFixed(1);
+    String fmt(double v) =>
+        v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    if (totals.gained == 0) return "";
+    return totals.possible > 0
+        ? '${fmt(totals.gained)} / ${fmt(totals.possible)}'
+        : fmt(totals.gained);
   }
+}
 
-  String _sectionHeader(_MarkSection section) {
-    final parts = <String>[section.sectionTitle];
-    if (section.total.isNotEmpty) {
-      parts.add("Total: ${section.total}");
-    }
-    return parts.join(" • ");
-  }
+class _Label extends StatelessWidget {
+  const _Label(this.text);
 
-  Widget _row(
-    BuildContext context,
-    String a,
-    String b,
-    String c,
-    String d,
-    String e,
-    String f,
-    bool header,
-  ) {
-    final style = TextStyle(
-      fontSize: header ? 13 : 12,
-      fontWeight: header ? FontWeight.w700 : FontWeight.w400,
-      color: header
-          ? context.theme.colors.primary
-          : context.theme.colors.foreground,
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          _cell(a, 110, style),
-          _cell(b, 220, style),
-          _cell(c, 110, style),
-          _cell(d, 120, style),
-          _cell(e, 120, style),
-          _cell(f, 120, style),
-        ],
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: context.theme.typography.body.xs.copyWith(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.5,
+      color: context.theme.colors.mutedForeground,
+    ),
+  );
+}
+
+class _CutoffChip extends StatelessWidget {
+  const _CutoffChip({
+    required this.grade,
+    required this.range,
+    required this.achieved,
+  });
+
+  final String grade;
+  final String range;
+  final bool achieved;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final tone = gradeTone(context, grade);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 4),
+      decoration: BoxDecoration(
+        color: achieved ? tone.subtle : const Color(0x00000000),
+        borderRadius: BorderRadius.circular(Radii.sm),
+        border: Border.all(color: achieved ? tone.base : colors.border),
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$grade ',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: achieved ? tone.onSubtle : colors.foreground,
+              ),
+            ),
+            TextSpan(
+              text: range,
+              style: TextStyle(
+                color: achieved ? tone.onSubtle : colors.mutedForeground,
+              ),
+            ),
+          ],
+        ),
+        style: context.theme.typography.body.xs.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }
+}
 
-  Widget _cell(String txt, double width, TextStyle style) => SizedBox(
-    width: width,
-    child: Text(
-      txt,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
-      style: style.copyWith(height: 1.25),
-    ),
-  );
+class _MarkRow extends StatelessWidget {
+  const _MarkRow({required this.mark});
 
-  String _formatGradeRanges(List<GradeRange> ranges) {
-    if (ranges.isEmpty) return "Grade ranges unavailable";
-    final normalized = ranges
-        .map(
-          (r) => GradeRange(
-            grade: r.grade,
-            range: r.range.replaceAll('#', '').trim(),
+  final GradeDetailMark mark;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final scored = double.tryParse(mark.scoredMark.trim()) ?? 0;
+    final max = double.tryParse(mark.maxMark.trim()) ?? 0;
+    final pct = max > 0 ? scored / max * 100 : 0.0;
+    final tone = pct >= 75
+        ? colors.app.success
+        : pct >= 60
+        ? colors.app.accentTone
+        : colors.app.warning;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Space.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  mark.markTitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.sm.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: colors.foreground,
+                  ),
+                ),
+              ),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: mark.scoredMark.trim()),
+                    TextSpan(
+                      text: ' / ${mark.maxMark.trim()}',
+                      style: TextStyle(color: colors.mutedForeground),
+                    ),
+                  ],
+                ),
+                style: typography.body.sm.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colors.foreground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
-        )
-        .where((r) => r.range.isNotEmpty)
-        .toList();
-    if (normalized.isEmpty) return "Grade ranges unavailable";
-    return normalized.map((r) => "${r.grade}: ${r.range}").join("   ");
+          const SizedBox(height: Space.xs + 2),
+          Row(
+            children: [
+              Expanded(
+                child: ProgressBar(
+                  value: pct / 100,
+                  color: tone.base,
+                  height: 4,
+                ),
+              ),
+              const SizedBox(width: Space.md),
+              Text(
+                '${mark.weightageMark.trim()} of ${mark.weightage.trim()}',
+                style: typography.body.xs.copyWith(
+                  color: colors.mutedForeground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -787,37 +675,166 @@ class _MarkSection {
   });
 }
 
-class _CenterInfo extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final IconData icon;
-  const _CenterInfo({required this.title, this.subtitle, required this.icon});
+class _SemesterChips extends StatelessWidget {
+  const _SemesterChips({
+    required this.semesters,
+    required this.selectedId,
+    required this.onSelect,
+  });
+
+  final List<SemesterInfo> semesters;
+  final String selectedId;
+  final ValueChanged<String> onSelect;
+
+  /// "Winter Semester 2025-26 Freshers" → "Winter 25-26 Freshers".
+  static String short(String name) => name
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAllMapped(
+        RegExp(r'\s*Semester\s+20(\d{2})-(\d{2})'),
+        (m) => ' ${m.group(1)}-${m.group(2)}',
+      )
+      .trim();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    final colors = context.theme.colors;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
         children: [
-          Icon(icon, size: 36, color: context.theme.colors.mutedForeground),
-          const SizedBox(height: 10),
+          for (final sem in semesters)
+            Padding(
+              padding: const EdgeInsets.only(right: Space.sm),
+              child: PressScale(
+                scale: 0.95,
+                semanticsLabel: sem.name,
+                onPress: () => onSelect(sem.id),
+                child: AnimatedContainer(
+                  duration: Motion.medium,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Space.md,
+                    vertical: Space.sm - 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: sem.id == selectedId ? colors.primary : colors.card,
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                    border: Border.all(
+                      color: sem.id == selectedId
+                          ? colors.primary
+                          : colors.border,
+                    ),
+                  ),
+                  child: Text(
+                    short(sem.name),
+                    style: context.theme.typography.body.sm.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: sem.id == selectedId
+                          ? colors.primaryForeground
+                          : colors.foreground,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Semester GPA from the grades, weighted by credits looked up in grade
+/// history. Courses without credits or a points grade (e.g. P) are left out.
+class _SemesterSummary extends StatelessWidget {
+  const _SemesterSummary({required this.courses, required this.creditsByCode});
+
+  final List<GradeCourseRecord> courses;
+  final Map<String, double?> creditsByCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    var credits = 0.0;
+    var points = 0.0;
+    var counted = 0;
+    for (final c in courses) {
+      final grade = Grade.tryParse(c.grade);
+      final cr = creditsByCode[c.courseCode.trim().toUpperCase()];
+      if (grade == null || cr == null || cr <= 0) continue;
+      credits += cr;
+      points += cr * grade.points;
+      counted++;
+    }
+    final gpa = credits > 0 ? points / credits : null;
+    final counts = <String, int>{};
+    for (final c in courses) {
+      final g = c.grade.trim().toUpperCase();
+      if (g.isEmpty || g == '-') continue;
+      counts[g] = (counts[g] ?? 0) + 1;
+    }
+    const order = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'N', 'P'];
+    int rank(String g) => order.contains(g) ? order.indexOf(g) : order.length;
+    final sortedCounts = counts.entries.toList()
+      ..sort((a, b) => rank(a.key).compareTo(rank(b.key)));
+
+    return Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            title,
-            style: TextStyle(
-              color: context.theme.colors.primary,
+            'SEMESTER GPA',
+            style: typography.body.xs.copyWith(
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+              color: colors.mutedForeground,
             ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 6),
+          gpa == null
+              ? Text(
+                  '—',
+                  style: typography.display.xl2.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                )
+              : CountUp(
+                  value: gpa,
+                  decimals: 2,
+                  style: typography.display.xl2.copyWith(
+                    height: 1.1,
+                    fontWeight: FontWeight.w600,
+                    color: colors.foreground,
+                  ),
+                ),
+          Text(
+            gpa == null
+                ? 'Needs credits from grade history'
+                : '${courses.length} courses · ${_num(credits)} credits',
+            style: typography.body.xs.copyWith(color: colors.mutedForeground),
+          ),
+          if (gpa != null && counted < courses.length)
             Text(
-              subtitle!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.theme.colors.mutedForeground),
+              '${courses.length - counted} without grade points not counted',
+              style: typography.body.xs.copyWith(color: colors.mutedForeground),
+            ),
+          if (counts.isNotEmpty) ...[
+            const SizedBox(height: Space.md),
+            Wrap(
+              spacing: Space.xs + 2,
+              runSpacing: Space.xs,
+              children: [
+                for (final e in sortedCounts)
+                  ToneBadge(
+                    label: '${e.key} ${e.value}',
+                    tone: gradeTone(context, e.key),
+                  ),
+              ],
             ),
           ],
         ],
       ),
     );
   }
+
+  static String _num(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 }

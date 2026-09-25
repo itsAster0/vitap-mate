@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'83fe13cd2a050045d92da228d8cadb851d84d969';
+String _$settingsHash() => r'8860c1c630783e1c98a23b0d3b44abce42374c75';
 
 @ProviderFor(inAppCaptchaSolver)
 final inAppCaptchaSolverProvider = InAppCaptchaSolverProvider._();
@@ -131,46 +131,6 @@ final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
 }
 
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
-
-@ProviderFor(btwExams)
-final btwExamsProvider = BtwExamsProvider._();
-
-final class BtwExamsProvider extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  BtwExamsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'btwExamsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$btwExamsHash();
-
-  @$internal
-  @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  bool create(Ref ref) {
-    return btwExams(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
-    );
-  }
-}
-
-String _$btwExamsHash() => r'77cc43c21a5b8dbd6ef2e949431fa4abf5d24a1b';
 
 @ProviderFor(autoRefresh)
 final autoRefreshProvider = AutoRefreshProvider._();

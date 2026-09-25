@@ -47,7 +47,20 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     final user = await ref.read(vtopUserProvider.future);
     final semData = await ref.watch(semesterIdProvider.future);
     final semId = user.semid ?? "";
-    return _loadSemester(semId, semData.semesters);
+    final initial = await _loadSemester(semId, semData.semesters);
+    if (initial.gradeView.courses.isNotEmpty) return initial;
+
+    // Grades for the running semester only appear once it ends, so opening
+    // the page on it is a dead end. Fall back to the semester before it.
+    final sems = semData.semesters;
+    final index = sems.indexWhere((s) => s.id == initial.selectedSemesterId);
+    if (index < 0 || index + 1 >= sems.length) return initial;
+    try {
+      final previous = await _loadSemester(sems[index + 1].id, sems);
+      return previous.gradeView.courses.isNotEmpty ? previous : initial;
+    } catch (_) {
+      return initial;
+    }
   }
 
   Future<void> refresh() async {

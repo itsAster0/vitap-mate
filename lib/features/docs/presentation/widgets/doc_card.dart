@@ -1,55 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class DocKindVisual {
-  final List<Color> gradient;
-  final Color accent;
+  final Tone tone;
   final IconData icon;
-  const DocKindVisual(this.gradient, this.accent, this.icon);
+  const DocKindVisual(this.tone, this.icon);
+
+  Color get accent => tone.base;
 }
 
-DocKindVisual visualFor(DocWindow doc) {
-  switch (doc.kind) {
-    case DocKind.pdf:
-      return const DocKindVisual(
-        [Color(0xFFFFDAD6), Color(0xFFFFB4AB)],
-        Color(0xFFB3261E),
-        FLucideIcons.fileText,
-      );
-    case DocKind.image:
-      return const DocKindVisual(
-        [Color(0xFFC6E7FF), Color(0xFFB3DDFF)],
-        Color(0xFF1976D2),
-        FLucideIcons.image,
-      );
-    case DocKind.spreadsheet:
-      return const DocKindVisual(
-        [Color(0xFFD4F6DD), Color(0xFFC1EFCB)],
-        Color(0xFF1B5E20),
-        FLucideIcons.fileSpreadsheet,
-      );
-    case DocKind.text:
-      return const DocKindVisual(
-        [Color(0xFFE4D7F5), Color(0xFFD3C2EE)],
-        Color(0xFF673AB7),
-        FLucideIcons.fileCode2,
-      );
-    case DocKind.file:
-      return const DocKindVisual(
-        [Color(0xFFE5E7EB), Color(0xFFD1D5DB)],
-        Color(0xFF374151),
-        FLucideIcons.file,
-      );
-    case DocKind.none:
-      return const DocKindVisual(
-        [Color(0xFFFFE8CD), Color(0xFFFFDDB3)],
-        Color(0xFFE65100),
-        FLucideIcons.utensils,
-      );
-  }
+DocKindVisual visualFor(BuildContext context, DocWindow doc) {
+  final colors = context.theme.colors;
+  final palette = colors.app;
+  return switch (doc.kind) {
+    DocKind.pdf => DocKindVisual(palette.danger, FLucideIcons.fileText),
+    DocKind.image => DocKindVisual(palette.accentTone, FLucideIcons.image),
+    DocKind.spreadsheet => DocKindVisual(
+      palette.success,
+      FLucideIcons.fileSpreadsheet,
+    ),
+    DocKind.text => DocKindVisual(palette.lab, FLucideIcons.fileCode2),
+    DocKind.file => DocKindVisual(
+      Tone(
+        base: colors.mutedForeground,
+        subtle: colors.secondary,
+        onSubtle: colors.foreground,
+      ),
+      FLucideIcons.file,
+    ),
+    DocKind.none => DocKindVisual(palette.warning, FLucideIcons.utensils),
+  };
 }
 
 String kindLabel(DocKind kind) {
@@ -80,7 +62,7 @@ String lastOpenedLabel(int? ms) {
   return 'opened ${hours ~/ 24}d ago';
 }
 
-class DocCard extends ConsumerWidget {
+class DocCard extends StatelessWidget {
   final DocWindow doc;
   final VoidCallback onOpen;
   final VoidCallback onRename;
@@ -95,76 +77,37 @@ class DocCard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    final visual = visualFor(doc);
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final visual = visualFor(context, doc);
 
     return FTappable(
       onPress: onOpen,
       onLongPress: () => _showActions(context),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: !darkMode && doc.hasFile
-              ? LinearGradient(
-                  colors: visual.gradient,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: darkMode ? context.theme.colors.primaryForeground : null,
-          borderRadius: BorderRadius.circular(16),
-          border: darkMode
-              ? Border.all(color: context.theme.colors.border)
-              : null,
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(12),
+      builder: (context, variants, child) => AnimatedScale(
+        scale: variants.contains(FTappableVariant.pressed) ? 0.97 : 1,
+        duration: Motion.fast,
+        child: child,
+      ),
+      child: Surface(
+        padding: const EdgeInsets.all(Space.md + 2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
-                    color: darkMode
-                        ? context.theme.colors.background
-                        : Colors.white.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(10),
+                    color: visual.tone.subtle,
+                    borderRadius: BorderRadius.circular(Radii.sm + 2),
                   ),
-                  child: Icon(visual.icon, size: 20, color: visual.accent),
+                  child: Icon(visual.icon, size: 18, color: visual.tone.base),
                 ),
                 const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: visual.accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: visual.accent.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Text(
-                    kindLabel(doc.kind),
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                      color: darkMode
-                          ? context.theme.colors.primary
-                          : visual.accent,
-                    ),
-                  ),
-                ),
+                ToneBadge.neutral(context, kindLabel(doc.kind)),
               ],
             ),
             const Spacer(),
@@ -172,29 +115,20 @@ class DocCard extends ConsumerWidget {
               doc.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-                height: 1.2,
-                color: darkMode
-                    ? context.theme.colors.primary
-                    : const Color(0xFF212121),
+              style: typography.body.sm.copyWith(
+                height: 1.25,
+                fontWeight: FontWeight.w600,
+                color: colors.foreground,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               doc.hasFile
                   ? lastOpenedLabel(doc.lastOpenedAt)
-                  : 'Tap to add file',
+                  : 'Tap to add a file',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: darkMode
-                    ? context.theme.colors.mutedForeground
-                    : const Color(0xFF616161),
-              ),
+              style: typography.body.xs.copyWith(color: colors.mutedForeground),
             ),
           ],
         ),

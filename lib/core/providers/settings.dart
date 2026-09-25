@@ -10,6 +10,7 @@ const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
 const timetableViewModeSettingKey = 'settings_timetable_view_mode';
 const inAppCaptchaSolverSettingKey = 'settings_in_app_captcha_solver';
+const emailOtpBannerDismissedSettingKey = 'settings_email_otp_banner_dismissed';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -17,7 +18,6 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
     cacheOptions: SharedPreferencesWithCacheOptions(
       allowList: {
         "settings_merge_tt",
-        "settings_btw_atten",
         "settings_auto_refresh",
         emailOtpDeleteAfterReadingSettingKey,
         "settings_class_notifications_enabled",
@@ -36,6 +36,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_student_projects_rotation_seed",
         timetableViewModeSettingKey,
         inAppCaptchaSolverSettingKey,
+        emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
         vtopDesktopModeSettingKey,
       },
@@ -65,18 +66,6 @@ Future<void> setMergeTT(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool("settings_merge_tt", value);
   ref.invalidate(mergeTTProvider);
-}
-
-@riverpod
-bool btwExams(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_btw_atten") ?? false;
-}
-
-Future<void> setbtwExam(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool("settings_btw_atten", value);
-  ref.invalidate(btwExamsProvider);
 }
 
 @riverpod

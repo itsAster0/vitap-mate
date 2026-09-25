@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 
-enum TimetableViewMode { daily, agenda, weekly }
+enum TimetableViewMode { agenda, weekly }
 
 class TimetableViewModeController extends Notifier<TimetableViewMode> {
   @override
@@ -10,17 +10,17 @@ class TimetableViewModeController extends Notifier<TimetableViewMode> {
         .watch(settingsProvider)
         .value
         ?.getString(timetableViewModeSettingKey);
+    // Anything else, including the removed "daily" view, opens the agenda.
     return TimetableViewMode.values.firstWhere(
       (mode) => mode.name == savedMode,
-      orElse: () => TimetableViewMode.daily,
+      orElse: () => TimetableViewMode.agenda,
     );
   }
 
   Future<void> showNext() async {
     final nextMode = switch (state) {
-      TimetableViewMode.daily => TimetableViewMode.agenda,
       TimetableViewMode.agenda => TimetableViewMode.weekly,
-      TimetableViewMode.weekly => TimetableViewMode.daily,
+      TimetableViewMode.weekly => TimetableViewMode.agenda,
     };
     state = nextMode;
     final prefs = await ref.read(settingsProvider.future);
