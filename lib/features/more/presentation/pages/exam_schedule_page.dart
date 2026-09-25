@@ -6,12 +6,14 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/domain/exam_time.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -49,26 +51,30 @@ class ExamSchedulePage extends HookConsumerWidget {
       child: examData.when(
         skipLoadingOnRefresh: true,
         skipLoadingOnReload: true,
-        data: (data) => RefreshIndicator(
-          key: const ValueKey('data'),
+        data: (data) => ScreenRefresh(
           onRefresh: update,
-          backgroundColor: context.theme.colors.background,
-          color: context.theme.colors.foreground,
-          child: data.exams.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    EmptyState(
-                      icon: FLucideIcons.calendarX,
-                      title: 'No exam schedule yet',
-                      message: 'It shows up here once VTOP publishes it.',
-                    ),
-                  ],
-                )
-              : _ExamsView(
-                  exams: data.exams,
-                  updateTime: data.updateTime.toInt(),
-                ),
+          tasks: const ['vtop_fetchSchedule'],
+          child: RefreshIndicator(
+            key: const ValueKey('data'),
+            onRefresh: update,
+            backgroundColor: context.theme.colors.background,
+            color: context.theme.colors.foreground,
+            child: data.exams.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      EmptyState(
+                        icon: FLucideIcons.calendarX,
+                        title: 'No exam schedule yet',
+                        message: 'It shows up here once VTOP publishes it.',
+                      ),
+                    ],
+                  )
+                : _ExamsView(
+                    exams: data.exams,
+                    updateTime: data.updateTime.toInt(),
+                  ),
+          ),
         ),
         error: (e, _) => EmptyState(
           key: const ValueKey('error'),
@@ -382,7 +388,7 @@ class _ExamCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      exam.examTime.split('-').first.trim(),
+                      formatClock(exam.examTime.split('-').first, context),
                       style: typography.body.md.copyWith(
                         fontWeight: FontWeight.w500,
                         color: colors.foreground,
@@ -391,7 +397,7 @@ class _ExamCard extends StatelessWidget {
                     ),
                     if (exam.examTime.contains('-'))
                       Text(
-                        'to ${exam.examTime.split('-').last.trim()}',
+                        'to ${formatClock(exam.examTime.split('-').last, context)}',
                         style: typography.body.xs.copyWith(
                           color: colors.mutedForeground,
                         ),
@@ -422,11 +428,14 @@ class _ExamCard extends StatelessWidget {
                 Row(
                   children: [
                     if (hasValue(exam.seatNo))
-                      _Fact(label: 'NO.', value: exam.seatNo.trim()),
+                      _Fact(label: 'SEAT NO.', value: exam.seatNo.trim()),
                     if (hasValue(exam.seatNo) && hasValue(exam.reportingTime))
                       const SizedBox(width: Space.sm),
                     if (hasValue(exam.reportingTime))
-                      _Fact(label: 'REPORT', value: exam.reportingTime.trim()),
+                      _Fact(
+                        label: 'REPORT',
+                        value: formatClock(exam.reportingTime, context),
+                      ),
                   ],
                 ),
             ],

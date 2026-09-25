@@ -8,6 +8,7 @@ import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/widgets/vtop_otp_overlay.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
@@ -64,7 +65,11 @@ class MyApp extends HookConsumerWidget {
         data: Theme.of(context).brightness == Brightness.dark
             ? appDarkTheme
             : appLightTheme,
-        child: FToaster(child: VtopOtpOverlay(child: child!)),
+        child: FToaster(
+          child: VtopOtpOverlay(
+            child: Stack(children: [child!, const ScreenRefreshButton()]),
+          ),
+        ),
       ),
     );
   }

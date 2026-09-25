@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/theme/app_palette.dart';
+import 'package:vitapmate/core/utils/extention.dart';
 
 export 'package:vitapmate/core/theme/app_palette.dart';
 
@@ -803,7 +804,7 @@ class FacultyLine extends StatelessWidget {
         const SizedBox(width: Space.xs + 2),
         Expanded(
           child: Text(
-            name.trim(),
+            name.asPersonName,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: context.theme.typography.body.xs.copyWith(

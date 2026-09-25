@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:vitapmate/core/utils/extention.dart';
 
 /// "14:05" → "2:05 PM", or unchanged when the device uses 24-hour time.
 String to12H(String time, BuildContext context) {
@@ -7,6 +8,21 @@ String to12H(String time, BuildContext context) {
   final hour24 = int.parse(parts[0]);
   final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
   return '$hour12:${parts[1]} ${hour24 >= 12 ? 'PM' : 'AM'}';
+}
+
+/// Any VTOP clock ("02:00 PM", "14:00", "9:5") in the app's one style:
+/// "2:00 PM", or "14:00" when the device uses 24-hour time. Unparseable
+/// input comes back trimmed.
+String formatClock(String raw, BuildContext context) {
+  final match = RegExp(
+    r'^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$',
+  ).firstMatch(raw);
+  if (match == null) return raw.trim();
+  var hour = int.parse(match.group(1)!);
+  final period = match.group(3)?.toUpperCase();
+  if (period == 'AM' && hour == 12) hour = 0;
+  if (period == 'PM' && hour != 12) hour += 12;
+  return to12H('${hour.toString().padLeft(2, '0')}:${match.group(2)}', context);
 }
 
 /// Minutes since midnight for an "HH:mm" string.
@@ -28,7 +44,7 @@ String formatMinutes(int minutes) {
 /// Faculty strings arrive as "Name - SCHOOL"; keep the name.
 String facultyName(String value) {
   final index = value.lastIndexOf('-');
-  return (index > 0 ? value.substring(0, index) : value).trim();
+  return (index > 0 ? value.substring(0, index) : value).asPersonName;
 }
 
 /// Monday-to-Sunday dates of the week shown in the weekly grid. On Sundays it

@@ -241,7 +241,7 @@ Widget _buildHeader(
       title: _HeaderTitle(
         title: data,
         subtitle: subtitle,
-        titleStyle: DefaultTextStyle.of(context).style,
+        titleStyle: _headerTitleStyle(context, subtitle),
       ),
       prefixes: [FHeaderAction.back(onPress: () => GoRouter.of(context).pop())],
     );
@@ -252,9 +252,7 @@ Widget _buildHeader(
     title: _HeaderTitle(
       title: data,
       subtitle: subtitle,
-      titleStyle: subtitle != null
-          ? context.theme.typography.body.sm
-          : context.theme.typography.body.lg,
+      titleStyle: _headerTitleStyle(context, subtitle),
     ),
 
     prefixes: [if (hasTimetableAction) const SyncGoogleCalendarButton()],
@@ -262,6 +260,14 @@ Widget _buildHeader(
     suffixes: [if (hasTimetableAction) const TimetableViewToggleButton()],
   );
 }
+
+/// Same title size on tabs and pushed pages, stepping down when a status
+/// line shares the header.
+TextStyle _headerTitleStyle(BuildContext context, String? subtitle) =>
+    (subtitle != null
+            ? context.theme.typography.body.sm
+            : context.theme.typography.body.lg)
+        .copyWith(fontWeight: FontWeight.w600);
 
 class _HeaderTitle extends StatelessWidget {
   const _HeaderTitle({

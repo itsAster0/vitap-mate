@@ -21,26 +21,31 @@ VTOP_SERVER_API_KEYS="$(openssl rand -base64 32)" cargo run --profile server -p 
 cargo run --profile server -p vtop-server
 ```
 
-or with Docker (build context is `rust/`):
+or with Docker from the repository root:
 
 ```sh
-cd rust
-docker build -f vtop-server/Dockerfile -t vtop-server .
+docker build -f rust/vtop-server/Dockerfile -t vtop-server .
 docker run -p 8080:8080 -e VTOP_SERVER_API_KEYS=... vtop-server
 ```
 
 ### Railway
 
-`rust/railway.toml` holds the build and deploy settings. In the Railway
-service, set **Root Directory** to `rust` and set `VTOP_SERVER_API_KEYS`
-(a public Railway URL should not run open). Railway supplies `PORT`, and `/health` is the health
+The Railway service (`vtop-server`) is defined in `.railway/railway.ts` at the
+repository root, applied with `railway config plan` / `railway config apply`.
+It sets Root Directory to `/rust` (without it the build sees the Flutter repo
+and finds no `Cargo.toml`) and builds with Railpack, which reads
+`rust/railpack.json`: a current Rust and the `server` profile (Railpack's
+default `--release` would use the app library's size-optimised,
+`panic = "abort"` profile). Set in the dashboard:
+
+- `VTOP_SERVER_API_KEYS` (a public Railway URL should not run open). Railway supplies `PORT`, and `/health` is the health
 check.
 
 ## Configuration
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `VTOP_SERVER_API_KEYS` | (none: open) | Comma-separated accepted keys, each at least 16 characters. Generate with `openssl rand -base64 32`. Unset or empty means **open mode**: no `X-API-Key` check, and all callers share one rate-limit bucket. |
+| `VTOP_SERVER_API_KEYS` | (none: open) | Comma-separated accepted keys, each at least 8 characters. Generate with `openssl rand -base64 32`. Unset or empty means **open mode**: no `X-API-Key` check, and all callers share one rate-limit bucket. |
 | `PORT` | `8080` | Port to listen on (all interfaces). Ignored when `VTOP_SERVER_BIND` is set. |
 | `VTOP_SERVER_BIND` | – | Explicit `host:port`, e.g. `127.0.0.1:8080`. |
 | `VTOP_SERVER_REQUEST_TIMEOUT_SECS` | `45` | Limit for a whole data request, VTOP round trips included. |

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,7 +71,40 @@ FThemeData _withPalette(
   Color? background,
 }) => FThemeData(
   colors: base.colors.copyWith(background: background, extensions: [palette]),
-  typography: base.typography,
+  typography: _tuned(base.typography),
   style: base.style,
   touch: true,
 );
+
+FTypography _tuned(FTypography typography) => typography.copyWith(
+  display: _tracked(typography.display),
+  body: _tracked(typography.body),
+);
+
+/// Inter is drawn for small text; at larger sizes it reads loose unless the
+/// tracking tightens. This is Inter's own "dynamic metrics" curve, so headings
+/// sit tight and captions keep a little air.
+FTypeface _tracked(FTypeface face) {
+  TextStyle t(TextStyle style) {
+    final size = style.fontSize ?? 14;
+    final em = -0.0223 + 0.185 * math.exp(-0.1745 * size);
+    return style.copyWith(letterSpacing: em * size);
+  }
+
+  return face.copyWith(
+    xs3: t(face.xs3),
+    xs2: t(face.xs2),
+    xs: t(face.xs),
+    sm: t(face.sm),
+    md: t(face.md),
+    lg: t(face.lg),
+    xl: t(face.xl),
+    xl2: t(face.xl2),
+    xl3: t(face.xl3),
+    xl4: t(face.xl4),
+    xl5: t(face.xl5),
+    xl6: t(face.xl6),
+    xl7: t(face.xl7),
+    xl8: t(face.xl8),
+  );
+}

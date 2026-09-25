@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -56,100 +57,106 @@ class TimetablePage extends HookConsumerWidget {
 
     final isAgenda = viewMode == TimetableViewMode.agenda;
 
-    return RefreshIndicator(
-      displacement: 60,
-      backgroundColor: context.theme.colors.background,
-      color: context.theme.colors.foreground,
-      strokeWidth: 2.5,
+    return ScreenRefresh(
       onRefresh: update,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        // Swipe left/right to move between days in the agenda.
-        child: GestureDetector(
-          onHorizontalDragStart: isAgenda
-              ? (details) => dragStartX.value = details.globalPosition.dx
-              : null,
-          onHorizontalDragUpdate: isAgenda
-              ? (details) {
-                  final days = classDays;
-                  if (days.isEmpty) return;
-                  final currentX = details.globalPosition.dx;
-                  final deltaX = currentX - (dragStartX.value ?? currentX);
-                  if (deltaX > 80 && days.first < selectedDay.value) {
-                    selectedDay.value -= 1;
-                    dragStartX.value = currentX;
-                  } else if (deltaX < -80 && days.last > selectedDay.value) {
-                    selectedDay.value += 1;
-                    dragStartX.value = currentX;
-                  }
-                }
-              : null,
-          onHorizontalDragEnd: isAgenda ? (_) => dragStartX.value = null : null,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height * 0.8,
-            ),
-            child: AnimatedSwitcher(
-              duration: Motion.medium,
-              // Keep content pinned to the top even when a day is short.
-              layoutBuilder: (current, previous) => Stack(
-                alignment: Alignment.topCenter,
-                children: [...previous, ?current],
-              ),
-              child: timetableData.when(
-                skipLoadingOnRefresh: true,
-                skipLoadingOnReload: true,
-                data: (data) {
-                  final days = classDays;
-
-                  List<TimetableSlot> slotsForDay(int day) {
-                    var slots = getDaySlotList(data, day);
-                    if (mergeLabs) {
-                      slots = mergeLabsSloths(slots);
+      tasks: const ['vtop_timetable'],
+      child: RefreshIndicator(
+        displacement: 60,
+        backgroundColor: context.theme.colors.background,
+        color: context.theme.colors.foreground,
+        strokeWidth: 2.5,
+        onRefresh: update,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          // Swipe left/right to move between days in the agenda.
+          child: GestureDetector(
+            onHorizontalDragStart: isAgenda
+                ? (details) => dragStartX.value = details.globalPosition.dx
+                : null,
+            onHorizontalDragUpdate: isAgenda
+                ? (details) {
+                    final days = classDays;
+                    if (days.isEmpty) return;
+                    final currentX = details.globalPosition.dx;
+                    final deltaX = currentX - (dragStartX.value ?? currentX);
+                    if (deltaX > 80 && days.first < selectedDay.value) {
+                      selectedDay.value -= 1;
+                      dragStartX.value = currentX;
+                    } else if (deltaX < -80 && days.last > selectedDay.value) {
+                      selectedDay.value += 1;
+                      dragStartX.value = currentX;
                     }
-                    slots.sort(
-                      (a, b) => _parseTime(
-                        a.startTime,
-                      ).compareTo(_parseTime(b.startTime)),
-                    );
-                    return slots;
                   }
-
-                  return Column(
-                    key: const ValueKey('data'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const EmailOtpBanner(),
-                      if (viewMode == TimetableViewMode.weekly)
-                        WeeklyTimetableView(
-                          days: days,
-                          slotsForDay: slotsForDay,
-                        )
-                      else
-                        AgendaTimetableView(
-                          selectedDay: selectedDay,
-                          classDays: days.toSet(),
-                          slotsForDay: slotsForDay,
-                          attendance: attendance,
-                        ),
-                      DataUpdatedFooter(updateTime: data.updateTime.toInt()),
-                    ],
-                  );
-                },
-                error: (e, stackTrace) => EmptyState(
-                  key: const ValueKey('error'),
-                  icon: FLucideIcons.cloudAlert,
-                  title: "Couldn't load your timetable",
-                  message: commonErrorMessage(e),
-                  action: FButton(
-                    variant: FButtonVariant.outline,
-                    mainAxisSize: MainAxisSize.min,
-                    onPress: update,
-                    child: const Text('Try again'),
-                  ),
+                : null,
+            onHorizontalDragEnd: isAgenda
+                ? (_) => dragStartX.value = null
+                : null,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              child: AnimatedSwitcher(
+                duration: Motion.medium,
+                // Keep content pinned to the top even when a day is short.
+                layoutBuilder: (current, previous) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: [...previous, ?current],
                 ),
-                loading: () =>
-                    const _TimetableSkeleton(key: ValueKey('loading')),
+                child: timetableData.when(
+                  skipLoadingOnRefresh: true,
+                  skipLoadingOnReload: true,
+                  data: (data) {
+                    final days = classDays;
+
+                    List<TimetableSlot> slotsForDay(int day) {
+                      var slots = getDaySlotList(data, day);
+                      if (mergeLabs) {
+                        slots = mergeLabsSloths(slots);
+                      }
+                      slots.sort(
+                        (a, b) => _parseTime(
+                          a.startTime,
+                        ).compareTo(_parseTime(b.startTime)),
+                      );
+                      return slots;
+                    }
+
+                    return Column(
+                      key: const ValueKey('data'),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const EmailOtpBanner(),
+                        if (viewMode == TimetableViewMode.weekly)
+                          WeeklyTimetableView(
+                            days: days,
+                            slotsForDay: slotsForDay,
+                          )
+                        else
+                          AgendaTimetableView(
+                            selectedDay: selectedDay,
+                            classDays: days.toSet(),
+                            slotsForDay: slotsForDay,
+                            attendance: attendance,
+                          ),
+                        DataUpdatedFooter(updateTime: data.updateTime.toInt()),
+                      ],
+                    );
+                  },
+                  error: (e, stackTrace) => EmptyState(
+                    key: const ValueKey('error'),
+                    icon: FLucideIcons.cloudAlert,
+                    title: "Couldn't load your timetable",
+                    message: commonErrorMessage(e),
+                    action: FButton(
+                      variant: FButtonVariant.outline,
+                      mainAxisSize: MainAxisSize.min,
+                      onPress: update,
+                      child: const Text('Try again'),
+                    ),
+                  ),
+                  loading: () =>
+                      const _TimetableSkeleton(key: ValueKey('loading')),
+                ),
               ),
             ),
           ),

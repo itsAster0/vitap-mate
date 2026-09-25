@@ -1,0 +1,7 @@
+*
+!rust/
+!rust/**
+rust/target/
+rust/**/target/
+rust/**/.env*
+rust/**/*.html.local

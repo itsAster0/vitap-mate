@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'5c099626b2fb2d95ae84732fd8844b01a70ea475';
+String _$settingsHash() => r'cb96ba3b2c79c6b291152202a807042f1abc4c82';
 
 /// The optional vtop-server. The API key is kept in plain preferences by
 /// choice; see rust/ARCHITECTURE.md.
@@ -145,6 +145,51 @@ final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
 }
 
 String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
+
+/// The floating refresh button on the screen edge.
+
+@ProviderFor(refreshButton)
+final refreshButtonProvider = RefreshButtonProvider._();
+
+/// The floating refresh button on the screen edge.
+
+final class RefreshButtonProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// The floating refresh button on the screen edge.
+  RefreshButtonProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'refreshButtonProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$refreshButtonHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return refreshButton(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$refreshButtonHash() => r'0711bfcdcccc930f573c3356d9adf8793e7fbe75';
 
 @ProviderFor(autoRefresh)
 final autoRefreshProvider = AutoRefreshProvider._();

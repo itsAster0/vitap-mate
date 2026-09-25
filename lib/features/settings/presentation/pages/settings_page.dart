@@ -434,6 +434,15 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
+                prefix: const Icon(FLucideIcons.refreshCw),
+                title: const Text('Refresh Button'),
+                subtitle: const Text('Floating button that reloads the screen'),
+                suffix: FSwitch(
+                  value: ref.watch(refreshButtonProvider),
+                  onChange: (value) => setRefreshButton(ref, value),
+                ),
+              ),
+              FTile(
                 prefix: const Icon(FLucideIcons.arrowDownUp),
                 title: const Text('Data Source'),
                 subtitle: Text(

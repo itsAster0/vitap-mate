@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -70,12 +71,16 @@ class GradeHistoryPage extends HookConsumerWidget {
             child: const Text('Try again'),
           ),
         ),
-        data: (history) => RefreshIndicator(
-          key: const ValueKey('data'),
+        data: (history) => ScreenRefresh(
           onRefresh: reload,
-          backgroundColor: context.theme.colors.background,
-          color: context.theme.colors.foreground,
-          child: _HistoryView(history: history),
+          tasks: const ['vtop_grade_history'],
+          child: RefreshIndicator(
+            key: const ValueKey('data'),
+            onRefresh: reload,
+            backgroundColor: context.theme.colors.background,
+            color: context.theme.colors.foreground,
+            child: _HistoryView(history: history),
+          ),
         ),
       ),
     );
