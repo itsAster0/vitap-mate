@@ -18,8 +18,7 @@ class ChangeAlertNotificationService {
   static const String _attendanceKey = 'settings_change_alerts_attendance';
   static const String _marksKey = 'settings_change_alerts_marks';
   static const String _timetableKey = 'settings_change_alerts_timetable';
-  static const String _examScheduleKey =
-      'settings_change_alerts_exam_schedule';
+  static const String _examScheduleKey = 'settings_change_alerts_exam_schedule';
 
   static bool _initialized = false;
 
@@ -76,8 +75,7 @@ class ChangeAlertNotificationService {
     if (prefs.getInt(hashKey) == hash) return;
     await prefs.setInt(hashKey, hash);
 
-    final id =
-        _stableHash('$channelId|${type.name}|$semesterId') & 0x7fffffff;
+    final id = _stableHash('$channelId|${type.name}|$semesterId') & 0x7fffffff;
 
     await _notifications.show(
       id: id,

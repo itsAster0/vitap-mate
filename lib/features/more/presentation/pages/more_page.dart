@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 
 class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
@@ -26,66 +27,70 @@ class MorePage extends HookConsumerWidget {
       GoRouter.of(context).pushNamed(Paths.vtopweb, extra: menuUrl);
     }
 
+    void push(String name) => GoRouter.of(context).pushNamed(name);
+
+    final tools = [
+      (FLucideIcons.clipboardList, 'Marks', 'Assessment scores', Paths.marks),
+      (FLucideIcons.graduationCap, 'Grades', 'This semester', Paths.grades),
+      (
+        FLucideIcons.history,
+        'Grade History',
+        'CGPA & all courses',
+        Paths.gradeHistory,
+      ),
+      (
+        FLucideIcons.calculator,
+        'GPA Planner',
+        'Project your CGPA',
+        Paths.gpaCalculator,
+      ),
+      (
+        FLucideIcons.calendarDays,
+        'Exams',
+        'Schedule & seats',
+        Paths.examSchedule,
+      ),
+      (
+        FLucideIcons.scanFace,
+        'Biometric',
+        'Entry logs',
+        Paths.biometricHistory,
+      ),
+    ];
+
     return SingleChildScrollView(
-      padding: EdgeInsets.all(4),
+      padding: const EdgeInsets.fromLTRB(
+        Space.sm,
+        Space.xs,
+        Space.sm,
+        Space.xl,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 12,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FTileGroup(
-            label: const Text("Academic Tools"),
-            divider: FItemDivider.indented,
+          const SectionHeader(title: 'Academics'),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: Space.sm + 2,
+            crossAxisSpacing: Space.sm + 2,
+            childAspectRatio: 1.45,
             children: [
-              FTile(
-                prefix: const Icon(FLucideIcons.clipboardList),
-                title: const Text('Marks'),
-                subtitle: const Text('View your marks'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => GoRouter.of(context).pushNamed(Paths.marks),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.graduationCap),
-                title: const Text('Grades'),
-                subtitle: const Text('View grades with detailed marks'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => GoRouter.of(context).pushNamed(Paths.grades),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.history),
-                title: const Text('Grade History'),
-                subtitle: const Text('View complete grade history'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () =>
-                    GoRouter.of(context).pushNamed(Paths.gradeHistory),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.calculator),
-                title: const Text('GPA / CGPA Calculator'),
-                subtitle: const Text('Plan your grades and project CGPA'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () =>
-                    GoRouter.of(context).pushNamed(Paths.gpaCalculator),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.calendarDays),
-                title: const Text('Exam Schedule'),
-                subtitle: const Text('View your exam schedule'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () =>
-                    GoRouter.of(context).pushNamed(Paths.examSchedule),
-              ),
-              FTile(
-                prefix: const Icon(Icons.fingerprint_rounded),
-                title: const Text('Biometric History'),
-                subtitle: const Text('View face and biometric entry logs'),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () =>
-                    GoRouter.of(context).pushNamed(Paths.biometricHistory),
-              ),
+              for (final (i, (icon, title, subtitle, route)) in tools.indexed)
+                EnterFade(
+                  index: i,
+                  child: _ToolTile(
+                    icon: icon,
+                    title: title,
+                    subtitle: subtitle,
+                    onPress: () => push(route),
+                  ),
+                ),
             ],
           ),
+          const SectionHeader(title: 'VTOP'),
           FTileGroup(
-            label: const Text("VTOP"),
             children: [
               FTile(
                 prefix: const Icon(FLucideIcons.externalLink),
@@ -102,14 +107,14 @@ class MorePage extends HookConsumerWidget {
                 onPress: () => openVtop(_coursePageUrl),
               ),
               FTile(
-                prefix: const Icon(FLucideIcons.anchor),
+                prefix: const Icon(FLucideIcons.doorOpen),
                 title: const Text("General Outing"),
                 subtitle: const Text("Open general outing in VTOP"),
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: () => openVtop(_generalOutingUrl),
               ),
               FTile(
-                prefix: const Icon(FLucideIcons.amphora),
+                prefix: const Icon(FLucideIcons.luggage),
                 title: const Text("Weekend Outing"),
                 subtitle: const Text("Open weekend outing in VTOP"),
                 suffix: const Icon(FLucideIcons.chevronRight),
@@ -118,8 +123,9 @@ class MorePage extends HookConsumerWidget {
             ],
           ),
           if (cookieBridgeAvailable == true)
+            const SectionHeader(title: 'Browser extension'),
+          if (cookieBridgeAvailable == true)
             FTileGroup(
-              label: const Text("Browser Extension"),
               children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.puzzle),
@@ -128,11 +134,65 @@ class MorePage extends HookConsumerWidget {
                     "Install VITAP Mate auto login on your computer",
                   ),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () =>
-                      GoRouter.of(context).pushNamed(Paths.chromeExtension),
+                  onPress: () => push(Paths.chromeExtension),
                 ),
               ],
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onPress,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Surface(
+      onPress: onPress,
+      semanticsLabel: title,
+      padding: const EdgeInsets.all(Space.md + 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: colors.app.accentTone.subtle,
+              borderRadius: BorderRadius.circular(Radii.sm + 2),
+            ),
+            child: Icon(icon, size: 18, color: colors.app.accentTone.onSubtle),
+          ),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: typography.body.md.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colors.foreground,
+            ),
+          ),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: typography.body.xs.copyWith(color: colors.mutedForeground),
+          ),
         ],
       ),
     );

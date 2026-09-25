@@ -15,4 +15,16 @@ void main() {
     expect(reset.getMaxScaleOnAxis(), 2);
     expect(original.getTranslation().x, -140);
   });
+
+  test('pdf recenter clears pan travel but keeps zoom', () {
+    final original = Matrix4.identity()
+      ..scaleByDouble(1.5, 1.5, 1, 1)
+      ..setTranslationRaw(-40, 963, 0);
+
+    final recentered = recenterPdf(original);
+
+    expect(recentered.getTranslation().x, 0);
+    expect(recentered.getTranslation().y, 0);
+    expect(recentered.getMaxScaleOnAxis(), 1.5);
+  });
 }

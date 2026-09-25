@@ -61,7 +61,10 @@ class DocumentViewerPage extends HookConsumerWidget {
         0,
         1,
       );
-      return TransformationController(m);
+      // A stale PDF offset can leave every page out of view; see recenterPdf.
+      return TransformationController(
+        doc.kind == DocKind.pdf ? recenterPdf(m) : m,
+      );
     }, [doc.id]);
     useEffect(() => transform.dispose, [transform]);
 
@@ -354,7 +357,9 @@ class _DocSurface extends HookConsumerWidget {
           bottom: 12,
           child: FTappable(
             onPress: () {
-              transform.value = resetHorizontalOffset(transform.value);
+              transform.value = doc.kind == DocKind.pdf
+                  ? recenterPdf(transform.value)
+                  : resetHorizontalOffset(transform.value);
               persist();
             },
             child: Container(

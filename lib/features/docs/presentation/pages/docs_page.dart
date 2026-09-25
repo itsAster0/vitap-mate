@@ -470,11 +470,11 @@ class _RecentDocumentPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visual = visualFor(doc);
+    final visual = visualFor(context, doc);
 
     return Container(
       decoration: BoxDecoration(
-        color: darkMode ? context.theme.colors.primaryForeground : Colors.white,
+        color: context.theme.colors.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.theme.colors.border),
         boxShadow: const [

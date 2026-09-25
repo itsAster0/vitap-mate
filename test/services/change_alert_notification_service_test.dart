@@ -30,7 +30,8 @@ void main() {
     test('notification id fits positive int32 range', () {
       const inputs = ['change_alerts_v1|marks|VL20262', 'x', ''];
       for (final input in inputs) {
-        final id = ChangeAlertNotificationService.stableHashForTest(input) &
+        final id =
+            ChangeAlertNotificationService.stableHashForTest(input) &
             0x7fffffff;
         expect(id, greaterThanOrEqualTo(0));
         expect(id, lessThanOrEqualTo(0x7fffffff));

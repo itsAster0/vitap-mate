@@ -1,16 +1,16 @@
 import 'dart:developer' show log;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show RefreshIndicator;
+import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/biometric_history_provider.dart';
-import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class BiometricHistoryPage extends ConsumerStatefulWidget {
@@ -89,399 +89,385 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     if (await isAutoRefreshEnabled(ref)) await _load();
   }
 
+  Future<void> _select(DateTime date) async {
+    setState(() => _selectedDate = date);
+    if (await isAutoRefreshEnabled(ref)) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final data = ref.watch(biometricHistoryProvider(_vtopDate(_selectedDate)));
+    final now = DateTime.now();
+    final isToday = _vtopDate(_selectedDate) == _vtopDate(now);
 
     return RefreshIndicator(
       onRefresh: _refresh,
-      displacement: 80,
-      backgroundColor: colors.primary,
-      color: colors.primaryForeground,
-      child: CustomScrollView(
+      backgroundColor: colors.background,
+      color: colors.foreground,
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
+        padding: const EdgeInsets.fromLTRB(
+          Space.sm,
+          Space.sm,
+          Space.sm,
+          Space.lg,
+        ),
+        children: [
+          // Last week as chips, plus a calendar for older dates.
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Builder(
+                    builder: (context) {
+                      final date = now.subtract(Duration(days: i));
+                      final selected =
+                          _vtopDate(date) == _vtopDate(_selectedDate);
+                      return Padding(
+                        padding: const EdgeInsets.only(right: Space.sm),
+                        child: _DateChip(
+                          label: i == 0
+                              ? 'Today'
+                              : i == 1
+                              ? 'Yesterday'
+                              : DateFormat('EEE d').format(date),
+                          selected: selected,
+                          onPress: () => _select(date),
+                        ),
+                      );
+                    },
+                  ),
+                _DateChip(
+                  label: 'Pick date',
+                  icon: FLucideIcons.calendarDays,
+                  selected: now.difference(_selectedDate).inDays >= 7,
+                  onPress: _pickDate,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          AnimatedSwitcher(
+            duration: Motion.medium,
+            child: data.when(
+              skipLoadingOnRefresh: true,
+              loading: () => const Column(
+                key: ValueKey('loading'),
+                children: [
+                  Skeleton(height: 72, radius: Radii.lg),
+                  SizedBox(height: Space.md),
+                  SkeletonList(count: 3, height: 64),
+                ],
+              ),
+              error: (error, _) => EmptyState(
+                key: const ValueKey('error'),
+                icon: FLucideIcons.cloudOff,
+                title: "Couldn't load biometric history",
+                message: commonErrorMessage(error),
+                action: FButton(
+                  variant: FButtonVariant.outline,
+                  mainAxisSize: MainAxisSize.min,
+                  onPress: _refresh,
+                  child: const Text('Try again'),
+                ),
+              ),
+              data: (data) {
+                final records = [...data.records]
+                  ..sort(
+                    (a, b) => _secondsOf(
+                      b.punchTime,
+                    ).compareTo(_secondsOf(a.punchTime)),
+                  );
+                return Column(
+                  key: ValueKey('data_${_vtopDate(_selectedDate)}'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (records.isEmpty)
+                      EmptyState(
+                        icon: FLucideIcons.scanFace,
+                        title: 'No punches',
+                        message:
+                            'No face or biometric logs on ${DateFormat('EEE d MMM').format(_selectedDate)}.',
+                      )
+                    else ...[
+                      _Status(latest: records.first, isToday: isToday),
+                      SectionHeader(
+                        title: DateFormat('EEEE, d MMMM').format(_selectedDate),
+                        trailing: Text(
+                          '${records.where((r) => _kindOf(r) == _Kind.entry).length} in · '
+                          '${records.where((r) => _kindOf(r) == _Kind.exit).length} out',
+                        ),
+                      ),
+                      Surface(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Space.md + 2,
+                          vertical: Space.sm,
+                        ),
+                        child: Column(
+                          children: [
+                            for (final (i, r) in records.indexed)
+                              _PunchRow(
+                                record: r,
+                                isFirst: i == 0,
+                                isLast: i == records.length - 1,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    DataUpdatedFooter(updateTime: data.updateTime.toInt()),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _Kind { entry, exit, other }
+
+_Kind _kindOf(BiometricRecord r) {
+  final venue = r.venue.toUpperCase();
+  if (venue.contains('-OUT-')) return _Kind.exit;
+  if (venue.contains('-IN-')) return _Kind.entry;
+  return _Kind.other;
+}
+
+/// "MH2-FACE-IN-5" → "MH2".
+String _placeOf(BiometricRecord r) => r.venue.split('-').first.trim();
+
+/// "13:16:05" → "13:16"; VTOP sometimes drops the minute's leading zero
+/// ("13:1"), so pad it.
+String _hm(String time) {
+  final parts = time.trim().split(':');
+  if (parts.length < 2) return time.trim();
+  return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+}
+
+/// Seconds since midnight, for ordering punches.
+int _secondsOf(String time) {
+  final p = time.trim().split(':').map((e) => int.tryParse(e) ?? 0).toList();
+  return (p.isNotEmpty ? p[0] : 0) * 3600 +
+      (p.length > 1 ? p[1] : 0) * 60 +
+      (p.length > 2 ? p[2] : 0);
+}
+
+class _Status extends StatelessWidget {
+  const _Status({required this.latest, required this.isToday});
+
+  final BiometricRecord latest;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final kind = _kindOf(latest);
+    final place = _placeOf(latest);
+    final tone = switch (kind) {
+      _Kind.entry => colors.app.success,
+      _Kind.exit => colors.app.warning,
+      _Kind.other => colors.app.accentTone,
+    };
+    final (title, detail) = isToday
+        ? switch (kind) {
+            _Kind.entry => ('Inside $place', 'since ${_hm(latest.punchTime)}'),
+            _Kind.exit => ('Out of $place', 'since ${_hm(latest.punchTime)}'),
+            _Kind.other => ('Last seen at $place', _hm(latest.punchTime)),
+          }
+        : (
+            'Last punch that day',
+            '${kind == _Kind.exit ? 'Exit' : 'Entry'} at $place, ${_hm(latest.punchTime)}',
+          );
+
+    return Surface(
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: tone.base,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: tone.base.withValues(alpha: 0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: typography.body.md.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colors.foreground,
+                  ),
+                ),
+                Text(
+                  detail,
+                  style: typography.body.sm.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PunchRow extends StatelessWidget {
+  const _PunchRow({
+    required this.record,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  final BiometricRecord record;
+  final bool isFirst;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final kind = _kindOf(record);
+    final (tone, label, icon) = switch (kind) {
+      _Kind.entry => (colors.app.success, 'ENTRY', FLucideIcons.logIn),
+      _Kind.exit => (colors.app.warning, 'EXIT', FLucideIcons.logOut),
+      _Kind.other => (colors.app.accentTone, 'PUNCH', FLucideIcons.scanFace),
+    };
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 48,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
+              padding: const EdgeInsets.only(top: Space.md),
+              child: Text(
+                _hm(record.punchTime),
+                style: typography.body.sm.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colors.foreground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 24,
+            child: Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                Positioned(
+                  top: isFirst ? 18 : 0,
+                  bottom: isLast ? null : 0,
+                  height: isLast ? 18 : null,
+                  child: Container(width: 1.5, color: colors.border),
+                ),
+                Positioned(
+                  top: 14,
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: tone.base,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: Space.sm + 2),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FTileGroup(
-                    children: [
-                      FTile(
-                        prefix: const Icon(FLucideIcons.calendarDays),
-                        title: const Text('Selected date'),
-                        subtitle: Text(
-                          DateFormat('EEEE, d MMMM yyyy').format(_selectedDate),
-                        ),
-                        suffix: const Icon(FLucideIcons.chevronDown),
-                        onPress: _pickDate,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: 7,
-                      separatorBuilder: (_, _) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final date = DateTime.now().subtract(
-                          Duration(days: index),
-                        );
-                        final selected =
-                            _vtopDate(date) == _vtopDate(_selectedDate);
-                        return FButton(
-                          variant: selected
-                              ? FButtonVariant.primary
-                              : FButtonVariant.outline,
-                          size: .sm,
-                          mainAxisSize: MainAxisSize.min,
-                          prefix: selected
-                              ? const Icon(FLucideIcons.check)
-                              : null,
-                          child: Text(
-                            index == 0
-                                ? 'Today'
-                                : DateFormat('EEE, d').format(date),
-                          ),
-                          onPress: () async {
-                            setState(() => _selectedDate = date);
-                            if (await isAutoRefreshEnabled(ref)) await _load();
-                          },
-                        );
-                      },
+                  ToneBadge(label: label, tone: tone, icon: icon),
+                  const SizedBox(height: Space.xs),
+                  Text(
+                    record.venue.trim(),
+                    style: typography.body.xs.copyWith(
+                      color: colors.mutedForeground,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          data.when(
-            loading: () => const SliverFillRemaining(
-              child: Center(child: SizedBox(width: 180, child: FProgress())),
-            ),
-            error: (error, _) => SliverFillRemaining(
-              child: _MessageState(
-                icon: FLucideIcons.cloudOff,
-                title: 'Could not load biometric history',
-                message: commonErrorMessage(error),
-                action: _refresh,
-              ),
-            ),
-            data: (data) => data.records.isEmpty
-                ? SliverFillRemaining(
-                    child: Column(
-                      children: [
-                        const Expanded(
-                          child: _MessageState(
-                            icon: FLucideIcons.fingerprint,
-                            title: 'No punches found',
-                            message:
-                                'There are no biometric or face logs for this date.',
-                          ),
-                        ),
-                        DataUpdatedFooter(
-                          updateTime: data.updateTime.toInt(),
-                          padding: const EdgeInsets.only(bottom: 16),
-                        ),
-                      ],
-                    ),
-                  )
-                : SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(0, 4, 0, 20),
-                    sliver: SliverList.list(
-                      children: [
-                        _Summary(records: data.records),
-                        const SizedBox(height: 10),
-                        _BiometricTable(
-                          records: data.records,
-                          darkMode: darkMode,
-                        ),
-                        DataUpdatedFooter(
-                          updateTime: data.updateTime.toInt(),
-                          padding: const EdgeInsets.only(top: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-          ),
         ],
       ),
     );
   }
 }
 
-class _Summary extends StatelessWidget {
-  const _Summary({required this.records});
-  final List<BiometricRecord> records;
-
-  @override
-  Widget build(BuildContext context) {
-    final inside = records
-        .where((e) => e.venue.toUpperCase().contains('-IN-'))
-        .length;
-    final outside = records
-        .where((e) => e.venue.toUpperCase().contains('-OUT-'))
-        .length;
-    return Row(
-      children: [
-        _Count(label: 'Total', value: records.length),
-        const SizedBox(width: 8),
-        _Count(label: 'Entries', value: inside),
-        const SizedBox(width: 8),
-        _Count(label: 'Exits', value: outside),
-      ],
-    );
-  }
-}
-
-class _Count extends StatelessWidget {
-  const _Count({required this.label, required this.value});
-  final String label;
-  final int value;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: context.theme.colors.primaryForeground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Column(
-        children: [
-          Text(
-            '$value',
-            style: context.theme.typography.body.xl.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _BiometricTable extends StatelessWidget {
-  const _BiometricTable({required this.records, required this.darkMode});
-
-  final List<BiometricRecord> records;
-  final bool darkMode;
-
-  String _type(BiometricRecord record) {
-    final venue = record.venue.toUpperCase();
-    if (venue.contains('-OUT-')) return 'Exit';
-    if (venue.contains('-IN-')) return 'Entry';
-    return 'Punch';
-  }
-
-  String _time(String value) =>
-      value.split(':').map((part) => part.padLeft(2, '0')).join(':');
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = darkMode
-        ? context.theme.colors.primary
-        : MoreColors.secondaryText;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: darkMode
-            ? context.theme.colors.primaryForeground
-            : MoreColors.tableBackground,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-            color: MoreColors.cardShadowSecondary,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            dividerThickness: darkMode ? 0 : 1,
-            headingRowColor: WidgetStatePropertyAll(
-              darkMode
-                  ? context.theme.colors.primaryForeground
-                  : MoreColors.tableHeaderBackground,
-            ),
-            headingRowHeight: 56,
-            dataRowMinHeight: 48,
-            dataRowMaxHeight: 64,
-            columnSpacing: 24,
-            horizontalMargin: 16,
-            columns: [
-              _column('#', textColor, numeric: true),
-              _column('Date', textColor),
-              _column('Time', textColor),
-              _column('Type', textColor),
-              _column('Venue', textColor),
-            ],
-            rows: records.asMap().entries.map((entry) {
-              final record = entry.value;
-              final type = _type(record);
-              final isEven = entry.key.isEven;
-              return DataRow(
-                color: WidgetStatePropertyAll(
-                  darkMode || isEven
-                      ? Colors.transparent
-                      : MoreColors.tableRowAlternate,
-                ),
-                cells: [
-                  _cell(record.serial, textColor, numeric: true),
-                  _cell(record.punchDate, textColor),
-                  _cell(_time(record.punchTime), textColor, numeric: true),
-                  DataCell(_TypeBadge(type: type)),
-                  _cell(record.venue, textColor),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  DataColumn _column(String label, Color color, {bool numeric = false}) {
-    return DataColumn(
-      numeric: numeric,
-      label: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  DataCell _cell(String value, Color color, {bool numeric = false}) {
-    return DataCell(
-      Text(
-        value,
-        style: TextStyle(
-          color: color,
-          fontSize: 13,
-          fontWeight: numeric ? FontWeight.w600 : FontWeight.w400,
-          fontFeatures: numeric ? const [FontFeature.tabularFigures()] : null,
-        ),
-      ),
-    );
-  }
-}
-
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge({required this.type});
-
-  final String type;
-
-  @override
-  Widget build(BuildContext context) {
-    final isExit = type == 'Exit';
-    final isEntry = type == 'Entry';
-    final color = isExit
-        ? MoreColors.errorText
-        : isEntry
-        ? MoreColors.successText
-        : MoreColors.infoText;
-    final background = isExit
-        ? MoreColors.errorBackground
-        : isEntry
-        ? MoreColors.successBackground
-        : MoreColors.infoBackground;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isExit
-                ? FLucideIcons.logOut
-                : isEntry
-                ? FLucideIcons.logIn
-                : FLucideIcons.fingerprint,
-            size: 12,
-            color: color,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            type,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageState extends StatelessWidget {
-  const _MessageState({
-    required this.icon,
-    required this.title,
-    required this.message,
-    this.action,
+class _DateChip extends StatelessWidget {
+  const _DateChip({
+    required this.label,
+    required this.selected,
+    required this.onPress,
+    this.icon,
   });
-  final IconData icon;
-  final String title;
-  final String message;
-  final Future<void> Function()? action;
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPress;
+  final IconData? icon;
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 52, color: context.theme.colors.mutedForeground),
-          const SizedBox(height: 14),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.theme.colors.mutedForeground),
-          ),
-          if (action != null) ...[
-            const SizedBox(height: 16),
-            FButton(
-              onPress: action,
-              prefix: const Icon(FLucideIcons.refreshCw),
-              child: const Text('Try again'),
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final fg = selected ? colors.primaryForeground : colors.foreground;
+    return PressScale(
+      scale: 0.95,
+      semanticsLabel: label,
+      onPress: onPress,
+      child: AnimatedContainer(
+        duration: Motion.medium,
+        padding: const EdgeInsets.symmetric(horizontal: Space.md),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? colors.primary : colors.card,
+          borderRadius: BorderRadius.circular(Radii.pill),
+          border: Border.all(color: selected ? colors.primary : colors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: Space.xs + 2),
+            ],
+            Text(
+              label,
+              style: context.theme.typography.body.sm.copyWith(
+                fontWeight: FontWeight.w500,
+                color: fg,
+              ),
             ),
           ],
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

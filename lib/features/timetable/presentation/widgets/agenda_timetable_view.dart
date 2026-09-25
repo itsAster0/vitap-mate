@@ -1,136 +1,218 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum AgendaClassStatus { completed, current, next, upcoming }
 
+/// Day view of the timetable: a live "now / next" panel on top of the day's
+/// schedule, with attendance guidance on every class.
 class AgendaTimetableView extends HookWidget {
   const AgendaTimetableView({
     super.key,
     required this.selectedDay,
     required this.classDays,
-    required this.slots,
+    required this.slotsForDay,
+    this.attendance = const [],
   });
 
+  /// ISO weekday (1 = Monday) being shown.
   final ValueNotifier<int> selectedDay;
   final Set<int> classDays;
-  final List<TimetableSlot> slots;
+  final List<TimetableSlot> Function(int weekday) slotsForDay;
+  final List<AttendanceRecord> attendance;
 
   @override
   Widget build(BuildContext context) {
     final now = useState(DateTime.now());
     useEffect(() {
-      final timer = Timer.periodic(
-        const Duration(minutes: 1),
-        (_) => now.value = DateTime.now(),
-      );
-      return timer.cancel;
+      // Status changes on minute boundaries; sync the first tick to one.
+      Timer? periodic;
+      final first = Timer(Duration(seconds: 60 - DateTime.now().second), () {
+        now.value = DateTime.now();
+        periodic = Timer.periodic(
+          const Duration(minutes: 1),
+          (_) => now.value = DateTime.now(),
+        );
+      });
+      return () {
+        first.cancel();
+        periodic?.cancel();
+      };
     }, const []);
 
-    final sortedSlots = [...slots]
-      ..sort((a, b) => _minutes(a.startTime).compareTo(_minutes(b.startTime)));
+    final slots = slotsForDay(selectedDay.value);
     final weekDates = _weekDates(now.value);
     final selectedDate = weekDates[selectedDay.value - 1];
     final isToday = selectedDay.value == now.value.weekday;
+    final minuteNow = _timeOfDay(now.value);
+
     final current = isToday
-        ? sortedSlots.cast<TimetableSlot?>().firstWhere(
-            (slot) =>
-                slot != null &&
-                _minutes(slot.startTime) <= _timeOfDay(now.value) &&
-                _minutes(slot.endTime) > _timeOfDay(now.value),
-            orElse: () => null,
+        ? _firstWhereOrNull(
+            slots,
+            (s) =>
+                minutesOf(s.startTime) <= minuteNow &&
+                minutesOf(s.endTime) > minuteNow,
           )
         : null;
-    final next = sortedSlots.cast<TimetableSlot?>().firstWhere(
-      (slot) =>
-          slot != null &&
-          (!isToday || _minutes(slot.startTime) > _timeOfDay(now.value)),
-      orElse: () => null,
+    final next = _firstWhereOrNull(
+      slots,
+      (s) => !isToday || minutesOf(s.startTime) > minuteNow,
     );
+    final remaining = isToday
+        ? slots.where((s) => minutesOf(s.endTime) > minuteNow).length
+        : slots.length;
+
+    // Previous day index tells the switcher which way to slide.
+    final previousDay = usePrevious(selectedDay.value) ?? selectedDay.value;
+    final forward = selectedDay.value >= previousDay;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DateHeading(date: selectedDate, isToday: isToday),
-          const SizedBox(height: 14),
+          _DateHeading(
+            date: selectedDate,
+            isToday: isToday,
+            slots: slots,
+            onToday: () => selectedDay.value = now.value.weekday,
+          ),
+          const SizedBox(height: Space.lg),
           _WeekStrip(
             dates: weekDates,
+            today: now.value.weekday,
             selectedDay: selectedDay,
             classDays: classDays,
           ),
-          const SizedBox(height: 14),
-          _PriorityPanel(
-            current: current,
-            next: next,
-            now: now.value,
-            isToday: isToday,
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  isToday ? "Today's timetable" : 'Timetable',
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    color: context.theme.colors.foreground,
+          const SizedBox(height: Space.lg),
+          AnimatedSwitcher(
+            duration: Motion.slow,
+            // Old day fades out in the first third, new day fades in after,
+            // so the two never overlap.
+            switchInCurve: const Interval(0.35, 1, curve: Curves.easeOutCubic),
+            switchOutCurve: const Interval(0.65, 1, curve: Curves.easeIn),
+            transitionBuilder: (child, animation) {
+              final incoming = child.key == ValueKey(selectedDay.value);
+              final dx = (incoming == forward ? 1 : -1) * 0.04;
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween(
+                    begin: Offset(dx, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            layoutBuilder: (currentChild, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [...previous, ?currentChild],
+            ),
+            child: Column(
+              key: ValueKey(selectedDay.value),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _FocusPanel(
+                  current: current,
+                  next: next,
+                  now: now.value,
+                  isToday: isToday,
+                  slots: slots,
+                  attendance: attendance,
+                  upcomingDay: slots.isEmpty || (isToday && next == null)
+                      ? _nextClassDay(selectedDay.value)
+                      : null,
+                ),
+                if (slots.isNotEmpty)
+                  SectionHeader(
+                    title: isToday ? 'Today' : 'Schedule',
+                    trailing: Text(
+                      slots.isEmpty
+                          ? ''
+                          : isToday && remaining < slots.length
+                          ? '$remaining of ${slots.length} left'
+                          : '${slots.length} ${slots.length == 1 ? 'class' : 'classes'}',
+                    ),
                   ),
-                ),
-              ),
-              Text(
-                '${sortedSlots.length} ${sortedSlots.length == 1 ? 'class' : 'classes'}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: context.theme.colors.mutedForeground,
-                ),
-              ),
-            ],
+                for (var i = 0; i < slots.length; i++) ...[
+                  if (i > 0)
+                    _BreakRow(
+                      previousEnd: slots[i - 1].endTime,
+                      nextStart: slots[i].startTime,
+                      isNow:
+                          isToday &&
+                          minutesOf(slots[i - 1].endTime) <= minuteNow &&
+                          minutesOf(slots[i].startTime) > minuteNow,
+                    ),
+                  EnterFade(
+                    index: i,
+                    child: _ClassRow(
+                      slot: slots[i],
+                      status: _statusFor(
+                        slots[i],
+                        current,
+                        next,
+                        minuteNow,
+                        isToday,
+                      ),
+                      record: attendanceForSlot(attendance, slots[i]),
+                      isFirst: i == 0,
+                      isLast: i == slots.length - 1,
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          if (sortedSlots.isEmpty)
-            const _EmptyDay()
-          else
-            for (var index = 0; index < sortedSlots.length; index++) ...[
-              if (index > 0)
-                _BreakRow(
-                  previousEnd: sortedSlots[index - 1].endTime,
-                  nextStart: sortedSlots[index].startTime,
-                ),
-              _AgendaClassCard(
-                slot: sortedSlots[index],
-                status: _statusFor(
-                  sortedSlots[index],
-                  current,
-                  next,
-                  now.value,
-                  isToday,
-                ),
-              ),
-            ],
         ],
       ),
     );
   }
+
+  /// The next weekday after [from] that has classes, with its first class.
+  ({int weekday, TimetableSlot first})? _nextClassDay(int from) {
+    for (var offset = 1; offset <= 7; offset++) {
+      final day = (from - 1 + offset) % 7 + 1;
+      final slots = slotsForDay(day);
+      if (slots.isNotEmpty) return (weekday: day, first: slots.first);
+    }
+    return null;
+  }
 }
 
 class _DateHeading extends StatelessWidget {
-  const _DateHeading({required this.date, required this.isToday});
+  const _DateHeading({
+    required this.date,
+    required this.isToday,
+    required this.slots,
+    required this.onToday,
+  });
 
   final DateTime date;
   final bool isToday;
+  final List<TimetableSlot> slots;
+  final VoidCallback onToday;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final summary = [
+      DateFormat('d MMMM').format(date),
+      if (slots.isNotEmpty)
+        '${to12H(slots.first.startTime, context)} – ${to12H(slots.last.endTime, context)}',
+    ].join('  ·  ');
+
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
@@ -138,40 +220,39 @@ class _DateHeading extends StatelessWidget {
             children: [
               Text(
                 DateFormat('EEEE').format(date),
-                style: TextStyle(
-                  fontSize: 27,
+                style: typography.display.xl3.copyWith(
                   height: 1.05,
                   fontWeight: FontWeight.w800,
-                  color: context.theme.colors.foreground,
+                  letterSpacing: -0.5,
+                  color: colors.foreground,
                 ),
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: Space.xs),
               Text(
-                DateFormat('d MMMM y').format(date),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: context.theme.colors.mutedForeground,
+                summary,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: typography.body.sm.copyWith(
+                  color: colors.mutedForeground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
           ),
         ),
-        if (isToday)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: context.theme.colors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              'TODAY',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: context.theme.colors.primary,
-              ),
-            ),
-          ),
+        AnimatedSwitcher(
+          duration: Motion.medium,
+          child: isToday
+              ? const SizedBox.shrink()
+              : FButton(
+                  variant: FButtonVariant.outline,
+                  size: FButtonSizeVariant.sm,
+                  mainAxisSize: MainAxisSize.min,
+                  prefix: const Icon(FLucideIcons.undo2),
+                  onPress: onToday,
+                  child: const Text('Today'),
+                ),
+        ),
       ],
     );
   }
@@ -180,79 +261,102 @@ class _DateHeading extends StatelessWidget {
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip({
     required this.dates,
+    required this.today,
     required this.selectedDay,
     required this.classDays,
   });
 
   final List<DateTime> dates;
+  final int today;
   final ValueNotifier<int> selectedDay;
   final Set<int> classDays;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.theme.colors;
     return Row(
       children: [
         for (var index = 0; index < dates.length; index++)
           Expanded(
-            child: FTappable(
-              semanticsLabel: DateFormat('EEEE, d MMMM').format(dates[index]),
-              selected: selectedDay.value == index + 1,
-              onPress: () => selectedDay.value = index + 1,
-              builder: (context, variants, child) => AnimatedScale(
-                scale: variants.contains(FTappableVariant.pressed) ? 0.96 : 1,
-                duration: const Duration(milliseconds: 100),
-                child: child,
-              ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                height: 68,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: selectedDay.value == index + 1
-                      ? context.theme.colors.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      DateFormat('EEE').format(dates[index]).toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: selectedDay.value == index + 1
-                            ? context.theme.colors.primaryForeground
-                            : context.theme.colors.mutedForeground,
+            child: Builder(
+              builder: (context) {
+                final day = index + 1;
+                final selected = selectedDay.value == day;
+                final isToday = today == day;
+                final fg = selected
+                    ? colors.primaryForeground
+                    : isToday
+                    ? colors.app.accent
+                    : colors.foreground;
+                return PressScale(
+                  scale: 0.94,
+                  semanticsLabel: DateFormat(
+                    'EEEE, d MMMM',
+                  ).format(dates[index]),
+                  onPress: () => selectedDay.value = day,
+                  child: AnimatedContainer(
+                    duration: Motion.medium,
+                    curve: Curves.easeOutCubic,
+                    height: 64,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? colors.primary
+                          : const Color(0x00000000),
+                      borderRadius: BorderRadius.circular(Radii.md),
+                      border: Border.all(
+                        color: selected
+                            ? colors.primary
+                            : isToday
+                            ? colors.app.accent.withValues(alpha: 0.5)
+                            : const Color(0x00000000),
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${dates[index].day}',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: selectedDay.value == index + 1
-                            ? context.theme.colors.primaryForeground
-                            : context.theme.colors.foreground,
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          DateFormat('EEE').format(dates[index]).toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 0.6,
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? colors.primaryForeground.withValues(
+                                    alpha: 0.7,
+                                  )
+                                : colors.mutedForeground,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${dates[index].day}',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            color: fg,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        AnimatedContainer(
+                          duration: Motion.medium,
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: !classDays.contains(day)
+                                ? const Color(0x00000000)
+                                : selected
+                                ? colors.primaryForeground
+                                : colors.mutedForeground,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: classDays.contains(index + 1)
-                            ? (selectedDay.value == index + 1
-                                  ? context.theme.colors.primaryForeground
-                                  : context.theme.colors.primary)
-                            : context.theme.colors.border,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
           ),
       ],
@@ -260,41 +364,69 @@ class _WeekStrip extends StatelessWidget {
   }
 }
 
-class _PriorityPanel extends StatelessWidget {
-  const _PriorityPanel({
+/// The card at the top: what's happening now and what's next, or a summary
+/// when the day hasn't started / is over / is free.
+class _FocusPanel extends StatelessWidget {
+  const _FocusPanel({
     required this.current,
     required this.next,
     required this.now,
     required this.isToday,
+    required this.slots,
+    required this.attendance,
+    required this.upcomingDay,
   });
 
   final TimetableSlot? current;
   final TimetableSlot? next;
   final DateTime now;
   final bool isToday;
+  final List<TimetableSlot> slots;
+  final List<AttendanceRecord> attendance;
+  final ({int weekday, TimetableSlot first})? upcomingDay;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+
+    // Day is over, or there's nothing today: point at the next class day.
     if (current == null && next == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: _panelDecoration(context),
+      final upcoming = upcomingDay;
+      return Surface(
         child: Row(
           children: [
-            Icon(
-              FLucideIcons.circleCheckBig,
-              color: context.theme.colors.primary,
+            _IconTile(
+              icon: slots.isEmpty
+                  ? FLucideIcons.sunMedium
+                  : FLucideIcons.circleCheckBig,
+              tone: slots.isEmpty ? colors.app.accentTone : colors.app.success,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: Space.md),
             Expanded(
-              child: Text(
-                isToday ? 'Classes finished for today' : 'No classes scheduled',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: context.theme.colors.foreground,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    slots.isEmpty ? 'Free day' : "You're done for today",
+                    style: context.theme.typography.body.md.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.foreground,
+                    ),
+                  ),
+                  if (upcoming != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_dayLabel(upcoming.weekday, now)} starts '
+                      '${to12H(upcoming.first.startTime, context)} · '
+                      '${upcoming.first.name}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.theme.typography.body.sm.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -302,157 +434,209 @@ class _PriorityPanel extends StatelessWidget {
       );
     }
 
-    return Container(
-      decoration: _panelDecoration(context),
+    return Surface(
+      padding: EdgeInsets.zero,
+      borderColor: current != null
+          ? colors.app.accent.withValues(alpha: 0.45)
+          : null,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (current != null)
-            _PriorityClass(
+            _FocusClass(
               slot: current!,
-              label: 'NOW',
-              detail:
-                  '${_minutes(current!.endTime) - _timeOfDay(now)} MIN LEFT',
-              emphasized: true,
+              badge: ToneBadge(
+                label: 'NOW',
+                tone: colors.app.accentTone,
+                solid: true,
+              ),
+              countdown: _Countdown(
+                target: _at(now, current!.endTime),
+                prefix: 'Ends in',
+              ),
+              progress:
+                  (_timeOfDay(now) - minutesOf(current!.startTime)) /
+                  (minutesOf(current!.endTime) - minutesOf(current!.startTime)),
+              record: attendanceForSlot(attendance, current!),
+              large: true,
             ),
-          if (current != null && next != null)
-            Divider(height: 1, color: context.theme.colors.border),
-          if (next != null)
-            _PriorityClass(
+          if (current != null && next != null) ...[
+            Container(height: 1, color: colors.border),
+            _NextStrip(slot: next!, now: now),
+          ],
+          if (current == null && next != null)
+            _FocusClass(
               slot: next!,
-              label: current == null ? 'NEXT' : 'UP NEXT',
-              detail: isToday
-                  ? _startsIn(next!, now)
-                  : _formatRange(context, next!),
-              emphasized: current == null,
+              badge: ToneBadge(
+                label: isToday ? 'NEXT' : 'FIRST CLASS',
+                tone: colors.app.accentTone,
+              ),
+              countdown: isToday
+                  ? _Countdown(
+                      target: _at(now, next!.startTime),
+                      prefix: 'Starts in',
+                    )
+                  : null,
+              record: attendanceForSlot(attendance, next!),
+              large: true,
             ),
         ],
       ),
     );
   }
-
-  BoxDecoration _panelDecoration(BuildContext context) => BoxDecoration(
-    color: context.theme.colors.background,
-    borderRadius: BorderRadius.circular(18),
-    border: Border.all(color: context.theme.colors.border),
-    boxShadow: [
-      BoxShadow(
-        color: Colors.black.withValues(alpha: 0.045),
-        blurRadius: 14,
-        offset: const Offset(0, 5),
-      ),
-    ],
-  );
 }
 
-class _PriorityClass extends StatelessWidget {
-  const _PriorityClass({
+class _FocusClass extends StatelessWidget {
+  const _FocusClass({
     required this.slot,
-    required this.label,
-    required this.detail,
-    required this.emphasized,
+    required this.badge,
+    required this.record,
+    this.countdown,
+    this.progress,
+    this.large = false,
   });
 
   final TimetableSlot slot;
-  final String label;
-  final String detail;
-  final bool emphasized;
+  final Widget badge;
+  final Widget? countdown;
+  final double? progress;
+  final AttendanceRecord? record;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Padding(
+      padding: const EdgeInsets.all(Space.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 5,
-            decoration: BoxDecoration(
-              color: emphasized
-                  ? context.theme.colors.primary
-                  : const Color(0xFF6D55C5),
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(18),
+          Row(
+            children: [
+              badge,
+              const SizedBox(width: Space.sm),
+              if (countdown != null) Expanded(child: countdown!),
+              if (countdown == null) const Spacer(),
+              Text(
+                '${to12H(slot.startTime, context)} – ${to12H(slot.endTime, context)}',
+                style: typography.body.xs.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.mutedForeground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: Space.md),
+          Text(
+            slot.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: typography.body.xl.copyWith(
+              height: 1.2,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+              color: colors.foreground,
             ),
           ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(15, 14, 14, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _StatusBadge(label: label, emphasized: emphasized),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          detail,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: emphasized
-                                ? context.theme.colors.primary
-                                : context.theme.colors.mutedForeground,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        _formatRange(context, slot),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.theme.colors.foreground,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 9),
-                  Text(
-                    slot.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: emphasized ? 18 : 16,
-                      height: 1.15,
-                      fontWeight: FontWeight.w700,
-                      color: context.theme.colors.foreground,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    slot.courseCode,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: context.theme.colors.mutedForeground,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Row(
-                    children: [
-                      Icon(
-                        FLucideIcons.mapPin,
-                        size: 15,
-                        color: context.theme.colors.primary,
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          '${slot.block} · Room ${slot.roomNo} · Slot ${slot.slot}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: context.theme.colors.foreground,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+          const SizedBox(height: Space.sm),
+          _MetaLine(
+            icon: FLucideIcons.mapPin,
+            text: '${slot.block} · Room ${slot.roomNo}',
+            emphasize: true,
+          ),
+          if (slot.faculty.trim().isNotEmpty) ...[
+            const SizedBox(height: Space.xs),
+            _MetaLine(icon: FLucideIcons.user, text: facultyName(slot.faculty)),
+          ],
+          const SizedBox(height: Space.md),
+          Row(
+            children: [
+              CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+              const SizedBox(width: Space.sm),
+              Text(
+                '${slot.courseCode} · Slot ${slot.slot}',
+                style: typography.body.xs.copyWith(
+                  color: colors.mutedForeground,
+                ),
               ),
+            ],
+          ),
+          if (record != null) ...[
+            const SizedBox(height: Space.sm),
+            _AttendanceBadge(record: record!),
+          ],
+          if (progress != null) ...[
+            const SizedBox(height: Space.md),
+            ProgressBar(value: progress!, color: colors.app.accent, height: 4),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact "up next" line under the current class.
+class _NextStrip extends StatelessWidget {
+  const _NextStrip({required this.slot, required this.now});
+
+  final TimetableSlot slot;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final gap = minutesOf(slot.startTime) - _timeOfDay(now);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Space.lg,
+        Space.md,
+        Space.lg,
+        Space.md,
+      ),
+      child: Row(
+        children: [
+          Text(
+            'NEXT',
+            style: typography.body.xs.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: colors.app.accentTone.onSubtle,
+            ),
+          ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  slot.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.sm.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colors.foreground,
+                  ),
+                ),
+                Text(
+                  '${to12H(slot.startTime, context)} · Room ${slot.roomNo}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.xs.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: Space.sm),
+          Text(
+            gap <= 0 ? 'now' : 'in ${formatMinutes(gap)}',
+            style: typography.body.xs.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colors.mutedForeground,
             ),
           ),
         ],
@@ -461,78 +645,154 @@ class _PriorityClass extends StatelessWidget {
   }
 }
 
-class _AgendaClassCard extends StatelessWidget {
-  const _AgendaClassCard({required this.slot, required this.status});
+/// Live h:mm:ss countdown to [target]; ticks once a second on its own so the
+/// rest of the view doesn't rebuild.
+class _Countdown extends HookWidget {
+  const _Countdown({required this.target, required this.prefix});
 
-  final TimetableSlot slot;
-  final AgendaClassStatus status;
+  final DateTime target;
+  final String prefix;
 
   @override
   Widget build(BuildContext context) {
-    final accent = switch (status) {
-      AgendaClassStatus.current => context.theme.colors.primary,
-      AgendaClassStatus.next => const Color(0xFF6D55C5),
-      AgendaClassStatus.completed => const Color(0xFF7A8A99),
-      AgendaClassStatus.upcoming => const Color(0xFF168C91),
-    };
-    final label = switch (status) {
-      AgendaClassStatus.current => 'NOW',
-      AgendaClassStatus.next => 'NEXT',
-      AgendaClassStatus.completed => 'DONE',
-      AgendaClassStatus.upcoming => 'UPCOMING',
-    };
+    final now = useState(DateTime.now());
+    useEffect(() {
+      final timer = Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => now.value = DateTime.now(),
+      );
+      return timer.cancel;
+    }, const []);
+    final left = target.difference(now.value);
+    final seconds = left.isNegative ? 0 : left.inSeconds;
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final s = seconds % 60;
+    String two(int v) => v.toString().padLeft(2, '0');
+    final value = h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
 
-    return Opacity(
-      opacity: status == AgendaClassStatus.completed ? 0.72 : 1,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Semantics(
+      liveRegion: false,
+      label: '$prefix ${h > 0 ? '$h hours ' : ''}$m minutes',
+      child: ExcludeSemantics(
+        child: Text.rich(
+          TextSpan(
             children: [
-              SizedBox(
-                width: 66,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 14, right: 10),
-                  child: Text(
-                    '${_formatTime(context, slot.startTime)}\n${_formatTime(context, slot.endTime)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 11,
-                      height: 1.55,
-                      fontWeight: status == AgendaClassStatus.current
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                      color: status == AgendaClassStatus.current
-                          ? context.theme.colors.primary
-                          : context.theme.colors.mutedForeground,
-                    ),
+              TextSpan(text: '$prefix '),
+              TextSpan(
+                text: value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: context.theme.colors.foreground,
+                ),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: context.theme.typography.body.xs.copyWith(
+            color: context.theme.colors.mutedForeground,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassRow extends HookWidget {
+  const _ClassRow({
+    required this.slot,
+    required this.status,
+    required this.record,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  final TimetableSlot slot;
+  final AgendaClassStatus status;
+  final AttendanceRecord? record;
+  final bool isFirst;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final done = status == AgendaClassStatus.completed;
+    final live = status == AgendaClassStatus.current;
+    final expanded = useState(false);
+    final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
+    final creditValue = double.tryParse(slot.credits.trim());
+    final credits = creditValue == null || creditValue <= 0
+        ? ''
+        : creditValue == creditValue.roundToDouble()
+        ? creditValue.toStringAsFixed(0)
+        : creditValue.toString();
+
+    return AnimatedOpacity(
+      duration: Motion.slow,
+      opacity: done ? 0.55 : 1,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 62,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topRight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        to12H(slot.startTime, context),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: typography.body.xs.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: live ? colors.app.accent : colors.foreground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      Text(
+                        to12H(slot.endTime, context),
+                        maxLines: 1,
+                        softWrap: false,
+                        style: typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              Container(
-                width: 2,
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                color: context.theme.colors.border,
-              ),
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(left: 10),
-                  padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
-                  decoration: BoxDecoration(
-                    color: Color.alphaBlend(
-                      accent.withValues(alpha: 0.055),
-                      context.theme.colors.background,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: context.theme.colors.border),
-                    boxShadow: [
-                      BoxShadow(color: accent, offset: const Offset(-4, 0)),
-                    ],
+            ),
+            _Rail(status: status, isFirst: isFirst, isLast: isLast),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                child: Surface(
+                  onPress: () => expanded.value = !expanded.value,
+                  semanticsLabel:
+                      '${slot.name}, ${expanded.value ? 'collapse' : 'show details'}',
+                  padding: const EdgeInsets.fromLTRB(
+                    Space.md + 2,
+                    Space.md,
+                    Space.md,
+                    Space.md,
                   ),
+                  borderColor: live
+                      ? colors.app.accent.withValues(alpha: 0.45)
+                      : null,
+                  color: live ? colors.app.accentTone.subtle : null,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Line 1: name + status
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -541,147 +801,99 @@ class _AgendaClassCard extends StatelessWidget {
                               slot.name,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 15,
-                                height: 1.15,
-                                fontWeight: FontWeight.w700,
-                                color: context.theme.colors.foreground,
+                              style: typography.body.md.copyWith(
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                                color: colors.foreground,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          _StatusBadge(
-                            label: label,
-                            emphasized: status == AgendaClassStatus.current,
-                            color: accent,
-                          ),
+                          if (live || status == AgendaClassStatus.next) ...[
+                            const SizedBox(width: Space.sm),
+                            ToneBadge(
+                              label: live ? 'NOW' : 'NEXT',
+                              tone: colors.app.accentTone,
+                              solid: live,
+                            ),
+                          ],
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${slot.courseCode} · Slot ${slot.slot}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: context.theme.colors.mutedForeground,
-                        ),
-                      ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: Space.sm),
+                      // Line 2: kind · code · room
                       Row(
                         children: [
-                          Icon(FLucideIcons.mapPin, size: 14, color: accent),
-                          const SizedBox(width: 5),
+                          CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+                          const SizedBox(width: Space.sm),
                           Expanded(
                             child: Text(
                               '${slot.block} · Room ${slot.roomNo}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.theme.colors.foreground,
+                              style: typography.body.xs.copyWith(
+                                color: colors.mutedForeground,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            slot.kind == ClassKind.lab ? 'LAB' : 'THEORY',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                              color: accent,
+                          AnimatedRotation(
+                            turns: expanded.value ? 0.5 : 0,
+                            duration: Motion.medium,
+                            child: Icon(
+                              FLucideIcons.chevronDown,
+                              size: 16,
+                              color: colors.mutedForeground,
                             ),
                           ),
                         ],
                       ),
+                      // Line 3: attendance
+                      if (record != null) ...[
+                        const SizedBox(height: Space.sm),
+                        _AttendanceBadge(record: record!),
+                      ],
+                      AnimatedSize(
+                        duration: Motion.medium,
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: expanded.value
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: Space.md),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(height: 1, color: colors.border),
+                                    const SizedBox(height: Space.md),
+                                    if (slot.faculty.trim().isNotEmpty) ...[
+                                      _MetaLine(
+                                        icon: FLucideIcons.user,
+                                        text: facultyName(slot.faculty),
+                                      ),
+                                      const SizedBox(height: Space.xs + 2),
+                                    ],
+                                    _MetaLine(
+                                      icon: FLucideIcons.hash,
+                                      text:
+                                          '${slot.courseCode} · Slot ${slot.slot}',
+                                    ),
+                                    const SizedBox(height: Space.xs + 2),
+                                    _MetaLine(
+                                      icon: FLucideIcons.clock,
+                                      text: formatMinutes(minutes),
+                                    ),
+                                    if (credits.isNotEmpty) ...[
+                                      const SizedBox(height: Space.xs + 2),
+                                      _MetaLine(
+                                        icon: FLucideIcons.award,
+                                        text: '$credits credits',
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              )
+                            : const SizedBox(width: double.infinity),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({
-    required this.label,
-    required this.emphasized,
-    this.color,
-  });
-
-  final String label;
-  final bool emphasized;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final badgeColor =
-        color ??
-        (emphasized ? context.theme.colors.primary : const Color(0xFF6D55C5));
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-      decoration: BoxDecoration(
-        color: emphasized ? badgeColor : badgeColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(7),
-        border: emphasized ? null : Border.all(color: badgeColor),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w800,
-          color: emphasized
-              ? context.theme.colors.primaryForeground
-              : badgeColor,
-        ),
-      ),
-    );
-  }
-}
-
-class _BreakRow extends StatelessWidget {
-  const _BreakRow({required this.previousEnd, required this.nextStart});
-
-  final String previousEnd;
-  final String nextStart;
-
-  @override
-  Widget build(BuildContext context) {
-    final gap = _minutes(nextStart) - _minutes(previousEnd);
-    if (gap <= 0) return const SizedBox.shrink();
-    final hours = gap ~/ 60;
-    final minutes = gap.remainder(60);
-    final duration = [
-      if (hours > 0) '$hours hr',
-      if (minutes > 0) '$minutes min',
-    ].join(' ');
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(78, 4, 0, 4),
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF59E0B).withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: const Color(0xFFF59E0B).withValues(alpha: 0.22),
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(FLucideIcons.coffee, size: 15, color: Color(0xFF9A5B00)),
-            const SizedBox(width: 8),
-            Text(
-              '$duration break',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF7A4A00),
               ),
             ),
           ],
@@ -691,41 +903,64 @@ class _BreakRow extends StatelessWidget {
   }
 }
 
-class _EmptyDay extends StatelessWidget {
-  const _EmptyDay();
+/// Timeline rail: a line through a dot marking each class's status.
+class _Rail extends StatelessWidget {
+  const _Rail({
+    required this.status,
+    required this.isFirst,
+    required this.isLast,
+  });
+
+  final AgendaClassStatus status;
+  final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 34),
-      decoration: BoxDecoration(
-        color: context.theme.colors.background,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Column(
+    final colors = context.theme.colors;
+    final accent = colors.app.accent;
+    final dot = switch (status) {
+      AgendaClassStatus.current => accent,
+      AgendaClassStatus.completed => colors.mutedForeground,
+      _ => colors.background,
+    };
+    final ring = switch (status) {
+      AgendaClassStatus.current => accent,
+      AgendaClassStatus.next => accent,
+      AgendaClassStatus.completed => colors.mutedForeground,
+      AgendaClassStatus.upcoming => colors.border,
+    };
+    return SizedBox(
+      width: 28,
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          Icon(
-            FLucideIcons.calendarCheck,
-            size: 30,
-            color: context.theme.colors.primary,
+          Positioned(
+            top: isFirst ? 18 : 0,
+            bottom: isLast ? null : 0,
+            height: isLast ? 18 : null,
+            child: Container(width: 1.5, color: colors.border),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'No classes today',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: context.theme.colors.foreground,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Your schedule is clear.',
-            style: TextStyle(
-              fontSize: 13,
-              color: context.theme.colors.mutedForeground,
+          Positioned(
+            top: 13,
+            child: AnimatedContainer(
+              duration: Motion.medium,
+              width: 11,
+              height: 11,
+              decoration: BoxDecoration(
+                color: dot,
+                shape: BoxShape.circle,
+                border: Border.all(color: ring, width: 2),
+                boxShadow: status == AgendaClassStatus.current
+                    ? [
+                        BoxShadow(
+                          color: accent.withValues(alpha: 0.35),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
             ),
           ),
         ],
@@ -734,21 +969,186 @@ class _EmptyDay extends StatelessWidget {
   }
 }
 
+class _AttendanceBadge extends StatelessWidget {
+  const _AttendanceBadge({required this.record});
+
+  final AttendanceRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final standing = AttendanceStanding.of(record);
+    final palette = context.theme.colors.app;
+    final tone = !standing.isSafe
+        ? palette.danger
+        : standing.canSkip == 0
+        ? palette.warning
+        : palette.success;
+    return ToneBadge(
+      label: '${standing.displayPercent.round()}% · ${standing.advice}',
+      tone: tone,
+    );
+  }
+}
+
+class _MetaLine extends StatelessWidget {
+  const _MetaLine({
+    required this.icon,
+    required this.text,
+    this.emphasize = false,
+  });
+
+  final IconData icon;
+  final String text;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: colors.mutedForeground),
+        const SizedBox(width: Space.xs + 2),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.theme.typography.body.sm.copyWith(
+              fontWeight: emphasize ? FontWeight.w500 : FontWeight.w400,
+              color: emphasize ? colors.foreground : colors.mutedForeground,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon, required this.tone});
+
+  final IconData icon;
+  final Tone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: tone.subtle,
+        borderRadius: BorderRadius.circular(Radii.md),
+      ),
+      child: Icon(icon, size: 20, color: tone.base),
+    );
+  }
+}
+
+class _BreakRow extends StatelessWidget {
+  const _BreakRow({
+    required this.previousEnd,
+    required this.nextStart,
+    required this.isNow,
+  });
+
+  final String previousEnd;
+  final String nextStart;
+  final bool isNow;
+
+  @override
+  Widget build(BuildContext context) {
+    final gap = minutesOf(nextStart) - minutesOf(previousEnd);
+    // VIT leaves 10 minutes between every class; only real breaks matter.
+    if (gap < 20) return const SizedBox.shrink();
+    final colors = context.theme.colors;
+    final color = isNow
+        ? colors.app.accentTone.onSubtle
+        : colors.mutedForeground;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 62),
+      child: SizedBox(
+        height: 34,
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              child: Center(
+                child: CustomPaint(
+                  size: const Size(1.5, 34),
+                  painter: _DashPainter(colors.border),
+                ),
+              ),
+            ),
+            Icon(FLucideIcons.coffee, size: 14, color: color),
+            const SizedBox(width: Space.sm),
+            Text(
+              isNow
+                  ? 'Free now · ${formatMinutes(gap)} break'
+                  : '${formatMinutes(gap)} break',
+              style: context.theme.typography.body.xs.copyWith(
+                fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashPainter extends CustomPainter {
+  _DashPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = size.width;
+    for (var y = 0.0; y < size.height; y += 6) {
+      canvas.drawLine(Offset(0, y), Offset(0, y + 3), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashPainter old) => old.color != color;
+}
+
 AgendaClassStatus _statusFor(
   TimetableSlot slot,
   TimetableSlot? current,
   TimetableSlot? next,
-  DateTime now,
+  int minuteNow,
   bool isToday,
 ) {
-  if (identical(slot, current) || slot == current) {
-    return AgendaClassStatus.current;
-  }
-  if (identical(slot, next) || slot == next) return AgendaClassStatus.next;
-  if (isToday && _minutes(slot.endTime) <= _timeOfDay(now)) {
+  if (slot == current) return AgendaClassStatus.current;
+  if (slot == next && isToday) return AgendaClassStatus.next;
+  if (isToday && minutesOf(slot.endTime) <= minuteNow) {
     return AgendaClassStatus.completed;
   }
   return AgendaClassStatus.upcoming;
+}
+
+T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
+  for (final item in items) {
+    if (test(item)) return item;
+  }
+  return null;
+}
+
+String _dayLabel(int weekday, DateTime now) {
+  if (weekday == now.weekday % 7 + 1) return 'Tomorrow';
+  return DateFormat('EEEE').format(
+    DateTime(2024, 1, weekday), // 1 Jan 2024 was a Monday.
+  );
+}
+
+DateTime _at(DateTime day, String time) {
+  final minutes = minutesOf(time);
+  return DateTime(day.year, day.month, day.day, minutes ~/ 60, minutes % 60);
 }
 
 List<DateTime> _weekDates(DateTime now) {
@@ -760,29 +1160,4 @@ List<DateTime> _weekDates(DateTime now) {
   return List.generate(7, (index) => monday.add(Duration(days: index)));
 }
 
-int _minutes(String time) {
-  final parts = time.split(':');
-  return int.parse(parts[0]) * 60 + int.parse(parts[1]);
-}
-
 int _timeOfDay(DateTime value) => value.hour * 60 + value.minute;
-
-String _formatTime(BuildContext context, String time) {
-  if (MediaQuery.alwaysUse24HourFormatOf(context)) return time;
-  final parts = time.split(':');
-  final hour24 = int.parse(parts[0]);
-  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
-  return '$hour12:${parts[1]} ${hour24 >= 12 ? 'PM' : 'AM'}';
-}
-
-String _formatRange(BuildContext context, TimetableSlot slot) =>
-    '${_formatTime(context, slot.startTime)} – ${_formatTime(context, slot.endTime)}';
-
-String _startsIn(TimetableSlot slot, DateTime now) {
-  final difference = _minutes(slot.startTime) - _timeOfDay(now);
-  if (difference <= 0) return 'STARTING NOW';
-  if (difference < 60) return 'IN $difference MIN';
-  final hours = difference ~/ 60;
-  final minutes = difference.remainder(60);
-  return minutes == 0 ? 'IN $hours HR' : 'IN $hours HR $minutes MIN';
-}

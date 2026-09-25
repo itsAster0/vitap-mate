@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
-import 'package:vitapmate/features/more/presentation/widgets/gpa_dial.dart';
+import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
 class _Row {
@@ -36,28 +36,46 @@ String _formatCredits(double credits) => credits == credits.roundToDouble()
     ? credits.toStringAsFixed(0)
     : credits.toStringAsFixed(1);
 
+/// Grades offered in the picker (N carries no points and is left out).
+const _pickerGrades = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
+
 class GpaCalculatorPage extends HookConsumerWidget {
   const GpaCalculatorPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasHistory = useState(false);
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
     final rows = useState<List<_Row>>([const _Row(id: 1)]);
     final nextId = useState(2);
     final cgpaController = useTextEditingController();
     final earnedController = useTextEditingController();
+    final editBase = useState(false);
     useListenable(cgpaController);
     useListenable(earnedController);
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
     final history = ref.watch(gradeHistoryProvider);
     final timetable = ref.watch(timetableProvider);
+
+    // Prefill current CGPA and credits from grade history once it's loaded.
+    final prefilled = useState(false);
+    useEffect(() {
+      final data = history.value;
+      if (data != null && !prefilled.value) {
+        prefilled.value = true;
+        if (cgpaController.text.isEmpty) cgpaController.text = data.cgpa.cgpa;
+        if (earnedController.text.isEmpty) {
+          earnedController.text = data.cgpa.creditsRegistered;
+        }
+      }
+      return null;
+    }, [history.value]);
 
     void addRow() {
       rows.value = [...rows.value, _Row(id: nextId.value)];
       nextId.value++;
     }
 
-    void updateRow(int id, {required _Row Function(_Row) transform}) {
+    void updateRow(int id, _Row Function(_Row) transform) {
       rows.value = [
         for (final r in rows.value)
           if (r.id == id) transform(r) else r,
@@ -67,15 +85,6 @@ class GpaCalculatorPage extends HookConsumerWidget {
     void removeRow(int id) {
       if (rows.value.length == 1) return;
       rows.value = rows.value.where((r) => r.id != id).toList();
-    }
-
-    void addFromHistory() {
-      final data = history.value;
-      if (data == null) return;
-
-      cgpaController.text = data.cgpa.cgpa;
-      earnedController.text = data.cgpa.creditsRegistered;
-      hasHistory.value = true;
     }
 
     void addCurrentSemester() {
@@ -116,252 +125,269 @@ class GpaCalculatorPage extends HookConsumerWidget {
           grade: Grade.tryParse(row.grade)!,
         ),
     ];
-    final sumCredits = courses.fold<double>(
-      0,
-      (total, course) => total + course.credits.value,
-    );
+    final sumCredits = courses.fold<double>(0, (t, c) => t + c.credits.value);
     final semesterGpa = calculateSemesterGpa(courses);
-
-    final currentCgpa = Cgpa.tryParse(cgpaController.text) ?? Cgpa(0);
+    final currentCgpa = Cgpa.tryParse(cgpaController.text);
     final earned = parseCredits(earnedController.text)?.value ?? 0.0;
-    final projected = calculateProjectedCgpa(
-      currentCgpa: currentCgpa,
-      completedCredits: earned,
-      plannedCourses: courses,
-    );
-    final delta = projected - currentCgpa.value;
+    final projected = currentCgpa == null
+        ? null
+        : calculateProjectedCgpa(
+            currentCgpa: currentCgpa,
+            completedCredits: earned,
+            plannedCourses: courses,
+          );
+    final delta = projected == null ? 0.0 : projected - currentCgpa!.value;
+    final gpaTone = gradeTone(context, _letterFor(semesterGpa));
 
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: hasHistory.value
-                  ? GpaDial(
-                      key: const ValueKey('dial-cgpa'),
-                      value: projected,
-                      label: 'PROJECTED CGPA',
-                      caption: delta.abs() < 0.005
-                          ? 'no change'
-                          : '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(2)}',
-                    )
-                  : GpaDial(
-                      key: const ValueKey('dial-gpa'),
-                      value: semesterGpa,
-                      label: 'SEMESTER GPA',
-                      caption: '${_formatCredits(sumCredits)} credits',
-                    ),
-            ),
-          ),
-          if (hasHistory.value) ...[
-            const SizedBox(height: 14),
-            Center(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: delta),
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeOutCubic,
-                builder: (context, d, _) {
-                  if (d.abs() < 0.005 || currentCgpa.value <= 0) {
-                    return const SizedBox.shrink();
-                  }
-                  final up = d > 0;
-                  final c = up
-                      ? const Color(0xFF2E7D32)
-                      : const Color(0xFFD32F2F);
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: c.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: c.withValues(alpha: 0.35)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          up
-                              ? FLucideIcons.trendingUp
-                              : FLucideIcons.trendingDown,
-                          size: 14,
-                          color: c,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${up ? '+' : ''}${d.toStringAsFixed(2)} from current ${currentCgpa.value.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: c,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-          const SizedBox(height: 18),
-          if (hasHistory.value)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: darkMode
-                    ? context.theme.colors.primaryForeground
-                    : const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.theme.colors.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: FTextField(
-                      label: const Text('Current CGPA'),
-                      hint: 'e.g. 8.35',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      control: FTextFieldControl.managed(
-                        controller: cgpaController,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FTextField(
-                      label: const Text('Completed credits'),
-                      hint: 'e.g. 54',
-                      keyboardType: TextInputType.number,
-                      control: FTextFieldControl.managed(
-                        controller: earnedController,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 14),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: Column(
-              children: [
-                for (var i = 0; i < rows.value.length; i++)
-                  _CourseRowTile(
-                    key: ValueKey(rows.value[i].id),
-                    index: i,
-                    row: rows.value[i],
-                    canRemove: rows.value.length > 1,
-                    onCredits: (c) => updateRow(
-                      rows.value[i].id,
-                      transform: (r) => r.copyWith(credits: c),
-                    ),
-                    onGrade: (g) => updateRow(
-                      rows.value[i].id,
-                      transform: (r) => r.copyWith(grade: g),
-                    ),
-                    onRemove: () => removeRow(rows.value[i].id),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        Space.sm,
+        Space.sm,
+        Space.sm,
+        Space.xl,
+      ),
+      children: [
+        // Summary: semester GPA ring + CGPA now → after.
+        Surface(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _actionButton(
-                context,
-                label: 'Add course',
-                icon: FLucideIcons.plus,
-                onPress: addRow,
-              ),
-              const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(
-                    child: _actionButton(
-                      context,
-                      label: 'Current semester',
-                      icon: FLucideIcons.calendarDays,
-                      onPress: addCurrentSemester,
+                  ProgressRing(
+                    value: semesterGpa / 10,
+                    color: gpaTone.base,
+                    size: 84,
+                    stroke: 7,
+                    child: Text(
+                      semesterGpa.toStringAsFixed(2),
+                      style: typography.body.lg.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.foreground,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: Space.lg),
                   Expanded(
-                    child: _actionButton(
-                      context,
-                      label: 'From history',
-                      icon: FLucideIcons.history,
-                      onPress: addFromHistory,
-                      muted: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SEMESTER GPA',
+                          style: typography.body.xs.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                        Text(
+                          '${rows.value.length} ${rows.value.length == 1 ? 'course' : 'courses'} · ${_formatCredits(sumCredits)} credits',
+                          style: typography.body.sm.copyWith(
+                            color: colors.foreground,
+                          ),
+                        ),
+                        const SizedBox(height: Space.md),
+                        Text(
+                          'PROJECTED CGPA',
+                          style: typography.body.xs.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                        if (projected == null)
+                          Text(
+                            'Add your current CGPA below',
+                            style: typography.body.sm.copyWith(
+                              color: colors.mutedForeground,
+                            ),
+                          )
+                        else
+                          Row(
+                            children: [
+                              Text(
+                                currentCgpa!.value.toStringAsFixed(2),
+                                style: typography.body.md.copyWith(
+                                  color: colors.mutedForeground,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: Space.xs,
+                                ),
+                                child: Icon(
+                                  FLucideIcons.arrowRight,
+                                  size: 14,
+                                  color: colors.mutedForeground,
+                                ),
+                              ),
+                              TweenAnimationBuilder<double>(
+                                tween: Tween(end: projected),
+                                duration: Motion.slow,
+                                curve: Curves.easeOutCubic,
+                                builder: (context, v, _) => Text(
+                                  v.toStringAsFixed(2),
+                                  style: typography.body.lg.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.foreground,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: Space.sm),
+                              if (delta.abs() >= 0.005)
+                                ToneBadge(
+                                  label:
+                                      '${delta > 0 ? '+' : '−'}${delta.abs().toStringAsFixed(2)}',
+                                  tone: delta > 0
+                                      ? colors.app.success
+                                      : colors.app.danger,
+                                ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: Space.md),
+              // Base values: prefilled from history, editable when needed.
+              PressScale(
+                scale: 0.99,
+                onPress: () => editBase.value = !editBase.value,
+                child: Row(
+                  children: [
+                    Icon(
+                      FLucideIcons.history,
+                      size: 14,
+                      color: colors.mutedForeground,
+                    ),
+                    const SizedBox(width: Space.xs + 2),
+                    Expanded(
+                      child: Text(
+                        currentCgpa == null
+                            ? 'Set current CGPA and credits'
+                            : 'Based on CGPA ${cgpaController.text} over ${earnedController.text} credits',
+                        style: typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      editBase.value ? 'Done' : 'Edit',
+                      style: typography.body.xs.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.app.accentTone.onSubtle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AnimatedSize(
+                duration: Motion.medium,
+                curve: Curves.easeOutCubic,
+                child: editBase.value || currentCgpa == null
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: Space.md),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: FTextField(
+                                label: const Text('Current CGPA'),
+                                hint: 'e.g. 8.35',
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                control: FTextFieldControl.managed(
+                                  controller: cgpaController,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: Space.sm + 2),
+                            Expanded(
+                              child: FTextField(
+                                label: const Text('Completed credits'),
+                                hint: 'e.g. 54',
+                                keyboardType: TextInputType.number,
+                                control: FTextFieldControl.managed(
+                                  controller: earnedController,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+        SectionHeader(
+          title: 'Courses',
+          trailing: FButton(
+            variant: FButtonVariant.ghost,
+            size: FButtonSizeVariant.sm,
+            mainAxisSize: MainAxisSize.min,
+            prefix: const Icon(FLucideIcons.calendarDays),
+            onPress: timetable.value == null ? null : addCurrentSemester,
+            child: const Text('Current semester'),
+          ),
+        ),
+        AnimatedSize(
+          duration: Motion.medium,
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: Column(
+            children: [
+              for (final (i, row) in rows.value.indexed)
+                Padding(
+                  key: ValueKey(row.id),
+                  padding: const EdgeInsets.only(bottom: Space.sm),
+                  child: _CourseRowCard(
+                    index: i,
+                    row: row,
+                    canRemove: rows.value.length > 1,
+                    onCredits: (c) =>
+                        updateRow(row.id, (r) => r.copyWith(credits: c)),
+                    onGrade: (g) =>
+                        updateRow(row.id, (r) => r.copyWith(grade: g)),
+                    onRemove: () => removeRow(row.id),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        FButton(
+          variant: FButtonVariant.outline,
+          prefix: const Icon(FLucideIcons.plus),
+          onPress: addRow,
+          child: const Text('Add course'),
+        ),
+      ],
     );
   }
 
-  Widget _actionButton(
-    BuildContext context, {
-    required String label,
-    required IconData icon,
-    required VoidCallback onPress,
-    bool muted = false,
-  }) {
-    final color = muted
-        ? context.theme.colors.mutedForeground
-        : context.theme.colors.primary;
-    return FTappable(
-      onPress: onPress,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: context.theme.colors.border, width: 1.5),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 16, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(fontWeight: FontWeight.w600, color: color),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  /// Nearest letter for a GPA, used only to colour the ring.
+  static String _letterFor(double gpa) {
+    if (gpa >= 9.5) return 'S';
+    if (gpa >= 8.5) return 'A';
+    if (gpa >= 7.5) return 'B';
+    if (gpa >= 6.5) return 'C';
+    if (gpa >= 5.5) return 'D';
+    if (gpa >= 4.5) return 'E';
+    return 'F';
   }
 }
 
-class _CourseRowTile extends StatelessWidget {
-  final int index;
-  final _Row row;
-  final bool canRemove;
-  final ValueChanged<double> onCredits;
-  final ValueChanged<String> onGrade;
-  final VoidCallback onRemove;
-
-  const _CourseRowTile({
-    super.key,
+class _CourseRowCard extends StatelessWidget {
+  const _CourseRowCard({
     required this.index,
     required this.row,
     required this.canRemove,
@@ -370,123 +396,104 @@ class _CourseRowTile extends StatelessWidget {
     required this.onRemove,
   });
 
+  final int index;
+  final _Row row;
+  final bool canRemove;
+  final ValueChanged<double> onCredits;
+  final ValueChanged<String> onGrade;
+  final VoidCallback onRemove;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-        decoration: BoxDecoration(
-          color: context.theme.colors.primaryForeground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.theme.colors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (row.courseCode.isNotEmpty) ...[
-              Text(
-                row.courseName.isEmpty
-                    ? row.courseCode
-                    : '${row.courseCode} - ${row.courseName}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: context.theme.colors.mutedForeground,
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final title = row.courseName.isNotEmpty
+        ? row.courseName
+        : 'Course ${index + 1}';
+
+    return Surface(
+      padding: const EdgeInsets.fromLTRB(
+        Space.md + 2,
+        Space.sm + 2,
+        Space.sm,
+        Space.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: typography.body.sm.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.foreground,
+                      ),
+                    ),
+                    if (row.courseCode.isNotEmpty)
+                      Text(
+                        row.courseCode,
+                        style: typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 6),
+              FButton.icon(
+                variant: FButtonVariant.ghost,
+                size: FButtonSizeVariant.sm,
+                semanticsLabel: 'Fewer credits',
+                onPress: row.credits > 0.5
+                    ? () => onCredits((row.credits - 0.5).clamp(0.5, 30))
+                    : null,
+                child: const Icon(FLucideIcons.minus),
+              ),
+              SizedBox(
+                width: 56,
+                child: Text(
+                  '${_formatCredits(row.credits)} cr',
+                  textAlign: TextAlign.center,
+                  style: typography.body.sm.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: colors.foreground,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              FButton.icon(
+                variant: FButtonVariant.ghost,
+                size: FButtonSizeVariant.sm,
+                semanticsLabel: 'More credits',
+                onPress: () => onCredits((row.credits + 0.5).clamp(0.5, 30)),
+                child: const Icon(FLucideIcons.plus),
+              ),
+              if (canRemove)
+                FButton.icon(
+                  variant: FButtonVariant.ghost,
+                  size: FButtonSizeVariant.sm,
+                  semanticsLabel: 'Remove course',
+                  onPress: onRemove,
+                  child: Icon(FLucideIcons.x, color: colors.mutedForeground),
+                ),
             ],
-            Row(
-              children: [
-                Text(
-                  '${index + 1}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: context.theme.colors.mutedForeground,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FTappable(
-                  onPress: () => onCredits((row.credits - 0.5).clamp(0.5, 30)),
-                  child: Icon(
-                    FLucideIcons.minus,
-                    size: 15,
-                    color: context.theme.colors.mutedForeground,
-                  ),
-                ),
-                SizedBox(
-                  width: 52,
-                  child: Column(
-                    children: [
-                      Text(
-                        _formatCredits(row.credits),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: context.theme.colors.primary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      Text(
-                        'credits',
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          color: context.theme.colors.mutedForeground,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                FTappable(
-                  onPress: () => onCredits((row.credits + 0.5).clamp(0.5, 30)),
-                  child: Icon(
-                    FLucideIcons.plus,
-                    size: 15,
-                    color: context.theme.colors.primary,
-                  ),
-                ),
-                const Spacer(),
-                SizedBox(
-                  width: 108,
-                  height: 40,
-                  child: FSelect<String>(
-                    size: .sm,
-                    items: {
-                      for (final grade in Grade.values)
-                        '${grade.label} (${grade.points})': grade.label,
-                    },
-                    control: FSelectControl.lifted(
-                      value: row.grade,
-                      onChange: (g) {
-                        if (g != null) onGrade(g);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (canRemove)
-                  FTappable(
-                    onPress: onRemove,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        FLucideIcons.trash2,
-                        size: 15,
-                        color: context.theme.colors.mutedForeground,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(width: 27),
-              ],
+          ),
+          const SizedBox(height: Space.sm),
+          Padding(
+            padding: const EdgeInsets.only(right: Space.xs + 2),
+            child: Segmented<String>(
+              value: row.grade,
+              onChanged: onGrade,
+              segments: [for (final g in _pickerGrades) (g, g)],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -1,17 +1,18 @@
 import 'dart:developer' show log;
-import 'package:flutter/material.dart';
+
+import 'package:flutter/material.dart' show RefreshIndicator, RefreshCallback;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/marks_card.dart';
-import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class MarksPage extends HookConsumerWidget {
@@ -28,6 +29,7 @@ class MarksPage extends HookConsumerWidget {
       });
       return null;
     }, const []);
+
     Future<void> update() async {
       try {
         await ref.read(marksProvider.notifier).updatemarks();
@@ -37,312 +39,133 @@ class MarksPage extends HookConsumerWidget {
       }
     }
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    final marksData = ref.watch(marksProvider);
 
-    var marksData = ref.watch(marksProvider);
-
-    return Container(
-      color: context.theme.colors.background,
+    return AnimatedSwitcher(
+      duration: Motion.medium,
       child: marksData.when(
-        data: (data) => _MarksFilterView(
+        skipLoadingOnRefresh: true,
+        skipLoadingOnReload: true,
+        data: (data) => _MarksView(
+          key: const ValueKey('data'),
           records: data.records,
           updateTime: data.updateTime.toInt(),
           onRefresh: update,
-          refreshIndicatorColor: darkMode
-              ? context.theme.colors.primaryForeground
-              : MarksColors.primaryText,
-          emptyStateBuilder: _buildEmptyState,
-          footerBuilder: _buildFooter,
         ),
-        error: (e, se) => _buildErrorState(e, context),
-        loading: () => _buildLoadingState(context),
+        error: (e, _) => EmptyState(
+          key: const ValueKey('error'),
+          icon: FLucideIcons.cloudAlert,
+          title: "Couldn't load marks",
+          message: commonErrorMessage(e),
+          action: FButton(
+            variant: FButtonVariant.outline,
+            mainAxisSize: MainAxisSize.min,
+            onPress: update,
+            child: const Text('Try again'),
+          ),
+        ),
+        loading: () => const Padding(
+          key: ValueKey('loading'),
+          padding: EdgeInsets.all(Space.sm),
+          child: Column(
+            children: [
+              Skeleton(height: 40, radius: Radii.md),
+              SizedBox(height: Space.lg),
+              SkeletonList(count: 5, height: 112),
+            ],
+          ),
+        ),
       ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: context.theme.colors.primaryForeground,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.assignment_outlined,
-              size: 48,
-              color: context.theme.colors.primary,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "No marks data available",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: context.theme.colors.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Check back later for updates",
-            style: TextStyle(fontSize: 14, color: context.theme.colors.primary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(Object error, BuildContext context) {
-    String msg = commonErrorMessage(error);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: MarksColors.failedBackground,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              Icons.error_outline_rounded,
-              size: 48,
-              color: MarksColors.failedText,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Unable to load marks data",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: context.theme.colors.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            msg,
-            style: TextStyle(fontSize: 14, color: context.theme.colors.primary),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: CircularProgressIndicator(
-              color: MarksColors.theoryIcon,
-              strokeWidth: 3,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "Loading marks data...",
-            style: TextStyle(
-              fontSize: 14,
-              color: context.theme.colors.primary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFooter(int updateTime) {
-    return DataUpdatedFooter(
-      updateTime: updateTime,
-      fontSize: 14,
-      color: MarksColors.tertiaryText,
     );
   }
 }
 
 enum _CourseFilter { all, theory, lab }
 
-class _MarksFilterView extends HookWidget {
-  final List<MarksRecord> records;
-  final int updateTime;
-  final RefreshCallback onRefresh;
-  final Color refreshIndicatorColor;
-  final Widget Function(BuildContext context) emptyStateBuilder;
-  final Widget Function(int updateTime) footerBuilder;
-
-  const _MarksFilterView({
+class _MarksView extends HookWidget {
+  const _MarksView({
+    super.key,
     required this.records,
     required this.updateTime,
     required this.onRefresh,
-    required this.refreshIndicatorColor,
-    required this.emptyStateBuilder,
-    required this.footerBuilder,
   });
+
+  final List<MarksRecord> records;
+  final int updateTime;
+  final RefreshCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
-    final selected = useState(_CourseFilter.all);
-    final theoryRecords = records.where((record) => !record.islab()).toList();
-    final labRecords = records.where((record) => record.islab()).toList();
-    final filteredRecords = switch (selected.value) {
+    final filter = useState(_CourseFilter.all);
+    final theory = records.where((r) => !r.islab()).toList();
+    final labs = records.where((r) => r.islab()).toList();
+    final shown = switch (filter.value) {
       _CourseFilter.all => records,
-      _CourseFilter.theory => theoryRecords,
-      _CourseFilter.lab => labRecords,
-    };
-    final emptyBuilder = switch (selected.value) {
-      _CourseFilter.all => emptyStateBuilder,
-      _CourseFilter.theory =>
-        (BuildContext context) =>
-            _buildFilteredEmptyState(context, 'No theory marks yet'),
-      _CourseFilter.lab => (BuildContext context) => _buildFilteredEmptyState(
-        context,
-        'No lab marks yet',
-      ),
+      _CourseFilter.theory => theory,
+      _CourseFilter.lab => labs,
     };
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-          child: Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: _FilterButton(
-                  label: 'All (${records.length})',
-                  selected: selected.value == _CourseFilter.all,
-                  onPress: () => selected.value = _CourseFilter.all,
-                ),
-              ),
-              Expanded(
-                child: _FilterButton(
-                  label: 'Theory (${theoryRecords.length})',
-                  selected: selected.value == _CourseFilter.theory,
-                  onPress: () => selected.value = _CourseFilter.theory,
-                ),
-              ),
-              Expanded(
-                child: _FilterButton(
-                  label: 'Lab (${labRecords.length})',
-                  selected: selected.value == _CourseFilter.lab,
-                  onPress: () => selected.value = _CourseFilter.lab,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _MarksRecordsList(
-            records: filteredRecords,
-            updateTime: updateTime,
-            onRefresh: onRefresh,
-            refreshIndicatorColor: refreshIndicatorColor,
-            emptyBuilder: emptyBuilder,
-            footerBuilder: footerBuilder,
-          ),
-        ),
-      ],
-    );
-  }
-
-  static Widget _buildFilteredEmptyState(BuildContext context, String message) {
-    return Center(
-      child: Text(
-        message,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: context.theme.colors.primary,
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onPress;
-
-  const _FilterButton({
-    required this.label,
-    required this.selected,
-    required this.onPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return FButton(
-      size: FButtonSizeVariant.sm,
-      variant: selected ? FButtonVariant.primary : FButtonVariant.outline,
-      selected: selected,
-      onPress: onPress,
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-}
-
-class _MarksRecordsList extends StatelessWidget {
-  final List<MarksRecord> records;
-  final int updateTime;
-  final RefreshCallback onRefresh;
-  final Color refreshIndicatorColor;
-  final Widget Function(BuildContext context) emptyBuilder;
-  final Widget Function(int updateTime) footerBuilder;
-
-  const _MarksRecordsList({
-    required this.records,
-    required this.updateTime,
-    required this.onRefresh,
-    required this.refreshIndicatorColor,
-    required this.emptyBuilder,
-    required this.footerBuilder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      backgroundColor: MarksColors.tableBackground,
-      color: refreshIndicatorColor,
-      child: SingleChildScrollView(
+      backgroundColor: context.theme.colors.background,
+      color: context.theme.colors.foreground,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          Space.sm,
+          Space.sm,
+          Space.sm,
+          Space.lg,
+        ),
         physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height * 0.72,
-          ),
-          child: records.isEmpty
-              ? emptyBuilder(context)
-              : Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Column(
-                    spacing: 4,
-                    children: [
-                      for (final record in records)
-                        MarksCard(
+        children: [
+          if (records.isNotEmpty) ...[
+            Segmented<_CourseFilter>(
+              value: filter.value,
+              onChanged: (value) => filter.value = value,
+              segments: [
+                (_CourseFilter.all, 'All  ${records.length}'),
+                (_CourseFilter.theory, 'Theory  ${theory.length}'),
+                (_CourseFilter.lab, 'Lab  ${labs.length}'),
+              ],
+            ),
+            const SizedBox(height: Space.md),
+          ],
+          AnimatedSwitcher(
+            duration: Motion.medium,
+            switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
+            switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [...previous, ?current],
+            ),
+            child: Column(
+              key: ValueKey(filter.value),
+              children: [
+                if (shown.isEmpty)
+                  EmptyState(
+                    icon: FLucideIcons.clipboardList,
+                    title: records.isEmpty ? 'No marks yet' : 'Nothing here',
+                    message: records.isEmpty
+                        ? 'Marks appear here once faculty upload them.'
+                        : 'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} marks yet.',
+                  )
+                else
+                  for (final (i, record) in shown.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                      child: EnterFade(
+                        index: i,
+                        child: MarksCard(
                           key: ValueKey('${record.coursecode}_${record.slot}'),
                           record: record.copyWith(marks: sortedMarks(record)),
                         ),
-                      footerBuilder(updateTime),
-                    ],
-                  ),
-                ),
-        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+          DataUpdatedFooter(updateTime: updateTime),
+        ],
       ),
     );
   }
@@ -350,6 +173,9 @@ class _MarksRecordsList extends StatelessWidget {
 
 List<MarksRecordEach> sortedMarks(MarksRecord record) {
   final cloned = [...record.marks];
-  cloned.sort((a, b) => int.parse(a.serial).compareTo(int.parse(b.serial)));
+  cloned.sort(
+    (a, b) =>
+        (int.tryParse(a.serial) ?? 0).compareTo(int.tryParse(b.serial) ?? 0),
+  );
   return cloned;
 }

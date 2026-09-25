@@ -1,17 +1,20 @@
 import 'dart:developer' show log;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show RefreshIndicator;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
-import 'package:vitapmate/features/more/presentation/widgets/more_color.dart';
+import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+
+const _gradeOrder = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'N'];
 
 class GradeHistoryPage extends HookConsumerWidget {
   const GradeHistoryPage({super.key});
@@ -39,488 +42,265 @@ class GradeHistoryPage extends HookConsumerWidget {
       return null;
     }, const []);
 
-    return RefreshIndicator(
-      onRefresh: reload,
-      displacement: 80,
-      backgroundColor: context.theme.colors.primary,
-      color: context.theme.colors.primaryForeground,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
-        child: data.when(
-          loading: () => SizedBox(
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: const _CenterInfo(
-              title: "Loading grade history...",
-              icon: FLucideIcons.loaderCircle,
-            ),
-          ),
-          error: (e, _) => SizedBox(
-            height: MediaQuery.of(context).size.height * 0.7,
-            child: _CenterInfo(
-              title: "Unable to load grade history",
-              subtitle: commonErrorMessage(e),
-              icon: FLucideIcons.triangleAlert,
-            ),
-          ),
-          data: (gradeHistory) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _StudentCard(info: gradeHistory.student),
-                const SizedBox(height: 10),
-                _CgpaCard(cgpa: gradeHistory.cgpa),
-                const SizedBox(height: 10),
-                if (gradeHistory.records.isEmpty)
-                  SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.4,
-                    child: const _CenterInfo(
-                      title: "No grade history found",
-                      subtitle: "Pull to refresh and try again.",
-                      icon: FLucideIcons.fileX,
-                    ),
-                  )
-                else
-                  ...gradeHistory.records.map((r) => _HistoryCard(record: r)),
-                DataUpdatedFooter(
-                  updateTime: gradeHistory.updateTime.toInt(),
-                  padding: const EdgeInsets.only(top: 12),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _StudentCard extends ConsumerWidget {
-  final GradeHistoryStudentInfo info;
-  const _StudentCard({required this.info});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: darkMode
-            ? null
-            : const LinearGradient(
-                colors: [
-                  MarksColors.theoryCardBackground,
-                  MarksColors.theoryCardSecondary,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-        borderRadius: BorderRadius.circular(12),
-        color: darkMode ? context.theme.colors.primaryForeground : null,
-        boxShadow: const [
-          BoxShadow(
-            color: MarksColors.cardShadow,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            info.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: darkMode
-                  ? context.theme.colors.primary
-                  : MarksColors.primaryText,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            info.regNo,
-            style: TextStyle(
-              fontSize: 13,
-              color: darkMode
-                  ? context.theme.colors.mutedForeground
-                  : MarksColors.secondaryText,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            info.programmeBranch,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 13,
-              color: darkMode
-                  ? context.theme.colors.mutedForeground
-                  : MarksColors.secondaryText,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CgpaCard extends StatelessWidget {
-  final GradeHistoryCgpa cgpa;
-  const _CgpaCard({required this.cgpa});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: context.theme.colors.primaryForeground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "CGPA Summary",
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-              color: context.theme.colors.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+    return AnimatedSwitcher(
+      duration: Motion.medium,
+      child: data.when(
+        skipLoadingOnRefresh: true,
+        skipLoadingOnReload: true,
+        loading: () => const Padding(
+          key: ValueKey('loading'),
+          padding: EdgeInsets.all(Space.sm),
+          child: Column(
             children: [
-              _chip(context, "CGPA", cgpa.cgpa),
-              _chip(context, "Credits Reg", cgpa.creditsRegistered),
-              _chip(context, "Credits Earned", cgpa.creditsEarned),
-              _chip(context, "S", cgpa.sGrades),
-              _chip(context, "A", cgpa.aGrades),
-              _chip(context, "B", cgpa.bGrades),
-              _chip(context, "C", cgpa.cGrades),
-              _chip(context, "D", cgpa.dGrades),
-              _chip(context, "E", cgpa.eGrades),
-              _chip(context, "F", cgpa.fGrades),
-              _chip(context, "N", cgpa.nGrades),
+              Skeleton(height: 150, radius: Radii.lg),
+              SizedBox(height: Space.lg),
+              SkeletonList(count: 5, height: 80),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(BuildContext context, String k, String v) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: context.theme.colors.background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Text(
-        "$k: $v",
-        style: TextStyle(
-          color: context.theme.colors.primary,
-          fontWeight: FontWeight.w500,
+        ),
+        error: (e, _) => EmptyState(
+          key: const ValueKey('error'),
+          icon: FLucideIcons.cloudAlert,
+          title: "Couldn't load grade history",
+          message: commonErrorMessage(e),
+          action: FButton(
+            variant: FButtonVariant.outline,
+            mainAxisSize: MainAxisSize.min,
+            onPress: reload,
+            child: const Text('Try again'),
+          ),
+        ),
+        data: (history) => RefreshIndicator(
+          key: const ValueKey('data'),
+          onRefresh: reload,
+          backgroundColor: context.theme.colors.background,
+          color: context.theme.colors.foreground,
+          child: _HistoryView(history: history),
         ),
       ),
     );
   }
 }
 
-class _HistoryCard extends ConsumerStatefulWidget {
-  final GradeHistoryRecord record;
-  const _HistoryCard({required this.record});
+class _HistoryView extends HookWidget {
+  const _HistoryView({required this.history});
 
-  @override
-  ConsumerState<_HistoryCard> createState() => _HistoryCardState();
-}
-
-class _HistoryCardState extends ConsumerState<_HistoryCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-  bool _expanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Color _gradeColor(String grade) {
-    switch (grade.trim().toUpperCase()) {
-      case 'S':
-      case 'A':
-        return MarksColors.excellentColor;
-      case 'B':
-      case 'C':
-        return MarksColors.averageColor;
-      case 'F':
-      case 'N':
-        return MarksColors.failedText;
-      default:
-        return MarksColors.secondaryText;
-    }
-  }
-
-  void _toggle() {
-    setState(() => _expanded = !_expanded);
-    if (_expanded) {
-      _controller.forward();
-    } else {
-      _controller.reverse();
-    }
-  }
+  final GradeHistoryData history;
 
   @override
   Widget build(BuildContext context) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
-    final r = widget.record;
+    final filter = useState<String?>(null);
+    final present = {
+      for (final r in history.records) r.grade.trim().toUpperCase(),
+    };
+    final grades = [
+      for (final g in _gradeOrder)
+        if (present.contains(g)) g,
+      for (final g in present)
+        if (!_gradeOrder.contains(g) && g != '-' && g.isNotEmpty) g,
+    ];
+    final shown = filter.value == null
+        ? history.records
+        : history.records
+              .where((r) => r.grade.trim().toUpperCase() == filter.value)
+              .toList();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        children: [
-          FTappable(
-            onPress: _toggle,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: !darkMode
-                    ? const LinearGradient(
-                        colors: [
-                          MarksColors.theoryCardBackground,
-                          MarksColors.theoryCardSecondary,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                borderRadius: BorderRadius.circular(12),
-                color: darkMode ? context.theme.colors.primaryForeground : null,
-                boxShadow: const [
-                  BoxShadow(
-                    color: MarksColors.cardShadow,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        Space.sm,
+        Space.sm,
+        Space.sm,
+        Space.lg,
+      ),
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        _CgpaHero(history: history),
+        if (history.records.isNotEmpty) ...[
+          SectionHeader(
+            title: 'Courses',
+            trailing: Text('${shown.length} of ${history.records.length}'),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'All',
+                  selected: filter.value == null,
+                  onPress: () => filter.value = null,
+                ),
+                for (final g in grades)
+                  _FilterChip(
+                    label: g,
+                    count: history.records
+                        .where((r) => r.grade.trim().toUpperCase() == g)
+                        .length,
+                    tone: gradeTone(context, g),
+                    selected: filter.value == g,
+                    onPress: () => filter.value = filter.value == g ? null : g,
                   ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+        ],
+        AnimatedSwitcher(
+          duration: Motion.medium,
+          switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
+          switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
+          layoutBuilder: (current, previous) => Stack(
+            alignment: Alignment.topCenter,
+            children: [...previous, ?current],
+          ),
+          child: Column(
+            key: ValueKey(filter.value),
+            children: [
+              if (shown.isEmpty)
+                const EmptyState(
+                  icon: FLucideIcons.fileX,
+                  title: 'No courses yet',
+                )
+              else
+                for (final (i, r) in shown.indexed)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Space.sm),
+                    child: EnterFade(
+                      index: i,
+                      child: _CourseCard(record: r),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        DataUpdatedFooter(updateTime: history.updateTime.toInt()),
+      ],
+    );
+  }
+}
+
+/// CGPA front and centre, credits beside it, and one bar for the grade mix.
+class _CgpaHero extends StatelessWidget {
+  const _CgpaHero({required this.history});
+
+  final GradeHistoryData history;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final c = history.cgpa;
+    final counts =
+        {
+            'S': c.sGrades,
+            'A': c.aGrades,
+            'B': c.bGrades,
+            'C': c.cGrades,
+            'D': c.dGrades,
+            'E': c.eGrades,
+            'F': c.fGrades,
+            'N': c.nGrades,
+          }.map((k, v) => MapEntry(k, int.tryParse(v.trim()) ?? 0))
+          ..removeWhere((_, v) => v == 0);
+    final total = counts.values.fold<int>(0, (a, b) => a + b);
+    final cgpa = double.tryParse(c.cgpa.trim());
+
+    return Surface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            [
+              history.student.name.trim(),
+              history.student.regNo.trim(),
+            ].where((p) => p.isNotEmpty).join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: typography.body.xs.copyWith(color: colors.mutedForeground),
+          ),
+          const SizedBox(height: Space.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'CGPA',
+                    style: typography.body.xs.copyWith(
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.6,
+                      color: colors.mutedForeground,
+                    ),
+                  ),
+                  cgpa == null
+                      ? Text(c.cgpa, style: typography.display.xl3)
+                      : CountUp(
+                          value: cgpa,
+                          decimals: 2,
+                          style: typography.display.xl3.copyWith(
+                            height: 1.1,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: -0.5,
+                            color: colors.foreground,
+                          ),
+                        ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
+              const Spacer(),
+              _Stat(label: 'CREDITS EARNED', value: c.creditsEarned),
+              const SizedBox(width: Space.lg),
+              _Stat(label: 'REGISTERED', value: c.creditsRegistered),
+            ],
+          ),
+          if (total > 0) ...[
+            const SizedBox(height: Space.lg),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Radii.pill),
+              child: SizedBox(
+                height: 10,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: context.theme.colors.primaryForeground,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            FLucideIcons.bookOpen,
-                            color: MarksColors.theoryIcon,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                r.courseTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 16,
-                                  color: darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.primaryText,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "${r.courseCode} • ${r.courseType} • ${r.credits} credits",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: darkMode
-                                      ? context.theme.colors.primary
-                                      : MarksColors.secondaryText,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 7,
-                          ),
-                          decoration: BoxDecoration(
-                            color: context.theme.colors.primaryForeground,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: _gradeColor(r.grade).withValues(alpha: .4),
-                            ),
-                          ),
-                          child: Text(
-                            r.grade,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: _gradeColor(r.grade),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _metaChip(
-                            context,
-                            "Exam",
-                            r.examMonth,
-                            icon: FLucideIcons.calendarDays,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _metaChip(
-                            context,
-                            "Declared",
-                            r.resultDeclared,
-                            icon: FLucideIcons.calendarCheck,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (r.courseDistribution.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: _metaChip(
-                            context,
-                            "Distribution",
-                            r.courseDistribution,
-                            icon: FLucideIcons.bookOpen,
-                          ),
+                    for (final e in counts.entries)
+                      Expanded(
+                        flex: e.value,
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 2),
+                          color: gradeTone(context, e.key).base,
                         ),
                       ),
                   ],
                 ),
               ),
             ),
-          ),
-          SizeTransition(
-            sizeFactor: _animation,
-            child: _HistoryDetails(record: r),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _metaChip(
-    BuildContext context,
-    String label,
-    String value, {
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
-        color: context.theme.colors.primaryForeground,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: context.theme.colors.mutedForeground),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              "$label: $value",
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                color: context.theme.colors.primary,
-                fontWeight: FontWeight.w500,
-              ),
+            const SizedBox(height: Space.sm),
+            Wrap(
+              spacing: Space.md,
+              runSpacing: Space.xs,
+              children: [
+                for (final e in counts.entries)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: gradeTone(context, e.key).base,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: Space.xs),
+                      Text(
+                        '${e.key} ${e.value}',
+                        style: typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HistoryDetails extends StatelessWidget {
-  final GradeHistoryRecord record;
-  const _HistoryDetails({required this.record});
-
-  @override
-  Widget build(BuildContext context) {
-    if (record.attempts.isEmpty) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: context.theme.colors.primaryForeground,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: context.theme.colors.border),
-        ),
-        child: Text(
-          "No attempt breakdown available",
-          style: TextStyle(
-            color: context.theme.colors.mutedForeground,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      decoration: BoxDecoration(
-        color: context.theme.colors.primaryForeground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Column(
-        children: [
-          for (int i = 0; i < record.attempts.length; i++) ...[
-            _AttemptItem(attempt: record.attempts[i]),
-            if (i != record.attempts.length - 1)
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: context.theme.colors.border,
-              ),
           ],
         ],
       ),
@@ -528,93 +308,253 @@ class _HistoryDetails extends StatelessWidget {
   }
 }
 
-class _AttemptItem extends StatelessWidget {
-  final GradeHistoryAttempt attempt;
-  const _AttemptItem({required this.attempt});
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            attempt.courseTitle,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: context.theme.colors.primary,
-            ),
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final number = double.tryParse(value.trim());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          style: typography.body.xs.copyWith(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            color: colors.mutedForeground,
           ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _small(context, "Code", attempt.courseCode),
-              _small(context, "Type", attempt.courseType),
-              _small(context, "Credits", attempt.credits),
-              _small(context, "Grade", attempt.grade),
-              _small(context, "Exam", attempt.examMonth),
-              _small(context, "Declared", attempt.resultDeclared),
-            ],
+        ),
+        Text(
+          number == null
+              ? value
+              : number == number.roundToDouble()
+              ? number.toStringAsFixed(0)
+              : number.toString(),
+          style: typography.body.lg.copyWith(
+            fontWeight: FontWeight.w500,
+            color: colors.foreground,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
 
-  Widget _small(BuildContext context, String k, String v) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: context.theme.colors.background,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: context.theme.colors.border),
-      ),
-      child: Text(
-        "$k: $v",
-        style: TextStyle(
-          fontSize: 12,
-          color: context.theme.colors.primary,
-          fontWeight: FontWeight.w500,
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onPress,
+    this.count,
+    this.tone,
+  });
+
+  final String label;
+  final int? count;
+  final Tone? tone;
+  final bool selected;
+  final VoidCallback onPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Padding(
+      padding: const EdgeInsets.only(right: Space.sm),
+      child: PressScale(
+        scale: 0.95,
+        semanticsLabel: 'Show grade $label',
+        onPress: onPress,
+        child: AnimatedContainer(
+          duration: Motion.medium,
+          padding: const EdgeInsets.symmetric(
+            horizontal: Space.md,
+            vertical: Space.sm - 1,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? colors.primary : colors.card,
+            borderRadius: BorderRadius.circular(Radii.pill),
+            border: Border.all(
+              color: selected ? colors.primary : colors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (tone != null) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: tone!.base,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: Space.xs + 2),
+              ],
+              Text(
+                count == null ? label : '$label  $count',
+                style: typography.body.sm.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: selected
+                      ? colors.primaryForeground
+                      : colors.foreground,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _CenterInfo extends StatelessWidget {
-  final String title;
-  final String? subtitle;
-  final IconData icon;
+class _CourseCard extends HookWidget {
+  const _CourseCard({required this.record});
 
-  const _CenterInfo({required this.title, required this.icon, this.subtitle});
+  final GradeHistoryRecord record;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 28, color: context.theme.colors.mutedForeground),
-        const SizedBox(height: 10),
-        Text(
-          title,
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: context.theme.colors.primary,
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final expanded = useState(false);
+    final credits = double.tryParse(record.credits.trim());
+    final components = record.attempts
+        .where((a) => a.courseType.trim() != record.courseType.trim())
+        .toList();
+
+    return Surface(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          PressScale(
+            scale: 0.99,
+            semanticsLabel: '${record.courseTitle}, grade ${record.grade}',
+            onPress: () => expanded.value = !expanded.value,
+            child: Padding(
+              padding: const EdgeInsets.all(Space.md + 2),
+              child: Row(
+                children: [
+                  GradeBadge(grade: record.grade),
+                  const SizedBox(width: Space.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          record.courseTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: typography.body.md.copyWith(
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            color: colors.foreground,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            record.courseCode,
+                            if (credits != null)
+                              '${credits == credits.roundToDouble() ? credits.toStringAsFixed(0) : credits} credits',
+                          ].join(' · '),
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                        Text(
+                          [
+                            record.examMonth.replaceAll('-', ' '),
+                            record.courseDistribution,
+                          ].where((p) => p.trim().isNotEmpty).join(' · '),
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (components.isNotEmpty)
+                    AnimatedRotation(
+                      turns: expanded.value ? 0.5 : 0,
+                      duration: Motion.medium,
+                      child: Icon(
+                        FLucideIcons.chevronDown,
+                        size: 16,
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            subtitle!,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: context.theme.colors.mutedForeground),
+          AnimatedSize(
+            duration: Motion.medium,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: expanded.value && components.isNotEmpty
+                ? Column(
+                    children: [
+                      Container(height: 1, color: colors.border),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          Space.md + 2,
+                          Space.sm,
+                          Space.md + 2,
+                          Space.md,
+                        ),
+                        child: Column(
+                          children: [
+                            for (final a in components)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: Space.xs,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _componentLabel(a.courseType),
+                                        style: typography.body.sm.copyWith(
+                                          color: colors.foreground,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'Declared ${a.resultDeclared}',
+                                      style: typography.body.xs.copyWith(
+                                        color: colors.mutedForeground,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : const SizedBox(width: double.infinity),
           ),
         ],
-      ],
+      ),
     );
   }
+
+  static String _componentLabel(String type) =>
+      switch (type.trim().toUpperCase()) {
+        'ETH' || 'TH' => 'Theory component',
+        'ELA' || 'LO' => 'Lab component',
+        'EPJ' || 'PJT' => 'Project component',
+        _ => type,
+      };
 }
