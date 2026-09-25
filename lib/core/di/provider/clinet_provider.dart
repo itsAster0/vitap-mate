@@ -15,6 +15,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 part 'clinet_provider.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -28,7 +29,6 @@ class VClient extends _$VClient {
       throw StateError('A configured VTOP account is required.');
     }
     final uname = user.username.toUpperCase();
-    final inAppCaptchaSolverEnabled = ref.watch(inAppCaptchaSolverProvider);
     final StoredVtopSession? storedSession = await loadStoredVtopSession(uname);
     PersistedVtopSession? persistedSession;
     if (storedSession != null) {
@@ -55,7 +55,6 @@ class VClient extends _$VClient {
       username: uname,
       password: user.password,
       persistedSession: persistedSession,
-      inAppCaptchaSolverEnabled: inAppCaptchaSolverEnabled,
     );
   }
 
@@ -82,6 +81,29 @@ class VClient extends _$VClient {
     );
   }
 
+  /// True when [client] is signed in and its last real login is younger
+  /// than the Session Reuse setting. The login time comes from Rust, which
+  /// sets it only when a password (+ OTP) login completes; sessions restored
+  /// without a known login time are reused until VTOP rejects them.
+  Future<bool> _canReuseSession(VtopClient client, String flowLabel) async {
+    if (!await fetchIsAuth(client: client)) return false;
+    final loggedInAt = exportSessionState(client: client).loggedInAt;
+    if (loggedInAt == null) return true;
+    final age = DateTime.now().toUtc().difference(
+      DateTime.fromMillisecondsSinceEpoch(
+        loggedInAt.toInt() * 1000,
+        isUtc: true,
+      ),
+    );
+    final ttl = ref.read(vtopSessionReuseTtlProvider);
+    if (age <= ttl) return true;
+    AppLogger.instance.info(
+      'client.auth',
+      '$flowLabel session is ${age.inMinutes}m old (limit ${ttl.inMinutes}m); logging in again',
+    );
+    return false;
+  }
+
   Future<VtopClient> ensureLogin({
     bool force = false,
     bool promptForOtp = true,
@@ -91,7 +113,7 @@ class VClient extends _$VClient {
     final flowId = ++_loginFlowCounter;
     final flowLabel = 'auth.flow#$flowId';
     if (!force) {
-      if (await fetchIsAuth(client: client)) {
+      if (await _canReuseSession(client, flowLabel)) {
         AppLogger.instance.info(
           'client.auth',
           '$flowLabel reused an authenticated in-memory session',
@@ -133,7 +155,7 @@ class VClient extends _$VClient {
             'client.auth',
             '$flowLabel entered serialized login queue',
           );
-          if (!force && await fetchIsAuth(client: client)) {
+          if (!force && await _canReuseSession(client, flowLabel)) {
             AppLogger.instance.info(
               'client.auth',
               '$flowLabel skipped full login because the session became authenticated while waiting for the queue',
@@ -141,7 +163,7 @@ class VClient extends _$VClient {
             return;
           }
           try {
-            await vtopClientLogin(client: client);
+            await ref.read(vtopAuthenticatorProvider).login(client);
           } catch (e) {
             if (!isSecurityOtpRequiredError(e)) rethrow;
             AppLogger.instance.info(

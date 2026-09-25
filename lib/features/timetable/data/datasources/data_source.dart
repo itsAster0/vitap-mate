@@ -2,15 +2,14 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
+import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 
 class TimetableDataSource {
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final AsyncQueue _globalAsyncQueue;
 
-  TimetableDataSource(this._storage, this._client, this._globalAsyncQueue);
+  TimetableDataSource(this._storage, this._backend, this._globalAsyncQueue);
 
   Future<TimetableData> getTimetable(String semid) async {
     final data = await _globalAsyncQueue.run(
@@ -52,8 +51,7 @@ class TimetableDataSource {
       action: 'fetchTimetable semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_timetable_$semid',
-        () async =>
-            vtop_api.fetchTimetable(client: await _client(), semesterId: semid),
+        () async => _backend().timetable(semid),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'dart:async';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
@@ -6,7 +7,6 @@ import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 part 'vtop_otp_challenge_provider.g.dart';
 
@@ -298,10 +298,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       clearError: true,
     );
     try {
-      await vtopClientSubmitSecurityOtp(
-        client: _client!,
-        otpCode: sanitizedOtp,
-      );
+      await ref
+          .read(vtopAuthenticatorProvider)
+          .submitOtp(_client!, sanitizedOtp);
       AppLogger.instance.info('client.otp', '$_logContext OTP accepted');
       _finishSuccess();
     } catch (error) {
@@ -341,7 +340,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     AppLogger.instance.info('client.otp', '$_logContext requesting OTP resend');
     try {
       final requestedAt = DateTime.now().toUtc();
-      await vtopClientResendSecurityOtp(client: _client!);
+      await ref.read(vtopAuthenticatorProvider).resendOtp(_client!);
       _otpRequiredAt = requestedAt;
       AppLogger.instance.info('client.otp', '$_logContext resend completed');
       state = state.update(

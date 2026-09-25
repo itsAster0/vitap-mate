@@ -6,4 +6,5 @@ pub fn greet(name: String) -> String {
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
+    crate::api::native_logs::install_native_logger();
 }

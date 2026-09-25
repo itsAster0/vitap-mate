@@ -4,13 +4,16 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
 part 'settings.g.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
 const timetableViewModeSettingKey = 'settings_timetable_view_mode';
-const inAppCaptchaSolverSettingKey = 'settings_in_app_captcha_solver';
 const emailOtpBannerDismissedSettingKey = 'settings_email_otp_banner_dismissed';
+const vtopServerUrlSettingKey = 'settings_vtop_server_url';
+const vtopServerApiKeySettingKey = 'settings_vtop_server_api_key';
+const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -35,25 +38,50 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         "settings_student_projects_json",
         "settings_student_projects_rotation_seed",
         timetableViewModeSettingKey,
-        inAppCaptchaSolverSettingKey,
         emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
         vtopDesktopModeSettingKey,
+        vtopServerUrlSettingKey,
+        vtopServerApiKeySettingKey,
+        vtopServerEnabledSettingKey,
       },
     ),
   );
 }
 
+/// The optional vtop-server. The API key is kept in plain preferences by
+/// choice; see rust/ARCHITECTURE.md.
 @riverpod
-bool inAppCaptchaSolver(Ref ref) {
+VtopServerSettings vtopServerSettings(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool(inAppCaptchaSolverSettingKey) ?? false;
+  final url = prefs?.getString(vtopServerUrlSettingKey) ?? '';
+  return VtopServerSettings(
+    url: url,
+    apiKey: prefs?.getString(vtopServerApiKeySettingKey) ?? '',
+    // Installs from before the switch existed: a saved URL meant "on".
+    enabled: prefs?.getBool(vtopServerEnabledSettingKey) ?? url.isNotEmpty,
+  );
 }
 
-Future<void> setInAppCaptchaSolver(WidgetRef ref, bool value) async {
+Future<void> setVtopServerSettings(
+  WidgetRef ref,
+  VtopServerSettings value,
+) async {
   final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(inAppCaptchaSolverSettingKey, value);
-  ref.invalidate(inAppCaptchaSolverProvider);
+  // URL and key are kept when the switch is off, so turning it back on
+  // needs no retyping.
+  await prefs.setBool(vtopServerEnabledSettingKey, value.enabled);
+  if (value.hasUrl) {
+    await prefs.setString(vtopServerUrlSettingKey, value.url.trim());
+  } else {
+    await prefs.remove(vtopServerUrlSettingKey);
+  }
+  if (value.hasApiKey) {
+    await prefs.setString(vtopServerApiKeySettingKey, value.apiKey.trim());
+  } else {
+    await prefs.remove(vtopServerApiKeySettingKey);
+  }
+  ref.invalidate(vtopServerSettingsProvider);
 }
 
 @riverpod

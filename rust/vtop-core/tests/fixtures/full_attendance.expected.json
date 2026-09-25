@@ -1,0 +1,32 @@
+{
+  "course_id": "AP2026271000123",
+  "course_type": "ETH",
+  "records": [
+    {
+      "date": "01-Jul-2026",
+      "day_time": "WED / 08:00-08:50",
+      "remark": "",
+      "serial": "1",
+      "slot": "A1",
+      "status": "Present"
+    },
+    {
+      "date": "03-Jul-2026",
+      "day_time": "FRI / 08:00-08:50",
+      "remark": "Medical",
+      "serial": "2",
+      "slot": "A1",
+      "status": "Absent"
+    },
+    {
+      "date": "06-Jul-2026",
+      "day_time": "MON / 08:00-08:50",
+      "remark": "Club event",
+      "serial": "3",
+      "slot": "A1",
+      "status": "On Duty"
+    }
+  ],
+  "semester_id": "AP2026271",
+  "update_time": 0
+}

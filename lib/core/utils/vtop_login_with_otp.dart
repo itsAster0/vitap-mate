@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -26,7 +27,10 @@ Future<void> loginWithSecurityOtpPrompt({
   required VtopClient client,
 }) async {
   try {
-    await vtopClientLogin(client: client);
+    await ProviderScope.containerOf(
+      context,
+      listen: false,
+    ).read(vtopAuthenticatorProvider).login(client);
     return;
   } catch (error) {
     if (!_isSecurityOtpRequiredError(error)) rethrow;

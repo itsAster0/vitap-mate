@@ -48,49 +48,63 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'8860c1c630783e1c98a23b0d3b44abce42374c75';
+String _$settingsHash() => r'5c099626b2fb2d95ae84732fd8844b01a70ea475';
 
-@ProviderFor(inAppCaptchaSolver)
-final inAppCaptchaSolverProvider = InAppCaptchaSolverProvider._();
+/// The optional vtop-server. The API key is kept in plain preferences by
+/// choice; see rust/ARCHITECTURE.md.
 
-final class InAppCaptchaSolverProvider
-    extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  InAppCaptchaSolverProvider._()
+@ProviderFor(vtopServerSettings)
+final vtopServerSettingsProvider = VtopServerSettingsProvider._();
+
+/// The optional vtop-server. The API key is kept in plain preferences by
+/// choice; see rust/ARCHITECTURE.md.
+
+final class VtopServerSettingsProvider
+    extends
+        $FunctionalProvider<
+          VtopServerSettings,
+          VtopServerSettings,
+          VtopServerSettings
+        >
+    with $Provider<VtopServerSettings> {
+  /// The optional vtop-server. The API key is kept in plain preferences by
+  /// choice; see rust/ARCHITECTURE.md.
+  VtopServerSettingsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'inAppCaptchaSolverProvider',
+        name: r'vtopServerSettingsProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$inAppCaptchaSolverHash();
+  String debugGetCreateSourceHash() => _$vtopServerSettingsHash();
 
   @$internal
   @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<VtopServerSettings> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
 
   @override
-  bool create(Ref ref) {
-    return inAppCaptchaSolver(ref);
+  VtopServerSettings create(Ref ref) {
+    return vtopServerSettings(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(VtopServerSettings value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<VtopServerSettings>(value),
     );
   }
 }
 
-String _$inAppCaptchaSolverHash() =>
-    r'54cbebd84901af6c0a20feb1231c88233f73ce08';
+String _$vtopServerSettingsHash() =>
+    r'8f0025ef6f3ae780df89b4c11271de4a5282cba4';
 
 @ProviderFor(mergeTT)
 final mergeTTProvider = MergeTTProvider._();

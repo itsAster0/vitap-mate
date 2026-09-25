@@ -25,6 +25,7 @@ import 'package:vitapmate/features/background/sync.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/vtop_server_dialog.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
@@ -318,6 +319,9 @@ class SettingsPage extends HookConsumerWidget {
   }
 
   Future<void> _refreshAllVtopData(BuildContext context, WidgetRef ref) async {
+    final stopwatch = Stopwatch()..start();
+    String took() =>
+        'Took ${(stopwatch.elapsedMilliseconds / 1000).toStringAsFixed(1)} s.';
     try {
       final success = await syncVtopData(
         read: ref.read,
@@ -329,12 +333,12 @@ class SettingsPage extends HookConsumerWidget {
       _invalidateVtopDataProviders(ref);
       if (!context.mounted) return;
       if (success) {
-        dispToast(context, "Updated", "All VTOP data is up to date.");
+        dispToast(context, "Updated", "All VTOP data is up to date. ${took()}");
       } else {
         dispToast(
           context,
           "Partially Updated",
-          "Some VTOP data could not be refreshed. Try again in a bit.",
+          "Some VTOP data could not be refreshed. Try again in a bit. ${took()}",
         );
       }
     } catch (error, stackTrace) {
@@ -428,6 +432,15 @@ class SettingsPage extends HookConsumerWidget {
                     setMergeTT(ref, value);
                   },
                 ),
+              ),
+              FTile(
+                prefix: const Icon(FLucideIcons.arrowDownUp),
+                title: const Text('Data Source'),
+                subtitle: Text(
+                  vtopDataSourceLabel(ref.watch(vtopServerSettingsProvider)),
+                ),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () => showVtopServerDialog(context, ref),
               ),
               FTile(
                 prefix: const Icon(FLucideIcons.cloudDownload),
@@ -576,19 +589,6 @@ class SettingsPage extends HookConsumerWidget {
                 onPress: () {
                   GoRouter.of(context).pushNamed(Paths.notificationManagement);
                 },
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.scanText),
-                title: const Text('In-app CAPTCHA Solver'),
-                subtitle: const Text(
-                  'Solve VTOP CAPTCHAs locally instead of using the hosted solver',
-                ),
-                suffix: FSwitch(
-                  value: ref.watch(inAppCaptchaSolverProvider),
-                  onChange: (value) {
-                    setInAppCaptchaSolver(ref, value);
-                  },
-                ),
               ),
             ],
           ),

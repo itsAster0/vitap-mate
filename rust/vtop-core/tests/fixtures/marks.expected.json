@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "coursecode": "CSE2001",
+      "coursetitle": "Data Structures",
+      "coursetype": "Embedded Theory",
+      "faculity": "Dr. Test Faculty",
+      "marks": [
+        {
+          "markstitle": "CAT-1",
+          "maxmarks": "50",
+          "remark": "",
+          "scoredmark": "41",
+          "serial": "1",
+          "status": "Present",
+          "weightage": "15",
+          "weightagemark": "12.30"
+        },
+        {
+          "markstitle": "Quiz 1",
+          "maxmarks": "10",
+          "remark": "Good",
+          "scoredmark": "9",
+          "serial": "2",
+          "status": "Present",
+          "weightage": "10",
+          "weightagemark": "9.00"
+        }
+      ],
+      "serial": "1",
+      "slot": "A1+TA1"
+    },
+    {
+      "coursecode": "MAT1001",
+      "coursetitle": "Calculus-I",
+      "coursetype": "Theory Only",
+      "faculity": "Prof. Maths Person",
+      "marks": [],
+      "serial": "2",
+      "slot": "B1"
+    }
+  ],
+  "semester_id": "AP2026271",
+  "update_time": 0
+}

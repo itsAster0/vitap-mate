@@ -819,11 +819,9 @@ class _ClassRow extends HookWidget {
                         ],
                       ),
                       const SizedBox(height: Space.sm),
-                      // Line 2: kind · code · room
+                      // Line 2: block and room
                       Row(
                         children: [
-                          CourseKindBadge(isLab: slot.kind == ClassKind.lab),
-                          const SizedBox(width: Space.sm),
                           Expanded(
                             child: Text(
                               '${slot.block} · Room ${slot.roomNo}',
@@ -845,11 +843,16 @@ class _ClassRow extends HookWidget {
                           ),
                         ],
                       ),
-                      // Line 3: attendance
-                      if (record != null) ...[
-                        const SizedBox(height: Space.sm),
-                        _AttendanceBadge(record: record!),
-                      ],
+                      const SizedBox(height: Space.sm),
+                      // Line 3: class kind and attendance
+                      Wrap(
+                        spacing: Space.sm,
+                        runSpacing: Space.sm,
+                        children: [
+                          CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+                          if (record != null) _AttendanceBadge(record: record!),
+                        ],
+                      ),
                       AnimatedSize(
                         duration: Motion.medium,
                         curve: Curves.easeOutCubic,

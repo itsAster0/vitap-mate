@@ -339,6 +339,9 @@ class _ExamCard extends StatelessWidget {
     final typography = context.theme.typography;
     final start = examStartOf(exam);
     final done = start != null && start.isBefore(DateTime.now());
+    final hasLocation = hasValue(exam.venue) || hasValue(exam.seatLocation);
+    final hasNumberOrReport =
+        hasValue(exam.seatNo) || hasValue(exam.reportingTime);
 
     return AnimatedOpacity(
       duration: Motion.medium,
@@ -397,25 +400,35 @@ class _ExamCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (hasValue(exam.venue) ||
-                hasValue(exam.seatNo) ||
-                hasValue(exam.reportingTime)) ...[
+            if (hasLocation || hasNumberOrReport) ...[
               const SizedBox(height: Space.md),
-              Row(
-                children: [
-                  if (hasValue(exam.venue))
-                    _Fact(label: 'VENUE', value: exam.venue.trim()),
-                  if (hasValue(exam.seatLocation))
-                    _Fact(
-                      label: 'SEAT',
-                      value: _seatLabel(exam.seatLocation.trim()),
-                    ),
-                  if (hasValue(exam.seatNo))
-                    _Fact(label: 'NO.', value: exam.seatNo.trim()),
-                  if (hasValue(exam.reportingTime))
-                    _Fact(label: 'REPORT', value: exam.reportingTime.trim()),
-                ],
-              ),
+              if (hasLocation)
+                Row(
+                  children: [
+                    if (hasValue(exam.venue))
+                      _Fact(label: 'VENUE', value: exam.venue.trim()),
+                    if (hasValue(exam.venue) && hasValue(exam.seatLocation))
+                      const SizedBox(width: Space.sm),
+                    if (hasValue(exam.seatLocation))
+                      _Fact(
+                        label: 'SEAT',
+                        value: _seatLabel(exam.seatLocation.trim()),
+                      ),
+                  ],
+                ),
+              if (hasLocation && hasNumberOrReport)
+                const SizedBox(height: Space.sm),
+              if (hasNumberOrReport)
+                Row(
+                  children: [
+                    if (hasValue(exam.seatNo))
+                      _Fact(label: 'NO.', value: exam.seatNo.trim()),
+                    if (hasValue(exam.seatNo) && hasValue(exam.reportingTime))
+                      const SizedBox(width: Space.sm),
+                    if (hasValue(exam.reportingTime))
+                      _Fact(label: 'REPORT', value: exam.reportingTime.trim()),
+                  ],
+                ),
             ],
           ],
         ),

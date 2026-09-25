@@ -1,0 +1,13 @@
+# Railway service for vtop-server. Set the service's root directory to `rust`
+# and the variables listed in vtop-server/README.md. Set VTOP_SERVER_API_KEYS:
+# without it the server is open to anyone. Railway provides PORT.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "vtop-server/Dockerfile"
+watchPatterns = ["vtop-core/**", "vtop-server/**", "Cargo.toml", "Cargo.lock"]
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

@@ -1,3 +1,4 @@
+pub mod email_otp;
 pub mod native_logs;
 pub mod simple;
 pub mod vtop;

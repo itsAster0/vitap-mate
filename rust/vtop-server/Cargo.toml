@@ -1,0 +1,24 @@
+[package]
+name = "vtop-server"
+version = "0.1.0"
+edition = "2021"
+description = "HTTP service that fetches and parses VTOP pages for a caller-supplied session"
+
+[dependencies]
+vtop-core = { path = "../vtop-core" }
+axum = "0.8"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "tracing-log"] }
+sha2 = "0.10"
+subtle = "2.6"
+base64 = "0.22.1"
+futures = "0.3"
+tower-http = { version = "0.6", features = ["compression-gzip"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

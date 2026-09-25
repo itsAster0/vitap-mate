@@ -495,6 +495,11 @@ _PersistedVtopSession _$PersistedVtopSessionFromJson(
   username: json['username'] as String,
   savedAtEpochMs: BigInt.parse(json['savedAtEpochMs'] as String),
   cookies: json['cookies'] as String?,
+  csrfToken: json['csrfToken'] as String?,
+  registrationNumber: json['registrationNumber'] as String?,
+  loggedInAt: json['loggedInAt'] == null
+      ? null
+      : BigInt.parse(json['loggedInAt'] as String),
 );
 
 Map<String, dynamic> _$PersistedVtopSessionToJson(
@@ -503,6 +508,9 @@ Map<String, dynamic> _$PersistedVtopSessionToJson(
   'username': instance.username,
   'savedAtEpochMs': instance.savedAtEpochMs.toString(),
   'cookies': instance.cookies,
+  'csrfToken': instance.csrfToken,
+  'registrationNumber': instance.registrationNumber,
+  'loggedInAt': instance.loggedInAt?.toString(),
 };
 
 _SemesterData _$SemesterDataFromJson(Map<String, dynamic> json) =>

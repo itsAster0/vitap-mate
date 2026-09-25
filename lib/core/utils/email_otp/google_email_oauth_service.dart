@@ -1,3 +1,5 @@
+import 'package:vitapmate/src/api/email_otp.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' show log;
@@ -36,6 +38,21 @@ const _googleServiceConfiguration = AuthorizationServiceConfiguration(
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
 );
 const _oauthStorageKey = 'email_otp_oauth_session_v1';
+
+typedef GmailOtpFinder =
+    Future<GmailOtpCode?> Function({
+      required String accessToken,
+      BigInt? expiresAtUnix,
+      required BigInt issuedAtUnix,
+      required List<String> skipMessageIds,
+    });
+
+typedef GmailOtpTidier =
+    Future<void> Function({
+      required String accessToken,
+      required String messageId,
+      required bool deleteAfterReading,
+    });
 
 @Riverpod(keepAlive: true)
 GoogleEmailOtpAuthService googleEmailOtpAuthService(Ref ref) {
@@ -119,9 +136,12 @@ class EmailOtpOAuthSession {
   bool get hasGmailScope =>
       scopes.contains('https://www.googleapis.com/auth/gmail.modify');
 
-  bool get isExpired {
+  bool get isExpired => expiresWithin(const Duration(seconds: 30));
+
+  /// True when the access token is expired or will be within [margin].
+  bool expiresWithin(Duration margin) {
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    return accessTokenExpiryEpochMs <= now + 30 * 1000;
+    return accessTokenExpiryEpochMs <= now + margin.inMilliseconds;
   }
 
   Map<String, dynamic> toJson() {
@@ -206,7 +226,11 @@ class GoogleEmailOtpAuthService {
     required FlutterSecureStorage storage,
     required http.Client httpClient,
     required GoogleLoopbackOAuthCoordinator loopbackOAuth,
-  }) : _appAuth = appAuth,
+    GmailOtpFinder? findOtp,
+    GmailOtpTidier? tidyUp,
+  }) : _findOtp = findOtp ?? _rustFindOtp,
+       _tidyUp = tidyUp ?? _rustTidyUp,
+       _appAuth = appAuth,
        _storage = storage,
        _http = httpClient,
        _loopbackOAuth = loopbackOAuth;
@@ -215,6 +239,33 @@ class GoogleEmailOtpAuthService {
   final FlutterSecureStorage _storage;
   final http.Client _http;
   final Set<String> _consumedOtpMessageIds = {};
+
+  /// Rust's Gmail OTP reader (`vtop_core::gmail`) by default; swappable so
+  /// tests run without the native library.
+  final GmailOtpFinder _findOtp;
+  final GmailOtpTidier _tidyUp;
+
+  static Future<GmailOtpCode?> _rustFindOtp({
+    required String accessToken,
+    BigInt? expiresAtUnix,
+    required BigInt issuedAtUnix,
+    required List<String> skipMessageIds,
+  }) => gmailFindOtp(
+    accessToken: accessToken,
+    expiresAtUnix: expiresAtUnix,
+    issuedAtUnix: issuedAtUnix,
+    skipMessageIds: skipMessageIds,
+  );
+
+  static Future<void> _rustTidyUp({
+    required String accessToken,
+    required String messageId,
+    required bool deleteAfterReading,
+  }) => gmailTidyUp(
+    accessToken: accessToken,
+    messageId: messageId,
+    deleteAfterReading: deleteAfterReading,
+  );
   final GoogleLoopbackOAuthCoordinator _loopbackOAuth;
 
   Future<EmailOtpOAuthSession?> loadSession() async {
@@ -551,10 +602,16 @@ class GoogleEmailOtpAuthService {
     }
   }
 
-  Future<EmailOtpOAuthSession?> refreshIfNeeded() async {
+  /// The session with an access token valid for at least [minValidity],
+  /// refreshing it when needed (or always, with [force], e.g. after Gmail
+  /// rejected the current token).
+  Future<EmailOtpOAuthSession?> refreshIfNeeded({
+    bool force = false,
+    Duration minValidity = const Duration(seconds: 30),
+  }) async {
     final session = await loadSession();
     if (session == null) return null;
-    if (!session.isExpired) return session;
+    if (!force && !session.expiresWithin(minValidity)) return session;
     if (session.authSource == EmailOtpAuthSource.personalByok) {
       return _refreshByokSession(session);
     }
@@ -653,60 +710,86 @@ class GoogleEmailOtpAuthService {
     return refreshed;
   }
 
+  /// VTOP's OTP from Gmail sent after [sinceUtc], or null when it has not
+  /// arrived yet. Reading and parsing run in Rust (`vtop_core::gmail`), the
+  /// same code vtop-server uses; this side only supplies a fresh token.
+  ///
+  /// A rejected token is refreshed once and retried before Gmail is
+  /// disconnected, since a 401 usually just means the token expired.
   Future<String?> fetchLatestOtpSince({
     required DateTime sinceUtc,
     bool deleteAfterReading = true,
   }) async {
-    final session = await refreshIfNeeded();
+    var session = await refreshIfNeeded();
     if (session == null) return null;
 
-    final listResponse = await _http.get(
-      Uri.https('gmail.googleapis.com', '/gmail/v1/users/me/messages', {
-        'maxResults': '1',
-        'q':
-            'from:noreply.sdc@vitap.ac.in '
-            'after:${sinceUtc.millisecondsSinceEpoch ~/ 1000}',
-      }),
-      headers: {'Authorization': 'Bearer ${session.accessToken}'},
+    Future<GmailOtpCode?> find(EmailOtpOAuthSession session) => _findOtp(
+      accessToken: session.accessToken,
+      expiresAtUnix: BigInt.from(session.accessTokenExpiryEpochMs ~/ 1000),
+      issuedAtUnix: BigInt.from(sinceUtc.millisecondsSinceEpoch ~/ 1000),
+      skipMessageIds: _consumedOtpMessageIds.toList(),
     );
-    await _throwForGmailReadFailure(listResponse);
-    if (listResponse.statusCode != 200) {
-      throw StateError(
-        'Unable to read Gmail inbox (status ${listResponse.statusCode}).',
-      );
-    }
 
-    final message = await _fetchFirstListedMessage(
-      listResponse.body,
-      session.accessToken,
+    GmailOtpCode? found;
+    try {
+      found = await find(session);
+    } on VtopError catch (error) {
+      if (_gmailErrorCode(error) != 'gmail_unauthorized') {
+        throw _gmailStateError(error);
+      }
+      session = await refreshIfNeeded(force: true);
+      if (session == null) return null;
+      try {
+        found = await find(session);
+      } on VtopError catch (retryError) {
+        if (_gmailErrorCode(retryError) == 'gmail_unauthorized') {
+          await clearSession();
+          throw StateError(
+            'Google authorization expired or was revoked. Reconnect Gmail.',
+          );
+        }
+        throw _gmailStateError(retryError);
+      }
+    }
+    if (found == null) return null;
+
+    _consumedOtpMessageIds.add(found.messageId);
+    await _tidyUp(
+      accessToken: session.accessToken,
+      messageId: found.messageId,
+      deleteAfterReading: deleteAfterReading,
     );
-    if (message == null) return null;
-    final messageId = message['id'] as String?;
-    if (messageId == null || _consumedOtpMessageIds.contains(messageId)) {
-      return null;
-    }
+    return found.code;
+  }
 
-    final internalDateMs = int.tryParse('${message['internalDate']}') ?? 0;
-    if (internalDateMs <= 0) return null;
-    final timestamp = DateTime.fromMillisecondsSinceEpoch(
-      internalDateMs,
-      isUtc: true,
+  /// An access token for vtop-server to read the OTP during a server login,
+  /// valid for at least [minValidity] (the server may wait a while for the
+  /// email). Null when Gmail is not connected.
+  Future<({String accessToken, int expiresAtUnix})?> accessForServerLogin({
+    Duration minValidity = const Duration(minutes: 3),
+  }) async {
+    final session = await refreshIfNeeded(minValidity: minValidity);
+    if (session == null || !session.hasGmailScope) return null;
+    return (
+      accessToken: session.accessToken,
+      expiresAtUnix: session.accessTokenExpiryEpochMs ~/ 1000,
     );
-    if (timestamp.isBefore(sinceUtc)) return null;
-    if (!_isFromVtopOtpSender(message)) return null;
+  }
 
-    final combinedText = _extractMessageText(message);
-    final match = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(combinedText);
-    final otp = match?.group(1);
-    if (otp != null) {
-      _consumedOtpMessageIds.add(messageId);
-      await _handleReadOtpMessage(
-        message,
-        session.accessToken,
-        deleteAfterReading: deleteAfterReading,
-      );
+  String? _gmailErrorCode(VtopError error) =>
+      error.maybeWhen(configurationError: (code) => code, orElse: () => null);
+
+  StateError _gmailStateError(VtopError error) {
+    switch (_gmailErrorCode(error)) {
+      case 'gmail_forbidden':
+        return StateError(
+          'Gmail refused access. Check the Gmail API is enabled and access was granted, or reconnect Gmail.',
+        );
+      case 'gmail_unavailable':
+        return StateError('Could not reach Gmail. Check your connection.');
+      default:
+        return StateError('Unable to read Gmail inbox ($error).');
     }
-    return otp;
   }
 
   Future<LatestInfoEmail?> fetchLatestInfoEmail({

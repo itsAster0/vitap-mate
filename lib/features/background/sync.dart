@@ -1,3 +1,5 @@
+import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart'
     show ProviderListenable;
@@ -47,7 +49,10 @@ void callbackDispatcher() {
 }
 
 Future<bool> _syncData({String? task}) async {
-  final container = ProviderContainer();
+  // Headless: nobody can answer an OTP prompt here.
+  final container = ProviderContainer(
+    overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
+  );
   try {
     await RustLib.init();
     return await syncVtopData(
@@ -89,10 +94,41 @@ Future<bool> syncVtopData({
     ).ensureLogin(promptForOtp: promptForOtp);
     final List<Future<bool>> futures = [];
 
+    // Decide what is stale first, so a vtop-server can fetch all of it in
+    // one /v1/refresh call before the per-page refreshes run.
     final timetable = await (await read(
       timetableRepositoryProvider.future,
     )).load();
-    if (force || !_isUpdatedWithinBacksyncWindow(timetable.updateTime)) {
+    final refreshTimetable =
+        force || !_isUpdatedWithinBacksyncWindow(timetable.updateTime);
+    final marks = await (await read(marksRepositoryProvider.future)).load();
+    final refreshMarks =
+        force || !_isUpdatedWithinBacksyncWindow(marks.updateTime);
+    final examSchedule = await (await read(
+      examScheduleRepositoryProvider.future,
+    )).load();
+    final refreshExamSchedule =
+        force || !_isUpdatedWithinBacksyncWindow(examSchedule.updateTime);
+    final semids = await (await read(
+      semidRepositoryProvider.future,
+    )).loadCache();
+    final refreshSemesters =
+        force ||
+        semids == null ||
+        !_isUpdatedWithinBacksyncWindow(semids.updateTime);
+
+    await read(vtopBackendProvider).prefetch(user.semid!, {
+      if (refreshTimetable) VtopPage.timetable,
+      if (refreshMarks) VtopPage.marks,
+      if (refreshExamSchedule) VtopPage.examSchedule,
+      if (refreshSemesters) VtopPage.semesters,
+      VtopPage.attendance,
+      // A manual update refreshes every course's detail; fetch them in the
+      // same call instead of one request per course.
+      if (force) VtopPage.fullAttendance,
+    });
+
+    if (refreshTimetable) {
       futures.add(
         _retryer(
           () => read(timetableProvider.notifier).updateTimetable(),
@@ -101,9 +137,7 @@ Future<bool> syncVtopData({
         ),
       );
     }
-
-    final marks = await (await read(marksRepositoryProvider.future)).load();
-    if (force || !_isUpdatedWithinBacksyncWindow(marks.updateTime)) {
+    if (refreshMarks) {
       futures.add(
         _retryer(
           () => read(marksProvider.notifier).updatemarks(),
@@ -112,11 +146,7 @@ Future<bool> syncVtopData({
         ),
       );
     }
-
-    final examSchedule = await (await read(
-      examScheduleRepositoryProvider.future,
-    )).load();
-    if (force || !_isUpdatedWithinBacksyncWindow(examSchedule.updateTime)) {
+    if (refreshExamSchedule) {
       futures.add(
         _retryer(
           () => read(examScheduleProvider.notifier).updatexamschedule(),
@@ -125,13 +155,7 @@ Future<bool> syncVtopData({
         ),
       );
     }
-
-    final semids = await (await read(
-      semidRepositoryProvider.future,
-    )).loadCache();
-    if (force ||
-        semids == null ||
-        !_isUpdatedWithinBacksyncWindow(semids.updateTime)) {
+    if (refreshSemesters) {
       futures.add(
         _retryer(
           () => read(semesterIdProvider.notifier).updatesemids(),

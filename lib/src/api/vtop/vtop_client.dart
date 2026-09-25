@@ -6,12 +6,5 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_str`, `as_str`, `as_str`, `auth_log`, `begin_auth_flow`, `ensure_authenticated_session`, `export_session_snapshot`, `extract_captcha_data`, `extract_csrf_token`, `extract_javascript_var`, `extract_registration_number`, `follow_security_otp_redirect`, `get_attendance`, `get_biometric_history`, `get_cookie`, `get_exam_schedule`, `get_full_attendance`, `get_grade_history`, `get_grade_view_details`, `get_grade_view`, `get_login_page_error`, `get_marks`, `get_semesters`, `get_timetable`, `invalid`, `is_authenticated`, `is_invalid_credentials_response`, `is_login_url`, `is_security_otp_required_response`, `load_initial_page`, `load_login_page`, `log_auth_event`, `log_cookie_store_state`, `log_network_request`, `login_alert_message`, `login`, `make_client`, `mark_session_expired`, `missing_csrf_error`, `network_auth_log`, `normalize_login_alert_message`, `parse`, `parse`, `parse`, `perform_login`, `read_authenticated_response_text`, `registration_number_value`, `registration_number`, `reqwest_network_error`, `resend_security_otp`, `reset_session_state`, `resolve_vtop_url`, `restore_session_snapshot`, `set_in_app_captcha_solver_enabled`, `solve_captcha`, `submit_security_otp`, `try_restore_existing_session`, `validate_authenticated_session`, `vtop_server_error`, `with_config`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AuthStage`, `BiometricDate`, `OtpCode`, `RegistrationNumber`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`
-
-Future<BigInt> nowUnix() =>
-    RustLib.instance.api.crateApiVtopVtopClientNowUnix();
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>
 abstract class VtopClient implements RustOpaqueInterface {}

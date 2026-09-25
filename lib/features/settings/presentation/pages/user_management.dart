@@ -311,9 +311,6 @@ class UserPassChange extends HookConsumerWidget {
                                 final client = await getVtopClient(
                                   username: newUsername,
                                   password: newPassword,
-                                  inAppCaptchaSolverEnabled: ref.read(
-                                    inAppCaptchaSolverProvider,
-                                  ),
                                 );
                                 if (!context.mounted) return;
                                 await loginWithSecurityOtpPrompt(

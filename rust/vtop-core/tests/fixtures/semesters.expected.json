@@ -1,0 +1,17 @@
+{
+  "semesters": [
+    {
+      "id": "AP2026271",
+      "name": "Fall Semester 2026-27 "
+    },
+    {
+      "id": "AP2025264",
+      "name": "Winter Semester 2025-26"
+    },
+    {
+      "id": "AP2025261",
+      "name": "Fall Semester 2025-26 "
+    }
+  ],
+  "update_time": 0
+}

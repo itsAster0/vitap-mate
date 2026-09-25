@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "attendance_percentage": "90%",
+      "attendence_fat_cat": "0",
+      "category": "Program Core",
+      "classes_attended": "28",
+      "course_code": "CSE2001",
+      "course_id": "AP2026271000123",
+      "course_name": "Data Structures",
+      "course_type": "ETH",
+      "debar_status": "-",
+      "faculty_detail": "Dr. Test Faculty - SCOPE",
+      "serial": "1",
+      "total_classes": "31"
+    },
+    {
+      "attendance_percentage": "79%",
+      "attendence_fat_cat": "0",
+      "category": "Program Core",
+      "classes_attended": "11",
+      "course_code": "CSE2001",
+      "course_id": "AP2026271000124",
+      "course_name": "Data Structures Lab",
+      "course_type": "ELA",
+      "debar_status": "Permitted",
+      "faculty_detail": "Dr. Test Faculty - SCOPE",
+      "serial": "2",
+      "total_classes": "14"
+    },
+    {
+      "attendance_percentage": "90%",
+      "attendence_fat_cat": "-",
+      "category": "University Elective",
+      "classes_attended": "9",
+      "course_code": "HUM1001",
+      "course_id": "AP2026271000125",
+      "course_name": "Short Row Course",
+      "course_type": "TH",
+      "debar_status": "-",
+      "faculty_detail": "Prof. Another - VISH",
+      "serial": "3",
+      "total_classes": "10"
+    }
+  ],
+  "semester_id": "AP2026271",
+  "update_time": 0
+}

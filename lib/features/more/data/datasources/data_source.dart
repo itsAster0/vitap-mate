@@ -2,15 +2,14 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
+import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 
 class ExamScheduleDataSource {
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final GlobalAsyncQueue _globalAsyncQueue;
 
-  ExamScheduleDataSource(this._storage, this._client, this._globalAsyncQueue);
+  ExamScheduleDataSource(this._storage, this._backend, this._globalAsyncQueue);
 
   Future<ExamScheduleData> getExamSchedule(String semid) async {
     final data = await _globalAsyncQueue.run(
@@ -42,10 +41,7 @@ class ExamScheduleDataSource {
       action: 'fetchExamSchedule semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_fetchSchedule_$semid',
-        () async => vtop_api.fetchExamShedule(
-          client: await _client(),
-          semesterId: semid,
-        ),
+        () async => _backend().examSchedule(semid),
       ),
     );
   }
@@ -53,10 +49,10 @@ class ExamScheduleDataSource {
 
 class MarksDataSource {
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final GlobalAsyncQueue _globalAsyncQueue;
 
-  MarksDataSource(this._storage, this._client, this._globalAsyncQueue);
+  MarksDataSource(this._storage, this._backend, this._globalAsyncQueue);
 
   Future<MarksData> getMarks(String semid) async {
     final data = await _globalAsyncQueue.run(
@@ -84,8 +80,7 @@ class MarksDataSource {
       action: 'fetchMarks semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_marks_$semid',
-        () async =>
-            vtop_api.fetchMarks(client: await _client(), semesterId: semid),
+        () async => _backend().marks(semid),
       ),
     );
   }
@@ -93,10 +88,10 @@ class MarksDataSource {
 
 class GradesDataSource {
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final GlobalAsyncQueue _globalAsyncQueue;
 
-  GradesDataSource(this._storage, this._client, this._globalAsyncQueue);
+  GradesDataSource(this._storage, this._backend, this._globalAsyncQueue);
 
   Future<GradeViewData> getGradeView(String semid) async {
     final data = await _globalAsyncQueue.run(
@@ -154,8 +149,7 @@ class GradesDataSource {
       action: 'fetchGradeView semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_grades_$semid',
-        () async =>
-            vtop_api.fetchGradeView(client: await _client(), semesterId: semid),
+        () async => _backend().gradeView(semid),
       ),
     );
   }
@@ -169,11 +163,8 @@ class GradesDataSource {
       action: 'fetchGradeDetails semid=$semid courseId=$courseId',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_details_${semid}_$courseId',
-        () async => vtop_api.fetchGradeViewDetails(
-          client: await _client(),
-          semesterId: semid,
-          courseId: courseId,
-        ),
+        () async =>
+            _backend().gradeViewDetails(semesterId: semid, courseId: courseId),
       ),
     );
   }
@@ -181,10 +172,10 @@ class GradesDataSource {
 
 class GradeHistoryDataSource {
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final GlobalAsyncQueue _globalAsyncQueue;
 
-  GradeHistoryDataSource(this._storage, this._client, this._globalAsyncQueue);
+  GradeHistoryDataSource(this._storage, this._backend, this._globalAsyncQueue);
 
   Future<GradeHistoryData> getGradeHistory() async {
     final data = await _globalAsyncQueue.run(
@@ -240,7 +231,7 @@ class GradeHistoryDataSource {
       action: 'fetchGradeHistory',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_history',
-        () async => vtop_api.fetchGradeHistory(client: await _client()),
+        () async => _backend().gradeHistory(),
       ),
     );
   }
@@ -249,12 +240,12 @@ class GradeHistoryDataSource {
 class BiometricHistoryDataSource {
   BiometricHistoryDataSource(
     this._storage,
-    this._client,
+    this._backend,
     this._globalAsyncQueue,
   );
 
   final JsonFileStorage _storage;
-  final Future<VtopClient> Function() _client;
+  final VtopBackend Function() _backend;
   final GlobalAsyncQueue _globalAsyncQueue;
 
   String _storageKey(String date) => 'biometric_history_$date';
@@ -283,8 +274,7 @@ class BiometricHistoryDataSource {
       action: 'fetchBiometricHistory date=$date',
       run: () => _globalAsyncQueue.run(
         'vtop_biometric_history_$date',
-        () async =>
-            vtop_api.fetchBiometricHistory(client: await _client(), date: date),
+        () async => _backend().biometricHistory(date),
       ),
     );
   }

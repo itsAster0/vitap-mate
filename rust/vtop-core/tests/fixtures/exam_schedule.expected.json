@@ -1,0 +1,61 @@
+{
+  "exams": [
+    {
+      "exam_type": "CAT1",
+      "records": [
+        {
+          "course_code": "CSE2001",
+          "course_id": "AP2026271000123",
+          "course_name": "Data Structures",
+          "course_type": "ETH",
+          "exam_date": "10-Aug-2026",
+          "exam_session": "FN",
+          "exam_time": "09:30 AM - 11:00 AM",
+          "reporting_time": "09:15 AM",
+          "seat_location": "Row 2",
+          "seat_no": "14",
+          "serial": "1",
+          "slot": "A1+TA1",
+          "venue": "AB1-101"
+        },
+        {
+          "course_code": "MAT1001",
+          "course_id": "AP2026271000200",
+          "course_name": "Calculus-I",
+          "course_type": "TH",
+          "exam_date": "11-Aug-2026",
+          "exam_session": "AN",
+          "exam_time": "02:00 PM - 03:30 PM",
+          "reporting_time": "01:45 PM",
+          "seat_location": "Row 5",
+          "seat_no": "3",
+          "serial": "2",
+          "slot": "B1",
+          "venue": "AB2-202"
+        }
+      ]
+    },
+    {
+      "exam_type": "FAT",
+      "records": [
+        {
+          "course_code": "CSE2001",
+          "course_id": "AP2026271000123",
+          "course_name": "Data Structures",
+          "course_type": "ETH",
+          "exam_date": "-",
+          "exam_session": "-",
+          "exam_time": "-",
+          "reporting_time": "-",
+          "seat_location": "-",
+          "seat_no": "-",
+          "serial": "1",
+          "slot": "A1+TA1",
+          "venue": "-"
+        }
+      ]
+    }
+  ],
+  "semester_id": "AP2026271",
+  "update_time": 0
+}

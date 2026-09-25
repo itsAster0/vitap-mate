@@ -6137,7 +6137,7 @@ as String,
 /// @nodoc
 mixin _$PersistedVtopSession {
 
- String get username; BigInt get savedAtEpochMs; String? get cookies;
+ String get username; BigInt get savedAtEpochMs; String? get cookies; String? get csrfToken; String? get registrationNumber; BigInt? get loggedInAt;
 /// Create a copy of PersistedVtopSession
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -6150,16 +6150,16 @@ $PersistedVtopSessionCopyWith<PersistedVtopSession> get copyWith => _$PersistedV
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.cookies, cookies) || other.cookies == cookies));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.cookies, cookies) || other.cookies == cookies)&&(identical(other.csrfToken, csrfToken) || other.csrfToken == csrfToken)&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.loggedInAt, loggedInAt) || other.loggedInAt == loggedInAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,cookies);
+int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,cookies,csrfToken,registrationNumber,loggedInAt);
 
 @override
 String toString() {
-  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, cookies: $cookies)';
+  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, cookies: $cookies, csrfToken: $csrfToken, registrationNumber: $registrationNumber, loggedInAt: $loggedInAt)';
 }
 
 
@@ -6170,7 +6170,7 @@ abstract mixin class $PersistedVtopSessionCopyWith<$Res>  {
   factory $PersistedVtopSessionCopyWith(PersistedVtopSession value, $Res Function(PersistedVtopSession) _then) = _$PersistedVtopSessionCopyWithImpl;
 @useResult
 $Res call({
- String username, BigInt savedAtEpochMs, String? cookies
+ String username, BigInt savedAtEpochMs, String? cookies, String? csrfToken, String? registrationNumber, BigInt? loggedInAt
 });
 
 
@@ -6187,12 +6187,15 @@ class _$PersistedVtopSessionCopyWithImpl<$Res>
 
 /// Create a copy of PersistedVtopSession
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? cookies = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? cookies = freezed,Object? csrfToken = freezed,Object? registrationNumber = freezed,Object? loggedInAt = freezed,}) {
   return _then(_self.copyWith(
 username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,savedAtEpochMs: null == savedAtEpochMs ? _self.savedAtEpochMs : savedAtEpochMs // ignore: cast_nullable_to_non_nullable
 as BigInt,cookies: freezed == cookies ? _self.cookies : cookies // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,csrfToken: freezed == csrfToken ? _self.csrfToken : csrfToken // ignore: cast_nullable_to_non_nullable
+as String?,registrationNumber: freezed == registrationNumber ? _self.registrationNumber : registrationNumber // ignore: cast_nullable_to_non_nullable
+as String?,loggedInAt: freezed == loggedInAt ? _self.loggedInAt : loggedInAt // ignore: cast_nullable_to_non_nullable
+as BigInt?,
   ));
 }
 
@@ -6274,10 +6277,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  String? cookies)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  String? cookies,  String? csrfToken,  String? registrationNumber,  BigInt? loggedInAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PersistedVtopSession() when $default != null:
-return $default(_that.username,_that.savedAtEpochMs,_that.cookies);case _:
+return $default(_that.username,_that.savedAtEpochMs,_that.cookies,_that.csrfToken,_that.registrationNumber,_that.loggedInAt);case _:
   return orElse();
 
 }
@@ -6295,10 +6298,10 @@ return $default(_that.username,_that.savedAtEpochMs,_that.cookies);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  String? cookies)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String username,  BigInt savedAtEpochMs,  String? cookies,  String? csrfToken,  String? registrationNumber,  BigInt? loggedInAt)  $default,) {final _that = this;
 switch (_that) {
 case _PersistedVtopSession():
-return $default(_that.username,_that.savedAtEpochMs,_that.cookies);}
+return $default(_that.username,_that.savedAtEpochMs,_that.cookies,_that.csrfToken,_that.registrationNumber,_that.loggedInAt);}
 }
 /// A variant of `when` that fallback to returning `null`
 ///
@@ -6312,10 +6315,10 @@ return $default(_that.username,_that.savedAtEpochMs,_that.cookies);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String username,  BigInt savedAtEpochMs,  String? cookies)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String username,  BigInt savedAtEpochMs,  String? cookies,  String? csrfToken,  String? registrationNumber,  BigInt? loggedInAt)?  $default,) {final _that = this;
 switch (_that) {
 case _PersistedVtopSession() when $default != null:
-return $default(_that.username,_that.savedAtEpochMs,_that.cookies);case _:
+return $default(_that.username,_that.savedAtEpochMs,_that.cookies,_that.csrfToken,_that.registrationNumber,_that.loggedInAt);case _:
   return null;
 
 }
@@ -6327,12 +6330,15 @@ return $default(_that.username,_that.savedAtEpochMs,_that.cookies);case _:
 @JsonSerializable()
 
 class _PersistedVtopSession implements PersistedVtopSession {
-  const _PersistedVtopSession({required this.username, required this.savedAtEpochMs, this.cookies});
+  const _PersistedVtopSession({required this.username, required this.savedAtEpochMs, this.cookies, this.csrfToken, this.registrationNumber, this.loggedInAt});
   factory _PersistedVtopSession.fromJson(Map<String, dynamic> json) => _$PersistedVtopSessionFromJson(json);
 
 @override final  String username;
 @override final  BigInt savedAtEpochMs;
 @override final  String? cookies;
+@override final  String? csrfToken;
+@override final  String? registrationNumber;
+@override final  BigInt? loggedInAt;
 
 /// Create a copy of PersistedVtopSession
 /// with the given fields replaced by the non-null parameter values.
@@ -6347,16 +6353,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.cookies, cookies) || other.cookies == cookies));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PersistedVtopSession&&(identical(other.username, username) || other.username == username)&&(identical(other.savedAtEpochMs, savedAtEpochMs) || other.savedAtEpochMs == savedAtEpochMs)&&(identical(other.cookies, cookies) || other.cookies == cookies)&&(identical(other.csrfToken, csrfToken) || other.csrfToken == csrfToken)&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.loggedInAt, loggedInAt) || other.loggedInAt == loggedInAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,cookies);
+int get hashCode => Object.hash(runtimeType,username,savedAtEpochMs,cookies,csrfToken,registrationNumber,loggedInAt);
 
 @override
 String toString() {
-  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, cookies: $cookies)';
+  return 'PersistedVtopSession(username: $username, savedAtEpochMs: $savedAtEpochMs, cookies: $cookies, csrfToken: $csrfToken, registrationNumber: $registrationNumber, loggedInAt: $loggedInAt)';
 }
 
 
@@ -6367,7 +6373,7 @@ abstract mixin class _$PersistedVtopSessionCopyWith<$Res> implements $PersistedV
   factory _$PersistedVtopSessionCopyWith(_PersistedVtopSession value, $Res Function(_PersistedVtopSession) _then) = __$PersistedVtopSessionCopyWithImpl;
 @override @useResult
 $Res call({
- String username, BigInt savedAtEpochMs, String? cookies
+ String username, BigInt savedAtEpochMs, String? cookies, String? csrfToken, String? registrationNumber, BigInt? loggedInAt
 });
 
 
@@ -6384,12 +6390,15 @@ class __$PersistedVtopSessionCopyWithImpl<$Res>
 
 /// Create a copy of PersistedVtopSession
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? cookies = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? username = null,Object? savedAtEpochMs = null,Object? cookies = freezed,Object? csrfToken = freezed,Object? registrationNumber = freezed,Object? loggedInAt = freezed,}) {
   return _then(_PersistedVtopSession(
 username: null == username ? _self.username : username // ignore: cast_nullable_to_non_nullable
 as String,savedAtEpochMs: null == savedAtEpochMs ? _self.savedAtEpochMs : savedAtEpochMs // ignore: cast_nullable_to_non_nullable
 as BigInt,cookies: freezed == cookies ? _self.cookies : cookies // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,csrfToken: freezed == csrfToken ? _self.csrfToken : csrfToken // ignore: cast_nullable_to_non_nullable
+as String?,registrationNumber: freezed == registrationNumber ? _self.registrationNumber : registrationNumber // ignore: cast_nullable_to_non_nullable
+as String?,loggedInAt: freezed == loggedInAt ? _self.loggedInAt : loggedInAt // ignore: cast_nullable_to_non_nullable
+as BigInt?,
   ));
 }
 
