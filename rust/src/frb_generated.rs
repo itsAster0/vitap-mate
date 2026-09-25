@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -245516669;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 863764966;
 
 // Section: executor
 
@@ -141,6 +141,56 @@ fn wire__crate__api__vtop_get_client__export_session_snapshot_impl(
         },
     )
 }
+fn wire__crate__api__vtop_get_client__export_session_state_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "export_session_state",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let mut api_client_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_client,
+                            0,
+                            false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_client_guard = Some(api_client.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_client_guard = api_client_guard.unwrap();
+                let output_ok = Result::<_, ()>::Ok(
+                    crate::api::vtop_get_client::export_session_state(&*api_client_guard),
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__vtop_get_client__fetch_attendance_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -177,21 +227,21 @@ fn wire__crate__api__vtop_get_client__fetch_attendance_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_attendance(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                         )
                         .await?;
@@ -239,21 +289,21 @@ fn wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_biometric_history(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_date,
                         )
                         .await?;
@@ -300,22 +350,21 @@ fn wire__crate__api__vtop_get_client__fetch_cookies_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok =
-                            crate::api::vtop_get_client::fetch_cookies(&mut *api_client_guard)
-                                .await?;
+                            crate::api::vtop_get_client::fetch_cookies(&*api_client_guard).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -324,7 +373,7 @@ fn wire__crate__api__vtop_get_client__fetch_cookies_impl(
         },
     )
 }
-fn wire__crate__api__vtop_get_client__fetch_exam_shedule_impl(
+fn wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -332,7 +381,7 @@ fn wire__crate__api__vtop_get_client__fetch_exam_shedule_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "fetch_exam_shedule",
+            debug_name: "fetch_exam_schedule",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -360,21 +409,21 @@ fn wire__crate__api__vtop_get_client__fetch_exam_shedule_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
-                        let output_ok = crate::api::vtop_get_client::fetch_exam_shedule(
-                            &mut *api_client_guard,
+                        let api_client_guard = api_client_guard.unwrap();
+                        let output_ok = crate::api::vtop_get_client::fetch_exam_schedule(
+                            &*api_client_guard,
                             api_semester_id,
                         )
                         .await?;
@@ -424,21 +473,21 @@ fn wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_full_attendance(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                             api_course_id,
                             api_course_type,
@@ -487,23 +536,22 @@ fn wire__crate__api__vtop_get_client__fetch_grade_history_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
-                        let output_ok = crate::api::vtop_get_client::fetch_grade_history(
-                            &mut *api_client_guard,
-                        )
-                        .await?;
+                        let api_client_guard = api_client_guard.unwrap();
+                        let output_ok =
+                            crate::api::vtop_get_client::fetch_grade_history(&*api_client_guard)
+                                .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -548,21 +596,21 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_grade_view(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                         )
                         .await?;
@@ -611,21 +659,21 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_grade_view_details(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                             api_course_id,
                         )
@@ -673,22 +721,21 @@ fn wire__crate__api__vtop_get_client__fetch_is_auth_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::api::vtop_get_client::fetch_is_auth(&mut *api_client_guard)
-                                .await,
+                            crate::api::vtop_get_client::fetch_is_auth(&*api_client_guard).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -734,21 +781,21 @@ fn wire__crate__api__vtop_get_client__fetch_marks_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_marks(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                         )
                         .await?;
@@ -795,21 +842,21 @@ fn wire__crate__api__vtop_get_client__fetch_semesters_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok =
-                            crate::api::vtop_get_client::fetch_semesters(&mut *api_client_guard)
+                            crate::api::vtop_get_client::fetch_semesters(&*api_client_guard)
                                 .await?;
                         Ok(output_ok)
                     })()
@@ -855,21 +902,21 @@ fn wire__crate__api__vtop_get_client__fetch_timetable_impl(
                                 vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
                                     &api_client,
                                     0,
-                                    true,
+                                    false,
                                 )],
                             );
                         for i in decode_indices_ {
                             match i {
                                 0 => {
                                     api_client_guard =
-                                        Some(api_client.lockable_decode_async_ref_mut().await)
+                                        Some(api_client.lockable_decode_async_ref().await)
                                 }
                                 _ => unreachable!(),
                             }
                         }
-                        let mut api_client_guard = api_client_guard.unwrap();
+                        let api_client_guard = api_client_guard.unwrap();
                         let output_ok = crate::api::vtop_get_client::fetch_timetable(
-                            &mut *api_client_guard,
+                            &*api_client_guard,
                             api_semester_id,
                         )
                         .await?;
@@ -909,7 +956,6 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
                 <Option<crate::api::vtop::types::PersistedVtopSession>>::sse_decode(
                     &mut deserializer,
                 );
-            let api_in_app_captcha_solver_enabled = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -918,9 +964,98 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
                             api_username,
                             api_password,
                             api_persisted_session,
-                            api_in_app_captcha_solver_enabled,
                         )
                         .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__email_otp__gmail_find_otp_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "gmail_find_otp",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_access_token = <String>::sse_decode(&mut deserializer);
+            let api_expires_at_unix = <Option<u64>>::sse_decode(&mut deserializer);
+            let api_issued_at_unix = <u64>::sse_decode(&mut deserializer);
+            let api_skip_message_ids = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
+                    (move || async move {
+                        let output_ok = crate::api::email_otp::gmail_find_otp(
+                            api_access_token,
+                            api_expires_at_unix,
+                            api_issued_at_unix,
+                            api_skip_message_ids,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__email_otp__gmail_tidy_up_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "gmail_tidy_up",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_access_token = <String>::sse_decode(&mut deserializer);
+            let api_message_id = <String>::sse_decode(&mut deserializer);
+            let api_delete_after_reading = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::email_otp::gmail_tidy_up(
+                                api_access_token,
+                                api_message_id,
+                                api_delete_after_reading,
+                            )
+                            .await;
+                        })?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1051,411 +1186,6 @@ fn wire__crate__api__native_logs__native_logs_get_entries_impl(
                     Result::<_, ()>::Ok(crate::api::native_logs::native_logs_get_entries())?;
                 Ok(output_ok)
             })())
-        },
-    )
-}
-fn wire__crate__api__vtop__vtop_client__now_unix_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "now_unix",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(crate::api::vtop::vtop_client::now_unix())?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parseattn__parse_attendance_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_attendance",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parseattn::parse_attendance(api_html, api_sem),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsebiometric__parse_biometric_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_biometric",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_requested_date = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsebiometric::parse_biometric(
-                            api_html,
-                            api_requested_date,
-                        ),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parseattn__parse_full_attendance_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_full_attendance",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            let api_course_id = <String>::sse_decode(&mut deserializer);
-            let api_course_type = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parseattn::parse_full_attendance(
-                            api_html,
-                            api_sem,
-                            api_course_id,
-                            api_course_type,
-                        ),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsegradehistory__parse_grade_history_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_grade_history",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsegradehistory::parse_grade_history(api_html),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_grade_view",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsegrades::parse_grade_view(api_html, api_sem),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_details_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_grade_view_details",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            let api_course_id = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsegrades::parse_grade_view_details(
-                            api_html,
-                            api_sem,
-                            api_course_id,
-                        ),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsemarks__parse_marks_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_marks",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsemarks::parse_marks(api_html, api_sem),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsesched__parse_schedule_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_schedule",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsesched::parse_schedule(api_html, api_sem),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsett__parse_semid_timetable_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_semid_timetable",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsett::parse_semid_timetable(api_html),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
-        },
-    )
-}
-fn wire__crate__api__vtop__paraser__parsett__parse_timetable_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "parse_timetable",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_html = <String>::sse_decode(&mut deserializer);
-            let api_sem = <String>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::vtop::paraser::parsett::parse_timetable(api_html, &api_sem),
-                    )?;
-                    Ok(output_ok)
-                })())
-            }
         },
     )
 }
@@ -1629,6 +1359,59 @@ fn wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
         },
     )
 }
+fn wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "vtop_client_resume_session",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_session =
+                <crate::api::vtop::types::SessionState>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>((move || {
+                let mut api_client_guard = None;
+                let decode_indices_ =
+                    flutter_rust_bridge::for_generated::lockable_compute_decode_order(vec![
+                        flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                            &api_client,
+                            0,
+                            false,
+                        ),
+                    ]);
+                for i in decode_indices_ {
+                    match i {
+                        0 => api_client_guard = Some(api_client.lockable_decode_sync_ref()),
+                        _ => unreachable!(),
+                    }
+                }
+                let api_client_guard = api_client_guard.unwrap();
+                let output_ok = crate::api::vtop_get_client::vtop_client_resume_session(
+                    &*api_client_guard,
+                    api_session,
+                )?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1692,6 +1475,300 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
         },
     )
 }
+
+// Section: static_checks
+
+#[allow(clippy::unnecessary_literal_unwrap)]
+const _: fn() = || {
+    {
+        let AttendanceData = None::<crate::api::vtop::types::AttendanceData>.unwrap();
+        let _: Vec<crate::api::vtop::types::AttendanceRecord> = AttendanceData.records;
+        let _: String = AttendanceData.semester_id;
+        let _: u64 = AttendanceData.update_time;
+    }
+    {
+        let AttendanceRecord = None::<crate::api::vtop::types::AttendanceRecord>.unwrap();
+        let _: String = AttendanceRecord.serial;
+        let _: String = AttendanceRecord.category;
+        let _: String = AttendanceRecord.course_name;
+        let _: String = AttendanceRecord.course_code;
+        let _: String = AttendanceRecord.course_type;
+        let _: String = AttendanceRecord.faculty_detail;
+        let _: String = AttendanceRecord.classes_attended;
+        let _: String = AttendanceRecord.total_classes;
+        let _: String = AttendanceRecord.attendance_percentage;
+        let _: String = AttendanceRecord.attendence_fat_cat;
+        let _: String = AttendanceRecord.debar_status;
+        let _: String = AttendanceRecord.course_id;
+    }
+    {
+        let BiometricData = None::<crate::api::vtop::types::BiometricData>.unwrap();
+        let _: Vec<crate::api::vtop::types::BiometricRecord> = BiometricData.records;
+        let _: String = BiometricData.requested_date;
+        let _: u64 = BiometricData.update_time;
+    }
+    {
+        let BiometricRecord = None::<crate::api::vtop::types::BiometricRecord>.unwrap();
+        let _: String = BiometricRecord.serial;
+        let _: String = BiometricRecord.punch_date;
+        let _: String = BiometricRecord.punch_time;
+        let _: String = BiometricRecord.venue;
+    }
+    {
+        let ExamScheduleData = None::<crate::api::vtop::types::ExamScheduleData>.unwrap();
+        let _: Vec<crate::api::vtop::types::PerExamScheduleRecord> = ExamScheduleData.exams;
+        let _: String = ExamScheduleData.semester_id;
+        let _: u64 = ExamScheduleData.update_time;
+    }
+    {
+        let ExamScheduleRecord = None::<crate::api::vtop::types::ExamScheduleRecord>.unwrap();
+        let _: String = ExamScheduleRecord.serial;
+        let _: String = ExamScheduleRecord.slot;
+        let _: String = ExamScheduleRecord.course_name;
+        let _: String = ExamScheduleRecord.course_code;
+        let _: String = ExamScheduleRecord.course_type;
+        let _: String = ExamScheduleRecord.course_id;
+        let _: String = ExamScheduleRecord.exam_date;
+        let _: String = ExamScheduleRecord.exam_session;
+        let _: String = ExamScheduleRecord.reporting_time;
+        let _: String = ExamScheduleRecord.exam_time;
+        let _: String = ExamScheduleRecord.venue;
+        let _: String = ExamScheduleRecord.seat_location;
+        let _: String = ExamScheduleRecord.seat_no;
+    }
+    {
+        let FullAttendanceData = None::<crate::api::vtop::types::FullAttendanceData>.unwrap();
+        let _: Vec<crate::api::vtop::types::FullAttendanceRecord> = FullAttendanceData.records;
+        let _: String = FullAttendanceData.semester_id;
+        let _: u64 = FullAttendanceData.update_time;
+        let _: String = FullAttendanceData.course_id;
+        let _: String = FullAttendanceData.course_type;
+    }
+    {
+        let FullAttendanceRecord = None::<crate::api::vtop::types::FullAttendanceRecord>.unwrap();
+        let _: String = FullAttendanceRecord.serial;
+        let _: String = FullAttendanceRecord.date;
+        let _: String = FullAttendanceRecord.slot;
+        let _: String = FullAttendanceRecord.day_time;
+        let _: String = FullAttendanceRecord.status;
+        let _: String = FullAttendanceRecord.remark;
+    }
+    {
+        let GradeCourseRecord = None::<crate::api::vtop::types::GradeCourseRecord>.unwrap();
+        let _: String = GradeCourseRecord.serial;
+        let _: String = GradeCourseRecord.course_code;
+        let _: String = GradeCourseRecord.course_title;
+        let _: String = GradeCourseRecord.course_type;
+        let _: String = GradeCourseRecord.grading_type;
+        let _: String = GradeCourseRecord.grand_total;
+        let _: String = GradeCourseRecord.grade;
+        let _: String = GradeCourseRecord.course_id;
+    }
+    {
+        let GradeDetailMark = None::<crate::api::vtop::types::GradeDetailMark>.unwrap();
+        let _: String = GradeDetailMark.serial;
+        let _: String = GradeDetailMark.mark_title;
+        let _: String = GradeDetailMark.max_mark;
+        let _: String = GradeDetailMark.weightage;
+        let _: String = GradeDetailMark.status;
+        let _: String = GradeDetailMark.scored_mark;
+        let _: String = GradeDetailMark.weightage_mark;
+    }
+    {
+        let GradeDetailsData = None::<crate::api::vtop::types::GradeDetailsData>.unwrap();
+        let _: String = GradeDetailsData.semester_id;
+        let _: String = GradeDetailsData.course_id;
+        let _: String = GradeDetailsData.class_number;
+        let _: String = GradeDetailsData.class_course_type;
+        let _: String = GradeDetailsData.grand_total;
+        let _: Vec<crate::api::vtop::types::GradeDetailMark> = GradeDetailsData.marks;
+        let _: Vec<crate::api::vtop::types::GradeRange> = GradeDetailsData.grade_ranges;
+        let _: u64 = GradeDetailsData.update_time;
+    }
+    {
+        let GradeHistoryAttempt = None::<crate::api::vtop::types::GradeHistoryAttempt>.unwrap();
+        let _: String = GradeHistoryAttempt.course_code;
+        let _: String = GradeHistoryAttempt.course_title;
+        let _: String = GradeHistoryAttempt.course_type;
+        let _: String = GradeHistoryAttempt.credits;
+        let _: String = GradeHistoryAttempt.grade;
+        let _: String = GradeHistoryAttempt.exam_month;
+        let _: String = GradeHistoryAttempt.result_declared;
+    }
+    {
+        let GradeHistoryCgpa = None::<crate::api::vtop::types::GradeHistoryCgpa>.unwrap();
+        let _: String = GradeHistoryCgpa.credits_registered;
+        let _: String = GradeHistoryCgpa.credits_earned;
+        let _: String = GradeHistoryCgpa.cgpa;
+        let _: String = GradeHistoryCgpa.s_grades;
+        let _: String = GradeHistoryCgpa.a_grades;
+        let _: String = GradeHistoryCgpa.b_grades;
+        let _: String = GradeHistoryCgpa.c_grades;
+        let _: String = GradeHistoryCgpa.d_grades;
+        let _: String = GradeHistoryCgpa.e_grades;
+        let _: String = GradeHistoryCgpa.f_grades;
+        let _: String = GradeHistoryCgpa.n_grades;
+    }
+    {
+        let GradeHistoryData = None::<crate::api::vtop::types::GradeHistoryData>.unwrap();
+        let _: crate::api::vtop::types::GradeHistoryStudentInfo = GradeHistoryData.student;
+        let _: Vec<crate::api::vtop::types::GradeHistoryRecord> = GradeHistoryData.records;
+        let _: crate::api::vtop::types::GradeHistoryCgpa = GradeHistoryData.cgpa;
+        let _: u64 = GradeHistoryData.update_time;
+    }
+    {
+        let GradeHistoryRecord = None::<crate::api::vtop::types::GradeHistoryRecord>.unwrap();
+        let _: String = GradeHistoryRecord.serial;
+        let _: String = GradeHistoryRecord.course_code;
+        let _: String = GradeHistoryRecord.course_title;
+        let _: String = GradeHistoryRecord.course_type;
+        let _: String = GradeHistoryRecord.credits;
+        let _: String = GradeHistoryRecord.grade;
+        let _: String = GradeHistoryRecord.exam_month;
+        let _: String = GradeHistoryRecord.result_declared;
+        let _: String = GradeHistoryRecord.course_distribution;
+        let _: Vec<crate::api::vtop::types::GradeHistoryAttempt> = GradeHistoryRecord.attempts;
+    }
+    {
+        let GradeHistoryStudentInfo =
+            None::<crate::api::vtop::types::GradeHistoryStudentInfo>.unwrap();
+        let _: String = GradeHistoryStudentInfo.reg_no;
+        let _: String = GradeHistoryStudentInfo.name;
+        let _: String = GradeHistoryStudentInfo.programme_branch;
+        let _: String = GradeHistoryStudentInfo.programme_mode;
+        let _: String = GradeHistoryStudentInfo.study_system;
+        let _: String = GradeHistoryStudentInfo.gender;
+        let _: String = GradeHistoryStudentInfo.year_joined;
+        let _: String = GradeHistoryStudentInfo.edu_status;
+        let _: String = GradeHistoryStudentInfo.school;
+        let _: String = GradeHistoryStudentInfo.campus;
+    }
+    {
+        let GradeRange = None::<crate::api::vtop::types::GradeRange>.unwrap();
+        let _: String = GradeRange.grade;
+        let _: String = GradeRange.range;
+    }
+    {
+        let GradeViewData = None::<crate::api::vtop::types::GradeViewData>.unwrap();
+        let _: Vec<crate::api::vtop::types::GradeCourseRecord> = GradeViewData.courses;
+        let _: Vec<crate::api::vtop::types::SemesterInfo> = GradeViewData.semesters;
+        let _: String = GradeViewData.semester_id;
+        let _: u64 = GradeViewData.update_time;
+    }
+    {
+        let MarksData = None::<crate::api::vtop::types::MarksData>.unwrap();
+        let _: Vec<crate::api::vtop::types::MarksRecord> = MarksData.records;
+        let _: String = MarksData.semester_id;
+        let _: u64 = MarksData.update_time;
+    }
+    {
+        let MarksRecord = None::<crate::api::vtop::types::MarksRecord>.unwrap();
+        let _: String = MarksRecord.serial;
+        let _: String = MarksRecord.coursecode;
+        let _: String = MarksRecord.coursetitle;
+        let _: String = MarksRecord.coursetype;
+        let _: String = MarksRecord.faculity;
+        let _: String = MarksRecord.slot;
+        let _: Vec<crate::api::vtop::types::MarksRecordEach> = MarksRecord.marks;
+    }
+    {
+        let MarksRecordEach = None::<crate::api::vtop::types::MarksRecordEach>.unwrap();
+        let _: String = MarksRecordEach.serial;
+        let _: String = MarksRecordEach.markstitle;
+        let _: String = MarksRecordEach.maxmarks;
+        let _: String = MarksRecordEach.weightage;
+        let _: String = MarksRecordEach.status;
+        let _: String = MarksRecordEach.scoredmark;
+        let _: String = MarksRecordEach.weightagemark;
+        let _: String = MarksRecordEach.remark;
+    }
+    {
+        let PerExamScheduleRecord = None::<crate::api::vtop::types::PerExamScheduleRecord>.unwrap();
+        let _: Vec<crate::api::vtop::types::ExamScheduleRecord> = PerExamScheduleRecord.records;
+        let _: String = PerExamScheduleRecord.exam_type;
+    }
+    {
+        let PersistedVtopSession = None::<crate::api::vtop::types::PersistedVtopSession>.unwrap();
+        let _: String = PersistedVtopSession.username;
+        let _: u64 = PersistedVtopSession.saved_at_epoch_ms;
+        let _: Option<String> = PersistedVtopSession.cookies;
+        let _: Option<String> = PersistedVtopSession.csrf_token;
+        let _: Option<String> = PersistedVtopSession.registration_number;
+        let _: Option<u64> = PersistedVtopSession.logged_in_at;
+    }
+    {
+        let SemesterData = None::<crate::api::vtop::types::SemesterData>.unwrap();
+        let _: Vec<crate::api::vtop::types::SemesterInfo> = SemesterData.semesters;
+        let _: u64 = SemesterData.update_time;
+    }
+    {
+        let SemesterInfo = None::<crate::api::vtop::types::SemesterInfo>.unwrap();
+        let _: String = SemesterInfo.id;
+        let _: String = SemesterInfo.name;
+    }
+    {
+        let SessionState = None::<crate::api::vtop::types::SessionState>.unwrap();
+        let _: String = SessionState.cookies;
+        let _: Option<String> = SessionState.csrf_token;
+        let _: Option<String> = SessionState.registration_number;
+        let _: Option<u64> = SessionState.otp_issued_at;
+        let _: Option<u64> = SessionState.logged_in_at;
+    }
+    {
+        let TimetableCourse = None::<crate::api::vtop::types::TimetableCourse>.unwrap();
+        let _: String = TimetableCourse.course_code;
+        let _: String = TimetableCourse.name;
+        let _: String = TimetableCourse.course_type;
+        let _: String = TimetableCourse.credits;
+    }
+    {
+        let TimetableData = None::<crate::api::vtop::types::TimetableData>.unwrap();
+        let _: Vec<crate::api::vtop::types::TimetableSlot> = TimetableData.slots;
+        let _: Vec<crate::api::vtop::types::TimetableCourse> = TimetableData.courses;
+        let _: String = TimetableData.semester_id;
+        let _: u64 = TimetableData.update_time;
+    }
+    {
+        let TimetableSlot = None::<crate::api::vtop::types::TimetableSlot>.unwrap();
+        let _: String = TimetableSlot.serial;
+        let _: String = TimetableSlot.day;
+        let _: String = TimetableSlot.slot;
+        let _: String = TimetableSlot.course_code;
+        let _: String = TimetableSlot.course_type;
+        let _: String = TimetableSlot.room_no;
+        let _: String = TimetableSlot.block;
+        let _: String = TimetableSlot.start_time;
+        let _: String = TimetableSlot.end_time;
+        let _: String = TimetableSlot.name;
+        let _: crate::api::vtop::types::ClassKind = TimetableSlot.kind;
+        let _: String = TimetableSlot.faculty;
+        let _: String = TimetableSlot.credits;
+    }
+    match None::<crate::api::vtop::vtop_errors::VtopError>.unwrap() {
+        crate::api::vtop::vtop_errors::VtopError::NetworkError => {}
+        crate::api::vtop::vtop_errors::VtopError::VtopServerError(field0) => {
+            let _: String = field0;
+        }
+        crate::api::vtop::vtop_errors::VtopError::AuthenticationFailed(field0) => {
+            let _: String = field0;
+        }
+        crate::api::vtop::vtop_errors::VtopError::RegistrationParsingError => {}
+        crate::api::vtop::vtop_errors::VtopError::InvalidCredentials => {}
+        crate::api::vtop::vtop_errors::VtopError::SessionExpired => {}
+        crate::api::vtop::vtop_errors::VtopError::ParseError(field0) => {
+            let _: String = field0;
+        }
+        crate::api::vtop::vtop_errors::VtopError::ConfigurationError(field0) => {
+            let _: String = field0;
+        }
+        crate::api::vtop::vtop_errors::VtopError::CaptchaRequired => {}
+        crate::api::vtop::vtop_errors::VtopError::InvalidResponse => {}
+        crate::api::vtop::vtop_errors::VtopError::OTPRequired(field0, field1) => {
+            let _: String = field0;
+            let _: u64 = field1;
+        }
+    }
+};
 
 // Section: related_funcs
 
@@ -1910,6 +1987,18 @@ impl SseDecode for crate::api::vtop::types::FullAttendanceRecord {
             day_time: var_dayTime,
             status: var_status,
             remark: var_remark,
+        };
+    }
+}
+
+impl SseDecode for crate::api::email_otp::GmailOtpCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_code = <String>::sse_decode(deserializer);
+        let mut var_messageId = <String>::sse_decode(deserializer);
+        return crate::api::email_otp::GmailOtpCode {
+            code: var_code,
+            message_id: var_messageId,
         };
     }
 }
@@ -2454,6 +2543,19 @@ impl SseDecode for Option<String> {
     }
 }
 
+impl SseDecode for Option<crate::api::email_otp::GmailOtpCode> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::email_otp::GmailOtpCode>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::vtop::types::PersistedVtopSession> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2461,6 +2563,17 @@ impl SseDecode for Option<crate::api::vtop::types::PersistedVtopSession> {
             return Some(<crate::api::vtop::types::PersistedVtopSession>::sse_decode(
                 deserializer,
             ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u64>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -2486,10 +2599,16 @@ impl SseDecode for crate::api::vtop::types::PersistedVtopSession {
         let mut var_username = <String>::sse_decode(deserializer);
         let mut var_savedAtEpochMs = <u64>::sse_decode(deserializer);
         let mut var_cookies = <Option<String>>::sse_decode(deserializer);
+        let mut var_csrfToken = <Option<String>>::sse_decode(deserializer);
+        let mut var_registrationNumber = <Option<String>>::sse_decode(deserializer);
+        let mut var_loggedInAt = <Option<u64>>::sse_decode(deserializer);
         return crate::api::vtop::types::PersistedVtopSession {
             username: var_username,
             saved_at_epoch_ms: var_savedAtEpochMs,
             cookies: var_cookies,
+            csrf_token: var_csrfToken,
+            registration_number: var_registrationNumber,
+            logged_in_at: var_loggedInAt,
         };
     }
 }
@@ -2515,6 +2634,24 @@ impl SseDecode for crate::api::vtop::types::SemesterInfo {
         return crate::api::vtop::types::SemesterInfo {
             id: var_id,
             name: var_name,
+        };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::SessionState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_cookies = <String>::sse_decode(deserializer);
+        let mut var_csrfToken = <Option<String>>::sse_decode(deserializer);
+        let mut var_registrationNumber = <Option<String>>::sse_decode(deserializer);
+        let mut var_otpIssuedAt = <Option<u64>>::sse_decode(deserializer);
+        let mut var_loggedInAt = <Option<u64>>::sse_decode(deserializer);
+        return crate::api::vtop::types::SessionState {
+            cookies: var_cookies,
+            csrf_token: var_csrfToken,
+            registration_number: var_registrationNumber,
+            otp_issued_at: var_otpIssuedAt,
+            logged_in_at: var_loggedInAt,
         };
     }
 }
@@ -2677,150 +2814,91 @@ fn pde_ffi_dispatcher_primary_impl(
         1 => {
             wire__crate__api__native_logs__append_native_log_impl(port, ptr, rust_vec_len, data_len)
         }
-        3 => wire__crate__api__vtop_get_client__fetch_attendance_impl(
+        4 => wire__crate__api__vtop_get_client__fetch_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        4 => wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
+        5 => wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        5 => {
+        6 => {
             wire__crate__api__vtop_get_client__fetch_cookies_impl(port, ptr, rust_vec_len, data_len)
         }
-        6 => wire__crate__api__vtop_get_client__fetch_exam_shedule_impl(
+        7 => wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        7 => wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
+        8 => wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__vtop_get_client__fetch_grade_history_impl(
+        9 => wire__crate__api__vtop_get_client__fetch_grade_history_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__vtop_get_client__fetch_grade_view_impl(
+        10 => wire__crate__api__vtop_get_client__fetch_grade_view_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        10 => wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
+        11 => wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => {
+        12 => {
             wire__crate__api__vtop_get_client__fetch_is_auth_impl(port, ptr, rust_vec_len, data_len)
         }
-        12 => {
+        13 => {
             wire__crate__api__vtop_get_client__fetch_marks_impl(port, ptr, rust_vec_len, data_len)
         }
-        13 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
+        14 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        14 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
+        15 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
+        16 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        17 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__vtop__vtop_client__now_unix_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__vtop__paraser__parseattn__parse_attendance_impl(
+        17 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        22 => wire__crate__api__vtop__paraser__parsebiometric__parse_biometric_impl(
+        25 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        23 => wire__crate__api__vtop__paraser__parseattn__parse_full_attendance_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        24 => wire__crate__api__vtop__paraser__parsegradehistory__parse_grade_history_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        25 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        26 => wire__crate__api__vtop__paraser__parsegrades__parse_grade_view_details_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        27 => wire__crate__api__vtop__paraser__parsemarks__parse_marks_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        28 => wire__crate__api__vtop__paraser__parsesched__parse_schedule_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        29 => wire__crate__api__vtop__paraser__parsett__parse_semid_timetable_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        30 => wire__crate__api__vtop__paraser__parsett__parse_timetable_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        31 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        33 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        34 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        27 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
@@ -2843,12 +2921,22 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
-        19 => {
+        3 => wire__crate__api__vtop_get_client__export_session_state_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        19 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
+        22 => {
             wire__crate__api__native_logs__native_logs_get_entries_impl(ptr, rust_vec_len, data_len)
         }
-        32 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        24 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        26 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,
@@ -2875,730 +2963,780 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<VtopClient>> for VtopClient {
 }
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::AttendanceData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::AttendanceData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.records.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::AttendanceData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::AttendanceData>>
     for crate::api::vtop::types::AttendanceData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::AttendanceData>
-    for crate::api::vtop::types::AttendanceData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::AttendanceData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::AttendanceData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::AttendanceRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::AttendanceRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.category.into_into_dart().into_dart(),
-            self.course_name.into_into_dart().into_dart(),
-            self.course_code.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.faculty_detail.into_into_dart().into_dart(),
-            self.classes_attended.into_into_dart().into_dart(),
-            self.total_classes.into_into_dart().into_dart(),
-            self.attendance_percentage.into_into_dart().into_dart(),
-            self.attendence_fat_cat.into_into_dart().into_dart(),
-            self.debar_status.into_into_dart().into_dart(),
-            self.course_id.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.category.into_into_dart().into_dart(),
+            self.0.course_name.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.faculty_detail.into_into_dart().into_dart(),
+            self.0.classes_attended.into_into_dart().into_dart(),
+            self.0.total_classes.into_into_dart().into_dart(),
+            self.0.attendance_percentage.into_into_dart().into_dart(),
+            self.0.attendence_fat_cat.into_into_dart().into_dart(),
+            self.0.debar_status.into_into_dart().into_dart(),
+            self.0.course_id.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::AttendanceRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::AttendanceRecord>>
     for crate::api::vtop::types::AttendanceRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::AttendanceRecord>
-    for crate::api::vtop::types::AttendanceRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::AttendanceRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::AttendanceRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::BiometricData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::BiometricData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.records.into_into_dart().into_dart(),
-            self.requested_date.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.requested_date.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vtop::types::BiometricData
+    for FrbWrapper<crate::api::vtop::types::BiometricData>
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::BiometricData>
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::BiometricData>>
     for crate::api::vtop::types::BiometricData
 {
-    fn into_into_dart(self) -> crate::api::vtop::types::BiometricData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::BiometricData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::BiometricRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::BiometricRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.punch_date.into_into_dart().into_dart(),
-            self.punch_time.into_into_dart().into_dart(),
-            self.venue.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.punch_date.into_into_dart().into_dart(),
+            self.0.punch_time.into_into_dart().into_dart(),
+            self.0.venue.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vtop::types::BiometricRecord
+    for FrbWrapper<crate::api::vtop::types::BiometricRecord>
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::BiometricRecord>
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::BiometricRecord>>
     for crate::api::vtop::types::BiometricRecord
 {
-    fn into_into_dart(self) -> crate::api::vtop::types::BiometricRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::BiometricRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::ClassKind {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ClassKind> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        match self {
-            Self::Theory => 0.into_dart(),
-            Self::Lab => 1.into_dart(),
+        match self.0 {
+            crate::api::vtop::types::ClassKind::Theory => 0.into_dart(),
+            crate::api::vtop::types::ClassKind::Lab => 1.into_dart(),
             _ => unreachable!(),
         }
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ClassKind>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ClassKind>>
     for crate::api::vtop::types::ClassKind
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::ClassKind>
-    for crate::api::vtop::types::ClassKind
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::ClassKind {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ClassKind> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::ExamScheduleData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ExamScheduleData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.exams.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.exams.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ExamScheduleData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ExamScheduleData>>
     for crate::api::vtop::types::ExamScheduleData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::ExamScheduleData>
-    for crate::api::vtop::types::ExamScheduleData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::ExamScheduleData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ExamScheduleData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::ExamScheduleRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ExamScheduleRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.slot.into_into_dart().into_dart(),
-            self.course_name.into_into_dart().into_dart(),
-            self.course_code.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.course_id.into_into_dart().into_dart(),
-            self.exam_date.into_into_dart().into_dart(),
-            self.exam_session.into_into_dart().into_dart(),
-            self.reporting_time.into_into_dart().into_dart(),
-            self.exam_time.into_into_dart().into_dart(),
-            self.venue.into_into_dart().into_dart(),
-            self.seat_location.into_into_dart().into_dart(),
-            self.seat_no.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.slot.into_into_dart().into_dart(),
+            self.0.course_name.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.course_id.into_into_dart().into_dart(),
+            self.0.exam_date.into_into_dart().into_dart(),
+            self.0.exam_session.into_into_dart().into_dart(),
+            self.0.reporting_time.into_into_dart().into_dart(),
+            self.0.exam_time.into_into_dart().into_dart(),
+            self.0.venue.into_into_dart().into_dart(),
+            self.0.seat_location.into_into_dart().into_dart(),
+            self.0.seat_no.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ExamScheduleRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ExamScheduleRecord>>
     for crate::api::vtop::types::ExamScheduleRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::ExamScheduleRecord>
-    for crate::api::vtop::types::ExamScheduleRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::ExamScheduleRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ExamScheduleRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::FullAttendanceData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::FullAttendanceData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.records.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
-            self.course_id.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
+            self.0.course_id.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::FullAttendanceData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::FullAttendanceData>>
     for crate::api::vtop::types::FullAttendanceData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::FullAttendanceData>
-    for crate::api::vtop::types::FullAttendanceData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::FullAttendanceData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::FullAttendanceData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::FullAttendanceRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::FullAttendanceRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.date.into_into_dart().into_dart(),
-            self.slot.into_into_dart().into_dart(),
-            self.day_time.into_into_dart().into_dart(),
-            self.status.into_into_dart().into_dart(),
-            self.remark.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.date.into_into_dart().into_dart(),
+            self.0.slot.into_into_dart().into_dart(),
+            self.0.day_time.into_into_dart().into_dart(),
+            self.0.status.into_into_dart().into_dart(),
+            self.0.remark.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::FullAttendanceRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::FullAttendanceRecord>>
     for crate::api::vtop::types::FullAttendanceRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::FullAttendanceRecord>
-    for crate::api::vtop::types::FullAttendanceRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::FullAttendanceRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::FullAttendanceRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeCourseRecord {
+impl flutter_rust_bridge::IntoDart for crate::api::email_otp::GmailOtpCode {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.course_code.into_into_dart().into_dart(),
-            self.course_title.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.grading_type.into_into_dart().into_dart(),
-            self.grand_total.into_into_dart().into_dart(),
-            self.grade.into_into_dart().into_dart(),
-            self.course_id.into_into_dart().into_dart(),
+            self.code.into_into_dart().into_dart(),
+            self.message_id.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::email_otp::GmailOtpCode
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::email_otp::GmailOtpCode>
+    for crate::api::email_otp::GmailOtpCode
+{
+    fn into_into_dart(self) -> crate::api::email_otp::GmailOtpCode {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeCourseRecord> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_title.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.grading_type.into_into_dart().into_dart(),
+            self.0.grand_total.into_into_dart().into_dart(),
+            self.0.grade.into_into_dart().into_dart(),
+            self.0.course_id.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeCourseRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeCourseRecord>>
     for crate::api::vtop::types::GradeCourseRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeCourseRecord>
-    for crate::api::vtop::types::GradeCourseRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeCourseRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeCourseRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeDetailMark {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeDetailMark> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.mark_title.into_into_dart().into_dart(),
-            self.max_mark.into_into_dart().into_dart(),
-            self.weightage.into_into_dart().into_dart(),
-            self.status.into_into_dart().into_dart(),
-            self.scored_mark.into_into_dart().into_dart(),
-            self.weightage_mark.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.mark_title.into_into_dart().into_dart(),
+            self.0.max_mark.into_into_dart().into_dart(),
+            self.0.weightage.into_into_dart().into_dart(),
+            self.0.status.into_into_dart().into_dart(),
+            self.0.scored_mark.into_into_dart().into_dart(),
+            self.0.weightage_mark.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeDetailMark>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeDetailMark>>
     for crate::api::vtop::types::GradeDetailMark
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeDetailMark>
-    for crate::api::vtop::types::GradeDetailMark
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeDetailMark {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeDetailMark> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeDetailsData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeDetailsData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.semester_id.into_into_dart().into_dart(),
-            self.course_id.into_into_dart().into_dart(),
-            self.class_number.into_into_dart().into_dart(),
-            self.class_course_type.into_into_dart().into_dart(),
-            self.grand_total.into_into_dart().into_dart(),
-            self.marks.into_into_dart().into_dart(),
-            self.grade_ranges.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.course_id.into_into_dart().into_dart(),
+            self.0.class_number.into_into_dart().into_dart(),
+            self.0.class_course_type.into_into_dart().into_dart(),
+            self.0.grand_total.into_into_dart().into_dart(),
+            self.0.marks.into_into_dart().into_dart(),
+            self.0.grade_ranges.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeDetailsData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeDetailsData>>
     for crate::api::vtop::types::GradeDetailsData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeDetailsData>
-    for crate::api::vtop::types::GradeDetailsData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeDetailsData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeDetailsData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeHistoryAttempt {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeHistoryAttempt> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.course_code.into_into_dart().into_dart(),
-            self.course_title.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.credits.into_into_dart().into_dart(),
-            self.grade.into_into_dart().into_dart(),
-            self.exam_month.into_into_dart().into_dart(),
-            self.result_declared.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_title.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.credits.into_into_dart().into_dart(),
+            self.0.grade.into_into_dart().into_dart(),
+            self.0.exam_month.into_into_dart().into_dart(),
+            self.0.result_declared.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryAttempt>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeHistoryAttempt>>
     for crate::api::vtop::types::GradeHistoryAttempt
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeHistoryAttempt>
-    for crate::api::vtop::types::GradeHistoryAttempt
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeHistoryAttempt {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeHistoryAttempt> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeHistoryCgpa {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeHistoryCgpa> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.credits_registered.into_into_dart().into_dart(),
-            self.credits_earned.into_into_dart().into_dart(),
-            self.cgpa.into_into_dart().into_dart(),
-            self.s_grades.into_into_dart().into_dart(),
-            self.a_grades.into_into_dart().into_dart(),
-            self.b_grades.into_into_dart().into_dart(),
-            self.c_grades.into_into_dart().into_dart(),
-            self.d_grades.into_into_dart().into_dart(),
-            self.e_grades.into_into_dart().into_dart(),
-            self.f_grades.into_into_dart().into_dart(),
-            self.n_grades.into_into_dart().into_dart(),
+            self.0.credits_registered.into_into_dart().into_dart(),
+            self.0.credits_earned.into_into_dart().into_dart(),
+            self.0.cgpa.into_into_dart().into_dart(),
+            self.0.s_grades.into_into_dart().into_dart(),
+            self.0.a_grades.into_into_dart().into_dart(),
+            self.0.b_grades.into_into_dart().into_dart(),
+            self.0.c_grades.into_into_dart().into_dart(),
+            self.0.d_grades.into_into_dart().into_dart(),
+            self.0.e_grades.into_into_dart().into_dart(),
+            self.0.f_grades.into_into_dart().into_dart(),
+            self.0.n_grades.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryCgpa>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeHistoryCgpa>>
     for crate::api::vtop::types::GradeHistoryCgpa
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeHistoryCgpa>
-    for crate::api::vtop::types::GradeHistoryCgpa
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeHistoryCgpa {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeHistoryCgpa> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeHistoryData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeHistoryData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.student.into_into_dart().into_dart(),
-            self.records.into_into_dart().into_dart(),
-            self.cgpa.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.student.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.cgpa.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeHistoryData>>
     for crate::api::vtop::types::GradeHistoryData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeHistoryData>
-    for crate::api::vtop::types::GradeHistoryData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeHistoryData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeHistoryData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeHistoryRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeHistoryRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.course_code.into_into_dart().into_dart(),
-            self.course_title.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.credits.into_into_dart().into_dart(),
-            self.grade.into_into_dart().into_dart(),
-            self.exam_month.into_into_dart().into_dart(),
-            self.result_declared.into_into_dart().into_dart(),
-            self.course_distribution.into_into_dart().into_dart(),
-            self.attempts.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_title.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.credits.into_into_dart().into_dart(),
+            self.0.grade.into_into_dart().into_dart(),
+            self.0.exam_month.into_into_dart().into_dart(),
+            self.0.result_declared.into_into_dart().into_dart(),
+            self.0.course_distribution.into_into_dart().into_dart(),
+            self.0.attempts.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeHistoryRecord>>
     for crate::api::vtop::types::GradeHistoryRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeHistoryRecord>
-    for crate::api::vtop::types::GradeHistoryRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeHistoryRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeHistoryRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeHistoryStudentInfo {
+impl flutter_rust_bridge::IntoDart
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryStudentInfo>
+{
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.reg_no.into_into_dart().into_dart(),
-            self.name.into_into_dart().into_dart(),
-            self.programme_branch.into_into_dart().into_dart(),
-            self.programme_mode.into_into_dart().into_dart(),
-            self.study_system.into_into_dart().into_dart(),
-            self.gender.into_into_dart().into_dart(),
-            self.year_joined.into_into_dart().into_dart(),
-            self.edu_status.into_into_dart().into_dart(),
-            self.school.into_into_dart().into_dart(),
-            self.campus.into_into_dart().into_dart(),
+            self.0.reg_no.into_into_dart().into_dart(),
+            self.0.name.into_into_dart().into_dart(),
+            self.0.programme_branch.into_into_dart().into_dart(),
+            self.0.programme_mode.into_into_dart().into_dart(),
+            self.0.study_system.into_into_dart().into_dart(),
+            self.0.gender.into_into_dart().into_dart(),
+            self.0.year_joined.into_into_dart().into_dart(),
+            self.0.edu_status.into_into_dart().into_dart(),
+            self.0.school.into_into_dart().into_dart(),
+            self.0.campus.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeHistoryStudentInfo>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeHistoryStudentInfo>>
     for crate::api::vtop::types::GradeHistoryStudentInfo
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeHistoryStudentInfo>
-    for crate::api::vtop::types::GradeHistoryStudentInfo
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeHistoryStudentInfo {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeHistoryStudentInfo> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeRange {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeRange> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.grade.into_into_dart().into_dart(),
-            self.range.into_into_dart().into_dart(),
+            self.0.grade.into_into_dart().into_dart(),
+            self.0.range.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeRange>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeRange>>
     for crate::api::vtop::types::GradeRange
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeRange>
-    for crate::api::vtop::types::GradeRange
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeRange {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeRange> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::GradeViewData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::GradeViewData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.courses.into_into_dart().into_dart(),
-            self.semesters.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.courses.into_into_dart().into_dart(),
+            self.0.semesters.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::GradeViewData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::GradeViewData>>
     for crate::api::vtop::types::GradeViewData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::GradeViewData>
-    for crate::api::vtop::types::GradeViewData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::GradeViewData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::GradeViewData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::MarksData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::MarksData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.records.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::MarksData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::MarksData>>
     for crate::api::vtop::types::MarksData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::MarksData>
-    for crate::api::vtop::types::MarksData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::MarksData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::MarksData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::MarksRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::MarksRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.coursecode.into_into_dart().into_dart(),
-            self.coursetitle.into_into_dart().into_dart(),
-            self.coursetype.into_into_dart().into_dart(),
-            self.faculity.into_into_dart().into_dart(),
-            self.slot.into_into_dart().into_dart(),
-            self.marks.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.coursecode.into_into_dart().into_dart(),
+            self.0.coursetitle.into_into_dart().into_dart(),
+            self.0.coursetype.into_into_dart().into_dart(),
+            self.0.faculity.into_into_dart().into_dart(),
+            self.0.slot.into_into_dart().into_dart(),
+            self.0.marks.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::MarksRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::MarksRecord>>
     for crate::api::vtop::types::MarksRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::MarksRecord>
-    for crate::api::vtop::types::MarksRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::MarksRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::MarksRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::MarksRecordEach {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::MarksRecordEach> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.markstitle.into_into_dart().into_dart(),
-            self.maxmarks.into_into_dart().into_dart(),
-            self.weightage.into_into_dart().into_dart(),
-            self.status.into_into_dart().into_dart(),
-            self.scoredmark.into_into_dart().into_dart(),
-            self.weightagemark.into_into_dart().into_dart(),
-            self.remark.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.markstitle.into_into_dart().into_dart(),
+            self.0.maxmarks.into_into_dart().into_dart(),
+            self.0.weightage.into_into_dart().into_dart(),
+            self.0.status.into_into_dart().into_dart(),
+            self.0.scoredmark.into_into_dart().into_dart(),
+            self.0.weightagemark.into_into_dart().into_dart(),
+            self.0.remark.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::MarksRecordEach>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::MarksRecordEach>>
     for crate::api::vtop::types::MarksRecordEach
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::MarksRecordEach>
-    for crate::api::vtop::types::MarksRecordEach
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::MarksRecordEach {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::MarksRecordEach> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::PerExamScheduleRecord {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::PerExamScheduleRecord> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.records.into_into_dart().into_dart(),
-            self.exam_type.into_into_dart().into_dart(),
+            self.0.records.into_into_dart().into_dart(),
+            self.0.exam_type.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::PerExamScheduleRecord>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::PerExamScheduleRecord>>
     for crate::api::vtop::types::PerExamScheduleRecord
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::PerExamScheduleRecord>
-    for crate::api::vtop::types::PerExamScheduleRecord
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::PerExamScheduleRecord {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::PerExamScheduleRecord> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::PersistedVtopSession {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::PersistedVtopSession> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.username.into_into_dart().into_dart(),
-            self.saved_at_epoch_ms.into_into_dart().into_dart(),
-            self.cookies.into_into_dart().into_dart(),
+            self.0.username.into_into_dart().into_dart(),
+            self.0.saved_at_epoch_ms.into_into_dart().into_dart(),
+            self.0.cookies.into_into_dart().into_dart(),
+            self.0.csrf_token.into_into_dart().into_dart(),
+            self.0.registration_number.into_into_dart().into_dart(),
+            self.0.logged_in_at.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::PersistedVtopSession>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::PersistedVtopSession>>
     for crate::api::vtop::types::PersistedVtopSession
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::PersistedVtopSession>
-    for crate::api::vtop::types::PersistedVtopSession
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::PersistedVtopSession {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::PersistedVtopSession> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::SemesterData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::SemesterData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.semesters.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.semesters.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::SemesterData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::SemesterData>>
     for crate::api::vtop::types::SemesterData
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::SemesterData>
-    for crate::api::vtop::types::SemesterData
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::SemesterData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::SemesterData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::SemesterInfo {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::SemesterInfo> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.id.into_into_dart().into_dart(),
-            self.name.into_into_dart().into_dart(),
+            self.0.id.into_into_dart().into_dart(),
+            self.0.name.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::SemesterInfo>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::SemesterInfo>>
     for crate::api::vtop::types::SemesterInfo
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::SemesterInfo>
-    for crate::api::vtop::types::SemesterInfo
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::SemesterInfo {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::SemesterInfo> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableCourse {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::SessionState> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.course_code.into_into_dart().into_dart(),
-            self.name.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.credits.into_into_dart().into_dart(),
+            self.0.cookies.into_into_dart().into_dart(),
+            self.0.csrf_token.into_into_dart().into_dart(),
+            self.0.registration_number.into_into_dart().into_dart(),
+            self.0.otp_issued_at.into_into_dart().into_dart(),
+            self.0.logged_in_at.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::SessionState>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::SessionState>>
+    for crate::api::vtop::types::SessionState
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::SessionState> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::TimetableCourse> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.name.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.credits.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::TimetableCourse>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::TimetableCourse>>
     for crate::api::vtop::types::TimetableCourse
 {
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::TimetableCourse>
-    for crate::api::vtop::types::TimetableCourse
-{
-    fn into_into_dart(self) -> crate::api::vtop::types::TimetableCourse {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::TimetableCourse> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableData {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::TimetableData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.slots.into_into_dart().into_dart(),
-            self.courses.into_into_dart().into_dart(),
-            self.semester_id.into_into_dart().into_dart(),
-            self.update_time.into_into_dart().into_dart(),
+            self.0.slots.into_into_dart().into_dart(),
+            self.0.courses.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vtop::types::TimetableData
+    for FrbWrapper<crate::api::vtop::types::TimetableData>
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::TimetableData>
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::TimetableData>>
     for crate::api::vtop::types::TimetableData
 {
-    fn into_into_dart(self) -> crate::api::vtop::types::TimetableData {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::TimetableData> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::types::TimetableSlot {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::TimetableSlot> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
-            self.serial.into_into_dart().into_dart(),
-            self.day.into_into_dart().into_dart(),
-            self.slot.into_into_dart().into_dart(),
-            self.course_code.into_into_dart().into_dart(),
-            self.course_type.into_into_dart().into_dart(),
-            self.room_no.into_into_dart().into_dart(),
-            self.block.into_into_dart().into_dart(),
-            self.start_time.into_into_dart().into_dart(),
-            self.end_time.into_into_dart().into_dart(),
-            self.name.into_into_dart().into_dart(),
-            self.kind.into_into_dart().into_dart(),
-            self.faculty.into_into_dart().into_dart(),
-            self.credits.into_into_dart().into_dart(),
+            self.0.serial.into_into_dart().into_dart(),
+            self.0.day.into_into_dart().into_dart(),
+            self.0.slot.into_into_dart().into_dart(),
+            self.0.course_code.into_into_dart().into_dart(),
+            self.0.course_type.into_into_dart().into_dart(),
+            self.0.room_no.into_into_dart().into_dart(),
+            self.0.block.into_into_dart().into_dart(),
+            self.0.start_time.into_into_dart().into_dart(),
+            self.0.end_time.into_into_dart().into_dart(),
+            self.0.name.into_into_dart().into_dart(),
+            self.0.kind.into_into_dart().into_dart(),
+            self.0.faculty.into_into_dart().into_dart(),
+            self.0.credits.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vtop::types::TimetableSlot
+    for FrbWrapper<crate::api::vtop::types::TimetableSlot>
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::types::TimetableSlot>
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::TimetableSlot>>
     for crate::api::vtop::types::TimetableSlot
 {
-    fn into_into_dart(self) -> crate::api::vtop::types::TimetableSlot {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::TimetableSlot> {
+        self.into()
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::vtop::vtop_errors::VtopError {
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::vtop_errors::VtopError> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        match self {
+        match self.0 {
             crate::api::vtop::vtop_errors::VtopError::NetworkError => [0.into_dart()].into_dart(),
             crate::api::vtop::vtop_errors::VtopError::VtopServerError(field0) => {
                 [1.into_dart(), field0.into_into_dart().into_dart()].into_dart()
@@ -3638,14 +3776,14 @@ impl flutter_rust_bridge::IntoDart for crate::api::vtop::vtop_errors::VtopError 
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::vtop::vtop_errors::VtopError
+    for FrbWrapper<crate::api::vtop::vtop_errors::VtopError>
 {
 }
-impl flutter_rust_bridge::IntoIntoDart<crate::api::vtop::vtop_errors::VtopError>
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::vtop_errors::VtopError>>
     for crate::api::vtop::vtop_errors::VtopError
 {
-    fn into_into_dart(self) -> crate::api::vtop::vtop_errors::VtopError {
-        self
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::vtop_errors::VtopError> {
+        self.into()
     }
 }
 
@@ -3791,6 +3929,14 @@ impl SseEncode for crate::api::vtop::types::FullAttendanceRecord {
         <String>::sse_encode(self.day_time, serializer);
         <String>::sse_encode(self.status, serializer);
         <String>::sse_encode(self.remark, serializer);
+    }
+}
+
+impl SseEncode for crate::api::email_otp::GmailOtpCode {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.code, serializer);
+        <String>::sse_encode(self.message_id, serializer);
     }
 }
 
@@ -4148,12 +4294,32 @@ impl SseEncode for Option<String> {
     }
 }
 
+impl SseEncode for Option<crate::api::email_otp::GmailOtpCode> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::email_otp::GmailOtpCode>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::vtop::types::PersistedVtopSession> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::vtop::types::PersistedVtopSession>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u64> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u64>::sse_encode(value, serializer);
         }
     }
 }
@@ -4172,6 +4338,9 @@ impl SseEncode for crate::api::vtop::types::PersistedVtopSession {
         <String>::sse_encode(self.username, serializer);
         <u64>::sse_encode(self.saved_at_epoch_ms, serializer);
         <Option<String>>::sse_encode(self.cookies, serializer);
+        <Option<String>>::sse_encode(self.csrf_token, serializer);
+        <Option<String>>::sse_encode(self.registration_number, serializer);
+        <Option<u64>>::sse_encode(self.logged_in_at, serializer);
     }
 }
 
@@ -4188,6 +4357,17 @@ impl SseEncode for crate::api::vtop::types::SemesterInfo {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.name, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::SessionState {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.cookies, serializer);
+        <Option<String>>::sse_encode(self.csrf_token, serializer);
+        <Option<String>>::sse_encode(self.registration_number, serializer);
+        <Option<u64>>::sse_encode(self.otp_issued_at, serializer);
+        <Option<u64>>::sse_encode(self.logged_in_at, serializer);
     }
 }
 

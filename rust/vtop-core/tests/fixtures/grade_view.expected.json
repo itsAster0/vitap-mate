@@ -1,0 +1,36 @@
+{
+  "courses": [
+    {
+      "course_code": "CSE2001",
+      "course_id": "AP2025261000123",
+      "course_title": "Data Structures",
+      "course_type": "Embedded Theory and Lab",
+      "grade": "A",
+      "grading_type": "RG",
+      "grand_total": "81.50",
+      "serial": "1"
+    },
+    {
+      "course_code": "MAT1001",
+      "course_id": "AP2025261000200",
+      "course_title": "Calculus-I",
+      "course_type": "Theory Only",
+      "grade": "B",
+      "grading_type": "AG",
+      "grand_total": "67",
+      "serial": "2"
+    }
+  ],
+  "semester_id": "AP2025261",
+  "semesters": [
+    {
+      "id": "AP2025264",
+      "name": "Winter Semester 2025-26"
+    },
+    {
+      "id": "AP2025261",
+      "name": "Fall Semester 2025-26"
+    }
+  ],
+  "update_time": 0
+}

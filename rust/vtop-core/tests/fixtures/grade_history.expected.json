@@ -1,0 +1,95 @@
+{
+  "cgpa": {
+    "a_grades": "1",
+    "b_grades": "0",
+    "c_grades": "0",
+    "cgpa": "9.12",
+    "credits_earned": "10",
+    "credits_registered": "10",
+    "d_grades": "0",
+    "e_grades": "0",
+    "f_grades": "1",
+    "n_grades": "0",
+    "s_grades": "1"
+  },
+  "records": [
+    {
+      "attempts": [
+        {
+          "course_code": "CSE1001",
+          "course_title": "Problem Solving",
+          "course_type": "ETL",
+          "credits": "4",
+          "exam_month": "Jan-2023",
+          "grade": "S",
+          "result_declared": "15-Feb-2023"
+        }
+      ],
+      "course_code": "CSE1001",
+      "course_distribution": "PC",
+      "course_title": "Problem Solving",
+      "course_type": "ETL",
+      "credits": "4",
+      "exam_month": "Jan-2023",
+      "grade": "S",
+      "result_declared": "15-Feb-2023",
+      "serial": "1"
+    },
+    {
+      "attempts": [
+        {
+          "course_code": "MAT1001",
+          "course_title": "Calculus-I",
+          "course_type": "TH",
+          "credits": "4",
+          "exam_month": "Jan-2023",
+          "grade": "F",
+          "result_declared": "15-Feb-2023"
+        },
+        {
+          "course_code": "MAT1001",
+          "course_title": "Calculus-I",
+          "course_type": "TH",
+          "credits": "4",
+          "exam_month": "May-2023",
+          "grade": "A",
+          "result_declared": "20-Jun-2023"
+        }
+      ],
+      "course_code": "MAT1001",
+      "course_distribution": "FC",
+      "course_title": "Calculus-I",
+      "course_type": "TH",
+      "credits": "4",
+      "exam_month": "May-2023",
+      "grade": "A",
+      "result_declared": "20-Jun-2023",
+      "serial": "2"
+    },
+    {
+      "attempts": [],
+      "course_code": "HUM1001",
+      "course_distribution": "UE",
+      "course_title": "Ethics",
+      "course_type": "TH",
+      "credits": "2",
+      "exam_month": "May-2023",
+      "grade": "P",
+      "result_declared": "20-Jun-2023",
+      "serial": "3"
+    }
+  ],
+  "student": {
+    "campus": "Amaravati",
+    "edu_status": "Studying",
+    "gender": "Other",
+    "name": "TEST STUDENT",
+    "programme_branch": "B.Tech / Computer Science and Engineering",
+    "programme_mode": "Regular",
+    "reg_no": "22BCE0000",
+    "school": "SCOPE",
+    "study_system": "CBCS",
+    "year_joined": "2022"
+  },
+  "update_time": 0
+}

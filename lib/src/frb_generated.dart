@@ -3,15 +3,9 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/email_otp.dart';
 import 'api/native_logs.dart';
 import 'api/simple.dart';
-import 'api/vtop/paraser/parseattn.dart';
-import 'api/vtop/paraser/parsebiometric.dart';
-import 'api/vtop/paraser/parsegradehistory.dart';
-import 'api/vtop/paraser/parsegrades.dart';
-import 'api/vtop/paraser/parsemarks.dart';
-import 'api/vtop/paraser/parsesched.dart';
-import 'api/vtop/paraser/parsett.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
 import 'api/vtop/vtop_errors.dart';
@@ -79,7 +73,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -245516669;
+  int get rustContentHash => 863764966;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -102,6 +96,10 @@ abstract class RustLibApi extends BaseApi {
     required BigInt savedAtEpochMs,
   });
 
+  SessionState crateApiVtopGetClientExportSessionState({
+    required VtopClient client,
+  });
+
   Future<AttendanceData> crateApiVtopGetClientFetchAttendance({
     required VtopClient client,
     required String semesterId,
@@ -116,7 +114,7 @@ abstract class RustLibApi extends BaseApi {
     required VtopClient client,
   });
 
-  Future<ExamScheduleData> crateApiVtopGetClientFetchExamShedule({
+  Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
   });
@@ -163,7 +161,19 @@ abstract class RustLibApi extends BaseApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
-    required bool inAppCaptchaSolverEnabled,
+  });
+
+  Future<GmailOtpCode?> crateApiEmailOtpGmailFindOtp({
+    required String accessToken,
+    BigInt? expiresAtUnix,
+    required BigInt issuedAtUnix,
+    required List<String> skipMessageIds,
+  });
+
+  Future<void> crateApiEmailOtpGmailTidyUp({
+    required String accessToken,
+    required String messageId,
+    required bool deleteAfterReading,
   });
 
   String crateApiSimpleGreet({required String name});
@@ -173,58 +183,6 @@ abstract class RustLibApi extends BaseApi {
   void crateApiNativeLogsNativeLogsClear();
 
   List<String> crateApiNativeLogsNativeLogsGetEntries();
-
-  Future<BigInt> crateApiVtopVtopClientNowUnix();
-
-  Future<AttendanceData> crateApiVtopParaserParseattnParseAttendance({
-    required String html,
-    required String sem,
-  });
-
-  Future<BiometricData> crateApiVtopParaserParsebiometricParseBiometric({
-    required String html,
-    required String requestedDate,
-  });
-
-  Future<FullAttendanceData> crateApiVtopParaserParseattnParseFullAttendance({
-    required String html,
-    required String sem,
-    required String courseId,
-    required String courseType,
-  });
-
-  Future<GradeHistoryData>
-  crateApiVtopParaserParsegradehistoryParseGradeHistory({required String html});
-
-  Future<GradeViewData> crateApiVtopParaserParsegradesParseGradeView({
-    required String html,
-    required String sem,
-  });
-
-  Future<GradeDetailsData> crateApiVtopParaserParsegradesParseGradeViewDetails({
-    required String html,
-    required String sem,
-    required String courseId,
-  });
-
-  Future<MarksData> crateApiVtopParaserParsemarksParseMarks({
-    required String html,
-    required String sem,
-  });
-
-  Future<ExamScheduleData> crateApiVtopParaserParseschedParseSchedule({
-    required String html,
-    required String sem,
-  });
-
-  Future<SemesterData> crateApiVtopParaserParsettParseSemidTimetable({
-    required String html,
-  });
-
-  Future<TimetableData> crateApiVtopParaserParsettParseTimetable({
-    required String html,
-    required String sem,
-  });
 
   Future<void> crateApiVtopGetClientVtopClientLogin({
     required VtopClient client,
@@ -236,6 +194,11 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiVtopGetClientVtopClientResendSecurityOtp({
     required VtopClient client,
+  });
+
+  void crateApiVtopGetClientVtopClientResumeSession({
+    required VtopClient client,
+    required SessionState session,
   });
 
   Future<void> crateApiVtopGetClientVtopClientSubmitSecurityOtp({
@@ -331,6 +294,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  SessionState crateApiVtopGetClientExportSessionState({
+    required VtopClient client,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_session_state,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiVtopGetClientExportSessionStateConstMeta,
+        argValues: [client],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientExportSessionStateConstMeta =>
+      const TaskConstMeta(
+        debugName: "export_session_state",
+        argNames: ["client"],
+      );
+
+  @override
   Future<AttendanceData> crateApiVtopGetClientFetchAttendance({
     required VtopClient client,
     required String semesterId,
@@ -339,7 +333,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -347,7 +341,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 4,
             port: port_,
           );
         },
@@ -377,7 +371,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -385,7 +379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -414,14 +408,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 6,
             port: port_,
           );
         },
@@ -440,7 +434,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "fetch_cookies", argNames: ["client"]);
 
   @override
-  Future<ExamScheduleData> crateApiVtopGetClientFetchExamShedule({
+  Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
   }) {
@@ -448,7 +442,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -456,7 +450,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 7,
             port: port_,
           );
         },
@@ -464,16 +458,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_exam_schedule_data,
           decodeErrorData: sse_decode_vtop_error,
         ),
-        constMeta: kCrateApiVtopGetClientFetchExamSheduleConstMeta,
+        constMeta: kCrateApiVtopGetClientFetchExamScheduleConstMeta,
         argValues: [client, semesterId],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiVtopGetClientFetchExamSheduleConstMeta =>
+  TaskConstMeta get kCrateApiVtopGetClientFetchExamScheduleConstMeta =>
       const TaskConstMeta(
-        debugName: "fetch_exam_shedule",
+        debugName: "fetch_exam_schedule",
         argNames: ["client", "semesterId"],
       );
 
@@ -488,7 +482,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -498,7 +492,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 8,
             port: port_,
           );
         },
@@ -527,14 +521,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 9,
             port: port_,
           );
         },
@@ -564,7 +558,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -572,7 +566,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 10,
             port: port_,
           );
         },
@@ -603,7 +597,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -612,7 +606,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 11,
             port: port_,
           );
         },
@@ -639,14 +633,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 12,
             port: port_,
           );
         },
@@ -673,7 +667,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -681,7 +675,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 13,
             port: port_,
           );
         },
@@ -710,14 +704,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 14,
             port: port_,
           );
         },
@@ -744,7 +738,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
             client,
             serializer,
           );
@@ -752,7 +746,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 15,
             port: port_,
           );
         },
@@ -778,7 +772,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
-    required bool inAppCaptchaSolverEnabled,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -790,11 +783,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             persistedSession,
             serializer,
           );
-          sse_encode_bool(inAppCaptchaSolverEnabled, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 16,
             port: port_,
           );
         },
@@ -804,12 +796,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientGetVtopClientConstMeta,
-        argValues: [
-          username,
-          password,
-          persistedSession,
-          inAppCaptchaSolverEnabled,
-        ],
+        argValues: [username, password, persistedSession],
         apiImpl: this,
       ),
     );
@@ -818,12 +805,88 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientGetVtopClientConstMeta =>
       const TaskConstMeta(
         debugName: "get_vtop_client",
+        argNames: ["username", "password", "persistedSession"],
+      );
+
+  @override
+  Future<GmailOtpCode?> crateApiEmailOtpGmailFindOtp({
+    required String accessToken,
+    BigInt? expiresAtUnix,
+    required BigInt issuedAtUnix,
+    required List<String> skipMessageIds,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(accessToken, serializer);
+          sse_encode_opt_box_autoadd_u_64(expiresAtUnix, serializer);
+          sse_encode_u_64(issuedAtUnix, serializer);
+          sse_encode_list_String(skipMessageIds, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 17,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_box_autoadd_gmail_otp_code,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiEmailOtpGmailFindOtpConstMeta,
+        argValues: [accessToken, expiresAtUnix, issuedAtUnix, skipMessageIds],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEmailOtpGmailFindOtpConstMeta =>
+      const TaskConstMeta(
+        debugName: "gmail_find_otp",
         argNames: [
-          "username",
-          "password",
-          "persistedSession",
-          "inAppCaptchaSolverEnabled",
+          "accessToken",
+          "expiresAtUnix",
+          "issuedAtUnix",
+          "skipMessageIds",
         ],
+      );
+
+  @override
+  Future<void> crateApiEmailOtpGmailTidyUp({
+    required String accessToken,
+    required String messageId,
+    required bool deleteAfterReading,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(accessToken, serializer);
+          sse_encode_String(messageId, serializer);
+          sse_encode_bool(deleteAfterReading, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 18,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiEmailOtpGmailTidyUpConstMeta,
+        argValues: [accessToken, messageId, deleteAfterReading],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiEmailOtpGmailTidyUpConstMeta =>
+      const TaskConstMeta(
+        debugName: "gmail_tidy_up",
+        argNames: ["accessToken", "messageId", "deleteAfterReading"],
       );
 
   @override
@@ -833,7 +896,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -858,7 +921,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 20,
             port: port_,
           );
         },
@@ -882,7 +945,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -904,7 +967,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -921,384 +984,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "native_logs_get_entries", argNames: []);
 
   @override
-  Future<BigInt> crateApiVtopVtopClientNowUnix() {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 20,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_u_64,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopVtopClientNowUnixConstMeta,
-        argValues: [],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopVtopClientNowUnixConstMeta =>
-      const TaskConstMeta(debugName: "now_unix", argNames: []);
-
-  @override
-  Future<AttendanceData> crateApiVtopParaserParseattnParseAttendance({
-    required String html,
-    required String sem,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 21,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_attendance_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParseattnParseAttendanceConstMeta,
-        argValues: [html, sem],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParseattnParseAttendanceConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_attendance",
-        argNames: ["html", "sem"],
-      );
-
-  @override
-  Future<BiometricData> crateApiVtopParaserParsebiometricParseBiometric({
-    required String html,
-    required String requestedDate,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(requestedDate, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 22,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_biometric_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParsebiometricParseBiometricConstMeta,
-        argValues: [html, requestedDate],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParsebiometricParseBiometricConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_biometric",
-        argNames: ["html", "requestedDate"],
-      );
-
-  @override
-  Future<FullAttendanceData> crateApiVtopParaserParseattnParseFullAttendance({
-    required String html,
-    required String sem,
-    required String courseId,
-    required String courseType,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          sse_encode_String(courseId, serializer);
-          sse_encode_String(courseType, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 23,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_full_attendance_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParseattnParseFullAttendanceConstMeta,
-        argValues: [html, sem, courseId, courseType],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParseattnParseFullAttendanceConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_full_attendance",
-        argNames: ["html", "sem", "courseId", "courseType"],
-      );
-
-  @override
-  Future<GradeHistoryData>
-  crateApiVtopParaserParsegradehistoryParseGradeHistory({
-    required String html,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 24,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_grade_history_data,
-          decodeErrorData: null,
-        ),
-        constMeta:
-            kCrateApiVtopParaserParsegradehistoryParseGradeHistoryConstMeta,
-        argValues: [html],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta
-  get kCrateApiVtopParaserParsegradehistoryParseGradeHistoryConstMeta =>
-      const TaskConstMeta(debugName: "parse_grade_history", argNames: ["html"]);
-
-  @override
-  Future<GradeViewData> crateApiVtopParaserParsegradesParseGradeView({
-    required String html,
-    required String sem,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 25,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_grade_view_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParsegradesParseGradeViewConstMeta,
-        argValues: [html, sem],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParsegradesParseGradeViewConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_grade_view",
-        argNames: ["html", "sem"],
-      );
-
-  @override
-  Future<GradeDetailsData> crateApiVtopParaserParsegradesParseGradeViewDetails({
-    required String html,
-    required String sem,
-    required String courseId,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          sse_encode_String(courseId, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 26,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_grade_details_data,
-          decodeErrorData: null,
-        ),
-        constMeta:
-            kCrateApiVtopParaserParsegradesParseGradeViewDetailsConstMeta,
-        argValues: [html, sem, courseId],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta
-  get kCrateApiVtopParaserParsegradesParseGradeViewDetailsConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_grade_view_details",
-        argNames: ["html", "sem", "courseId"],
-      );
-
-  @override
-  Future<MarksData> crateApiVtopParaserParsemarksParseMarks({
-    required String html,
-    required String sem,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 27,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_marks_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParsemarksParseMarksConstMeta,
-        argValues: [html, sem],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParsemarksParseMarksConstMeta =>
-      const TaskConstMeta(debugName: "parse_marks", argNames: ["html", "sem"]);
-
-  @override
-  Future<ExamScheduleData> crateApiVtopParaserParseschedParseSchedule({
-    required String html,
-    required String sem,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 28,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_exam_schedule_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParseschedParseScheduleConstMeta,
-        argValues: [html, sem],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParseschedParseScheduleConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_schedule",
-        argNames: ["html", "sem"],
-      );
-
-  @override
-  Future<SemesterData> crateApiVtopParaserParsettParseSemidTimetable({
-    required String html,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 29,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_semester_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParsettParseSemidTimetableConstMeta,
-        argValues: [html],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParsettParseSemidTimetableConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_semid_timetable",
-        argNames: ["html"],
-      );
-
-  @override
-  Future<TimetableData> crateApiVtopParaserParsettParseTimetable({
-    required String html,
-    required String sem,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(html, serializer);
-          sse_encode_String(sem, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 30,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_timetable_data,
-          decodeErrorData: null,
-        ),
-        constMeta: kCrateApiVtopParaserParsettParseTimetableConstMeta,
-        argValues: [html, sem],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiVtopParaserParsettParseTimetableConstMeta =>
-      const TaskConstMeta(
-        debugName: "parse_timetable",
-        argNames: ["html", "sem"],
-      );
-
-  @override
   Future<void> crateApiVtopGetClientVtopClientLogin({
     required VtopClient client,
   }) {
@@ -1313,7 +998,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 23,
             port: port_,
           );
         },
@@ -1343,7 +1028,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1378,7 +1063,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 33,
+            funcId: 25,
             port: port_,
           );
         },
@@ -1401,6 +1086,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiVtopGetClientVtopClientResumeSession({
+    required VtopClient client,
+    required SessionState session,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_box_autoadd_session_state(session, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientVtopClientResumeSessionConstMeta,
+        argValues: [client, session],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientVtopClientResumeSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "vtop_client_resume_session",
+        argNames: ["client", "session"],
+      );
+
+  @override
   Future<void> crateApiVtopGetClientVtopClientSubmitSecurityOtp({
     required VtopClient client,
     required String otpCode,
@@ -1417,7 +1135,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1558,11 +1276,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GmailOtpCode dco_decode_box_autoadd_gmail_otp_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_gmail_otp_code(raw);
+  }
+
+  @protected
   PersistedVtopSession dco_decode_box_autoadd_persisted_vtop_session(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_persisted_vtop_session(raw);
+  }
+
+  @protected
+  SessionState dco_decode_box_autoadd_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_session_state(raw);
+  }
+
+  @protected
+  BigInt dco_decode_box_autoadd_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_u_64(raw);
   }
 
   @protected
@@ -1635,6 +1371,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       dayTime: dco_decode_String(arr[3]),
       status: dco_decode_String(arr[4]),
       remark: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  GmailOtpCode dco_decode_gmail_otp_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return GmailOtpCode(
+      code: dco_decode_String(arr[0]),
+      messageId: dco_decode_String(arr[1]),
     );
   }
 
@@ -1982,6 +1730,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GmailOtpCode? dco_decode_opt_box_autoadd_gmail_otp_code(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_gmail_otp_code(raw);
+  }
+
+  @protected
   PersistedVtopSession? dco_decode_opt_box_autoadd_persisted_vtop_session(
     dynamic raw,
   ) {
@@ -1989,6 +1743,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return raw == null
         ? null
         : dco_decode_box_autoadd_persisted_vtop_session(raw);
+  }
+
+  @protected
+  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_64(raw);
   }
 
   @protected
@@ -2007,12 +1767,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PersistedVtopSession dco_decode_persisted_vtop_session(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return PersistedVtopSession(
       username: dco_decode_String(arr[0]),
       savedAtEpochMs: dco_decode_u_64(arr[1]),
       cookies: dco_decode_opt_String(arr[2]),
+      csrfToken: dco_decode_opt_String(arr[3]),
+      registrationNumber: dco_decode_opt_String(arr[4]),
+      loggedInAt: dco_decode_opt_box_autoadd_u_64(arr[5]),
     );
   }
 
@@ -2037,6 +1800,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return SemesterInfo(
       id: dco_decode_String(arr[0]),
       name: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  SessionState dco_decode_session_state(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return SessionState(
+      cookies: dco_decode_String(arr[0]),
+      csrfToken: dco_decode_opt_String(arr[1]),
+      registrationNumber: dco_decode_opt_String(arr[2]),
+      otpIssuedAt: dco_decode_opt_box_autoadd_u_64(arr[3]),
+      loggedInAt: dco_decode_opt_box_autoadd_u_64(arr[4]),
     );
   }
 
@@ -2283,11 +2061,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GmailOtpCode sse_decode_box_autoadd_gmail_otp_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_gmail_otp_code(deserializer));
+  }
+
+  @protected
   PersistedVtopSession sse_decode_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_persisted_vtop_session(deserializer));
+  }
+
+  @protected
+  SessionState sse_decode_box_autoadd_session_state(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_session_state(deserializer));
+  }
+
+  @protected
+  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_64(deserializer));
   }
 
   @protected
@@ -2383,6 +2183,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: var_status,
       remark: var_remark,
     );
+  }
+
+  @protected
+  GmailOtpCode sse_decode_gmail_otp_code(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_String(deserializer);
+    var var_messageId = sse_decode_String(deserializer);
+    return GmailOtpCode(code: var_code, messageId: var_messageId);
   }
 
   @protected
@@ -2902,6 +2710,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  GmailOtpCode? sse_decode_opt_box_autoadd_gmail_otp_code(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_gmail_otp_code(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   PersistedVtopSession? sse_decode_opt_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   ) {
@@ -2909,6 +2730,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_persisted_vtop_session(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_64(deserializer));
     } else {
       return null;
     }
@@ -2932,10 +2764,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_username = sse_decode_String(deserializer);
     var var_savedAtEpochMs = sse_decode_u_64(deserializer);
     var var_cookies = sse_decode_opt_String(deserializer);
+    var var_csrfToken = sse_decode_opt_String(deserializer);
+    var var_registrationNumber = sse_decode_opt_String(deserializer);
+    var var_loggedInAt = sse_decode_opt_box_autoadd_u_64(deserializer);
     return PersistedVtopSession(
       username: var_username,
       savedAtEpochMs: var_savedAtEpochMs,
       cookies: var_cookies,
+      csrfToken: var_csrfToken,
+      registrationNumber: var_registrationNumber,
+      loggedInAt: var_loggedInAt,
     );
   }
 
@@ -2953,6 +2791,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_id = sse_decode_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     return SemesterInfo(id: var_id, name: var_name);
+  }
+
+  @protected
+  SessionState sse_decode_session_state(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_cookies = sse_decode_String(deserializer);
+    var var_csrfToken = sse_decode_opt_String(deserializer);
+    var var_registrationNumber = sse_decode_opt_String(deserializer);
+    var var_otpIssuedAt = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_loggedInAt = sse_decode_opt_box_autoadd_u_64(deserializer);
+    return SessionState(
+      cookies: var_cookies,
+      csrfToken: var_csrfToken,
+      registrationNumber: var_registrationNumber,
+      otpIssuedAt: var_otpIssuedAt,
+      loggedInAt: var_loggedInAt,
+    );
   }
 
   @protected
@@ -3196,12 +3051,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_gmail_otp_code(
+    GmailOtpCode self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_gmail_otp_code(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_persisted_vtop_session(
     PersistedVtopSession self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_persisted_vtop_session(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_session_state(
+    SessionState self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_session_state(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_64(self, serializer);
   }
 
   @protected
@@ -3267,6 +3146,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.dayTime, serializer);
     sse_encode_String(self.status, serializer);
     sse_encode_String(self.remark, serializer);
+  }
+
+  @protected
+  void sse_encode_gmail_otp_code(GmailOtpCode self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.messageId, serializer);
   }
 
   @protected
@@ -3669,6 +3555,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_gmail_otp_code(
+    GmailOtpCode? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_gmail_otp_code(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_persisted_vtop_session(
     PersistedVtopSession? self,
     SseSerializer serializer,
@@ -3678,6 +3577,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_persisted_vtop_session(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_64(self, serializer);
     }
   }
 
@@ -3700,6 +3609,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.username, serializer);
     sse_encode_u_64(self.savedAtEpochMs, serializer);
     sse_encode_opt_String(self.cookies, serializer);
+    sse_encode_opt_String(self.csrfToken, serializer);
+    sse_encode_opt_String(self.registrationNumber, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.loggedInAt, serializer);
   }
 
   @protected
@@ -3714,6 +3626,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.name, serializer);
+  }
+
+  @protected
+  void sse_encode_session_state(SessionState self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.cookies, serializer);
+    sse_encode_opt_String(self.csrfToken, serializer);
+    sse_encode_opt_String(self.registrationNumber, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.otpIssuedAt, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.loggedInAt, serializer);
   }
 
   @protected

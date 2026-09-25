@@ -1,0 +1,18 @@
+{
+  "records": [
+    {
+      "punch_date": "18/07/2026",
+      "punch_time": "08:02",
+      "serial": "1",
+      "venue": "AB1-GF-(101)"
+    },
+    {
+      "punch_date": "18/07/2026",
+      "punch_time": "19:38",
+      "serial": "2",
+      "venue": "MH2-IN-6-(349)"
+    }
+  ],
+  "requested_date": "18/07/2026",
+  "update_time": 0
+}

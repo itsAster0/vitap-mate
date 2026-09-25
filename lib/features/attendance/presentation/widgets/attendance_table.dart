@@ -348,14 +348,6 @@ class _Insights extends StatelessWidget {
                         color: colors.mutedForeground,
                       ),
                     ),
-                    const Spacer(),
-                    Text(
-                      notes.join(' · '),
-                      style: typography.body.xs.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.foreground,
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: Space.md),

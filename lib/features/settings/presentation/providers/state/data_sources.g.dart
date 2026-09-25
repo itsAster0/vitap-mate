@@ -48,4 +48,4 @@ final class SemidDataSourceProvider
   }
 }
 
-String _$semidDataSourceHash() => r'dfacbc100551b80c945f8931f7f10c839ebb5f98';
+String _$semidDataSourceHash() => r'6402317cc47365f6bcb467c33c67f4234b2fb6f8';

@@ -50,11 +50,19 @@ Future<StoredVtopSession?> loadStoredVtopSession(String username) async {
     final snapshot = PersistedVtopSession.fromJson(
       jsonDecode(raw) as Map<String, dynamic>,
     );
-    final savedAt = DateTime.fromMillisecondsSinceEpoch(
-      snapshot.savedAtEpochMs.toInt(),
-      isUtc: true,
-    );
-    final age = DateTime.now().toUtc().difference(savedAt);
+    // Age counts from the last real login (set by Rust) when known; older
+    // snapshots only have the time they were saved.
+    final loggedInAt = snapshot.loggedInAt;
+    final since = loggedInAt != null
+        ? DateTime.fromMillisecondsSinceEpoch(
+            loggedInAt.toInt() * 1000,
+            isUtc: true,
+          )
+        : DateTime.fromMillisecondsSinceEpoch(
+            snapshot.savedAtEpochMs.toInt(),
+            isUtc: true,
+          );
+    final age = DateTime.now().toUtc().difference(since);
     final ttl = await readVtopSessionReuseTtl();
     final isExpired = age > ttl;
     return StoredVtopSession(

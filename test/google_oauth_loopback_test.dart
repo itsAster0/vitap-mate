@@ -1,3 +1,5 @@
+import 'package:vitapmate/src/api/email_otp.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -11,69 +13,116 @@ import 'package:http/testing.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
 
+EmailOtpOAuthSession _session() => const EmailOtpOAuthSession(
+  email: 'student@example.com',
+  accessToken: 'access',
+  refreshToken: 'refresh',
+  scopes: ['https://www.googleapis.com/auth/gmail.modify'],
+  accessTokenExpiryEpochMs: 4102444800000,
+  authSource: EmailOtpAuthSource.personalByok,
+  oauthClientId: 'personal.apps.googleusercontent.com',
+);
+
 void main() {
   test(
-    'OTP fetch ignores older mail and never reuses a consumed message',
+    'OTP fetch never reuses a consumed message and tidies it once',
     () async {
-      const session = EmailOtpOAuthSession(
-        email: 'student@example.com',
-        accessToken: 'access',
-        refreshToken: 'refresh',
-        scopes: ['https://www.googleapis.com/auth/gmail.modify'],
-        accessTokenExpiryEpochMs: 4102444800000,
-        authSource: EmailOtpAuthSource.personalByok,
-        oauthClientId: 'personal.apps.googleusercontent.com',
-      );
       FlutterSecureStorage.setMockInitialValues({
-        'email_otp_oauth_session_v1': jsonEncode(session.toJson()),
+        'email_otp_oauth_session_v1': jsonEncode(_session().toJson()),
       });
       final since = DateTime.utc(2026, 9, 20);
-      var timestamp = since.subtract(const Duration(milliseconds: 1));
-      var modifications = 0;
-      final client = MockClient((request) async {
-        if (request.method == 'POST') {
-          modifications++;
-          return http.Response('{}', 200);
-        }
-        if (request.url.path.endsWith('/messages')) {
-          expect(request.url.queryParameters['q'], contains('after:'));
-          return http.Response(
-            jsonEncode({
-              'messages': [
-                {'id': 'otp-mail'},
-              ],
-            }),
-            200,
-          );
-        }
-        return http.Response(
-          jsonEncode({
-            'id': 'otp-mail',
-            'internalDate': '${timestamp.millisecondsSinceEpoch}',
-            'snippet': 'Your OTP is 123456',
-            'payload': {
-              'headers': [
-                {'name': 'From', 'value': 'noreply.sdc@vitap.ac.in'},
-              ],
-            },
-          }),
-          200,
-        );
-      });
+      var mailArrived = false;
+      final skipped = <List<String>>[];
+      final tidied = <String>[];
+      final client = MockClient((_) async => http.Response('{}', 200));
       final service = GoogleEmailOtpAuthService(
         appAuth: const FlutterAppAuth(),
         storage: const FlutterSecureStorage(),
         httpClient: client,
         loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: client),
+        // Stands in for Rust: an OTP mail exists once it has arrived, and
+        // skipped ids are not returned again.
+        findOtp:
+            ({
+              required accessToken,
+              expiresAtUnix,
+              required issuedAtUnix,
+              required skipMessageIds,
+            }) async {
+              expect(
+                issuedAtUnix,
+                BigInt.from(since.millisecondsSinceEpoch ~/ 1000),
+              );
+              skipped.add(skipMessageIds);
+              if (!mailArrived || skipMessageIds.contains('otp-mail')) {
+                return null;
+              }
+              return const GmailOtpCode(code: '123456', messageId: 'otp-mail');
+            },
+        tidyUp:
+            ({
+              required accessToken,
+              required messageId,
+              required deleteAfterReading,
+            }) async => tidied.add(messageId),
       );
+
       expect(await service.fetchLatestOtpSince(sinceUtc: since), isNull);
-      expect(modifications, 0);
-      timestamp = since.add(const Duration(seconds: 1));
+      mailArrived = true;
       expect(await service.fetchLatestOtpSince(sinceUtc: since), '123456');
       expect(await service.fetchLatestOtpSince(sinceUtc: since), isNull);
-      expect(modifications, 1);
+      expect(skipped.last, ['otp-mail']);
+      expect(tidied, ['otp-mail']);
     },
   );
+
+  test('a rejected Gmail token is refreshed once before giving up', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'email_otp_oauth_session_v1': jsonEncode(_session().toJson()),
+    });
+    final tokensSeen = <String>[];
+    final client = MockClient((request) async {
+      if (request.url.host == 'oauth2.googleapis.com') {
+        return http.Response(
+          jsonEncode({'access_token': 'fresh', 'expires_in': 3600}),
+          200,
+        );
+      }
+      return http.Response('{}', 200);
+    });
+    final service = GoogleEmailOtpAuthService(
+      appAuth: const FlutterAppAuth(),
+      storage: const FlutterSecureStorage(),
+      httpClient: client,
+      loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: client),
+      findOtp:
+          ({
+            required accessToken,
+            expiresAtUnix,
+            required issuedAtUnix,
+            required skipMessageIds,
+          }) async {
+            tokensSeen.add(accessToken);
+            if (accessToken != 'fresh') {
+              throw const VtopError.configurationError('gmail_unauthorized');
+            }
+            return const GmailOtpCode(code: '654321', messageId: 'm2');
+          },
+      tidyUp:
+          ({
+            required accessToken,
+            required messageId,
+            required deleteAfterReading,
+          }) async {},
+    );
+
+    expect(
+      await service.fetchLatestOtpSince(sinceUtc: DateTime.utc(2026, 9, 20)),
+      '654321',
+    );
+    expect(tokensSeen, ['access', 'fresh']);
+    expect(await service.loadSession(), isNotNull);
+  });
 
   group('GoogleDesktopOAuthCredentials', () {
     test(

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -122,7 +121,6 @@ class Step1 extends HookConsumerWidget {
         final client = await getVtopClient(
           username: username.text,
           password: password.text,
-          inAppCaptchaSolverEnabled: ref.read(inAppCaptchaSolverProvider),
         );
         if (!context.mounted) return;
         await loginWithSecurityOtpPrompt(context: context, client: client);

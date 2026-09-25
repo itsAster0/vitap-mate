@@ -1,1 +1,7 @@
 /target
+
+# Benchmark results and raw VTOP page dumps are local only (they also hold
+# personal data). The benches write under target/bench by default.
+bench-results/
+**/*.bench.json
+**/pages/*.html

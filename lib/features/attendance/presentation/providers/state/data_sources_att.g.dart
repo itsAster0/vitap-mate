@@ -49,4 +49,4 @@ final class AttendanceDataSourceProvider
 }
 
 String _$attendanceDataSourceHash() =>
-    r'80e04974e670252515b582006e213483be35e104';
+    r'9b0f841b9749d9581b60fc3afacf90eba865faba';

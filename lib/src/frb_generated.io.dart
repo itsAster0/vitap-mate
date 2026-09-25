@@ -3,15 +3,9 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/email_otp.dart';
 import 'api/native_logs.dart';
 import 'api/simple.dart';
-import 'api/vtop/paraser/parseattn.dart';
-import 'api/vtop/paraser/parsebiometric.dart';
-import 'api/vtop/paraser/parsegradehistory.dart';
-import 'api/vtop/paraser/parsegrades.dart';
-import 'api/vtop/paraser/parsemarks.dart';
-import 'api/vtop/paraser/parsesched.dart';
-import 'api/vtop/paraser/parsett.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
 import 'api/vtop/vtop_errors.dart';
@@ -78,9 +72,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  GmailOtpCode dco_decode_box_autoadd_gmail_otp_code(dynamic raw);
+
+  @protected
   PersistedVtopSession dco_decode_box_autoadd_persisted_vtop_session(
     dynamic raw,
   );
+
+  @protected
+  SessionState dco_decode_box_autoadd_session_state(dynamic raw);
+
+  @protected
+  BigInt dco_decode_box_autoadd_u_64(dynamic raw);
 
   @protected
   ClassKind dco_decode_class_kind(dynamic raw);
@@ -96,6 +99,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FullAttendanceRecord dco_decode_full_attendance_record(dynamic raw);
+
+  @protected
+  GmailOtpCode dco_decode_gmail_otp_code(dynamic raw);
 
   @protected
   GradeCourseRecord dco_decode_grade_course_record(dynamic raw);
@@ -198,9 +204,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
+  GmailOtpCode? dco_decode_opt_box_autoadd_gmail_otp_code(dynamic raw);
+
+  @protected
   PersistedVtopSession? dco_decode_opt_box_autoadd_persisted_vtop_session(
     dynamic raw,
   );
+
+  @protected
+  BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
   PerExamScheduleRecord dco_decode_per_exam_schedule_record(dynamic raw);
@@ -213,6 +225,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SemesterInfo dco_decode_semester_info(dynamic raw);
+
+  @protected
+  SessionState dco_decode_session_state(dynamic raw);
 
   @protected
   TimetableCourse dco_decode_timetable_course(dynamic raw);
@@ -281,9 +296,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  GmailOtpCode sse_decode_box_autoadd_gmail_otp_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PersistedVtopSession sse_decode_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   );
+
+  @protected
+  SessionState sse_decode_box_autoadd_session_state(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
   ClassKind sse_decode_class_kind(SseDeserializer deserializer);
@@ -305,6 +333,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   FullAttendanceRecord sse_decode_full_attendance_record(
     SseDeserializer deserializer,
   );
+
+  @protected
+  GmailOtpCode sse_decode_gmail_otp_code(SseDeserializer deserializer);
 
   @protected
   GradeCourseRecord sse_decode_grade_course_record(
@@ -437,9 +468,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
+  GmailOtpCode? sse_decode_opt_box_autoadd_gmail_otp_code(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PersistedVtopSession? sse_decode_opt_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   );
+
+  @protected
+  BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
   PerExamScheduleRecord sse_decode_per_exam_schedule_record(
@@ -456,6 +495,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SemesterInfo sse_decode_semester_info(SseDeserializer deserializer);
+
+  @protected
+  SessionState sse_decode_session_state(SseDeserializer deserializer);
 
   @protected
   TimetableCourse sse_decode_timetable_course(SseDeserializer deserializer);
@@ -537,10 +579,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_gmail_otp_code(
+    GmailOtpCode self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_persisted_vtop_session(
     PersistedVtopSession self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_box_autoadd_session_state(
+    SessionState self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_class_kind(ClassKind self, SseSerializer serializer);
@@ -568,6 +625,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     FullAttendanceRecord self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_gmail_otp_code(GmailOtpCode self, SseSerializer serializer);
 
   @protected
   void sse_encode_grade_course_record(
@@ -741,10 +801,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_gmail_otp_code(
+    GmailOtpCode? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_persisted_vtop_session(
     PersistedVtopSession? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
   void sse_encode_per_exam_schedule_record(
@@ -763,6 +832,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_semester_info(SemesterInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_session_state(SessionState self, SseSerializer serializer);
 
   @protected
   void sse_encode_timetable_course(

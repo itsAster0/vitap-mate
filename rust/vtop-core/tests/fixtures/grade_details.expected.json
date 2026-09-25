@@ -1,0 +1,67 @@
+{
+  "class_course_type": "ETH | ELA",
+  "class_number": "AP2025261000123 | AP2025261000124",
+  "course_id": "AP2025261000123",
+  "grade_ranges": [
+    {
+      "grade": "S",
+      "range": ">= 90"
+    },
+    {
+      "grade": "A",
+      "range": ">= 80 < 90"
+    },
+    {
+      "grade": "B",
+      "range": ">= 70 < 80"
+    },
+    {
+      "grade": "C",
+      "range": ">=60 <70"
+    },
+    {
+      "grade": "D",
+      "range": ">=55 <60"
+    },
+    {
+      "grade": "E",
+      "range": ">=50 <55"
+    },
+    {
+      "grade": "F",
+      "range": "< 50"
+    }
+  ],
+  "grand_total": "44.30 | 45.00",
+  "marks": [
+    {
+      "mark_title": "ETH • CAT-1",
+      "max_mark": "50",
+      "scored_mark": "41",
+      "serial": "1",
+      "status": "Present",
+      "weightage": "15",
+      "weightage_mark": "12.30"
+    },
+    {
+      "mark_title": "ETH • FAT",
+      "max_mark": "100",
+      "scored_mark": "80",
+      "serial": "2",
+      "status": "Present",
+      "weightage": "40",
+      "weightage_mark": "32.00"
+    },
+    {
+      "mark_title": "ELA • Lab FAT",
+      "max_mark": "50",
+      "scored_mark": "45",
+      "serial": "1",
+      "status": "Present",
+      "weightage": "50",
+      "weightage_mark": "45.00"
+    }
+  ],
+  "semester_id": "AP2025261",
+  "update_time": 0
+}

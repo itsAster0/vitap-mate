@@ -1,3 +1,4 @@
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' show log;
@@ -159,7 +160,10 @@ String resolveCookieCallbackUrlForTest(Map<String, dynamic> data) {
 }
 
 Future<List<Map<String, dynamic>>> _authenticatedCookieEditorCookies() async {
-  final container = ProviderContainer();
+  // Headless: nobody can answer an OTP prompt here.
+  final container = ProviderContainer(
+    overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
+  );
   try {
     final user = await container.read(vtopUserProvider.future);
     final username = user.username?.trim();

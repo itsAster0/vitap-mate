@@ -10,19 +10,14 @@ import 'vtop/types.dart';
 import 'vtop/vtop_client.dart';
 import 'vtop/vtop_errors.dart';
 
-// These functions are ignored because they are not marked as `pub`: `as_str`, `as_str`, `as_str`, `parse`, `parse`, `parse`, `parse`, `parse`, `parse`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CourseId`, `CourseType`, `Credentials`, `Password`, `SemesterId`, `Username`
-
 Future<VtopClient> getVtopClient({
   required String username,
   required String password,
   PersistedVtopSession? persistedSession,
-  required bool inAppCaptchaSolverEnabled,
 }) => RustLib.instance.api.crateApiVtopGetClientGetVtopClient(
   username: username,
   password: password,
   persistedSession: persistedSession,
-  inAppCaptchaSolverEnabled: inAppCaptchaSolverEnabled,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>
@@ -93,10 +88,10 @@ Future<MarksData> fetchMarks({
   semesterId: semesterId,
 );
 
-Future<ExamScheduleData> fetchExamShedule({
+Future<ExamScheduleData> fetchExamSchedule({
   required VtopClient client,
   required String semesterId,
-}) => RustLib.instance.api.crateApiVtopGetClientFetchExamShedule(
+}) => RustLib.instance.api.crateApiVtopGetClientFetchExamSchedule(
   client: client,
   semesterId: semesterId,
 );
@@ -131,6 +126,23 @@ PersistedVtopSession exportSessionSnapshot({
 }) => RustLib.instance.api.crateApiVtopGetClientExportSessionSnapshot(
   client: client,
   savedAtEpochMs: savedAtEpochMs,
+);
+
+/// The current session with its CSRF token and registration number, for
+/// sending to a vtop-server.
+SessionState exportSessionState({required VtopClient client}) => RustLib
+    .instance
+    .api
+    .crateApiVtopGetClientExportSessionState(client: client);
+
+/// Replaces the client's session with one logged in elsewhere (a
+/// vtop-server login), including a pending OTP challenge.
+void vtopClientResumeSession({
+  required VtopClient client,
+  required SessionState session,
+}) => RustLib.instance.api.crateApiVtopGetClientVtopClientResumeSession(
+  client: client,
+  session: session,
 );
 
 Future<bool> fetchIsAuth({required VtopClient client}) =>

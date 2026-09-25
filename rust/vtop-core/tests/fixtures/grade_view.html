@@ -1,0 +1,18 @@
+<!-- Synthetic: shaped like VTOP's examGradeView/doStudentGradeView. All data is made up. -->
+<form>
+  <select id="semesterSubId" name="semesterSubId">
+    <option value="">-- Choose Semester --</option>
+    <option value="AP2025264">Winter Semester 2025-26</option>
+    <option value="AP2025261" selected>Fall   Semester
+      2025-26</option>
+  </select>
+</form>
+<table class="table">
+  <tr><th>Sl.No.</th><th>Course Code</th><th>Course Title</th><th>Course Type</th><th>Grading Type</th><th>Grand Total</th><th>Grade</th><th>View</th></tr>
+  <tr><td>1</td><td>CSE2001</td><td>Data Structures</td><td>Embedded Theory and Lab</td><td>RG</td><td>81.50</td><td>A</td>
+      <td><button type="button" class="btn" onclick="javascript:getGradeViewDetails('AP2025261000123','AP2025261');">View</button></td></tr>
+  <tr><td>2</td><td>MAT1001</td><td>Calculus-I</td><td>Theory Only</td><td>AG</td><td>67</td><td>B</td>
+      <td><button type="button" class="btn" onclick="getGradeViewDetails( 'AP2025261000200' )">View</button></td></tr>
+  <tr><td>Total</td><td></td><td></td><td></td><td></td><td></td><td></td><td><button onclick="noop()">x</button></td></tr>
+  <tr><td>3</td><td>HUM1001</td><td>Ethics</td><td>Theory Only</td><td>PF</td><td>-</td><td>P</td><td>No details</td></tr>
+</table>

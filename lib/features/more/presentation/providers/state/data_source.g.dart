@@ -49,7 +49,7 @@ final class ExamScheduleDataSourceProvider
 }
 
 String _$examScheduleDataSourceHash() =>
-    r'5a1732d4fb8218b0442d9af85b4fd18d557054cb';
+    r'1b6fdd373a89bc608d945966ca39d097ac6cde81';
 
 @ProviderFor(marksDataSource)
 final marksDataSourceProvider = MarksDataSourceProvider._();
@@ -88,7 +88,7 @@ final class MarksDataSourceProvider
   }
 }
 
-String _$marksDataSourceHash() => r'2935f3cea59fc1c6c277cb8101c3f3d18b604f55';
+String _$marksDataSourceHash() => r'946e1b3b0b171d38efb905a939ec1f8d69ddee5f';
 
 @ProviderFor(gradesDataSource)
 final gradesDataSourceProvider = GradesDataSourceProvider._();
@@ -127,7 +127,7 @@ final class GradesDataSourceProvider
   }
 }
 
-String _$gradesDataSourceHash() => r'1ce7df45145d16d13f64201f14fc49070b64886f';
+String _$gradesDataSourceHash() => r'8c0ed981a0513ed73ec26161bb37716fd3c47272';
 
 @ProviderFor(gradeHistoryDataSource)
 final gradeHistoryDataSourceProvider = GradeHistoryDataSourceProvider._();
@@ -169,7 +169,7 @@ final class GradeHistoryDataSourceProvider
 }
 
 String _$gradeHistoryDataSourceHash() =>
-    r'cd917311ca90addd0d2b36eaf1ca5493f4c330ce';
+    r'00aeebb1b34ea1f7e795bf90a513f474efd060d6';
 
 @ProviderFor(biometricHistoryDataSource)
 final biometricHistoryDataSourceProvider =
@@ -212,4 +212,4 @@ final class BiometricHistoryDataSourceProvider
 }
 
 String _$biometricHistoryDataSourceHash() =>
-    r'9bccbf4b40e5d316c6bb3d1abdb12b463c21e0f5';
+    r'cda01c91eae9403d6eef47bbf727b4c91d71f667';

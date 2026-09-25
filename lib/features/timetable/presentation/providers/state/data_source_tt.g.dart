@@ -49,4 +49,4 @@ final class TimetableDataSourceProvider
 }
 
 String _$timetableDataSourceHash() =>
-    r'07f7aa3ba0eff0a5d7ff879b61b9c8f107dd8856';
+    r'e1555dff9f6231c70261d8870b38d62037905230';

@@ -1,0 +1,116 @@
+{
+  "courses": [
+    {
+      "course_code": "CSE2001",
+      "course_type": "Embedded Theory",
+      "credits": "3.0",
+      "name": "Data Structures"
+    },
+    {
+      "course_code": "CSE2001",
+      "course_type": "Embedded Lab",
+      "credits": "1.0",
+      "name": "Data Structures"
+    },
+    {
+      "course_code": "MAT1001",
+      "course_type": "Theory Only",
+      "credits": "4.0",
+      "name": "Calculus-I"
+    }
+  ],
+  "semester_id": "AP2026271",
+  "slots": [
+    {
+      "block": "AB1 ALL",
+      "course_code": "CSE2001",
+      "course_type": "ETH",
+      "credits": "3.0",
+      "day": "MON",
+      "end_time": "08:50",
+      "faculty": "Dr. Test Faculty - SCOPE",
+      "kind": "Theory",
+      "name": "Data Structures",
+      "room_no": "107",
+      "serial": "1",
+      "slot": "A1",
+      "start_time": "08:00"
+    },
+    {
+      "block": "AB2 ALL",
+      "course_code": "MAT1001",
+      "course_type": "TH",
+      "credits": "4.0",
+      "day": "MON",
+      "end_time": "09:50",
+      "faculty": "Prof. Maths Person - SAS",
+      "kind": "Theory",
+      "name": "Calculus-I",
+      "room_no": "210",
+      "serial": "2",
+      "slot": "B1",
+      "start_time": "09:00"
+    },
+    {
+      "block": "AB1 ALL",
+      "course_code": "CSE2001",
+      "course_type": "ELA",
+      "credits": "1.0",
+      "day": "MON",
+      "end_time": "08:50",
+      "faculty": "Dr. Lab Faculty - SCOPE",
+      "kind": "Lab",
+      "name": "Data Structures",
+      "room_no": "305",
+      "serial": "1",
+      "slot": "L1",
+      "start_time": "08:00"
+    },
+    {
+      "block": "AB1 ALL",
+      "course_code": "CSE2001",
+      "course_type": "ELA",
+      "credits": "1.0",
+      "day": "MON",
+      "end_time": "09:40",
+      "faculty": "Dr. Lab Faculty - SCOPE",
+      "kind": "Lab",
+      "name": "Data Structures",
+      "room_no": "305",
+      "serial": "2",
+      "slot": "L2",
+      "start_time": "08:51"
+    },
+    {
+      "block": "AB2 ALL",
+      "course_code": "MAT1001",
+      "course_type": "TH",
+      "credits": "4.0",
+      "day": "TUE",
+      "end_time": "08:50",
+      "faculty": "Prof. Maths Person - SAS",
+      "kind": "Theory",
+      "name": "Calculus-I",
+      "room_no": "210",
+      "serial": "1",
+      "slot": "B1",
+      "start_time": "08:00"
+    },
+    {
+      "block": "AB1 ALL",
+      "course_code": "CSE2001",
+      "course_type": "ETH",
+      "credits": "3.0",
+      "day": "TUE",
+      "end_time": "10:50",
+      "faculty": "Dr. Test Faculty - SCOPE",
+      "kind": "Theory",
+      "name": "Data Structures",
+      "room_no": "107",
+      "serial": "3",
+      "slot": "A1",
+      "start_time": "10:00"
+    }
+  ],
+  "update_time": 0
+}

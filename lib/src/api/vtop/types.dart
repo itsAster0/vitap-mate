@@ -11,7 +11,6 @@ part 'types.freezed.dart';
 part 'types.g.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PersistedCookie`, `PersistedHeader`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 @freezed
 @meta.immutable
@@ -380,6 +379,9 @@ sealed class PersistedVtopSession with _$PersistedVtopSession {
     required String username,
     required BigInt savedAtEpochMs,
     String? cookies,
+    String? csrfToken,
+    String? registrationNumber,
+    BigInt? loggedInAt,
   }) = _PersistedVtopSession;
 
   factory PersistedVtopSession.fromJson(Map<String, dynamic> json) =>
@@ -406,6 +408,44 @@ sealed class SemesterInfo with _$SemesterInfo {
 
   factory SemesterInfo.fromJson(Map<String, dynamic> json) =>
       _$SemesterInfoFromJson(json);
+}
+
+/// A session in the portable form vtop-server takes: the cookie header plus
+/// the CSRF token and registration number, so the server can skip
+/// validating the cookie with VTOP.
+class SessionState {
+  final String cookies;
+  final String? csrfToken;
+  final String? registrationNumber;
+  final BigInt? otpIssuedAt;
+  final BigInt? loggedInAt;
+
+  const SessionState({
+    required this.cookies,
+    this.csrfToken,
+    this.registrationNumber,
+    this.otpIssuedAt,
+    this.loggedInAt,
+  });
+
+  @override
+  int get hashCode =>
+      cookies.hashCode ^
+      csrfToken.hashCode ^
+      registrationNumber.hashCode ^
+      otpIssuedAt.hashCode ^
+      loggedInAt.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SessionState &&
+          runtimeType == other.runtimeType &&
+          cookies == other.cookies &&
+          csrfToken == other.csrfToken &&
+          registrationNumber == other.registrationNumber &&
+          otpIssuedAt == other.otpIssuedAt &&
+          loggedInAt == other.loggedInAt;
 }
 
 @freezed
