@@ -83,9 +83,9 @@ impl ServerConfig {
             .collect();
         // No keys means an open server: fine on localhost or a private
         // network, risky on a public URL (see README).
-        if api_keys.iter().any(|key| key.len() < 16) {
+        if api_keys.iter().any(|key| key.len() < 8) {
             return Err(ConfigError(
-                "every API key must be at least 16 characters".into(),
+                "every API key must be at least 8 characters".into(),
             ));
         }
 

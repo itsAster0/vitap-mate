@@ -47,11 +47,11 @@ class AttendanceStanding {
     return n > 0 ? n : 0;
   }
 
-  /// One-line guidance, e.g. "Can skip 3" or "Attend 2 more".
+  /// One-line guidance, e.g. "Can skip 3" or "Attend 2".
   String get advice {
     if (total == 0) return 'No classes yet';
-    if (!isSafe) return 'Attend $mustAttend more';
-    if (canSkip == 0) return "Don't skip the next one";
+    if (!isSafe) return 'Attend $mustAttend';
+    if (canSkip == 0) return "Don't skip";
     return 'Can skip $canSkip';
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -101,130 +102,136 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     final now = DateTime.now();
     final isToday = _vtopDate(_selectedDate) == _vtopDate(now);
 
-    return RefreshIndicator(
+    return ScreenRefresh(
       onRefresh: _refresh,
-      backgroundColor: colors.background,
-      color: colors.foreground,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.lg,
-        ),
-        children: [
-          // Last week as chips, plus a calendar for older dates.
-          SizedBox(
-            height: 36,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Builder(
-                    builder: (context) {
-                      final date = now.subtract(Duration(days: i));
-                      final selected =
-                          _vtopDate(date) == _vtopDate(_selectedDate);
-                      return Padding(
-                        padding: const EdgeInsets.only(right: Space.sm),
-                        child: _DateChip(
-                          label: i == 0
-                              ? 'Today'
-                              : i == 1
-                              ? 'Yesterday'
-                              : DateFormat('EEE d').format(date),
-                          selected: selected,
-                          onPress: () => _select(date),
-                        ),
-                      );
-                    },
-                  ),
-                _DateChip(
-                  label: 'Pick date',
-                  icon: FLucideIcons.calendarDays,
-                  selected: now.difference(_selectedDate).inDays >= 7,
-                  onPress: _pickDate,
-                ),
-              ],
-            ),
+      tasks: const ['vtop_biometric_history'],
+      child: RefreshIndicator(
+        onRefresh: _refresh,
+        backgroundColor: colors.background,
+        color: colors.foreground,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            Space.sm,
+            Space.sm,
+            Space.sm,
+            Space.lg,
           ),
-          const SizedBox(height: Space.md),
-          AnimatedSwitcher(
-            duration: Motion.medium,
-            child: data.when(
-              skipLoadingOnRefresh: true,
-              loading: () => const Column(
-                key: ValueKey('loading'),
+          children: [
+            // Last week as chips, plus a calendar for older dates.
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
                 children: [
-                  Skeleton(height: 72, radius: Radii.lg),
-                  SizedBox(height: Space.md),
-                  SkeletonList(count: 3, height: 64),
+                  for (var i = 0; i < 7; i++)
+                    Builder(
+                      builder: (context) {
+                        final date = now.subtract(Duration(days: i));
+                        final selected =
+                            _vtopDate(date) == _vtopDate(_selectedDate);
+                        return Padding(
+                          padding: const EdgeInsets.only(right: Space.sm),
+                          child: _DateChip(
+                            label: i == 0
+                                ? 'Today'
+                                : i == 1
+                                ? 'Yesterday'
+                                : DateFormat('EEE d').format(date),
+                            selected: selected,
+                            onPress: () => _select(date),
+                          ),
+                        );
+                      },
+                    ),
+                  _DateChip(
+                    label: 'Pick date',
+                    icon: FLucideIcons.calendarDays,
+                    selected: now.difference(_selectedDate).inDays >= 7,
+                    onPress: _pickDate,
+                  ),
                 ],
               ),
-              error: (error, _) => EmptyState(
-                key: const ValueKey('error'),
-                icon: FLucideIcons.cloudOff,
-                title: "Couldn't load biometric history",
-                message: commonErrorMessage(error),
-                action: FButton(
-                  variant: FButtonVariant.outline,
-                  mainAxisSize: MainAxisSize.min,
-                  onPress: _refresh,
-                  child: const Text('Try again'),
-                ),
-              ),
-              data: (data) {
-                final records = [...data.records]
-                  ..sort(
-                    (a, b) => _secondsOf(
-                      b.punchTime,
-                    ).compareTo(_secondsOf(a.punchTime)),
-                  );
-                return Column(
-                  key: ValueKey('data_${_vtopDate(_selectedDate)}'),
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (records.isEmpty)
-                      EmptyState(
-                        icon: FLucideIcons.scanFace,
-                        title: 'No punches',
-                        message:
-                            'No face or biometric logs on ${DateFormat('EEE d MMM').format(_selectedDate)}.',
-                      )
-                    else ...[
-                      _Status(latest: records.first, isToday: isToday),
-                      SectionHeader(
-                        title: DateFormat('EEEE, d MMMM').format(_selectedDate),
-                        trailing: Text(
-                          '${records.where((r) => _kindOf(r) == _Kind.entry).length} in · '
-                          '${records.where((r) => _kindOf(r) == _Kind.exit).length} out',
-                        ),
-                      ),
-                      Surface(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: Space.md + 2,
-                          vertical: Space.sm,
-                        ),
-                        child: Column(
-                          children: [
-                            for (final (i, r) in records.indexed)
-                              _PunchRow(
-                                record: r,
-                                isFirst: i == 0,
-                                isLast: i == records.length - 1,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    DataUpdatedFooter(updateTime: data.updateTime.toInt()),
-                  ],
-                );
-              },
             ),
-          ),
-        ],
+            const SizedBox(height: Space.md),
+            AnimatedSwitcher(
+              duration: Motion.medium,
+              child: data.when(
+                skipLoadingOnRefresh: true,
+                loading: () => const Column(
+                  key: ValueKey('loading'),
+                  children: [
+                    Skeleton(height: 72, radius: Radii.lg),
+                    SizedBox(height: Space.md),
+                    SkeletonList(count: 3, height: 64),
+                  ],
+                ),
+                error: (error, _) => EmptyState(
+                  key: const ValueKey('error'),
+                  icon: FLucideIcons.cloudOff,
+                  title: "Couldn't load biometric history",
+                  message: commonErrorMessage(error),
+                  action: FButton(
+                    variant: FButtonVariant.outline,
+                    mainAxisSize: MainAxisSize.min,
+                    onPress: _refresh,
+                    child: const Text('Try again'),
+                  ),
+                ),
+                data: (data) {
+                  final records = [...data.records]
+                    ..sort(
+                      (a, b) => _secondsOf(
+                        b.punchTime,
+                      ).compareTo(_secondsOf(a.punchTime)),
+                    );
+                  return Column(
+                    key: ValueKey('data_${_vtopDate(_selectedDate)}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (records.isEmpty)
+                        EmptyState(
+                          icon: FLucideIcons.scanFace,
+                          title: 'No punches',
+                          message:
+                              'No face or biometric logs on ${DateFormat('EEE d MMM').format(_selectedDate)}.',
+                        )
+                      else ...[
+                        _Status(latest: records.first, isToday: isToday),
+                        SectionHeader(
+                          title: DateFormat(
+                            'EEEE, d MMMM',
+                          ).format(_selectedDate),
+                          trailing: Text(
+                            '${records.where((r) => _kindOf(r) == _Kind.entry).length} in · '
+                            '${records.where((r) => _kindOf(r) == _Kind.exit).length} out',
+                          ),
+                        ),
+                        Surface(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: Space.md + 2,
+                            vertical: Space.sm,
+                          ),
+                          child: Column(
+                            children: [
+                              for (final (i, r) in records.indexed)
+                                _PunchRow(
+                                  record: r,
+                                  isFirst: i == 0,
+                                  isLast: i == records.length - 1,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      DataUpdatedFooter(updateTime: data.updateTime.toInt()),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

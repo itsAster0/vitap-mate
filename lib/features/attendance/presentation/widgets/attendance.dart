@@ -121,7 +121,7 @@ class AttendanceCard extends ConsumerWidget {
   }
 }
 
-/// "22 of 24" with the attended count emphasised and misses called out.
+/// "22/24 attended".
 class _ClassCount extends StatelessWidget {
   const _ClassCount({required this.standing});
 
@@ -131,10 +131,8 @@ class _ClassCount extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final missed = standing.total - standing.attended;
     return Text(
-      '${standing.attended}/${standing.total} attended'
-      '${missed > 0 ? ' · $missed missed' : ''}',
+      '${standing.attended}/${standing.total} attended',
       style: typography.body.sm.copyWith(
         color: colors.mutedForeground,
         fontFeatures: const [FontFeature.tabularFigures()],

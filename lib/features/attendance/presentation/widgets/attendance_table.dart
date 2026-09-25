@@ -5,6 +5,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -15,6 +16,7 @@ import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_cal.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum _Tab { history, planner }
@@ -32,8 +34,8 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     final typography = context.theme.typography;
     final provider = fullAttendanceProvider(record.courseType, record.courseId);
     final dataAsync = ref.watch(provider);
-    final refreshing = useState(false);
     final tab = useState(_Tab.history);
+    final refreshing = useState(false);
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -52,7 +54,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
       } catch (e) {
         if (context.mounted) disCommonToast(context, e);
       } finally {
-        refreshing.value = false;
+        if (context.mounted) refreshing.value = false;
       }
     }
 
@@ -65,199 +67,211 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     );
     final history = dataAsync.value;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.background,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(Radii.lg + 4),
+    return ScreenRefresh(
+      onRefresh: refresh,
+      tasks: const ['vtop_fullattendance'],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.background,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(Radii.lg + 4),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SheetHandle(),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(
-                Space.lg,
-                Space.sm,
-                Space.lg,
-                Space.xl + MediaQuery.paddingOf(context).bottom,
-              ),
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name.trim().isEmpty
-                                ? record.courseName
-                                : name.trim(),
-                            style: typography.body.xl.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                              color: colors.foreground,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SheetHandle(),
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.fromLTRB(
+                  Space.lg,
+                  Space.sm,
+                  Space.lg,
+                  Space.xl + MediaQuery.paddingOf(context).bottom,
+                ),
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name.trim().isEmpty
+                                  ? record.courseName
+                                  : name.trim(),
+                              style: typography.body.xl.copyWith(
+                                fontWeight: FontWeight.w700,
+                                height: 1.2,
+                                color: colors.foreground,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: Space.sm),
-                          Row(
-                            children: [
-                              CourseKindBadge(isLab: record.islab()),
-                              const SizedBox(width: Space.sm),
-                              Text(
-                                code.trim(),
-                                style: typography.body.xs.copyWith(
-                                  color: colors.mutedForeground,
+                            const SizedBox(height: Space.sm),
+                            Row(
+                              children: [
+                                CourseKindBadge(isLab: record.islab()),
+                                const SizedBox(width: Space.sm),
+                                Text(
+                                  code.trim(),
+                                  style: typography.body.xs.copyWith(
+                                    color: colors.mutedForeground,
+                                  ),
                                 ),
+                              ],
+                            ),
+                            if (record.facultyDetail.trim().isNotEmpty) ...[
+                              const SizedBox(height: Space.xs + 2),
+                              FacultyLine(
+                                name: record.facultyDetail
+                                    .split(' - ')
+                                    .first
+                                    .trim(),
                               ),
                             ],
-                          ),
-                          if (record.facultyDetail.trim().isNotEmpty) ...[
-                            const SizedBox(height: Space.xs + 2),
-                            FacultyLine(
-                              name: record.facultyDetail
-                                  .split(' - ')
-                                  .first
-                                  .trim(),
-                            ),
                           ],
-                        ],
-                      ),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      semanticsLabel: 'Refresh attendance',
-                      onPress: refreshing.value ? null : refresh,
-                      child: refreshing.value
-                          ? const FCircularProgress(
-                              size: FCircularProgressSizeVariant.sm,
-                            )
-                          : const Icon(FLucideIcons.refreshCw),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: Space.lg),
-                Surface(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          CountUp(
-                            value: standing.displayPercent,
-                            suffix: '%',
-                            style: typography.display.xl2.copyWith(
-                              height: 1,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.5,
-                              color: tone.base,
-                            ),
-                          ),
-                          const SizedBox(width: Space.md),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 3),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    standing.advice,
-                                    style: typography.body.md.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.foreground,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${standing.attended} of ${standing.total} attended',
-                                    style: typography.body.xs.copyWith(
-                                      color: colors.mutedForeground,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Space.md),
-                      SkipMeter(percent: standing.displayPercent, tone: tone),
-                      const SizedBox(height: Space.xs),
-                      Align(
-                        alignment: const Alignment(0.5, 0),
-                        child: Text(
-                          '75% required',
-                          style: typography.body.xs.copyWith(
-                            fontSize: 10,
-                            color: colors.mutedForeground,
-                          ),
                         ),
+                      ),
+                      FButton.icon(
+                        variant: FButtonVariant.ghost,
+                        semanticsLabel: 'Refresh attendance',
+                        onPress: refreshing.value ? null : refresh,
+                        child: refreshing.value
+                            ? const FCircularProgress(
+                                size: FCircularProgressSizeVariant.sm,
+                              )
+                            : const Icon(FLucideIcons.refreshCw),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: Space.md),
-                AnimatedSwitcher(
-                  duration: Motion.medium,
-                  child: history == null
-                      ? const Column(
-                          key: ValueKey('loading'),
+                  const SizedBox(height: Space.lg),
+                  Surface(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Skeleton(height: 64, radius: Radii.lg),
-                            SizedBox(height: Space.md),
-                            Skeleton(height: 90, radius: Radii.lg),
+                            CountUp(
+                              value: standing.displayPercent,
+                              suffix: '%',
+                              style: typography.display.xl2.copyWith(
+                                height: 1,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.5,
+                                color: tone.base,
+                              ),
+                            ),
+                            const SizedBox(width: Space.md),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 3),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      standing.advice,
+                                      style: typography.body.md.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.foreground,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${standing.attended} of ${standing.total} attended',
+                                      style: typography.body.xs.copyWith(
+                                        color: colors.mutedForeground,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
-                        )
-                      : _Insights(key: const ValueKey('data'), data: history),
-                ),
-                const SizedBox(height: Space.lg),
-                Segmented<_Tab>(
-                  value: tab.value,
-                  onChanged: (value) => tab.value = value,
-                  segments: const [
-                    (_Tab.history, 'History'),
-                    (_Tab.planner, 'Planner'),
-                  ],
-                ),
-                AnimatedSwitcher(
-                  duration: Motion.medium,
-                  switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
-                  switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
-                  layoutBuilder: (current, previous) => Stack(
-                    alignment: Alignment.topCenter,
-                    children: [...previous, ?current],
-                  ),
-                  child: KeyedSubtree(
-                    key: ValueKey(tab.value),
-                    child: switch (tab.value) {
-                      _Tab.history => dataAsync.when(
-                        skipLoadingOnRefresh: true,
-                        data: (data) => _History(data: data),
-                        error: (e, _) => EmptyState(
-                          icon: FLucideIcons.cloudAlert,
-                          title: "Couldn't load history",
-                          message: commonErrorMessage(e),
                         ),
-                        loading: () => const Padding(
-                          padding: EdgeInsets.only(top: Space.lg),
-                          child: SkeletonList(count: 4, height: 72),
+                        const SizedBox(height: Space.md),
+                        SkipMeter(percent: standing.displayPercent, tone: tone),
+                        const SizedBox(height: Space.xs),
+                        Align(
+                          alignment: const Alignment(0.5, 0),
+                          child: Text(
+                            '75% required',
+                            style: typography.body.xs.copyWith(
+                              fontSize: 10,
+                              color: colors.mutedForeground,
+                            ),
+                          ),
                         ),
-                      ),
-                      // Plans from the summary counts, which match VTOP.
-                      _Tab.planner => AttendancePlanner(
-                        attended: standing.attended,
-                        total: standing.total,
-                      ),
-                    },
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: Space.md),
+                  AnimatedSwitcher(
+                    duration: Motion.medium,
+                    child: history == null
+                        ? const Column(
+                            key: ValueKey('loading'),
+                            children: [
+                              Skeleton(height: 64, radius: Radii.lg),
+                              SizedBox(height: Space.md),
+                              Skeleton(height: 90, radius: Radii.lg),
+                            ],
+                          )
+                        : _Insights(key: const ValueKey('data'), data: history),
+                  ),
+                  const SizedBox(height: Space.lg),
+                  Segmented<_Tab>(
+                    value: tab.value,
+                    onChanged: (value) => tab.value = value,
+                    segments: const [
+                      (_Tab.history, 'History'),
+                      (_Tab.planner, 'Planner'),
+                    ],
+                  ),
+                  AnimatedSwitcher(
+                    duration: Motion.medium,
+                    switchInCurve: const Interval(
+                      0.3,
+                      1,
+                      curve: Curves.easeOut,
+                    ),
+                    switchOutCurve: const Interval(
+                      0.7,
+                      1,
+                      curve: Curves.easeIn,
+                    ),
+                    layoutBuilder: (current, previous) => Stack(
+                      alignment: Alignment.topCenter,
+                      children: [...previous, ?current],
+                    ),
+                    child: KeyedSubtree(
+                      key: ValueKey(tab.value),
+                      child: switch (tab.value) {
+                        _Tab.history => dataAsync.when(
+                          skipLoadingOnRefresh: true,
+                          data: (data) => _History(data: data),
+                          error: (e, _) => EmptyState(
+                            icon: FLucideIcons.cloudAlert,
+                            title: "Couldn't load history",
+                            message: commonErrorMessage(e),
+                          ),
+                          loading: () => const Padding(
+                            padding: EdgeInsets.only(top: Space.lg),
+                            child: SkeletonList(count: 4, height: 72),
+                          ),
+                        ),
+                        // Plans from the summary counts, which match VTOP.
+                        _Tab.planner => AttendancePlanner(
+                          attended: standing.attended,
+                          total: standing.total,
+                        ),
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -565,8 +579,13 @@ class _HistoryRow extends StatelessWidget {
       ),
     };
     final absent = status == _Status.absent;
-    // "WED / 15:00-15:50" → "15:00–15:50"
-    final time = record.dayTime.split('/').last.trim().replaceAll('-', '–');
+    // "WED / 15:00-15:50" → "3:00 – 3:50 PM"
+    final time = record.dayTime
+        .split('/')
+        .last
+        .split('-')
+        .map((t) => formatClock(t, context))
+        .join(' – ');
 
     return Container(
       color: absent ? tone.subtle.withValues(alpha: 0.6) : null,

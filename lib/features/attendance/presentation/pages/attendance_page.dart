@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -44,38 +45,42 @@ class AttendancePage extends HookConsumerWidget {
 
     final attendanceData = ref.watch(attendanceProvider);
 
-    return AnimatedSwitcher(
-      duration: Motion.medium,
-      child: attendanceData.when(
-        skipLoadingOnRefresh: true,
-        skipLoadingOnReload: true,
-        data: (data) => _AttendanceView(
-          key: const ValueKey('data'),
-          records: data.records,
-          updateTime: data.updateTime.toInt(),
-          onRefresh: update,
-        ),
-        error: (e, _) => EmptyState(
-          key: const ValueKey('error'),
-          icon: FLucideIcons.cloudAlert,
-          title: "Couldn't load attendance",
-          message: commonErrorMessage(e),
-          action: FButton(
-            variant: FButtonVariant.outline,
-            mainAxisSize: MainAxisSize.min,
-            onPress: update,
-            child: const Text('Try again'),
+    return ScreenRefresh(
+      onRefresh: update,
+      tasks: const ['vtop_attendance'],
+      child: AnimatedSwitcher(
+        duration: Motion.medium,
+        child: attendanceData.when(
+          skipLoadingOnRefresh: true,
+          skipLoadingOnReload: true,
+          data: (data) => _AttendanceView(
+            key: const ValueKey('data'),
+            records: data.records,
+            updateTime: data.updateTime.toInt(),
+            onRefresh: update,
           ),
-        ),
-        loading: () => const Padding(
-          key: ValueKey('loading'),
-          padding: EdgeInsets.all(Space.sm),
-          child: Column(
-            children: [
-              Skeleton(height: 40, radius: Radii.md),
-              SizedBox(height: Space.lg),
-              SkeletonList(count: 5, height: 104),
-            ],
+          error: (e, _) => EmptyState(
+            key: const ValueKey('error'),
+            icon: FLucideIcons.cloudAlert,
+            title: "Couldn't load attendance",
+            message: commonErrorMessage(e),
+            action: FButton(
+              variant: FButtonVariant.outline,
+              mainAxisSize: MainAxisSize.min,
+              onPress: update,
+              child: const Text('Try again'),
+            ),
+          ),
+          loading: () => const Padding(
+            key: ValueKey('loading'),
+            padding: EdgeInsets.all(Space.sm),
+            child: Column(
+              children: [
+                Skeleton(height: 40, radius: Radii.md),
+                SizedBox(height: Space.lg),
+                SkeletonList(count: 5, height: 104),
+              ],
+            ),
           ),
         ),
       ),

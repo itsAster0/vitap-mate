@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -65,100 +66,104 @@ class GradesPage extends HookConsumerWidget {
         r.courseCode.trim().toUpperCase(): double.tryParse(r.credits.trim()),
     };
 
-    return RefreshIndicator(
-      backgroundColor: context.theme.colors.background,
-      color: context.theme.colors.foreground,
+    return ScreenRefresh(
       onRefresh: refresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.lg,
-        ),
-        children: [
-          if (semLoading)
-            const Skeleton(height: 36, radius: Radii.pill)
-          else if (semLoadError)
-            FButton(
-              variant: FButtonVariant.outline,
-              prefix: const Icon(FLucideIcons.rotateCw),
-              onPress: () => ref.invalidate(semesterIdProvider),
-              child: const Text("Couldn't load semesters. Retry"),
-            )
-          else
-            _SemesterChips(
-              semesters: semesters,
-              selectedId: selectedSemesterId,
-              onSelect: (id) async {
-                try {
-                  await ref.read(gradesProvider.notifier).selectSemester(id);
-                } catch (e) {
-                  log("$e");
-                }
-              },
-            ),
-          const SizedBox(height: Space.md),
-          AnimatedSwitcher(
-            duration: Motion.medium,
-            child: state.when(
-              skipLoadingOnRefresh: true,
-              loading: () => const Column(
-                key: ValueKey('loading'),
-                children: [
-                  Skeleton(height: 96, radius: Radii.lg),
-                  SizedBox(height: Space.md),
-                  SkeletonList(count: 5, height: 76),
-                ],
-              ),
-              error: (e, _) => EmptyState(
-                key: const ValueKey('error'),
-                icon: FLucideIcons.cloudAlert,
-                title: "Couldn't load grades",
-                message: commonErrorMessage(e),
-              ),
-              data: (data) {
-                final sorted = [...data.gradeView.courses]
-                  ..sort(
-                    (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
-                      int.tryParse(b.serial) ?? 0,
-                    ),
-                  );
-                return Column(
-                  key: ValueKey('data_${data.selectedSemesterId}'),
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (sorted.isEmpty)
-                      const EmptyState(
-                        icon: FLucideIcons.school,
-                        title: 'No grades for this semester',
-                        message: 'Grades appear after results are declared.',
-                      )
-                    else ...[
-                      _SemesterSummary(
-                        courses: sorted,
-                        creditsByCode: creditsByCode,
-                      ),
-                      const SizedBox(height: Space.md),
-                      for (final (i, c) in sorted.indexed)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: Space.sm),
-                          child: EnterFade(
-                            index: i,
-                            child: _GradeCard(course: c),
-                          ),
-                        ),
-                    ],
-                    DataUpdatedFooter(
-                      updateTime: data.gradeView.updateTime.toInt(),
-                    ),
-                  ],
-                );
-              },
-            ),
+      tasks: const ['vtop_grades', 'vtop_grade_details'],
+      child: RefreshIndicator(
+        backgroundColor: context.theme.colors.background,
+        color: context.theme.colors.foreground,
+        onRefresh: refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(
+            Space.sm,
+            Space.sm,
+            Space.sm,
+            Space.lg,
           ),
-        ],
+          children: [
+            if (semLoading)
+              const Skeleton(height: 36, radius: Radii.pill)
+            else if (semLoadError)
+              FButton(
+                variant: FButtonVariant.outline,
+                prefix: const Icon(FLucideIcons.rotateCw),
+                onPress: () => ref.invalidate(semesterIdProvider),
+                child: const Text("Couldn't load semesters. Retry"),
+              )
+            else
+              _SemesterChips(
+                semesters: semesters,
+                selectedId: selectedSemesterId,
+                onSelect: (id) async {
+                  try {
+                    await ref.read(gradesProvider.notifier).selectSemester(id);
+                  } catch (e) {
+                    log("$e");
+                  }
+                },
+              ),
+            const SizedBox(height: Space.md),
+            AnimatedSwitcher(
+              duration: Motion.medium,
+              child: state.when(
+                skipLoadingOnRefresh: true,
+                loading: () => const Column(
+                  key: ValueKey('loading'),
+                  children: [
+                    Skeleton(height: 96, radius: Radii.lg),
+                    SizedBox(height: Space.md),
+                    SkeletonList(count: 5, height: 76),
+                  ],
+                ),
+                error: (e, _) => EmptyState(
+                  key: const ValueKey('error'),
+                  icon: FLucideIcons.cloudAlert,
+                  title: "Couldn't load grades",
+                  message: commonErrorMessage(e),
+                ),
+                data: (data) {
+                  final sorted = [...data.gradeView.courses]
+                    ..sort(
+                      (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
+                        int.tryParse(b.serial) ?? 0,
+                      ),
+                    );
+                  return Column(
+                    key: ValueKey('data_${data.selectedSemesterId}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (sorted.isEmpty)
+                        const EmptyState(
+                          icon: FLucideIcons.school,
+                          title: 'No grades for this semester',
+                          message: 'Grades appear after results are declared.',
+                        )
+                      else ...[
+                        _SemesterSummary(
+                          courses: sorted,
+                          creditsByCode: creditsByCode,
+                        ),
+                        const SizedBox(height: Space.md),
+                        for (final (i, c) in sorted.indexed)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: Space.sm),
+                            child: EnterFade(
+                              index: i,
+                              child: _GradeCard(course: c),
+                            ),
+                          ),
+                      ],
+                      DataUpdatedFooter(
+                        updateTime: data.gradeView.updateTime.toInt(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

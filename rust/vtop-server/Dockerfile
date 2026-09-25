@@ -1,8 +1,8 @@
-# Build context: the rust/ workspace root.
-#   docker build -f vtop-server/Dockerfile -t vtop-server .
+# Build context: the repository root.
+#   docker build -f rust/vtop-server/Dockerfile -t vtop-server .
 FROM rust:1-bookworm AS build
 WORKDIR /src
-COPY . .
+COPY rust/ .
 RUN cargo build --locked --profile server -p vtop-server \
  && cp target/server/vtop-server /vtop-server
 

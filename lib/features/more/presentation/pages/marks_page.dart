@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -105,67 +106,73 @@ class _MarksView extends HookWidget {
       _CourseFilter.lab => labs,
     };
 
-    return RefreshIndicator(
+    return ScreenRefresh(
       onRefresh: onRefresh,
-      backgroundColor: context.theme.colors.background,
-      color: context.theme.colors.foreground,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.lg,
-        ),
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          if (records.isNotEmpty) ...[
-            Segmented<_CourseFilter>(
-              value: filter.value,
-              onChanged: (value) => filter.value = value,
-              segments: [
-                (_CourseFilter.all, 'All  ${records.length}'),
-                (_CourseFilter.theory, 'Theory  ${theory.length}'),
-                (_CourseFilter.lab, 'Lab  ${labs.length}'),
-              ],
-            ),
-            const SizedBox(height: Space.md),
-          ],
-          AnimatedSwitcher(
-            duration: Motion.medium,
-            switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
-            switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
-            layoutBuilder: (current, previous) => Stack(
-              alignment: Alignment.topCenter,
-              children: [...previous, ?current],
-            ),
-            child: Column(
-              key: ValueKey(filter.value),
-              children: [
-                if (shown.isEmpty)
-                  EmptyState(
-                    icon: FLucideIcons.clipboardList,
-                    title: records.isEmpty ? 'No marks yet' : 'Nothing here',
-                    message: records.isEmpty
-                        ? 'Marks appear here once faculty upload them.'
-                        : 'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} marks yet.',
-                  )
-                else
-                  for (final (i, record) in shown.indexed)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm + 2),
-                      child: EnterFade(
-                        index: i,
-                        child: MarksCard(
-                          key: ValueKey('${record.coursecode}_${record.slot}'),
-                          record: record.copyWith(marks: sortedMarks(record)),
+      tasks: const ['vtop_marks'],
+      child: RefreshIndicator(
+        onRefresh: onRefresh,
+        backgroundColor: context.theme.colors.background,
+        color: context.theme.colors.foreground,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            Space.sm,
+            Space.sm,
+            Space.sm,
+            Space.lg,
+          ),
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            if (records.isNotEmpty) ...[
+              Segmented<_CourseFilter>(
+                value: filter.value,
+                onChanged: (value) => filter.value = value,
+                segments: [
+                  (_CourseFilter.all, 'All  ${records.length}'),
+                  (_CourseFilter.theory, 'Theory  ${theory.length}'),
+                  (_CourseFilter.lab, 'Lab  ${labs.length}'),
+                ],
+              ),
+              const SizedBox(height: Space.md),
+            ],
+            AnimatedSwitcher(
+              duration: Motion.medium,
+              switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
+              switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.topCenter,
+                children: [...previous, ?current],
+              ),
+              child: Column(
+                key: ValueKey(filter.value),
+                children: [
+                  if (shown.isEmpty)
+                    EmptyState(
+                      icon: FLucideIcons.clipboardList,
+                      title: records.isEmpty ? 'No marks yet' : 'Nothing here',
+                      message: records.isEmpty
+                          ? 'Marks appear here once faculty upload them.'
+                          : 'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} marks yet.',
+                    )
+                  else
+                    for (final (i, record) in shown.indexed)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                        child: EnterFade(
+                          index: i,
+                          child: MarksCard(
+                            key: ValueKey(
+                              '${record.coursecode}_${record.slot}',
+                            ),
+                            record: record.copyWith(marks: sortedMarks(record)),
+                          ),
                         ),
                       ),
-                    ),
-              ],
+                ],
+              ),
             ),
-          ),
-          DataUpdatedFooter(updateTime: updateTime),
-        ],
+            DataUpdatedFooter(updateTime: updateTime),
+          ],
+        ),
       ),
     );
   }

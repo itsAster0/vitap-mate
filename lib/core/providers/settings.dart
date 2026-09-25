@@ -14,6 +14,7 @@ const emailOtpBannerDismissedSettingKey = 'settings_email_otp_banner_dismissed';
 const vtopServerUrlSettingKey = 'settings_vtop_server_url';
 const vtopServerApiKeySettingKey = 'settings_vtop_server_api_key';
 const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
+const refreshButtonSettingKey = 'settings_refresh_button';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -22,6 +23,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         "settings_merge_tt",
         "settings_auto_refresh",
+        refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,
         "settings_class_notifications_enabled",
         "settings_class_notify_before_minutes",
@@ -94,6 +96,19 @@ Future<void> setMergeTT(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool("settings_merge_tt", value);
   ref.invalidate(mergeTTProvider);
+}
+
+/// The floating refresh button on the screen edge.
+@riverpod
+bool refreshButton(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool(refreshButtonSettingKey) ?? true;
+}
+
+Future<void> setRefreshButton(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool(refreshButtonSettingKey, value);
+  ref.invalidate(refreshButtonProvider);
 }
 
 @riverpod
