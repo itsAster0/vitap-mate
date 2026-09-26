@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/features/background/stale_refresh.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
@@ -40,6 +41,8 @@ class ShellLayout extends HookConsumerWidget {
           int.tryParse(sem.semid!.toLowerCase().replaceAll("ap", "")) ?? 0;
       return currentSemID < max;
     }, [sem?.semid, sems?.semesters.length]);
+    // Refreshes stale pages after a quick fetch while the app is open.
+    ref.watch(staleRefresherProvider);
     final runningTasks = ref.watch(
       globalAsyncQueueProvider.select((value) => value.running.keys.toList()),
     );

@@ -12,6 +12,13 @@ abstract class AsyncQueue {
 class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   final _taskEvents = StreamController<Set<String>>.broadcast();
   Stream<Set<String>> get taskStream => _taskEvents.stream;
+
+  final _quickFetches = StreamController<void>.broadcast();
+
+  /// Fires when a VTOP fetch succeeds within [quickFetchLimit]: the session
+  /// is live and the network is good, so stale pages can be refreshed.
+  Stream<void> get quickFetches => _quickFetches.stream;
+  static const quickFetchLimit = Duration(seconds: 2);
   @override
   GlobalAsyncQueueEntity build() {
     return const GlobalAsyncQueueEntity();
@@ -45,7 +52,14 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
             await Future.wait(mainFutures);
           }
         }
-        completer.complete(await task());
+        final watch = Stopwatch()..start();
+        final result = await task();
+        if (id.startsWith('vtop_') &&
+            !id.startsWith('vtop_login') &&
+            watch.elapsed <= quickFetchLimit) {
+          _quickFetches.add(null);
+        }
+        completer.complete(result);
       } catch (e, st) {
         completer.completeError(e, st);
       } finally {
