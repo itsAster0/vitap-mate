@@ -27,7 +27,12 @@ class DocumentViewerPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    // "System" follows the phone's setting, not just an explicit Dark.
+    final themeMode = ref.watch(themeProvider);
+    final darkMode =
+        themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     final activeTitle = ref.read(activeDocumentTitleProvider.notifier);
     final registry = ref.read(docsRegistryProvider.notifier);
 

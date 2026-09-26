@@ -1,457 +1,538 @@
+import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/utils/extention.dart';
-import 'package:vitapmate/core/theme/app_palette.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
+/// The whole week on one screen: a compact grid with a column per class day.
+/// Blocks show course code and room; tap one for the full details.
 class WeeklyTimetableView extends HookWidget {
   const WeeklyTimetableView({
     super.key,
     required this.days,
     required this.slotsForDay,
+    this.attendance = const [],
   });
 
   final List<int> days;
   final List<TimetableSlot> Function(int day) slotsForDay;
+  final List<AttendanceRecord> attendance;
 
-  static const _dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  static const _timeGutterWidth = 62.0;
-  static const _dayWidth = 164.0;
-  static const _headerHeight = 66.0;
-  static const _hourHeight = 82.0;
-  static const _bottomPadding = 18.0;
+  static const _dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  static const _gutter = 30.0;
+  static const _headerHeight = 52.0;
+  static const _hourHeight = 58.0;
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final now = useState(DateTime.now());
+    useEffect(() {
+      final timer = Timer.periodic(
+        const Duration(minutes: 1),
+        (_) => now.value = DateTime.now(),
+      );
+      return timer.cancel;
+    }, const []);
+
     final dates = getCurrentWeekDates();
     final daySlots = {for (final day in days) day: slotsForDay(day)};
     final allSlots = daySlots.values.expand((slots) => slots).toList();
 
     if (allSlots.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(24),
-        child: Center(
-          child: Text(
-            'No classes this week',
-            style: TextStyle(color: context.theme.colors.mutedForeground),
-          ),
-        ),
+      return const EmptyState(
+        icon: FLucideIcons.calendarX,
+        title: 'No classes this week',
       );
     }
 
-    final earliestMinute = allSlots
-        .map((slot) => _minutesFromMidnight(slot.startTime))
-        .reduce(math.min);
-    final latestMinute = allSlots
-        .map((slot) => _minutesFromMidnight(slot.endTime))
-        .reduce(math.max);
-    final calendarStart = (earliestMinute ~/ 60) * 60;
-    final calendarEnd = ((latestMinute + 59) ~/ 60) * 60;
-    final calendarMinutes = math.max(60, calendarEnd - calendarStart);
-    final gridHeight = calendarMinutes / 60 * _hourHeight;
-    final calendarWidth = days.length * _dayWidth;
-    final totalHeight = _headerHeight + gridHeight + _bottomPadding;
-    final now = DateTime.now();
-    // Open scrolled so today (or the next class day) is the first column.
-    final firstIndex = days.indexWhere((d) => d >= now.weekday);
-    final scroll = useScrollController(
-      initialScrollOffset: math.max(0, firstIndex) * _dayWidth,
-    );
+    final start =
+        (allSlots.map((s) => minutesOf(s.startTime)).reduce(math.min) ~/ 60) *
+        60;
+    final end =
+        ((allSlots.map((s) => minutesOf(s.endTime)).reduce(math.max) + 59) ~/
+            60) *
+        60;
+    final gridHeight = math.max(60, end - start) / 60 * _hourHeight;
+    final today = now.value.weekday;
+    final minuteNow = now.value.hour * 60 + now.value.minute;
+    final showNow =
+        days.contains(today) && minuteNow >= start && minuteNow <= end;
 
-    double minuteToY(int minute) =>
-        _headerHeight + (minute - calendarStart) / 60 * _hourHeight;
+    double yOf(int minute) => (minute - start) / 60 * _hourHeight;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: context.theme.colors.card,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: context.theme.colors.border),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hour labels stay put while the days scroll sideways.
-              SizedBox(
-                width: _timeGutterWidth,
-                height: totalHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      bottom: totalHeight - _headerHeight,
-                      child: ColoredBox(color: context.theme.colors.secondary),
-                    ),
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      width: _timeGutterWidth,
-                      height: _headerHeight,
-                      child: Center(
-                        child: Text(
-                          'Time',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: context.theme.colors.mutedForeground,
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, 0),
+      child: Surface(
+        padding: const EdgeInsets.fromLTRB(0, 0, Space.xs, Space.sm),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final dayWidth = (constraints.maxWidth - _gutter) / days.length;
+            final todayIndex = days.indexOf(today);
+
+            return Column(
+              children: [
+                // Day header
+                SizedBox(
+                  height: _headerHeight,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: _gutter),
+                      for (final day in days)
+                        SizedBox(
+                          width: dayWidth,
+                          child: _DayHeader(
+                            name: _dayNames[day - 1],
+                            date: dates[day - 1],
+                            isToday: day == today,
+                            count: daySlots[day]!.length,
                           ),
                         ),
-                      ),
-                    ),
-                    for (
-                      var minute = calendarStart;
-                      minute <= calendarEnd;
-                      minute += 60
-                    )
-                      Positioned(
-                        left: 4,
-                        top: math.max(minuteToY(minute) - 8, _headerHeight + 3),
-                        width: _timeGutterWidth - 9,
-                        child: Text(
-                          _formatTime(context, minute),
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: context.theme.colors.mutedForeground,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scroll,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: calendarWidth,
-                    height: totalHeight,
-                    child: Stack(
-                      children: [
-                        for (var index = 0; index < days.length; index++)
-                          if (days[index] == now.weekday)
-                            Positioned(
-                              left: index * _dayWidth,
-                              top: _headerHeight,
-                              width: _dayWidth,
-                              height: gridHeight,
-                              child: ColoredBox(
-                                color: context
-                                    .theme
-                                    .colors
-                                    .app
-                                    .accentTone
-                                    .subtle
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                        Positioned(
-                          left: 0,
-                          top: 0,
-                          width: calendarWidth,
-                          height: _headerHeight,
-                          child: ColoredBox(
-                            color: context.theme.colors.secondary,
-                          ),
-                        ),
-                        for (var index = 0; index < days.length; index++)
-                          Positioned(
-                            left: index * _dayWidth,
-                            top: 0,
-                            width: _dayWidth,
-                            height: _headerHeight,
-                            child: _DayHeader(
-                              dayName: _dayNames[days[index] - 1],
-                              date: dates[days[index] - 1],
-                              isToday: days[index] == now.weekday,
-                            ),
-                          ),
-                        for (
-                          var minute = calendarStart;
-                          minute <= calendarEnd;
-                          minute += 30
-                        )
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            top: minuteToY(minute),
-                            child: Container(
-                              height: minute % 60 == 0 ? 1 : 0.5,
-                              color: context.theme.colors.border.withValues(
-                                alpha: minute % 60 == 0 ? 0.9 : 0.45,
-                              ),
-                            ),
-                          ),
-                        for (var index = 0; index <= days.length; index++)
-                          Positioned(
-                            left: index * _dayWidth,
-                            top: 0,
-                            width: 1,
-                            height: _headerHeight + gridHeight,
-                            child: ColoredBox(
-                              color: context.theme.colors.border,
-                            ),
-                          ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          top: _headerHeight,
-                          child: Container(
-                            height: 1,
-                            color: context.theme.colors.border,
-                          ),
-                        ),
-                        for (
-                          var dayIndex = 0;
-                          dayIndex < days.length;
-                          dayIndex++
-                        )
-                          for (final slot in daySlots[days[dayIndex]]!)
-                            Positioned(
-                              left: dayIndex * _dayWidth + 5,
-                              top:
-                                  minuteToY(
-                                    _minutesFromMidnight(slot.startTime),
-                                  ) +
-                                  3,
-                              width: _dayWidth - 10,
-                              height: math.max(
-                                46,
-                                (_minutesFromMidnight(slot.endTime) -
-                                            _minutesFromMidnight(
-                                              slot.startTime,
-                                            )) /
-                                        60 *
-                                        _hourHeight -
-                                    6,
-                              ),
-                              child: _CalendarClassBlock(slot: slot),
-                            ),
-                        if (days.contains(now.weekday) &&
-                            now.hour * 60 + now.minute >= calendarStart &&
-                            now.hour * 60 + now.minute <= calendarEnd)
-                          _CurrentTimeIndicator(
-                            left: days.indexOf(now.weekday) * _dayWidth,
-                            top: minuteToY(now.hour * 60 + now.minute),
-                            width: _dayWidth,
-                          ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
+                SizedBox(
+                  height: gridHeight + 8,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Today's column tint
+                      if (todayIndex >= 0)
+                        Positioned(
+                          left: _gutter + todayIndex * dayWidth,
+                          top: 0,
+                          width: dayWidth,
+                          height: gridHeight,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colors.app.accentTone.subtle.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(Radii.sm),
+                            ),
+                          ),
+                        ),
+                      // Hour lines and labels
+                      for (var m = start; m <= end; m += 60) ...[
+                        Positioned(
+                          left: _gutter,
+                          right: 0,
+                          top: yOf(m),
+                          child: Container(
+                            height: 0.5,
+                            color: colors.border.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          width: _gutter - 6,
+                          top: yOf(m) - 6,
+                          child: Text(
+                            _hourLabel(m),
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1,
+                              fontWeight: FontWeight.w500,
+                              color: colors.mutedForeground,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      // Class blocks
+                      for (final (i, day) in days.indexed)
+                        for (final slot in daySlots[day]!)
+                          Positioned(
+                            left: _gutter + i * dayWidth + 2,
+                            width: dayWidth - 4,
+                            top: yOf(minutesOf(slot.startTime)) + 1.5,
+                            height: math.max(
+                              30,
+                              yOf(minutesOf(slot.endTime)) -
+                                  yOf(minutesOf(slot.startTime)) -
+                                  3,
+                            ),
+                            child: _Block(
+                              slot: slot,
+                              past:
+                                  day < today ||
+                                  (day == today &&
+                                      minutesOf(slot.endTime) <= minuteNow),
+                              live:
+                                  day == today &&
+                                  minutesOf(slot.startTime) <= minuteNow &&
+                                  minutesOf(slot.endTime) > minuteNow,
+                              onPress: () => _showClass(
+                                context,
+                                slot,
+                                attendanceForSlot(attendance, slot),
+                              ),
+                            ),
+                          ),
+                      // Now line: faint across the week, solid on today.
+                      if (showNow) ...[
+                        Positioned(
+                          left: _gutter,
+                          right: 0,
+                          top: yOf(minuteNow),
+                          child: Container(
+                            height: 1,
+                            color: colors.app.accent.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        Positioned(
+                          left: _gutter + todayIndex * dayWidth - 3,
+                          width: dayWidth + 3,
+                          top: yOf(minuteNow) - 3,
+                          height: 7,
+                          child: IgnorePointer(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: colors.app.accent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    height: 2,
+                                    color: colors.app.accent,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  static int _minutesFromMidnight(String time) {
-    final parts = time.split(':');
-    return int.parse(parts[0]) * 60 + int.parse(parts[1]);
-  }
-
-  static String _formatTime(BuildContext context, int minutes) {
-    final hour = (minutes ~/ 60).toString().padLeft(2, '0');
-    final minute = (minutes % 60).toString().padLeft(2, '0');
-    return to12H('$hour:$minute', context);
+  /// 8, 9 … 12, 1, 2 — the grid reads as a school day, so no AM/PM noise.
+  static String _hourLabel(int minutes) {
+    final h = (minutes ~/ 60) % 12;
+    return '${h == 0 ? 12 : h}';
   }
 }
 
 class _DayHeader extends StatelessWidget {
   const _DayHeader({
-    required this.dayName,
+    required this.name,
     required this.date,
     required this.isToday,
+    required this.count,
   });
 
-  final String dayName;
+  final String name;
   final DateTime date;
   final bool isToday;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
+    final colors = context.theme.colors;
+    return Semantics(
+      label: '$name ${date.day}, $count classes',
+      excludeSemantics: true,
+      child: Center(
+        child: Container(
+          width: 40,
+          padding: const EdgeInsets.symmetric(vertical: 5),
           decoration: BoxDecoration(
-            color: isToday
-                ? context.theme.colors.primary
-                : context.theme.colors.background,
-            borderRadius: BorderRadius.circular(10),
-            border: isToday
-                ? null
-                : Border.all(color: context.theme.colors.border),
+            color: isToday ? colors.primary : null,
+            borderRadius: BorderRadius.circular(Radii.md),
           ),
-          child: Text(
-            date.day.toString(),
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: isToday
-                  ? context.theme.colors.primaryForeground
-                  : context.theme.colors.foreground,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                name,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  letterSpacing: 0.6,
+                  fontWeight: FontWeight.w600,
+                  color: isToday
+                      ? colors.primaryForeground.withValues(alpha: 0.7)
+                      : colors.mutedForeground,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                '${date.day}',
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: isToday ? colors.primaryForeground : colors.foreground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 8),
-        Text(
-          dayName,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: isToday
-                ? context.theme.colors.primary
-                : context.theme.colors.foreground,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _CalendarClassBlock extends StatelessWidget {
-  const _CalendarClassBlock({required this.slot});
+class _Block extends StatelessWidget {
+  const _Block({
+    required this.slot,
+    required this.past,
+    required this.live,
+    required this.onPress,
+  });
 
   final TimetableSlot slot;
+  final bool past;
+  final bool live;
+  final VoidCallback onPress;
 
   @override
   Widget build(BuildContext context) {
-    final isLab = slot.islab();
-    final palette = context.theme.colors.app;
-    final tone = isLab ? palette.lab : palette.accentTone;
-    final accent = tone.base;
-    final background = tone.subtle;
+    final colors = context.theme.colors;
+    final isLab = slot.kind == ClassKind.lab;
+    final tone = isLab ? colors.app.lab : colors.app.accentTone;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 6, 7, 6),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(left: BorderSide(color: accent, width: 3)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final showLocation = constraints.maxHeight >= 64;
-          final showType = constraints.maxHeight >= 88;
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${to12H(slot.startTime, context)} – ${to12H(slot.endTime, context)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 10,
-                  height: 1.1,
-                  fontWeight: FontWeight.w700,
-                  color: tone.onSubtle,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Flexible(
-                child: Text(
-                  slot.name,
-                  maxLines: showLocation ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.15,
-                    fontWeight: FontWeight.w700,
-                    color: context.theme.colors.foreground,
+    return PressScale(
+      scale: 0.95,
+      semanticsLabel:
+          '${slot.name}, ${to12H(slot.startTime, context)}, room ${slot.roomNo}',
+      onPress: onPress,
+      child: AnimatedOpacity(
+        duration: Motion.medium,
+        opacity: past ? 0.45 : 1,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(5, 4, 3, 3),
+          decoration: BoxDecoration(
+            // Opaque so grid lines don't show through.
+            color: Color.alphaBlend(tone.subtle, colors.card),
+            borderRadius: BorderRadius.circular(6),
+            border: live
+                ? Border.all(color: tone.base, width: 1.5)
+                : Border(left: BorderSide(color: tone.base, width: 2.5)),
+          ),
+          child: LayoutBuilder(
+            builder: (context, c) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    slot.courseCode,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.15,
+                      fontWeight: FontWeight.w700,
+                      color: colors.foreground,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
+                if (c.maxHeight >= 24)
+                  Text(
+                    slot.roomNo,
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1.2,
+                      fontWeight: FontWeight.w500,
+                      color: tone.onSubtle,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                if (isLab && c.maxHeight >= 44) ...[
+                  const Spacer(),
+                  Icon(FLucideIcons.flaskConical, size: 10, color: tone.base),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showClass(
+  BuildContext context,
+  TimetableSlot slot,
+  AttendanceRecord? record,
+) {
+  showFSheet(
+    context: context,
+    side: FLayout.btt,
+    useRootNavigator: true,
+    builder: (context) => _ClassSheet(slot: slot, record: record),
+  );
+}
+
+class _ClassSheet extends StatelessWidget {
+  const _ClassSheet({required this.slot, required this.record});
+
+  final TimetableSlot slot;
+  final AttendanceRecord? record;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
+    final standing = record == null ? null : AttendanceStanding.of(record!);
+    final tone = standing == null
+        ? null
+        : !standing.isSafe
+        ? colors.app.danger
+        : standing.canSkip == 0
+        ? colors.app.warning
+        : colors.app.success;
+
+    Widget line(IconData icon, String text) => Padding(
+      padding: const EdgeInsets.only(top: Space.sm),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: colors.mutedForeground),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Text(
+              text,
+              style: typography.body.sm.copyWith(color: colors.foreground),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(Radii.lg + 4),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          Space.lg,
+          0,
+          Space.lg,
+          Space.xl + MediaQuery.paddingOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SheetHandle(),
+            const SizedBox(height: Space.sm),
+            Text(
+              slot.name,
+              style: typography.body.xl.copyWith(
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+                color: colors.foreground,
               ),
-              if (showLocation) ...[
-                const SizedBox(height: 4),
-                Row(
+            ),
+            const SizedBox(height: Space.sm),
+            Row(
+              children: [
+                CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+                const SizedBox(width: Space.sm),
+                Text(
+                  '${slot.courseCode} · Slot ${slot.slot}',
+                  style: typography.body.xs.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Space.sm),
+            line(
+              FLucideIcons.clock,
+              '${to12H(slot.startTime, context)} – ${to12H(slot.endTime, context)} · ${formatMinutes(minutes)}',
+            ),
+            line(FLucideIcons.mapPin, 'Room ${slot.roomNo} · ${slot.block}'),
+            if (slot.faculty.trim().isNotEmpty)
+              line(FLucideIcons.user, facultyName(slot.faculty)),
+            if (standing != null && tone != null) ...[
+              const SizedBox(height: Space.lg),
+              Surface(
+                padding: const EdgeInsets.all(Space.md),
+                onPress: () {
+                  Navigator.of(context).pop();
+                  showAttendanceDetails(context, record!);
+                },
+                semanticsLabel: 'Open attendance details',
+                child: Row(
                   children: [
-                    Icon(FLucideIcons.mapPin, size: 11, color: accent),
-                    const SizedBox(width: 3),
-                    Expanded(
+                    ProgressRing(
+                      value: standing.displayPercent / 100,
+                      color: tone.base,
+                      size: 40,
+                      stroke: 4,
+                      marker: attendanceThreshold / 100,
                       child: Text(
-                        '${slot.block} - ${slot.roomNo}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        '${standing.displayPercent.round()}',
                         style: TextStyle(
-                          fontSize: 10,
-                          height: 1,
-                          color: context.theme.colors.foreground.withValues(
-                            alpha: 0.72,
-                          ),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: tone.onSubtle,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
+                    const SizedBox(width: Space.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            standing.advice,
+                            style: typography.body.sm.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: colors.foreground,
+                            ),
+                          ),
+                          Text(
+                            '${standing.attended} of ${standing.total} attended',
+                            style: typography.body.xs.copyWith(
+                              color: colors.mutedForeground,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      FLucideIcons.chevronRight,
+                      size: 16,
+                      color: colors.mutedForeground,
+                    ),
                   ],
                 ),
-              ],
-              if (showType) ...[
-                const Spacer(),
-                Text(
-                  '${slot.courseCode} • ${isLab ? 'LAB' : 'LECTURE'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: tone.onSubtle,
-                  ),
-                ),
-              ],
+              ),
             ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _CurrentTimeIndicator extends StatelessWidget {
-  const _CurrentTimeIndicator({
-    required this.left,
-    required this.top,
-    required this.width,
-  });
-
-  final double left;
-  final double top;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      left: left,
-      top: top - 3,
-      width: width,
-      height: 7,
-      child: Row(
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: context.theme.colors.app.accent,
-              shape: BoxShape.circle,
-            ),
-          ),
-          Expanded(
-            child: Container(height: 2, color: context.theme.colors.app.accent),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

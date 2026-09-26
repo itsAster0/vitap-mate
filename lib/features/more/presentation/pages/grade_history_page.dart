@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'dart:developer' show log;
 
 import 'package:flutter/material.dart' show RefreshIndicator;
@@ -11,11 +13,48 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 const _gradeOrder = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'N'];
+
+/// Courses grouped by exam session ("Jan-2025"), in the order VTOP lists them.
+Map<String, List<GradeHistoryRecord>> _bySession(
+  Iterable<GradeHistoryRecord> records,
+) {
+  final groups = <String, List<GradeHistoryRecord>>{};
+  for (final r in records) {
+    groups.putIfAbsent(r.examMonth.trim(), () => []).add(r);
+  }
+  return groups;
+}
+
+/// Credit-weighted GPA of [records]; pass/fail and N grades carry no points
+/// and are left out. Null when nothing counts.
+double? _sessionGpa(List<GradeHistoryRecord> records) {
+  var points = 0.0;
+  var credits = 0.0;
+  for (final r in records) {
+    final grade = Grade.tryParse(r.grade);
+    final c = Credits.tryParse(r.credits);
+    if (grade == null || grade == Grade.n || c == null) continue;
+    points += grade.points * c.value;
+    credits += c.value;
+  }
+  return credits == 0 ? null : points / credits;
+}
+
+/// "Jan-2025" → "Jan 25", for chart labels.
+String _shortSession(String month) {
+  final parts = month.trim().split('-');
+  if (parts.length != 2 || parts[1].length != 4) return month;
+  return "${parts[0]} '${parts[1].substring(2)}";
+}
+
+/// "Jan-2025" → "Jan 2025".
+String _sessionLabel(String month) => month.replaceAll('-', ' ').trim();
 
 class GradeHistoryPage extends HookConsumerWidget {
   const GradeHistoryPage({super.key});
@@ -166,14 +205,34 @@ class _HistoryView extends HookWidget {
                   title: 'No courses yet',
                 )
               else
-                for (final (i, r) in shown.indexed)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Space.sm),
-                    child: EnterFade(
-                      index: i,
-                      child: _CourseCard(record: r),
+                for (final entry in _bySession(shown).entries) ...[
+                  SectionHeader(
+                    title: entry.key.isEmpty
+                        ? 'Other'
+                        : _sessionLabel(entry.key),
+                    trailing: Builder(
+                      builder: (context) {
+                        // GPA of the whole session, not just filtered rows.
+                        final gpa = _sessionGpa(
+                          history.records
+                              .where((r) => r.examMonth.trim() == entry.key)
+                              .toList(),
+                        );
+                        return Text(
+                          gpa == null ? '' : 'GPA ${gpa.toStringAsFixed(2)}',
+                        );
+                      },
                     ),
                   ),
+                  for (final (i, r) in entry.value.indexed)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: Space.sm),
+                      child: EnterFade(
+                        index: i,
+                        child: _CourseCard(record: r),
+                      ),
+                    ),
+                ],
             ],
           ),
         ),
@@ -208,6 +267,10 @@ class _CgpaHero extends StatelessWidget {
           ..removeWhere((_, v) => v == 0);
     final total = counts.values.fold<int>(0, (a, b) => a + b);
     final cgpa = double.tryParse(c.cgpa.trim());
+    final trend = [
+      for (final e in _bySession(history.records).entries)
+        if (_sessionGpa(e.value) case final gpa?) (_shortSession(e.key), gpa),
+    ];
 
     return Surface(
       child: Column(
@@ -307,10 +370,136 @@ class _CgpaHero extends StatelessWidget {
               ],
             ),
           ],
+          if (trend.length >= 2) ...[
+            const SizedBox(height: Space.lg),
+            Text(
+              'GPA BY SEMESTER',
+              style: typography.body.xs.copyWith(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+                color: colors.mutedForeground,
+              ),
+            ),
+            const SizedBox(height: Space.sm),
+            _GpaTrend(points: trend),
+          ],
         ],
       ),
     );
   }
+}
+
+/// Semester GPAs as a line with a dot and value per semester.
+class _GpaTrend extends StatelessWidget {
+  const _GpaTrend({required this.points});
+
+  final List<(String, double)> points;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final values = points.map((p) => p.$2);
+    final lo = (values.reduce(math.min) - 0.5).clamp(0.0, 10.0);
+    final hi = (values.reduce(math.max) + 0.3).clamp(0.0, 10.0);
+    const chartHeight = 56.0;
+
+    return Column(
+      children: [
+        SizedBox(
+          height: chartHeight + 18,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final step = c.maxWidth / points.length;
+              Offset at(int i) => Offset(
+                step * (i + 0.5),
+                18 + chartHeight * (1 - (points[i].$2 - lo) / (hi - lo)),
+              );
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _TrendPainter(
+                        [for (var i = 0; i < points.length; i++) at(i)],
+                        colors.app.accent,
+                        colors.card,
+                      ),
+                    ),
+                  ),
+                  for (var i = 0; i < points.length; i++)
+                    Positioned(
+                      left: at(i).dx - 24,
+                      top: at(i).dy - 20,
+                      width: 48,
+                      child: Text(
+                        points[i].$2.toStringAsFixed(2),
+                        textAlign: TextAlign.center,
+                        style: typography.body.xs.copyWith(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: colors.foreground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: Space.xs),
+        Row(
+          children: [
+            for (final p in points)
+              Expanded(
+                child: Text(
+                  p.$1,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: typography.body.xs.copyWith(
+                    fontSize: 10,
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TrendPainter extends CustomPainter {
+  _TrendPainter(this.points, this.color, this.hole);
+
+  final List<Offset> points;
+  final Color color;
+  final Color hole;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final p in points.skip(1)) {
+      path.lineTo(p.dx, p.dy);
+    }
+    canvas.drawPath(path, line);
+    for (final p in points) {
+      canvas.drawCircle(p, 4.5, Paint()..color = hole);
+      canvas.drawCircle(p, 3.5, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TrendPainter old) =>
+      old.points != points || old.color != color;
 }
 
 class _Stat extends StatelessWidget {
@@ -469,16 +658,6 @@ class _CourseCard extends HookWidget {
                         Text(
                           [
                             record.courseCode,
-                            if (credits != null)
-                              '${credits == credits.roundToDouble() ? credits.toStringAsFixed(0) : credits} credits',
-                          ].join(' · '),
-                          style: typography.body.xs.copyWith(
-                            color: colors.mutedForeground,
-                          ),
-                        ),
-                        Text(
-                          [
-                            record.examMonth.replaceAll('-', ' '),
                             record.courseDistribution,
                           ].where((p) => p.trim().isNotEmpty).join(' · '),
                           style: typography.body.xs.copyWith(
@@ -488,7 +667,37 @@ class _CourseCard extends HookWidget {
                       ],
                     ),
                   ),
-                  if (components.isNotEmpty)
+                  if (credits != null) ...[
+                    const SizedBox(width: Space.md),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          credits == credits.roundToDouble()
+                              ? credits.toStringAsFixed(0)
+                              : '$credits',
+                          style: typography.body.lg.copyWith(
+                            height: 1.1,
+                            fontWeight: FontWeight.w600,
+                            color: colors.foreground,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        Text(
+                          credits == 1 ? 'credit' : 'credits',
+                          style: typography.body.xs.copyWith(
+                            fontSize: 10,
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: Space.sm),
+                  ],
+                  // Space kept when there's nothing to expand, so credits line up.
+                  if (components.isEmpty)
+                    const SizedBox(width: 16)
+                  else
                     AnimatedRotation(
                       turns: expanded.value ? 0.5 : 0,
                       duration: Motion.medium,

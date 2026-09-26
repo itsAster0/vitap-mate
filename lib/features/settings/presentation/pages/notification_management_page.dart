@@ -9,20 +9,19 @@ import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
-double _classReminderSliderValue(int minutes) =>
-    ((minutes - 5) / 55).clamp(0.0, 1.0);
+const _classReminderOptions = [5, 10, 15, 30, 60];
+const _examReminderOptions = [10, 15, 30, 60, 120];
 
-double _examReminderSliderValue(int minutes) =>
-    ((minutes - 5) / 115).clamp(0.0, 1.0);
+/// Presets plus the saved value when it isn't one (older slider values), so
+/// the selected chip always matches what reminders actually use.
+List<int> _optionsWith(List<int> presets, int saved) =>
+    presets.contains(saved) ? presets : ([...presets, saved]..sort());
 
-int _classReminderMinutes(FSliderValue selection) =>
-    (5 + (selection.max * 55).round()).clamp(5, 60).toInt();
-
-int _examReminderMinutes(FSliderValue selection) =>
-    (5 + (selection.max * 115).round()).clamp(5, 120).toInt();
+String _minutesLabel(int m) => m >= 60 ? '${m ~/ 60}h' : '${m}m';
 
 IconData _changeAlertIcon(ChangeAlertTypeSetting type) => switch (type) {
   ChangeAlertTypeSetting.attendance => FLucideIcons.circlePercent,
@@ -37,36 +36,6 @@ String _changeAlertLabel(ChangeAlertTypeSetting type) => switch (type) {
   ChangeAlertTypeSetting.timetable => "Timetable Changes",
   ChangeAlertTypeSetting.examSchedule => "Exam Schedule Updates",
 };
-
-class _AnimatedMinutesLabel extends StatelessWidget {
-  const _AnimatedMinutesLabel(this.minutes);
-
-  final int minutes;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 24,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          final offset = Tween<Offset>(
-            begin: const Offset(0, 0.35),
-            end: Offset.zero,
-          ).animate(animation);
-
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(position: offset, child: child),
-          );
-        },
-        child: Text("$minutes minutes", key: ValueKey(minutes)),
-      ),
-    );
-  }
-}
 
 class NotificationManagementPage extends HookConsumerWidget {
   const NotificationManagementPage({super.key});
@@ -203,42 +172,49 @@ class NotificationManagementPage extends HookConsumerWidget {
                   details: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _AnimatedMinutesLabel(classNotifyMinutes.value),
-                      FSlider(
-                        control: FSliderControl.liftedContinuous(
-                          value: FSliderValue(
-                            max: _classReminderSliderValue(
-                              classNotifyMinutes.value,
-                            ),
-                          ),
-                          onChange: (selection) async {
-                            try {
-                              final minutes = _classReminderMinutes(selection);
-                              classNotifyMinutes.value = minutes;
-                              if (minutes ==
-                                  classReminderSettings.notifyBeforeMinutes) {
-                                return;
-                              }
-                              await setClassReminderNotifyBeforeMinutes(
-                                ref,
-                                minutes,
-                              );
-                              if (!context.mounted) return;
-                              if (ref
-                                  .read(classReminderSettingsProvider)
-                                  .enabled) {
-                                await ref
-                                    .read(timetableProvider.notifier)
-                                    .updateTimetable();
-                              }
-                            } catch (e, st) {
-                              log(
-                                'Error updating class reminder notify before: $e',
-                                stackTrace: st,
-                              );
-                            }
-                          },
+                      const SizedBox(height: 8),
+                      Text(
+                        'Remind me before',
+                        style: context.theme.typography.body.xs.copyWith(
+                          color: context.theme.colors.mutedForeground,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      Segmented<int>(
+                        value: classNotifyMinutes.value,
+                        segments: [
+                          for (final m in _optionsWith(
+                            _classReminderOptions,
+                            classNotifyMinutes.value,
+                          ))
+                            (m, _minutesLabel(m)),
+                        ],
+                        onChanged: (minutes) async {
+                          try {
+                            classNotifyMinutes.value = minutes;
+                            if (minutes ==
+                                classReminderSettings.notifyBeforeMinutes) {
+                              return;
+                            }
+                            await setClassReminderNotifyBeforeMinutes(
+                              ref,
+                              minutes,
+                            );
+                            if (!context.mounted) return;
+                            if (ref
+                                .read(classReminderSettingsProvider)
+                                .enabled) {
+                              await ref
+                                  .read(timetableProvider.notifier)
+                                  .updateTimetable();
+                            }
+                          } catch (e, st) {
+                            log(
+                              'Error updating class reminder notify before: $e',
+                              stackTrace: st,
+                            );
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -341,35 +317,40 @@ class NotificationManagementPage extends HookConsumerWidget {
                   details: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _AnimatedMinutesLabel(examNotifyMinutes.value),
-                      FSlider(
-                        control: FSliderControl.liftedContinuous(
-                          value: FSliderValue(
-                            max: _examReminderSliderValue(
-                              examNotifyMinutes.value,
-                            ),
-                          ),
-                          onChange: (selection) async {
-                            final minutes = _examReminderMinutes(selection);
-                            examNotifyMinutes.value = minutes;
-                            if (minutes ==
-                                examReminderSettings.notifyBeforeMinutes) {
-                              return;
-                            }
-                            await setExamReminderNotifyBeforeMinutes(
-                              ref,
-                              minutes,
-                            );
-                            if (!context.mounted) return;
-                            if (ref
-                                .read(examReminderSettingsProvider)
-                                .enabled) {
-                              await ref
-                                  .read(examScheduleProvider.notifier)
-                                  .updatexamschedule();
-                            }
-                          },
+                      const SizedBox(height: 8),
+                      Text(
+                        'Remind me before',
+                        style: context.theme.typography.body.xs.copyWith(
+                          color: context.theme.colors.mutedForeground,
                         ),
+                      ),
+                      const SizedBox(height: 6),
+                      Segmented<int>(
+                        value: examNotifyMinutes.value,
+                        segments: [
+                          for (final m in _optionsWith(
+                            _examReminderOptions,
+                            examNotifyMinutes.value,
+                          ))
+                            (m, _minutesLabel(m)),
+                        ],
+                        onChanged: (minutes) async {
+                          examNotifyMinutes.value = minutes;
+                          if (minutes ==
+                              examReminderSettings.notifyBeforeMinutes) {
+                            return;
+                          }
+                          await setExamReminderNotifyBeforeMinutes(
+                            ref,
+                            minutes,
+                          );
+                          if (!context.mounted) return;
+                          if (ref.read(examReminderSettingsProvider).enabled) {
+                            await ref
+                                .read(examScheduleProvider.notifier)
+                                .updatexamschedule();
+                          }
+                        },
                       ),
                     ],
                   ),

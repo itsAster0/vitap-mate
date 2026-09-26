@@ -638,7 +638,9 @@ class CalendarSyncPage extends HookConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text("Customize recurring event fields."),
+              subtitle: const Text(
+                "Reminder and how events read in your calendar.",
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -669,35 +671,49 @@ class CalendarSyncPage extends HookConsumerWidget {
                       FSelectTile<int>(title: Text("60 min before"), value: 60),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  FTextField(
-                    control: FTextFieldControl.managed(
-                      controller: titleTemplateController,
-                    ),
-                    label: const Text("Title Template"),
-                    hint: "{name}",
-                  ),
-                  const SizedBox(height: 8),
-                  FTextField.multiline(
-                    maxLines: 4,
-                    control: FTextFieldControl.managed(
-                      controller: descriptionTemplateController,
-                    ),
-                    label: const Text("Description Template"),
-                    hint: "Course: {courseCode}",
-                  ),
-                  const SizedBox(height: 8),
-                  FTextField(
-                    control: FTextFieldControl.managed(
-                      controller: locationTemplateController,
-                    ),
-                    label: const Text("Location Template"),
-                    hint: "{block}-{roomNo}",
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Placeholders: {name} {courseCode} {courseType} {faculty} {slot} {day} {startTime} {endTime} {block} {roomNo}",
-                    style: context.theme.typography.body.sm,
+                  // Templates are rarely changed; keep them folded away.
+                  FAccordion(
+                    children: [
+                      FAccordionItem(
+                        title: const Text("Customize event text"),
+                        initiallyExpanded: false,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 8),
+                            FTextField(
+                              control: FTextFieldControl.managed(
+                                controller: titleTemplateController,
+                              ),
+                              label: const Text("Title Template"),
+                              hint: "{name}",
+                            ),
+                            const SizedBox(height: 8),
+                            FTextField.multiline(
+                              maxLines: 4,
+                              control: FTextFieldControl.managed(
+                                controller: descriptionTemplateController,
+                              ),
+                              label: const Text("Description Template"),
+                              hint: "Course: {courseCode}",
+                            ),
+                            const SizedBox(height: 8),
+                            FTextField(
+                              control: FTextFieldControl.managed(
+                                controller: locationTemplateController,
+                              ),
+                              label: const Text("Location Template"),
+                              hint: "{block}-{roomNo}",
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Placeholders: {name} {courseCode} {courseType} {faculty} {slot} {day} {startTime} {endTime} {block} {roomNo}",
+                              style: context.theme.typography.body.sm,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

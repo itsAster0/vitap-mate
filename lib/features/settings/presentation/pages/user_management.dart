@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
@@ -103,11 +105,9 @@ class SemesterDialog extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final controller = useMemoized(
-      () => FMultiValueNotifier<String>.radio(user.semid),
-    );
     final disableCanecel = useState(false);
-    useEffect(() => controller.dispose, [controller]);
+    // The semester being saved, for its row's spinner.
+    final saving = useState<String?>(null);
 
     final isRefreshing = useState(false);
     final semester = ref.watch(semesterIdProvider);
@@ -133,9 +133,14 @@ class SemesterDialog extends HookConsumerWidget {
 
     Future<void> handleSemesterChange(Set<String> values) async {
       final selected = values.isEmpty ? null : values.first;
-      if (selected == null) return;
+      if (selected == null || disableCanecel.value) return;
+      if (selected == user.semid) {
+        Navigator.of(context).pop();
+        return;
+      }
 
       disableCanecel.value = true;
+      saving.value = selected;
       try {
         await ref
             .read(vtopusersutilsProvider.notifier)
@@ -159,6 +164,7 @@ class SemesterDialog extends HookConsumerWidget {
         }
       } finally {
         disableCanecel.value = false;
+        if (context.mounted) saving.value = null;
       }
     }
 
@@ -168,8 +174,7 @@ class SemesterDialog extends HookConsumerWidget {
           title: Row(
             mainAxisSize: MainAxisSize.max,
             children: [
-              const SizedBox(width: 10),
-              const Expanded(child: Text('Semesters')),
+              const Expanded(child: Text('Semester')),
               if (!isRefreshing.value)
                 FTappable(
                   onPress: handleRefresh,
@@ -180,28 +185,41 @@ class SemesterDialog extends HookConsumerWidget {
             ],
           ),
           body: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 300),
+            constraints: const BoxConstraints(maxHeight: 400),
             child: SingleChildScrollView(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FSelectTileGroup(
-                    control: FMultiValueControl.managedRadio(
-                      controller: controller,
-                      onChange: handleSemesterChange,
+                  Text(
+                    'Pick which semester the app shows.',
+                    style: context.theme.typography.body.sm.copyWith(
+                      color: context.theme.colors.mutedForeground,
                     ),
-
-                    description: const Text('Select the Semester.'),
-                    validator: (values) => values?.isEmpty ?? true
-                        ? 'Please select a value.'
-                        : null,
-                    children: [
-                      for (final i in data.semesters)
-                        FSelectTile(
-                          title: Text(i.name, maxLines: 2),
-                          value: i.id,
-                        ),
-                    ],
                   ),
+                  for (final group in _groupByYear(data.semesters)) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: 14, bottom: 6),
+                      child: Text(
+                        group.year,
+                        style: context.theme.typography.body.xs.copyWith(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                          color: context.theme.colors.mutedForeground,
+                        ),
+                      ),
+                    ),
+                    for (final sem in group.items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _SemesterRow(
+                          semester: sem,
+                          selected: sem.id == user.semid,
+                          saving: saving.value == sem.id,
+                          enabled: !disableCanecel.value,
+                          onPress: () => handleSemesterChange({sem.id}),
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -248,6 +266,120 @@ class SemesterDialog extends HookConsumerWidget {
   }
 }
 
+/// A semester name split into season, academic year and any extra note:
+/// "Winter Semester 2024-25 Freshers" → (Winter, 2024-25, Freshers).
+({String season, String year, String note}) _parseSemester(String name) {
+  final m = RegExp(
+    r'^\s*(\w+)\s+semester\s+(\d{4}-\d{2,4})\s*(.*)$',
+    caseSensitive: false,
+  ).firstMatch(name);
+  if (m == null) return (season: name.trim(), year: '', note: '');
+  return (season: m.group(1)!, year: m.group(2)!, note: m.group(3)!.trim());
+}
+
+/// Semesters grouped by academic year, keeping VTOP's order (newest first).
+List<({String year, List<SemesterInfo> items})> _groupByYear(
+  List<SemesterInfo> semesters,
+) {
+  final groups = <String, List<SemesterInfo>>{};
+  for (final s in semesters) {
+    final year = _parseSemester(s.name).year;
+    groups.putIfAbsent(year.isEmpty ? 'OTHER' : year, () => []).add(s);
+  }
+  return [for (final e in groups.entries) (year: e.key, items: e.value)];
+}
+
+class _SemesterRow extends StatelessWidget {
+  const _SemesterRow({
+    required this.semester,
+    required this.selected,
+    required this.saving,
+    required this.enabled,
+    required this.onPress,
+  });
+
+  final SemesterInfo semester;
+  final bool selected;
+  final bool saving;
+  final bool enabled;
+  final VoidCallback onPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final parsed = _parseSemester(semester.name);
+    final season = parsed.season.toLowerCase();
+    final icon = switch (season) {
+      'fall' => FLucideIcons.leaf,
+      'winter' => FLucideIcons.snowflake,
+      'summer' => FLucideIcons.sun,
+      _ => FLucideIcons.calendar,
+    };
+    final tone = selected ? colors.app.accentTone : null;
+
+    return PressScale(
+      scale: 0.98,
+      semanticsLabel: '${semester.name}${selected ? ', selected' : ''}',
+      onPress: enabled ? onPress : () {},
+      child: AnimatedContainer(
+        duration: Motion.medium,
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.md,
+          vertical: Space.sm + 2,
+        ),
+        decoration: BoxDecoration(
+          color: tone?.subtle ?? colors.secondary,
+          borderRadius: BorderRadius.circular(Radii.md),
+          border: Border.all(
+            color: selected ? colors.app.accent : colors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: tone?.onSubtle ?? colors.mutedForeground,
+            ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Text(
+                parsed.year.isEmpty
+                    ? semester.name
+                    : '${parsed.season[0].toUpperCase()}${parsed.season.substring(1).toLowerCase()}',
+                style: typography.body.md.copyWith(
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: colors.foreground,
+                ),
+              ),
+            ),
+            if (parsed.note.isNotEmpty) ...[
+              ToneBadge.neutral(context, parsed.note.toUpperCase()),
+              const SizedBox(width: Space.sm),
+            ],
+            SizedBox(
+              width: 18,
+              child: saving
+                  ? const FCircularProgress(
+                      size: FCircularProgressSizeVariant.sm,
+                    )
+                  : selected
+                  ? Icon(
+                      FLucideIcons.check,
+                      size: 18,
+                      color: colors.app.accentTone.onSubtle,
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class UserPassChange extends HookConsumerWidget {
   final VtopUserEntity user;
   const UserPassChange({super.key, required this.user});
@@ -259,6 +391,9 @@ class UserPassChange extends HookConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         FButton(
+          variant: FButtonVariant.outline,
+          size: FButtonSizeVariant.sm,
+          prefix: const Icon(FLucideIcons.userPen),
           onPress: () {
             showAdaptiveDialog(
               context: outerContext,
@@ -366,7 +501,7 @@ class UserPassChange extends HookConsumerWidget {
               },
             );
           },
-          child: const Text('Update account details'),
+          child: const Text('Update details'),
         ),
       ],
     );

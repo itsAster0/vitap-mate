@@ -412,38 +412,32 @@ class SettingsPage extends HookConsumerWidget {
         : 'Every ${initialValSync.inHours} hours';
     final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
 
+    final colors = context.theme.colors;
+    Future<void> openGmailSetup() async {
+      await context.pushNamed(Paths.gmailOtpSetup);
+      await refreshEmailOtpReady();
+    }
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(0, Space.sm, 0, Space.lg),
+      padding: const EdgeInsets.fromLTRB(
+        Space.sm,
+        Space.sm,
+        Space.sm,
+        Space.lg,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const UserBox(),
-          SectionHeader(title: 'VTOP Data'),
+          SectionHeader(title: 'VTOP'),
           FTileGroup(
             divider: FItemDivider.indented,
             children: [
               FTile(
-                prefix: Icon(FLucideIcons.calendarDays),
-                title: const Text('Merge Labs'),
-                subtitle: const Text('Combine consecutive lab slots'),
-                suffix: FSwitch(
-                  value: ref.watch(mergeTTProvider),
-                  onChange: (value) {
-                    setMergeTT(ref, value);
-                  },
+                prefix: _IconTile(
+                  icon: FLucideIcons.arrowDownUp,
+                  tone: colors.app.accentTone,
                 ),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.refreshCw),
-                title: const Text('Refresh Button'),
-                subtitle: const Text('Floating button that reloads the screen'),
-                suffix: FSwitch(
-                  value: ref.watch(refreshButtonProvider),
-                  onChange: (value) => setRefreshButton(ref, value),
-                ),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.arrowDownUp),
                 title: const Text('Data Source'),
                 subtitle: Text(
                   vtopDataSourceLabel(ref.watch(vtopServerSettingsProvider)),
@@ -452,7 +446,10 @@ class SettingsPage extends HookConsumerWidget {
                 onPress: () => showVtopServerDialog(context, ref),
               ),
               FTile(
-                prefix: const Icon(FLucideIcons.cloudDownload),
+                prefix: _IconTile(
+                  icon: FLucideIcons.cloudDownload,
+                  tone: colors.app.accentTone,
+                ),
                 title: const Text('Update VTOP Data'),
                 subtitle: const Text('Refresh all VTOP data now'),
                 suffix: isVtopSyncing.value
@@ -468,42 +465,38 @@ class SettingsPage extends HookConsumerWidget {
                         }
                       },
               ),
-            ],
-          ),
-          if (isEmailOtpFeatureEnabled.value) SectionHeader(title: 'Email OTP'),
-          if (isEmailOtpFeatureEnabled.value)
-            FTileGroup(
-              divider: FItemDivider.indented,
-              children: [
+              if (isEmailOtpFeatureEnabled.value) ...[
                 FTile(
-                  prefix: const Icon(FLucideIcons.mail),
+                  prefix: _IconTile(
+                    icon: FLucideIcons.mail,
+                    tone: colors.app.warning,
+                  ),
                   title: const Text('Gmail Autofetch'),
                   subtitle: isEmailOtpReady.value == true
-                      ? const Text('Connected · tap to manage')
-                      : Align(
-                          alignment: Alignment.centerLeft,
-                          child: ToneBadge(
-                            label: 'NOT CONNECTED',
-                            tone: context.theme.colors.app.warning,
-                          ),
-                        ),
+                      ? Text(
+                          'Connected · tap to manage',
+                          style: TextStyle(color: colors.app.success.onSubtle),
+                        )
+                      : const Text('Auto-fill OTPs from Gmail'),
                   suffix: isEmailOtpBusy.value
                       ? const FCircularProgress.pinwheel()
-                      : Icon(
-                          isEmailOtpReady.value == true
-                              ? FLucideIcons.chevronRight
-                              : FLucideIcons.link,
+                      : isEmailOtpReady.value == true
+                      ? const Icon(FLucideIcons.chevronRight)
+                      : FButton(
+                          variant: FButtonVariant.outline,
+                          size: FButtonSizeVariant.sm,
+                          mainAxisSize: MainAxisSize.min,
+                          onPress: openGmailSetup,
+                          child: const Text('Connect'),
                         ),
-                  onPress: isEmailOtpBusy.value
-                      ? null
-                      : () async {
-                          await context.pushNamed(Paths.gmailOtpSetup);
-                          await refreshEmailOtpReady();
-                        },
+                  onPress: isEmailOtpBusy.value ? null : openGmailSetup,
                 ),
                 if (isEmailOtpReady.value == true)
                   FTile(
-                    prefix: const Icon(FLucideIcons.trash2),
+                    prefix: _IconTile(
+                      icon: FLucideIcons.trash2,
+                      tone: colors.app.warning,
+                    ),
                     title: const Text('Delete After Reading'),
                     subtitle: const Text(
                       'Move fetched OTP emails to Gmail Trash',
@@ -517,7 +510,10 @@ class SettingsPage extends HookConsumerWidget {
                   ),
                 if (isEmailOtpReady.value == true && showDebugFeatures.value)
                   FTile(
-                    prefix: const Icon(FLucideIcons.mailCheck),
+                    prefix: _IconTile(
+                      icon: FLucideIcons.mailCheck,
+                      tone: colors.app.warning,
+                    ),
                     title: const Text('Test Latest OTP Email'),
                     subtitle: const Text('Fetch the latest VTOP OTP email'),
                     suffix: isEmailOtpTestBusy.value
@@ -532,13 +528,58 @@ class SettingsPage extends HookConsumerWidget {
                           },
                   ),
               ],
-            ),
+            ],
+          ),
+          SectionHeader(title: 'Display'),
+          _AppearancePicker(
+            value: ref.watch(themeProvider),
+            onChanged: (mode) =>
+                ref.read(themeProvider.notifier).setThemeMode(mode),
+            // Hidden: long-press toggles developer tools.
+            onLongPress: () =>
+                showDebugFeatures.value = !showDebugFeatures.value,
+          ),
+          const SizedBox(height: Space.sm + 2),
+          FTileGroup(
+            divider: FItemDivider.indented,
+            children: [
+              FTile(
+                prefix: _IconTile(
+                  icon: FLucideIcons.calendarDays,
+                  tone: colors.app.lab,
+                ),
+                title: const Text('Merge Labs'),
+                subtitle: const Text('Combine consecutive lab slots'),
+                suffix: FSwitch(
+                  value: ref.watch(mergeTTProvider),
+                  onChange: (value) {
+                    setMergeTT(ref, value);
+                  },
+                ),
+              ),
+              FTile(
+                prefix: _IconTile(
+                  icon: FLucideIcons.refreshCw,
+                  tone: colors.app.lab,
+                ),
+                title: const Text('Refresh Button'),
+                subtitle: const Text('Floating button that reloads the screen'),
+                suffix: FSwitch(
+                  value: ref.watch(refreshButtonProvider),
+                  onChange: (value) => setRefreshButton(ref, value),
+                ),
+              ),
+            ],
+          ),
           SectionHeader(title: 'Sync'),
           FTileGroup(
             divider: FItemDivider.indented,
             children: [
               FTile(
-                prefix: Icon(FLucideIcons.refreshCcw),
+                prefix: _IconTile(
+                  icon: FLucideIcons.refreshCcw,
+                  tone: colors.app.success,
+                ),
                 title: const Text('Auto Refresh'),
                 suffix: FSwitch(
                   value: ref.watch(autoRefreshProvider),
@@ -548,7 +589,10 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FSelectMenuTile(
-                prefix: Icon(FLucideIcons.folderSync),
+                prefix: _IconTile(
+                  icon: FLucideIcons.folderSync,
+                  tone: colors.app.success,
+                ),
                 title: FTappable(child: Text('Background Sync')),
                 subtitle: Text(backgroundSyncLabel),
                 selectControl: FMultiValueControl.managedRadio(
@@ -564,34 +608,11 @@ class SettingsPage extends HookConsumerWidget {
                 ),
                 menu: backgroundSync,
               ),
-            ],
-          ),
-          SectionHeader(title: 'App Settings'),
-          FTileGroup(
-            divider: FItemDivider.indented,
-            children: [
               FTile(
-                prefix: Icon(FLucideIcons.sunMoon),
-                title: const Text('Appearance'),
-                onLongPress: () {
-                  showDebugFeatures.value = !showDebugFeatures.value;
-                },
-                suffix: SizedBox(
-                  width: 204,
-                  child: Segmented<ThemeMode>(
-                    value: ref.watch(themeProvider),
-                    onChanged: (mode) =>
-                        ref.read(themeProvider.notifier).setThemeMode(mode),
-                    segments: const [
-                      (ThemeMode.light, 'Light'),
-                      (ThemeMode.dark, 'Dark'),
-                      (ThemeMode.system, 'System'),
-                    ],
-                  ),
+                prefix: _IconTile(
+                  icon: FLucideIcons.bell,
+                  tone: colors.app.success,
                 ),
-              ),
-              FTile(
-                prefix: Icon(FLucideIcons.bell),
                 title: const Text('Notifications'),
                 subtitle: const Text('Manage class and exam reminders'),
                 suffix: Icon(FLucideIcons.chevronRight),
@@ -712,6 +733,201 @@ class _FooterLink extends StatelessWidget {
               Text(
                 label,
                 style: context.theme.typography.body.xs.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A row icon in a small tinted square; the tint groups related settings.
+class _IconTile extends StatelessWidget {
+  const _IconTile({required this.icon, required this.tone});
+
+  final IconData icon;
+  final Tone tone;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 30,
+    height: 30,
+    decoration: BoxDecoration(
+      color: tone.subtle,
+      borderRadius: BorderRadius.circular(Radii.sm + 1),
+    ),
+    child: Icon(icon, size: 16, color: tone.onSubtle),
+  );
+}
+
+/// Theme choice as three small previews of the app in light, dark and
+/// system (half and half).
+class _AppearancePicker extends StatelessWidget {
+  const _AppearancePicker({
+    required this.value,
+    required this.onChanged,
+    required this.onLongPress,
+  });
+
+  final ThemeMode value;
+  final ValueChanged<ThemeMode> onChanged;
+  final VoidCallback onLongPress;
+
+  static const _light = (
+    Color(0xFFF4F4F5),
+    Color(0xFFFFFFFF),
+    Color(0xFFD4D4D8),
+  );
+  static const _dark = (
+    Color(0xFF0A0A0A),
+    Color(0xFF1F1F22),
+    Color(0xFF3F3F46),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Surface(
+      padding: const EdgeInsets.fromLTRB(
+        Space.md,
+        Space.md,
+        Space.md,
+        Space.md,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onLongPress: onLongPress,
+            child: Row(
+              children: [
+                _IconTile(icon: FLucideIcons.sunMoon, tone: colors.app.lab),
+                const SizedBox(width: Space.md),
+                Text(
+                  'Appearance',
+                  style: typography.body.md.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: colors.foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          Row(
+            children: [
+              for (final (i, (mode, label)) in const [
+                (ThemeMode.light, 'Light'),
+                (ThemeMode.dark, 'Dark'),
+                (ThemeMode.system, 'System'),
+              ].indexed) ...[
+                if (i > 0) const SizedBox(width: Space.sm + 2),
+                Expanded(
+                  child: PressScale(
+                    scale: 0.96,
+                    semanticsLabel: '$label theme',
+                    onPress: () => onChanged(mode),
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: Motion.medium,
+                          height: 64,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(Radii.md),
+                            border: Border.all(
+                              color: value == mode
+                                  ? colors.app.accent
+                                  : colors.border,
+                              width: value == mode ? 2 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(Radii.md - 3),
+                            child: switch (mode) {
+                              ThemeMode.light => const _MiniApp(
+                                palette: _light,
+                              ),
+                              ThemeMode.dark => const _MiniApp(palette: _dark),
+                              ThemeMode.system => const Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(child: _MiniApp(palette: _light)),
+                                  Expanded(child: _MiniApp(palette: _dark)),
+                                ],
+                              ),
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: Space.xs + 2),
+                        Text(
+                          label,
+                          style: typography.body.xs.copyWith(
+                            fontWeight: value == mode
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: value == mode
+                                ? colors.foreground
+                                : colors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A tiny sketch of the app: background, a card and two text lines.
+class _MiniApp extends StatelessWidget {
+  const _MiniApp({required this.palette});
+
+  final (Color, Color, Color) palette;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, card, line) = palette;
+    return ColoredBox(
+      color: bg,
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Container(
+          decoration: BoxDecoration(
+            color: card,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          padding: const EdgeInsets.all(5),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FractionallySizedBox(
+                widthFactor: 0.7,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: line,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              FractionallySizedBox(
+                widthFactor: 0.45,
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: line.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
             ],
           ),

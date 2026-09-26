@@ -67,7 +67,7 @@ class UserCard extends HookConsumerWidget {
 
     return Surface(
       child: Column(
-        spacing: 16,
+        spacing: 12,
         children: [
           Row(
             spacing: 12,
@@ -102,11 +102,7 @@ class UserCard extends HookConsumerWidget {
                       ),
                     ),
                     Text(
-                      [
-                        username,
-                        if (semesterName != null && semesterName.isNotEmpty)
-                          semesterName,
-                      ].join(' · '),
+                      username,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: typography.body.xs.copyWith(
@@ -118,6 +114,18 @@ class UserCard extends HookConsumerWidget {
                   ],
                 ),
               ),
+              Semantics(
+                label: 'Sign out',
+                button: true,
+                child: FButton.icon(
+                  variant: FButtonVariant.ghost,
+                  onPress: () => _confirmSignOut(context, ref),
+                  child: Icon(
+                    FLucideIcons.logOut,
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ),
             ],
           ),
           if (!user.isValid) ...[
@@ -127,34 +135,80 @@ class UserCard extends HookConsumerWidget {
               subtitle: Text('Update your VTOP password to continue.'),
             ),
           ],
-          Row(
-            spacing: 6,
-            children: [
-              Expanded(child: UserPassChange(user: user)),
-              Semantics(
-                label: 'Sign out',
-                button: true,
-                child: FButton.icon(
-                  onPress: () => _confirmSignOut(context, ref),
-                  child: const Icon(FLucideIcons.logOut),
-                ),
+          // Which semester the app shows, as a field you can tap to change.
+          PressScale(
+            scale: 0.98,
+            semanticsLabel: 'Semester, ${semesterName ?? 'not chosen'}, change',
+            onPress: () => showAdaptiveDialog(
+              context: context,
+              builder: (_) => SemesterDialog(user: user, outerContext: context),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Space.md,
+                vertical: Space.sm + 2,
               ),
-            ],
+              decoration: BoxDecoration(
+                color: colors.secondary,
+                borderRadius: BorderRadius.circular(Radii.md),
+                border: Border.all(color: colors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: colors.app.accentTone.subtle,
+                      borderRadius: BorderRadius.circular(Radii.sm + 2),
+                    ),
+                    child: Icon(
+                      FLucideIcons.calendarRange,
+                      size: 16,
+                      color: colors.app.accentTone.onSubtle,
+                    ),
+                  ),
+                  const SizedBox(width: Space.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SEMESTER',
+                          style: typography.body.xs.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.6,
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                        Text(
+                          semesterName == null || semesterName.isEmpty
+                              ? 'Choose semester'
+                              : semesterName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: typography.body.md.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colors.foreground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    FLucideIcons.chevronsUpDown,
+                    size: 16,
+                    color: colors.mutedForeground,
+                  ),
+                ],
+              ),
+            ),
           ),
           Row(
             spacing: 6,
             children: [
-              Expanded(
-                child: FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: () => showAdaptiveDialog(
-                    context: context,
-                    builder: (_) =>
-                        SemesterDialog(user: user, outerContext: context),
-                  ),
-                  child: const Text('Change semester'),
-                ),
-              ),
+              Expanded(child: UserPassChange(user: user)),
               if (hasEnrolledBiometrics) ...[
                 Tooltip(
                   message: 'View saved password',
@@ -162,6 +216,8 @@ class UserCard extends HookConsumerWidget {
                     label: 'View saved password',
                     button: true,
                     child: FButton.icon(
+                      variant: FButtonVariant.outline,
+                      size: FButtonSizeVariant.sm,
                       onPress: () => _showPassword(context),
                       child: const Icon(FLucideIcons.eye),
                     ),

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -126,15 +128,21 @@ class MarksCard extends HookWidget {
                     ],
                   ),
                   const SizedBox(height: Space.md),
+                  _WeightBar(marks: record.marks),
+                  const SizedBox(height: Space.sm),
                   Row(
                     children: [
                       Expanded(
-                        child: ProgressBar(
-                          value: hasMarks ? totals.percentage / 100 : 0,
-                          color: tone.base,
+                        child: Text(
+                          totals.possible >= 100
+                              ? 'All assessed'
+                              : '${_fmt(100 - totals.possible)} marks to come',
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                         ),
                       ),
-                      const SizedBox(width: Space.md),
                       Text(
                         '${record.marks.length} ${record.marks.length == 1 ? 'assessment' : 'assessments'}',
                         style: typography.body.xs.copyWith(
@@ -187,6 +195,76 @@ class MarksCard extends HookWidget {
   }
 }
 
+/// The course's 100 weighted marks as one bar: a segment per assessment,
+/// sized by its weight and filled by what was scored, then a faint tail for
+/// weight not assessed yet.
+class _WeightBar extends StatelessWidget {
+  const _WeightBar({required this.marks});
+
+  final List<MarksRecordEach> marks;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final parts = [
+      for (final m in marks)
+        (
+          weight: double.tryParse(m.weightage.trim()) ?? 0,
+          gained: double.tryParse(m.weightagemark.trim()) ?? 0,
+          absent: m.status.trim().toLowerCase() == 'absent',
+        ),
+    ].where((p) => p.weight > 0).toList();
+    final assessed = parts.fold<double>(0, (sum, p) => sum + p.weight);
+    final remaining = math.max(0.0, 100 - assessed);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Motion.slow * 2,
+      curve: Curves.easeOutCubic,
+      builder: (context, t, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(Radii.pill),
+        child: SizedBox(
+          height: 8,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (i, p) in parts.indexed) ...[
+                if (i > 0) const SizedBox(width: 2),
+                Expanded(
+                  flex: (p.weight * 10).round(),
+                  child: Builder(
+                    builder: (context) {
+                      final fill = (p.gained / p.weight).clamp(0.0, 1.0);
+                      final tone = p.absent
+                          ? colors.app.danger
+                          : scoreTone(context, fill * 100);
+                      return ColoredBox(
+                        color: tone.base.withValues(alpha: 0.25),
+                        child: FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: fill * t,
+                          child: ColoredBox(color: tone.base),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+              if (remaining > 0) ...[
+                if (parts.isNotEmpty) const SizedBox(width: 2),
+                Expanded(
+                  flex: (remaining * 10).round(),
+                  child: ColoredBox(color: colors.secondary),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AssessmentRow extends StatelessWidget {
   const _AssessmentRow({required this.mark});
 
@@ -201,6 +279,15 @@ class _AssessmentRow extends StatelessWidget {
     final percent = max > 0 ? scored / max * 100 : 0.0;
     final absent = mark.status.trim().toLowerCase() == 'absent';
     final tone = absent ? colors.app.danger : scoreTone(context, percent);
+    // Same colour rule as this assessment's segment in the card's bar.
+    final weight = double.tryParse(mark.weightage.trim()) ?? 0;
+    final gained = double.tryParse(mark.weightagemark.trim()) ?? 0;
+    final segmentTone = absent
+        ? colors.app.danger
+        : scoreTone(
+            context,
+            weight > 0 ? (gained / weight).clamp(0.0, 1.0) * 100 : percent,
+          );
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -212,6 +299,15 @@ class _AssessmentRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: segmentTone.base,
+                  borderRadius: BorderRadius.circular(2.5),
+                ),
+              ),
+              const SizedBox(width: Space.sm),
               Expanded(
                 child: Text(
                   mark.markstitle,

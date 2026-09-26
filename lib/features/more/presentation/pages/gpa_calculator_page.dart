@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -118,6 +120,22 @@ class GpaCalculatorPage extends HookConsumerWidget {
       nextId.value = uid;
     }
 
+    // Start from this semester's courses instead of a blank row, as long as
+    // the user hasn't started editing.
+    final autoLoaded = useState(false);
+    useEffect(() {
+      if (timetable.value != null &&
+          !autoLoaded.value &&
+          rows.value.length == 1 &&
+          rows.value.single.courseCode.isEmpty) {
+        autoLoaded.value = true;
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => addCurrentSemester(),
+        );
+      }
+      return null;
+    }, [timetable.value]);
+
     final courses = [
       for (final row in rows.value)
         GpaCourse(
@@ -137,6 +155,17 @@ class GpaCalculatorPage extends HookConsumerWidget {
             plannedCourses: courses,
           );
     final delta = projected == null ? 0.0 : projected - currentCgpa!.value;
+    // Target defaults to the next quarter point above the current CGPA.
+    final target = useState<double?>(null);
+    final targetValue =
+        target.value ??
+        (currentCgpa == null
+            ? 9.0
+            : math.min(10.0, ((currentCgpa.value + 0.01) * 4).ceil() / 4));
+    final needed = currentCgpa == null || sumCredits == 0
+        ? null
+        : (targetValue * (earned + sumCredits) - currentCgpa.value * earned) /
+              sumCredits;
     final gpaTone = gradeTone(context, _letterFor(semesterGpa));
 
     return ListView(
@@ -329,6 +358,99 @@ class GpaCalculatorPage extends HookConsumerWidget {
             ],
           ),
         ),
+        if (needed != null) ...[
+          const SizedBox(height: Space.sm + 2),
+          Surface(
+            padding: const EdgeInsets.fromLTRB(
+              Space.lg,
+              Space.sm,
+              Space.sm,
+              Space.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'TARGET CGPA',
+                        style: typography.body.xs.copyWith(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                          color: colors.mutedForeground,
+                        ),
+                      ),
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.sm,
+                      semanticsLabel: 'Lower target',
+                      onPress: targetValue > 5
+                          ? () => target.value = targetValue - 0.05
+                          : null,
+                      child: const Icon(FLucideIcons.minus),
+                    ),
+                    SizedBox(
+                      width: 52,
+                      child: Text(
+                        targetValue.toStringAsFixed(2),
+                        textAlign: TextAlign.center,
+                        style: typography.body.lg.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colors.foreground,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ),
+                    FButton.icon(
+                      variant: FButtonVariant.ghost,
+                      size: FButtonSizeVariant.sm,
+                      semanticsLabel: 'Raise target',
+                      onPress: targetValue < 9.995
+                          ? () =>
+                                target.value = math.min(10, targetValue + 0.05)
+                          : null,
+                      child: const Icon(FLucideIcons.plus),
+                    ),
+                  ],
+                ),
+                Text.rich(
+                  needed <= 0 || needed <= semesterGpa + 0.0001
+                      ? TextSpan(
+                          text: needed <= 0
+                              ? 'Already there, whatever you score'
+                              : 'Your plan above gets you there',
+                          style: TextStyle(color: colors.app.success.onSubtle),
+                        )
+                      : needed > 10
+                      ? TextSpan(
+                          text:
+                              'Out of reach this semester (needs ${needed.toStringAsFixed(2)})',
+                          style: TextStyle(color: colors.app.danger.onSubtle),
+                        )
+                      : TextSpan(
+                          children: [
+                            const TextSpan(text: 'Needs a '),
+                            TextSpan(
+                              text: needed.toStringAsFixed(2),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: colors.foreground,
+                              ),
+                            ),
+                            const TextSpan(text: ' semester GPA'),
+                          ],
+                        ),
+                  style: typography.body.sm.copyWith(
+                    color: colors.mutedForeground,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         SectionHeader(
           title: 'Courses',
           trailing: FButton(
@@ -421,29 +543,40 @@ class _CourseRowCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Line 1: name (room to wrap) and remove.
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.foreground,
-                      ),
-                    ),
-                    if (row.courseCode.isNotEmpty)
-                      Text(
-                        row.courseCode,
-                        style: typography.body.xs.copyWith(
-                          color: colors.mutedForeground,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.sm.copyWith(
+                    height: 1.25,
+                    fontWeight: FontWeight.w600,
+                    color: colors.foreground,
+                  ),
+                ),
+              ),
+              if (canRemove)
+                FButton.icon(
+                  variant: FButtonVariant.ghost,
+                  size: FButtonSizeVariant.sm,
+                  semanticsLabel: 'Remove course',
+                  onPress: onRemove,
+                  child: Icon(FLucideIcons.x, color: colors.mutedForeground),
+                ),
+            ],
+          ),
+          // Line 2: code and credits.
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  row.courseCode,
+                  style: typography.body.xs.copyWith(
+                    color: colors.mutedForeground,
+                  ),
                 ),
               ),
               FButton.icon(
@@ -474,14 +607,6 @@ class _CourseRowCard extends StatelessWidget {
                 onPress: () => onCredits((row.credits + 0.5).clamp(0.5, 30)),
                 child: const Icon(FLucideIcons.plus),
               ),
-              if (canRemove)
-                FButton.icon(
-                  variant: FButtonVariant.ghost,
-                  size: FButtonSizeVariant.sm,
-                  semanticsLabel: 'Remove course',
-                  onPress: onRemove,
-                  child: Icon(FLucideIcons.x, color: colors.mutedForeground),
-                ),
             ],
           ),
           const SizedBox(height: Space.sm),
