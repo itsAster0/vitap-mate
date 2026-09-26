@@ -26,6 +26,9 @@ abstract interface class VtopBackend {
   Future<TimetableData> timetable(String semesterId);
   Future<MarksData> marks(String semesterId);
   Future<ExamScheduleData> examSchedule(String semesterId);
+
+  /// Every month of the semester's academic calendar.
+  Future<AcademicCalendarData> academicCalendar(String semesterId);
   Future<GradeViewData> gradeView(String semesterId);
   Future<GradeDetailsData> gradeViewDetails({
     required String semesterId,

@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class ClassReminderNotificationService {
@@ -17,6 +18,10 @@ class ClassReminderNotificationService {
   static const String _beforeKey = "settings_class_notify_before_minutes";
   static const String _pauseUntilKey = "settings_class_pause_until_millis";
   static bool _tzInitialized = false;
+
+  /// How far ahead dated reminders are scheduled. Each timetable or
+  /// calendar load, and each background sync, tops them up.
+  static const _datedHorizonDays = 14;
 
   static Future<void> ensureInitialized() async {
     if (!_tzInitialized) {
@@ -98,7 +103,14 @@ class ClassReminderNotificationService {
     return false;
   }
 
-  static Future<void> syncFromTimetable(TimetableData data) async {
+  /// Schedules a reminder before every class. With a [calendar], reminders
+  /// are set for the actual class days of the next two weeks, so holidays,
+  /// exam days and labs after the LAB FAT get none; without one they repeat
+  /// weekly.
+  static Future<void> syncFromTimetable(
+    TimetableData data, {
+    SemesterCalendar? calendar,
+  }) async {
     await ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
@@ -118,7 +130,10 @@ class ClassReminderNotificationService {
     final beforeMinutes = prefs.getInt(_beforeKey) ?? 10;
     await cancelAll();
 
-    var scheduled = 0;
+    if (calendar != null) {
+      await _scheduleDated(data, calendar, beforeMinutes);
+      return;
+    }
 
     for (final slot in data.slots) {
       if (slot.serial == "-1") {
@@ -154,33 +169,87 @@ class ClassReminderNotificationService {
         "slot": slot.slot,
       });
 
-      final details = NotificationDetails(
-        android: AndroidNotificationDetails(
-          channelId,
-          "Class reminders",
-          channelDescription: "Notifications before your classes",
-          importance: Importance.high,
-          priority: Priority.high,
-          actions: const [
-            AndroidNotificationAction(
-              _pauseActionId,
-              "Pause for today",
-              cancelNotification: true,
-            ),
-          ],
-        ),
-      );
       await _notifications.zonedSchedule(
         id: id,
         title: "Class Reminder",
         body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
         scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-        notificationDetails: details,
+        notificationDetails: _details,
         payload: payload,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
-      scheduled++;
+    }
+  }
+
+  static const _details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      channelId,
+      "Class reminders",
+      channelDescription: "Notifications before your classes",
+      importance: Importance.high,
+      priority: Priority.high,
+      actions: [
+        AndroidNotificationAction(
+          _pauseActionId,
+          "Pause for today",
+          cancelNotification: true,
+        ),
+      ],
+    ),
+  );
+
+  /// One-off reminders for each class the calendar holds in the next
+  /// [_datedHorizonDays] days.
+  static Future<void> _scheduleDated(
+    TimetableData data,
+    SemesterCalendar calendar,
+    int beforeMinutes,
+  ) async {
+    final now = DateTime.now();
+    for (var offset = 0; offset < _datedHorizonDays; offset++) {
+      final day = DateTime(now.year, now.month, now.day + offset);
+      for (final slot in data.slots) {
+        if (slot.serial == "-1") continue;
+        if (_weekdayFromSlot(slot.day) != day.weekday) continue;
+        if (!calendar.holdsClasses(day, lab: slot.kind == ClassKind.lab)) {
+          continue;
+        }
+        final classTime = _parseTime(slot.startTime);
+        if (classTime == null) continue;
+        final remindAt = DateTime(
+          day.year,
+          day.month,
+          day.day,
+          classTime.$1,
+          classTime.$2,
+        ).subtract(Duration(minutes: beforeMinutes));
+        if (!remindAt.isAfter(now)) continue;
+
+        final id =
+            Object.hash(
+              data.semesterId,
+              day.millisecondsSinceEpoch,
+              slot.startTime,
+              slot.courseCode,
+              slot.slot,
+            ) &
+            0x7fffffff;
+        await _notifications.zonedSchedule(
+          id: id,
+          title: "Class Reminder",
+          body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
+          scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+          notificationDetails: _details,
+          payload: jsonEncode({
+            "type": _payloadType,
+            "semesterId": data.semesterId,
+            "courseCode": slot.courseCode,
+            "slot": slot.slot,
+          }),
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        );
+      }
     }
   }
 

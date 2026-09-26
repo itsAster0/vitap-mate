@@ -279,6 +279,15 @@ class RemoteVtopBackend implements VtopBackend {
       );
 
   @override
+  Future<AcademicCalendarData> academicCalendar(String semesterId) async =>
+      AcademicCalendarData.fromJson(
+        rustJsonToDart(
+              await _post('academic-calendar', {'semester_id': semesterId}),
+            )
+            as Map<String, dynamic>,
+      );
+
+  @override
   Future<GradeViewData> gradeView(String semesterId) async =>
       GradeViewData.fromJson(
         await _fetch(VtopPage.grades, 'grades', {'semester_id': semesterId}),

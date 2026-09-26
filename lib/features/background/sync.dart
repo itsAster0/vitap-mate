@@ -21,6 +21,7 @@ import 'package:vitapmate/features/more/presentation/providers/marks_provider.da
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
 import 'package:vitapmate/services/change_alert_notification_service.dart';
@@ -178,6 +179,9 @@ Future<bool> syncVtopData({
       }),
     );
     final k = await Future.wait(futures);
+    // Dated class reminders cover two weeks; keep them topped up even when
+    // the app isn't opened.
+    await rescheduleClassReminders(read);
     await _runChangeDetection(
       read,
       task,

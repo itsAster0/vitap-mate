@@ -15,13 +15,13 @@ void main() {
     expect(s.isSafe, isFalse);
     // (6 + 6) / (10 + 6) = 75%
     expect(s.mustAttend, 6);
-    expect(s.advice, 'Attend 6 more');
+    expect(s.advice, 'Attend 6');
   });
 
   test('exactly on the line cannot skip', () {
     const s = AttendanceStanding(attended: 3, total: 4);
     expect(s.canSkip, 0);
-    expect(s.advice, "Don't skip the next one");
+    expect(s.advice, "Don't skip");
   });
 
   test('no classes yet', () {

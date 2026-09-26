@@ -15,13 +15,14 @@ const vtopServerUrlSettingKey = 'settings_vtop_server_url';
 const vtopServerApiKeySettingKey = 'settings_vtop_server_api_key';
 const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
 const refreshButtonSettingKey = 'settings_refresh_button';
+const classesLeftUntilSettingKey = 'settings_classes_left_until';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
   return SharedPreferencesWithCache.create(
     cacheOptions: SharedPreferencesWithCacheOptions(
       allowList: {
-        "settings_merge_tt",
+        classesLeftUntilSettingKey,
         "settings_auto_refresh",
         refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,
@@ -87,16 +88,29 @@ Future<void> setVtopServerSettings(
   ref.invalidate(vtopServerSettingsProvider);
 }
 
-@riverpod
-bool mergeTT(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_merge_tt") ?? true;
+/// How far ahead "classes left" on the attendance cards counts.
+enum ClassesLeftUntil {
+  /// To the last class before the FAT.
+  semesterEnd,
+
+  /// To the next exam: CAT-I, then CAT-II, then the FAT.
+  nextExam,
 }
 
-Future<void> setMergeTT(WidgetRef ref, bool value) async {
+@riverpod
+ClassesLeftUntil classesLeftUntil(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  final stored = prefs?.getString(classesLeftUntilSettingKey);
+  return ClassesLeftUntil.values.firstWhere(
+    (value) => value.name == stored,
+    orElse: () => ClassesLeftUntil.nextExam,
+  );
+}
+
+Future<void> setClassesLeftUntil(WidgetRef ref, ClassesLeftUntil value) async {
   final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool("settings_merge_tt", value);
-  ref.invalidate(mergeTTProvider);
+  await prefs.setString(classesLeftUntilSettingKey, value.name);
+  ref.invalidate(classesLeftUntilProvider);
 }
 
 /// The floating refresh button on the screen edge.

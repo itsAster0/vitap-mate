@@ -8,9 +8,9 @@ use vtop_core::inputs::{BiometricDate, CourseId, CourseType, Password, SemesterI
 
 use crate::api::vtop::{
     types::{
-        AttendanceData, BiometricData, ExamScheduleData, FullAttendanceData, GradeDetailsData,
-        GradeHistoryData, GradeViewData, MarksData, PersistedVtopSession, SemesterData,
-        SessionState, TimetableData,
+        AcademicCalendarData, AttendanceData, BiometricData, ExamScheduleData, FullAttendanceData,
+        GradeDetailsData, GradeHistoryData, GradeViewData, MarksData, PersistedVtopSession,
+        SemesterData, SessionState, TimetableData,
     },
     vtop_client::{VtopClient, VtopError},
 };
@@ -120,6 +120,17 @@ pub async fn fetch_exam_schedule(
     client
         .inner
         .exam_schedule(&SemesterId::parse(&semester_id)?)
+        .await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_academic_calendar(
+    client: &VtopClient,
+    semester_id: String,
+) -> Result<AcademicCalendarData, VtopError> {
+    client
+        .inner
+        .academic_calendar(&SemesterId::parse(&semester_id)?)
         .await
 }
 

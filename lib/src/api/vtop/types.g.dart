@@ -6,6 +6,24 @@ part of 'types.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+_AcademicCalendarData _$AcademicCalendarDataFromJson(
+  Map<String, dynamic> json,
+) => _AcademicCalendarData(
+  entries: (json['entries'] as List<dynamic>)
+      .map((e) => CalendarEntry.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  semesterId: json['semesterId'] as String,
+  updateTime: BigInt.parse(json['updateTime'] as String),
+);
+
+Map<String, dynamic> _$AcademicCalendarDataToJson(
+  _AcademicCalendarData instance,
+) => <String, dynamic>{
+  'entries': instance.entries,
+  'semesterId': instance.semesterId,
+  'updateTime': instance.updateTime.toString(),
+};
+
 _AttendanceData _$AttendanceDataFromJson(Map<String, dynamic> json) =>
     _AttendanceData(
       records: (json['records'] as List<dynamic>)
@@ -84,6 +102,22 @@ Map<String, dynamic> _$BiometricRecordToJson(_BiometricRecord instance) =>
       'punchDate': instance.punchDate,
       'punchTime': instance.punchTime,
       'venue': instance.venue,
+    };
+
+_CalendarEntry _$CalendarEntryFromJson(Map<String, dynamic> json) =>
+    _CalendarEntry(
+      date: json['date'] as String,
+      kind: json['kind'] as String,
+      group: json['group'] as String,
+      note: json['note'] as String,
+    );
+
+Map<String, dynamic> _$CalendarEntryToJson(_CalendarEntry instance) =>
+    <String, dynamic>{
+      'date': instance.date,
+      'kind': instance.kind,
+      'group': instance.group,
+      'note': instance.note,
     };
 
 _ExamScheduleData _$ExamScheduleDataFromJson(Map<String, dynamic> json) =>

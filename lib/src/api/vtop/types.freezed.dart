@@ -13,6 +13,275 @@ part of 'types.dart';
 T _$identity<T>(T value) => value;
 
 /// @nodoc
+mixin _$AcademicCalendarData {
+
+ List<CalendarEntry> get entries; String get semesterId; BigInt get updateTime;
+/// Create a copy of AcademicCalendarData
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$AcademicCalendarDataCopyWith<AcademicCalendarData> get copyWith => _$AcademicCalendarDataCopyWithImpl<AcademicCalendarData>(this as AcademicCalendarData, _$identity);
+
+  /// Serializes this AcademicCalendarData to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AcademicCalendarData&&const DeepCollectionEquality().equals(other.entries, entries)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(entries),semesterId,updateTime);
+
+@override
+String toString() {
+  return 'AcademicCalendarData(entries: $entries, semesterId: $semesterId, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $AcademicCalendarDataCopyWith<$Res>  {
+  factory $AcademicCalendarDataCopyWith(AcademicCalendarData value, $Res Function(AcademicCalendarData) _then) = _$AcademicCalendarDataCopyWithImpl;
+@useResult
+$Res call({
+ List<CalendarEntry> entries, String semesterId, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class _$AcademicCalendarDataCopyWithImpl<$Res>
+    implements $AcademicCalendarDataCopyWith<$Res> {
+  _$AcademicCalendarDataCopyWithImpl(this._self, this._then);
+
+  final AcademicCalendarData _self;
+  final $Res Function(AcademicCalendarData) _then;
+
+/// Create a copy of AcademicCalendarData
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? entries = null,Object? semesterId = null,Object? updateTime = null,}) {
+  return _then(_self.copyWith(
+entries: null == entries ? _self.entries : entries // ignore: cast_nullable_to_non_nullable
+as List<CalendarEntry>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
+as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [AcademicCalendarData].
+extension AcademicCalendarDataPatterns on AcademicCalendarData {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _AcademicCalendarData value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _AcademicCalendarData() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _AcademicCalendarData value)  $default,){
+final _that = this;
+switch (_that) {
+case _AcademicCalendarData():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _AcademicCalendarData value)?  $default,){
+final _that = this;
+switch (_that) {
+case _AcademicCalendarData() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<CalendarEntry> entries,  String semesterId,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _AcademicCalendarData() when $default != null:
+return $default(_that.entries,_that.semesterId,_that.updateTime);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<CalendarEntry> entries,  String semesterId,  BigInt updateTime)  $default,) {final _that = this;
+switch (_that) {
+case _AcademicCalendarData():
+return $default(_that.entries,_that.semesterId,_that.updateTime);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<CalendarEntry> entries,  String semesterId,  BigInt updateTime)?  $default,) {final _that = this;
+switch (_that) {
+case _AcademicCalendarData() when $default != null:
+return $default(_that.entries,_that.semesterId,_that.updateTime);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _AcademicCalendarData implements AcademicCalendarData {
+  const _AcademicCalendarData({required final  List<CalendarEntry> entries, required this.semesterId, required this.updateTime}): _entries = entries;
+  factory _AcademicCalendarData.fromJson(Map<String, dynamic> json) => _$AcademicCalendarDataFromJson(json);
+
+ final  List<CalendarEntry> _entries;
+@override List<CalendarEntry> get entries {
+  if (_entries is EqualUnmodifiableListView) return _entries;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_entries);
+}
+
+@override final  String semesterId;
+@override final  BigInt updateTime;
+
+/// Create a copy of AcademicCalendarData
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$AcademicCalendarDataCopyWith<_AcademicCalendarData> get copyWith => __$AcademicCalendarDataCopyWithImpl<_AcademicCalendarData>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$AcademicCalendarDataToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AcademicCalendarData&&const DeepCollectionEquality().equals(other._entries, _entries)&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_entries),semesterId,updateTime);
+
+@override
+String toString() {
+  return 'AcademicCalendarData(entries: $entries, semesterId: $semesterId, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$AcademicCalendarDataCopyWith<$Res> implements $AcademicCalendarDataCopyWith<$Res> {
+  factory _$AcademicCalendarDataCopyWith(_AcademicCalendarData value, $Res Function(_AcademicCalendarData) _then) = __$AcademicCalendarDataCopyWithImpl;
+@override @useResult
+$Res call({
+ List<CalendarEntry> entries, String semesterId, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class __$AcademicCalendarDataCopyWithImpl<$Res>
+    implements _$AcademicCalendarDataCopyWith<$Res> {
+  __$AcademicCalendarDataCopyWithImpl(this._self, this._then);
+
+  final _AcademicCalendarData _self;
+  final $Res Function(_AcademicCalendarData) _then;
+
+/// Create a copy of AcademicCalendarData
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? entries = null,Object? semesterId = null,Object? updateTime = null,}) {
+  return _then(_AcademicCalendarData(
+entries: null == entries ? _self._entries : entries // ignore: cast_nullable_to_non_nullable
+as List<CalendarEntry>,semesterId: null == semesterId ? _self.semesterId : semesterId // ignore: cast_nullable_to_non_nullable
+as String,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$AttendanceData {
 
  List<AttendanceRecord> get records; String get semesterId; BigInt get updateTime;
@@ -1098,6 +1367,272 @@ serial: null == serial ? _self.serial : serial // ignore: cast_nullable_to_non_n
 as String,punchDate: null == punchDate ? _self.punchDate : punchDate // ignore: cast_nullable_to_non_nullable
 as String,punchTime: null == punchTime ? _self.punchTime : punchTime // ignore: cast_nullable_to_non_nullable
 as String,venue: null == venue ? _self.venue : venue // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$CalendarEntry {
+
+ String get date; String get kind; String get group; String get note;
+/// Create a copy of CalendarEntry
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CalendarEntryCopyWith<CalendarEntry> get copyWith => _$CalendarEntryCopyWithImpl<CalendarEntry>(this as CalendarEntry, _$identity);
+
+  /// Serializes this CalendarEntry to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CalendarEntry&&(identical(other.date, date) || other.date == date)&&(identical(other.kind, kind) || other.kind == kind)&&(identical(other.group, group) || other.group == group)&&(identical(other.note, note) || other.note == note));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,date,kind,group,note);
+
+@override
+String toString() {
+  return 'CalendarEntry(date: $date, kind: $kind, group: $group, note: $note)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CalendarEntryCopyWith<$Res>  {
+  factory $CalendarEntryCopyWith(CalendarEntry value, $Res Function(CalendarEntry) _then) = _$CalendarEntryCopyWithImpl;
+@useResult
+$Res call({
+ String date, String kind, String group, String note
+});
+
+
+
+
+}
+/// @nodoc
+class _$CalendarEntryCopyWithImpl<$Res>
+    implements $CalendarEntryCopyWith<$Res> {
+  _$CalendarEntryCopyWithImpl(this._self, this._then);
+
+  final CalendarEntry _self;
+  final $Res Function(CalendarEntry) _then;
+
+/// Create a copy of CalendarEntry
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? date = null,Object? kind = null,Object? group = null,Object? note = null,}) {
+  return _then(_self.copyWith(
+date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
+as String,kind: null == kind ? _self.kind : kind // ignore: cast_nullable_to_non_nullable
+as String,group: null == group ? _self.group : group // ignore: cast_nullable_to_non_nullable
+as String,note: null == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [CalendarEntry].
+extension CalendarEntryPatterns on CalendarEntry {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _CalendarEntry value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _CalendarEntry() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _CalendarEntry value)  $default,){
+final _that = this;
+switch (_that) {
+case _CalendarEntry():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _CalendarEntry value)?  $default,){
+final _that = this;
+switch (_that) {
+case _CalendarEntry() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String date,  String kind,  String group,  String note)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _CalendarEntry() when $default != null:
+return $default(_that.date,_that.kind,_that.group,_that.note);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String date,  String kind,  String group,  String note)  $default,) {final _that = this;
+switch (_that) {
+case _CalendarEntry():
+return $default(_that.date,_that.kind,_that.group,_that.note);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String date,  String kind,  String group,  String note)?  $default,) {final _that = this;
+switch (_that) {
+case _CalendarEntry() when $default != null:
+return $default(_that.date,_that.kind,_that.group,_that.note);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _CalendarEntry implements CalendarEntry {
+  const _CalendarEntry({required this.date, required this.kind, required this.group, required this.note});
+  factory _CalendarEntry.fromJson(Map<String, dynamic> json) => _$CalendarEntryFromJson(json);
+
+@override final  String date;
+@override final  String kind;
+@override final  String group;
+@override final  String note;
+
+/// Create a copy of CalendarEntry
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$CalendarEntryCopyWith<_CalendarEntry> get copyWith => __$CalendarEntryCopyWithImpl<_CalendarEntry>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$CalendarEntryToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CalendarEntry&&(identical(other.date, date) || other.date == date)&&(identical(other.kind, kind) || other.kind == kind)&&(identical(other.group, group) || other.group == group)&&(identical(other.note, note) || other.note == note));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,date,kind,group,note);
+
+@override
+String toString() {
+  return 'CalendarEntry(date: $date, kind: $kind, group: $group, note: $note)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$CalendarEntryCopyWith<$Res> implements $CalendarEntryCopyWith<$Res> {
+  factory _$CalendarEntryCopyWith(_CalendarEntry value, $Res Function(_CalendarEntry) _then) = __$CalendarEntryCopyWithImpl;
+@override @useResult
+$Res call({
+ String date, String kind, String group, String note
+});
+
+
+
+
+}
+/// @nodoc
+class __$CalendarEntryCopyWithImpl<$Res>
+    implements _$CalendarEntryCopyWith<$Res> {
+  __$CalendarEntryCopyWithImpl(this._self, this._then);
+
+  final _CalendarEntry _self;
+  final $Res Function(_CalendarEntry) _then;
+
+/// Create a copy of CalendarEntry
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? date = null,Object? kind = null,Object? group = null,Object? note = null,}) {
+  return _then(_CalendarEntry(
+date: null == date ? _self.date : date // ignore: cast_nullable_to_non_nullable
+as String,kind: null == kind ? _self.kind : kind // ignore: cast_nullable_to_non_nullable
+as String,group: null == group ? _self.group : group // ignore: cast_nullable_to_non_nullable
+as String,note: null == note ? _self.note : note // ignore: cast_nullable_to_non_nullable
 as String,
   ));
 }

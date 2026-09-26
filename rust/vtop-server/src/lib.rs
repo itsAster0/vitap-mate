@@ -86,6 +86,7 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/timetable", post(routes::timetable))
         .route("/marks", post(routes::marks))
         .route("/exam-schedule", post(routes::exam_schedule))
+        .route("/academic-calendar", post(routes::academic_calendar))
         .route("/grades", post(routes::grades))
         .route("/grades/details", post(routes::grade_details))
         .route("/grade-history", post(routes::grade_history))

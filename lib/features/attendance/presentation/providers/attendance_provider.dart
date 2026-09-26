@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/vtop_controller.dart';
+import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -35,5 +36,11 @@ class Attendance extends _$Attendance {
     );
     final attendance = await controller.refresh();
     state = AsyncData(attendance);
+    // The projection needs a current calendar, but it rarely changes, so
+    // it is refetched only when a day old. Not awaited, and failures only
+    // log, so attendance never waits on it.
+    ref
+        .read(academicCalendarProvider.notifier)
+        .refreshIfStale(calendarMaxAgeOnAttendance);
   }
 }

@@ -220,6 +220,9 @@ Widget _buildHeader(
       case "exam_schedule":
         data = "Exam Schedule";
         break;
+      case "academic-calendar":
+        data = "Academic Calendar";
+        break;
       case "biometric-history":
         data = "Biometric History";
         break;

@@ -262,6 +262,17 @@ pub async fn exam_schedule(
     .await
 }
 
+pub async fn academic_calendar(
+    State(state): State<Arc<AppState>>,
+    ApiJson(body): ApiJson<SemesterRequest>,
+) -> AppResult {
+    let semester = SemesterId::parse(&body.semester_id)?;
+    with_session(&state, body.session, |client| async move {
+        client.academic_calendar(&semester).await
+    })
+    .await
+}
+
 pub async fn grades(
     State(state): State<Arc<AppState>>,
     ApiJson(body): ApiJson<SemesterRequest>,

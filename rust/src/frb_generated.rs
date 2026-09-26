@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 863764966;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2056155509;
 
 // Section: executor
 
@@ -188,6 +188,68 @@ fn wire__crate__api__vtop_get_client__export_session_state_impl(
                 )?;
                 Ok(output_ok)
             })())
+        },
+    )
+}
+fn wire__crate__api__vtop_get_client__fetch_academic_calendar_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "fetch_academic_calendar",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
+            >>::sse_decode(&mut deserializer);
+            let api_semester_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
+                    (move || async move {
+                        let mut api_client_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_client,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_client_guard =
+                                        Some(api_client.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_client_guard = api_client_guard.unwrap();
+                        let output_ok = crate::api::vtop_get_client::fetch_academic_calendar(
+                            &*api_client_guard,
+                            api_semester_id,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
         },
     )
 }
@@ -1481,6 +1543,12 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
 #[allow(clippy::unnecessary_literal_unwrap)]
 const _: fn() = || {
     {
+        let AcademicCalendarData = None::<crate::api::vtop::types::AcademicCalendarData>.unwrap();
+        let _: Vec<crate::api::vtop::types::CalendarEntry> = AcademicCalendarData.entries;
+        let _: String = AcademicCalendarData.semester_id;
+        let _: u64 = AcademicCalendarData.update_time;
+    }
+    {
         let AttendanceData = None::<crate::api::vtop::types::AttendanceData>.unwrap();
         let _: Vec<crate::api::vtop::types::AttendanceRecord> = AttendanceData.records;
         let _: String = AttendanceData.semester_id;
@@ -1513,6 +1581,13 @@ const _: fn() = || {
         let _: String = BiometricRecord.punch_date;
         let _: String = BiometricRecord.punch_time;
         let _: String = BiometricRecord.venue;
+    }
+    {
+        let CalendarEntry = None::<crate::api::vtop::types::CalendarEntry>.unwrap();
+        let _: String = CalendarEntry.date;
+        let _: String = CalendarEntry.kind;
+        let _: String = CalendarEntry.group;
+        let _: String = CalendarEntry.note;
     }
     {
         let ExamScheduleData = None::<crate::api::vtop::types::ExamScheduleData>.unwrap();
@@ -1806,6 +1881,21 @@ impl SseDecode for String {
     }
 }
 
+impl SseDecode for crate::api::vtop::types::AcademicCalendarData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_entries =
+            <Vec<crate::api::vtop::types::CalendarEntry>>::sse_decode(deserializer);
+        let mut var_semesterId = <String>::sse_decode(deserializer);
+        let mut var_updateTime = <u64>::sse_decode(deserializer);
+        return crate::api::vtop::types::AcademicCalendarData {
+            entries: var_entries,
+            semester_id: var_semesterId,
+            update_time: var_updateTime,
+        };
+    }
+}
+
 impl SseDecode for crate::api::vtop::types::AttendanceData {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1888,6 +1978,22 @@ impl SseDecode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         deserializer.cursor.read_u8().unwrap() != 0
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::CalendarEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_date = <String>::sse_decode(deserializer);
+        let mut var_kind = <String>::sse_decode(deserializer);
+        let mut var_group = <String>::sse_decode(deserializer);
+        let mut var_note = <String>::sse_decode(deserializer);
+        return crate::api::vtop::types::CalendarEntry {
+            date: var_date,
+            kind: var_kind,
+            group: var_group,
+            note: var_note,
+        };
     }
 }
 
@@ -2272,6 +2378,20 @@ impl SseDecode for Vec<crate::api::vtop::types::BiometricRecord> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::vtop::types::BiometricRecord>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::vtop::types::CalendarEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::CalendarEntry>::sse_decode(
                 deserializer,
             ));
         }
@@ -2814,91 +2934,97 @@ fn pde_ffi_dispatcher_primary_impl(
         1 => {
             wire__crate__api__native_logs__append_native_log_impl(port, ptr, rust_vec_len, data_len)
         }
-        4 => wire__crate__api__vtop_get_client__fetch_attendance_impl(
+        4 => wire__crate__api__vtop_get_client__fetch_academic_calendar_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        5 => wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
+        5 => wire__crate__api__vtop_get_client__fetch_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        6 => {
+        6 => wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        7 => {
             wire__crate__api__vtop_get_client__fetch_cookies_impl(port, ptr, rust_vec_len, data_len)
         }
-        7 => wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
+        8 => wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        8 => wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
+        9 => wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__vtop_get_client__fetch_grade_history_impl(
+        10 => wire__crate__api__vtop_get_client__fetch_grade_history_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        10 => wire__crate__api__vtop_get_client__fetch_grade_view_impl(
+        11 => wire__crate__api__vtop_get_client__fetch_grade_view_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
+        12 => wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => {
+        13 => {
             wire__crate__api__vtop_get_client__fetch_is_auth_impl(port, ptr, rust_vec_len, data_len)
         }
-        13 => {
+        14 => {
             wire__crate__api__vtop_get_client__fetch_marks_impl(port, ptr, rust_vec_len, data_len)
         }
-        14 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
+        15 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        15 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
+        16 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        16 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
+        17 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        17 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        18 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        26 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        28 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
@@ -2926,17 +3052,17 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        19 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
-        22 => {
+        20 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
+        23 => {
             wire__crate__api__native_logs__native_logs_get_entries_impl(ptr, rust_vec_len, data_len)
         }
-        24 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        25 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+        27 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,
@@ -2962,6 +3088,28 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<VtopClient>> for VtopClient {
     }
 }
 
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::AcademicCalendarData> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.entries.into_into_dart().into_dart(),
+            self.0.semester_id.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::AcademicCalendarData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::AcademicCalendarData>>
+    for crate::api::vtop::types::AcademicCalendarData
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::AcademicCalendarData> {
+        self.into()
+    }
+}
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::AttendanceData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -3057,6 +3205,29 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Biome
     for crate::api::vtop::types::BiometricRecord
 {
     fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::BiometricRecord> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::CalendarEntry> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.date.into_into_dart().into_dart(),
+            self.0.kind.into_into_dart().into_dart(),
+            self.0.group.into_into_dart().into_dart(),
+            self.0.note.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::CalendarEntry>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::CalendarEntry>>
+    for crate::api::vtop::types::CalendarEntry
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::CalendarEntry> {
         self.into()
     }
 }
@@ -3812,6 +3983,15 @@ impl SseEncode for String {
     }
 }
 
+impl SseEncode for crate::api::vtop::types::AcademicCalendarData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::vtop::types::CalendarEntry>>::sse_encode(self.entries, serializer);
+        <String>::sse_encode(self.semester_id, serializer);
+        <u64>::sse_encode(self.update_time, serializer);
+    }
+}
+
 impl SseEncode for crate::api::vtop::types::AttendanceData {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3862,6 +4042,16 @@ impl SseEncode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u8(self as _).unwrap();
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::CalendarEntry {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.date, serializer);
+        <String>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.group, serializer);
+        <String>::sse_encode(self.note, serializer);
     }
 }
 
@@ -4104,6 +4294,16 @@ impl SseEncode for Vec<crate::api::vtop::types::BiometricRecord> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::vtop::types::BiometricRecord>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::vtop::types::CalendarEntry> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::CalendarEntry>::sse_encode(item, serializer);
         }
     }
 }

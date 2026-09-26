@@ -96,6 +96,14 @@ Future<ExamScheduleData> fetchExamSchedule({
   semesterId: semesterId,
 );
 
+Future<AcademicCalendarData> fetchAcademicCalendar({
+  required VtopClient client,
+  required String semesterId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchAcademicCalendar(
+  client: client,
+  semesterId: semesterId,
+);
+
 Future<GradeViewData> fetchGradeView({
   required VtopClient client,
   required String semesterId,

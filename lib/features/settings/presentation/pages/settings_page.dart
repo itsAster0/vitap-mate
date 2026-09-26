@@ -22,6 +22,7 @@ import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
+import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
@@ -313,6 +314,7 @@ class SettingsPage extends HookConsumerWidget {
   void _invalidateVtopDataProviders(WidgetRef ref) {
     ref.invalidate(attendanceProvider);
     ref.invalidate(examScheduleProvider);
+    ref.invalidate(academicCalendarProvider);
     ref.invalidate(marksProvider);
     ref.invalidate(semesterIdProvider);
     ref.invalidate(timetableProvider);
@@ -411,6 +413,7 @@ class SettingsPage extends HookConsumerWidget {
         ? 'Disabled'
         : 'Every ${initialValSync.inHours} hours';
     final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
+    final classesLeftUntil = ref.watch(classesLeftUntilProvider);
 
     final colors = context.theme.colors;
     Future<void> openGmailSetup() async {
@@ -543,19 +546,36 @@ class SettingsPage extends HookConsumerWidget {
           FTileGroup(
             divider: FItemDivider.indented,
             children: [
-              FTile(
+              FSelectMenuTile(
                 prefix: _IconTile(
-                  icon: FLucideIcons.calendarDays,
+                  icon: FLucideIcons.calendarClock,
                   tone: colors.app.lab,
                 ),
-                title: const Text('Merge Labs'),
-                subtitle: const Text('Combine consecutive lab slots'),
-                suffix: FSwitch(
-                  value: ref.watch(mergeTTProvider),
+                title: FTappable(child: const Text('Classes Left')),
+                subtitle: Text(switch (classesLeftUntil) {
+                  ClassesLeftUntil.semesterEnd => 'Count to the semester end',
+                  ClassesLeftUntil.nextExam => 'Count to the next exam',
+                }),
+                selectControl: FMultiValueControl.managedRadio(
+                  initial: classesLeftUntil,
                   onChange: (value) {
-                    setMergeTT(ref, value);
+                    if (value.isNotEmpty) {
+                      setClassesLeftUntil(ref, value.first);
+                    }
                   },
                 ),
+                menu: const [
+                  FSelectTile(
+                    title: Text('Semester end'),
+                    subtitle: Text('Classes until the FAT'),
+                    value: ClassesLeftUntil.semesterEnd,
+                  ),
+                  FSelectTile(
+                    title: Text('Next exam'),
+                    subtitle: Text('CAT-I → CAT-II → FAT'),
+                    value: ClassesLeftUntil.nextExam,
+                  ),
+                ],
               ),
               FTile(
                 prefix: _IconTile(
@@ -664,6 +684,18 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ],
             ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            child: Text(
+              'Classes left and skip counts are a best-effort estimate from '
+              'the VTOP academic calendar and your timetable. Holidays '
+              'announced later, cancelled or extra classes can change them.',
+              textAlign: TextAlign.center,
+              style: context.theme.typography.body.xs.copyWith(
+                color: context.theme.colors.mutedForeground,
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Row(
