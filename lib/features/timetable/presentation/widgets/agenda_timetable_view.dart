@@ -285,15 +285,18 @@ class _DateHeading extends StatelessWidget {
         '${to12H(slots.first.startTime, context)} – ${to12H(slots.last.endTime, context)}',
     ].join('  ·  ');
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    // The Today button sits beside the day name, so the summary below gets the
+    // full width instead of ellipsing beside it.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
+        Row(
+          children: [
+            Expanded(
+              child: Text(
                 DateFormat('EEEE').format(date),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: typography.display.xl2.copyWith(
                   height: 1.05,
                   fontWeight: FontWeight.w800,
@@ -301,31 +304,31 @@ class _DateHeading extends StatelessWidget {
                   color: colors.foreground,
                 ),
               ),
-              const SizedBox(height: Space.xs),
-              Text(
-                summary,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: typography.body.sm.copyWith(
-                  color: colors.mutedForeground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-            ],
-          ),
+            ),
+            AnimatedSwitcher(
+              duration: Motion.medium,
+              child: isToday
+                  ? const SizedBox.shrink()
+                  : FButton(
+                      variant: FButtonVariant.outline,
+                      size: FButtonSizeVariant.sm,
+                      mainAxisSize: MainAxisSize.min,
+                      prefix: const Icon(FLucideIcons.undo2),
+                      onPress: onToday,
+                      child: const Text('Today'),
+                    ),
+            ),
+          ],
         ),
-        AnimatedSwitcher(
-          duration: Motion.medium,
-          child: isToday
-              ? const SizedBox.shrink()
-              : FButton(
-                  variant: FButtonVariant.outline,
-                  size: FButtonSizeVariant.sm,
-                  mainAxisSize: MainAxisSize.min,
-                  prefix: const Icon(FLucideIcons.undo2),
-                  onPress: onToday,
-                  child: const Text('Today'),
-                ),
+        const SizedBox(height: Space.xs),
+        Text(
+          summary,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: typography.body.sm.copyWith(
+            color: colors.mutedForeground,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
       ],
     );
