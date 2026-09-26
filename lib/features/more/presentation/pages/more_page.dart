@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
+import 'package:vitapmate/core/utils/vtop_webview_pages.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 
 class MorePage extends HookConsumerWidget {
@@ -28,6 +29,7 @@ class MorePage extends HookConsumerWidget {
     }
 
     void push(String name) => GoRouter.of(context).pushNamed(name);
+    final recentPages = ref.watch(vtopRecentPagesProvider);
 
     final tools = [
       (FLucideIcons.clipboardList, 'Marks', 'Scores so far', Paths.marks),
@@ -91,6 +93,11 @@ class MorePage extends HookConsumerWidget {
             ],
           ),
           const SectionHeader(title: 'VTOP'),
+          if (recentPages.isNotEmpty)
+            _RecentVtopPages(
+              pages: recentPages,
+              onOpen: (page) => openVtop(page.url),
+            ),
           FTileGroup(
             children: [
               FTile(
@@ -207,6 +214,69 @@ class _ToolTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Pages last opened inside VTOP, one tap away from More.
+class _RecentVtopPages extends StatelessWidget {
+  const _RecentVtopPages({required this.pages, required this.onOpen});
+
+  final List<VtopPage> pages;
+  final ValueChanged<VtopPage> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.md),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        child: Row(
+          spacing: Space.sm,
+          children: [
+            for (final page in pages)
+              PressScale(
+                onPress: () => onOpen(page),
+                semanticsLabel: 'Open ${page.title} in VTOP',
+                scale: 0.96,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.card,
+                    borderRadius: BorderRadius.circular(Radii.pill),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Space.md,
+                      vertical: Space.sm,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: 6,
+                      children: [
+                        Icon(
+                          FLucideIcons.history,
+                          size: 14,
+                          color: colors.mutedForeground,
+                        ),
+                        Text(
+                          page.title,
+                          style: typography.body.sm.copyWith(
+                            color: colors.foreground,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

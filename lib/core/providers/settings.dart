@@ -46,6 +46,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         vtopServerUrlSettingKey,
         vtopServerApiKeySettingKey,
         vtopServerEnabledSettingKey,
+        vtopRecentPagesSettingKey,
       },
     ),
   );
@@ -482,6 +483,7 @@ class ChangeAlertsSettingsController {
 
 const vtopCompactModeSettingKey = 'settings_vtop_compact_mode';
 const vtopDesktopModeSettingKey = 'settings_vtop_desktop_mode';
+const vtopRecentPagesSettingKey = 'settings_vtop_recent_pages';
 
 /// Serialize preference writes while updating the visible selection immediately.
 class VtopViewPreference extends Notifier<bool> {

@@ -191,11 +191,15 @@ const vtopActivityScript = r'''
     const target = event.target instanceof Element
       ? event.target : event.target?.parentElement;
     const link = target?.closest('a[data-url]');
-    if (link) {
-      const menu = link.getAttribute('data-url') || '';
+    // VTOP's own Home icon loads the dashboard in place; report it as ''.
+    const home = !link && target?.closest('[onclick*="home()"]');
+    if (link || home) {
+      const menu = link ? link.getAttribute('data-url') || '' : '';
+      const title = link ? (link.textContent || '').trim().replace(/\s+/g, ' ') : '';
       if (!/\/download/i.test(menu)) {
         window.__mateCurrentMenu = menu;
-        try { window.flutter_inappwebview?.callHandler('vtopMenuChanged', menu); }
+        window.__mateCurrentTitle = title;
+        try { window.flutter_inappwebview?.callHandler('vtopMenuChanged', menu, title); }
         catch (_) {}
       }
     }
@@ -297,3 +301,70 @@ String vtopWaitForMenuScript(String url, String requestId) =>
   attempt();
 })();
 """;
+
+/// Every page in VTOP's sidebar, grouped by its sidebar section.
+const vtopPagesScript = r'''
+(function() {
+  const sidebar = document.getElementById('expandedSideBar');
+  if (!sidebar) return [];
+  const seen = new Set();
+  return Array.from(sidebar.querySelectorAll('a[data-url]')).flatMap(link => {
+    const url = link.getAttribute('data-url') || '';
+    const title = (link.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!url || !title || seen.has(url) || /\/download/i.test(url)) return [];
+    seen.add(url);
+    const section = link.closest('.accordion-item')
+      ?.querySelector('.accordion-header')?.textContent?.trim()
+      .replace(/\s+/g, ' ') || '';
+    return [{url: url, title: title, section: section}];
+  });
+})();
+''';
+
+/// Closes the top-most VTOP overlay; true when something was closed.
+const vtopCloseOverlayScript = r'''
+(function() {
+  const bs = window.bootstrap;
+  const modals = Array.from(document.querySelectorAll('.modal.show'));
+  if (modals.length) {
+    const modal = modals[modals.length - 1];
+    const instance = bs?.Modal?.getInstance(modal);
+    if (instance) instance.hide();
+    else modal.querySelector('[data-bs-dismiss="modal"]')?.click();
+    return true;
+  }
+  const canvas = document.querySelector('.offcanvas.show');
+  if (canvas) {
+    const instance = bs?.Offcanvas?.getInstance(canvas);
+    if (instance) instance.hide();
+    else canvas.querySelector('[data-bs-dismiss="offcanvas"]')?.click();
+    return true;
+  }
+  const dropdown = document.querySelector('.dropdown-menu.show');
+  if (dropdown) {
+    const toggle = dropdown.parentElement
+      ?.querySelector('[data-bs-toggle="dropdown"]');
+    const instance = toggle && bs?.Dropdown?.getInstance(toggle);
+    if (instance) instance.hide();
+    else dropdown.classList.remove('show');
+    return true;
+  }
+  const panel = document.getElementById('sidePanel');
+  if (panel && !panel.classList.contains('d-none')) {
+    panel.classList.add('d-none');
+    return true;
+  }
+  return false;
+})();
+''';
+
+/// VTOP's in-place Home, without reloading the document.
+const vtopHomeScript = r'''
+(function() {
+  if (typeof window.home !== 'function') return false;
+  window.__mateCurrentMenu = '';
+  window.__mateCurrentTitle = '';
+  window.home();
+  return true;
+})();
+''';

@@ -43,19 +43,16 @@ class TestPreferences implements SharedPreferencesWithCache {
 class TestCookies implements CookieManager {
   List<Cookie> cookies = [];
   final writes = <String>[];
-  final deletions = <String>[];
+  int wipes = 0;
   bool rejectWrite = false;
-  VoidCallback? afterRead;
+  VoidCallback? afterWipe;
+
   @override
-  Future<List<Cookie>> getCookies({
-    required WebUri url,
-    InAppWebViewController? iosBelow11WebViewController,
-    InAppWebViewController? webViewController,
-  }) async {
-    expect(url.host, 'vtop.vitap.ac.in');
-    expect(url.path, '/vtop/');
-    afterRead?.call();
-    return cookies;
+  Future<bool> deleteAllCookies() async {
+    wipes++;
+    cookies = [];
+    afterWipe?.call();
+    return true;
   }
 
   @override
@@ -74,27 +71,14 @@ class TestCookies implements CookieManager {
     InAppWebViewController? webViewController,
   }) async {
     expect(url.host, 'vtop.vitap.ac.in');
+    expect(url.path, '/vtop/');
+    expect(domain, '.vitap.ac.in');
     expect(path, '/vtop');
     expect(isSecure, isTrue);
     writes.add('$name=$value');
     return !rejectWrite;
   }
 
-  @override
-  Future<bool> deleteCookie({
-    required WebUri url,
-    required String name,
-    String path = '/',
-    String? domain,
-    InAppWebViewController? iosBelow11WebViewController,
-    InAppWebViewController? webViewController,
-  }) async {
-    expect(url.host, 'vtop.vitap.ac.in');
-    deletions.add(name);
-    return true;
-  }
-
-  // Global deletion deliberately has no implementation, so any use fails.
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -167,51 +151,38 @@ void main() {
   );
 
   test(
-    'cookie synchronization skips unchanged values and removes obsolete cookies',
+    'cookie synchronization wipes the jar before writing the session',
     () async {
+      // VTOP's own host-only JSESSIONID would otherwise shadow the new one.
       final cookies = TestCookies()
         ..cookies = [
-          Cookie(name: 'JSESSIONID', value: 'new', path: '/vtop'),
           Cookie(
-            name: 'obsolete',
-            value: 'old',
-            path: '/vtop',
-            domain: '.vitap.ac.in',
+            name: 'JSESSIONID',
+            value: 'stale',
+            domain: 'vtop.vitap.ac.in',
           ),
+          Cookie(name: 'obsolete', value: 'old', domain: '.vitap.ac.in'),
         ];
       final session = await sync(cookies);
-      expect(cookies.writes, ['token=a=b']);
-      expect(cookies.deletions, ['obsolete']);
+      expect(cookies.wipes, 1);
+      expect(cookies.writes, ['JSESSIONID=new', 'token=a=b']);
       expect(session!.cookieHeader, 'JSESSIONID=new; token=a=b');
     },
   );
 
-  test(
-    'changed cookies replace prior values and failed native writes surface',
-    () async {
-      final cookies = TestCookies()
-        ..cookies = [Cookie(name: 'JSESSIONID', value: 'old')];
-      await sync(cookies);
-      expect(cookies.deletions, hasLength(9));
-      expect(cookies.deletions, everyElement('JSESSIONID'));
-      expect(cookies.writes, ['JSESSIONID=new', 'token=a=b']);
-      await expectLater(
-        sync(TestCookies()..rejectWrite = true),
-        throwsStateError,
-      );
-    },
-  );
+  test('failed native writes surface', () async {
+    await expectLater(
+      sync(TestCookies()..rejectWrite = true),
+      throwsStateError,
+    );
+  });
 
-  test(
-    'stale preparation cannot mutate cookies after asynchronous reads',
-    () async {
-      var current = true;
-      final cookies = TestCookies()..afterRead = () => current = false;
-      expect(await sync(cookies, current: () => current), isNull);
-      expect(cookies.writes, isEmpty);
-      expect(cookies.deletions, isEmpty);
-    },
-  );
+  test('stale preparation stops writing after the wipe', () async {
+    var current = true;
+    final cookies = TestCookies()..afterWipe = () => current = false;
+    expect(await sync(cookies, current: () => current), isNull);
+    expect(cookies.writes, isEmpty);
+  });
 
   test(
     'cookie state is limited to one account and cleared on logout',
