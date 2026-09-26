@@ -11,10 +11,14 @@ class AttendancePlanner extends HookWidget {
     super.key,
     required this.attended,
     required this.total,
+    this.reported,
   });
 
   final int attended;
   final int total;
+
+  /// VTOP's own percentage, shown as "now" until the counts are edited.
+  final double? reported;
 
   @override
   Widget build(BuildContext context) {
@@ -24,9 +28,12 @@ class AttendancePlanner extends HookWidget {
     final editCurrent = useState(false);
     final curAttended = useState(attended);
     final curTotal = useState(total);
+    final countsEdited =
+        curAttended.value != attended || curTotal.value != total;
     final current = AttendanceStanding(
       attended: curAttended.value,
       total: curTotal.value,
+      reported: countsEdited ? null : reported,
     );
 
     final willAttend = useState(0);
@@ -84,7 +91,8 @@ class AttendancePlanner extends HookWidget {
                   children: [
                     _Figure(
                       label: 'NOW',
-                      value: current.percent,
+                      value: current.displayPercent,
+                      decimals: current.reported != null ? 0 : 1,
                       color: nowTone.onSubtle,
                     ),
                     Expanded(
@@ -310,12 +318,14 @@ class _Figure extends StatelessWidget {
     required this.value,
     required this.color,
     this.alignEnd = false,
+    this.decimals = 1,
   });
 
   final String label;
   final double value;
   final Color color;
   final bool alignEnd;
+  final int decimals;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +349,7 @@ class _Figure extends StatelessWidget {
           duration: Motion.slow,
           curve: Curves.easeOutCubic,
           builder: (context, v, _) => Text(
-            '${v.toStringAsFixed(1)}%',
+            '${v.toStringAsFixed(decimals)}%',
             style: typography.display.xl2.copyWith(
               height: 1.1,
               fontWeight: FontWeight.w800,

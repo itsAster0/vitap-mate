@@ -1,10 +1,13 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
+import 'package:intl/intl.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_table.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// One course in the attendance list: ring, name, and what to do next.
@@ -26,6 +29,12 @@ class AttendanceCard extends ConsumerWidget {
     );
     final (code, name) = formateName(record.courseName);
     final isLab = record.islab();
+    final next = _nextClassLabel(
+      context,
+      ref.watch(timetableProvider).value,
+      record,
+      DateTime.now(),
+    );
 
     final pct = standing.displayPercent;
     return Surface(
@@ -71,14 +80,25 @@ class AttendanceCard extends ConsumerWidget {
                                   ),
                                 ),
                                 const SizedBox(height: Space.xs + 2),
+                                // Type, and when the course meets next (the
+                                // code if it has no upcoming class).
                                 Row(
                                   children: [
                                     CourseKindBadge(isLab: isLab),
                                     const SizedBox(width: Space.sm),
-                                    Text(
-                                      code.trim(),
-                                      style: typography.body.xs.copyWith(
-                                        color: colors.mutedForeground,
+                                    Expanded(
+                                      child: Text(
+                                        next == null
+                                            ? code.trim()
+                                            : 'Next: $next',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: typography.body.xs.copyWith(
+                                          color: colors.mutedForeground,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -106,7 +126,7 @@ class AttendanceCard extends ConsumerWidget {
                         children: [
                           _ClassCount(standing: standing),
                           const Spacer(),
-                          _BufferDots(standing: standing, tone: tone),
+                          _Advice(standing: standing, tone: tone),
                         ],
                       ),
                     ],
@@ -141,69 +161,69 @@ class _ClassCount extends StatelessWidget {
   }
 }
 
-/// One dot per class that can still be skipped (filled), or per class that
-/// must be attended to recover (hollow), with the advice as a caption.
-class _BufferDots extends StatelessWidget {
-  const _BufferDots({required this.standing, required this.tone});
+/// "Can skip 5" / "Attend 2", tinted when there's no room to skip.
+class _Advice extends StatelessWidget {
+  const _Advice({required this.standing, required this.tone});
 
   final AttendanceStanding standing;
   final Tone tone;
 
-  static const _maxDots = 6;
-
   @override
   Widget build(BuildContext context) {
-    final typography = context.theme.typography;
-    final recovering = !standing.isSafe;
-    final count = recovering ? standing.mustAttend : standing.canSkip;
-    final shown = count.clamp(0, _maxDots);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        if (shown > 0)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < shown; i++)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(left: 3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: recovering ? null : tone.base,
-                    border: recovering
-                        ? Border.all(color: tone.base, width: 1.5)
-                        : null,
-                  ),
-                ),
-              if (count > _maxDots)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Text(
-                    '+${count - _maxDots}',
-                    style: typography.body.xs.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: tone.onSubtle,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        const SizedBox(height: 3),
-        Text(
-          standing.advice,
-          style: typography.body.xs.copyWith(
-            fontWeight: FontWeight.w500,
-            color: standing.isSafe && standing.canSkip > 0
-                ? context.theme.colors.mutedForeground
-                : tone.onSubtle,
-          ),
-        ),
-      ],
+    return Text(
+      standing.advice,
+      style: context.theme.typography.body.sm.copyWith(
+        fontWeight: FontWeight.w500,
+        color: standing.isSafe && standing.canSkip > 0
+            ? context.theme.colors.mutedForeground
+            : tone.onSubtle,
+      ),
     );
   }
+}
+
+const _slotDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+/// When [record]'s course meets next per the timetable — "Today 2:00 PM",
+/// "Tomorrow 8:00 AM", "Mon 2:00 PM", or "Sat 3 Oct 8:00 AM" a week out —
+/// or null if it isn't scheduled.
+String? _nextClassLabel(
+  BuildContext context,
+  TimetableData? data,
+  AttendanceRecord record,
+  DateTime now,
+) {
+  if (data == null) return null;
+  final code = courseCodeOf(record);
+  final lab = record.islab();
+  final nowMinute = now.hour * 60 + now.minute;
+  // Up to a week ahead; offset 7 is the same weekday next week.
+  for (var offset = 0; offset <= 7; offset++) {
+    final weekday = (now.weekday - 1 + offset) % 7 + 1;
+    final slots =
+        data.slots
+            .where(
+              (s) =>
+                  s.day == _slotDays[weekday - 1] &&
+                  s.courseCode == code &&
+                  (s.kind == ClassKind.lab) == lab &&
+                  (offset > 0 || minutesOf(s.startTime) > nowMinute),
+            )
+            .toList()
+          ..sort(
+            (a, b) => minutesOf(a.startTime).compareTo(minutesOf(b.startTime)),
+          );
+    if (slots.isEmpty) continue;
+    final day = switch (offset) {
+      0 => 'Today',
+      1 => 'Tomorrow',
+      // Same weekday as today: add the date so it isn't read as today.
+      7 => DateFormat('EEE d MMM').format(now.add(Duration(days: offset))),
+      _ => DateFormat('EEE').format(now.add(Duration(days: offset))),
+    };
+    return '$day ${to12H(slots.first.startTime, context)}';
+  }
+  return null;
 }
 
 void showAttendanceDetails(BuildContext context, AttendanceRecord record) {

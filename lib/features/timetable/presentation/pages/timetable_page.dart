@@ -130,6 +130,7 @@ class TimetablePage extends HookConsumerWidget {
                           WeeklyTimetableView(
                             days: days,
                             slotsForDay: slotsForDay,
+                            attendance: attendance,
                           )
                         else
                           AgendaTimetableView(

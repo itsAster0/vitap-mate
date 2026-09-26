@@ -249,12 +249,15 @@ _Kind _kindOf(BiometricRecord r) {
 /// "MH2-FACE-IN-5" → "MH2".
 String _placeOf(BiometricRecord r) => r.venue.split('-').first.trim();
 
-/// "13:16:05" → "13:16"; VTOP sometimes drops the minute's leading zero
-/// ("13:1"), so pad it.
+/// "13:16:05" → "1:16 PM", matching the 12-hour times used elsewhere.
+/// VTOP sometimes drops the minute's leading zero ("13:1"), so parse parts.
 String _hm(String time) {
   final parts = time.trim().split(':');
   if (parts.length < 2) return time.trim();
-  return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
+  final h = int.tryParse(parts[0]);
+  final m = int.tryParse(parts[1]);
+  if (h == null || m == null) return time.trim();
+  return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
 }
 
 /// Seconds since midnight, for ordering punches.
@@ -365,7 +368,7 @@ class _PunchRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 48,
+            width: 64,
             child: Padding(
               padding: const EdgeInsets.only(top: Space.md),
               child: Text(

@@ -172,7 +172,7 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, Space.xl, 2, Space.md),
+      padding: const EdgeInsets.fromLTRB(2, Space.lg, 2, Space.sm + 2),
       child: Row(
         children: [
           Expanded(
@@ -205,6 +205,7 @@ class ProgressRing extends HookWidget {
     required this.color,
     this.size = 52,
     this.stroke = 5,
+    this.marker,
     this.child,
   });
 
@@ -212,18 +213,22 @@ class ProgressRing extends HookWidget {
   final Color color;
   final double size;
   final double stroke;
+
+  /// Optional threshold (0–1) drawn as a small tick across the ring.
+  final double? marker;
   final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     final track = context.theme.colors.secondary;
+    final markerColor = context.theme.colors.foreground.withValues(alpha: 0.6);
     final target = value.clamp(0.0, 1.0);
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: target),
       duration: _reduceMotion(context) ? Duration.zero : Motion.slow * 2,
       curve: Curves.easeOutCubic,
       builder: (context, v, child) => CustomPaint(
-        painter: _RingPainter(v, color, track, stroke),
+        painter: _RingPainter(v, color, track, stroke, marker, markerColor),
         child: child,
       ),
       child: SizedBox.square(
@@ -235,12 +240,21 @@ class ProgressRing extends HookWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  _RingPainter(this.value, this.color, this.track, this.stroke);
+  _RingPainter(
+    this.value,
+    this.color,
+    this.track,
+    this.stroke, [
+    this.marker,
+    this.markerColor,
+  ]);
 
   final double value;
   final Color color;
   final Color track;
   final double stroke;
+  final double? marker;
+  final Color? markerColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -260,11 +274,31 @@ class _RingPainter extends CustomPainter {
         paint..color = color,
       );
     }
+    if (marker != null && markerColor != null) {
+      final angle = -math.pi / 2 + math.pi * 2 * marker!;
+      final center = rect.center;
+      // Kept inside the stroke so it reads as a notch, not a mark beside it.
+      final outer = size.width / 2;
+      final inner = size.width / 2 - stroke;
+      final dir = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(
+        center + dir * inner,
+        center + dir * outer,
+        Paint()
+          ..color = markerColor!
+          ..strokeWidth = 1.5
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(_RingPainter old) =>
-      old.value != value || old.color != color || old.track != track;
+      old.value != value ||
+      old.color != color ||
+      old.track != track ||
+      old.marker != marker ||
+      old.markerColor != markerColor;
 }
 
 /// Thin horizontal bar that animates to [value] (0–1).
@@ -428,8 +462,8 @@ class SkeletonList extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: Space.md),
             child: Surface(
-              child: SizedBox(
-                height: height - Space.lg * 2,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: height - Space.lg * 2),
                 child: const Row(
                   children: [
                     Skeleton(width: 44, height: 44, radius: Radii.md),
@@ -520,11 +554,15 @@ class Segmented<T> extends StatelessWidget {
     required this.segments,
     required this.value,
     required this.onChanged,
+    this.counts,
   });
 
   final List<(T, String)> segments;
   final T value;
   final ValueChanged<T> onChanged;
+
+  /// Optional count per segment (same order), shown as a small pill.
+  final List<int>? counts;
 
   @override
   Widget build(BuildContext context) {
@@ -551,15 +589,18 @@ class Segmented<T> extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 width: width,
+                // Page background with a border reads as a distinct raised
+                // chip on the track in both themes.
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colors.card,
+                    color: colors.background,
                     borderRadius: BorderRadius.circular(Radii.sm + 1),
-                    boxShadow: const [
+                    border: Border.all(color: colors.border),
+                    boxShadow: [
                       BoxShadow(
-                        color: Color(0x14000000),
-                        blurRadius: 4,
-                        offset: Offset(0, 1),
+                        color: colors.app.shadow,
+                        blurRadius: 6,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
@@ -567,7 +608,7 @@ class Segmented<T> extends StatelessWidget {
               ),
               Row(
                 children: [
-                  for (final (segment, label) in segments)
+                  for (final (i, (segment, label)) in segments.indexed)
                     Expanded(
                       child: FTappable(
                         selected: segment == value,
@@ -577,17 +618,57 @@ class Segmented<T> extends StatelessWidget {
                           onChanged(segment);
                         },
                         child: Center(
-                          child: AnimatedDefaultTextStyle(
-                            duration: Motion.medium,
-                            style: context.theme.typography.body.sm.copyWith(
-                              fontWeight: segment == value
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: segment == value
-                                  ? colors.foreground
-                                  : colors.mutedForeground,
-                            ),
-                            child: Text(label, maxLines: 1),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              AnimatedDefaultTextStyle(
+                                duration: Motion.medium,
+                                style: context.theme.typography.body.sm
+                                    .copyWith(
+                                      fontWeight: segment == value
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: segment == value
+                                          ? colors.foreground
+                                          : colors.mutedForeground,
+                                    ),
+                                child: Text(label, maxLines: 1),
+                              ),
+                              if (counts case final c? when i < c.length) ...[
+                                const SizedBox(width: 6),
+                                AnimatedContainer(
+                                  duration: Motion.medium,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: segment == value
+                                        ? colors.app.accentTone.subtle
+                                        : colors.background.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                    borderRadius: BorderRadius.circular(
+                                      Radii.pill,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    '${c[i]}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      height: 1.3,
+                                      fontWeight: FontWeight.w700,
+                                      color: segment == value
+                                          ? colors.app.accentTone.onSubtle
+                                          : colors.mutedForeground,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),

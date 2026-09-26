@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
@@ -69,12 +70,23 @@ class AgendaTimetableView extends HookWidget {
         ? slots.where((s) => minutesOf(s.endTime) > minuteNow).length
         : slots.length;
 
+    // Real breaks (VIT leaves 10 minutes between classes); the longest one is
+    // tagged when the day has more than one.
+    final gaps = [
+      for (var i = 1; i < slots.length; i++)
+        minutesOf(slots[i].startTime) - minutesOf(slots[i - 1].endTime),
+    ];
+    final realGaps = gaps.where((g) => g >= _minBreak).toList();
+    final longestGap = realGaps.length > 1
+        ? realGaps.reduce((a, b) => a > b ? a : b)
+        : null;
+
     // Previous day index tells the switcher which way to slide.
     final previousDay = usePrevious(selectedDay.value) ?? selectedDay.value;
     final forward = selectedDay.value >= previousDay;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, 0),
+      padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -84,14 +96,18 @@ class AgendaTimetableView extends HookWidget {
             slots: slots,
             onToday: () => selectedDay.value = now.value.weekday,
           ),
-          const SizedBox(height: Space.lg),
+          if (slots.isNotEmpty) ...[
+            const SizedBox(height: Space.md),
+            _DayBar(slots: slots, minuteNow: isToday ? minuteNow : null),
+          ],
+          const SizedBox(height: Space.md),
           _WeekStrip(
             dates: weekDates,
             today: now.value.weekday,
             selectedDay: selectedDay,
-            classDays: classDays,
+            classCounts: [for (var d = 1; d <= 7; d++) slotsForDay(d).length],
           ),
-          const SizedBox(height: Space.lg),
+          const SizedBox(height: Space.md),
           AnimatedSwitcher(
             duration: Motion.slow,
             // Old day fades out in the first third, new day fades in after,
@@ -151,6 +167,8 @@ class AgendaTimetableView extends HookWidget {
                           isToday &&
                           minutesOf(slots[i - 1].endTime) <= minuteNow &&
                           minutesOf(slots[i].startTime) > minuteNow,
+                      minuteNow: minuteNow,
+                      isLongest: gaps[i - 1] == longestGap,
                     ),
                   EnterFade(
                     index: i,
@@ -164,6 +182,7 @@ class AgendaTimetableView extends HookWidget {
                         isToday,
                       ),
                       record: attendanceForSlot(attendance, slots[i]),
+                      minuteNow: isToday ? minuteNow : null,
                       isFirst: i == 0,
                       isLast: i == slots.length - 1,
                     ),
@@ -220,7 +239,7 @@ class _DateHeading extends StatelessWidget {
             children: [
               Text(
                 DateFormat('EEEE').format(date),
-                style: typography.display.xl3.copyWith(
+                style: typography.display.xl2.copyWith(
                   height: 1.05,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
@@ -258,18 +277,115 @@ class _DateHeading extends StatelessWidget {
   }
 }
 
+/// The day's shape on one thin line: a segment per class along the span from
+/// first class to last, filled up to now, with a marker at the current time.
+class _DayBar extends StatelessWidget {
+  const _DayBar({required this.slots, required this.minuteNow});
+
+  final List<TimetableSlot> slots;
+
+  /// Minutes since midnight when this is today, else null (nothing elapsed).
+  final int? minuteNow;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final start = minutesOf(slots.first.startTime);
+    final end = minutesOf(slots.last.endTime);
+    final span = (end - start).clamp(1, 24 * 60);
+    final now = minuteNow;
+
+    return SizedBox(
+      height: 10,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          double x(int minute) =>
+              ((minute - start) / span).clamp(0.0, 1.0) * c.maxWidth;
+          return Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.centerLeft,
+            children: [
+              // Track for the free time between classes.
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 4,
+                child: Container(height: 2, color: colors.secondary),
+              ),
+              for (final slot in slots)
+                Builder(
+                  builder: (context) {
+                    final s = minutesOf(slot.startTime);
+                    final e = minutesOf(slot.endTime);
+                    final tone = slot.kind == ClassKind.lab
+                        ? colors.app.lab
+                        : colors.app.accentTone;
+                    final elapsed = now == null
+                        ? 0.0
+                        : ((now - s) / (e - s)).clamp(0.0, 1.0);
+                    final width = math.max(3.0, x(e) - x(s) - 2);
+                    return Positioned(
+                      left: x(s) + 1,
+                      top: 2,
+                      width: width,
+                      height: 6,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: ColoredBox(
+                                color: tone.base.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            Positioned(
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: width * elapsed,
+                              child: ColoredBox(color: tone.base),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              if (now != null && now >= start && now <= end)
+                Positioned(
+                  left: x(now) - 1,
+                  top: -2,
+                  width: 2,
+                  height: 14,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.foreground,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip({
     required this.dates,
     required this.today,
     required this.selectedDay,
-    required this.classDays,
+    required this.classCounts,
   });
 
   final List<DateTime> dates;
   final int today;
   final ValueNotifier<int> selectedDay;
-  final Set<int> classDays;
+
+  /// Classes per weekday, Monday first.
+  final List<int> classCounts;
 
   @override
   Widget build(BuildContext context) {
@@ -283,6 +399,9 @@ class _WeekStrip extends StatelessWidget {
                 final day = index + 1;
                 final selected = selectedDay.value == day;
                 final isToday = today == day;
+                final count = classCounts[index];
+                // Class-free days recede unless selected or today.
+                final free = count == 0 && !selected && !isToday;
                 final fg = selected
                     ? colors.primaryForeground
                     : isToday
@@ -297,7 +416,7 @@ class _WeekStrip extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: Motion.medium,
                     curve: Curves.easeOutCubic,
-                    height: 64,
+                    height: 54,
                     margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       color: selected
@@ -312,47 +431,66 @@ class _WeekStrip extends StatelessWidget {
                             : const Color(0x00000000),
                       ),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          DateFormat('EEE').format(dates[index]).toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            letterSpacing: 0.6,
-                            fontWeight: FontWeight.w600,
-                            color: selected
-                                ? colors.primaryForeground.withValues(
-                                    alpha: 0.7,
-                                  )
-                                : colors.mutedForeground,
+                    child: AnimatedOpacity(
+                      duration: Motion.medium,
+                      opacity: free ? 0.35 : 1,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            DateFormat(
+                              'EEE',
+                            ).format(dates[index]).toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 0.6,
+                              fontWeight: FontWeight.w600,
+                              color: selected
+                                  ? colors.primaryForeground.withValues(
+                                      alpha: 0.7,
+                                    )
+                                  : colors.mutedForeground,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${dates[index].day}',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                            color: fg,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                          const SizedBox(height: 2),
+                          Text(
+                            '${dates[index].day}',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: fg,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        AnimatedContainer(
-                          duration: Motion.medium,
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: !classDays.contains(day)
-                                ? const Color(0x00000000)
-                                : selected
-                                ? colors.primaryForeground
-                                : colors.mutedForeground,
+                          const SizedBox(height: 5),
+                          // One dot per class (capped), so the week's load
+                          // reads at a glance.
+                          SizedBox(
+                            height: 3,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                for (var i = 0; i < count.clamp(0, 6); i++)
+                                  Container(
+                                    width: 3,
+                                    height: 3,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: selected
+                                          ? colors.primaryForeground
+                                          : colors.mutedForeground,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -540,38 +678,121 @@ class _FocusClass extends StatelessWidget {
               color: colors.foreground,
             ),
           ),
-          const SizedBox(height: Space.sm),
-          _MetaLine(
-            icon: FLucideIcons.mapPin,
-            text: '${slot.block} · Room ${slot.roomNo}',
-            emphasize: true,
-          ),
-          if (slot.faculty.trim().isNotEmpty) ...[
-            const SizedBox(height: Space.xs),
-            _MetaLine(icon: FLucideIcons.user, text: facultyName(slot.faculty)),
-          ],
           const SizedBox(height: Space.md),
+          // Details on the left, the room as a big tile on the right — it's
+          // what you look for on the way to class.
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              CourseKindBadge(isLab: slot.kind == ClassKind.lab),
-              const SizedBox(width: Space.sm),
-              Text(
-                '${slot.courseCode} · Slot ${slot.slot}',
-                style: typography.body.xs.copyWith(
-                  color: colors.mutedForeground,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (slot.faculty.trim().isNotEmpty) ...[
+                      _MetaLine(
+                        icon: FLucideIcons.user,
+                        text: facultyName(slot.faculty),
+                      ),
+                      const SizedBox(height: Space.sm),
+                    ],
+                    Row(
+                      children: [
+                        CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+                        const SizedBox(width: Space.sm),
+                        Expanded(
+                          child: Text(
+                            slot.courseCode,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: typography.body.xs.copyWith(
+                              color: colors.mutedForeground,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (record != null) ...[
+                      const SizedBox(height: Space.sm),
+                      _InlineAttendance(record: record!),
+                    ],
+                  ],
                 ),
               ),
+              const SizedBox(width: Space.md),
+              _RoomTile(slot: slot),
             ],
           ),
-          if (record != null) ...[
-            const SizedBox(height: Space.sm),
-            _AttendanceBadge(record: record!),
-          ],
           if (progress != null) ...[
             const SizedBox(height: Space.md),
             ProgressBar(value: progress!, color: colors.app.accent, height: 4),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The room number, large, with its block underneath.
+class _RoomTile extends StatelessWidget {
+  const _RoomTile({required this.slot});
+
+  final TimetableSlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    return Semantics(
+      label: 'Room ${slot.roomNo}, ${slot.block}',
+      excludeSemantics: true,
+      child: Container(
+        width: 88,
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.sm,
+          vertical: Space.sm + 2,
+        ),
+        decoration: BoxDecoration(
+          color: colors.secondary,
+          borderRadius: BorderRadius.circular(Radii.md),
+          border: Border.all(color: colors.border),
+        ),
+        child: Column(
+          children: [
+            Text(
+              'ROOM',
+              style: TextStyle(
+                fontSize: 9,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w600,
+                color: colors.mutedForeground,
+              ),
+            ),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                slot.roomNo,
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: 26,
+                  height: 1.15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                  color: colors.foreground,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            Text(
+              slot.block,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+                color: colors.mutedForeground,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -705,6 +926,7 @@ class _ClassRow extends HookWidget {
     required this.slot,
     required this.status,
     required this.record,
+    required this.minuteNow,
     required this.isFirst,
     required this.isLast,
   });
@@ -712,6 +934,9 @@ class _ClassRow extends HookWidget {
   final TimetableSlot slot;
   final AgendaClassStatus status;
   final AttendanceRecord? record;
+
+  /// Minutes since midnight when this is today's schedule, else null.
+  final int? minuteNow;
   final bool isFirst;
   final bool isLast;
 
@@ -723,6 +948,16 @@ class _ClassRow extends HookWidget {
     final live = status == AgendaClassStatus.current;
     final expanded = useState(false);
     final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
+    // Right side of the room line: when it starts, how long is left, or done.
+    // Other days just show the length.
+    final nowMin = minuteNow;
+    final timeHint = nowMin == null
+        ? _compactMinutes(minutes)
+        : done
+        ? 'done'
+        : live
+        ? '${_compactMinutes(minutesOf(slot.endTime) - nowMin)} left'
+        : 'in ${_compactMinutes(minutesOf(slot.startTime) - nowMin)}';
     final creditValue = double.tryParse(slot.credits.trim());
     final credits = creditValue == null || creditValue <= 0
         ? ''
@@ -741,33 +976,67 @@ class _ClassRow extends HookWidget {
               width: 62,
               child: Padding(
                 padding: const EdgeInsets.only(top: 14),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.topRight,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        to12H(slot.startTime, context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.topRight,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            to12H(slot.startTime, context),
+                            maxLines: 1,
+                            softWrap: false,
+                            style: typography.body.xs.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: live
+                                  ? colors.app.accent
+                                  : colors.foreground,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            to12H(slot.endTime, context),
+                            maxLines: 1,
+                            softWrap: false,
+                            style: typography.body.xs.copyWith(
+                              color: colors.mutedForeground,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Time status sits with the times: countdown, left, or done.
+                    const SizedBox(height: Space.sm),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.topRight,
+                      child: Text(
+                        timeHint,
                         maxLines: 1,
                         softWrap: false,
                         style: typography.body.xs.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: live ? colors.app.accent : colors.foreground,
+                          fontSize: 11,
+                          fontWeight: done ? FontWeight.w500 : FontWeight.w600,
+                          color: live || status == AgendaClassStatus.next
+                              ? colors.app.accentTone.onSubtle
+                              : colors.mutedForeground,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      Text(
-                        to12H(slot.endTime, context),
-                        maxLines: 1,
-                        softWrap: false,
-                        style: typography.body.xs.copyWith(
-                          color: colors.mutedForeground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
+                    ),
+                    if (record != null) ...[
+                      const SizedBox(height: Space.md),
+                      _GutterAttendance(record: record!),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -844,13 +1113,21 @@ class _ClassRow extends HookWidget {
                         ],
                       ),
                       const SizedBox(height: Space.sm),
-                      // Line 3: class kind and attendance
-                      Wrap(
-                        spacing: Space.sm,
-                        runSpacing: Space.sm,
+                      // Line 3: class kind and course code
+                      Row(
                         children: [
                           CourseKindBadge(isLab: slot.kind == ClassKind.lab),
-                          if (record != null) _AttendanceBadge(record: record!),
+                          const SizedBox(width: Space.sm),
+                          Expanded(
+                            child: Text(
+                              slot.courseCode,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: typography.body.xs.copyWith(
+                                color: colors.mutedForeground,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                       AnimatedSize(
@@ -874,8 +1151,7 @@ class _ClassRow extends HookWidget {
                                     ],
                                     _MetaLine(
                                       icon: FLucideIcons.hash,
-                                      text:
-                                          '${slot.courseCode} · Slot ${slot.slot}',
+                                      text: 'Slot ${slot.slot}',
                                     ),
                                     const SizedBox(height: Space.xs + 2),
                                     _MetaLine(
@@ -886,7 +1162,8 @@ class _ClassRow extends HookWidget {
                                       const SizedBox(height: Space.xs + 2),
                                       _MetaLine(
                                         icon: FLucideIcons.award,
-                                        text: '$credits credits',
+                                        text:
+                                            '$credits ${credits == '1' ? 'credit' : 'credits'}',
                                       ),
                                     ],
                                   ],
@@ -972,8 +1249,10 @@ class _Rail extends StatelessWidget {
   }
 }
 
-class _AttendanceBadge extends StatelessWidget {
-  const _AttendanceBadge({required this.record});
+/// Right side of a class card's last line: a small ring filled to the
+/// percentage (notched at 75%) with "84% · skip 3" beside it.
+class _InlineAttendance extends StatelessWidget {
+  const _InlineAttendance({required this.record});
 
   final AttendanceRecord record;
 
@@ -986,23 +1265,114 @@ class _AttendanceBadge extends StatelessWidget {
         : standing.canSkip == 0
         ? palette.warning
         : palette.success;
-    return ToneBadge(
-      label: '${standing.displayPercent.round()}% · ${standing.advice}',
-      tone: tone,
+    final hint = !standing.isSafe
+        ? 'need ${standing.mustAttend}'
+        : standing.canSkip == 0
+        ? "don't skip"
+        : 'skip ${standing.canSkip}';
+    return Semantics(
+      label:
+          '${standing.displayPercent.round()}% attendance, ${standing.advice}',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ProgressRing(
+            value: standing.displayPercent / 100,
+            color: tone.base,
+            size: 15,
+            stroke: 2.5,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${standing.displayPercent.round()}% · $hint',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: tone.onSubtle,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Attendance for the time column: a small ring with the percentage, and the
+/// skip/attend hint under it, coloured by the 75% status.
+class _GutterAttendance extends StatelessWidget {
+  const _GutterAttendance({required this.record});
+
+  final AttendanceRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final standing = AttendanceStanding.of(record);
+    final palette = context.theme.colors.app;
+    final tone = !standing.isSafe
+        ? palette.danger
+        : standing.canSkip == 0
+        ? palette.warning
+        : palette.success;
+    final hint = !standing.isSafe
+        ? 'need ${standing.mustAttend}'
+        : standing.canSkip == 0
+        ? "don't skip"
+        : 'skip ${standing.canSkip}';
+    return Semantics(
+      label:
+          '${standing.displayPercent.round()}% attendance, ${standing.advice}',
+      excludeSemantics: true,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.topRight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ProgressRing(
+                  value: standing.displayPercent / 100,
+                  color: tone.base,
+                  size: 13,
+                  stroke: 2.5,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '${standing.displayPercent.round()}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: tone.onSubtle,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 1),
+            Text(
+              hint,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+                color: tone.onSubtle.withValues(alpha: 0.8),
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _MetaLine extends StatelessWidget {
-  const _MetaLine({
-    required this.icon,
-    required this.text,
-    this.emphasize = false,
-  });
+  const _MetaLine({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
-  final bool emphasize;
 
   @override
   Widget build(BuildContext context) {
@@ -1017,8 +1387,7 @@ class _MetaLine extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: context.theme.typography.body.sm.copyWith(
-              fontWeight: emphasize ? FontWeight.w500 : FontWeight.w400,
-              color: emphasize ? colors.foreground : colors.mutedForeground,
+              color: colors.mutedForeground,
             ),
           ),
         ),
@@ -1047,26 +1416,36 @@ class _IconTile extends StatelessWidget {
   }
 }
 
+/// VIT leaves 10 minutes between every class; only longer gaps are breaks.
+const _minBreak = 20;
+
 class _BreakRow extends StatelessWidget {
   const _BreakRow({
     required this.previousEnd,
     required this.nextStart,
     required this.isNow,
+    required this.minuteNow,
+    required this.isLongest,
   });
 
   final String previousEnd;
   final String nextStart;
   final bool isNow;
+  final int minuteNow;
+  final bool isLongest;
 
   @override
   Widget build(BuildContext context) {
     final gap = minutesOf(nextStart) - minutesOf(previousEnd);
-    // VIT leaves 10 minutes between every class; only real breaks matter.
-    if (gap < 20) return const SizedBox.shrink();
+    if (gap < _minBreak) return const SizedBox.shrink();
     final colors = context.theme.colors;
     final color = isNow
         ? colors.app.accentTone.onSubtle
         : colors.mutedForeground;
+    final until = to12H(nextStart, context);
+    final length = isNow
+        ? '${_compactMinutes(minutesOf(nextStart) - minuteNow)} left'
+        : _compactMinutes(gap);
 
     return Padding(
       padding: const EdgeInsets.only(left: 62),
@@ -1085,20 +1464,47 @@ class _BreakRow extends StatelessWidget {
             ),
             Icon(FLucideIcons.coffee, size: 14, color: color),
             const SizedBox(width: Space.sm),
-            Text(
-              isNow
-                  ? 'Free now · ${formatMinutes(gap)} break'
-                  : '${formatMinutes(gap)} break',
-              style: context.theme.typography.body.xs.copyWith(
-                fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
-                color: color,
+            Flexible(
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: 'Free until $until',
+                      style: TextStyle(
+                        fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
+                        color: isNow ? color : colors.foreground,
+                      ),
+                    ),
+                    TextSpan(text: ' · $length'),
+                  ],
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.theme.typography.body.xs.copyWith(
+                  color: color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
+            // The live break is already highlighted; skip the tag so the
+            // countdown fits.
+            if (isLongest && !isNow) ...[
+              const SizedBox(width: Space.sm),
+              ToneBadge.neutral(context, 'LONGEST'),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// 129 → "2h 9m", 45 → "45m"; short enough to share a row with a tag.
+String _compactMinutes(int minutes) {
+  final h = minutes ~/ 60;
+  final m = minutes % 60;
+  if (h == 0) return '${m}m';
+  return m == 0 ? '${h}h' : '${h}h ${m}m';
 }
 
 class _DashPainter extends CustomPainter {

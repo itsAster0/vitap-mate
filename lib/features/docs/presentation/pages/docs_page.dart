@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/theme/app_palette.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:open_file/open_file.dart';
@@ -41,7 +42,12 @@ class DocsPage extends HookConsumerWidget {
       }
     }
 
-    final darkMode = ref.watch(themeProvider) == ThemeMode.dark;
+    // "System" follows the phone's setting, not just an explicit Dark.
+    final themeMode = ref.watch(themeProvider);
+    final darkMode =
+        themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     final entrance = useAnimationController(
       duration: const Duration(milliseconds: 450),
     )..forward();
@@ -158,115 +164,118 @@ class DocsPage extends HookConsumerWidget {
       GoRouter.of(context).pushNamed(Paths.docView, extra: doc);
     }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: FTextField(
-                  control: FTextFieldControl.managed(
-                    controller: searchController,
-                  ),
-                  hint: 'Search documents',
-                  prefixBuilder: (_, _, _) => Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 8),
-                    child: Icon(
-                      FLucideIcons.search,
-                      size: 18,
-                      color: context.theme.colors.mutedForeground,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FTextField(
+                    control: FTextFieldControl.managed(
+                      controller: searchController,
                     ),
-                  ),
-                  suffixBuilder: (_, _, _) => searchController.text.isEmpty
-                      ? const SizedBox.shrink()
-                      : IconButton(
-                          tooltip: 'Clear search',
-                          onPressed: searchController.clear,
-                          icon: Icon(
-                            FLucideIcons.x,
-                            size: 18,
-                            color: context.theme.colors.mutedForeground,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              FPopoverMenu(
-                menuAnchor: Alignment.topLeft,
-                childAnchor: Alignment.bottomLeft,
-                menu: [
-                  FItemGroup(
-                    children: [
-                      for (final option in DocSort.values)
-                        FItem(
-                          title: Text(option.label),
-                          prefix: Icon(
-                            option == sort
-                                ? FLucideIcons.check
-                                : FLucideIcons.arrowUpDown,
-                          ),
-                          onPress: () => selectSort(option),
-                        ),
-                    ],
-                  ),
-                ],
-                builder: (_, controller, _) => FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: sortAsync.isLoading ? null : controller.toggle,
-                  child: const Text('Sort'),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: windowsAsync.when(
-            loading: () => Center(
-              child: CircularProgressIndicator(
-                color: context.theme.colors.primary,
-                strokeWidth: 3,
-              ),
-            ),
-            error: (e, _) => _CenterInfo(
-              icon: FLucideIcons.triangleAlert,
-              title: 'Unable to load documents',
-              subtitle: '$e',
-            ),
-            data: (windows) {
-              final messPreset = windows
-                  .where((w) => w.isPreset && !w.hasFile)
-                  .firstOrNull;
-              return AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: windows.isEmpty
-                    ? _EmptyState(
-                        key: const ValueKey('empty'),
-                        onImport: () => importFlow(),
-                        onMess: () => importFlow(messPreset),
-                      )
-                    : _Grid(
-                        key: const ValueKey('grid'),
-                        windows: queryDocs(
-                          windows,
-                          sort: sort,
-                          query: searchController.text,
-                        ),
-                        searching: searching,
-                        totalCount: windows.length,
-                        onClearSearch: searchController.clear,
-                        darkMode: darkMode,
-                        entrance: entrance,
-                        onOpen: openDoc,
-                        onRename: openRename,
-                        onDelete: openDelete,
-                        onImport: () => importFlow(),
+                    hint: 'Search documents',
+                    prefixBuilder: (_, _, _) => Padding(
+                      padding: const EdgeInsets.only(left: 12, right: 8),
+                      child: Icon(
+                        FLucideIcons.search,
+                        size: 18,
+                        color: context.theme.colors.mutedForeground,
                       ),
-              );
-            },
+                    ),
+                    suffixBuilder: (_, _, _) => searchController.text.isEmpty
+                        ? const SizedBox.shrink()
+                        : IconButton(
+                            tooltip: 'Clear search',
+                            onPressed: searchController.clear,
+                            icon: Icon(
+                              FLucideIcons.x,
+                              size: 18,
+                              color: context.theme.colors.mutedForeground,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FPopoverMenu(
+                  menuAnchor: Alignment.topLeft,
+                  childAnchor: Alignment.bottomLeft,
+                  menu: [
+                    FItemGroup(
+                      children: [
+                        for (final option in DocSort.values)
+                          FItem(
+                            title: Text(option.label),
+                            prefix: Icon(
+                              option == sort
+                                  ? FLucideIcons.check
+                                  : FLucideIcons.arrowUpDown,
+                            ),
+                            onPress: () => selectSort(option),
+                          ),
+                      ],
+                    ),
+                  ],
+                  builder: (_, controller, _) => FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: sortAsync.isLoading ? null : controller.toggle,
+                    child: const Text('Sort'),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            child: windowsAsync.when(
+              loading: () => Center(
+                child: CircularProgressIndicator(
+                  color: context.theme.colors.primary,
+                  strokeWidth: 3,
+                ),
+              ),
+              error: (e, _) => _CenterInfo(
+                icon: FLucideIcons.triangleAlert,
+                title: 'Unable to load documents',
+                subtitle: '$e',
+              ),
+              data: (windows) {
+                final messPreset = windows
+                    .where((w) => w.isPreset && !w.hasFile)
+                    .firstOrNull;
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: windows.isEmpty
+                      ? _EmptyState(
+                          key: const ValueKey('empty'),
+                          onImport: () => importFlow(),
+                          onMess: () => importFlow(messPreset),
+                        )
+                      : _Grid(
+                          key: const ValueKey('grid'),
+                          windows: queryDocs(
+                            windows,
+                            sort: sort,
+                            query: searchController.text,
+                          ),
+                          searching: searching,
+                          totalCount: windows.length,
+                          onClearSearch: searchController.clear,
+                          darkMode: darkMode,
+                          entrance: entrance,
+                          onOpen: openDoc,
+                          onRename: openRename,
+                          onDelete: openDelete,
+                          onImport: () => importFlow(),
+                        ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -419,7 +428,8 @@ class _GridState extends State<_Grid> {
             maxCrossAxisExtent: 200,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
-            childAspectRatio: 0.92,
+            // Fits icon, two-line name and subtitle without a dead middle.
+            mainAxisExtent: 140,
           ),
           itemBuilder: (context, i) {
             final doc = widget.windows[i];
@@ -567,7 +577,7 @@ class _RecentDocumentPreview extends StatelessWidget {
           Divider(height: 1, thickness: 1, color: context.theme.colors.border),
           LayoutBuilder(
             builder: (context, constraints) => SizedBox(
-              height: constraints.maxWidth >= 700 ? 420 : 310,
+              height: constraints.maxWidth >= 700 ? 320 : 210,
               child: MouseRegion(
                 onEnter: (_) => onInteractionStart(),
                 onExit: (_) => onInteractionEnd(),

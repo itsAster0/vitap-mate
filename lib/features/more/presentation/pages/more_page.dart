@@ -30,18 +30,18 @@ class MorePage extends HookConsumerWidget {
     void push(String name) => GoRouter.of(context).pushNamed(name);
 
     final tools = [
-      (FLucideIcons.clipboardList, 'Marks', 'Assessment scores', Paths.marks),
+      (FLucideIcons.clipboardList, 'Marks', 'Scores so far', Paths.marks),
       (FLucideIcons.graduationCap, 'Grades', 'This semester', Paths.grades),
       (
         FLucideIcons.history,
         'Grade History',
-        'CGPA & all courses',
+        'All semesters',
         Paths.gradeHistory,
       ),
       (
         FLucideIcons.calculator,
         'GPA Planner',
-        'Project your CGPA',
+        'Plan your CGPA',
         Paths.gpaCalculator,
       ),
       (
@@ -75,7 +75,8 @@ class MorePage extends HookConsumerWidget {
             physics: const NeverScrollableScrollPhysics(),
             mainAxisSpacing: Space.sm + 2,
             crossAxisSpacing: Space.sm + 2,
-            childAspectRatio: 1.45,
+            // Icon beside the text keeps each tile to about two lines tall.
+            mainAxisExtent: 66,
             children: [
               for (final (i, (icon, title, subtitle, route)) in tools.indexed)
                 EnterFade(
@@ -164,34 +165,46 @@ class _ToolTile extends StatelessWidget {
     return Surface(
       onPress: onPress,
       semanticsLabel: title,
-      padding: const EdgeInsets.all(Space.md + 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.md,
+        vertical: Space.sm + 2,
+      ),
+      child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: colors.app.accentTone.subtle,
               borderRadius: BorderRadius.circular(Radii.sm + 2),
             ),
-            child: Icon(icon, size: 18, color: colors.app.accentTone.onSubtle),
+            child: Icon(icon, size: 17, color: colors.app.accentTone.onSubtle),
           ),
-          const Spacer(),
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: typography.body.md.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colors.foreground,
+          const SizedBox(width: Space.sm + 2),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.sm.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colors.foreground,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.xs.copyWith(
+                    color: colors.mutedForeground,
+                  ),
+                ),
+              ],
             ),
-          ),
-          Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: typography.body.xs.copyWith(color: colors.mutedForeground),
           ),
         ],
       ),

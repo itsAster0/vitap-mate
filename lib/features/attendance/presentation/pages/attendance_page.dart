@@ -130,11 +130,12 @@ class _AttendanceView extends HookWidget {
             Segmented<_CourseFilter>(
               value: filter.value,
               onChanged: (value) => filter.value = value,
-              segments: [
-                (_CourseFilter.all, 'All  ${records.length}'),
-                (_CourseFilter.theory, 'Theory  ${theory.length}'),
-                (_CourseFilter.lab, 'Lab  ${labs.length}'),
+              segments: const [
+                (_CourseFilter.all, 'All'),
+                (_CourseFilter.theory, 'Theory'),
+                (_CourseFilter.lab, 'Lab'),
               ],
+              counts: [records.length, theory.length, labs.length],
             ),
             const SizedBox(height: Space.md),
           ],

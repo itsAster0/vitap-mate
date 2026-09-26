@@ -117,10 +117,14 @@ class _ExamsView extends HookWidget {
       ..sort((a, b) => _typeRank(a.examType).compareTo(_typeRank(b.examType)));
     final now = DateTime.now();
 
-    // Open on the type with the next exam, else the latest with dates.
+    // Open on the next exam type — one with an upcoming or not-yet-announced
+    // date — else the latest with dates.
     int initialIndex() {
       for (final (i, t) in types.indexed) {
-        if (t.records.any((e) => examStartOf(e)?.isAfter(now) ?? false)) {
+        if (t.records.any(
+          (e) =>
+              examDayOf(e) == null || (examStartOf(e)?.isAfter(now) ?? false),
+        )) {
           return i;
         }
       }
@@ -204,8 +208,14 @@ class _Timeline extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final (i, day) in days.indexed) ...[
-          if (i > 0) _GapRow(days: day.difference(days[i - 1]).inDays - 1),
-          _DayHeader(day: day, count: byDay[day]!.length),
+          // Past days carry their date inside each compact row, so they get
+          // no header or prep gap.
+          if (!_isPastDay(day)) ...[
+            if (i > 0 && !_isPastDay(days[i - 1]))
+              _GapRow(days: day.difference(days[i - 1]).inDays - 1),
+            _DayHeader(day: day, count: byDay[day]!.length),
+          ] else if (i == 0)
+            const SizedBox(height: Space.md),
           for (final exam in byDay[day]!)
             Padding(
               padding: const EdgeInsets.only(bottom: Space.sm),
@@ -281,6 +291,53 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
+bool _isPastDay(DateTime day) {
+  final now = DateTime.now();
+  return DateTime(
+    day.year,
+    day.month,
+    day.day,
+  ).isBefore(DateTime(now.year, now.month, now.day));
+}
+
+/// Day number over a short weekday, for rows that carry their own date.
+class _DateColumn extends StatelessWidget {
+  const _DateColumn({required this.day, this.muted = false});
+
+  final DateTime day;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return SizedBox(
+      width: 34,
+      child: Column(
+        children: [
+          Text(
+            '${day.day}',
+            style: typography.body.lg.copyWith(
+              height: 1.1,
+              fontWeight: FontWeight.w700,
+              color: muted ? colors.mutedForeground : colors.foreground,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          Text(
+            DateFormat('EEE').format(day).toUpperCase(),
+            style: typography.body.xs.copyWith(
+              fontSize: 10,
+              letterSpacing: 0.4,
+              color: colors.mutedForeground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// "done", "TODAY", "TOMORROW", "IN 3 DAYS" – with a tone for upcoming days.
 (String, Tone?) _relative(BuildContext context, DateTime day) {
   final palette = context.theme.colors.app;
@@ -333,7 +390,7 @@ class _GapRow extends StatelessWidget {
   }
 }
 
-class _ExamCard extends StatelessWidget {
+class _ExamCard extends HookWidget {
   const _ExamCard({required this.exam, required this.day});
 
   final ExamScheduleRecord exam;
@@ -348,11 +405,72 @@ class _ExamCard extends StatelessWidget {
     final hasLocation = hasValue(exam.venue) || hasValue(exam.seatLocation);
     final hasNumberOrReport =
         hasValue(exam.seatNo) || hasValue(exam.reportingTime);
+    final expanded = useState(false);
+    void toggle() => expanded.value = !expanded.value;
 
+    // Finished exams shrink to one row so the upcoming ones stand out; tap
+    // to see the full card again.
+    if (done && !expanded.value) {
+      return Surface(
+        onPress: toggle,
+        semanticsLabel: '${exam.courseName}, finished, show details',
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.md + 2,
+          vertical: Space.md,
+        ),
+        child: Row(
+          children: [
+            _isPastDay(day)
+                ? _DateColumn(day: day, muted: true)
+                : Icon(
+                    FLucideIcons.circleCheck,
+                    size: 16,
+                    color: colors.mutedForeground,
+                  ),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    exam.courseName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: typography.body.sm.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: colors.mutedForeground,
+                    ),
+                  ),
+                  if (hasValue(exam.venue))
+                    Text(
+                      exam.venue.trim(),
+                      style: typography.body.xs.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: Space.md),
+            Text(
+              formatClock(exam.examTime.split('-').first, context),
+              style: typography.body.xs.copyWith(
+                color: colors.mutedForeground,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // A finished exam only reaches here when opened, so show it at full
+    // strength.
     return AnimatedOpacity(
       duration: Motion.medium,
-      opacity: done ? 0.6 : 1,
+      opacity: 1,
       child: Surface(
+        onPress: done ? toggle : null,
         padding: const EdgeInsets.all(Space.md + 2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,6 +482,16 @@ class _ExamCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (_isPastDay(day)) ...[
+                        ToneBadge(
+                          label: DateFormat(
+                            'EEE d MMM',
+                          ).format(day).toUpperCase(),
+                          icon: FLucideIcons.calendar,
+                          tone: colors.app.accentTone,
+                        ),
+                        const SizedBox(height: Space.sm),
+                      ],
                       Text(
                         exam.courseName,
                         maxLines: 2,
@@ -375,7 +503,7 @@ class _ExamCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '${exam.courseCode} · Slot ${exam.slot}',
+                        exam.courseCode,
                         style: typography.body.xs.copyWith(
                           color: colors.mutedForeground,
                         ),
