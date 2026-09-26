@@ -53,70 +53,30 @@ Future<VtopWebviewSession?> loadVtopWebviewSession({
 }) async {
   final cookieManager = manager ?? CookieManager.instance();
   if (isCurrent?.call() == false) return null;
-  final parsedCookies = <({String name, String value})>[];
-  for (final cookiePart in (snapshot.cookies ?? '').split(';')) {
-    final parsedCookie = parseCookiePair(cookiePart);
-    if (parsedCookie == null) continue;
-    parsedCookies.add(parsedCookie);
-  }
   final path = '/vtop';
-  final cookies = parsedCookies
-      .map(
-        (cookie) => VtopWebviewCookie(
+  final cookies = [
+    for (final cookiePart in (snapshot.cookies ?? '').split(';'))
+      if (parseCookiePair(cookiePart) case final cookie?)
+        VtopWebviewCookie(
           name: cookie.name,
           value: cookie.value,
           domain: '.vitap.ac.in',
           path: path,
           isSecure: true,
         ),
-      )
-      .toList(growable: false);
+  ];
   if (cookies.isEmpty) return null;
 
-  final cookieUrl = WebUri('${baseUrl.origin}/vtop/');
-  final existing = await cookieManager.getCookies(url: cookieUrl);
-  final desiredNames = cookies.map((cookie) => cookie.name).toSet();
-  for (final old in existing) {
-    if (isCurrent?.call() == false) return null;
-    final matching = cookies.where((cookie) => cookie.name == old.name);
-    if (desiredNames.contains(old.name) &&
-        matching.any(
-          (cookie) =>
-              cookie.value == old.value &&
-              (old.path == null || old.path == cookie.path),
-        )) {
-      continue;
-    }
-    // Android may return only names and values. Remove stale variants at the
-    // known VTOP scopes instead of deleting cookies for unrelated websites.
-    final domains = old.domain == null
-        ? ['.vitap.ac.in', 'vtop.vitap.ac.in', '.vtop.vitap.ac.in']
-        : [old.domain!];
-    final paths = old.path == null ? ['/vtop', '/vtop/', '/'] : [old.path!];
-    for (final domain in domains) {
-      for (final oldPath in paths) {
-        if (isCurrent?.call() == false) return null;
-        await cookieManager.deleteCookie(
-          url: cookieUrl,
-          name: old.name,
-          domain: domain,
-          path: oldPath,
-        );
-      }
-    }
-  }
+  // Start from an empty jar. Targeted deletes miss VTOP's own host-only
+  // JSESSIONID, which then shadows the new session and VTOP keeps sending the
+  // view to its login page. Re-setting an unchanged value keeps the session,
+  // so a reopened page is unaffected.
+  await cookieManager.deleteAllCookies();
+
   for (final cookie in cookies) {
     if (isCurrent?.call() == false) return null;
-    if (existing.any(
-      (old) =>
-          old.name == cookie.name &&
-          old.value == cookie.value &&
-          (old.path == null || old.path == cookie.path),
-    )) {
-      continue;
-    }
     final didSet = await cookieManager.setCookie(
-      url: cookieUrl,
+      url: WebUri('${baseUrl.origin}/vtop/'),
       name: cookie.name,
       value: cookie.value,
       isSecure: cookie.isSecure,

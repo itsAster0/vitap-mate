@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_recovery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -11,12 +13,14 @@ import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/core/utils/vtop_webview_pages.dart';
 import 'package:vitapmate/core/utils/vtop_webview_store.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_actions.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_body.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_cookie_service.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_loading.dart';
+import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_search.dart';
 
 class VtopWebview extends ConsumerStatefulWidget {
   const VtopWebview({this.initialMenuUrl, super.key});
@@ -27,7 +31,8 @@ class VtopWebview extends ConsumerStatefulWidget {
 }
 
 class _VtopWebviewState extends ConsumerState<VtopWebview> {
-  final _bodyKey = GlobalKey<VtopWebviewBodyState>();
+  var _bodyKey = GlobalKey<VtopWebviewBodyState>();
+  int? _bodyGeneration;
   VtopWebviewSession? _session;
   String? _owner;
   Object? _error;
@@ -39,6 +44,8 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
   int _loadRevision = 0;
   final _recovery = VtopWebviewRecovery();
   String? _pendingMenu;
+  VtopPage? _page;
+  DateTime? _lastViewLoss;
 
   @override
   void initState() {
@@ -172,6 +179,64 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
     }
   }
 
+  void _pageChanged(VtopPage? page) {
+    if (!mounted) return;
+    if (page?.url != _page?.url || page?.title != _page?.title) {
+      setState(() => _page = page);
+    }
+    if (page != null && _owner != null) {
+      unawaited(ref.read(vtopRecentPagesProvider.notifier).add(page));
+    }
+  }
+
+  /// Replaces a crashed view with a fresh one on the same page. A second
+  /// crash soon after stops and asks, so a page that keeps crashing
+  /// cannot loop.
+  void _viewLost() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    final repeated =
+        _lastViewLoss != null &&
+        now.difference(_lastViewLoss!) < const Duration(seconds: 30);
+    _lastViewLoss = now;
+    vtopWebviewStore.replaceKeptView();
+    setState(() {
+      _pendingMenu = _page?.url;
+      _page = null;
+      _bodyKey = GlobalKey<VtopWebviewBodyState>();
+      if (repeated) _error = StateError('VTOP stopped responding.');
+    });
+    if (!repeated) {
+      dispToast(
+        context,
+        'VTOP reopened',
+        'The page stopped responding, so it was loaded again.',
+      );
+    }
+  }
+
+  void _openMenu(String url) {
+    _pendingMenu = url;
+    _bodyKey.currentState?.openMenu(url);
+  }
+
+  Future<void> _search() async {
+    final body = _bodyKey.currentState;
+    if (body == null || _owner == null) return;
+    await showVtopPageSearch(
+      context,
+      pages: body.pages(),
+      recent: ref.read(vtopRecentPagesProvider),
+      onSelect: (page) => _openMenu(page.url),
+    );
+  }
+
+  Future<void> _back(bool ready) async {
+    final handled =
+        ready && (await _bodyKey.currentState?.handleBack() ?? false);
+    if (!handled && mounted) GoRouter.of(context).pop();
+  }
+
   @override
   void dispose() {
     _generation++;
@@ -198,64 +263,91 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
         theme == ThemeMode.dark ||
         (theme == ThemeMode.system &&
             MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+    final username = user.isLoading ? null : user.value?.username;
     final ready =
-        !user.isLoading &&
+        username != null &&
         _session != null &&
-        _owner == user.value?.username &&
+        _owner == username &&
         !_preparing &&
         _error == null;
-    return FScaffold(
-      childPad: false,
-      header: FHeader.nested(
-        title: const Text('VTOP'),
-        prefixes: [
-          FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
-        ],
-        suffixes: ready
-            ? [
-                VtopWebviewThemeAction(
-                  isDarkMode: _dark!,
-                  onToggle: () => setState(() => _dark = !_dark!),
-                ),
-                VtopWebviewActionsMenu(
-                  isCompactMode: compact,
-                  isDesktopMode: desktop,
-                  onGoTo: (url) {
-                    _pendingMenu = url;
-                    _bodyKey.currentState?.openMenu(url);
-                  },
-                  onToggleCompactMode: () => _savePreference(
-                    ref.read(vtopCompactModeProvider.notifier),
-                    !compact,
+    // A cleared store invalidates the old view; start a fresh one.
+    if (_bodyGeneration != vtopWebviewStore.generation) {
+      _bodyGeneration = vtopWebviewStore.generation;
+      _bodyKey = GlobalKey<VtopWebviewBodyState>();
+    }
+    final loading = VtopWebviewLoading(
+      error: _error,
+      onRetry: () => _prepare(),
+      reconnecting: _recovering,
+    );
+    // System Back steps through VTOP first; the header arrow always leaves.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _back(ready);
+      },
+      child: FScaffold(
+        childPad: false,
+        header: FHeader.nested(
+          title: Text(
+            _page?.title ?? 'VTOP',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          prefixes: [
+            FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
+          ],
+          suffixes: ready
+              ? [
+                  VtopWebviewSearchAction(onPress: _search),
+                  VtopWebviewActionsMenu(
+                    isDarkMode: _dark!,
+                    isCompactMode: compact,
+                    isDesktopMode: desktop,
+                    onSearch: _search,
+                    onHome: () => _bodyKey.currentState?.openHome(),
+                    onToggleDarkMode: () => setState(() => _dark = !_dark!),
+                    onToggleCompactMode: () => _savePreference(
+                      ref.read(vtopCompactModeProvider.notifier),
+                      !compact,
+                    ),
+                    onToggleDesktopMode: () => _savePreference(
+                      ref.read(vtopDesktopModeProvider.notifier),
+                      !desktop,
+                    ),
+                    onForceLogin: _forceLogin,
                   ),
-                  onToggleDesktopMode: () => _savePreference(
-                    ref.read(vtopDesktopModeProvider.notifier),
-                    !desktop,
+                ]
+              : [],
+        ),
+        // The web view starts while login is prepared, so its engine start-up
+        // overlaps the network work; the loading screen covers it until then.
+        child: username == null
+            ? loading
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  VtopWebviewBody(
+                    key: _bodyKey,
+                    initialUrl: WebUri(
+                      'https://vtop.vitap.ac.in/vtop/content?',
+                    ),
+                    revision: _loadRevision,
+                    isCompactMode: compact,
+                    isDesktopMode: desktop,
+                    isDarkMode: _dark!,
+                    session: ready ? _session : null,
+                    initialMenuUrl: _pendingMenu,
+                    onMenuOpened: () => _pendingMenu = null,
+                    onPageChanged: _pageChanged,
+                    onViewLost: _viewLost,
+                    onLoginRedirect: _loginRedirect,
+                    onAuthenticatedPage: _recovery.authenticatedPageReady,
                   ),
-                  onForceLogin: _forceLogin,
-                ),
-              ]
-            : [],
+                  if (!ready) loading,
+                ],
+              ),
       ),
-      child: ready
-          ? VtopWebviewBody(
-              key: _bodyKey,
-              initialUrl: WebUri('https://vtop.vitap.ac.in/vtop/content?'),
-              revision: _loadRevision,
-              isCompactMode: compact,
-              isDesktopMode: desktop,
-              isDarkMode: _dark!,
-              session: _session!,
-              initialMenuUrl: _pendingMenu,
-              onMenuOpened: () => _pendingMenu = null,
-              onLoginRedirect: _loginRedirect,
-              onAuthenticatedPage: _recovery.authenticatedPageReady,
-            )
-          : VtopWebviewLoading(
-              error: _error,
-              onRetry: () => _prepare(),
-              reconnecting: _recovering,
-            ),
     );
   }
 }

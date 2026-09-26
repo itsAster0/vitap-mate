@@ -51,7 +51,6 @@ dependencies:
   flutter_inappwebview:
   url_launcher: ^6.3.1
   permission_handler: ^13.0.0
-  webview_flutter: ^4.13.0
   background_downloader: ^9.4.0
   dio: ^5.8.0+1
   http: ^1.4.0

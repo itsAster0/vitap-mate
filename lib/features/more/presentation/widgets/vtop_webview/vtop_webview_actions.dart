@@ -1,39 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 
-class VtopWebviewThemeAction extends StatelessWidget {
-  const VtopWebviewThemeAction({
-    required this.isDarkMode,
-    required this.onToggle,
-    super.key,
-  });
+class VtopWebviewSearchAction extends StatelessWidget {
+  const VtopWebviewSearchAction({required this.onPress, super.key});
 
-  final bool isDarkMode;
-  final VoidCallback onToggle;
+  final VoidCallback onPress;
 
   @override
   Widget build(BuildContext context) {
     return FHeaderAction(
-      icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode, size: 20),
-      onPress: onToggle,
+      icon: const Icon(FLucideIcons.search),
+      semanticsLabel: 'Search VTOP pages',
+      onPress: onPress,
     );
   }
 }
 
 class VtopWebviewActionsMenu extends StatelessWidget {
   const VtopWebviewActionsMenu({
+    required this.isDarkMode,
     required this.isCompactMode,
     required this.isDesktopMode,
-    required this.onGoTo,
+    required this.onSearch,
+    required this.onHome,
+    required this.onToggleDarkMode,
     required this.onToggleCompactMode,
     required this.onToggleDesktopMode,
     required this.onForceLogin,
     super.key,
   });
 
+  final bool isDarkMode;
   final bool isCompactMode;
   final bool isDesktopMode;
-  final ValueChanged<String> onGoTo;
+  final VoidCallback onSearch;
+  final VoidCallback onHome;
+  final VoidCallback onToggleDarkMode;
   final VoidCallback onToggleCompactMode;
   final VoidCallback onToggleDesktopMode;
   final VoidCallback onForceLogin;
@@ -48,64 +50,24 @@ class VtopWebviewActionsMenu extends StatelessWidget {
         FItemGroup(
           children: [
             FItem(
-              prefix: const Icon(FLucideIcons.calendar),
-              title: const Text('Timetable'),
-              onPress: () => onGoTo('academics/common/StudentTimeTable'),
+              prefix: const Icon(FLucideIcons.search),
+              title: const Text('Search pages'),
+              onPress: onSearch,
             ),
             FItem(
-              prefix: const Icon(FLucideIcons.paperclip),
-              title: const Text('Attendance'),
-              onPress: () => onGoTo('academics/common/StudentAttendance'),
-            ),
-            FItem(
-              prefix: const Icon(FLucideIcons.book),
-              title: const Text('CoursePage'),
-              onPress: () => onGoTo('academics/common/StudentCoursePage'),
-            ),
-            FItem(
-              prefix: const Icon(FLucideIcons.university),
-              title: const Text('Academic Calendar'),
-              onPress: () => onGoTo('academics/common/CalendarPreview'),
-            ),
-            FItem(
-              prefix: const Icon(FLucideIcons.workflow),
-              title: const Text('Digital Assignment'),
-              onPress: () => onGoTo('examinations/StudentDA'),
+              prefix: const Icon(FLucideIcons.house),
+              title: const Text('VTOP Home'),
+              onPress: onHome,
             ),
           ],
         ),
         FItemGroup(
           children: [
             FItem(
-              prefix: const Icon(FLucideIcons.graduationCap),
-              title: const Text('Grades'),
-              onPress: () =>
-                  onGoTo('examinations/examGradeView/StudentGradeView'),
+              prefix: FCheckbox(value: isDarkMode),
+              title: const Text('Dark Pages'),
+              onPress: onToggleDarkMode,
             ),
-            FItem(
-              prefix: const Icon(FLucideIcons.history),
-              title: const Text('Grades History'),
-              onPress: () =>
-                  onGoTo('examinations/examGradeView/StudentGradeHistory'),
-            ),
-          ],
-        ),
-        FItemGroup(
-          children: [
-            FItem(
-              prefix: const Icon(FLucideIcons.amphora),
-              title: const Text('Weekend Outing'),
-              onPress: () => onGoTo('hostel/StudentWeekendOuting'),
-            ),
-            FItem(
-              prefix: const Icon(FLucideIcons.anchor),
-              title: const Text('General Outing'),
-              onPress: () => onGoTo('hostel/StudentGeneralOuting'),
-            ),
-          ],
-        ),
-        FItemGroup(
-          children: [
             FItem(
               prefix: FCheckbox(value: isCompactMode),
               title: const Text('Compact View'),
@@ -116,6 +78,10 @@ class VtopWebviewActionsMenu extends StatelessWidget {
               title: const Text('Desktop Mode'),
               onPress: onToggleDesktopMode,
             ),
+          ],
+        ),
+        FItemGroup(
+          children: [
             FItem(
               prefix: const Icon(FLucideIcons.logIn),
               title: const Text('Force Login'),
