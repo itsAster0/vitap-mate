@@ -82,46 +82,17 @@ class AttendanceCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name.trim().isEmpty
-                                      ? record.courseName
-                                      : name.trim(),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: typography.body.md.copyWith(
-                                    height: 1.25,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.foreground,
-                                  ),
-                                ),
-                                const SizedBox(height: Space.xs + 2),
-                                // Type, and when the course meets next (the
-                                // code if it has no upcoming class).
-                                Row(
-                                  children: [
-                                    CourseKindBadge(isLab: isLab),
-                                    const SizedBox(width: Space.sm),
-                                    Expanded(
-                                      child: Text(
-                                        next == null
-                                            ? code.trim()
-                                            : 'Next: $next',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: typography.body.xs.copyWith(
-                                          color: colors.mutedForeground,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures(),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            child: Text(
+                              name.trim().isEmpty
+                                  ? record.courseName
+                                  : name.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: typography.body.md.copyWith(
+                                height: 1.25,
+                                fontWeight: FontWeight.w600,
+                                color: colors.foreground,
+                              ),
                             ),
                           ),
                           const SizedBox(width: Space.md),
@@ -132,6 +103,29 @@ class AttendanceCard extends ConsumerWidget {
                               height: 1.2,
                               fontWeight: FontWeight.w500,
                               color: tone.base,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: Space.xs + 2),
+                      // Type, and when the course meets next (the code if it
+                      // has no upcoming class). Spans the full card width, not
+                      // just the title's column beside the percentage.
+                      Row(
+                        children: [
+                          CourseKindBadge(isLab: isLab),
+                          const SizedBox(width: Space.sm),
+                          Expanded(
+                            child: Text(
+                              next == null ? code.trim() : 'Next: $next',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: typography.body.xs.copyWith(
+                                color: colors.mutedForeground,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                             ),
                           ),
                         ],
