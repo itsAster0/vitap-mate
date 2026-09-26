@@ -75,7 +75,9 @@ Future<bool> syncVtopData({
   bool respectBackgroundFeatureFlag = false,
   bool promptForOtp = true,
   bool ignoreRecoverableErrors = false,
+  Duration maxAge = backgroundSyncMaxAge,
 }) async {
+  bool fresh(BigInt updatedAt) => isVtopDataFresh(updatedAt, maxAge);
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val_start', DateTime.now().toString());
@@ -100,23 +102,18 @@ Future<bool> syncVtopData({
     final timetable = await (await read(
       timetableRepositoryProvider.future,
     )).load();
-    final refreshTimetable =
-        force || !_isUpdatedWithinBacksyncWindow(timetable.updateTime);
+    final refreshTimetable = force || !fresh(timetable.updateTime);
     final marks = await (await read(marksRepositoryProvider.future)).load();
-    final refreshMarks =
-        force || !_isUpdatedWithinBacksyncWindow(marks.updateTime);
+    final refreshMarks = force || !fresh(marks.updateTime);
     final examSchedule = await (await read(
       examScheduleRepositoryProvider.future,
     )).load();
-    final refreshExamSchedule =
-        force || !_isUpdatedWithinBacksyncWindow(examSchedule.updateTime);
+    final refreshExamSchedule = force || !fresh(examSchedule.updateTime);
     final semids = await (await read(
       semidRepositoryProvider.future,
     )).loadCache();
     final refreshSemesters =
-        force ||
-        semids == null ||
-        !_isUpdatedWithinBacksyncWindow(semids.updateTime);
+        force || semids == null || !fresh(semids.updateTime);
 
     await read(vtopBackendProvider).prefetch(user.semid!, {
       if (refreshTimetable) VtopPage.timetable,
@@ -172,6 +169,7 @@ Future<bool> syncVtopData({
         read,
         task,
         force: force,
+        maxAge: maxAge,
         ignoreRecoverableErrors: ignoreRecoverableErrors,
       ).then((result) {
         previousAttendance = result.$2;
@@ -200,11 +198,13 @@ Future<bool> syncVtopData({
   }
 }
 
-const _backsyncFreshWindow = Duration(minutes: 15);
+/// Periodic background sync refetches anything older than this.
+const backgroundSyncMaxAge = Duration(minutes: 15);
 
-bool _isUpdatedWithinBacksyncWindow(BigInt updatedAt) {
+/// Whether data saved at [updatedAt] (unix seconds) is younger than [maxAge].
+bool isVtopDataFresh(BigInt updatedAt, Duration maxAge) {
   final nowUnixSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-  final minFresh = BigInt.from(nowUnixSeconds - _backsyncFreshWindow.inSeconds);
+  final minFresh = BigInt.from(nowUnixSeconds - maxAge.inSeconds);
   return _isFreshSince(updatedAt, minFresh);
 }
 
@@ -266,14 +266,16 @@ Future<(bool, AttendanceData?)> _attendanceSync(
   ProviderReader read,
   String? task, {
   required bool force,
+  required Duration maxAge,
   required bool ignoreRecoverableErrors,
 }) async {
+  bool fresh(BigInt updatedAt) => isVtopDataFresh(updatedAt, maxAge);
   try {
     final attendanceRepo = await read(attendanceRepositoryProvider.future);
     var att = await attendanceRepo.load();
     final previousAttendance = att;
     var ok = true;
-    if (force || !_isUpdatedWithinBacksyncWindow(att.updateTime)) {
+    if (force || !fresh(att.updateTime)) {
       ok = await _retryer(
         () => read(attendanceProvider.notifier).updateAttendance(),
         read: read,
@@ -298,7 +300,7 @@ Future<(bool, AttendanceData?)> _attendanceSync(
           final fullAttendance = await fullAttendanceRepo.loadCache();
           if (!force &&
               fullAttendance != null &&
-              _isUpdatedWithinBacksyncWindow(fullAttendance.updateTime)) {
+              fresh(fullAttendance.updateTime)) {
             return true;
           }
           return _retryer(
