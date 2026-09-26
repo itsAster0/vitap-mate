@@ -1,0 +1,77 @@
+<div class="form-group" id="getDateForSemesterPreview">
+
+										<div class="form-group">
+											<label for="classGrouId" class="col-sm-3 control-label">Class Group</label>
+											<div class="col-sm-9 form-group">
+												<select class="form-select" name="classGroupId"
+													id="classGroupId"
+													data-validation-engine="validate[required]"
+													onchange="javascript:getListForSemester(&#39;getListForSemester&#39;);">
+													<option value="COMB" selected="selected">All Class Group (Combined)</option>
+													<option value="ALL">General (Semester)</option>
+												</select>
+
+											</div>
+
+										</div>
+
+
+
+										<div id="getListForSemester"
+											style="width: 100%; float: left;">
+
+											<div
+												style="width: 100%; float: left; text-align: center; display: block; margin: auto;">
+
+												<a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-JUL-2026&#39;);"
+													href="javascript:void(0);">JUL-2026</a><a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-AUG-2026&#39;);"
+													href="javascript:void(0);">AUG-2026</a><a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-SEP-2026&#39;);"
+													href="javascript:void(0);">SEP-2026</a><a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-OCT-2026&#39;);"
+													href="javascript:void(0);">OCT-2026</a><a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-NOV-2026&#39;);"
+													href="javascript:void(0);">NOV-2026</a><a class="btn btn-md btn-primary"
+													style="margin:0 5px 5px 0;"
+													onclick="javascript:processViewCalendar(&#39;01-DEC-2026&#39;);"
+													href="javascript:void(0);">DEC-2026</a>
+
+
+											</div>
+
+										<div>
+											<div class="table-responsive table-responsive"
+												 style="float: left; width: 100%;">
+												<div id="list-wrapper">
+												<table class="table calendar-table"
+												style="background-color: #fff; border: 1px solid #ddd; float: left; width: 100%; margin: 0;">
+												
+													<h4 style="text-align: center; margin: 0; 
+													background-color: #9675ce; line-height: 35px; 
+													color: #fff; font-weight: bold;"></h4>
+												
+														
+
+														<tr style="background-color: #9675ce; color: #fff;">
+															
+														</tr>
+
+														<tr>
+
+															
+
+														</tr>
+													</table>
+												</div>
+											</div>
+											</div>
+										</div>
+																		
+									</div>

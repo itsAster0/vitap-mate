@@ -13,6 +13,7 @@ import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/email_otp_banner.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
+import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
@@ -44,7 +45,7 @@ class TimetablePage extends HookConsumerWidget {
 
       return null;
     }, const []);
-    final mergeLabs = ref.watch(mergeTTProvider);
+    final calendar = ref.watch(semesterCalendarProvider);
 
     Future<void> update() async {
       try {
@@ -109,10 +110,7 @@ class TimetablePage extends HookConsumerWidget {
                     final days = classDays;
 
                     List<TimetableSlot> slotsForDay(int day) {
-                      var slots = getDaySlotList(data, day);
-                      if (mergeLabs) {
-                        slots = mergeLabsSloths(slots);
-                      }
+                      final slots = mergeLabsSloths(getDaySlotList(data, day));
                       slots.sort(
                         (a, b) => _parseTime(
                           a.startTime,
@@ -138,6 +136,7 @@ class TimetablePage extends HookConsumerWidget {
                             classDays: days.toSet(),
                             slotsForDay: slotsForDay,
                             attendance: attendance,
+                            calendar: calendar,
                           ),
                         DataUpdatedFooter(updateTime: data.updateTime.toInt()),
                       ],

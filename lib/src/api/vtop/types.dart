@@ -14,6 +14,19 @@ part 'types.g.dart';
 
 @freezed
 @meta.immutable
+sealed class AcademicCalendarData with _$AcademicCalendarData {
+  const factory AcademicCalendarData({
+    required List<CalendarEntry> entries,
+    required String semesterId,
+    required BigInt updateTime,
+  }) = _AcademicCalendarData;
+
+  factory AcademicCalendarData.fromJson(Map<String, dynamic> json) =>
+      _$AcademicCalendarDataFromJson(json);
+}
+
+@freezed
+@meta.immutable
 sealed class AttendanceData with _$AttendanceData {
   const factory AttendanceData({
     required List<AttendanceRecord> records,
@@ -72,6 +85,20 @@ sealed class BiometricRecord with _$BiometricRecord {
 
   factory BiometricRecord.fromJson(Map<String, dynamic> json) =>
       _$BiometricRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class CalendarEntry with _$CalendarEntry {
+  const factory CalendarEntry({
+    required String date,
+    required String kind,
+    required String group,
+    required String note,
+  }) = _CalendarEntry;
+
+  factory CalendarEntry.fromJson(Map<String, dynamic> json) =>
+      _$CalendarEntryFromJson(json);
 }
 
 enum ClassKind { theory, lab }

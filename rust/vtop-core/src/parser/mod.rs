@@ -6,6 +6,7 @@
 
 pub mod attendance;
 pub mod biometric;
+pub mod calendar;
 pub mod exam_schedule;
 pub mod grade_history;
 pub mod grades;

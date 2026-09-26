@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'cb96ba3b2c79c6b291152202a807042f1abc4c82';
+String _$settingsHash() => r'ceb9b7f7845d6820edc184147b546cbe4b9e5fa3';
 
 /// The optional vtop-server. The API key is kept in plain preferences by
 /// choice; see rust/ARCHITECTURE.md.
@@ -106,45 +106,51 @@ final class VtopServerSettingsProvider
 String _$vtopServerSettingsHash() =>
     r'8f0025ef6f3ae780df89b4c11271de4a5282cba4';
 
-@ProviderFor(mergeTT)
-final mergeTTProvider = MergeTTProvider._();
+@ProviderFor(classesLeftUntil)
+final classesLeftUntilProvider = ClassesLeftUntilProvider._();
 
-final class MergeTTProvider extends $FunctionalProvider<bool, bool, bool>
-    with $Provider<bool> {
-  MergeTTProvider._()
+final class ClassesLeftUntilProvider
+    extends
+        $FunctionalProvider<
+          ClassesLeftUntil,
+          ClassesLeftUntil,
+          ClassesLeftUntil
+        >
+    with $Provider<ClassesLeftUntil> {
+  ClassesLeftUntilProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'mergeTTProvider',
+        name: r'classesLeftUntilProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$mergeTTHash();
+  String debugGetCreateSourceHash() => _$classesLeftUntilHash();
 
   @$internal
   @override
-  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+  $ProviderElement<ClassesLeftUntil> $createElement($ProviderPointer pointer) =>
       $ProviderElement(pointer);
 
   @override
-  bool create(Ref ref) {
-    return mergeTT(ref);
+  ClassesLeftUntil create(Ref ref) {
+    return classesLeftUntil(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(bool value) {
+  Override overrideWithValue(ClassesLeftUntil value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<bool>(value),
+      providerOverride: $SyncValueProvider<ClassesLeftUntil>(value),
     );
   }
 }
 
-String _$mergeTTHash() => r'3511f9380bc7ee242b375bb7efa0594a4aa0187c';
+String _$classesLeftUntilHash() => r'87980823782c1ba0b332a8cbbd5b428259e4a347';
 
 /// The floating refresh button on the screen edge.
 

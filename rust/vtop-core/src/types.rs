@@ -155,6 +155,28 @@ pub struct ExamScheduleData {
     pub update_time: u64,
 }
 
+/// One event on one day of the academic calendar, e.g. "Holiday" for
+/// "General (Semester)" with the note "Deepavali". A day can carry several.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalendarEntry {
+    /// `YYYY-MM-DD`.
+    pub date: String,
+    /// "Instructional Day", "Holiday", "No Instructional Day", "CAT - I", ...
+    pub kind: String,
+    /// The class group the event applies to, e.g. "General (Semester)".
+    pub group: String,
+    /// The bracketed note without brackets: "WorkingDay", "LAB FAT", ...
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AcademicCalendarData {
+    /// Every dated entry of every month of the semester, in date order.
+    pub entries: Vec<CalendarEntry>,
+    pub semester_id: String,
+    pub update_time: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SemesterInfo {
     pub id: String,

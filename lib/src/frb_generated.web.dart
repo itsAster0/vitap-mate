@@ -59,6 +59,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AcademicCalendarData dco_decode_academic_calendar_data(dynamic raw);
+
+  @protected
   AttendanceData dco_decode_attendance_data(dynamic raw);
 
   @protected
@@ -86,6 +89,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  CalendarEntry dco_decode_calendar_entry(dynamic raw);
 
   @protected
   ClassKind dco_decode_class_kind(dynamic raw);
@@ -146,6 +152,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<BiometricRecord> dco_decode_list_biometric_record(dynamic raw);
+
+  @protected
+  List<CalendarEntry> dco_decode_list_calendar_entry(dynamic raw);
 
   @protected
   List<ExamScheduleRecord> dco_decode_list_exam_schedule_record(dynamic raw);
@@ -283,6 +292,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  AcademicCalendarData sse_decode_academic_calendar_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   AttendanceData sse_decode_attendance_data(SseDeserializer deserializer);
 
   @protected
@@ -314,6 +328,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  CalendarEntry sse_decode_calendar_entry(SseDeserializer deserializer);
 
   @protected
   ClassKind sse_decode_class_kind(SseDeserializer deserializer);
@@ -390,6 +407,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<BiometricRecord> sse_decode_list_biometric_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CalendarEntry> sse_decode_list_calendar_entry(
     SseDeserializer deserializer,
   );
 
@@ -557,6 +579,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_academic_calendar_data(
+    AcademicCalendarData self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_attendance_data(
     AttendanceData self,
     SseSerializer serializer,
@@ -600,6 +628,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_calendar_entry(CalendarEntry self, SseSerializer serializer);
 
   @protected
   void sse_encode_class_kind(ClassKind self, SseSerializer serializer);
@@ -700,6 +731,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_biometric_record(
     List<BiometricRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_calendar_entry(
+    List<CalendarEntry> self,
     SseSerializer serializer,
   );
 

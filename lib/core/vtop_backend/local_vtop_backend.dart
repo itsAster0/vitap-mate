@@ -49,6 +49,13 @@ class LocalVtopBackend implements VtopBackend {
       .fetchExamSchedule(client: await _client(), semesterId: semesterId);
 
   @override
+  Future<AcademicCalendarData> academicCalendar(String semesterId) async =>
+      vtop_api.fetchAcademicCalendar(
+        client: await _client(),
+        semesterId: semesterId,
+      );
+
+  @override
   Future<GradeViewData> gradeView(String semesterId) async =>
       vtop_api.fetchGradeView(client: await _client(), semesterId: semesterId);
 

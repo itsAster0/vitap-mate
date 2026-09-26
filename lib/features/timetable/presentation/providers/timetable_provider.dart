@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/vtop_controller.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
-import 'package:vitapmate/services/class_reminder_notification_service.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'timetable_provider.g.dart';
@@ -15,10 +17,10 @@ class Timetable extends _$Timetable {
       repository: repo,
       featureName: "fetch-timetable",
       hooks: VtopHooks(
+        // Also from cache: dated reminders need topping up on every
+        // start. Not awaited, since it may wait on the calendar.
         onSuccess: (data, {required fromCache}) async {
-          if (!fromCache) {
-            await ClassReminderNotificationService.syncFromTimetable(data);
-          }
+          unawaited(rescheduleClassReminders(ref.read, timetable: data));
         },
       ),
     );
@@ -38,10 +40,10 @@ class Timetable extends _$Timetable {
       repository: repo,
       featureName: "fetch-timetable",
       hooks: VtopHooks(
+        // Also from cache: dated reminders need topping up on every
+        // start. Not awaited, since it may wait on the calendar.
         onSuccess: (data, {required fromCache}) async {
-          if (!fromCache) {
-            await ClassReminderNotificationService.syncFromTimetable(data);
-          }
+          unawaited(rescheduleClassReminders(ref.read, timetable: data));
         },
       ),
     );

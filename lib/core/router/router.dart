@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vitapmate/features/calendar/presentation/pages/academic_calendar_page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
@@ -154,6 +155,14 @@ GoRouter router(Ref ref) {
                         child: ExamSchedulePage(),
                       );
                     },
+                  ),
+                  GoRoute(
+                    path: 'academic-calendar',
+                    name: Paths.academicCalendar,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const AcademicCalendarPage(),
+                    ),
                   ),
                   GoRoute(
                     path: 'biometric-history',

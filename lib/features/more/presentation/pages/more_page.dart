@@ -58,6 +58,12 @@ class MorePage extends HookConsumerWidget {
         'Entry logs',
         Paths.biometricHistory,
       ),
+      (
+        FLucideIcons.calendarRange,
+        'Calendar',
+        'Holidays & exams',
+        Paths.academicCalendar,
+      ),
     ];
 
     return SingleChildScrollView(

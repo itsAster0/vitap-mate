@@ -66,6 +66,13 @@ class AttendanceDetailSheet extends HookConsumerWidget {
       atEdge: standing.canSkip == 0,
     );
     final history = dataAsync.value;
+    // Lab summaries count each two-period session twice. Count sessions
+    // from the history, which has one row each, or halve until it loads.
+    final count = !record.islab()
+        ? (standing.attended, standing.total)
+        : history != null
+        ? _sessionCount(history)
+        : (standing.attended ~/ 2, standing.total ~/ 2);
 
     return ScreenRefresh(
       onRefresh: refresh,
@@ -177,7 +184,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                                       ),
                                     ),
                                     Text(
-                                      '${standing.attended} of ${standing.total} attended',
+                                      '${count.$1} of ${count.$2} attended',
                                       style: typography.body.xs.copyWith(
                                         color: colors.mutedForeground,
                                       ),
@@ -259,11 +266,14 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                             child: SkeletonList(count: 4, height: 72),
                           ),
                         ),
-                        // Plans from the summary counts, which match VTOP.
+                        // Plans from the summary counts, which match VTOP
+                        // (in sessions for labs). Keyed so it resets when
+                        // the lab history loads.
                         _Tab.planner => AttendancePlanner(
-                          attended: standing.attended,
+                          key: ValueKey(count),
+                          attended: count.$1,
                           reported: standing.reported,
-                          total: standing.total,
+                          total: count.$2,
                         ),
                       },
                     ),
@@ -683,6 +693,24 @@ class _History extends StatelessWidget {
 }
 
 enum _Status { present, onDuty, absent, other }
+
+/// (attended, total) sessions in [data]; on duty counts as attended.
+(int, int) _sessionCount(FullAttendanceData data) {
+  var attended = 0;
+  var total = 0;
+  for (final r in data.records) {
+    switch (_statusOf(r.status)) {
+      case _Status.present || _Status.onDuty:
+        attended++;
+        total++;
+      case _Status.absent:
+        total++;
+      case _Status.other:
+        break;
+    }
+  }
+  return (attended, total);
+}
 
 _Status _statusOf(String raw) {
   final s = raw.toLowerCase().replaceAll(' ', '');

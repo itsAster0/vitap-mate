@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
+import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum AgendaClassStatus { completed, current, next, upcoming }
@@ -21,13 +22,19 @@ class AgendaTimetableView extends HookWidget {
     required this.classDays,
     required this.slotsForDay,
     this.attendance = const [],
+    this.calendar,
   });
 
   /// ISO weekday (1 = Monday) being shown.
   final ValueNotifier<int> selectedDay;
   final Set<int> classDays;
+
+  /// A weekday's timetable, before the academic calendar is applied.
   final List<TimetableSlot> Function(int weekday) slotsForDay;
   final List<AttendanceRecord> attendance;
+
+  /// Drops classes on holidays and exam days, and explains the day off.
+  final SemesterCalendar? calendar;
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +55,33 @@ class AgendaTimetableView extends HookWidget {
       };
     }, const []);
 
-    final slots = slotsForDay(selectedDay.value);
     final weekDates = _weekDates(now.value);
+    List<TimetableSlot> daySlots(int weekday) =>
+        classesOnDate(slotsForDay(weekday), weekDates[weekday - 1], calendar);
+    // The day's regular schedule is always listed; [slots] are the classes
+    // that actually meet, which drive the hero card, day bar and statuses.
+    final schedule = slotsForDay(selectedDay.value);
+    final slots = daySlots(selectedDay.value);
     final selectedDate = weekDates[selectedDay.value - 1];
+    // What the calendar says about the day: a holiday or exam that cancels
+    // it, or a note (Lab FAT, an event) on a day that still has classes.
+    final dayEntry = calendar?.entryOn(selectedDate);
+    final dayMark = dayEntry == null ? null : markOf(dayEntry);
+    final dayOff = dayEntry != null && slots.isEmpty && schedule.isNotEmpty
+        ? dayEntry
+        : null;
+    // Plain "Holiday" Sundays and "No instructional day" Mondays say
+    // nothing new, so only named days get a note.
+    final dayNote =
+        dayEntry == null ||
+            dayOff != null ||
+            dayMark == CalendarMark.classes ||
+            const {
+              'Holiday',
+              'No instructional day',
+            }.contains(titleOf(dayEntry))
+        ? null
+        : titleOf(dayEntry);
     final isToday = selectedDay.value == now.value.weekday;
     final minuteNow = _timeOfDay(now.value);
 
@@ -73,8 +104,8 @@ class AgendaTimetableView extends HookWidget {
     // Real breaks (VIT leaves 10 minutes between classes); the longest one is
     // tagged when the day has more than one.
     final gaps = [
-      for (var i = 1; i < slots.length; i++)
-        minutesOf(slots[i].startTime) - minutesOf(slots[i - 1].endTime),
+      for (var i = 1; i < schedule.length; i++)
+        minutesOf(schedule[i].startTime) - minutesOf(schedule[i - 1].endTime),
     ];
     final realGaps = gaps.where((g) => g >= _minBreak).toList();
     final longestGap = realGaps.length > 1
@@ -94,6 +125,7 @@ class AgendaTimetableView extends HookWidget {
             date: selectedDate,
             isToday: isToday,
             slots: slots,
+            note: dayOff == null ? dayNote : titleOf(dayOff),
             onToday: () => selectedDay.value = now.value.weekday,
           ),
           if (slots.isNotEmpty) ...[
@@ -105,7 +137,7 @@ class AgendaTimetableView extends HookWidget {
             dates: weekDates,
             today: now.value.weekday,
             selectedDay: selectedDay,
-            classCounts: [for (var d = 1; d <= 7; d++) slotsForDay(d).length],
+            classCounts: [for (var d = 1; d <= 7; d++) daySlots(d).length],
           ),
           const SizedBox(height: Space.md),
           AnimatedSwitcher(
@@ -143,49 +175,65 @@ class AgendaTimetableView extends HookWidget {
                   isToday: isToday,
                   slots: slots,
                   attendance: attendance,
+                  dayOff: dayOff,
                   upcomingDay: slots.isEmpty || (isToday && next == null)
-                      ? _nextClassDay(selectedDay.value)
+                      ? _nextClassDay(selectedDate)
                       : null,
                 ),
-                if (slots.isNotEmpty)
+                if (schedule.isNotEmpty)
                   SectionHeader(
                     title: isToday ? 'Today' : 'Schedule',
                     trailing: Text(
                       slots.isEmpty
-                          ? ''
+                          ? 'No classes'
                           : isToday && remaining < slots.length
                           ? '$remaining of ${slots.length} left'
                           : '${slots.length} ${slots.length == 1 ? 'class' : 'classes'}',
                     ),
                   ),
-                for (var i = 0; i < slots.length; i++) ...[
+                for (var i = 0; i < schedule.length; i++) ...[
                   if (i > 0)
-                    _BreakRow(
-                      previousEnd: slots[i - 1].endTime,
-                      nextStart: slots[i].startTime,
-                      isNow:
-                          isToday &&
-                          minutesOf(slots[i - 1].endTime) <= minuteNow &&
-                          minutesOf(slots[i].startTime) > minuteNow,
-                      minuteNow: minuteNow,
-                      isLongest: gaps[i - 1] == longestGap,
-                    ),
-                  EnterFade(
-                    index: i,
-                    child: _ClassRow(
-                      slot: slots[i],
-                      status: _statusFor(
-                        slots[i],
-                        current,
-                        next,
-                        minuteNow,
-                        isToday,
+                    _dimmedIf(
+                      dayOff != null,
+                      _BreakRow(
+                        previousEnd: schedule[i - 1].endTime,
+                        nextStart: schedule[i].startTime,
+                        isNow:
+                            isToday &&
+                            dayOff == null &&
+                            minutesOf(schedule[i - 1].endTime) <= minuteNow &&
+                            minutesOf(schedule[i].startTime) > minuteNow,
+                        minuteNow: minuteNow,
+                        isLongest: gaps[i - 1] == longestGap,
                       ),
-                      record: attendanceForSlot(attendance, slots[i]),
-                      minuteNow: isToday ? minuteNow : null,
-                      isFirst: i == 0,
-                      isLast: i == slots.length - 1,
                     ),
+                  Builder(
+                    builder: (context) {
+                      // Called off by the calendar (a holiday, or a lab
+                      // after the LAB FAT): shown dimmed, with no live state.
+                      final off = !slots.contains(schedule[i]);
+                      final live = isToday && !off;
+                      return EnterFade(
+                        index: i,
+                        child: Opacity(
+                          opacity: off ? 0.45 : 1,
+                          child: _ClassRow(
+                            slot: schedule[i],
+                            status: _statusFor(
+                              schedule[i],
+                              current,
+                              next,
+                              minuteNow,
+                              live,
+                            ),
+                            record: attendanceForSlot(attendance, schedule[i]),
+                            minuteNow: live ? minuteNow : null,
+                            isFirst: i == 0,
+                            isLast: i == schedule.length - 1,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ],
@@ -196,12 +244,14 @@ class AgendaTimetableView extends HookWidget {
     );
   }
 
-  /// The next weekday after [from] that has classes, with its first class.
-  ({int weekday, TimetableSlot first})? _nextClassDay(int from) {
-    for (var offset = 1; offset <= 7; offset++) {
-      final day = (from - 1 + offset) % 7 + 1;
-      final slots = slotsForDay(day);
-      if (slots.isNotEmpty) return (weekday: day, first: slots.first);
+  /// The next day after [from] that has classes, with its first class. With
+  /// a calendar it looks further ahead, past exam weeks and breaks.
+  ({DateTime date, TimetableSlot first})? _nextClassDay(DateTime from) {
+    final horizon = calendar == null ? 7 : 28;
+    for (var offset = 1; offset <= horizon; offset++) {
+      final date = DateTime(from.year, from.month, from.day + offset);
+      final slots = classesOnDate(slotsForDay(date.weekday), date, calendar);
+      if (slots.isNotEmpty) return (date: date, first: slots.first);
     }
     return null;
   }
@@ -213,6 +263,7 @@ class _DateHeading extends StatelessWidget {
     required this.isToday,
     required this.slots,
     required this.onToday,
+    this.note,
   });
 
   final DateTime date;
@@ -220,12 +271,16 @@ class _DateHeading extends StatelessWidget {
   final List<TimetableSlot> slots;
   final VoidCallback onToday;
 
+  /// The calendar's word on the day: "CAT - II", "Lab FAT", "Deepavali".
+  final String? note;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final summary = [
       DateFormat('d MMMM').format(date),
+      ?note,
       if (slots.isNotEmpty)
         '${to12H(slots.first.startTime, context)} – ${to12H(slots.last.endTime, context)}',
     ].join('  ·  ');
@@ -513,6 +568,7 @@ class _FocusPanel extends StatelessWidget {
     required this.slots,
     required this.attendance,
     required this.upcomingDay,
+    this.dayOff,
   });
 
   final TimetableSlot? current;
@@ -521,7 +577,10 @@ class _FocusPanel extends StatelessWidget {
   final bool isToday;
   final List<TimetableSlot> slots;
   final List<AttendanceRecord> attendance;
-  final ({int weekday, TimetableSlot first})? upcomingDay;
+  final ({DateTime date, TimetableSlot first})? upcomingDay;
+
+  /// The calendar entry that cancels a normal class day.
+  final CalendarEntry? dayOff;
 
   @override
   Widget build(BuildContext context) {
@@ -530,36 +589,75 @@ class _FocusPanel extends StatelessWidget {
     // Day is over, or there's nothing today: point at the next class day.
     if (current == null && next == null) {
       final upcoming = upcomingDay;
+      final off = dayOff;
+      final offMark = off == null ? null : markOf(off);
+      final (icon, tone) = switch (offMark) {
+        CalendarMark.exam => (FLucideIcons.penLine, colors.app.warning),
+        CalendarMark.holiday => (FLucideIcons.partyPopper, colors.app.success),
+        CalendarMark() => (FLucideIcons.calendarOff, colors.app.accentTone),
+        null when slots.isEmpty => (
+          FLucideIcons.sunMedium,
+          colors.app.accentTone,
+        ),
+        null => (FLucideIcons.circleCheckBig, colors.app.success),
+      };
+      final typography = context.theme.typography;
+      final title = off != null
+          ? titleOf(off)
+          : slots.isEmpty
+          ? 'Free day'
+          : "You're done for today";
+      final eyebrow = switch (offMark) {
+        CalendarMark.exam => 'EXAM · NO CLASSES',
+        CalendarMark.holiday => 'HOLIDAY',
+        CalendarMark() => 'NO CLASSES',
+        null => null,
+      };
       return Surface(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _IconTile(
-              icon: slots.isEmpty
-                  ? FLucideIcons.sunMedium
-                  : FLucideIcons.circleCheckBig,
-              tone: slots.isEmpty ? colors.app.accentTone : colors.app.success,
-            ),
+            _IconTile(icon: icon, tone: tone),
             const SizedBox(width: Space.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (eyebrow != null) ...[
+                    ToneBadge(label: eyebrow, tone: tone),
+                    const SizedBox(height: Space.xs + 2),
+                  ],
                   Text(
-                    slots.isEmpty ? 'Free day' : "You're done for today",
-                    style: context.theme.typography.body.md.copyWith(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: typography.body.md.copyWith(
+                      height: 1.25,
                       fontWeight: FontWeight.w700,
                       color: colors.foreground,
                     ),
                   ),
                   if (upcoming != null) ...[
+                    const SizedBox(height: Space.xs),
+                    // When: "Back Tue 6 Oct · 11:01 AM" / "Tomorrow · 8:00 AM".
+                    Text(
+                      '${off != null ? 'Back ' : ''}'
+                      '${_dayLabel(upcoming.date, now)} · '
+                      '${to12H(upcoming.first.startTime, context)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: typography.body.sm.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colors.foreground,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                      '${_dayLabel(upcoming.weekday, now)} starts '
-                      '${to12H(upcoming.first.startTime, context)} · '
-                      '${upcoming.first.name}',
-                      maxLines: 2,
+                      upcoming.first.name,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: context.theme.typography.body.sm.copyWith(
+                      style: typography.body.xs.copyWith(
                         color: colors.mutedForeground,
                       ),
                     ),
@@ -1548,11 +1646,17 @@ T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
   return null;
 }
 
-String _dayLabel(int weekday, DateTime now) {
-  if (weekday == now.weekday % 7 + 1) return 'Tomorrow';
-  return DateFormat('EEEE').format(
-    DateTime(2024, 1, weekday), // 1 Jan 2024 was a Monday.
-  );
+/// "Tomorrow", a weekday name within the coming week, else "Tue 6 Oct".
+String _dayLabel(DateTime date, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  final days = DateTime(
+    date.year,
+    date.month,
+    date.day,
+  ).difference(today).inDays;
+  if (days == 1) return 'Tomorrow';
+  if (days > 1 && days < 7) return DateFormat('EEEE').format(date);
+  return DateFormat('EEE d MMM').format(date);
 }
 
 DateTime _at(DateTime day, String time) {
@@ -1570,3 +1674,7 @@ List<DateTime> _weekDates(DateTime now) {
 }
 
 int _timeOfDay(DateTime value) => value.hour * 60 + value.minute;
+
+/// [child] at reduced opacity when [dimmed], for classes called off.
+Widget _dimmedIf(bool dimmed, Widget child) =>
+    dimmed ? Opacity(opacity: 0.45, child: child) : child;

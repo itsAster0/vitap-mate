@@ -83,6 +83,10 @@ class ReloginVtopBackend implements VtopBackend {
       _guard(() => _inner.examSchedule(semesterId));
 
   @override
+  Future<AcademicCalendarData> academicCalendar(String semesterId) =>
+      _guard(() => _inner.academicCalendar(semesterId));
+
+  @override
   Future<GradeViewData> gradeView(String semesterId) =>
       _guard(() => _inner.gradeView(semesterId));
 

@@ -19,12 +19,13 @@ pub struct _SessionState {
     pub logged_in_at: Option<u64>,
 }
 pub use vtop_core::types::{
-    AttendanceData, AttendanceRecord, BiometricData, BiometricRecord, ClassKind, ExamScheduleData,
-    ExamScheduleRecord, FullAttendanceData, FullAttendanceRecord, GradeCourseRecord,
-    GradeDetailMark, GradeDetailsData, GradeHistoryAttempt, GradeHistoryCgpa, GradeHistoryData,
-    GradeHistoryRecord, GradeHistoryStudentInfo, GradeRange, GradeViewData, MarksData, MarksRecord,
-    MarksRecordEach, PerExamScheduleRecord, PersistedCookie, PersistedHeader, PersistedVtopSession,
-    SemesterData, SemesterInfo, TimetableCourse, TimetableData, TimetableSlot,
+    AcademicCalendarData, AttendanceData, AttendanceRecord, BiometricData, BiometricRecord,
+    CalendarEntry, ClassKind, ExamScheduleData, ExamScheduleRecord, FullAttendanceData,
+    FullAttendanceRecord, GradeCourseRecord, GradeDetailMark, GradeDetailsData,
+    GradeHistoryAttempt, GradeHistoryCgpa, GradeHistoryData, GradeHistoryRecord,
+    GradeHistoryStudentInfo, GradeRange, GradeViewData, MarksData, MarksRecord, MarksRecordEach,
+    PerExamScheduleRecord, PersistedCookie, PersistedHeader, PersistedVtopSession, SemesterData,
+    SemesterInfo, TimetableCourse, TimetableData, TimetableSlot,
 };
 
 #[frb(mirror(ClassKind), non_opaque)]
@@ -177,6 +178,21 @@ pub struct _PerExamScheduleRecord {
 #[frb(mirror(ExamScheduleData), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _ExamScheduleData {
     pub exams: Vec<PerExamScheduleRecord>,
+    pub semester_id: String,
+    pub update_time: u64,
+}
+
+#[frb(mirror(CalendarEntry), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _CalendarEntry {
+    pub date: String,
+    pub kind: String,
+    pub group: String,
+    pub note: String,
+}
+
+#[frb(mirror(AcademicCalendarData), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _AcademicCalendarData {
+    pub entries: Vec<CalendarEntry>,
     pub semester_id: String,
     pub update_time: u64,
 }

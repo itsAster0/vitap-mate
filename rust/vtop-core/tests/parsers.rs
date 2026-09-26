@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 use serde_json::Value;
 use vtop_core::parser::{
-    attendance, biometric, exam_schedule, grade_history, grades, marks, timetable,
+    attendance, biometric, calendar, exam_schedule, grade_history, grades, marks, timetable,
 };
 
 fn fixture_dir() -> PathBuf {
@@ -174,6 +174,40 @@ fn biometric_fixture() {
     assert_snapshot("biometric", &data);
 }
 
+#[test]
+fn calendar_months_fixture() {
+    let months = calendar::parse_calendar_months(&fixture("calendar_months"));
+    assert_eq!(
+        months,
+        [
+            "01-JUL-2026",
+            "01-AUG-2026",
+            "01-SEP-2026",
+            "01-OCT-2026",
+            "01-NOV-2026",
+            "01-DEC-2026"
+        ]
+    );
+}
+
+#[test]
+fn calendar_month_fixture() {
+    let entries = calendar::parse_calendar_month(&fixture("calendar_month"), "01-OCT-2026");
+    // October 2026 has 31 days, each with one event.
+    assert_eq!(entries.len(), 31);
+    assert_eq!(entries[0].date, "2026-10-01");
+    assert_eq!(entries[0].kind, "CAT - II");
+    assert_eq!(entries[1].kind, "Holiday");
+    assert_eq!(entries[1].note, "Mahatma Gandhi Jayanti");
+    assert!(entries
+        .iter()
+        .any(|entry| entry.kind == "Instructional Day" && entry.note == "LAB FAT"));
+    assert!(entries
+        .iter()
+        .all(|entry| entry.group == "General (Semester)"));
+    assert_snapshot("calendar_month", &entries);
+}
+
 /// Every parser survives truncated and mangled pages (VTOP sometimes
 /// returns partial HTML) without panicking.
 #[test]
@@ -189,6 +223,8 @@ fn parsers_never_panic_on_truncated_pages() {
         "grade_details",
         "grade_history",
         "biometric",
+        "calendar_months",
+        "calendar_month",
     ];
     for name in names {
         let html = fixture(name);
@@ -207,6 +243,8 @@ fn parsers_never_panic_on_truncated_pages() {
             grades::parse_grade_view_details(page, "S", "C");
             grade_history::parse_grade_history(page);
             biometric::parse_biometric(page, "01/01/2026");
+            calendar::parse_calendar_months(page);
+            calendar::parse_calendar_month(page, "01-OCT-2026");
         }
     }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// "14:05" → "2:05 PM", or unchanged when the device uses 24-hour time.
 String to12H(String time, BuildContext context) {
@@ -58,4 +60,19 @@ List<DateTime> getCurrentWeekDates() {
     Duration(days: referenceDate.weekday - 1),
   );
   return List.generate(7, (index) => startOfWeek.add(Duration(days: index)));
+}
+
+/// [slots] (one weekday's classes) that actually meet on [date] per the
+/// academic calendar: none on holidays and exam days, and no labs from the
+/// LAB FAT on. Without a calendar every slot meets.
+List<TimetableSlot> classesOnDate(
+  List<TimetableSlot> slots,
+  DateTime date,
+  SemesterCalendar? calendar,
+) {
+  if (calendar == null) return slots;
+  return [
+    for (final slot in slots)
+      if (calendar.classesOn(date, lab: slot.kind == ClassKind.lab)) slot,
+  ];
 }
