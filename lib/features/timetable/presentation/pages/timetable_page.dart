@@ -17,6 +17,12 @@ import 'package:vitapmate/features/calendar/presentation/providers/academic_cale
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
+import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
+import 'package:vitapmate/features/more/domain/exam_time.dart';
+import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/agenda_timetable_view.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/weekly_timetable_view.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -46,6 +52,24 @@ class TimetablePage extends HookConsumerWidget {
       return null;
     }, const []);
     final calendar = ref.watch(semesterCalendarProvider);
+    // Each course's saved class history, by (course code, lab), for the
+    // week recap.
+    final history = {
+      for (final record in attendance)
+        (courseCodeOf(record), record.islab()): ?ref
+            .watch(
+              cachedFullAttendanceProvider(record.courseType, record.courseId),
+            )
+            .value,
+    };
+    final exams = <ExamPaper>[
+      for (final type
+          in ref.watch(cachedExamScheduleProvider).value?.exams ??
+              const <PerExamScheduleRecord>[])
+        for (final exam in type.records)
+          if (examStartOf(exam) case final start?)
+            (name: examName(type.examType), start: start, exam: exam),
+    ]..sort((a, b) => a.start.compareTo(b.start));
 
     Future<void> update() async {
       try {
@@ -137,6 +161,8 @@ class TimetablePage extends HookConsumerWidget {
                             slotsForDay: slotsForDay,
                             attendance: attendance,
                             calendar: calendar,
+                            exams: exams,
+                            history: history,
                           ),
                         DataUpdatedFooter(updateTime: data.updateTime.toInt()),
                       ],

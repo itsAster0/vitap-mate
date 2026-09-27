@@ -21,6 +21,22 @@ class AttendanceStanding {
     ),
   );
 
+  /// [record]'s standing in the units a student can actually skip. Labs meet
+  /// in two-period sessions that VTOP counts as two classes each, so they
+  /// are halved: whenever the history agrees with the summary this is
+  /// exactly its session count, and otherwise the summary still stands in
+  /// for it. An odd total rounds up and an odd attended count down, so a
+  /// half-posted session never reads as skippable.
+  factory AttendanceStanding.sessions(AttendanceRecord record) {
+    final summary = AttendanceStanding.of(record);
+    if (!record.islab()) return summary;
+    return AttendanceStanding(
+      attended: summary.attended ~/ 2,
+      total: (summary.total + 1) ~/ 2,
+      reported: summary.reported,
+    );
+  }
+
   final int attended;
   final int total;
 

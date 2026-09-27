@@ -1,6 +1,9 @@
 import 'package:intl/intl.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
+/// One exam paper with its exam's name ("CAT-II", "FAT") and start time.
+typedef ExamPaper = ({String name, DateTime start, ExamScheduleRecord exam});
+
 /// Exam day from VTOP's "17-Aug-2026", or null when not announced.
 DateTime? examDayOf(ExamScheduleRecord exam) {
   final raw = exam.examDate.trim();

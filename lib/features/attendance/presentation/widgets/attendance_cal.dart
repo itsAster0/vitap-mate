@@ -12,10 +12,14 @@ class AttendancePlanner extends HookWidget {
     required this.attended,
     required this.total,
     this.reported,
+    this.unposted = 0,
   });
 
   final int attended;
   final int total;
+
+  /// Classes held but not posted yet, so not in [attended] or [total].
+  final int unposted;
 
   /// VTOP's own percentage, shown as "now" until the counts are edited.
   final double? reported;
@@ -82,6 +86,31 @@ class AttendancePlanner extends HookWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (unposted > 0) ...[
+            Row(
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: colors.mutedForeground,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: Space.xs + 2),
+                Expanded(
+                  child: Text(
+                    '+$unposted ${unposted == 1 ? 'class' : 'classes'} held, '
+                    'not posted yet. Not in NOW.',
+                    style: typography.body.xs.copyWith(
+                      color: colors.mutedForeground,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Space.sm),
+          ],
           // Result: now → after the plan.
           Surface(
             child: Column(

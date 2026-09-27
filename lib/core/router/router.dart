@@ -7,6 +7,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/router/slide_fade_page.dart';
 import 'package:vitapmate/core/widgets/onboarding_page.dart';
 import 'package:vitapmate/core/widgets/shell_layout.dart';
+import 'package:vitapmate/features/attendance/presentation/pages/attendance_guide_page.dart';
 import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
 import 'package:vitapmate/features/docs/presentation/pages/docs_page.dart';
@@ -76,14 +77,12 @@ GoRouter router(Ref ref) {
                     builder: (context, state) => Placeholder(),
                   ),
                   GoRoute(
-                    path: 'calendar-sync',
-                    name: Paths.calendarSync,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: CalendarSyncPage(),
-                      );
-                    },
+                    path: 'how-it-works',
+                    name: Paths.timetableAttendanceGuide,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const AttendanceGuidePage(showTimetable: true),
+                    ),
                   ),
                 ],
               ),
@@ -101,6 +100,16 @@ GoRouter router(Ref ref) {
                   key: state.pageKey,
                   child: AttendancePage(),
                 ),
+                routes: [
+                  GoRoute(
+                    path: 'how-it-works',
+                    name: Paths.attendanceGuide,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const AttendanceGuidePage(),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -252,6 +261,16 @@ GoRouter router(Ref ref) {
                   child: SettingsPage(),
                 ),
                 routes: [
+                  GoRoute(
+                    path: 'calendar-sync',
+                    name: Paths.calendarSync,
+                    pageBuilder: (context, state) {
+                      return SlideFadePage<void>(
+                        key: state.pageKey,
+                        child: CalendarSyncPage(),
+                      );
+                    },
+                  ),
                   GoRoute(
                     path: 'gmail-otp-setup',
                     name: Paths.gmailOtpSetup,

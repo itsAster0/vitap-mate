@@ -2,6 +2,8 @@ class Paths {
   //use names with / removed in path
   static final timetable = "timetable";
   static final attendance = "attendance";
+  static final attendanceGuide = "attendanceGuide";
+  static final timetableAttendanceGuide = "timetableAttendanceGuide";
   static final more = "more";
   static final onbaording = "onbaording";
   static final vtopUserManagement = "vtopUsermanagement";

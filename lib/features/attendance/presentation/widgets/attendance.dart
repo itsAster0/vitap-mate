@@ -5,8 +5,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_table.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
@@ -25,18 +27,32 @@ class AttendanceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    // The x/y and percentage are VTOP's own; skipping is worked out in
+    // sessions for labs, the same as the detail sheet.
     final standing = AttendanceStanding.of(record);
+    final plan = AttendanceStanding.sessions(record);
     final tone = attendanceTone(
       context,
-      safe: standing.isSafe,
-      atEdge: standing.canSkip == 0,
+      safe: plan.isSafe,
+      atEdge: plan.canSkip == 0,
     );
     final (code, name) = formateName(record.courseName);
     final isLab = record.islab();
     final timetable = ref.watch(timetableProvider).value;
     final calendar = ref.watch(semesterCalendarProvider);
+    final history = ref
+        .watch(cachedFullAttendanceProvider(record.courseType, record.courseId))
+        .value;
+    final sync = history == null ? null : HistorySync.of(record, history);
     final now = DateTime.now();
-    final next = _nextClassLabel(context, timetable, calendar, record, now);
+    final next = nextClassLabel(
+      context,
+      timetable,
+      calendar,
+      code: courseCodeOf(record),
+      lab: record.islab(),
+      now: now,
+    );
     // In "next exam" mode, count to the next CAT/FAT; once the FAT has
     // begun there is no next exam and it counts to the end as usual.
     final exam =
@@ -44,7 +60,7 @@ class AttendanceCard extends ConsumerWidget {
             ref.watch(classesLeftUntilProvider) == ClassesLeftUntil.nextExam
         ? calendar.nextExam(now)
         : null;
-    final projection = timetable == null || calendar == null
+    final classes = timetable == null || calendar == null
         ? null
         : AttendanceProjection.of(
             record: record,
@@ -52,13 +68,15 @@ class AttendanceCard extends ConsumerWidget {
             calendar: calendar,
             now: now,
             until: exam?.start,
+            countedThrough: sync?.countedThrough,
           );
+    final projection = isLab ? classes?.inSessions(record) : classes;
 
     final pct = standing.displayPercent;
     return Surface(
       padding: EdgeInsets.zero,
       semanticsLabel:
-          '$name, ${pct.round()} percent, ${standing.attended} of ${standing.total} attended, ${standing.advice}',
+          '$name, ${pct.round()} percent, ${standing.attended} of ${standing.total} attended${sync?.inSync == false ? ', history not in sync' : ''}${(projection?.unposted ?? 0) > 0 ? ', ${projection!.unposted} held but not posted yet' : ''}, ${plan.advice}',
       onPress: () => showAttendanceDetails(context, record),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Radii.lg - 1),
@@ -136,9 +154,12 @@ class AttendanceCard extends ConsumerWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _ClassCount(standing: standing),
+                          _ClassCount(
+                            standing: standing,
+                            outOfSync: sync?.inSync == false,
+                          ),
                           const Spacer(),
-                          _Advice(standing: standing, tone: tone),
+                          _Advice(standing: plan, tone: tone),
                         ],
                       ),
                       if (projection != null) ...[
@@ -146,7 +167,6 @@ class AttendanceCard extends ConsumerWidget {
                         _SemesterOutlook(
                           projection: projection,
                           tone: tone,
-                          isLab: isLab,
                           examName: exam?.name,
                         ),
                       ],
@@ -162,27 +182,46 @@ class AttendanceCard extends ConsumerWidget {
   }
 }
 
-/// "22/24 attended".
+/// "22/24 attended", with a small warning dot when the class history
+/// disagrees with these counts.
 class _ClassCount extends StatelessWidget {
-  const _ClassCount({required this.standing});
+  const _ClassCount({required this.standing, required this.outOfSync});
 
   final AttendanceStanding standing;
+  final bool outOfSync;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    return Text(
-      '${standing.attended}/${standing.total} attended',
-      style: typography.body.sm.copyWith(
-        color: colors.mutedForeground,
-        fontFeatures: const [FontFeature.tabularFigures()],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${standing.attended}/${standing.total} attended',
+          style: typography.body.sm.copyWith(
+            color: colors.mutedForeground,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        if (outOfSync) ...[
+          const SizedBox(width: Space.xs + 2),
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: colors.app.warning.base,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
 
-/// "Can skip 5" / "Attend 2", tinted when there's no room to skip.
+/// "Can skip 5" / "Attend 2" (sessions for labs), tinted when there's no
+/// room to skip.
 class _Advice extends StatelessWidget {
   const _Advice({required this.standing, required this.tone});
 
@@ -204,22 +243,18 @@ class _Advice extends StatelessWidget {
 }
 
 /// Where the course ends up by the last class (or by [examName]), from the
-/// academic calendar, centred under a hairline: "16 left · 8 to spare ·
-/// 95% max".
+/// academic calendar, centred under a hairline: "1+16 left · 8 to spare ·
+/// 95% max", where the muted "1+" is classes held but not posted yet. Lab
+/// projections come in sessions ([AttendanceProjection.inSessions]).
 class _SemesterOutlook extends StatelessWidget {
   const _SemesterOutlook({
     required this.projection,
     required this.tone,
-    required this.isLab,
     this.examName,
   });
 
   final AttendanceProjection projection;
   final Tone tone;
-
-  /// Lab attendance counts each two-period session as two classes; "left"
-  /// and "to spare" show sessions instead, the rest stay in VTOP's units.
-  final bool isLab;
 
   /// Set when counting to an exam rather than to the semester's end.
   final String? examName;
@@ -239,10 +274,13 @@ class _SemesterOutlook extends StatelessWidget {
       color: short ? tone.onSubtle : colors.foreground,
     );
 
-    // (value, label) pairs; a null value is a plain label.
-    final parts = <(String?, String)>[
+    final unposted = projection.unposted;
+    // (lead, value, label); a null value is a plain label. The lead is the
+    // muted "1+" for classes held but not posted yet.
+    final parts = <(String?, String?, String)>[
       if (left == 0)
         (
+          null,
           null,
           examName == null
               ? 'No classes left this semester'
@@ -250,20 +288,17 @@ class _SemesterOutlook extends StatelessWidget {
         )
       else ...[
         (
-          '${isLab ? (left / 2).ceil() : left}',
+          unposted > 0 ? '$unposted+' : null,
+          '${projection.upcoming}',
           examName == null ? ' left' : ' left till $examName',
         ),
         if (mustAttend == null)
-          (null, 'short of 75%')
+          (null, null, 'short of 75%')
         else if (!projection.standing.isSafe)
-          ('$mustAttend', ' needed')
+          (null, '$mustAttend', ' needed')
         else
-          // Whole sessions only: missing one costs two classes.
-          (
-            '${isLab ? projection.canMiss ~/ 2 : projection.canMiss}',
-            ' to spare',
-          ),
-        ('${projection.bestPercent.floor()}%', ' max'),
+          (null, '${projection.canMiss}', ' to spare'),
+        (null, '${projection.bestPercent.floor()}%', ' max'),
       ],
     ];
 
@@ -274,8 +309,9 @@ class _SemesterOutlook extends StatelessWidget {
         Text.rich(
           TextSpan(
             children: [
-              for (final (i, (value, label)) in parts.indexed) ...[
+              for (final (i, (lead, value, label)) in parts.indexed) ...[
                 if (i > 0) TextSpan(text: '  ·  ', style: base),
+                if (lead != null) TextSpan(text: lead, style: base),
                 if (value != null) TextSpan(text: value, style: strong),
                 TextSpan(
                   text: label,
@@ -297,20 +333,19 @@ class _SemesterOutlook extends StatelessWidget {
 
 const _slotDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
-/// When [record]'s course meets next per the timetable — "Today 2:00 PM",
+/// When course [code] ([lab] or theory) meets next per the timetable — "Today 2:00 PM",
 /// "Tomorrow 8:00 AM", "Mon 2:00 PM", or "Sat 3 Oct 8:00 AM" a week or more
 /// out — or null if it isn't scheduled. With a [calendar], days without
 /// classes (holidays, exams, labs after the LAB FAT) are skipped.
-String? _nextClassLabel(
+String? nextClassLabel(
   BuildContext context,
   TimetableData? data,
-  SemesterCalendar? calendar,
-  AttendanceRecord record,
-  DateTime now,
-) {
+  SemesterCalendar? calendar, {
+  required String code,
+  required bool lab,
+  required DateTime now,
+}) {
   if (data == null) return null;
-  final code = courseCodeOf(record);
-  final lab = record.islab();
   final nowMinute = now.hour * 60 + now.minute;
   // A week ahead without a calendar (offset 7 is the same weekday next
   // week); with one, far enough to get past exam weeks and breaks.

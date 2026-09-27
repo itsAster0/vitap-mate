@@ -29,5 +29,21 @@ class FullAttendance extends _$FullAttendance {
       featureName: 'fetch-full-attendance',
     ).refresh();
     state = AsyncData(attendance);
+    ref.invalidate(cachedFullAttendanceProvider(courseType, courseId));
   }
+}
+
+/// The course's history as last saved, or null if it was never fetched.
+/// Never goes to VTOP, so the attendance list can read every course's
+/// history without a request each.
+@Riverpod(keepAlive: true)
+Future<FullAttendanceData?> cachedFullAttendance(
+  Ref ref,
+  String courseType,
+  String courseId,
+) async {
+  final repository = await ref.watch(
+    fullAttendanceRepositoryProvider(courseType, courseId).future,
+  );
+  return repository.loadCache();
 }

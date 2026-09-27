@@ -8,10 +8,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/features/attendance/presentation/pages/attendance_guide_page.dart';
 import 'package:vitapmate/features/background/stale_refresh.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/sync_google_calendar_button.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_view_toggle_button.dart';
 
 class ShellLayout extends HookConsumerWidget {
@@ -241,6 +241,9 @@ Widget _buildHeader(
       case "gmail-oauth-guide":
         data = "Google OAuth Guide";
         break;
+      case "how-it-works":
+        data = "How It's Calculated";
+        break;
     }
 
     return FHeader.nested(
@@ -261,9 +264,12 @@ Widget _buildHeader(
       titleStyle: _headerTitleStyle(context, subtitle),
     ),
 
-    prefixes: [if (hasTimetableAction) const SyncGoogleCalendarButton()],
+    prefixes: [if (hasTimetableAction) const _AttendanceGuideButton()],
 
-    suffixes: [if (hasTimetableAction) const TimetableViewToggleButton()],
+    suffixes: [
+      if (hasTimetableAction) const TimetableViewToggleButton(),
+      if (path.startsWith('/attendance')) const _AttendanceGuideButton(),
+    ],
   );
 }
 
@@ -349,4 +355,16 @@ String _taskLabel(String id) {
   }
 
   return 'Working...';
+}
+
+/// Opens the page explaining how attendance numbers are worked out.
+class _AttendanceGuideButton extends StatelessWidget {
+  const _AttendanceGuideButton();
+
+  @override
+  Widget build(BuildContext context) => FButton.icon(
+    semanticsLabel: 'How attendance is calculated',
+    onPress: () => openAttendanceGuide(context),
+    child: const Icon(FLucideIcons.info),
+  );
 }

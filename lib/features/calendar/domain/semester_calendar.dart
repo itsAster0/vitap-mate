@@ -98,6 +98,16 @@ class SemesterCalendar {
     return null;
   }
 
+  /// The first exam starting after today, whether or not classes come
+  /// before it.
+  ({DateTime start, String name})? upcomingExam(DateTime now) {
+    final today = _dateOnly(now);
+    for (final exam in _exams) {
+      if (exam.start.isAfter(today)) return exam;
+    }
+    return null;
+  }
+
   /// The most notable entry of each dated day.
   final Map<DateTime, CalendarEntry> _dayEntries;
 
@@ -153,6 +163,11 @@ class SemesterCalendar {
     return null;
   }
 
+  /// The semester's first class day, or null for an empty calendar.
+  DateTime? get firstClassDay => _instructionalDays.isEmpty
+      ? null
+      : _instructionalDays.reduce((a, b) => a.isBefore(b) ? a : b);
+
   /// The last day with classes of this kind, or null for an empty calendar.
   DateTime? lastClassDay({required bool lab}) {
     DateTime? last;
@@ -167,8 +182,21 @@ class SemesterCalendar {
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
 
 /// "CAT - II" → "CAT-II", "Final Assessment Test" → "FAT".
-String _shortExamName(String kind) {
-  if (kind.toLowerCase() == 'final assessment test') return 'FAT';
+String _shortExamName(String kind) => examName(kind);
+
+/// One name for an exam wherever it comes from: the calendar's "CAT - II"
+/// or "Final Assessment Test", or the exam schedule's "CAT2" or "FAT", all
+/// read "CAT-II" / "FAT".
+String examName(String raw) {
+  final kind = raw.trim();
+  final lower = kind.toLowerCase();
+  if (lower == 'final assessment test' || lower == 'fat') return 'FAT';
+  final cat = RegExp(r'^cat\s*-?\s*(\d+|[ivx]+)$').firstMatch(lower);
+  if (cat != null) {
+    final n = cat.group(1)!;
+    const roman = {'1': 'I', '2': 'II', '3': 'III', '4': 'IV'};
+    return 'CAT-${roman[n] ?? n.toUpperCase()}';
+  }
   return kind.replaceAll(' - ', '-');
 }
 
@@ -205,7 +233,7 @@ String titleOf(CalendarEntry entry) {
   final note = entry.note.trim();
   return switch (markOf(entry)) {
     CalendarMark.holiday => note.isEmpty ? 'Holiday' : note,
-    CalendarMark.exam => entry.kind,
+    CalendarMark.exam => _shortExamName(entry.kind),
     CalendarMark.labFat => 'Lab FAT',
     CalendarMark.noClasses =>
       note.isEmpty || note.toLowerCase() == 'no instructional day'
