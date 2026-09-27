@@ -12,6 +12,7 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/more/domain/exam_time.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
@@ -151,7 +152,7 @@ class _ExamsView extends HookWidget {
             value: index,
             onChanged: (value) => selected.value = value,
             segments: [
-              for (final (i, t) in types.indexed) (i, t.examType.trim()),
+              for (final (i, t) in types.indexed) (i, examName(t.examType)),
             ],
           ),
           const SizedBox(height: Space.xs),

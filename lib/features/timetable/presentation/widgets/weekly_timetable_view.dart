@@ -400,7 +400,11 @@ class _ClassSheet extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
-    final standing = record == null ? null : AttendanceStanding.of(record!);
+    // Advice in sessions for labs; the x/y line below stays VTOP's own.
+    final standing = record == null
+        ? null
+        : AttendanceStanding.sessions(record!);
+    final summary = record == null ? null : AttendanceStanding.of(record!);
     final tone = standing == null
         ? null
         : !standing.isSafe
@@ -514,7 +518,7 @@ class _ClassSheet extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${standing.attended} of ${standing.total} attended',
+                            '${summary!.attended} of ${summary.total} attended',
                             style: typography.body.xs.copyWith(
                               color: colors.mutedForeground,
                             ),

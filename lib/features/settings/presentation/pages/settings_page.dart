@@ -20,6 +20,10 @@ import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
@@ -110,6 +114,67 @@ class SettingsPage extends HookConsumerWidget {
       if (context.mounted) {
         dispToast(context, "Failed", "Could not copy your Token right now.");
       }
+    }
+  }
+
+  /// Developer tool: removes the newest row from every course's saved
+  /// history, so it disagrees with the summary. A refresh restores it.
+  Future<void> _dropLatestHistoryEntries(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    try {
+      final attendance = await (await ref.read(
+        attendanceRepositoryProvider.future,
+      )).loadCache();
+      var dropped = 0;
+      for (final course in attendance?.records ?? <AttendanceRecord>[]) {
+        final repo = await ref.read(
+          fullAttendanceRepositoryProvider(
+            course.courseType,
+            course.courseId,
+          ).future,
+        );
+        final history = await repo.loadCache();
+        if (history == null) continue;
+        final trimmed = withoutLatestEntry(history);
+        if (trimmed.records.length == history.records.length) continue;
+        await repo.saveCache(trimmed);
+        dropped++;
+        ref.invalidate(
+          cachedFullAttendanceProvider(course.courseType, course.courseId),
+        );
+        ref.invalidate(
+          fullAttendanceProvider(course.courseType, course.courseId),
+        );
+      }
+      if (context.mounted) {
+        dispToast(
+          context,
+          'History Trimmed',
+          'Dropped the latest entry from $dropped courses.',
+        );
+      }
+    } catch (e) {
+      if (context.mounted) disCommonToast(context, e);
+    }
+  }
+
+  /// Developer tool: saves the attendance summary with no courses, as before
+  /// VTOP posts any. A refresh restores it.
+  Future<void> _clearAttendance(BuildContext context, WidgetRef ref) async {
+    try {
+      final repo = await ref.read(attendanceRepositoryProvider.future);
+      final attendance = await repo.loadCache();
+      if (attendance != null) {
+        await repo.saveCache(attendance.copyWith(records: const []));
+      }
+      ref.invalidate(attendanceProvider);
+      if (context.mounted) {
+        dispToast(context, 'Attendance Cleared', 'Refresh to bring it back.');
+      }
+    } catch (e) {
+      if (context.mounted) disCommonToast(context, e);
     }
   }
 
@@ -630,6 +695,18 @@ class SettingsPage extends HookConsumerWidget {
               ),
               FTile(
                 prefix: _IconTile(
+                  icon: FLucideIcons.calendarPlus,
+                  tone: colors.app.success,
+                ),
+                title: const Text('Calendar Sync'),
+                subtitle: const Text('Add your classes to the phone calendar'),
+                suffix: Icon(FLucideIcons.chevronRight),
+                onPress: () {
+                  GoRouter.of(context).pushNamed(Paths.calendarSync);
+                },
+              ),
+              FTile(
+                prefix: _IconTile(
                   icon: FLucideIcons.bell,
                   tone: colors.app.success,
                 ),
@@ -673,6 +750,24 @@ class SettingsPage extends HookConsumerWidget {
                   title: const Text('Clear Saved Cookies'),
                   suffix: const Icon(FLucideIcons.chevronRight),
                   onPress: () => _clearSavedCookies(context, ref),
+                ),
+                FTile(
+                  prefix: const Icon(FLucideIcons.calendarX),
+                  title: const Text('Drop Latest History Entry'),
+                  subtitle: const Text(
+                    'Every course, saved until the next refresh',
+                  ),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _dropLatestHistoryEntries(context, ref),
+                ),
+                FTile(
+                  prefix: const Icon(FLucideIcons.clipboardX),
+                  title: const Text('Clear Attendance'),
+                  subtitle: const Text(
+                    'Show it as not posted, until the next refresh',
+                  ),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () => _clearAttendance(context, ref),
                 ),
                 FTile(
                   prefix: const Icon(Icons.receipt_long_outlined),

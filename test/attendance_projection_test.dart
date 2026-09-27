@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
@@ -81,6 +82,14 @@ final _timetable = TimetableData(
 );
 
 void main() {
+  test('exam names read the same from the calendar and the schedule', () {
+    expect(examName('CAT - II'), 'CAT-II');
+    expect(examName('CAT2'), 'CAT-II');
+    expect(examName('CAT1'), 'CAT-I');
+    expect(examName('Final Assessment Test'), 'FAT');
+    expect(examName('FAT'), 'FAT');
+  });
+
   group('SemesterCalendar', () {
     test('labs stop on the first LAB FAT day, theory carries on', () {
       expect(_october.labFatStart, DateTime(2026, 10, 31));
@@ -216,6 +225,43 @@ void main() {
       expect(left, 2);
     });
 
+    test('counts unposted classes from the day after the last posted', () {
+      final p = AttendanceProjection.of(
+        record: _record('ETH'),
+        timetable: _timetable,
+        calendar: _october,
+        // Tue 6 evening; VTOP has posted up to Sat 3 Oct.
+        now: DateTime(2026, 10, 6, 18),
+        countedThrough: DateTime(2026, 10, 3),
+      );
+      // Tue 6's class has started but is unposted, so it still counts.
+      expect(p.left, 5);
+      expect((p.unposted, p.upcoming), (1, 4));
+    });
+
+    test('earlier days since the last posted count as unposted', () {
+      final p = AttendanceProjection.of(
+        record: _record('ETH'),
+        timetable: _timetable,
+        calendar: _october,
+        // Wed 7; posted up to Sat 3, so Tue 6 is held but unposted.
+        now: DateTime(2026, 10, 7, 9),
+        countedThrough: DateTime(2026, 10, 3),
+      );
+      expect((p.unposted, p.upcoming), (1, 4));
+    });
+
+    test('a summary posted through today counts from now', () {
+      final left = AttendanceProjection.of(
+        record: _record('ETH'),
+        timetable: _timetable,
+        calendar: _october,
+        now: DateTime(2026, 10, 6, 18),
+        countedThrough: DateTime(2026, 10, 6),
+      ).left;
+      expect(left, 4);
+    });
+
     test('nothing left after the last class day', () {
       expect(project('ETH', DateTime(2026, 11, 4)).left, 0);
       expect(project('ELA', DateTime(2026, 10, 25)).left, 0);
@@ -241,6 +287,109 @@ void main() {
       expect(p.canMiss, 0);
       expect(p.mustAttend, isNull);
       expect(p.canFinishSafe, isFalse);
+    });
+  });
+
+  group('HistorySync', () {
+    FullAttendanceRecord row(String date, String status) =>
+        FullAttendanceRecord(
+          serial: '',
+          date: date,
+          slot: '',
+          dayTime: '',
+          status: status,
+          remark: '',
+        );
+    FullAttendanceData history(List<FullAttendanceRecord> rows) =>
+        FullAttendanceData(
+          records: rows,
+          semesterId: 'S',
+          updateTime: BigInt.zero,
+          courseId: 'C',
+          courseType: 'ETH',
+        );
+    final rows = [
+      row('03-10-2026', 'Present'),
+      row('29-09-2026', 'Absent'),
+      row('26-09-2026', 'On Duty'),
+    ];
+
+    test('matching counts give the last posted day', () {
+      final sync = HistorySync.of(
+        _record('ETH', attended: 2, total: 3),
+        history(rows),
+      );
+      expect(sync.inSync, isTrue);
+      expect(sync.countedThrough, DateTime(2026, 10, 3));
+    });
+
+    test('lab summaries count each session twice', () {
+      final sync = HistorySync.of(
+        _record('ELA', attended: 4, total: 6),
+        history(rows),
+      );
+      expect(sync.inSync, isTrue);
+    });
+
+    test('dropping the latest entry removes only the newest row', () {
+      final trimmed = withoutLatestEntry(history(rows));
+      expect(trimmed.records.map((r) => r.date), ['29-09-2026', '26-09-2026']);
+    });
+
+    test('a summary ahead of the history is out of sync', () {
+      final sync = HistorySync.of(
+        _record('ETH', attended: 3, total: 4),
+        history(rows),
+      );
+      expect(sync.inSync, isFalse);
+      expect((sync.attended, sync.total), (2, 3));
+      expect(sync.countedThrough, isNull);
+    });
+  });
+
+  group('lab sessions', () {
+    test('halve VTOP counts, which the history matches when in sync', () {
+      final s = AttendanceStanding.sessions(
+        _record('ELA', attended: 18, total: 22),
+      );
+      expect((s.attended, s.total), (9, 11));
+      // 9 / (11 + 1) = 75%; in classes it would read "Can skip 2".
+      expect(s.advice, 'Can skip 1');
+    });
+
+    test('fall back to the halved summary when the history lags', () {
+      // VTOP 10/12, history 5/5: plan from 5/6, not the history.
+      final s = AttendanceStanding.sessions(
+        _record('ELA', attended: 10, total: 12),
+      );
+      expect((s.attended, s.total), (5, 6));
+    });
+
+    test('odd counts round against skipping', () {
+      final s = AttendanceStanding.sessions(
+        _record('ELA', attended: 17, total: 21),
+      );
+      expect((s.attended, s.total), (8, 11));
+    });
+
+    test('theory is left in classes', () {
+      final s = AttendanceStanding.sessions(
+        _record('ETH', attended: 18, total: 22),
+      );
+      expect((s.attended, s.total), (18, 22));
+    });
+
+    test('projection converts to sessions', () {
+      final record = _record('ELA', attended: 18, total: 22);
+      final p = AttendanceProjection(
+        standing: AttendanceStanding.of(record),
+        left: 8,
+        unposted: 2,
+      ).inSessions(record);
+      expect((p.standing.attended, p.standing.total), (9, 11));
+      expect((p.left, p.unposted, p.upcoming), (4, 1, 3));
+      // (9 + 4 - x) / 15 >= 75% for x <= 1.
+      expect(p.canMiss, 1);
     });
   });
 }

@@ -14,6 +14,7 @@ import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
+import 'package:vitapmate/features/attendance/presentation/widgets/attendance_not_posted.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class AttendancePage extends HookConsumerWidget {
@@ -150,15 +151,20 @@ class _AttendanceView extends HookWidget {
             child: Column(
               key: ValueKey(filter.value),
               children: [
-                if (shown.isEmpty)
+                if (records.isEmpty)
+                  const AttendanceNotPosted(
+                    fallback: EmptyState(
+                      icon: FLucideIcons.clipboardList,
+                      title: 'No attendance yet',
+                      message: 'Attendance shows up once classes begin.',
+                    ),
+                  )
+                else if (shown.isEmpty)
                   EmptyState(
                     icon: FLucideIcons.clipboardList,
-                    title: records.isEmpty
-                        ? 'No attendance yet'
-                        : 'Nothing here',
-                    message: records.isEmpty
-                        ? 'Attendance shows up once classes begin.'
-                        : 'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} courses this semester.',
+                    title: 'Nothing here',
+                    message:
+                        'No ${filter.value == _CourseFilter.lab ? 'lab' : 'theory'} courses this semester.',
                   )
                 else
                   for (final (i, record) in shown.indexed)

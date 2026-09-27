@@ -12,7 +12,11 @@ import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_cal.dart';
@@ -59,20 +63,32 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     }
 
     final (code, name) = formateName(record.courseName);
-    final standing = AttendanceStanding.of(record);
+    // In sessions for labs; exactly the history's count whenever it agrees.
+    final standing = AttendanceStanding.sessions(record);
     final tone = attendanceTone(
       context,
       safe: standing.isSafe,
       atEdge: standing.canSkip == 0,
     );
     final history = dataAsync.value;
-    // Lab summaries count each two-period session twice. Count sessions
-    // from the history, which has one row each, or halve until it loads.
-    final count = !record.islab()
-        ? (standing.attended, standing.total)
-        : history != null
-        ? _sessionCount(history)
-        : (standing.attended ~/ 2, standing.total ~/ 2);
+    final sync = history == null ? null : HistorySync.of(record, history);
+    final count = (standing.attended, standing.total);
+    // Classes held since VTOP's last posted day, known only when the
+    // history agrees with the summary (in sessions for labs).
+    final timetable = ref.watch(timetableProvider).value;
+    final calendar = ref.watch(semesterCalendarProvider);
+    final classes = timetable == null || calendar == null
+        ? null
+        : AttendanceProjection.of(
+            record: record,
+            timetable: timetable,
+            calendar: calendar,
+            now: DateTime.now(),
+            countedThrough: sync?.countedThrough,
+          );
+    final unposted =
+        (record.islab() ? classes?.inSessions(record) : classes)?.unposted ??
+        0;
 
     return ScreenRefresh(
       onRefresh: refresh,
@@ -189,6 +205,35 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                                         color: colors.mutedForeground,
                                       ),
                                     ),
+                                    // VTOP updates the history separately;
+                                    // flag when it disagrees.
+                                    if (sync != null && !sync.inSync)
+                                      Row(
+                                        children: [
+                                          Container(
+                                            width: 5,
+                                            height: 5,
+                                            decoration: BoxDecoration(
+                                              color: colors.app.warning.base,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: Space.xs + 2),
+                                          Expanded(
+                                            child: Text(
+                                              'History shows ${sync.attended} '
+                                              'of ${sync.total} · pull to sync',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: typography.body.xs
+                                                  .copyWith(
+                                                    color:
+                                                        colors.mutedForeground,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                   ],
                                 ),
                               ),
@@ -268,12 +313,13 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                         ),
                         // Plans from the summary counts, which match VTOP
                         // (in sessions for labs). Keyed so it resets when
-                        // the lab history loads.
+                        // a refresh changes them.
                         _Tab.planner => AttendancePlanner(
                           key: ValueKey(count),
                           attended: count.$1,
                           reported: standing.reported,
                           total: count.$2,
+                          unposted: unposted,
                         ),
                       },
                     ),
@@ -301,26 +347,26 @@ class _Insights extends StatelessWidget {
     final typography = context.theme.typography;
     final palette = colors.app;
     final statuses = [
-      for (final r in data.records.reversed) _statusOf(r.status),
+      for (final r in data.records.reversed) classStatusOf(r.status),
     ];
     if (statuses.isEmpty) return const SizedBox.shrink();
-    int count(_Status s) => statuses.where((x) => x == s).length;
-    final present = count(_Status.present);
-    final onDuty = count(_Status.onDuty);
-    final absent = count(_Status.absent);
+    int count(ClassStatus s) => statuses.where((x) => x == s).length;
+    final present = count(ClassStatus.present);
+    final onDuty = count(ClassStatus.onDuty);
+    final absent = count(ClassStatus.absent);
 
     // Streak of attended (present or on duty) classes ending at the latest.
     var streak = 0;
     for (final s in statuses.reversed) {
-      if (s == _Status.present || s == _Status.onDuty) {
+      if (s == ClassStatus.present || s == ClassStatus.onDuty) {
         streak++;
       } else {
         break;
       }
     }
     final lastMissed = data.records
-        .where((r) => _statusOf(r.status) == _Status.absent)
-        .map((r) => _parseDate(r.date))
+        .where((r) => classStatusOf(r.status) == ClassStatus.absent)
+        .map((r) => parseHistoryDate(r.date))
         .whereType<DateTime>()
         .firstOrNull;
     final note = [
@@ -458,17 +504,17 @@ class _MonthCalendar extends HookWidget {
     final palette = colors.app;
 
     // Worst status per day: absent > on duty > present.
-    int rank(_Status s) => switch (s) {
-      _Status.absent => 3,
-      _Status.onDuty => 2,
-      _Status.present => 1,
-      _Status.other => 0,
+    int rank(ClassStatus s) => switch (s) {
+      ClassStatus.absent => 3,
+      ClassStatus.onDuty => 2,
+      ClassStatus.present => 1,
+      ClassStatus.other => 0,
     };
-    final byDay = <DateTime, _Status>{};
+    final byDay = <DateTime, ClassStatus>{};
     for (final r in records) {
-      final d = _parseDate(r.date);
+      final d = parseHistoryDate(r.date);
       if (d == null) continue;
-      final s = _statusOf(r.status);
+      final s = classStatusOf(r.status);
       final prev = byDay[d];
       if (prev == null || rank(s) > rank(prev)) byDay[d] = s;
     }
@@ -485,11 +531,11 @@ class _MonthCalendar extends HookWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    Tone toneOf(_Status s) => switch (s) {
-      _Status.present => palette.success,
-      _Status.onDuty => palette.accentTone,
-      _Status.absent => palette.danger,
-      _Status.other => Tone(
+    Tone toneOf(ClassStatus s) => switch (s) {
+      ClassStatus.present => palette.success,
+      ClassStatus.onDuty => palette.accentTone,
+      ClassStatus.absent => palette.danger,
+      ClassStatus.other => Tone(
         base: colors.mutedForeground,
         subtle: colors.secondary,
         onSubtle: colors.mutedForeground,
@@ -646,7 +692,7 @@ class _History extends StatelessWidget {
     // VTOP lists newest first; group consecutive records by month.
     final groups = <String, List<FullAttendanceRecord>>{};
     for (final record in data.records) {
-      final date = _parseDate(record.date);
+      final date = parseHistoryDate(record.date);
       final key = date == null ? 'Other' : DateFormat('MMMM y').format(date);
       groups.putIfAbsent(key, () => []).add(record);
     }
@@ -685,46 +731,12 @@ class _History extends StatelessWidget {
   }
 
   String _monthSummary(List<FullAttendanceRecord> records) {
-    final missed = records.where((r) => _statusOf(r.status) == _Status.absent);
+    final missed = records.where(
+      (r) => classStatusOf(r.status) == ClassStatus.absent,
+    );
     return missed.isEmpty
         ? '${records.length} classes'
         : '${missed.length} missed of ${records.length}';
-  }
-}
-
-enum _Status { present, onDuty, absent, other }
-
-/// (attended, total) sessions in [data]; on duty counts as attended.
-(int, int) _sessionCount(FullAttendanceData data) {
-  var attended = 0;
-  var total = 0;
-  for (final r in data.records) {
-    switch (_statusOf(r.status)) {
-      case _Status.present || _Status.onDuty:
-        attended++;
-        total++;
-      case _Status.absent:
-        total++;
-      case _Status.other:
-        break;
-    }
-  }
-  return (attended, total);
-}
-
-_Status _statusOf(String raw) {
-  final s = raw.toLowerCase().replaceAll(' ', '');
-  if (s == 'present') return _Status.present;
-  if (s == 'onduty') return _Status.onDuty;
-  if (s == 'absent') return _Status.absent;
-  return _Status.other;
-}
-
-DateTime? _parseDate(String value) {
-  try {
-    return DateFormat('dd-MM-yyyy').parseStrict(value);
-  } catch (_) {
-    return null;
   }
 }
 
@@ -738,13 +750,13 @@ class _HistoryRow extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final palette = colors.app;
-    final date = _parseDate(record.date);
-    final status = _statusOf(record.status);
+    final date = parseHistoryDate(record.date);
+    final status = classStatusOf(record.status);
     final (tone, label) = switch (status) {
-      _Status.present => (palette.success, 'Present'),
-      _Status.onDuty => (palette.accentTone, 'On duty'),
-      _Status.absent => (palette.danger, 'Absent'),
-      _Status.other => (
+      ClassStatus.present => (palette.success, 'Present'),
+      ClassStatus.onDuty => (palette.accentTone, 'On duty'),
+      ClassStatus.absent => (palette.danger, 'Absent'),
+      ClassStatus.other => (
         Tone(
           base: colors.mutedForeground,
           subtle: colors.secondary,
@@ -753,7 +765,7 @@ class _HistoryRow extends StatelessWidget {
         record.status,
       ),
     };
-    final absent = status == _Status.absent;
+    final absent = status == ClassStatus.absent;
     // "WED / 15:00-15:50" → "3:00 – 3:50 PM"
     final time = record.dayTime
         .split('/')

@@ -33,7 +33,7 @@ final class ExamScheduleProvider
   ExamSchedule create() => ExamSchedule();
 }
 
-String _$examScheduleHash() => r'2354e596f9f2f5537f892b683072eed59e8aa610';
+String _$examScheduleHash() => r'3a6654fc682ff7c80553ca8e40d59f03e9f03823';
 
 abstract class _$ExamSchedule extends $AsyncNotifier<ExamScheduleData> {
   FutureOr<ExamScheduleData> build();
@@ -53,3 +53,53 @@ abstract class _$ExamSchedule extends $AsyncNotifier<ExamScheduleData> {
     element.handleCreate(ref, build);
   }
 }
+
+/// The exam schedule as last saved, or null if it was never fetched. Never
+/// goes to VTOP, for screens that only show it in passing.
+
+@ProviderFor(cachedExamSchedule)
+final cachedExamScheduleProvider = CachedExamScheduleProvider._();
+
+/// The exam schedule as last saved, or null if it was never fetched. Never
+/// goes to VTOP, for screens that only show it in passing.
+
+final class CachedExamScheduleProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<ExamScheduleData?>,
+          ExamScheduleData?,
+          FutureOr<ExamScheduleData?>
+        >
+    with
+        $FutureModifier<ExamScheduleData?>,
+        $FutureProvider<ExamScheduleData?> {
+  /// The exam schedule as last saved, or null if it was never fetched. Never
+  /// goes to VTOP, for screens that only show it in passing.
+  CachedExamScheduleProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cachedExamScheduleProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cachedExamScheduleHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<ExamScheduleData?> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<ExamScheduleData?> create(Ref ref) {
+    return cachedExamSchedule(ref);
+  }
+}
+
+String _$cachedExamScheduleHash() =>
+    r'a813401d7b8323977d610856851d6b5fa90a5394';

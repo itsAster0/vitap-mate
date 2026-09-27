@@ -46,5 +46,14 @@ class ExamSchedule extends _$ExamSchedule {
     );
     final examSchedule = await controller.refresh();
     state = AsyncData(examSchedule);
+    ref.invalidate(cachedExamScheduleProvider);
   }
+}
+
+/// The exam schedule as last saved, or null if it was never fetched. Never
+/// goes to VTOP, for screens that only show it in passing.
+@Riverpod(keepAlive: true)
+Future<ExamScheduleData?> cachedExamSchedule(Ref ref) async {
+  final repo = await ref.watch(examScheduleRepositoryProvider.future);
+  return repo.loadCache();
 }
