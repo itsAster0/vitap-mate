@@ -41,12 +41,30 @@ class TimetablePage extends HookConsumerWidget {
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
-        ref.read(timetableProvider.notifier).updateTimetable().catchError((
-          e,
-          st,
-        ) {
+        try {
+          await ref.read(timetableProvider.notifier).updateTimetable();
+        } catch (e, st) {
           log('auto refresh failed: $e', stackTrace: st);
-        });
+        }
+        // On an exam day, pull the exam schedule too so a moved venue,
+        // seat or time shows up.
+        try {
+          final schedule = await ref.read(cachedExamScheduleProvider.future);
+          final now = DateTime.now();
+          final examToday = [
+            for (final type in schedule?.exams ?? const []) ...type.records,
+          ].any((exam) {
+            final day = examDayOf(exam);
+            return day != null &&
+                day.year == now.year &&
+                day.month == now.month &&
+                day.day == now.day;
+          });
+          if (!examToday) return;
+          await ref.read(examScheduleProvider.notifier).updatexamschedule();
+        } catch (e, st) {
+          log('exam schedule auto refresh failed: $e', stackTrace: st);
+        }
       });
 
       return null;
