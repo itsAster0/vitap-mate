@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:flutter/material.dart' show RefreshIndicator, RefreshCallback;
@@ -28,18 +29,22 @@ class AttendancePage extends HookConsumerWidget {
       } catch (e) {
         log("$e");
         if (context.mounted) disCommonToast(context, e);
+        return;
       }
+      // Not awaited, so the refresh spinner stops with the summary.
+      unawaited(ref.read(attendanceProvider.notifier).pullMismatchedHistory());
     }
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
-        ref.read(attendanceProvider.notifier).updateAttendance().catchError((
-          e,
-          st,
-        ) {
+        try {
+          await ref.read(attendanceProvider.notifier).updateAttendance();
+        } catch (e, st) {
           log('auto refresh failed: $e', stackTrace: st);
-        });
+          return;
+        }
+        await ref.read(attendanceProvider.notifier).pullMismatchedHistory();
       });
       return null;
     }, const []);
