@@ -126,6 +126,7 @@ class _CalendarView extends HookWidget {
       return map;
     }, [data]);
     final semester = useMemoized(() => SemesterCalendar.of(data), [data]);
+    final events = useMemoized(() => _semesterEvents(byDate), [byDate]);
 
     // Every month from the first to the last dated entry.
     final months = useMemoized(() {
@@ -248,9 +249,8 @@ class _CalendarView extends HookWidget {
             child: _MonthEvents(
               key: ValueKey(month),
               month: month,
-              byDate: byDate,
+              events: events,
               today: today,
-              labFatStart: semester.labFatStart,
             ),
           ),
           DataUpdatedFooter(updateTime: data.updateTime.toInt()),
@@ -507,80 +507,149 @@ class _Legend extends StatelessWidget {
   }
 }
 
-/// One row of the month's list: a single day, or a run of consecutive
-/// listed days with the same title (an exam week).
+/// One row of the month's list: a single day, or a run of listed days with
+/// the same title (an exam, the lab FAT). A run is broken only by a class
+/// day, so holidays inside it and month ends do not split it.
 class _Event {
-  _Event(this.first, this.entry) : last = first;
+  _Event(this.first, this.entry) : last = first, parts = [_Part(first, entry)];
+
+  final DateTime first;
+  DateTime last;
+
+  /// The entry naming the row; for a run of days off, its most telling day.
+  CalendarEntry entry;
+
+  bool get isDayOff => _isDayOff(markOf(entry));
+
+  /// Calendar days the row spans, ends included.
+  int get days => last.difference(first).inDays + 1;
+
+  /// The reasons inside a run of days off, each over its own days.
+  final List<_Part> parts;
+}
+
+/// One reason inside a run of days off ("Holiday" on Sunday, "Vijaya
+/// Dashami / Dussehra" on Tuesday).
+class _Part {
+  _Part(this.first, this.entry) : last = first;
 
   final DateTime first;
   DateTime last;
   final CalendarEntry entry;
 }
 
-/// The month's notable days: holidays, exams, no-class days and named
-/// events. Plain class days and Sundays are left out.
+bool _isDayOff(CalendarMark mark) =>
+    mark == CalendarMark.holiday || mark == CalendarMark.noClasses;
+
+/// Which day of a run of days off names it: a named holiday, then a named
+/// no-class day ("5th Annual Convocation"), then a plain holiday.
+int _dayOffRank(CalendarEntry entry) {
+  final holiday = markOf(entry) == CalendarMark.holiday;
+  final named = switch (titleOf(entry)) {
+    'Holiday' || 'No instructional day' => false,
+    _ => true,
+  };
+  return switch ((named, holiday)) {
+    (true, true) => 0,
+    (true, false) => 1,
+    (false, true) => 2,
+    (false, false) => 3,
+  };
+}
+
+/// Whether classes are held on any day strictly between [a] and [b], so
+/// two exam blocks around a class week stay separate rows.
+bool _classDayBetween(
+  Map<DateTime, List<CalendarEntry>> byDate,
+  DateTime a,
+  DateTime b,
+) {
+  for (
+    var d = DateTime(a.year, a.month, a.day + 1);
+    d.isBefore(b);
+    d = DateTime(d.year, d.month, d.day + 1)
+  ) {
+    final mark = _dayMark(byDate[d]);
+    if (mark == CalendarMark.classes ||
+        mark == CalendarMark.special ||
+        mark == CalendarMark.labFat) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// The semester's notable days as rows, in date order: holidays, exams,
+/// no-class days and named events. Plain class days and Sundays are left
+/// out.
+List<_Event> _semesterEvents(Map<DateTime, List<CalendarEntry>> byDate) {
+  final days = byDate.keys.toList()..sort();
+  final events = <_Event>[];
+  for (final day in days) {
+    for (final entry in byDate[day]!) {
+      final mark = markOf(entry);
+      if (mark == CalendarMark.classes) continue;
+      // Back-to-back days off (Sunday, a no-class Monday, a festival) are
+      // one row, named by its most telling day.
+      if (_isDayOff(mark)) {
+        final previous = events.reversed.where((e) => e.isDayOff).firstOrNull;
+        if (previous != null && day.difference(previous.last).inDays <= 1) {
+          previous.last = day;
+          final part = previous.parts.last;
+          if (titleOf(part.entry) == titleOf(entry) &&
+              markOf(part.entry) == mark) {
+            part.last = day;
+          } else {
+            previous.parts.add(_Part(day, entry));
+          }
+          if (_dayOffRank(entry) < _dayOffRank(previous.entry)) {
+            previous.entry = entry;
+          }
+        } else {
+          events.add(_Event(day, entry));
+        }
+        continue;
+      }
+      // The latest row of the same kind, even with a holiday row after it.
+      _Event? previous;
+      for (final e in events.reversed) {
+        if (markOf(e.entry) == mark && titleOf(e.entry) == titleOf(entry)) {
+          previous = e;
+          break;
+        }
+      }
+      if (previous != null && !_classDayBetween(byDate, previous.last, day)) {
+        previous.last = day;
+      } else {
+        events.add(_Event(day, entry));
+      }
+    }
+  }
+  return events;
+}
+
+/// The rows touching the shown month, a run from a neighbouring month
+/// included whole.
 class _MonthEvents extends StatelessWidget {
   const _MonthEvents({
     super.key,
     required this.month,
-    required this.byDate,
+    required this.events,
     required this.today,
-    required this.labFatStart,
   });
 
   final DateTime month;
-  final Map<DateTime, List<CalendarEntry>> byDate;
+  final List<_Event> events;
   final DateTime today;
-  final DateTime? labFatStart;
-
-  /// Whether classes are held on any day strictly between [a] and [b], so
-  /// two exam blocks around a class week stay separate rows.
-  bool _classDayBetween(DateTime a, DateTime b) {
-    for (
-      var d = DateTime(a.year, a.month, a.day + 1);
-      d.isBefore(b);
-      d = DateTime(d.year, d.month, d.day + 1)
-    ) {
-      final mark = _dayMark(byDate[d]);
-      if (mark == CalendarMark.classes ||
-          mark == CalendarMark.special ||
-          mark == CalendarMark.labFat) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   @override
   Widget build(BuildContext context) {
-    final days =
-        byDate.keys
-            .where((d) => d.year == month.year && d.month == month.month)
-            .toList()
-          ..sort();
-    final events = <_Event>[];
-    for (final day in days) {
-      for (final entry in byDate[day]!) {
-        final mark = markOf(entry);
-        if (mark == CalendarMark.classes) continue;
-        if (mark == CalendarMark.holiday &&
-            day.weekday == DateTime.sunday &&
-            titleOf(entry) == 'Holiday') {
-          continue;
-        }
-        final previous = events.isEmpty ? null : events.last;
-        if (previous != null &&
-            titleOf(previous.entry) == titleOf(entry) &&
-            markOf(previous.entry) == mark &&
-            !_classDayBetween(previous.last, day)) {
-          previous.last = day;
-        } else {
-          events.add(_Event(day, entry));
-        }
-      }
-    }
+    final next = DateTime(month.year, month.month + 1);
+    final shown = events
+        .where((e) => !e.last.isBefore(month) && e.first.isBefore(next))
+        .toList();
 
-    if (events.isEmpty) {
+    if (shown.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: Space.lg),
         child: Text(
@@ -597,18 +666,14 @@ class _MonthEvents extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: Column(
         children: [
-          for (final (i, event) in events.indexed) ...[
+          for (final (i, event) in shown.indexed) ...[
             if (i > 0)
               Container(
                 height: 1,
                 margin: const EdgeInsets.only(left: 64),
                 color: context.theme.colors.border,
               ),
-            _EventRow(
-              event: event,
-              today: today,
-              isLabFatStart: event.first == labFatStart,
-            ),
+            _EventRow(event: event, month: month, today: today),
           ],
         ],
       ),
@@ -619,20 +684,25 @@ class _MonthEvents extends StatelessWidget {
 class _EventRow extends StatelessWidget {
   const _EventRow({
     required this.event,
+    required this.month,
     required this.today,
-    required this.isLabFatStart,
   });
 
   final _Event event;
+  final DateTime month;
   final DateTime today;
-  final bool isLabFatStart;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final app = colors.app;
-    final mark = markOf(event.entry);
+    // A run of days off with any holiday in it reads as a holiday.
+    final mark =
+        event.isDayOff &&
+            event.parts.any((p) => markOf(p.entry) == CalendarMark.holiday)
+        ? CalendarMark.holiday
+        : markOf(event.entry);
     final past = event.last.isBefore(today);
     final range = event.last != event.first;
 
@@ -650,11 +720,14 @@ class _EventRow extends StatelessWidget {
         ),
       ),
     };
+    // Days off for different reasons: one row, each reason as a card.
+    final mixed = event.isDayOff && event.parts.length > 1;
+    final title = mixed ? '${event.days} days off' : titleOf(event.entry);
     final subtitle = [
       if (range)
-        '${DateFormat('EEE d').format(event.first)} – '
+        '${DateFormat(event.first.month == event.last.month ? 'EEE d' : 'EEE d MMM').format(event.first)} – '
             '${DateFormat('EEE d MMM').format(event.last)}',
-      if (isLabFatStart) 'Labs end · theory as usual',
+      if (event.isDayOff && range && !mixed) '${event.days} days',
     ].join(' · ');
 
     return Opacity(
@@ -664,65 +737,148 @@ class _EventRow extends StatelessWidget {
           horizontal: Space.md,
           vertical: Space.md,
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 40,
-              child: Column(
-                children: [
-                  Text(
-                    DateFormat('EEE').format(event.first).toUpperCase(),
-                    style: typography.body.xs.copyWith(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.4,
-                      color: colors.mutedForeground,
-                    ),
-                  ),
-                  Text(
-                    '${event.first.day}',
-                    style: typography.body.lg.copyWith(
-                      height: 1.15,
-                      fontWeight: FontWeight.w600,
-                      color: colors.foreground,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: Space.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    titleOf(event.entry),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: colors.foreground,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        subtitle,
+            Row(
+              children: [
+                SizedBox(
+                  width: 40,
+                  child: Column(
+                    children: [
+                      Text(
+                        // A run begun last month shows that month, not a weekday.
+                        DateFormat(
+                          event.first.month == month.month ? 'EEE' : 'MMM',
+                        ).format(event.first).toUpperCase(),
                         style: typography.body.xs.copyWith(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
                           color: colors.mutedForeground,
+                        ),
+                      ),
+                      Text(
+                        '${event.first.day}',
+                        style: typography.body.lg.copyWith(
+                          height: 1.15,
+                          fontWeight: FontWeight.w600,
+                          color: colors.foreground,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                    ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Space.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: typography.body.sm.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: colors.foreground,
+                        ),
+                      ),
+                      if (subtitle.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            subtitle,
+                            style: typography.body.xs.copyWith(
+                              color: colors.mutedForeground,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                ToneBadge(label: label, tone: tone),
+              ],
             ),
-            const SizedBox(width: Space.sm),
-            ToneBadge(label: label, tone: tone),
+            if (mixed)
+              Padding(
+                padding: const EdgeInsets.only(top: Space.sm),
+                child: Column(
+                  children: [
+                    for (final part in event.parts)
+                      Padding(
+                        padding: const EdgeInsets.only(top: Space.xs),
+                        child: _PartCard(part: part),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// One reason inside a run of days off: its days, a mark dot and the name.
+class _PartCard extends StatelessWidget {
+  const _PartCard({required this.part});
+
+  final _Part part;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final days = part.last == part.first
+        ? DateFormat('EEE d').format(part.first)
+        : '${DateFormat('EEE d').format(part.first)} – '
+              '${DateFormat('EEE d').format(part.last)}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.md,
+        vertical: Space.sm,
+      ),
+      decoration: BoxDecoration(
+        color: colors.secondary,
+        borderRadius: BorderRadius.circular(Radii.sm),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: _markColor(context, markOf(part.entry)),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: Space.sm),
+          SizedBox(
+            width: 120,
+            child: Text(
+              days,
+              style: typography.body.xs.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colors.mutedForeground,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              titleOf(part.entry),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: typography.body.sm.copyWith(color: colors.foreground),
+            ),
+          ),
+        ],
       ),
     );
   }
