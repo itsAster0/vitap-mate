@@ -1661,7 +1661,9 @@ class _FocusClass extends StatelessWidget {
               if (countdown == null) const Spacer(),
               Text(
                 '${to12H(slot.startTime, context)} – ${to12H(slot.endTime, context)}',
+                // A notch under the countdown so both fit on one line.
                 style: typography.body.xs.copyWith(
+                  fontSize: (typography.body.xs.fontSize ?? 12) - 2,
                   fontWeight: FontWeight.w600,
                   color: colors.mutedForeground,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -2450,53 +2452,60 @@ class _BreakRow extends StatelessWidget {
         ? '${_compactMinutes(minutesOf(nextStart) - minuteNow)} left'
         : _compactMinutes(gap);
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 62),
-      child: SizedBox(
-        height: 34,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 28,
-              child: Center(
-                child: CustomPaint(
-                  size: const Size(1.5, 34),
-                  painter: _DashPainter(colors.border),
-                ),
-              ),
-            ),
-            Icon(FLucideIcons.coffee, size: 14, color: color),
-            const SizedBox(width: Space.sm),
-            Flexible(
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Free until $until',
-                      style: TextStyle(
-                        fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
-                        color: isNow ? color : colors.foreground,
+    return SizedBox(
+      height: 34,
+      child: Row(
+        children: [
+          // The tag sits in the time column so the break text gets the row.
+          SizedBox(
+            width: 62,
+            child: isLongest && !isNow
+                ? Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: Space.xs),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: ToneBadge.neutral(context, 'LONGEST'),
                       ),
                     ),
-                    TextSpan(text: ' · $length'),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: context.theme.typography.body.xs.copyWith(
-                  color: color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                  )
+                : null,
+          ),
+          SizedBox(
+            width: 28,
+            child: Center(
+              child: CustomPaint(
+                size: const Size(1.5, 34),
+                painter: _DashPainter(colors.border),
               ),
             ),
-            // The live break is already highlighted; skip the tag so the
-            // countdown fits.
-            if (isLongest && !isNow) ...[
-              const SizedBox(width: Space.sm),
-              ToneBadge.neutral(context, 'LONGEST'),
-            ],
-          ],
-        ),
+          ),
+          Icon(FLucideIcons.coffee, size: 14, color: color),
+          const SizedBox(width: Space.sm),
+          Flexible(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Free until $until',
+                    style: TextStyle(
+                      fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
+                      color: isNow ? color : colors.foreground,
+                    ),
+                  ),
+                  TextSpan(text: ' · $length'),
+                ],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.theme.typography.body.xs.copyWith(
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
