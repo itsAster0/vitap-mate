@@ -8,11 +8,12 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:pdfx/pdfx.dart' as pdfx;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
+import 'package:vitapmate/features/docs/data/spreadsheet_tables.dart';
 import 'package:vitapmate/features/docs/domain/document_transform.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
+import 'package:vitapmate/features/docs/presentation/widgets/mess_menu_view.dart';
 import 'package:vitapmate/features/docs/presentation/widgets/pdf_document_viewport.dart';
 
 class DocumentViewerPage extends HookConsumerWidget {
@@ -122,28 +123,9 @@ class _EmptyPrompt extends HookConsumerWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'No file added yet. Import one to view it here anytime.',
+              'This document has no file. Delete it and import the file again.',
               textAlign: TextAlign.center,
               style: TextStyle(color: context.theme.colors.mutedForeground),
-            ),
-          ),
-          const SizedBox(height: 20),
-          FButton(
-            onPress: () async {
-              final pickedPath = await pickDocPath();
-              if (pickedPath == null) return;
-              // ignore: use_build_context_synchronously
-              await ref
-                  .read(docsRegistryProvider.notifier)
-                  .fillPreset(doc, pickedPath);
-            },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(FLucideIcons.filePlus2, size: 16),
-                SizedBox(width: 8),
-                Text('Add file'),
-              ],
             ),
           ),
         ],
@@ -181,8 +163,10 @@ class _DocSurface extends HookConsumerWidget {
           ({double scale, double offsetX, double offsetY, double scrollOffset})?
         >(null);
     final registry = ref.read(docsRegistryProvider.notifier);
+    final messMenu = doc.kind == DocKind.spreadsheet && doc.asMessMenu;
     final searchable =
-        doc.kind == DocKind.spreadsheet || doc.kind == DocKind.text;
+        (doc.kind == DocKind.spreadsheet && !messMenu) ||
+        doc.kind == DocKind.text;
 
     useEffect(() {
       if (embedded) return null;
@@ -261,6 +245,9 @@ class _DocSurface extends HookConsumerWidget {
           searchQuery: searchQuery.value,
         );
         break;
+      case DocKind.spreadsheet when doc.asMessMenu:
+        content = MessMenuView(doc: doc, compact: embedded);
+        break;
       case DocKind.spreadsheet:
         content = _SpreadsheetBody(
           doc: doc,
@@ -322,7 +309,7 @@ class _DocSurface extends HookConsumerWidget {
               },
             ),
           ),
-        if (showGestureHint.value)
+        if (showGestureHint.value && !messMenu)
           Positioned(
             left: 24,
             right: 24,
@@ -357,40 +344,42 @@ class _DocSurface extends HookConsumerWidget {
               ),
             ),
           ),
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: FTappable(
-            onPress: () {
-              transform.value = doc.kind == DocKind.pdf
-                  ? recenterPdf(transform.value)
-                  : resetHorizontalOffset(transform.value);
-              persist();
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: darkMode
-                    ? context.theme.colors.primaryForeground
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: context.theme.colors.border),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                FLucideIcons.locateFixed,
-                size: 18,
-                color: context.theme.colors.primary,
+        // The mess menu is a plain list; there is nothing to pan or re-centre.
+        if (!messMenu)
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: FTappable(
+              onPress: () {
+                transform.value = doc.kind == DocKind.pdf
+                    ? recenterPdf(transform.value)
+                    : resetHorizontalOffset(transform.value);
+                persist();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: darkMode
+                      ? context.theme.colors.primaryForeground
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.theme.colors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  FLucideIcons.locateFixed,
+                  size: 18,
+                  color: context.theme.colors.primary,
+                ),
               ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -873,18 +862,6 @@ class _SingleContent extends HookConsumerWidget {
   }
 }
 
-Map<String, List<List<String>>> decodeSpreadsheetIsolate(Uint8List bytes) {
-  final decoder = SpreadsheetDecoder.decodeBytes(bytes);
-  final out = <String, List<List<String>>>{};
-  decoder.tables.forEach((name, table) {
-    out[name] = [
-      for (final row in table.rows)
-        [for (final cell in row) cell?.toString() ?? ''],
-    ];
-  });
-  return out;
-}
-
 List<InlineSpan> _searchSpans(String text, String query, Color highlightColor) {
   final needle = query.trim().toLowerCase();
   if (needle.isEmpty) return [TextSpan(text: text)];
@@ -941,7 +918,7 @@ class _SpreadsheetBody extends HookConsumerWidget {
         final path = await repo.storedFilePathOf(doc);
         if (path == null) return null;
         final bytes = await File(path).readAsBytes();
-        return compute(decodeSpreadsheetIsolate, bytes);
+        return compute(decodeSpreadsheetTables, bytes);
       }, [doc.fileName, attempt.value]),
     );
 

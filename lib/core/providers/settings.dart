@@ -16,6 +16,7 @@ const vtopServerApiKeySettingKey = 'settings_vtop_server_api_key';
 const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
 const refreshButtonSettingKey = 'settings_refresh_button';
 const classesLeftUntilSettingKey = 'settings_classes_left_until';
+const messTimingsSettingKey = 'settings_mess_timings';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -23,6 +24,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
     cacheOptions: SharedPreferencesWithCacheOptions(
       allowList: {
         classesLeftUntilSettingKey,
+        messTimingsSettingKey,
         "settings_auto_refresh",
         refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,

@@ -45,6 +45,11 @@ void main() {
           name: 'Notes',
         );
         await repo.importFile(sourcePath: '/zebra.pdf', name: 'Zebra');
+        final menu = await repo.importFile(
+          sourcePath: '/mess.xlsx',
+          name: 'Mess Menu',
+        );
+        await repo.setMessMenu(menu.id, true);
         await repo.touchLastOpened(notes.id, openedAt: 123);
         final container = ProviderContainer(
           overrides: [

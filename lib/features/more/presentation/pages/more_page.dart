@@ -31,41 +31,80 @@ class MorePage extends HookConsumerWidget {
     void push(String name) => GoRouter.of(context).pushNamed(name);
     final recentPages = ref.watch(vtopRecentPagesProvider);
 
-    final tools = [
-      (FLucideIcons.clipboardList, 'Marks', 'Scores so far', Paths.marks),
-      (FLucideIcons.graduationCap, 'Grades', 'This semester', Paths.grades),
+    final colors = context.theme.colors;
+    // Each group gets its own icon tone so a tile can be found by colour and
+    // position without reading every label.
+    final sections = [
       (
-        FLucideIcons.history,
-        'Grade History',
-        'All semesters',
-        Paths.gradeHistory,
+        'Results',
+        colors.app.accentTone,
+        [
+          _Tool(
+            FLucideIcons.clipboardList,
+            'Marks',
+            'Scores so far',
+            () => push(Paths.marks),
+          ),
+          _Tool(
+            FLucideIcons.graduationCap,
+            'Grades',
+            'This semester',
+            () => push(Paths.grades),
+          ),
+          _Tool(
+            FLucideIcons.history,
+            'Grade History',
+            'All semesters',
+            () => push(Paths.gradeHistory),
+          ),
+          _Tool(
+            FLucideIcons.calculator,
+            'GPA Planner',
+            'Plan your CGPA',
+            () => push(Paths.gpaCalculator),
+          ),
+        ],
       ),
       (
-        FLucideIcons.calculator,
-        'GPA Planner',
-        'Plan your CGPA',
-        Paths.gpaCalculator,
+        'Schedule',
+        colors.app.warning,
+        [
+          _Tool(
+            FLucideIcons.calendarDays,
+            'Exams',
+            'Schedule & seats',
+            () => push(Paths.examSchedule),
+          ),
+          _Tool(
+            FLucideIcons.partyPopper,
+            'Calendar',
+            'Holidays & exams',
+            () => push(Paths.academicCalendar),
+          ),
+        ],
       ),
       (
-        FLucideIcons.calendarDays,
-        'Exams',
-        'Schedule & seats',
-        Paths.examSchedule,
-      ),
-      (
-        FLucideIcons.scanFace,
-        'Biometric',
-        'Entry logs',
-        Paths.biometricHistory,
-      ),
-      (
-        FLucideIcons.calendarRange,
-        'Calendar',
-        'Holidays & exams',
-        Paths.academicCalendar,
+        'Campus',
+        colors.app.lab,
+        [
+          _Tool(
+            FLucideIcons.scanFace,
+            'Biometric',
+            'Entry logs',
+            () => push(Paths.biometricHistory),
+          ),
+          _Tool(
+            FLucideIcons.doorOpen,
+            'Outing',
+            'General pass',
+            () => openVtop(_generalOutingUrl),
+            external: true,
+          ),
+        ],
       ),
     ];
 
+    var index = 0;
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(
         Space.sm,
@@ -76,94 +115,80 @@ class MorePage extends HookConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SectionHeader(title: 'Academics'),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: Space.sm + 2,
-            crossAxisSpacing: Space.sm + 2,
-            // Icon beside the text keeps each tile to about two lines tall.
-            mainAxisExtent: 66,
-            children: [
-              for (final (i, (icon, title, subtitle, route)) in tools.indexed)
-                EnterFade(
-                  index: i,
-                  child: _ToolTile(
-                    icon: icon,
-                    title: title,
-                    subtitle: subtitle,
-                    onPress: () => push(route),
+          for (final (title, tone, tools) in sections) ...[
+            SectionHeader(title: title),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: Space.sm + 2,
+              crossAxisSpacing: Space.sm + 2,
+              // Icon beside the text keeps each tile to about two lines tall.
+              mainAxisExtent: 66,
+              children: [
+                for (final tool in tools)
+                  EnterFade(
+                    index: index++,
+                    child: _ToolTile(tool: tool, tone: tone),
                   ),
-                ),
-            ],
-          ),
-          const SectionHeader(title: 'VTOP'),
-          if (recentPages.isNotEmpty)
-            _RecentVtopPages(
-              pages: recentPages,
-              onOpen: (page) => openVtop(page.url),
+              ],
             ),
+          ],
+          const SectionHeader(title: 'VTOP'),
           FTileGroup(
             children: [
               FTile(
                 prefix: const Icon(FLucideIcons.externalLink),
                 title: const Text("Open VTOP"),
-                subtitle: const Text("Open the VTOP portal without auto login"),
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: openVtop,
               ),
               FTile(
                 prefix: const Icon(FLucideIcons.book),
                 title: const Text("Course Page"),
-                subtitle: const Text("Open the VTOP course page"),
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: () => openVtop(_coursePageUrl),
               ),
               FTile(
-                prefix: const Icon(FLucideIcons.doorOpen),
-                title: const Text("General Outing"),
-                subtitle: const Text("Open general outing in VTOP"),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => openVtop(_generalOutingUrl),
-              ),
-              FTile(
                 prefix: const Icon(FLucideIcons.luggage),
                 title: const Text("Weekend Outing"),
-                subtitle: const Text("Open weekend outing in VTOP"),
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: () => openVtop(_weekendOutingUrl),
               ),
             ],
           ),
-          if (cookieBridgeAvailable == true)
-            const SectionHeader(title: 'Browser extension'),
-          if (cookieBridgeAvailable == true)
+          if (recentPages.isNotEmpty)
+            _RecentVtopPages(
+              pages: recentPages,
+              onOpen: (page) => openVtop(page.url),
+            ),
+          if (cookieBridgeAvailable == true) ...[
+            const SizedBox(height: Space.lg),
             FTileGroup(
               children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.puzzle),
                   title: const Text("Chrome Extension"),
-                  subtitle: const Text(
-                    "Install VITAP Mate auto login on your computer",
-                  ),
                   suffix: const Icon(FLucideIcons.chevronRight),
                   onPress: () => push(Paths.chromeExtension),
                 ),
               ],
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _ToolTile extends StatelessWidget {
-  const _ToolTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onPress,
+class _Tool {
+  const _Tool(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.onPress, {
+    this.external = false,
   });
 
   final IconData icon;
@@ -171,13 +196,23 @@ class _ToolTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onPress;
 
+  /// Opens inside VTOP rather than an app screen.
+  final bool external;
+}
+
+class _ToolTile extends StatelessWidget {
+  const _ToolTile({required this.tool, required this.tone});
+
+  final _Tool tool;
+  final Tone tone;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Surface(
-      onPress: onPress,
-      semanticsLabel: title,
+      onPress: tool.onPress,
+      semanticsLabel: tool.external ? '${tool.title}, opens VTOP' : tool.title,
       padding: const EdgeInsets.symmetric(
         horizontal: Space.md,
         vertical: Space.sm + 2,
@@ -188,10 +223,10 @@ class _ToolTile extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: colors.app.accentTone.subtle,
+              color: tone.subtle,
               borderRadius: BorderRadius.circular(Radii.sm + 2),
             ),
-            child: Icon(icon, size: 17, color: colors.app.accentTone.onSubtle),
+            child: Icon(tool.icon, size: 17, color: tone.onSubtle),
           ),
           const SizedBox(width: Space.sm + 2),
           Expanded(
@@ -200,7 +235,7 @@ class _ToolTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  tool.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: typography.body.sm.copyWith(
@@ -209,7 +244,7 @@ class _ToolTile extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  subtitle,
+                  tool.subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: typography.body.xs.copyWith(
@@ -219,6 +254,12 @@ class _ToolTile extends StatelessWidget {
               ],
             ),
           ),
+          if (tool.external)
+            Icon(
+              FLucideIcons.arrowUpRight,
+              size: 14,
+              color: colors.mutedForeground,
+            ),
         ],
       ),
     );
@@ -237,13 +278,24 @@ class _RecentVtopPages extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.only(bottom: Space.md),
+      padding: const EdgeInsets.only(top: Space.sm + 2),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         child: Row(
           spacing: Space.sm,
           children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 2, right: Space.xs),
+              child: Text(
+                'RECENT',
+                style: typography.body.xs.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.6,
+                  color: colors.mutedForeground,
+                ),
+              ),
+            ),
             for (final page in pages)
               PressScale(
                 onPress: () => onOpen(page),
