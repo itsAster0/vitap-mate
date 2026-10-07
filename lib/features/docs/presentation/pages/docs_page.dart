@@ -11,6 +11,7 @@ import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/domain/docs_query.dart';
+import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_sort_provider.dart';
 import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
@@ -52,22 +53,43 @@ class DocsPage extends HookConsumerWidget {
       duration: const Duration(milliseconds: 450),
     )..forward();
 
-    Future<void> importFlow([DocWindow? preset]) async {
+    Future<void> setMessMenu(DocWindow doc, bool value) async {
+      try {
+        await ref.read(docsRegistryProvider.notifier).setMessMenu(doc, value);
+      } on MessMenuFormatException catch (e) {
+        if (context.mounted) {
+          dispToast(
+            context,
+            'Not a mess menu',
+            '${e.message} It stays a spreadsheet.',
+          );
+        }
+      } catch (e) {
+        if (context.mounted) disCommonToast(context, e);
+      }
+    }
+
+    Future<void> importFlow({bool asMessMenu = false}) async {
       try {
         final pickedPath = await pickDocPath();
         if (pickedPath == null) return;
-        if (preset != null) {
-          await ref
-              .read(docsRegistryProvider.notifier)
-              .fillPreset(preset, pickedPath);
-        } else {
-          final suggested = pickedPath
-              .split('/')
-              .last
-              .replaceAll(RegExp(r'\.[^.]+$'), '');
-          await ref
-              .read(docsRegistryProvider.notifier)
-              .importNew(pickedPath, suggested);
+        final suggested = pickedPath
+            .split('/')
+            .last
+            .replaceAll(RegExp(r'\.[^.]+$'), '');
+        final doc = await ref
+            .read(docsRegistryProvider.notifier)
+            .importNew(pickedPath, suggested);
+        if (asMessMenu && doc != null) {
+          if (doc.kind == DocKind.spreadsheet) {
+            await setMessMenu(doc, true);
+          } else if (context.mounted) {
+            dispToast(
+              context,
+              'Added as a document',
+              'Only the .xlsx mess menu can be shown as a menu.',
+            );
+          }
         }
       } catch (e) {
         if (context.mounted) disCommonToast(context, e);
@@ -138,10 +160,6 @@ class DocsPage extends HookConsumerWidget {
     }
 
     Future<void> openDoc(DocWindow doc) async {
-      if (!doc.hasFile) {
-        await importFlow(doc);
-        return;
-      }
       if (doc.kind == DocKind.file) {
         try {
           final repo = await ref.read(docsRepositoryProvider.future);
@@ -242,16 +260,13 @@ class DocsPage extends HookConsumerWidget {
                 subtitle: '$e',
               ),
               data: (windows) {
-                final messPreset = windows
-                    .where((w) => w.isPreset && !w.hasFile)
-                    .firstOrNull;
                 return AnimatedSwitcher(
                   duration: const Duration(milliseconds: 250),
                   child: windows.isEmpty
                       ? _EmptyState(
                           key: const ValueKey('empty'),
                           onImport: () => importFlow(),
-                          onMess: () => importFlow(messPreset),
+                          onMess: () => importFlow(asMessMenu: true),
                         )
                       : _Grid(
                           key: const ValueKey('grid'),
@@ -268,6 +283,8 @@ class DocsPage extends HookConsumerWidget {
                           onOpen: openDoc,
                           onRename: openRename,
                           onDelete: openDelete,
+                          onToggleMessMenu: (doc) =>
+                              setMessMenu(doc, !doc.asMessMenu),
                           onImport: () => importFlow(),
                         ),
                 );
@@ -290,6 +307,7 @@ class _Grid extends StatefulWidget {
   final void Function(DocWindow) onOpen;
   final void Function(DocWindow) onRename;
   final void Function(DocWindow) onDelete;
+  final void Function(DocWindow) onToggleMessMenu;
   final VoidCallback onImport;
 
   const _Grid({
@@ -303,6 +321,7 @@ class _Grid extends StatefulWidget {
     required this.onOpen,
     required this.onRename,
     required this.onDelete,
+    required this.onToggleMessMenu,
     required this.onImport,
   });
 
@@ -452,6 +471,7 @@ class _GridState extends State<_Grid> {
                     onOpen: () => widget.onOpen(doc),
                     onRename: () => widget.onRename(doc),
                     onDelete: () => widget.onDelete(doc),
+                    onToggleMessMenu: () => widget.onToggleMessMenu(doc),
                   ),
                 ),
               ),
@@ -671,7 +691,7 @@ class _EmptyState extends ConsumerWidget {
             FTappable(
               onPress: onMess,
               child: Text(
-                'or add straight to Mess Menu',
+                'or add the mess menu (.xlsx)',
                 style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,

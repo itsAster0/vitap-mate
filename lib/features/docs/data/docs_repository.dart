@@ -7,7 +7,6 @@ import 'package:vitapmate/features/docs/data/doc_models.dart';
 class DocsRepository {
   static const _registryKey = 'docs_registry';
   static const _fileSubDir = 'docs';
-  static const _messPresetId = 'mess-preset';
 
   final JsonFileStorage storage;
   int _nextImportId = 0;
@@ -16,24 +15,15 @@ class DocsRepository {
   Future<List<DocWindow>> list() async {
     final data = await storage.readJson(_registryKey);
     final raw = data?['windows'] as List<dynamic>?;
-    if (raw == null) return [_seedMessPreset()];
-    final windows = raw
+    if (raw == null) return [];
+    return raw
         .whereType<Map<String, dynamic>>()
         .map(DocWindow.fromJson)
+        // Older versions kept an empty "Mess Menu" slot; a filled one stays
+        // as an ordinary document.
+        .where((w) => !(w.isPreset && !w.hasFile))
         .toList();
-    if (!windows.any((w) => w.id == _messPresetId)) {
-      windows.insert(0, _seedMessPreset());
-    }
-    return windows;
   }
-
-  DocWindow _seedMessPreset() => const DocWindow(
-    id: _messPresetId,
-    name: 'Mess Menu',
-    kind: DocKind.none,
-    isPreset: true,
-    addedAt: 0,
-  );
 
   Future<void> _writeAll(List<DocWindow> windows) async {
     await storage.writeJson(_registryKey, {
@@ -76,26 +66,12 @@ class DocsRepository {
     return doc;
   }
 
-  Future<DocWindow?> fillPreset(String presetId, String pickedPath) async {
+  Future<void> setMessMenu(String id, bool value) async {
     final windows = await list();
-    final idx = windows.indexWhere((w) => w.id == presetId && !w.hasFile);
-    if (idx == -1) return null;
-    final ext = pickedPath.split('.').last.toLowerCase();
-    final storedName =
-        '${windows[idx].id}-${DateTime.now().millisecondsSinceEpoch}.$ext';
-    final storedPath = await storage.copyIntoUserDir(
-      _fileSubDir,
-      pickedPath,
-      fileName: storedName,
-    );
-    final updated = windows[idx].copyWith(
-      kind: docKindFromExtension(storedPath),
-      fileName: storedName,
-      addedAt: DateTime.now().millisecondsSinceEpoch,
-    );
-    windows[idx] = updated;
+    final idx = windows.indexWhere((w) => w.id == id);
+    if (idx == -1) return;
+    windows[idx] = windows[idx].copyWith(asMessMenu: value);
     await _writeAll(windows);
-    return updated;
   }
 
   Future<void> rename(String id, String name) async {
@@ -139,6 +115,7 @@ class DocsRepository {
       kind: w.kind,
       fileName: w.fileName,
       isPreset: w.isPreset,
+      asMessMenu: w.asMessMenu,
       addedAt: w.addedAt,
       lastOpenedAt: w.lastOpenedAt,
       scale: scale,

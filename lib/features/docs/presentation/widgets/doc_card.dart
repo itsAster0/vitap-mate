@@ -14,6 +14,9 @@ class DocKindVisual {
 DocKindVisual visualFor(BuildContext context, DocWindow doc) {
   final colors = context.theme.colors;
   final palette = colors.app;
+  if (doc.asMessMenu) {
+    return DocKindVisual(palette.warning, FLucideIcons.utensils);
+  }
   return switch (doc.kind) {
     DocKind.pdf => DocKindVisual(palette.danger, FLucideIcons.fileText),
     DocKind.image => DocKindVisual(palette.accentTone, FLucideIcons.image),
@@ -68,12 +71,16 @@ class DocCard extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onDelete;
 
+  /// Switches a spreadsheet between the mess menu and table views.
+  final VoidCallback onToggleMessMenu;
+
   const DocCard({
     super.key,
     required this.doc,
     required this.onOpen,
     required this.onRename,
     required this.onDelete,
+    required this.onToggleMessMenu,
   });
 
   @override
@@ -107,7 +114,10 @@ class DocCard extends StatelessWidget {
                   child: Icon(visual.icon, size: 18, color: visual.tone.base),
                 ),
                 const Spacer(),
-                ToneBadge.neutral(context, kindLabel(doc.kind)),
+                ToneBadge.neutral(
+                  context,
+                  doc.asMessMenu ? 'MENU' : kindLabel(doc.kind),
+                ),
               ],
             ),
             const Spacer(),
@@ -159,6 +169,24 @@ class DocCard extends StatelessWidget {
                     onRename();
                   },
                 ),
+                if (doc.kind == DocKind.spreadsheet)
+                  FTile(
+                    prefix: Icon(
+                      doc.asMessMenu
+                          ? FLucideIcons.sheet
+                          : FLucideIcons.utensils,
+                    ),
+                    title: Text(
+                      doc.asMessMenu
+                          ? 'Show as spreadsheet'
+                          : 'Show as mess menu',
+                    ),
+                    subtitle: const Text("The file itself isn't changed"),
+                    onPress: () {
+                      Navigator.of(context).pop();
+                      onToggleMessMenu();
+                    },
+                  ),
                 FTile(
                   prefix: const Icon(FLucideIcons.trash2),
                   title: const Text('Delete'),

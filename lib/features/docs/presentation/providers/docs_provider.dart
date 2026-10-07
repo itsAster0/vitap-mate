@@ -1,9 +1,14 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
+import 'package:vitapmate/features/docs/data/spreadsheet_tables.dart';
+import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 
 Future<String?> pickDocPath() async {
   final file = await FilePicker.pickFile(
@@ -31,6 +36,15 @@ Future<String?> pickDocPath() async {
   );
   return file?.path;
 }
+
+Future<MessMenu> loadMessMenu(DocsRepository repo, DocWindow doc) async {
+  final path = await repo.storedFilePathOf(doc);
+  if (path == null) throw StateError('Document file is missing.');
+  return compute(_parseMessMenuBytes, await File(path).readAsBytes());
+}
+
+MessMenu _parseMessMenuBytes(Uint8List bytes) =>
+    parseMessMenu(decodeSpreadsheetTables(bytes));
 
 final docsRepositoryProvider = FutureProvider<DocsRepository>((ref) async {
   final storage = await ref.watch(jsonFileStorageProvider.future);
@@ -67,25 +81,26 @@ class DocsRegistryNotifier extends AsyncNotifier<List<DocWindow>> {
 
   Future<DocsRepository> _repo() => ref.read(docsRepositoryProvider.future);
 
-  Future<void> importNew(String pickedPath, String name) async {
+  Future<DocWindow?> importNew(String pickedPath, String name) async {
+    DocWindow? imported;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final repo = await _repo();
       final windows = await repo.list();
-      windows.add(await repo.importFile(sourcePath: pickedPath, name: name));
+      imported = await repo.importFile(sourcePath: pickedPath, name: name);
+      windows.add(imported!);
       return windows;
     });
+    return imported;
   }
 
-  Future<void> fillPreset(DocWindow preset, String pickedPath) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final repo = await _repo();
-      final updated = await repo.fillPreset(preset.id, pickedPath);
-      if (updated == null) return repo.list();
-      final windows = await repo.list();
-      return windows;
-    });
+  /// Switches a spreadsheet between the mess menu and table views. Turning it
+  /// on parses the file first so a sheet in another format is refused.
+  Future<void> setMessMenu(DocWindow doc, bool value) async {
+    final repo = await _repo();
+    if (value) await loadMessMenu(repo, doc);
+    await repo.setMessMenu(doc.id, value);
+    ref.invalidateSelf();
   }
 
   Future<void> rename(String id, String name) async {

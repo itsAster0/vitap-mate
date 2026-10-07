@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
 import 'package:vitapmate/features/docs/domain/docs_query.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_sort_provider.dart';
@@ -75,7 +76,24 @@ void main() {
     expect(storage.data[DocsSortNotifier.storageKey]?['sort'], 'recentlyAdded');
   });
 
-  test('imports and preset filling do not count as opens', () async {
+  test('starts empty and the mess menu flag only changes the view', () async {
+    final repo = DocsRepository(DocsTestStorage());
+    expect(await repo.list(), isEmpty);
+    final sheet = await repo.importFile(sourcePath: '/menu.xlsx', name: 'Menu');
+    await repo.setMessMenu(sheet.id, true);
+    var stored = (await repo.list()).single;
+    expect(stored.asMessMenu, isTrue);
+    expect(stored.fileName, sheet.fileName);
+    expect(stored.kind, DocKind.spreadsheet);
+    await repo.setMessMenu(sheet.id, false);
+    stored = (await repo.list()).single;
+    expect(stored.asMessMenu, isFalse);
+    expect(stored.fileName, sheet.fileName);
+    await repo.remove(sheet.id);
+    expect(await repo.list(), isEmpty);
+  });
+
+  test('imports do not count as opens', () async {
     final repo = DocsRepository(DocsTestStorage());
     final imported = await repo.importFile(
       sourcePath: '/notes.pdf',
@@ -83,10 +101,6 @@ void main() {
     );
     expect(imported.lastOpenedAt, isNull);
     expect(imported.addedAt, greaterThan(0));
-    final preset = (await repo.list()).firstWhere((d) => d.isPreset);
-    final filled = (await repo.fillPreset(preset.id, '/menu.pdf'))!;
-    expect(filled.addedAt, greaterThan(0));
-    expect(filled.lastOpenedAt, isNull);
     await repo.touchLastOpened(imported.id, openedAt: 123);
     await repo.rename(imported.id, 'New name');
     await repo.saveScrollState(imported.id, scale: 2, offsetX: 4, offsetY: 8);

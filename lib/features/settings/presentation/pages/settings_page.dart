@@ -30,7 +30,9 @@ import 'package:vitapmate/features/calendar/presentation/providers/academic_cale
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/mess_timings_sheet.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/vtop_server_dialog.dart';
+import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
@@ -641,6 +643,20 @@ class SettingsPage extends HookConsumerWidget {
                     value: ClassesLeftUntil.nextExam,
                   ),
                 ],
+              ),
+              FTile(
+                prefix: _IconTile(
+                  icon: FLucideIcons.utensils,
+                  tone: colors.app.lab,
+                ),
+                title: const Text('Mess Timings'),
+                subtitle: Text(
+                  messTimingsSummary(ref.watch(messTimingsProvider)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                suffix: Icon(FLucideIcons.chevronRight),
+                onPress: () => showMessTimingsSheet(context),
               ),
               FTile(
                 prefix: _IconTile(
