@@ -34,10 +34,10 @@ class ConnectedAppsPage extends HookConsumerWidget {
     final loadError = useState<String?>(null);
     final colors = context.theme.colors;
 
-    Future<String> cookieHeader() async {
+    Future<String> cookieHeader({required bool force}) async {
       final client = await ref
           .read(vClientProvider.notifier)
-          .ensureLogin(force: false);
+          .ensureLogin(force: force);
       if (!await fetchIsAuth(client: client)) {
         throw StateError('Sign in to VTOP first.');
       }
@@ -53,8 +53,11 @@ class ConnectedAppsPage extends HookConsumerWidget {
     ) async {
       final client = http.Client();
       try {
-        final cookies = await cookieHeader();
-        return await run(VtopBridgeAccountService(client: client), cookies);
+        final service = VtopBridgeAccountService(client: client);
+        return await withFreshVtopSession(
+          cookies: cookieHeader,
+          run: (cookies) => run(service, cookies),
+        );
       } finally {
         client.close();
       }
