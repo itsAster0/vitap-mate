@@ -21,6 +21,10 @@ use crate::AppState;
 #[derive(Clone)]
 pub struct Account(pub String);
 
+/// The label of the key a request came with.
+#[derive(Clone)]
+pub struct KeyLabel(pub String);
+
 fn store_unavailable() -> ApiError {
     ApiError::new(
         StatusCode::SERVICE_UNAVAILABLE,
@@ -58,8 +62,12 @@ pub async fn require_key(
         .map(str::trim)
         .unwrap_or_default()
         .to_string();
-    let account = match state.keys.resolve(&presented, vtop_core::now_unix()).await {
-        Ok(Some(account)) => account,
+    let key = match state
+        .keys
+        .resolve_key(&presented, vtop_core::now_unix())
+        .await
+    {
+        Ok(Some(key)) => key,
         Ok(None) => {
             return ApiError::new(
                 StatusCode::UNAUTHORIZED,
@@ -73,6 +81,7 @@ pub async fn require_key(
             return store_unavailable().into_response();
         }
     };
+    let account = key.registration_number;
     if !state.account_limiter.allow(&account) {
         let mut response = ApiError::new(
             StatusCode::TOO_MANY_REQUESTS,
@@ -86,6 +95,7 @@ pub async fn require_key(
         return response;
     }
     request.extensions_mut().insert(Account(account));
+    request.extensions_mut().insert(KeyLabel(key.label));
     next.run(request).await
 }
 
@@ -98,8 +108,11 @@ fn ready(session: &SessionState) -> Response {
     .into_response()
 }
 
-pub async fn whoami(Extension(Account(account)): Extension<Account>) -> Response {
-    Json(json!({ "registrationNumber": account })).into_response()
+pub async fn whoami(
+    Extension(Account(account)): Extension<Account>,
+    Extension(KeyLabel(label)): Extension<KeyLabel>,
+) -> Response {
+    Json(json!({ "registrationNumber": account, "keyLabel": label })).into_response()
 }
 
 pub async fn post_session(

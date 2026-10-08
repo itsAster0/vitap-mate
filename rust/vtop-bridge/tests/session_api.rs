@@ -99,7 +99,10 @@ async fn whoami_names_the_account() {
         )
         .await;
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(json(response).await, json!({ "registrationNumber": REG }));
+    assert_eq!(
+        json(response).await,
+        json!({ "registrationNumber": REG, "keyLabel": "test" })
+    );
 }
 
 #[tokio::test]
@@ -107,7 +110,13 @@ async fn ready_from_cache_carries_session_and_cookies() {
     let app = TestApp::new();
     let key = key_for(&app, REG).await;
     app.accounts()
-        .record_phone(REG, Some("fcm"), &session("JSESSIONID=abc; REG=22BCE0001"), None, now())
+        .record_phone(
+            REG,
+            Some("fcm"),
+            &session("JSESSIONID=abc; REG=22BCE0001"),
+            None,
+            now(),
+        )
         .await
         .unwrap();
     let response = post_session(&app, &key).await;
@@ -207,7 +216,13 @@ async fn expire_drops_the_cache() {
     let app = TestApp::new();
     let key = key_for(&app, REG).await;
     app.accounts()
-        .record_phone(REG, Some("fcm"), &session("A=1; REG=22BCE0001"), None, now())
+        .record_phone(
+            REG,
+            Some("fcm"),
+            &session("A=1; REG=22BCE0001"),
+            None,
+            now(),
+        )
         .await
         .unwrap();
     let expire = app
@@ -230,7 +245,13 @@ async fn rate_limited_per_account() {
     let key = key_for(&app, REG).await;
     let other = key_for(&app, REG).await;
     app.accounts()
-        .record_phone(REG, Some("fcm"), &session("A=1; REG=22BCE0001"), None, now())
+        .record_phone(
+            REG,
+            Some("fcm"),
+            &session("A=1; REG=22BCE0001"),
+            None,
+            now(),
+        )
         .await
         .unwrap();
     for _ in 0..60 {
