@@ -250,3 +250,27 @@ async fn expire_posts_with_the_key() {
         .await;
     client(&server).expire(KEY).await.unwrap();
 }
+
+#[test]
+fn instructions_explain_the_tools_to_an_agent() {
+    use rmcp::ServerHandler;
+    let tools = vtop_mcp::tools::VtopTools::new(FakeSource::new());
+    let instructions = tools.get_info().instructions.unwrap_or_default();
+    for needle in [
+        "get_semesters",
+        "newest first",
+        "get_courses",
+        "get_course_detail",
+        "DD/MM/YYYY",
+        "75%",
+        "phone_unreachable",
+        "key_unknown",
+        "rate_limited",
+        "wait",
+    ] {
+        assert!(
+            instructions.contains(needle),
+            "missing {needle:?} in {instructions}"
+        );
+    }
+}

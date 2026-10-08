@@ -133,10 +133,7 @@ async fn key_create_list_revoke() {
     let created = create_key(&app, MINE, &secret).await;
     let key = created["key"].as_str().unwrap();
     assert!(key.starts_with("vtm_"));
-    assert_eq!(
-        created["mcpUrl"],
-        "https://vtop-mcp.aster0.dev/mcp"
-    );
+    assert_eq!(created["mcpUrl"], "https://vtop-mcp.aster0.dev/mcp");
     let id = created["id"].as_str().unwrap().to_string();
 
     let account = json(
