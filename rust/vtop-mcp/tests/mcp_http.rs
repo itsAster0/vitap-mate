@@ -28,6 +28,7 @@ impl SessionSource for RecordingSource {
             (key == KEY && !*self.revoked.lock().unwrap()).then(|| Identity {
                 registration_number: "22BCE0001".to_string(),
                 key_label: Some("My laptop".to_string()),
+                semester_id: Some("AP2026272".to_string()),
             }),
         )
     }
@@ -332,7 +333,11 @@ async fn whoami_answers_from_the_bridge_without_a_vtop_session() {
         serde_json::from_str(body["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(
         text,
-        json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop" })
+        json!({
+            "registrationNumber": "22BCE0001",
+            "keyLabel": "My laptop",
+            "semesterId": "AP2026272"
+        })
     );
     assert!(source.usernames.lock().unwrap().is_empty());
 }
@@ -399,5 +404,5 @@ async fn discover_returns_the_instructions() {
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
     let instructions = body["result"]["instructions"].as_str().unwrap_or_default();
-    assert!(instructions.contains("newest first"), "{body}");
+    assert!(instructions.contains("marked current"), "{body}");
 }

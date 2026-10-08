@@ -134,6 +134,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         )
         .route("/v1/account/delete", post(account_api::delete_account))
         .route("/v1/account/settings", post(account_api::update_settings))
+        .route("/v1/account/semester", post(account_api::update_semester))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             requests::rate_limit,

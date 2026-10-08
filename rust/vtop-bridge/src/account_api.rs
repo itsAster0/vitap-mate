@@ -59,6 +59,20 @@ pub struct AccountBody {
     app_secret: Option<String>,
     #[serde(default)]
     settings: Option<serde_json::Value>,
+    #[serde(default)]
+    semester_id: Option<String>,
+}
+
+/// A VTOP semester id as the app sends it: plain alphanumerics.
+fn semester_id(body: &AccountBody) -> Result<Option<String>, ApiError> {
+    let Some(raw) = body.semester_id.as_deref() else {
+        return Ok(None);
+    };
+    let id = raw.trim();
+    if id.is_empty() || id.len() > 40 || !id.chars().all(|c| c.is_ascii_alphanumeric()) {
+        return Err(bad_request("semesterId is not a VTOP semester id."));
+    }
+    Ok(Some(id.to_string()))
 }
 
 fn bad_request(message: &str) -> ApiError {
@@ -155,6 +169,7 @@ pub async fn link(
         .map(str::trim)
         .filter(|token| !token.is_empty())
         .ok_or_else(|| bad_request("fcmToken is required."))?;
+    let semester = semester_id(&body)?;
     let vault = body.credentials.and_then(|credentials| {
         let gmail = credentials.gmail?;
         let username = credentials.username.trim().to_string();
@@ -193,6 +208,13 @@ pub async fn link(
         )
         .await
         .map_err(store_unavailable)?;
+    if let Some(semester) = semester {
+        state
+            .accounts
+            .set_semester(&account, &semester, vtop_core::now_unix())
+            .await
+            .map_err(store_unavailable)?;
+    }
     if !same_app {
         tracing::info!("account {account}: linked a new app; keys revoked");
     }
@@ -282,6 +304,7 @@ pub async fn account(
     Ok(Json(json!({
         "registrationNumber": account,
         "settings": settings,
+        "semesterId": state.accounts.semester(&account).await.map_err(store_unavailable)?,
         "linked": linked,
         "savedCredentials": saved_credentials,
         "phoneLinked": phone_linked,
@@ -373,6 +396,23 @@ pub async fn update_settings(
     state
         .accounts
         .set_settings(&account, settings, vtop_core::now_unix())
+        .await
+        .map_err(store_unavailable)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// The semester the student picked in the app; agents default to it.
+pub async fn update_semester(
+    State(state): State<Arc<AppState>>,
+    body: Result<Json<AccountBody>, JsonRejection>,
+) -> Result<StatusCode, ApiError> {
+    let (account, _, body) = verified(&state, body).await?;
+    require_linked(&state, &account).await?;
+    require_app_secret(&state, &account, &body).await?;
+    let semester = semester_id(&body)?.ok_or_else(|| bad_request("semesterId is required."))?;
+    state
+        .accounts
+        .set_semester(&account, &semester, vtop_core::now_unix())
         .await
         .map_err(store_unavailable)?;
     Ok(StatusCode::NO_CONTENT)

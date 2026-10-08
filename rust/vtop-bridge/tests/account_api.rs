@@ -644,3 +644,83 @@ async fn settings_need_the_app_secret_and_an_offered_choice() {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{bad}");
     }
 }
+
+// ---- semester -------------------------------------------------------------
+
+async fn whoami_with(app: &TestApp, key: &str) -> Value {
+    let response = app
+        .send(
+            axum::http::Request::get("/v1/whoami")
+                .header("authorization", format!("Bearer {key}"))
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    json(response).await
+}
+
+#[tokio::test]
+async fn the_apps_semester_reaches_connected_apps() {
+    let app = TestApp::new();
+    let secret = linked(&app, MINE, json!({ "semesterId": "AP2026271" })).await;
+    let key = create_key(&app, MINE, &secret).await["key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(whoami_with(&app, &key).await["semesterId"], "AP2026271");
+
+    let response = app
+        .post(
+            "/v1/account/semester",
+            with_session(
+                MINE,
+                json!({ "appSecret": secret, "semesterId": "AP2026272" }),
+            ),
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    assert_eq!(whoami_with(&app, &key).await["semesterId"], "AP2026272");
+    let account = json(
+        app.post(
+            "/v1/account",
+            with_session(MINE, json!({ "appSecret": secret })),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(account["semesterId"], "AP2026272");
+}
+
+#[tokio::test]
+async fn semester_needs_the_app_secret_and_a_plain_id() {
+    let app = TestApp::new();
+    let secret = linked(&app, MINE, json!({})).await;
+    let without = app
+        .post(
+            "/v1/account/semester",
+            with_session(MINE, json!({ "semesterId": "AP2026272" })),
+        )
+        .await;
+    assert_eq!(without.status(), StatusCode::FORBIDDEN);
+    for bad in ["", "AP 2026", "AP2026272/../x", &"A".repeat(41)] {
+        let response = app
+            .post(
+                "/v1/account/semester",
+                with_session(MINE, json!({ "appSecret": secret, "semesterId": bad })),
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{bad:?}");
+    }
+}
+
+#[tokio::test]
+async fn whoami_has_no_semester_until_the_app_sends_one() {
+    let app = TestApp::new();
+    let secret = linked(&app, MINE, json!({})).await;
+    let key = create_key(&app, MINE, &secret).await["key"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(whoami_with(&app, &key).await["semesterId"], Value::Null);
+}

@@ -125,6 +125,27 @@ impl Accounts {
         Ok(Some(vault))
     }
 
+    /// The semester picked in the app, if it has sent one.
+    pub async fn semester(&self, registration_number: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .load(&account_id(registration_number))
+            .await?
+            .and_then(|doc| doc.semester_id))
+    }
+
+    pub async fn set_semester(
+        &self,
+        registration_number: &str,
+        semester_id: &str,
+        now: u64,
+    ) -> Result<(), StoreError> {
+        let semester_id = semester_id.to_string();
+        self.update(registration_number, now, |doc, _, _| {
+            doc.semester_id = Some(semester_id);
+        })
+        .await
+    }
+
     pub async fn settings(&self, username: &str) -> Result<AccountSettings, StoreError> {
         Ok(self
             .load(&account_id(username))
