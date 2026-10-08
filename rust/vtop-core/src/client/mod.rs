@@ -10,8 +10,10 @@ mod academics;
 mod auth;
 mod biometric;
 mod captcha;
+mod course_page;
 mod email_otp;
 mod exams;
+mod hostel;
 mod http;
 mod otp;
 
@@ -26,7 +28,9 @@ use crate::inputs::{Password, RegistrationNumber, Username};
 use crate::session::{parse_cookie_pairs, ResettableJar, SessionManager, SessionState};
 use crate::types::PersistedVtopSession;
 
+pub use course_page::{CourseFile, CourseFileInfo};
 pub use email_otp::EmailOtpLogin;
+pub use hostel::{GeneralOutingApplication, OutingKind, WeekendOutingApplication};
 use reqwest::cookie::CookieStore;
 
 const AUTH: &str = "rust.auth";

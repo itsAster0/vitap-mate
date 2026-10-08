@@ -103,6 +103,110 @@ sealed class CalendarEntry with _$CalendarEntry {
 
 enum ClassKind { theory, lab }
 
+class CourseFileInfo {
+  final String contentDisposition;
+  final String contentType;
+
+  const CourseFileInfo({
+    required this.contentDisposition,
+    required this.contentType,
+  });
+
+  @override
+  int get hashCode => contentDisposition.hashCode ^ contentType.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CourseFileInfo &&
+          runtimeType == other.runtimeType &&
+          contentDisposition == other.contentDisposition &&
+          contentType == other.contentType;
+}
+
+@freezed
+@meta.immutable
+sealed class CourseLecture with _$CourseLecture {
+  const factory CourseLecture({
+    required String serial,
+    required String date,
+    required String day,
+    required String topic,
+    required List<CourseMaterial> materials,
+  }) = _CourseLecture;
+}
+
+@freezed
+@meta.immutable
+sealed class CourseMaterial with _$CourseMaterial {
+  const factory CourseMaterial({required String label, required String path}) =
+      _CourseMaterial;
+}
+
+@freezed
+@meta.immutable
+sealed class CoursePageClass with _$CoursePageClass {
+  const factory CoursePageClass({
+    required String classId,
+    required String erpId,
+    required String classGroup,
+    required String courseCode,
+    required String courseTitle,
+    required String courseType,
+    required String slot,
+    required String faculty,
+    required String facultySchool,
+  }) = _CoursePageClass;
+}
+
+@freezed
+@meta.immutable
+sealed class CoursePageClasses with _$CoursePageClasses {
+  const factory CoursePageClasses({
+    required String semesterId,
+    required String courseId,
+    required List<CoursePageClass> classes,
+    required BigInt updateTime,
+  }) = _CoursePageClasses;
+}
+
+@freezed
+@meta.immutable
+sealed class CoursePageCourse with _$CoursePageCourse {
+  const factory CoursePageCourse({
+    required String id,
+    required String code,
+    required String title,
+    required String courseType,
+  }) = _CoursePageCourse;
+}
+
+@freezed
+@meta.immutable
+sealed class CoursePageCourses with _$CoursePageCourses {
+  const factory CoursePageCourses({
+    required String semesterId,
+    required List<CoursePageCourse> courses,
+    required BigInt updateTime,
+  }) = _CoursePageCourses;
+}
+
+@freezed
+@meta.immutable
+sealed class CoursePageDetail with _$CoursePageDetail {
+  const factory CoursePageDetail({
+    required String semesterId,
+    required CoursePageClass class_,
+    required String courseId,
+    required String allMaterialsPath,
+    required String generalMaterialsPath,
+    required String syllabusPath,
+    required bool hasCoursePlan,
+    required List<CourseLecture> lectures,
+    required BigInt updateTime,
+  }) = _CoursePageDetail;
+}
+
 @freezed
 @meta.immutable
 sealed class ExamScheduleData with _$ExamScheduleData {
@@ -168,6 +272,40 @@ sealed class FullAttendanceRecord with _$FullAttendanceRecord {
 
   factory FullAttendanceRecord.fromJson(Map<String, dynamic> json) =>
       _$FullAttendanceRecordFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class GeneralOutingData with _$GeneralOutingData {
+  const factory GeneralOutingData({
+    OutingStudent? student,
+    required String notice,
+    required List<GeneralOutingRecord> records,
+    required Uint8List outHours,
+    required Uint8List inHours,
+    required int placeMaxLength,
+    required int purposeMaxLength,
+    required int maxDaysAhead,
+    required int maxDaysAway,
+    required BigInt updateTime,
+  }) = _GeneralOutingData;
+}
+
+@freezed
+@meta.immutable
+sealed class GeneralOutingRecord with _$GeneralOutingRecord {
+  const factory GeneralOutingRecord({
+    required String serial,
+    required String place,
+    required String purpose,
+    required String fromDate,
+    required String fromTime,
+    required String toDate,
+    required String toTime,
+    required String status,
+    required String passId,
+    required String cancelId,
+  }) = _GeneralOutingRecord;
 }
 
 @freezed
@@ -389,6 +527,45 @@ sealed class MarksRecordEach with _$MarksRecordEach {
 
 @freezed
 @meta.immutable
+sealed class OutingApplyResult with _$OutingApplyResult {
+  const factory OutingApplyResult({
+    required bool applied,
+    required String message,
+  }) = _OutingApplyResult;
+}
+
+@freezed
+@meta.immutable
+sealed class OutingCancelResult with _$OutingCancelResult {
+  const factory OutingCancelResult({
+    required bool cancelled,
+    required String message,
+  }) = _OutingCancelResult;
+}
+
+@freezed
+@meta.immutable
+sealed class OutingOption with _$OutingOption {
+  const factory OutingOption({required String value, required String label}) =
+      _OutingOption;
+}
+
+@freezed
+@meta.immutable
+sealed class OutingStudent with _$OutingStudent {
+  const factory OutingStudent({
+    required String registrationNumber,
+    required String name,
+    required String applicationNo,
+    required String gender,
+    required String hostelBlock,
+    required String roomNumber,
+    required String parentContactNumber,
+  }) = _OutingStudent;
+}
+
+@freezed
+@meta.immutable
 sealed class PerExamScheduleRecord with _$PerExamScheduleRecord {
   const factory PerExamScheduleRecord({
     required List<ExamScheduleRecord> records,
@@ -524,4 +701,37 @@ sealed class TimetableSlot with _$TimetableSlot {
 
   factory TimetableSlot.fromJson(Map<String, dynamic> json) =>
       _$TimetableSlotFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class WeekendOutingData with _$WeekendOutingData {
+  const factory WeekendOutingData({
+    OutingStudent? student,
+    required String notice,
+    required List<WeekendOutingRecord> records,
+    required List<OutingOption> places,
+    required List<OutingOption> timeSlots,
+    required int purposeMaxLength,
+    required int maxDaysAhead,
+    required Uint8List weekdays,
+    required BigInt updateTime,
+  }) = _WeekendOutingData;
+}
+
+@freezed
+@meta.immutable
+sealed class WeekendOutingRecord with _$WeekendOutingRecord {
+  const factory WeekendOutingRecord({
+    required String serial,
+    required String hostelBlock,
+    required String roomNumber,
+    required String place,
+    required String purpose,
+    required String timeSlot,
+    required String date,
+    required String status,
+    required String passId,
+    required String cancelId,
+  }) = _WeekendOutingRecord;
 }

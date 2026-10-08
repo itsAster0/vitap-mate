@@ -1636,6 +1636,7 @@ dependencies = [
  "flutter_rust_bridge",
  "log",
  "serde",
+ "serde_json",
  "tokio",
  "vtop-core",
 ]
@@ -2315,6 +2316,7 @@ name = "vtop-core"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "httpdate",
  "image",
  "log",
  "reqwest",

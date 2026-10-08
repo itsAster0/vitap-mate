@@ -100,6 +100,8 @@ class DocsPage extends HookConsumerWidget {
       final controller = TextEditingController(text: doc.name);
       await showFDialog(
         context: context,
+        // Above the tab shell, so the keyboard inset is counted once.
+        useRootNavigator: true,
         builder: (context, style, animation) => AppDialog(
           animation: animation,
           direction: Axis.horizontal,
@@ -136,6 +138,8 @@ class DocsPage extends HookConsumerWidget {
     void openDelete(DocWindow doc) async {
       await showFDialog(
         context: context,
+        // Above the tab shell, so the keyboard inset is counted once.
+        useRootNavigator: true,
         builder: (context, style, animation) => AppDialog(
           animation: animation,
           direction: Axis.horizontal,

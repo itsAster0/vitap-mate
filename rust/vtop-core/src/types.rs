@@ -334,3 +334,193 @@ pub struct GradeHistoryData {
     pub cgpa: GradeHistoryCgpa,
     pub update_time: u64,
 }
+
+/// The student details VTOP pre-fills on an outing form and expects back
+/// when it is submitted. Only present while VTOP is taking applications.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutingStudent {
+    pub registration_number: String,
+    pub name: String,
+    pub application_no: String,
+    pub gender: String,
+    pub hostel_block: String,
+    pub room_number: String,
+    pub parent_contact_number: String,
+}
+
+/// A `<select>` option: what VTOP expects back and what it shows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutingOption {
+    pub value: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeneralOutingRecord {
+    pub serial: String,
+    pub place: String,
+    pub purpose: String,
+    /// `YYYY-MM-DD`.
+    pub from_date: String,
+    /// `hh:mm AM`, as VTOP shows it.
+    pub from_time: String,
+    pub to_date: String,
+    /// Empty on some older requests.
+    pub to_time: String,
+    pub status: String,
+    /// The leave pass id, set once the request is accepted.
+    pub pass_id: String,
+    /// The id VTOP's delete button carries, set only while VTOP lets the
+    /// request be cancelled (before the mentor approves it).
+    #[serde(default)]
+    pub cancel_id: String,
+}
+
+/// The general outing page: the form's limits and the student's requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GeneralOutingData {
+    /// `None` when VTOP is not taking applications.
+    pub student: Option<OutingStudent>,
+    /// VTOP's own message for why the form is shut, if it gave one.
+    pub notice: String,
+    pub records: Vec<GeneralOutingRecord>,
+    /// The hours (24 h) offered for leaving and for coming back. The last
+    /// hour of each only allows minute 00.
+    pub out_hours: Vec<u8>,
+    pub in_hours: Vec<u8>,
+    pub place_max_length: u32,
+    pub purpose_max_length: u32,
+    /// How many days ahead the leaving date may be.
+    pub max_days_ahead: u32,
+    /// How many days after leaving the return date may be.
+    pub max_days_away: u32,
+    pub update_time: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeekendOutingRecord {
+    pub serial: String,
+    pub hostel_block: String,
+    pub room_number: String,
+    pub place: String,
+    pub purpose: String,
+    pub time_slot: String,
+    /// `YYYY-MM-DD`.
+    pub date: String,
+    pub status: String,
+    /// The outing form id, set once the request is accepted.
+    pub pass_id: String,
+    /// The id VTOP's delete button carries, set only while VTOP lets the
+    /// request be cancelled.
+    #[serde(default)]
+    pub cancel_id: String,
+}
+
+/// The weekend outing page: the form's choices and the student's requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeekendOutingData {
+    /// `None` when VTOP is not taking applications.
+    pub student: Option<OutingStudent>,
+    pub notice: String,
+    pub records: Vec<WeekendOutingRecord>,
+    pub places: Vec<OutingOption>,
+    pub time_slots: Vec<OutingOption>,
+    pub purpose_max_length: u32,
+    /// How many days ahead the outing date may be.
+    pub max_days_ahead: u32,
+    /// Days an outing may fall on, `0` = Sunday … `6` = Saturday.
+    pub weekdays: Vec<u8>,
+    pub update_time: u64,
+}
+
+/// What came of cancelling an outing request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutingCancelResult {
+    /// The request is gone from the list.
+    pub cancelled: bool,
+    pub message: String,
+}
+
+/// What came of an outing application.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutingApplyResult {
+    /// The request now shows in the list.
+    pub applied: bool,
+    /// VTOP's message, or ours when it gave none.
+    pub message: String,
+}
+
+/// A course the student is registered for, as the course page lists it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoursePageCourse {
+    /// What the course page posts to list the course's classes.
+    pub id: String,
+    pub code: String,
+    pub title: String,
+    /// Short type: `ETH`, `ELA`, `TH`, `EPJ`...
+    pub course_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoursePageCourses {
+    pub semester_id: String,
+    pub courses: Vec<CoursePageCourse>,
+    pub update_time: u64,
+}
+
+/// One class (section) of a course: its slot and faculty.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoursePageClass {
+    pub class_id: String,
+    /// The faculty's employee id, which opens the class's lecture plan.
+    pub erp_id: String,
+    pub class_group: String,
+    pub course_code: String,
+    pub course_title: String,
+    /// Long type, e.g. "Embedded Theory".
+    pub course_type: String,
+    pub slot: String,
+    pub faculty: String,
+    pub faculty_school: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoursePageClasses {
+    pub semester_id: String,
+    pub course_id: String,
+    pub classes: Vec<CoursePageClass>,
+    pub update_time: u64,
+}
+
+/// A file link on the course page; `path` is what to download.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CourseMaterial {
+    pub label: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CourseLecture {
+    pub serial: String,
+    /// `YYYY-MM-DD`.
+    pub date: String,
+    /// `TUE`.
+    pub day: String,
+    pub topic: String,
+    pub materials: Vec<CourseMaterial>,
+}
+
+/// A class's lecture plan and its downloads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoursePageDetail {
+    pub semester_id: String,
+    pub class: CoursePageClass,
+    /// Course id used by the syllabus, e.g. `AM_CSE4007_00100`.
+    pub course_id: String,
+    pub all_materials_path: String,
+    pub general_materials_path: String,
+    pub syllabus_path: String,
+    pub has_course_plan: bool,
+    pub lectures: Vec<CourseLecture>,
+    pub update_time: u64,
+}

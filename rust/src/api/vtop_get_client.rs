@@ -4,13 +4,19 @@
 //! Fetches borrow the client immutably, so flutter_rust_bridge takes a read
 //! lock and several fetches can run at once. Login and OTP take `&mut`.
 
-use vtop_core::inputs::{BiometricDate, CourseId, CourseType, Password, SemesterId, Username};
+use vtop_core::client::{GeneralOutingApplication, OutingKind, WeekendOutingApplication};
+use vtop_core::inputs::{
+    BiometricDate, ContactNumber, CourseFilePath, CourseId, CourseType, OutingDate, OutingPassId,
+    OutingTime, Password, SemesterId, Username,
+};
 
 use crate::api::vtop::{
     types::{
-        AcademicCalendarData, AttendanceData, BiometricData, ExamScheduleData, FullAttendanceData,
-        GradeDetailsData, GradeHistoryData, GradeViewData, MarksData, PersistedVtopSession,
-        SemesterData, SessionState, TimetableData,
+        AcademicCalendarData, AttendanceData, BiometricData, CourseFileInfo, CoursePageClasses,
+        CoursePageCourses, CoursePageDetail, ExamScheduleData, FullAttendanceData,
+        GeneralOutingData, GradeDetailsData, GradeHistoryData, GradeViewData, MarksData,
+        OutingApplyResult, OutingCancelResult, PersistedVtopSession, SemesterData, SessionState,
+        TimetableData, WeekendOutingData,
     },
     vtop_client::{VtopClient, VtopError},
 };
@@ -163,6 +169,168 @@ pub async fn fetch_grade_view_details(
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_grade_history(client: &VtopClient) -> Result<GradeHistoryData, VtopError> {
     client.inner.grade_history().await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_general_outing(client: &VtopClient) -> Result<GeneralOutingData, VtopError> {
+    client.inner.general_outing().await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_weekend_outing(client: &VtopClient) -> Result<WeekendOutingData, VtopError> {
+    client.inner.weekend_outing().await
+}
+
+/// Dates are `DD-Mon-YYYY` (`11-Oct-2026`); times are 24-hour.
+#[allow(clippy::too_many_arguments)]
+#[flutter_rust_bridge::frb()]
+pub async fn apply_general_outing(
+    client: &VtopClient,
+    place: String,
+    purpose: String,
+    out_date: String,
+    out_hour: u8,
+    out_minute: u8,
+    in_date: String,
+    in_hour: u8,
+    in_minute: u8,
+) -> Result<OutingApplyResult, VtopError> {
+    let application = GeneralOutingApplication {
+        place,
+        purpose,
+        out_date: OutingDate::parse(&out_date)?,
+        out_time: OutingTime::new(out_hour, out_minute)?,
+        in_date: OutingDate::parse(&in_date)?,
+        in_time: OutingTime::new(in_hour, in_minute)?,
+    };
+    client.inner.apply_general_outing(&application).await
+}
+
+/// `place` and `time_slot` are option values from [`WeekendOutingData`].
+#[flutter_rust_bridge::frb()]
+pub async fn apply_weekend_outing(
+    client: &VtopClient,
+    place: String,
+    purpose: String,
+    date: String,
+    time_slot: String,
+    contact_number: String,
+) -> Result<OutingApplyResult, VtopError> {
+    let application = WeekendOutingApplication {
+        place,
+        purpose,
+        date: OutingDate::parse(&date)?,
+        time_slot,
+        contact_number: ContactNumber::parse(&contact_number)?,
+    };
+    client.inner.apply_weekend_outing(&application).await
+}
+
+/// Cancels a general outing request while VTOP still allows it.
+#[flutter_rust_bridge::frb()]
+pub async fn cancel_general_outing(
+    client: &VtopClient,
+    leave_id: String,
+) -> Result<OutingCancelResult, VtopError> {
+    client
+        .inner
+        .cancel_general_outing(&OutingPassId::parse(&leave_id)?)
+        .await
+}
+
+/// Cancels a weekend outing request while VTOP still allows it.
+#[flutter_rust_bridge::frb()]
+pub async fn cancel_weekend_outing(
+    client: &VtopClient,
+    booking_id: String,
+) -> Result<OutingCancelResult, VtopError> {
+    client
+        .inner
+        .cancel_weekend_outing(&OutingPassId::parse(&booking_id)?)
+        .await
+}
+
+/// The PDF pass of an accepted outing.
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_outing_pass(
+    client: &VtopClient,
+    weekend: bool,
+    pass_id: String,
+) -> Result<Vec<u8>, VtopError> {
+    let kind = if weekend {
+        OutingKind::Weekend
+    } else {
+        OutingKind::General
+    };
+    client
+        .inner
+        .outing_pass(kind, &OutingPassId::parse(&pass_id)?)
+        .await
+}
+
+/// The courses the student is registered for in [semester_id].
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_course_page_courses(
+    client: &VtopClient,
+    semester_id: String,
+) -> Result<CoursePageCourses, VtopError> {
+    client
+        .inner
+        .course_page_courses(&SemesterId::parse(&semester_id)?)
+        .await
+}
+
+/// Every class (section) of a course, with its slot and faculty.
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_course_page_classes(
+    client: &VtopClient,
+    semester_id: String,
+    course_id: String,
+) -> Result<CoursePageClasses, VtopError> {
+    client
+        .inner
+        .course_page_classes(&SemesterId::parse(&semester_id)?, &course_id)
+        .await
+}
+
+/// A class's lecture plan and downloads.
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_course_page_detail(
+    client: &VtopClient,
+    semester_id: String,
+    erp_id: String,
+    class_id: String,
+) -> Result<CoursePageDetail, VtopError> {
+    client
+        .inner
+        .course_page_detail(&SemesterId::parse(&semester_id)?, &erp_id, &class_id)
+        .await
+}
+
+/// The name and type of a course page download (lecture material,
+/// syllabus, material bundle), so the system downloader can save it.
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_course_file_info(
+    client: &VtopClient,
+    path: String,
+) -> Result<CourseFileInfo, VtopError> {
+    client
+        .inner
+        .course_page_file_info(&CourseFilePath::parse(&path)?)
+        .await
+}
+
+/// The name and type of a class's course plan (Excel).
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_course_plan_info(
+    client: &VtopClient,
+    semester_id: String,
+    class_id: String,
+) -> Result<CourseFileInfo, VtopError> {
+    client
+        .inner
+        .course_plan_info(&SemesterId::parse(&semester_id)?, &class_id)
+        .await
 }
 
 #[flutter_rust_bridge::frb()]

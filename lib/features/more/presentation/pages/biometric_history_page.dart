@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/widgets/fit_calendar.dart';
 import 'package:vitapmate/core/widgets/screen_refresh.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
@@ -62,11 +63,14 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     DateTime candidate = _selectedDate;
     final picked = await showFDialog<DateTime>(
       context: context,
+      // Above the tab shell, so the keyboard inset is counted once.
+      useRootNavigator: true,
       useSafeArea: true,
       builder: (dialogContext, _, _) => Center(
-        child: SizedBox(
-          height: 430,
-          child: FCalendar.grid(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+          child: FitCalendar(
+            boxed: true,
             control: FGridCalendarControl(
               start: DateTime(2020),
               end: DateTime.now().add(const Duration(days: 1)),

@@ -125,6 +125,139 @@ Future<GradeDetailsData> fetchGradeViewDetails({
 Future<GradeHistoryData> fetchGradeHistory({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchGradeHistory(client: client);
 
+Future<GeneralOutingData> fetchGeneralOuting({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchGeneralOuting(
+      client: client,
+    );
+
+Future<WeekendOutingData> fetchWeekendOuting({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchWeekendOuting(
+      client: client,
+    );
+
+/// Dates are `DD-Mon-YYYY` (`11-Oct-2026`); times are 24-hour.
+Future<OutingApplyResult> applyGeneralOuting({
+  required VtopClient client,
+  required String place,
+  required String purpose,
+  required String outDate,
+  required int outHour,
+  required int outMinute,
+  required String inDate,
+  required int inHour,
+  required int inMinute,
+}) => RustLib.instance.api.crateApiVtopGetClientApplyGeneralOuting(
+  client: client,
+  place: place,
+  purpose: purpose,
+  outDate: outDate,
+  outHour: outHour,
+  outMinute: outMinute,
+  inDate: inDate,
+  inHour: inHour,
+  inMinute: inMinute,
+);
+
+/// `place` and `time_slot` are option values from [`WeekendOutingData`].
+Future<OutingApplyResult> applyWeekendOuting({
+  required VtopClient client,
+  required String place,
+  required String purpose,
+  required String date,
+  required String timeSlot,
+  required String contactNumber,
+}) => RustLib.instance.api.crateApiVtopGetClientApplyWeekendOuting(
+  client: client,
+  place: place,
+  purpose: purpose,
+  date: date,
+  timeSlot: timeSlot,
+  contactNumber: contactNumber,
+);
+
+/// Cancels a general outing request while VTOP still allows it.
+Future<OutingCancelResult> cancelGeneralOuting({
+  required VtopClient client,
+  required String leaveId,
+}) => RustLib.instance.api.crateApiVtopGetClientCancelGeneralOuting(
+  client: client,
+  leaveId: leaveId,
+);
+
+/// Cancels a weekend outing request while VTOP still allows it.
+Future<OutingCancelResult> cancelWeekendOuting({
+  required VtopClient client,
+  required String bookingId,
+}) => RustLib.instance.api.crateApiVtopGetClientCancelWeekendOuting(
+  client: client,
+  bookingId: bookingId,
+);
+
+/// The PDF pass of an accepted outing.
+Future<Uint8List> fetchOutingPass({
+  required VtopClient client,
+  required bool weekend,
+  required String passId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchOutingPass(
+  client: client,
+  weekend: weekend,
+  passId: passId,
+);
+
+/// The courses the student is registered for in [semester_id].
+Future<CoursePageCourses> fetchCoursePageCourses({
+  required VtopClient client,
+  required String semesterId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageCourses(
+  client: client,
+  semesterId: semesterId,
+);
+
+/// Every class (section) of a course, with its slot and faculty.
+Future<CoursePageClasses> fetchCoursePageClasses({
+  required VtopClient client,
+  required String semesterId,
+  required String courseId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageClasses(
+  client: client,
+  semesterId: semesterId,
+  courseId: courseId,
+);
+
+/// A class's lecture plan and downloads.
+Future<CoursePageDetail> fetchCoursePageDetail({
+  required VtopClient client,
+  required String semesterId,
+  required String erpId,
+  required String classId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageDetail(
+  client: client,
+  semesterId: semesterId,
+  erpId: erpId,
+  classId: classId,
+);
+
+/// The name and type of a course page download (lecture material,
+/// syllabus, material bundle), so the system downloader can save it.
+Future<CourseFileInfo> fetchCourseFileInfo({
+  required VtopClient client,
+  required String path,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchCourseFileInfo(
+  client: client,
+  path: path,
+);
+
+/// The name and type of a class's course plan (Excel).
+Future<CourseFileInfo> fetchCoursePlanInfo({
+  required VtopClient client,
+  required String semesterId,
+  required String classId,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePlanInfo(
+  client: client,
+  semesterId: semesterId,
+  classId: classId,
+);
+
 Future<Uint8List> fetchCookies({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchCookies(client: client);
 

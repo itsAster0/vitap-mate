@@ -308,3 +308,241 @@ async fn live_bench() {
         println!("wrote {out}");
     }
 }
+
+/// Saves the two hostel outing pages for parser work. Ignored by default:
+///
+/// ```sh
+/// cd rust
+/// VTOP_USERNAME=... VTOP_PASSWORD=... cargo test --release live_hostel_dump -- --ignored --nocapture
+/// ```
+///
+/// Pages go to `target/bench/pages` (override with `VTOP_DUMP_DIR`). They hold
+/// personal data: local only, never commit them.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "hits live VTOP; needs VTOP_USERNAME and VTOP_PASSWORD"]
+async fn live_hostel_dump() {
+    let (Some(username), Some(password)) = (env("VTOP_USERNAME"), env("VTOP_PASSWORD")) else {
+        panic!("set VTOP_USERNAME and VTOP_PASSWORD");
+    };
+    let saved = env("VTOP_SESSION_FILE").map(|path| {
+        serde_json::from_str(&std::fs::read_to_string(path).expect("session file"))
+            .expect("session json")
+    });
+    let has_session = saved.is_some();
+    let mut client = api::get_vtop_client(username, password, saved)
+        .await
+        .expect("client");
+    if !has_session {
+        login_with_otp_prompt(&mut client).await.expect("login");
+    }
+
+    let dir = env("VTOP_DUMP_DIR").unwrap_or_else(|| "target/bench/pages".to_string());
+    let dir = std::path::Path::new(&dir);
+    std::fs::create_dir_all(dir).expect("create dump dir");
+    let core = &client.inner;
+    for (name, page) in [
+        ("general_outing", core.general_outing_page().await),
+        ("weekend_outing", core.weekend_outing_page().await),
+    ] {
+        match page {
+            Ok(html) => {
+                std::fs::write(dir.join(format!("{name}.html")), html).expect("write page");
+            }
+            Err(error) => println!("dump {name} failed: {error}"),
+        }
+    }
+    println!("hostel pages saved in {}", dir.display());
+
+    // Parsed shape only; names, places and numbers stay out of the output.
+    use vtop_core::client::OutingKind;
+    use vtop_core::inputs::OutingPassId;
+    let general = core.general_outing().await.expect("general outing");
+    println!(
+        "general: open={} notice={:?} requests={} passes={} out_hours={:?} in_hours={:?} \
+         lengths={}/{} ahead={} away={}",
+        general.student.is_some(),
+        general.notice,
+        general.records.len(),
+        general
+            .records
+            .iter()
+            .filter(|r| !r.pass_id.is_empty())
+            .count(),
+        general.out_hours,
+        general.in_hours,
+        general.place_max_length,
+        general.purpose_max_length,
+        general.max_days_ahead,
+        general.max_days_away,
+    );
+    let weekend = core.weekend_outing().await.expect("weekend outing");
+    println!(
+        "weekend: open={} notice={:?} requests={} places={:?} slots={:?} purpose={} ahead={} days={:?}",
+        weekend.student.is_some(),
+        weekend.notice,
+        weekend.records.len(),
+        weekend.places.iter().map(|o| &o.value).collect::<Vec<_>>(),
+        weekend.time_slots.iter().map(|o| &o.value).collect::<Vec<_>>(),
+        weekend.purpose_max_length,
+        weekend.max_days_ahead,
+        weekend.weekdays,
+    );
+    let passes = [
+        (
+            OutingKind::General,
+            general
+                .records
+                .iter()
+                .map(|r| &r.pass_id)
+                .find(|id| !id.is_empty()),
+        ),
+        (
+            OutingKind::Weekend,
+            weekend
+                .records
+                .iter()
+                .map(|r| &r.pass_id)
+                .find(|id| !id.is_empty()),
+        ),
+    ];
+    for (kind, id) in passes {
+        let Some(id) = id else { continue };
+        match core
+            .outing_pass(kind, &OutingPassId::parse(id).expect("pass id"))
+            .await
+        {
+            Ok(pdf) => println!("{kind:?} pass: {} bytes of PDF", pdf.len()),
+            Err(error) => println!("{kind:?} pass failed: {error}"),
+        }
+    }
+}
+
+/// Saves the course page chain (menu, courses, classes, one lecture plan)
+/// for parser work. Same setup as [`live_hostel_dump`].
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "hits live VTOP; needs VTOP_USERNAME and VTOP_PASSWORD"]
+async fn live_course_page_dump() {
+    use vtop_core::inputs::SemesterId;
+    let (Some(username), Some(password)) = (env("VTOP_USERNAME"), env("VTOP_PASSWORD")) else {
+        panic!("set VTOP_USERNAME and VTOP_PASSWORD");
+    };
+    // VTOP_SESSION_FILE: a saved session (snake_case PersistedVtopSession
+    // JSON) to reuse instead of a login that may want an emailed OTP.
+    let saved = env("VTOP_SESSION_FILE").map(|path| {
+        serde_json::from_str(&std::fs::read_to_string(path).expect("session file"))
+            .expect("session json")
+    });
+    let has_session = saved.is_some();
+    let mut client = api::get_vtop_client(username, password, saved)
+        .await
+        .expect("client");
+    if !has_session {
+        login_with_otp_prompt(&mut client).await.expect("login");
+    }
+    let dir = env("VTOP_DUMP_DIR").unwrap_or_else(|| "target/bench/pages".to_string());
+    let dir = std::path::Path::new(&dir);
+    std::fs::create_dir_all(dir).expect("create dump dir");
+    let save = |name: &str, html: &str| {
+        std::fs::write(dir.join(format!("{name}.html")), html).expect("write page");
+    };
+    let core = &client.inner;
+    save("course_menu", &core.course_page_menu().await.expect("menu"));
+    let semesters = api::fetch_semesters(&client).await.expect("semesters");
+    let semester = env("VTOP_SEMESTER")
+        .or_else(|| semesters.semesters.first().map(|s| s.id.clone()))
+        .expect("semester");
+    let semester = SemesterId::parse(&semester).expect("semester id");
+    let courses = core
+        .course_page_courses_page(&semester)
+        .await
+        .expect("courses");
+    save("course_courses", &courses);
+    // First course option value, picked without a parser yet.
+    let course_id = courses
+        .split("value=\"")
+        .skip(1)
+        .map(|rest| rest.split('"').next().unwrap_or_default())
+        .find(|value| !value.is_empty())
+        .expect("a course option")
+        .to_string();
+    let classes = core
+        .course_page_classes_page(&semester, &course_id)
+        .await
+        .expect("classes");
+    save("course_classes", &classes);
+    // Every class's lecture plan; the View buttons carry (semester, erp, class).
+    for (index, call) in classes
+        .split("processViewStudentCourseDetail(")
+        .skip(1)
+        .filter(|call| call.trim_start().starts_with("&#39;"))
+        .enumerate()
+    {
+        let args: Vec<String> = call
+            .split(')')
+            .next()
+            .unwrap_or_default()
+            .split(',')
+            .map(|arg| {
+                arg.replace("&#39;", "")
+                    .replace('\'', "")
+                    .trim()
+                    .to_string()
+            })
+            .collect();
+        if let [_, erp, class] = args.as_slice() {
+            let detail = core
+                .course_page_detail_page(&semester, erp, class)
+                .await
+                .expect("detail");
+            save(&format!("course_detail_{index}"), &detail);
+        }
+    }
+    println!("course pages saved in {}", dir.display());
+
+    // Each kind of download from the first lecture plan: name, type, size.
+    use vtop_core::inputs::CourseFilePath;
+    let detail = std::fs::read_to_string(dir.join("course_detail_0.html")).expect("detail");
+    let mut seen = std::collections::HashSet::new();
+    for path in detail.split("vtopDownload(&#39;").skip(1) {
+        let path = path.split("&#39;").next().unwrap_or_default();
+        let kind = path.split('/').next().unwrap_or_default().to_string()
+            + if path.contains("/2/1/") {
+                " general"
+            } else {
+                ""
+            };
+        if !seen.insert(kind.clone()) {
+            continue;
+        }
+        let Ok(parsed) = CourseFilePath::parse(path) else {
+            println!("{kind}: path rejected");
+            continue;
+        };
+        match core.course_page_file(&parsed).await {
+            Ok(file) => println!(
+                "{kind}: name={:?} type={:?} {} bytes, starts {:?}",
+                file.file_name,
+                file.content_type,
+                file.bytes.len(),
+                String::from_utf8_lossy(&file.bytes[..file.bytes.len().min(4)])
+            ),
+            Err(error) => println!("{kind}: {error}"),
+        }
+    }
+    let class_id = detail
+        .split("id=\"classId\"")
+        .nth(1)
+        .and_then(|rest| rest.split("value=\"").nth(1))
+        .and_then(|rest| rest.split('"').next())
+        .expect("class id")
+        .to_string();
+    match core.course_plan(&semester, &class_id).await {
+        Ok(file) => println!(
+            "course plan: name={:?} type={:?} {} bytes",
+            file.file_name,
+            file.content_type,
+            file.bytes.len()
+        ),
+        Err(error) => println!("course plan: {error}"),
+    }
+}

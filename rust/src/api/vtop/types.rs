@@ -18,14 +18,18 @@ pub struct _SessionState {
     pub otp_issued_at: Option<u64>,
     pub logged_in_at: Option<u64>,
 }
+pub use vtop_core::client::CourseFileInfo;
 pub use vtop_core::types::{
     AcademicCalendarData, AttendanceData, AttendanceRecord, BiometricData, BiometricRecord,
-    CalendarEntry, ClassKind, ExamScheduleData, ExamScheduleRecord, FullAttendanceData,
-    FullAttendanceRecord, GradeCourseRecord, GradeDetailMark, GradeDetailsData,
-    GradeHistoryAttempt, GradeHistoryCgpa, GradeHistoryData, GradeHistoryRecord,
-    GradeHistoryStudentInfo, GradeRange, GradeViewData, MarksData, MarksRecord, MarksRecordEach,
-    PerExamScheduleRecord, PersistedCookie, PersistedHeader, PersistedVtopSession, SemesterData,
-    SemesterInfo, TimetableCourse, TimetableData, TimetableSlot,
+    CalendarEntry, ClassKind, CourseLecture, CourseMaterial, CoursePageClass, CoursePageClasses,
+    CoursePageCourse, CoursePageCourses, CoursePageDetail, ExamScheduleData, ExamScheduleRecord,
+    FullAttendanceData, FullAttendanceRecord, GeneralOutingData, GeneralOutingRecord,
+    GradeCourseRecord, GradeDetailMark, GradeDetailsData, GradeHistoryAttempt, GradeHistoryCgpa,
+    GradeHistoryData, GradeHistoryRecord, GradeHistoryStudentInfo, GradeRange, GradeViewData,
+    MarksData, MarksRecord, MarksRecordEach, OutingApplyResult, OutingCancelResult, OutingOption,
+    OutingStudent, PerExamScheduleRecord, PersistedCookie, PersistedHeader, PersistedVtopSession,
+    SemesterData, SemesterInfo, TimetableCourse, TimetableData, TimetableSlot, WeekendOutingData,
+    WeekendOutingRecord,
 };
 
 #[frb(mirror(ClassKind), non_opaque)]
@@ -348,4 +352,158 @@ pub struct _GradeHistoryData {
     pub records: Vec<GradeHistoryRecord>,
     pub cgpa: GradeHistoryCgpa,
     pub update_time: u64,
+}
+
+#[frb(mirror(OutingStudent), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _OutingStudent {
+    pub registration_number: String,
+    pub name: String,
+    pub application_no: String,
+    pub gender: String,
+    pub hostel_block: String,
+    pub room_number: String,
+    pub parent_contact_number: String,
+}
+
+#[frb(mirror(OutingOption), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _OutingOption {
+    pub value: String,
+    pub label: String,
+}
+
+#[frb(mirror(GeneralOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _GeneralOutingRecord {
+    pub serial: String,
+    pub place: String,
+    pub purpose: String,
+    pub from_date: String,
+    pub from_time: String,
+    pub to_date: String,
+    pub to_time: String,
+    pub status: String,
+    pub pass_id: String,
+    pub cancel_id: String,
+}
+
+#[frb(mirror(GeneralOutingData), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _GeneralOutingData {
+    pub student: Option<OutingStudent>,
+    pub notice: String,
+    pub records: Vec<GeneralOutingRecord>,
+    pub out_hours: Vec<u8>,
+    pub in_hours: Vec<u8>,
+    pub place_max_length: u32,
+    pub purpose_max_length: u32,
+    pub max_days_ahead: u32,
+    pub max_days_away: u32,
+    pub update_time: u64,
+}
+
+#[frb(mirror(WeekendOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _WeekendOutingRecord {
+    pub serial: String,
+    pub hostel_block: String,
+    pub room_number: String,
+    pub place: String,
+    pub purpose: String,
+    pub time_slot: String,
+    pub date: String,
+    pub status: String,
+    pub pass_id: String,
+    pub cancel_id: String,
+}
+
+#[frb(mirror(WeekendOutingData), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _WeekendOutingData {
+    pub student: Option<OutingStudent>,
+    pub notice: String,
+    pub records: Vec<WeekendOutingRecord>,
+    pub places: Vec<OutingOption>,
+    pub time_slots: Vec<OutingOption>,
+    pub purpose_max_length: u32,
+    pub max_days_ahead: u32,
+    pub weekdays: Vec<u8>,
+    pub update_time: u64,
+}
+
+#[frb(mirror(OutingApplyResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _OutingApplyResult {
+    pub applied: bool,
+    pub message: String,
+}
+
+#[frb(mirror(CoursePageCourse), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CoursePageCourse {
+    pub id: String,
+    pub code: String,
+    pub title: String,
+    pub course_type: String,
+}
+
+#[frb(mirror(CoursePageCourses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CoursePageCourses {
+    pub semester_id: String,
+    pub courses: Vec<CoursePageCourse>,
+    pub update_time: u64,
+}
+
+#[frb(mirror(CoursePageClass), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CoursePageClass {
+    pub class_id: String,
+    pub erp_id: String,
+    pub class_group: String,
+    pub course_code: String,
+    pub course_title: String,
+    pub course_type: String,
+    pub slot: String,
+    pub faculty: String,
+    pub faculty_school: String,
+}
+
+#[frb(mirror(CoursePageClasses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CoursePageClasses {
+    pub semester_id: String,
+    pub course_id: String,
+    pub classes: Vec<CoursePageClass>,
+    pub update_time: u64,
+}
+
+#[frb(mirror(CourseMaterial), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CourseMaterial {
+    pub label: String,
+    pub path: String,
+}
+
+#[frb(mirror(CourseLecture), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CourseLecture {
+    pub serial: String,
+    pub date: String,
+    pub day: String,
+    pub topic: String,
+    pub materials: Vec<CourseMaterial>,
+}
+
+#[frb(mirror(CoursePageDetail), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _CoursePageDetail {
+    pub semester_id: String,
+    pub class: CoursePageClass,
+    pub course_id: String,
+    pub all_materials_path: String,
+    pub general_materials_path: String,
+    pub syllabus_path: String,
+    pub has_course_plan: bool,
+    pub lectures: Vec<CourseLecture>,
+    pub update_time: u64,
+}
+
+#[frb(mirror(CourseFileInfo))]
+pub struct _CourseFileInfo {
+    pub content_disposition: String,
+    pub content_type: String,
+}
+
+#[frb(mirror(OutingCancelResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+pub struct _OutingCancelResult {
+    pub cancelled: bool,
+    pub message: String,
 }

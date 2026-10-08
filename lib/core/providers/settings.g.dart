@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'ceb9b7f7845d6820edc184147b546cbe4b9e5fa3';
+String _$settingsHash() => r'ccafff297e45c7005d15e8758b6db0f0a16c17c7';
 
 /// The optional vtop-server. The API key is kept in plain preferences by
 /// choice; see rust/ARCHITECTURE.md.

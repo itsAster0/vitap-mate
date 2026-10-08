@@ -10,10 +10,6 @@ import 'package:vitapmate/core/widgets/ui/ui.dart';
 class MorePage extends HookConsumerWidget {
   const MorePage({super.key});
 
-  static const _coursePageUrl = 'academics/common/StudentCoursePage';
-  static const _generalOutingUrl = 'hostel/StudentGeneralOuting';
-  static const _weekendOutingUrl = 'hostel/StudentWeekendOuting';
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cookieBridgeAvailable = ref
@@ -81,6 +77,12 @@ class MorePage extends HookConsumerWidget {
             'Holidays & exams',
             () => push(Paths.academicCalendar),
           ),
+          _Tool(
+            FLucideIcons.bookOpen,
+            'Course Page',
+            'Lecture notes',
+            () => push(Paths.coursePage),
+          ),
         ],
       ),
       (
@@ -96,9 +98,8 @@ class MorePage extends HookConsumerWidget {
           _Tool(
             FLucideIcons.doorOpen,
             'Outing',
-            'General pass',
-            () => openVtop(_generalOutingUrl),
-            external: true,
+            'Leave & passes',
+            () => push(Paths.outing),
           ),
         ],
       ),
@@ -144,18 +145,6 @@ class MorePage extends HookConsumerWidget {
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: openVtop,
               ),
-              FTile(
-                prefix: const Icon(FLucideIcons.book),
-                title: const Text("Course Page"),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => openVtop(_coursePageUrl),
-              ),
-              FTile(
-                prefix: const Icon(FLucideIcons.luggage),
-                title: const Text("Weekend Outing"),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => openVtop(_weekendOutingUrl),
-              ),
             ],
           ),
           if (recentPages.isNotEmpty)
@@ -183,21 +172,12 @@ class MorePage extends HookConsumerWidget {
 }
 
 class _Tool {
-  const _Tool(
-    this.icon,
-    this.title,
-    this.subtitle,
-    this.onPress, {
-    this.external = false,
-  });
+  const _Tool(this.icon, this.title, this.subtitle, this.onPress);
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onPress;
-
-  /// Opens inside VTOP rather than an app screen.
-  final bool external;
 }
 
 class _ToolTile extends StatelessWidget {
@@ -212,7 +192,7 @@ class _ToolTile extends StatelessWidget {
     final typography = context.theme.typography;
     return Surface(
       onPress: tool.onPress,
-      semanticsLabel: tool.external ? '${tool.title}, opens VTOP' : tool.title,
+      semanticsLabel: tool.title,
       padding: const EdgeInsets.symmetric(
         horizontal: Space.md,
         vertical: Space.sm + 2,
@@ -254,12 +234,6 @@ class _ToolTile extends StatelessWidget {
               ],
             ),
           ),
-          if (tool.external)
-            Icon(
-              FLucideIcons.arrowUpRight,
-              size: 14,
-              color: colors.mutedForeground,
-            ),
         ],
       ),
     );

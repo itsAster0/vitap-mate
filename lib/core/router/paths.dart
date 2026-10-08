@@ -17,6 +17,10 @@ class Paths {
   static final examSchedule = "examSchedule";
   static final academicCalendar = "academicCalendar";
   static final biometricHistory = "biometricHistory";
+  static final outing = "outing";
+  static final outingPass = "outingPass";
+  static final coursePage = "coursePage";
+  static final coursePageCourse = "coursePageCourse";
   static final chromeExtension = "chromeExtension";
   static final vtopweb = "vtopweb";
   static final notificationManagement = "notificationManagement";

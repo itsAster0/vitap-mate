@@ -229,6 +229,12 @@ Widget _buildHeader(
       case "biometric-history":
         data = "Biometric History";
         break;
+      case "course-page":
+        data = path.endsWith('/course') ? "Course" : "Course Page";
+        break;
+      case "outing":
+        data = path.endsWith('/pass') ? "Outing Pass" : "Outing";
+        break;
       case "chrome-extension":
         data = "Chrome Extension";
         break;
