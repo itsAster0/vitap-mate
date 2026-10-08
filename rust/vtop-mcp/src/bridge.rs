@@ -7,11 +7,19 @@ use reqwest::StatusCode;
 use serde_json::Value;
 use vtop_core::SessionState;
 
+/// Who a key belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Identity {
+    pub registration_number: String,
+    pub key_label: Option<String>,
+}
+
 /// Where tools get VTOP sessions from. Every call carries the caller's key.
 #[async_trait]
 pub trait SessionSource: Send + Sync {
-    /// The account behind `key`, or `None` for an unknown or revoked key.
-    async fn whoami(&self, key: &str) -> Result<Option<String>, String>;
+    /// Who `key` belongs to, or `None` for an unknown or revoked key.
+    async fn whoami(&self, key: &str) -> Result<Option<Identity>, String>;
     async fn session(&self, key: &str) -> Result<SessionState, String>;
     async fn expire(&self, key: &str) -> Result<(), String>;
 }
@@ -96,13 +104,18 @@ impl BridgeClient {
 
 #[async_trait]
 impl SessionSource for BridgeClient {
-    async fn whoami(&self, key: &str) -> Result<Option<String>, String> {
+    async fn whoami(&self, key: &str) -> Result<Option<Identity>, String> {
         let (status, body) = self.call(reqwest::Method::GET, "/v1/whoami", key).await?;
         match status {
-            StatusCode::OK => Ok(body
-                .get("registrationNumber")
-                .and_then(Value::as_str)
-                .map(String::from)),
+            StatusCode::OK => Ok(body.get("registrationNumber").and_then(Value::as_str).map(
+                |registration_number| Identity {
+                    registration_number: registration_number.to_string(),
+                    key_label: body
+                        .get("keyLabel")
+                        .and_then(Value::as_str)
+                        .map(String::from),
+                },
+            )),
             StatusCode::UNAUTHORIZED => Ok(None),
             other => Err(error_text(&body, other.as_str())),
         }

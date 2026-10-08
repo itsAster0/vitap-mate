@@ -84,6 +84,14 @@ impl Keys {
 
     /// The account a presented key belongs to.
     pub async fn resolve(&self, key: &str, now: u64) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .resolve_key(key, now)
+            .await?
+            .map(|doc| doc.registration_number))
+    }
+
+    /// The record of a presented key; touches `last_used_at`.
+    pub async fn resolve_key(&self, key: &str, now: u64) -> Result<Option<KeyDoc>, StoreError> {
         let key = key.trim();
         if !key.starts_with(KEY_PREFIX) {
             return Ok(None);
@@ -100,7 +108,7 @@ impl Keys {
                 tracing::warn!("touch access key: {error}");
             }
         }
-        Ok(Some(doc.registration_number))
+        Ok(Some(doc))
     }
 
     pub async fn list(&self, registration_number: &str) -> Result<Vec<KeyDoc>, StoreError> {

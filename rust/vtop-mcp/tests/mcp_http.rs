@@ -7,7 +7,7 @@ use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 use vtop_core::SessionState;
-use vtop_mcp::bridge::SessionSource;
+use vtop_mcp::bridge::{Identity, SessionSource};
 use vtop_mcp::config::Config;
 use vtop_mcp::router;
 
@@ -22,9 +22,14 @@ struct RecordingSource {
 
 #[async_trait]
 impl SessionSource for RecordingSource {
-    async fn whoami(&self, key: &str) -> Result<Option<String>, String> {
+    async fn whoami(&self, key: &str) -> Result<Option<Identity>, String> {
         *self.whoami_calls.lock().unwrap() += 1;
-        Ok((key == KEY && !*self.revoked.lock().unwrap()).then(|| "22BCE0001".to_string()))
+        Ok(
+            (key == KEY && !*self.revoked.lock().unwrap()).then(|| Identity {
+                registration_number: "22BCE0001".to_string(),
+                key_label: Some("My laptop".to_string()),
+            }),
+        )
     }
 
     async fn session(&self, key: &str) -> Result<SessionState, String> {
@@ -112,7 +117,7 @@ async fn mcp_without_bearer_is_401() {
 }
 
 #[tokio::test]
-async fn mcp_tools_list_names_all_ten_tools() {
+async fn mcp_tools_list_names_every_tool() {
     let (status, body) = call(
         Arc::new(RecordingSource::default()),
         Some(KEY),
@@ -130,16 +135,23 @@ async fn mcp_tools_list_names_all_ten_tools() {
     assert_eq!(
         names,
         [
+            "get_academic_calendar",
             "get_attendance",
             "get_biometric",
+            "get_course_classes",
+            "get_course_detail",
+            "get_courses",
             "get_exam_schedule",
             "get_full_attendance",
+            "get_general_outing",
             "get_grade_details",
             "get_grade_history",
             "get_grades",
             "get_marks",
             "get_semesters",
             "get_timetable",
+            "get_weekend_outing",
+            "whoami",
         ]
     );
 }
@@ -228,7 +240,7 @@ async fn legacy_protocol_clients_work_without_sessions() {
     let body: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(
         body["result"]["tools"].as_array().unwrap().len(),
-        10,
+        17,
         "{body}"
     );
 }
@@ -303,4 +315,76 @@ async fn key_in_the_url_path_works_without_a_header() {
         .await
         .unwrap();
     assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn whoami_answers_from_the_bridge_without_a_vtop_session() {
+    let source = Arc::new(RecordingSource::default());
+    let (status, body) = call(
+        source.clone(),
+        Some(KEY),
+        rpc("tools/call", json!({ "name": "whoami", "arguments": {} })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["result"]["isError"], false, "{body}");
+    let text: Value =
+        serde_json::from_str(body["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        text,
+        json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop" })
+    );
+    assert!(source.usernames.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn course_tools_reject_bad_ids_before_asking_for_a_session() {
+    let source = Arc::new(RecordingSource::default());
+    for (name, arguments) in [
+        ("get_academic_calendar", json!({ "semester_id": " " })),
+        ("get_courses", json!({ "semester_id": " " })),
+        (
+            "get_course_classes",
+            json!({ "semester_id": "AP2026272", "course_id": "a/b" }),
+        ),
+        (
+            "get_course_detail",
+            json!({ "semester_id": "AP2026272", "erp_id": "1 2", "class_id": "x" }),
+        ),
+    ] {
+        let (status, body) = call(
+            source.clone(),
+            Some(KEY),
+            rpc(
+                "tools/call",
+                json!({ "name": name, "arguments": arguments }),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["result"]["isError"], true, "{name}: {body}");
+    }
+    assert!(source.usernames.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn outing_tools_use_the_callers_session() {
+    let source = Arc::new(RecordingSource::default());
+    for name in ["get_general_outing", "get_weekend_outing"] {
+        let (_, body) = call(
+            source.clone(),
+            Some(KEY),
+            rpc("tools/call", json!({ "name": name, "arguments": {} })),
+        )
+        .await;
+        assert_eq!(body["result"]["isError"], true, "{body}");
+        assert!(
+            body["result"]["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("phone_unreachable"),
+            "{body}"
+        );
+    }
+    assert_eq!(*source.usernames.lock().unwrap(), [KEY, KEY]);
 }

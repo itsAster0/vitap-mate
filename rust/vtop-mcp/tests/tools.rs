@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use vtop_core::{SessionState, VtopError};
-use vtop_mcp::bridge::{BridgeClient, SessionSource};
+use vtop_mcp::bridge::{BridgeClient, Identity, SessionSource};
 use vtop_mcp::config::Config;
 use vtop_mcp::tools::with_retry;
 use wiremock::matchers::{header, method, path};
@@ -39,8 +39,11 @@ impl FakeSource {
 
 #[async_trait]
 impl SessionSource for FakeSource {
-    async fn whoami(&self, _key: &str) -> Result<Option<String>, String> {
-        Ok(Some("22BCE0001".into()))
+    async fn whoami(&self, _key: &str) -> Result<Option<Identity>, String> {
+        Ok(Some(Identity {
+            registration_number: "22BCE0001".into(),
+            key_label: None,
+        }))
     }
 
     async fn session(&self, _key: &str) -> Result<SessionState, String> {
@@ -193,10 +196,9 @@ async fn whoami_maps_401_to_unknown() {
     Mock::given(method("GET"))
         .and(path("/v1/whoami"))
         .and(header("authorization", format!("Bearer {KEY}").as_str()))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(serde_json::json!({ "registrationNumber": "22BCE0001" })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop" }),
+        ))
         .mount(&server)
         .await;
     Mock::given(method("GET"))
@@ -208,8 +210,11 @@ async fn whoami_maps_401_to_unknown() {
         .mount(&server)
         .await;
     assert_eq!(
-        client(&server).whoami(KEY).await.unwrap().as_deref(),
-        Some("22BCE0001")
+        client(&server).whoami(KEY).await.unwrap(),
+        Some(Identity {
+            registration_number: "22BCE0001".into(),
+            key_label: Some("My laptop".into()),
+        })
     );
     assert_eq!(client(&server).whoami("vtm_other").await.unwrap(), None);
 }
