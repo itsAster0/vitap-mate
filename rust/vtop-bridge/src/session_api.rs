@@ -109,10 +109,20 @@ fn ready(session: &SessionState) -> Response {
 }
 
 pub async fn whoami(
+    State(state): State<Arc<AppState>>,
     Extension(Account(account)): Extension<Account>,
     Extension(KeyLabel(label)): Extension<KeyLabel>,
-) -> Response {
-    Json(json!({ "registrationNumber": account, "keyLabel": label })).into_response()
+) -> Result<Response, ApiError> {
+    let semester = state.accounts.semester(&account).await.map_err(|error| {
+        tracing::warn!("read semester: {error}");
+        store_unavailable()
+    })?;
+    Ok(Json(json!({
+        "registrationNumber": account,
+        "keyLabel": label,
+        "semesterId": semester,
+    }))
+    .into_response())
 }
 
 pub async fn post_session(

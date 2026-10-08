@@ -118,6 +118,7 @@ pub fn account_fields(doc: &AccountDoc) -> Value {
         .settings
         .map(|settings| serde_json::to_string(&settings).expect("settings serialise"));
     put_opt(&mut fields, "settings", &settings);
+    put_opt(&mut fields, "semesterId", &doc.semester_id);
     fields.insert("updatedAt".into(), timestamp(doc.updated_at));
     Value::Object(fields)
 }
@@ -131,6 +132,7 @@ pub fn account_from_fields(username: &str, fields: &Map<String, Value>) -> Accou
         fcm_token: read_string(fields, "fcmToken"),
         app_secret_hash: read_string(fields, "appSecretHash"),
         vault_expires_at: read_timestamp(fields, "vaultExpiresAt"),
+        semester_id: read_string(fields, "semesterId"),
         settings: read_string(fields, "settings").and_then(|json| serde_json::from_str(&json).ok()),
         updated_at: read_timestamp(fields, "updatedAt").unwrap_or(0),
     }
@@ -547,6 +549,7 @@ mod tests {
         doc.session = Some("sealed".into());
         doc.app_secret_hash = Some("hash".into());
         doc.vault_expires_at = Some(1_790_086_400);
+        doc.semester_id = Some("AP2026272".into());
         doc.settings = Some(crate::store::AccountSettings {
             phone_wait_secs: 45,
             vault_ttl_secs: Some(86_400),

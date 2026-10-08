@@ -101,7 +101,7 @@ async fn whoami_names_the_account() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         json(response).await,
-        json!({ "registrationNumber": REG, "keyLabel": "test" })
+        json!({ "registrationNumber": REG, "keyLabel": "test", "semesterId": null })
     );
 }
 

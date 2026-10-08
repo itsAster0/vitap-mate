@@ -109,6 +109,37 @@ fn plain_id(value: &str, label: &str) -> VtopResult<String> {
     Ok(value.to_string())
 }
 
+/// The semester list with the current one marked: the semester picked in
+/// the student's app, else the newest (VTOP lists newest first).
+pub fn mark_current(
+    data: vtop_core::types::SemesterData,
+    picked: Option<&str>,
+) -> serde_json::Value {
+    let current = picked
+        .filter(|id| data.semesters.iter().any(|semester| semester.id == *id))
+        .map(str::to_string)
+        .or_else(|| data.semesters.first().map(|semester| semester.id.clone()));
+    let semesters: Vec<_> = data
+        .semesters
+        .iter()
+        .map(|semester| {
+            serde_json::json!({
+                "id": semester.id,
+                "name": semester.name,
+                "current": current.as_deref() == Some(semester.id.as_str()),
+            })
+        })
+        .collect();
+    serde_json::json!({ "current_semester_id": current, "semesters": semesters })
+}
+
+fn json_result(value: &impl Serialize) -> CallToolResult {
+    match serde_json::to_string(value) {
+        Ok(json) => CallToolResult::success(vec![ContentBlock::text(json)]),
+        Err(error) => tool_error(format!("could not encode the result: {error}")),
+    }
+}
+
 fn tool_error(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message.into())])
 }
@@ -154,15 +185,30 @@ impl VtopTools {
 #[tool_router]
 impl VtopTools {
     #[tool(
-        description = "List the student's VTOP semesters (ids and names). Call this first to get a semester_id."
+        description = "List the student's VTOP semesters (ids and names). The one marked current (also current_semester_id) is the semester picked in the student's app; use it unless they name another. Call this first to get a semester_id."
     )]
     async fn get_semesters(
         &self,
         Parameters(_): Parameters<NoArgs>,
         Extension(parts): Extension<Parts>,
     ) -> CallToolResult {
-        self.fetch(&parts, |client| async move { client.semesters().await })
-            .await
+        let Some(Caller(key)) = parts.extensions.get::<Caller>().cloned() else {
+            return tool_error("no caller on the request");
+        };
+        let data = match with_retry(self.source.as_ref(), &key, |client| async move {
+            client.semesters().await
+        })
+        .await
+        {
+            Ok(data) => data,
+            Err(message) => return tool_error(message),
+        };
+        // No VTOP request: the bridge has the app's pick.
+        let picked = match self.source.whoami(&key).await {
+            Ok(Some(identity)) => identity.semester_id,
+            _ => None,
+        };
+        json_result(&mark_current(data, picked.as_deref()))
     }
 
     #[tool(description = "Attendance summary for every course in a semester.")]
@@ -472,8 +518,9 @@ impl VtopTools {
 const INSTRUCTIONS: &str = "\
 Read-only access to one VIT-AP student's VTOP data; nothing can be changed.
 
-- Call get_semesters first. Semesters are listed newest first, so the first one \
-is the current semester; use its id as semester_id unless the student names another.
+- Call get_semesters first and use the semester marked current (current_semester_id) \
+as semester_id unless the student names another. It is the semester picked in the \
+student's app, or else the newest, as VTOP lists them newest first.
 - Ids chain from one tool to the next: get_attendance gives course_id and course_type \
 for get_full_attendance; get_courses gives course_id for get_course_classes, which \
 gives erp_id and class_id for get_course_detail. Dates are DD/MM/YYYY.

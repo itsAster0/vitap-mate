@@ -43,6 +43,7 @@ impl SessionSource for FakeSource {
         Ok(Some(Identity {
             registration_number: "22BCE0001".into(),
             key_label: None,
+            semester_id: None,
         }))
     }
 
@@ -197,7 +198,7 @@ async fn whoami_maps_401_to_unknown() {
         .and(path("/v1/whoami"))
         .and(header("authorization", format!("Bearer {KEY}").as_str()))
         .respond_with(ResponseTemplate::new(200).set_body_json(
-            serde_json::json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop" }),
+            serde_json::json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop", "semesterId": "AP2026272" }),
         ))
         .mount(&server)
         .await;
@@ -214,6 +215,7 @@ async fn whoami_maps_401_to_unknown() {
         Some(Identity {
             registration_number: "22BCE0001".into(),
             key_label: Some("My laptop".into()),
+            semester_id: Some("AP2026272".into()),
         })
     );
     assert_eq!(client(&server).whoami("vtm_other").await.unwrap(), None);
@@ -258,6 +260,7 @@ fn instructions_explain_the_tools_to_an_agent() {
     let instructions = tools.get_info().instructions.unwrap_or_default();
     for needle in [
         "get_semesters",
+        "marked current",
         "newest first",
         "get_courses",
         "get_course_detail",
@@ -272,5 +275,40 @@ fn instructions_explain_the_tools_to_an_agent() {
             instructions.contains(needle),
             "missing {needle:?} in {instructions}"
         );
+    }
+}
+
+fn semesters() -> vtop_core::types::SemesterData {
+    vtop_core::types::SemesterData {
+        semesters: ["AP2026273", "AP2026272", "AP2025264"]
+            .iter()
+            .map(|id| vtop_core::types::SemesterInfo {
+                id: id.to_string(),
+                name: format!("Semester {id}"),
+            })
+            .collect(),
+        update_time: 0,
+    }
+}
+
+#[test]
+fn the_apps_semester_is_marked_current() {
+    let value = vtop_mcp::tools::mark_current(semesters(), Some("AP2026272"));
+    assert_eq!(value["current_semester_id"], "AP2026272");
+    let flags: Vec<bool> = value["semesters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|semester| semester["current"] == true)
+        .collect();
+    assert_eq!(flags, [false, true, false]);
+}
+
+#[test]
+fn without_the_apps_semester_the_newest_is_current() {
+    for missing in [None, Some("AP1999999")] {
+        let value = vtop_mcp::tools::mark_current(semesters(), missing);
+        assert_eq!(value["current_semester_id"], "AP2026273", "{missing:?}");
+        assert_eq!(value["semesters"][0]["current"], true);
     }
 }

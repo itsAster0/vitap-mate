@@ -13,6 +13,8 @@ use vtop_core::SessionState;
 pub struct Identity {
     pub registration_number: String,
     pub key_label: Option<String>,
+    /// The semester picked in the student's app, once it has sent one.
+    pub semester_id: Option<String>,
 }
 
 /// Where tools get VTOP sessions from. Every call carries the caller's key.
@@ -112,6 +114,10 @@ impl SessionSource for BridgeClient {
                     registration_number: registration_number.to_string(),
                     key_label: body
                         .get("keyLabel")
+                        .and_then(Value::as_str)
+                        .map(String::from),
+                    semester_id: body
+                        .get("semesterId")
                         .and_then(Value::as_str)
                         .map(String::from),
                 },
