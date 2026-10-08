@@ -351,6 +351,45 @@ Future<void> syncBridgeFcmToken(String? token) async {
   }
 }
 
+/// Sends the semester picked in the app to the vtop-bridge account, so
+/// agents default to it. Like [syncBridgeFcmToken]: only when linked and
+/// changed, headless, never throws.
+Future<void> syncBridgeSemester(String? semesterId) async {
+  final container = ProviderContainer(
+    overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
+  );
+  try {
+    final prefs = await container.read(settingsProvider.future);
+    if (!shouldSyncFcmToken(
+      linked: prefs.getBool(bridgeLinkedSettingKey) ?? false,
+      lastSent: prefs.getString(bridgeLastSemesterSettingKey),
+      current: semesterId,
+    )) {
+      return;
+    }
+    final current = semesterId!;
+    final cookieHeader = await _headlessVtopCookieHeader(container);
+    final client = http.Client();
+    try {
+      await VtopBridgeAccountService(
+        client: client,
+      ).updateSemester(cookies: cookieHeader, semesterId: current);
+    } finally {
+      client.close();
+    }
+    await prefs.setString(bridgeLastSemesterSettingKey, current);
+  } catch (error, stackTrace) {
+    log(
+      'Failed to sync the semester with the vtop-bridge',
+      name: 'fcm.cookie',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  } finally {
+    container.dispose();
+  }
+}
+
 List<Map<String, dynamic>> cookieEditorCookiesFromHeader(String cookieHeader) {
   final parts = cookieHeader.split(';');
   final cookies = <Map<String, dynamic>>[];
