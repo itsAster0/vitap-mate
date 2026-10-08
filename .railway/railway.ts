@@ -8,11 +8,6 @@ export const partial = "vtop-server";
 
 const repo = github("itsAster0/vitap-mate", { checkSuites: false });
 
-// The bridge and MCP services deploy from this branch until it is merged,
-// then from main.
-const bridgeBranch = "feat/vtop-bridge";
-const bridgeRepo = github("itsAster0/vitap-mate", { checkSuites: false, branch: bridgeBranch });
-
 // Every Rust service builds from the Cargo workspace in rust/.
 function rustService(
   name: string,
@@ -23,7 +18,7 @@ function rustService(
   },
 ) {
   return service(name, {
-    source: bridgeRepo,
+    source: repo,
     // The Cargo workspace lives in rust/, not at the repository root.
     rootDirectory: "/rust",
     build: {
@@ -92,7 +87,8 @@ export default defineRailway(() => {
       RAILPACK_CONFIG_FILE: "railpack.vtop-bridge.json",
       // Fixed so vtop-mcp can reach it on the private network.
       PORT: "8080",
-      PUBLIC_BASE_URL: preserve(),
+      // PUBLIC_BASE_URL is unset: the bridge uses its RAILWAY_PUBLIC_DOMAIN.
+      PUBLIC_MCP_URL: "https://${{vtop-mcp.RAILWAY_PUBLIC_DOMAIN}}/mcp",
       FIREBASE_CREDENTIALS_JSON: preserve(),
       VAULT_KEY: preserve(),
     },

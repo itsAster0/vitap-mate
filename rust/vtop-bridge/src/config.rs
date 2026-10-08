@@ -57,7 +57,16 @@ impl Config {
                 .ok_or_else(|| ConfigError(format!("{name} is required")))
         };
 
-        let public_base_url = required("PUBLIC_BASE_URL")?
+        // On Railway the service's own domain is known, so PUBLIC_BASE_URL
+        // only needs setting for a custom domain.
+        let public_base_url = required("PUBLIC_BASE_URL")
+            .or_else(|error| {
+                lookup("RAILWAY_PUBLIC_DOMAIN")
+                    .map(|domain| domain.trim().to_string())
+                    .filter(|domain| !domain.is_empty())
+                    .map(|domain| format!("https://{domain}"))
+                    .ok_or(error)
+            })?
             .trim_end_matches('/')
             .to_string();
         let parsed = reqwest::Url::parse(&public_base_url).ok();
@@ -180,6 +189,25 @@ mod tests {
         assert_eq!(c.listen.port(), 8080);
         assert_eq!(c.vault_key, [0u8; 32]);
         assert!(c.allowed_origins.is_empty());
+    }
+
+    #[test]
+    fn public_base_url_falls_back_to_the_railway_domain() {
+        let c = config(&[
+            ("PUBLIC_BASE_URL", ""),
+            (
+                "RAILWAY_PUBLIC_DOMAIN",
+                "vtop-bridge-production.up.railway.app",
+            ),
+        ])
+        .unwrap();
+        assert_eq!(
+            c.public_base_url,
+            "https://vtop-bridge-production.up.railway.app"
+        );
+        let explicit = config(&[("RAILWAY_PUBLIC_DOMAIN", "other.up.railway.app")]).unwrap();
+        assert_eq!(explicit.public_base_url, "https://bridge.example");
+        assert!(config(&[("PUBLIC_BASE_URL", "")]).is_err());
     }
 
     #[test]

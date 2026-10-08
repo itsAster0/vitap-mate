@@ -77,7 +77,7 @@ nothing.
 
 | Variable                    | Default | Notes                                        |
 | --------------------------- | ------- | -------------------------------------------- |
-| `PUBLIC_BASE_URL`           | —       | required; callback URL base sent to phones   |
+| `PUBLIC_BASE_URL`           | Railway | callback URL base sent to phones; defaults to `https://$RAILWAY_PUBLIC_DOMAIN` |
 | `FIREBASE_CREDENTIALS_JSON` | —       | required; service account (FCM + Firestore)  |
 | `VAULT_KEY`                 | —       | required; base64 of 32 bytes                 |
 | `REQUEST_TIMEOUT_SECS`      | 120     | 30–600                                       |
