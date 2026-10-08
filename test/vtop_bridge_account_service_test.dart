@@ -13,10 +13,12 @@ void main() {
     VtopBridgeAccountService service,
     List<http.Request> sent,
     MemoryBridgeAppSecretStore secrets,
+    MemoryBridgeKeyStash stash,
   })
   serviceAnswering(int status, Object body, {String? secret}) {
     final sent = <http.Request>[];
     final secrets = MemoryBridgeAppSecretStore(secret);
+    final stash = MemoryBridgeKeyStash();
     final client = MockClient((request) async {
       sent.add(request);
       return http.Response(
@@ -30,9 +32,11 @@ void main() {
         client: client,
         baseUrl: base,
         secrets: secrets,
+        keys: stash,
       ),
       sent: sent,
       secrets: secrets,
+      stash: stash,
     );
   }
 
@@ -291,6 +295,56 @@ void main() {
         throwsA(isA<BridgeAccountException>()),
       );
       expect(calls, 1);
+    });
+  });
+
+  group('keys this phone created', () {
+    final key = 'vtm_${'1' * 64}';
+
+    test('are kept so they can be copied again', () async {
+      final rig = serviceAnswering(201, {
+        'id': 'abcd1234',
+        'key': key,
+        'mcpUrl': 'https://mcp.test/mcp',
+      });
+      await rig.service.createKey(cookies: cookies, label: 'Laptop');
+      final saved = await rig.service.savedKey('abcd1234');
+      expect(saved?.key, key);
+      expect(saved?.agentUrl, 'https://mcp.test/mcp/$key');
+      expect(await rig.service.savedKey('other'), isNull);
+    });
+
+    test('are dropped when revoked or deleted', () async {
+      final rig = serviceAnswering(204, {});
+      await rig.stash.save(
+        BridgeKey(id: 'a', key: key, mcpUrl: 'https://mcp.test/mcp'),
+      );
+      await rig.stash.save(
+        BridgeKey(id: 'b', key: key, mcpUrl: 'https://mcp.test/mcp'),
+      );
+      await rig.service.revokeKey(cookies: cookies, id: 'a');
+      expect(await rig.service.savedKey('a'), isNull);
+      expect(await rig.service.savedKey('b'), isNotNull);
+      await rig.service.deleteAccount(cookies: cookies);
+      expect(await rig.service.savedKey('b'), isNull);
+    });
+
+    test('are pruned to the keys the server still has', () async {
+      final rig = serviceAnswering(200, {
+        'linked': true,
+        'thisPhone': true,
+        'keys': [
+          {'id': 'b', 'label': 'B', 'createdAt': 1, 'lastUsedAt': null},
+        ],
+      });
+      for (final id in ['a', 'b']) {
+        await rig.stash.save(
+          BridgeKey(id: id, key: key, mcpUrl: 'https://mcp.test/mcp'),
+        );
+      }
+      await rig.service.account(cookies: cookies);
+      expect(await rig.service.savedKey('a'), isNull);
+      expect(await rig.service.savedKey('b'), isNotNull);
     });
   });
 }
