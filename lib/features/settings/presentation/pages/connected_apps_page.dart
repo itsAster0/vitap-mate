@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
@@ -195,7 +196,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
         final key = await withService(
           (s, c) => s.createKey(cookies: c, label: label),
         );
-        if (context.mounted) await _showNewKey(context, key);
+        if (context.mounted) await _showKey(context, key, fresh: true);
       });
     }
 
@@ -224,6 +225,23 @@ class ConnectedAppsPage extends HookConsumerWidget {
         'Clear',
       );
       if (ok) await toggleServerSignIn(false);
+    }
+
+    /// Long-press: shows a key this phone created, after the device's
+    /// biometrics or screen lock when it has one.
+    Future<void> showSavedKey(BridgeKeyInfo info) async {
+      final saved = await SecureBridgeKeyStash().read(info.id);
+      if (!context.mounted) return;
+      if (saved == null) {
+        dispToast(
+          context,
+          'Not saved on this phone',
+          'Keys can be shown again only on the phone that created them. Create a new key to copy one.',
+        );
+        return;
+      }
+      if (!await _confirmOwner()) return;
+      if (context.mounted) await _showKey(context, saved, fresh: false);
     }
 
     Future<void> revoke(BridgeKeyInfo key) async {
@@ -452,6 +470,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
                     ),
                     title: Text(key.label),
                     subtitle: Text('${key.id} · ${_lastUsed(key.lastUsedAt)}'),
+                    onLongPress: busy.value ? null : () => showSavedKey(key),
                     suffix: FButton.icon(
                       variant: FButtonVariant.ghost,
                       onPress: busy.value ? null : () => revoke(key),
@@ -587,19 +606,38 @@ Future<String?> _askLabel(BuildContext context) {
   );
 }
 
-Future<void> _showNewKey(BuildContext context, BridgeKey key) {
+/// Asks for the device's biometrics or screen lock, when it has either.
+Future<bool> _confirmOwner() async {
+  final auth = LocalAuthentication();
+  try {
+    if (!await auth.isDeviceSupported()) return true;
+    return await auth.authenticate(
+      localizedReason: 'Confirm it\'s you to show this access key',
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
+Future<void> _showKey(
+  BuildContext context,
+  BridgeKey key, {
+  required bool fresh,
+}) {
   return showFDialog<void>(
     context: context,
     useRootNavigator: true,
     builder: (context, style, animation) => AppDialog(
       animation: animation,
-      title: const Text('Copy your key now'),
+      title: Text(fresh ? 'Copy your key' : 'Access key'),
       body: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            "It won't be shown again. Paste the key into the browser extension, or the MCP URL into your AI agent.",
+          Text(
+            fresh
+                ? 'Paste the key into the browser extension, or the MCP URL into your AI agent. Long-press it in the list to show it again on this phone.'
+                : 'Paste the key into the browser extension, or the MCP URL into your AI agent.',
           ),
           const SizedBox(height: Space.md),
           _CopyRow(label: 'Access key', value: key.key),

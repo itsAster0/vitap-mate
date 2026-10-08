@@ -49,6 +49,82 @@ class MemoryBridgeAppSecretStore implements BridgeAppSecretStore {
   Future<void> delete() async => _secret = null;
 }
 
+/// Keys this phone created. The bridge keeps only their hashes, so this is
+/// the only place a key can be shown again.
+abstract class BridgeKeyStash {
+  Future<Map<String, BridgeKey>> readAll();
+  Future<void> writeAll(Map<String, BridgeKey> keys);
+
+  Future<BridgeKey?> read(String id) async => (await readAll())[id];
+
+  Future<void> save(BridgeKey key) async =>
+      writeAll({...await readAll(), key.id: key});
+
+  Future<void> remove(String id) async =>
+      writeAll({...await readAll()}..remove(id));
+
+  /// Drops keys the bridge no longer has (revoked elsewhere, or by a
+  /// relink).
+  Future<void> retainOnly(Set<String> ids) async {
+    final all = await readAll();
+    if (all.keys.every(ids.contains)) return;
+    await writeAll({...all}..removeWhere((id, _) => !ids.contains(id)));
+  }
+}
+
+class SecureBridgeKeyStash extends BridgeKeyStash {
+  SecureBridgeKeyStash();
+
+  static const _key = 'bridge_key_stash';
+  static const _storage = FlutterSecureStorage();
+
+  @override
+  Future<Map<String, BridgeKey>> readAll() async {
+    try {
+      final raw = await _storage.read(key: _key);
+      if (raw == null) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      return {
+        for (final entry in decoded.entries)
+          if (entry.value is Map)
+            '${entry.key}': BridgeKey(
+              id: '${entry.key}',
+              key: '${entry.value['key'] ?? ''}',
+              mcpUrl: '${entry.value['mcpUrl'] ?? ''}',
+            ),
+      };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  @override
+  Future<void> writeAll(Map<String, BridgeKey> keys) async {
+    if (keys.isEmpty) {
+      await _storage.delete(key: _key);
+      return;
+    }
+    await _storage.write(
+      key: _key,
+      value: jsonEncode({
+        for (final key in keys.values)
+          key.id: {'key': key.key, 'mcpUrl': key.mcpUrl},
+      }),
+    );
+  }
+}
+
+class MemoryBridgeKeyStash extends BridgeKeyStash {
+  Map<String, BridgeKey> _keys = {};
+
+  @override
+  Future<Map<String, BridgeKey>> readAll() async => {..._keys};
+
+  @override
+  Future<void> writeAll(Map<String, BridgeKey> keys) async => _keys = {...keys};
+}
+
 class BridgeAccountException implements Exception {
   const BridgeAccountException({
     required this.code,
@@ -210,13 +286,20 @@ class VtopBridgeAccountService {
     required http.Client client,
     String baseUrl = vtopBridgeBaseUrl,
     BridgeAppSecretStore secrets = const SecureBridgeAppSecretStore(),
+    BridgeKeyStash? keys,
   }) : _client = client,
        _baseUrl = baseUrl,
-       _secrets = secrets;
+       _secrets = secrets,
+       _keys = keys ?? SecureBridgeKeyStash();
 
   final http.Client _client;
   final String _baseUrl;
   final BridgeAppSecretStore _secrets;
+  final BridgeKeyStash _keys;
+
+  /// A key this phone created, to copy again; `null` when it was created
+  /// elsewhere or before keys were kept.
+  Future<BridgeKey?> savedKey(String id) => _keys.read(id);
 
   static const _timeout = Duration(seconds: 15);
 
@@ -284,11 +367,13 @@ class VtopBridgeAccountService {
       cookies: cookies,
       body: {'label': label},
     );
-    return BridgeKey(
+    final key = BridgeKey(
       id: '${body['id'] ?? ''}',
       key: '${body['key'] ?? ''}',
       mcpUrl: '${body['mcpUrl'] ?? ''}',
     );
+    if (key.id.isNotEmpty && key.key.isNotEmpty) await _keys.save(key);
+    return key;
   }
 
   Future<BridgeAccount> account({required String cookies}) async {
@@ -310,6 +395,9 @@ class VtopBridgeAccountService {
         );
       }
     }
+    if (body['thisPhone'] == true) {
+      await _keys.retainOnly({for (final key in keys) key.id});
+    }
     return BridgeAccount(
       registrationNumber: '${body['registrationNumber'] ?? ''}',
       linked: body['linked'] == true,
@@ -323,6 +411,7 @@ class VtopBridgeAccountService {
 
   Future<void> revokeKey({required String cookies, required String id}) async {
     await _post('/v1/keys/revoke', cookies: cookies, body: {'id': id});
+    await _keys.remove(id);
   }
 
   Future<void> updateFcmToken({
@@ -354,5 +443,6 @@ class VtopBridgeAccountService {
   Future<void> deleteAccount({required String cookies}) async {
     await _post('/v1/account/delete', cookies: cookies);
     await _secrets.delete();
+    await _keys.writeAll({});
   }
 }
