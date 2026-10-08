@@ -12,10 +12,17 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
+import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/firebase_options.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/frb_generated.dart';
+import 'package:vitapmate/services/class_reminder_notification_service.dart';
 
 const _cookieRequestType = 'vtop_cookie_request';
 const _vtopDomain = 'vtop.vitap.ac.in';
@@ -92,7 +99,19 @@ Future<void> _startVtopCookieBridgeListener() async {
 
   FirebaseMessaging.instance.onTokenRefresh.listen((token) {
     log('FCM token refreshed (${token.length} chars)', name: 'fcm.cookie');
+    unawaited(syncBridgeFcmToken(token));
   });
+
+  try {
+    await syncBridgeFcmToken(await FirebaseMessaging.instance.getToken());
+  } catch (error, stackTrace) {
+    log(
+      'Failed to sync the FCM token with the vtop-bridge',
+      name: 'fcm.cookie',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
 }
 
 @pragma('vm:entry-point')
@@ -115,11 +134,38 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
     return;
   }
 
+  final wantCredentials = data['wantCredentials'] == '1';
+
   await FcmCookieNotificationService.showProgress();
   List<Map<String, dynamic>>? cookies;
+  String? username;
+  String? fcmToken;
+  Map<String, dynamic>? credentials;
   String? callbackError;
   try {
-    cookies = await _authenticatedCookieEditorCookies();
+    final prepared = await _authenticatedCookieEditorCookies(
+      wantCredentials: wantCredentials,
+    );
+    cookies = prepared.cookies;
+    username = prepared.username;
+    credentials = prepared.credentials;
+  } on BridgeOtpRequired catch (otp) {
+    // The phone answers once the user enters the OTP; a late answer is
+    // still cached by the bridge.
+    await savePendingBridgeOtp(
+      PendingBridgeOtp(
+        requestId: requestId,
+        responseToken: responseToken,
+        callbackUrl: callbackUrl,
+        wantCredentials: wantCredentials,
+        state: otp.state,
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+    await FcmCookieNotificationService.cancel();
+    await showBridgeOtpNotification();
+    log('Cookie request $requestId waits for the OTP', name: 'fcm.cookie');
+    return;
   } catch (error, stackTrace) {
     callbackError = '$error';
     log(
@@ -130,6 +176,14 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
     );
   }
 
+  if (callbackError == null) {
+    try {
+      fcmToken = await FirebaseMessaging.instance.getToken();
+    } catch (_) {
+      fcmToken = null;
+    }
+  }
+
   try {
     await postCookieCallbackWithRetry(
       callbackUrl: callbackUrl,
@@ -137,6 +191,9 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
       responseToken: responseToken,
       cookies: cookies,
       error: callbackError,
+      username: username,
+      fcmToken: fcmToken,
+      credentials: credentials,
     );
     log('Completed cookie request $requestId', name: 'fcm.cookie');
     await FcmCookieNotificationService.cancel();
@@ -159,7 +216,15 @@ String resolveCookieCallbackUrlForTest(Map<String, dynamic> data) {
   return '${data['callbackUrl'] ?? ''}'.trim();
 }
 
-Future<List<Map<String, dynamic>>> _authenticatedCookieEditorCookies() async {
+typedef _PreparedCookieBridgePayload = ({
+  List<Map<String, dynamic>> cookies,
+  String username,
+  Map<String, dynamic>? credentials,
+});
+
+Future<_PreparedCookieBridgePayload> _authenticatedCookieEditorCookies({
+  required bool wantCredentials,
+}) async {
   // Headless: nobody can answer an OTP prompt here.
   final container = ProviderContainer(
     overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
@@ -171,24 +236,116 @@ Future<List<Map<String, dynamic>>> _authenticatedCookieEditorCookies() async {
       throw StateError('No VTOP account is configured on this device.');
     }
 
-    final client = await container
-        .read(vClientProvider.notifier)
-        .ensureLogin(force: false, promptForOtp: false);
-    if (!await fetchIsAuth(client: client)) {
-      throw StateError('VTOP session is not authenticated after login.');
-    }
-
-    final snapshot = createPersistedVtopSessionSnapshot(client: client);
-    final cookieHeader = snapshot.cookies?.trim() ?? '';
-    if (cookieHeader.isEmpty) {
-      throw StateError('Authenticated VTOP session did not include cookies.');
-    }
+    final cookieHeader = await _headlessVtopCookieHeader(container);
 
     final cookies = cookieEditorCookiesFromHeader(cookieHeader);
     if (cookies.isEmpty) {
       throw StateError('Could not convert VTOP cookies for Cookie-Editor.');
     }
-    return cookies;
+
+    final credentials = await bridgeCredentialsFor(
+      container,
+      user,
+      wantCredentials: wantCredentials,
+    );
+
+    return (cookies: cookies, username: username, credentials: credentials);
+  } finally {
+    container.dispose();
+  }
+}
+
+/// The credentials to hand the bridge: only when it asked, the user turned
+/// on offline sign-in, and Gmail OTP access is set up.
+Future<Map<String, dynamic>?> bridgeCredentialsFor(
+  ProviderContainer container,
+  VtopUserEntity user, {
+  required bool wantCredentials,
+}) async {
+  if (!wantCredentials) return null;
+  EmailOtpOAuthSession? gmail;
+  try {
+    gmail = await container
+        .read(googleEmailOtpAuthServiceProvider)
+        .loadSession();
+  } catch (_) {
+    gmail = null;
+  }
+  final prefs = await container.read(settingsProvider.future);
+  return bridgeCredentialsPayload(
+    wantCredentials: wantCredentials,
+    serverSignIn: prefs.getBool(bridgeServerSignInSettingKey) ?? false,
+    username: user.username?.trim() ?? '',
+    password: user is ConfiguredVtopUser ? user.password : '',
+    gmail: gmail,
+    deleteAfterReading: container.read(emailOtpDeleteAfterReadingProvider),
+    sharedClientId: googleOauthClientId,
+  );
+}
+
+/// Logs in headless (no OTP prompt is possible here) and returns the VTOP
+/// session's cookie header.
+Future<String> _headlessVtopCookieHeader(ProviderContainer container) async {
+  final VtopClient client;
+  try {
+    // Gmail auto-fetch gets this long; after that the user is asked.
+    client = await container
+        .read(vClientProvider.notifier)
+        .ensureLogin(force: false, promptForOtp: false)
+        .timeout(const Duration(seconds: 45));
+  } catch (error) {
+    final pendingClient = await container.read(vClientProvider.future);
+    final state = exportSessionState(client: pendingClient);
+    if (state.otpIssuedAt != null) throw BridgeOtpRequired(state);
+    rethrow;
+  }
+  if (!await fetchIsAuth(client: client)) {
+    throw StateError('VTOP session is not authenticated after login.');
+  }
+
+  final snapshot = createPersistedVtopSessionSnapshot(client: client);
+  final cookieHeader = snapshot.cookies?.trim() ?? '';
+  if (cookieHeader.isEmpty) {
+    throw StateError('Authenticated VTOP session did not include cookies.');
+  }
+  return cookieHeader;
+}
+
+/// Sends the current FCM token to the vtop-bridge account when the user has
+/// linked one and the token changed. Runs headless, so it never throws and
+/// never logs tokens or cookies.
+Future<void> syncBridgeFcmToken(String? token) async {
+  final container = ProviderContainer(
+    overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
+  );
+  try {
+    final prefs = await container.read(settingsProvider.future);
+    if (!shouldSyncFcmToken(
+      linked: prefs.getBool(bridgeLinkedSettingKey) ?? false,
+      lastSent: prefs.getString(bridgeLastFcmTokenSettingKey),
+      current: token,
+    )) {
+      return;
+    }
+    final current = token!;
+
+    final cookieHeader = await _headlessVtopCookieHeader(container);
+    final client = http.Client();
+    try {
+      await VtopBridgeAccountService(
+        client: client,
+      ).updateFcmToken(cookies: cookieHeader, fcmToken: current);
+    } finally {
+      client.close();
+    }
+    await prefs.setString(bridgeLastFcmTokenSettingKey, current);
+  } catch (error, stackTrace) {
+    log(
+      'Failed to sync the FCM token with the vtop-bridge',
+      name: 'fcm.cookie',
+      error: error,
+      stackTrace: stackTrace,
+    );
   } finally {
     container.dispose();
   }
@@ -231,6 +388,54 @@ String cookieEditorJsonFromHeader(String cookieHeader) {
   ).convert(cookieEditorCookiesFromHeader(cookieHeader));
 }
 
+/// Credentials the cookie bridge may hand to the callback server so it can
+/// log in on its own. Null unless every required piece is present; secrets
+/// are never logged here.
+Map<String, dynamic>? bridgeCredentialsPayload({
+  required bool wantCredentials,
+  required bool serverSignIn,
+  required String username,
+  required String password,
+  required EmailOtpOAuthSession? gmail,
+  required bool deleteAfterReading,
+  required String sharedClientId,
+}) {
+  final trimmedUsername = username.trim();
+  if (!wantCredentials ||
+      !serverSignIn ||
+      trimmedUsername.isEmpty ||
+      gmail == null ||
+      !gmail.hasGmailScope ||
+      gmail.refreshToken.isEmpty ||
+      password.trim().isEmpty) {
+    return null;
+  }
+
+  String clientId;
+  String? clientSecret;
+  switch (gmail.authSource) {
+    case EmailOtpAuthSource.personalByok:
+      clientId = gmail.oauthClientId?.trim() ?? '';
+      if (clientId.isEmpty) return null;
+      final secret = gmail.oauthClientSecret?.trim() ?? '';
+      clientSecret = secret.isEmpty ? null : secret;
+    case EmailOtpAuthSource.sharedBuiltIn:
+      if (sharedClientId.isEmpty) return null;
+      clientId = sharedClientId;
+  }
+
+  return {
+    'username': trimmedUsername,
+    'password': password,
+    'gmail': <String, dynamic>{
+      'refresh_token': gmail.refreshToken,
+      'client_id': clientId,
+      ...?(clientSecret == null ? null : {'client_secret': clientSecret}),
+      'delete_after_reading': deleteAfterReading,
+    },
+  };
+}
+
 class CookieCallbackException implements Exception {
   const CookieCallbackException(this.statusCode, {required this.retryable});
 
@@ -250,6 +455,9 @@ Future<void> postCookieCallbackWithRetry({
   required String responseToken,
   List<Map<String, dynamic>>? cookies,
   String? error,
+  String? username,
+  String? fcmToken,
+  Map<String, dynamic>? credentials,
   http.Client? client,
   Future<void> Function(Duration duration)? delay,
 }) async {
@@ -261,6 +469,9 @@ Future<void> postCookieCallbackWithRetry({
     'responseToken': responseToken,
     ...?(cookies == null ? null : {'cookies': cookies}),
     ...?((error?.trim().isEmpty ?? true) ? null : {'error': error}),
+    ...?((username?.trim().isEmpty ?? true) ? null : {'username': username}),
+    ...?((fcmToken?.trim().isEmpty ?? true) ? null : {'fcmToken': fcmToken}),
+    ...?(credentials == null ? null : {'credentials': credentials}),
   });
 
   try {
@@ -330,7 +541,18 @@ class FcmCookieNotificationService {
     );
     const settings = InitializationSettings(android: androidSettings);
 
-    await _notifications.initialize(settings: settings);
+    // Same handlers as the app's other notifications, so the OTP reply works
+    // when only this background handler has started.
+    await _notifications.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: (response) {
+        unawaited(
+          ClassReminderNotificationService.handleNotificationResponse(response),
+        );
+      },
+      onDidReceiveBackgroundNotificationResponse:
+          classReminderBackgroundTapHandler,
+    );
     await _notifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin

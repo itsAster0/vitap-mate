@@ -235,8 +235,10 @@ Widget _buildHeader(
       case "outing":
         data = path.endsWith('/pass') ? "Outing Pass" : "Outing";
         break;
-      case "chrome-extension":
-        data = "Chrome Extension";
+      case "connected-apps":
+        data = path.endsWith('/chrome-extension')
+            ? "Browser extension"
+            : "Connected apps";
         break;
       case "gpa_calculator":
         data = "GPA Planner";

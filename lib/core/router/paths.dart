@@ -9,6 +9,7 @@ class Paths {
   static final vtopUserManagement = "vtopUsermanagement";
   static final settings = "settings";
   static final gmailOtpSetup = "gmailOtpSetup";
+  static final connectedApps = "connectedApps";
   static final gmailOauthGuide = "gmailOauthGuide";
   static final studentProjects = "studentProjects";
   static final marks = "marks";

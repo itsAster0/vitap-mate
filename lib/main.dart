@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -35,6 +37,15 @@ class MyApp extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goRouter = ref.watch(routerProvider);
+    useEffect(() {
+      // A tap on the OTP notification, or a login left waiting for its OTP:
+      // finish it with the app's OTP prompt.
+      final container = ProviderScope.containerOf(context, listen: false);
+      void answer() => unawaited(answerPendingBridgeOtpInApp(container));
+      bridgeOtpTapSignal.addListener(answer);
+      answer();
+      return () => bridgeOtpTapSignal.removeListener(answer);
+    }, const []);
     useEffect(() {
       Future(() async {
         startVtopCookieBridgeListener();

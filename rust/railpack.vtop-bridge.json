@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "rust",
+  "packages": {
+    "rust": "1.98"
+  },
+  "steps": {
+    "build": {
+      "commands": [
+        "mkdir -p bin",
+        "cargo build --locked --profile server --package vtop-bridge",
+        "cp target/server/vtop-bridge bin"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "./bin/vtop-bridge",
+    "variables": {
+      "RUST_LOG": "info"
+    }
+  }
+}

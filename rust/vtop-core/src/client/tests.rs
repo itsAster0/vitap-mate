@@ -441,3 +441,75 @@ async fn cookies_set_during_a_redirect_are_kept() {
     );
     assert!(client.cookie_header().unwrap().contains("SERVERID=s9"));
 }
+
+fn cookie_session(cookies: &str) -> SessionState {
+    SessionState {
+        cookies: cookies.into(),
+        csrf_token: None,
+        registration_number: None,
+        otp_issued_at: None,
+        logged_in_at: None,
+    }
+}
+
+#[tokio::test]
+async fn verify_session_returns_registration_number() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&cookie_session("JSESSIONID=abc"))
+        .unwrap();
+
+    assert_eq!(client.verify_session().await.unwrap(), "22BCE0001");
+    assert_eq!(mock.hits("/vtop/content"), 1);
+}
+
+#[tokio::test]
+async fn verify_session_ignores_a_claimed_registration_number() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&SessionState {
+            registration_number: Some("21BCE9999".into()),
+            csrf_token: Some("forged".into()),
+            ..cookie_session("JSESSIONID=abc")
+        })
+        .unwrap();
+
+    assert_eq!(client.verify_session().await.unwrap(), "22BCE0001");
+    assert_eq!(mock.hits("/vtop/content"), 1);
+}
+
+#[tokio::test]
+async fn verify_session_on_server_error_is_not_expired() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    *mock.failures_left.lock().unwrap() = 100;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&cookie_session("JSESSIONID=abc"))
+        .unwrap();
+
+    assert!(matches!(
+        client.verify_session().await.unwrap_err(),
+        VtopError::VtopServerError(_)
+    ));
+}
+
+#[tokio::test]
+async fn verify_session_on_login_redirect_is_expired() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    *mock.expired.lock().unwrap() = true;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&cookie_session("JSESSIONID=abc"))
+        .unwrap();
+
+    assert_eq!(
+        client.verify_session().await.unwrap_err(),
+        VtopError::SessionExpired
+    );
+}
