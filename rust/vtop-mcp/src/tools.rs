@@ -133,6 +133,42 @@ pub fn mark_current(
     serde_json::json!({ "current_semester_id": current, "semesters": semesters })
 }
 
+const VTOP_HOST: &str = "vtop.vitap.ac.in";
+
+/// A session as browser cookies (Playwright and Puppeteer take this shape)
+/// and as a Cookie header.
+pub fn browser_session(cookie_header: &str) -> serde_json::Value {
+    let pairs: Vec<(&str, &str)> = cookie_header
+        .split(';')
+        .filter_map(|part| part.trim().split_once('='))
+        .map(|(name, value)| (name.trim(), value.trim()))
+        .filter(|(name, _)| !name.is_empty())
+        .collect();
+    let cookies: Vec<_> = pairs
+        .iter()
+        .map(|(name, value)| {
+            serde_json::json!({
+                "name": name,
+                "value": value,
+                "domain": VTOP_HOST,
+                "path": "/",
+                "secure": true,
+                "httpOnly": true,
+            })
+        })
+        .collect();
+    let header = pairs
+        .iter()
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect::<Vec<_>>()
+        .join("; ");
+    serde_json::json!({
+        "url": format!("https://{VTOP_HOST}/vtop/content"),
+        "cookie_header": header,
+        "cookies": cookies,
+    })
+}
+
 fn json_result(value: &impl Serialize) -> CallToolResult {
     match serde_json::to_string(value) {
         Ok(json) => CallToolResult::success(vec![ContentBlock::text(json)]),
@@ -493,6 +529,24 @@ impl VtopTools {
     }
 
     #[tool(
+        description = "A live, signed-in VTOP session for a browser, so you can open VTOP as the student (for pages no other tool covers). Returns `url`, `cookies` (Playwright `context.add_cookies(cookies)` / Puppeteer `page.setCookie(...cookies)` shape) and `cookie_header` (for curl or requests). To use it: add the cookies to the browser context, then open `url`; it lands on the signed-in VTOP home. If VTOP shows its login page, the session expired: call get_session again. This is the student's full account: anything done in the browser acts as them, so do only what they asked, never print or share the cookies, and confirm before submitting any form."
+    )]
+    async fn get_session(
+        &self,
+        Parameters(_): Parameters<NoArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        let Some(Caller(key)) = parts.extensions.get::<Caller>().cloned() else {
+            return tool_error("no caller on the request");
+        };
+        // The bridge checks the session with VTOP before handing it out.
+        match self.source.session(&key).await {
+            Ok(session) => json_result(&browser_session(&session.cookies)),
+            Err(message) => tool_error(message),
+        }
+    }
+
+    #[tool(
         description = "Who this access key belongs to: registration number and key label. Does not contact VTOP."
     )]
     async fn whoami(
@@ -516,7 +570,10 @@ impl VtopTools {
 
 /// What an agent reads on connecting: how the tools fit together.
 const INSTRUCTIONS: &str = "\
-Read-only access to one VIT-AP student's VTOP data; nothing can be changed.
+Access to one VIT-AP student's VTOP data. Every tool is read-only except get_session, \
+which hands over a live login for a browser: use it only for pages the other tools do \
+not cover, act only as the student asked, confirm before submitting anything, and never \
+show the cookies.
 
 - Call get_semesters first and use the semester marked current (current_semester_id) \
 as semester_id unless the student names another. It is the semester picked in the \

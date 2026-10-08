@@ -261,6 +261,7 @@ fn instructions_explain_the_tools_to_an_agent() {
     for needle in [
         "get_semesters",
         "marked current",
+        "get_session",
         "newest first",
         "get_courses",
         "get_course_detail",
@@ -311,4 +312,20 @@ fn without_the_apps_semester_the_newest_is_current() {
         assert_eq!(value["current_semester_id"], "AP2026273", "{missing:?}");
         assert_eq!(value["semesters"][0]["current"], true);
     }
+}
+
+#[test]
+fn a_session_becomes_browser_cookies() {
+    let value = vtop_mcp::tools::browser_session("JSESSIONID=abc; SERVERID=s1;  ; bad");
+    assert_eq!(value["url"], "https://vtop.vitap.ac.in/vtop/content");
+    assert_eq!(value["cookie_header"], "JSESSIONID=abc; SERVERID=s1");
+    assert_eq!(
+        value["cookies"],
+        serde_json::json!([
+            { "name": "JSESSIONID", "value": "abc", "domain": "vtop.vitap.ac.in", "path": "/",
+              "secure": true, "httpOnly": true },
+            { "name": "SERVERID", "value": "s1", "domain": "vtop.vitap.ac.in", "path": "/",
+              "secure": true, "httpOnly": true }
+        ])
+    );
 }
