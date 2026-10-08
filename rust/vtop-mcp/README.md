@@ -1,6 +1,7 @@
 # vtop-mcp
 
-A read-only MCP server for VTOP. It runs `vtop-core` against a session it
+An MCP server for VTOP. Every tool is read-only except `get_session`, which hands a
+signed-in session to a browser. It runs `vtop-core` against a session it
 gets from `vtop-bridge`, so it never sees a password.
 
 Students create an access key in VITAP Mate → Settings → Connected apps and
@@ -37,6 +38,7 @@ session, the server asks the bridge to expire it and retries once.
 | `get_course_detail` | `semester_id`, `erp_id`, `class_id` | lecture plan, syllabus, course plan |
 | `get_general_outing` | — | general outing form and records |
 | `get_weekend_outing` | — | weekend outing form and records |
+| `get_session` | — | a live VTOP login for a browser: `url`, `cookies` (Playwright/Puppeteer shape), `cookie_header`. Not read-only. |
 
 ## Configuration
 

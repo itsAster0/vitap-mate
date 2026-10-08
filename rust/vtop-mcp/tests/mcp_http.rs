@@ -150,6 +150,7 @@ async fn mcp_tools_list_names_every_tool() {
             "get_grades",
             "get_marks",
             "get_semesters",
+            "get_session",
             "get_timetable",
             "get_weekend_outing",
             "whoami",
@@ -241,7 +242,7 @@ async fn legacy_protocol_clients_work_without_sessions() {
     let body: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(
         body["result"]["tools"].as_array().unwrap().len(),
-        17,
+        18,
         "{body}"
     );
 }
@@ -375,7 +376,7 @@ async fn course_tools_reject_bad_ids_before_asking_for_a_session() {
 #[tokio::test]
 async fn outing_tools_use_the_callers_session() {
     let source = Arc::new(RecordingSource::default());
-    for name in ["get_general_outing", "get_weekend_outing"] {
+    for name in ["get_general_outing", "get_weekend_outing", "get_session"] {
         let (_, body) = call(
             source.clone(),
             Some(KEY),
@@ -391,7 +392,7 @@ async fn outing_tools_use_the_callers_session() {
             "{body}"
         );
     }
-    assert_eq!(*source.usernames.lock().unwrap(), [KEY, KEY]);
+    assert_eq!(*source.usernames.lock().unwrap(), [KEY, KEY, KEY]);
 }
 
 #[tokio::test]
