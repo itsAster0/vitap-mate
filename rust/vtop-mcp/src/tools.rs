@@ -468,11 +468,27 @@ impl VtopTools {
     }
 }
 
+/// What an agent reads on connecting: how the tools fit together.
+const INSTRUCTIONS: &str = "\
+Read-only access to one VIT-AP student's VTOP data; nothing can be changed.
+
+- Call get_semesters first. Semesters are listed newest first, so the first one \
+is the current semester; use its id as semester_id unless the student names another.
+- Ids chain from one tool to the next: get_attendance gives course_id and course_type \
+for get_full_attendance; get_courses gives course_id for get_course_classes, which \
+gives erp_id and class_id for get_course_detail. Dates are DD/MM/YYYY.
+- Attendance below 75% risks being barred from exams. CAT-1 and CAT-2 are the \
+mid-term exams; FAT is the final exam.
+- The first call can take up to a minute while the student's phone or the server \
+signs in to VTOP; wait for it rather than retrying.
+- Errors: key_unknown means the access key was revoked; phone_unreachable or \
+phone_timeout means the student should open the VITAP Mate app; rate_limited means \
+wait a minute.";
+
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for VtopTools {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
-            "Read-only access to the student's VTOP (VIT-AP) data. Start with get_semesters to find a semester_id.",
-        )
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(INSTRUCTIONS)
     }
 }

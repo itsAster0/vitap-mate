@@ -388,3 +388,16 @@ async fn outing_tools_use_the_callers_session() {
     }
     assert_eq!(*source.usernames.lock().unwrap(), [KEY, KEY]);
 }
+
+#[tokio::test]
+async fn discover_returns_the_instructions() {
+    let (status, body) = call(
+        Arc::new(RecordingSource::default()),
+        Some(KEY),
+        rpc("server/discover", json!({})),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let instructions = body["result"]["instructions"].as_str().unwrap_or_default();
+    assert!(instructions.contains("newest first"), "{body}");
+}
