@@ -109,6 +109,8 @@ pub struct AccountDoc {
     pub vault_expires_at: Option<u64>,
     /// `None` until the student changes something.
     pub settings: Option<AccountSettings>,
+    /// The semester picked in the app, for agents to default to.
+    pub semester_id: Option<String>,
     pub updated_at: u64,
 }
 
@@ -123,6 +125,7 @@ impl AccountDoc {
             app_secret_hash: None,
             vault_expires_at: None,
             settings: None,
+            semester_id: None,
             updated_at: now,
         }
     }
