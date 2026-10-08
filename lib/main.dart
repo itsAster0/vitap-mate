@@ -18,13 +18,13 @@ import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final firebaseReady = await ensureFirebaseReady();
+  // Independent, so start both rather than waiting on one then the other.
+  final (firebaseReady, _) = await (ensureFirebaseReady(), RustLib.init()).wait;
   if (firebaseReady) {
     FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
   }
   Workmanager().initialize(callbackDispatcher);
 
-  await RustLib.init();
   fileDownloaderConfig();
 
   runApp(const ProviderScope(child: MyApp()));

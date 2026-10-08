@@ -137,6 +137,8 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
     try {
       final retry = await showFDialog<bool>(
         context: context,
+        // Above the tab shell, so the keyboard inset is counted once.
+        useRootNavigator: true,
         builder: (context, style, animation) => AppDialog(
           animation: animation,
           title: const Text('Login expired'),

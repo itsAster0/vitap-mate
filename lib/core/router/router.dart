@@ -19,6 +19,10 @@ import 'package:vitapmate/features/more/presentation/pages/grade_history_page.da
 import 'package:vitapmate/features/more/presentation/pages/marks_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/biometric_history_page.dart';
+import 'package:vitapmate/features/outing/presentation/pages/outing_page.dart';
+import 'package:vitapmate/features/course_page/presentation/pages/course_page_page.dart';
+import 'package:vitapmate/features/course_page/presentation/pages/course_view_page.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
@@ -180,6 +184,50 @@ GoRouter router(Ref ref) {
                       key: state.pageKey,
                       child: const BiometricHistoryPage(),
                     ),
+                  ),
+                  GoRoute(
+                    path: 'outing',
+                    name: Paths.outing,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: OutingPage(
+                        initialTab: state.extra is OutingTab
+                            ? state.extra! as OutingTab
+                            : OutingTab.general,
+                      ),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'pass',
+                        name: Paths.outingPass,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: DocumentViewerPage(
+                            doc: state.extra as DocWindow,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'course-page',
+                    name: Paths.coursePage,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const CoursePagePage(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'course',
+                        name: Paths.coursePageCourse,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: CourseViewPage(
+                            course: state.extra as CoursePageCourse,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'chrome-extension',

@@ -78,6 +78,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GmailOtpCode dco_decode_box_autoadd_gmail_otp_code(dynamic raw);
 
   @protected
+  OutingStudent dco_decode_box_autoadd_outing_student(dynamic raw);
+
+  @protected
   PersistedVtopSession dco_decode_box_autoadd_persisted_vtop_session(
     dynamic raw,
   );
@@ -95,6 +98,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ClassKind dco_decode_class_kind(dynamic raw);
 
   @protected
+  CourseFileInfo dco_decode_course_file_info(dynamic raw);
+
+  @protected
+  CourseLecture dco_decode_course_lecture(dynamic raw);
+
+  @protected
+  CourseMaterial dco_decode_course_material(dynamic raw);
+
+  @protected
+  CoursePageClass dco_decode_course_page_class(dynamic raw);
+
+  @protected
+  CoursePageClasses dco_decode_course_page_classes(dynamic raw);
+
+  @protected
+  CoursePageCourse dco_decode_course_page_course(dynamic raw);
+
+  @protected
+  CoursePageCourses dco_decode_course_page_courses(dynamic raw);
+
+  @protected
+  CoursePageDetail dco_decode_course_page_detail(dynamic raw);
+
+  @protected
   ExamScheduleData dco_decode_exam_schedule_data(dynamic raw);
 
   @protected
@@ -105,6 +132,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FullAttendanceRecord dco_decode_full_attendance_record(dynamic raw);
+
+  @protected
+  GeneralOutingData dco_decode_general_outing_data(dynamic raw);
+
+  @protected
+  GeneralOutingRecord dco_decode_general_outing_record(dynamic raw);
 
   @protected
   GmailOtpCode dco_decode_gmail_otp_code(dynamic raw);
@@ -155,12 +188,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<CalendarEntry> dco_decode_list_calendar_entry(dynamic raw);
 
   @protected
+  List<CourseLecture> dco_decode_list_course_lecture(dynamic raw);
+
+  @protected
+  List<CourseMaterial> dco_decode_list_course_material(dynamic raw);
+
+  @protected
+  List<CoursePageClass> dco_decode_list_course_page_class(dynamic raw);
+
+  @protected
+  List<CoursePageCourse> dco_decode_list_course_page_course(dynamic raw);
+
+  @protected
   List<ExamScheduleRecord> dco_decode_list_exam_schedule_record(dynamic raw);
 
   @protected
   List<FullAttendanceRecord> dco_decode_list_full_attendance_record(
     dynamic raw,
   );
+
+  @protected
+  List<GeneralOutingRecord> dco_decode_list_general_outing_record(dynamic raw);
 
   @protected
   List<GradeCourseRecord> dco_decode_list_grade_course_record(dynamic raw);
@@ -184,6 +232,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MarksRecordEach> dco_decode_list_marks_record_each(dynamic raw);
 
   @protected
+  List<OutingOption> dco_decode_list_outing_option(dynamic raw);
+
+  @protected
   List<PerExamScheduleRecord> dco_decode_list_per_exam_schedule_record(
     dynamic raw,
   );
@@ -201,6 +252,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TimetableSlot> dco_decode_list_timetable_slot(dynamic raw);
 
   @protected
+  List<WeekendOutingRecord> dco_decode_list_weekend_outing_record(dynamic raw);
+
+  @protected
   MarksData dco_decode_marks_data(dynamic raw);
 
   @protected
@@ -216,12 +270,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GmailOtpCode? dco_decode_opt_box_autoadd_gmail_otp_code(dynamic raw);
 
   @protected
+  OutingStudent? dco_decode_opt_box_autoadd_outing_student(dynamic raw);
+
+  @protected
   PersistedVtopSession? dco_decode_opt_box_autoadd_persisted_vtop_session(
     dynamic raw,
   );
 
   @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  OutingApplyResult dco_decode_outing_apply_result(dynamic raw);
+
+  @protected
+  OutingCancelResult dco_decode_outing_cancel_result(dynamic raw);
+
+  @protected
+  OutingOption dco_decode_outing_option(dynamic raw);
+
+  @protected
+  OutingStudent dco_decode_outing_student(dynamic raw);
 
   @protected
   PerExamScheduleRecord dco_decode_per_exam_schedule_record(dynamic raw);
@@ -248,6 +317,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TimetableSlot dco_decode_timetable_slot(dynamic raw);
 
   @protected
+  int dco_decode_u_32(dynamic raw);
+
+  @protected
   BigInt dco_decode_u_64(dynamic raw);
 
   @protected
@@ -261,6 +333,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopError dco_decode_vtop_error(dynamic raw);
+
+  @protected
+  WeekendOutingData dco_decode_weekend_outing_data(dynamic raw);
+
+  @protected
+  WeekendOutingRecord dco_decode_weekend_outing_record(dynamic raw);
 
   @protected
   VtopClient
@@ -315,6 +393,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  OutingStudent sse_decode_box_autoadd_outing_student(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PersistedVtopSession sse_decode_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   );
@@ -334,6 +417,34 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ClassKind sse_decode_class_kind(SseDeserializer deserializer);
 
   @protected
+  CourseFileInfo sse_decode_course_file_info(SseDeserializer deserializer);
+
+  @protected
+  CourseLecture sse_decode_course_lecture(SseDeserializer deserializer);
+
+  @protected
+  CourseMaterial sse_decode_course_material(SseDeserializer deserializer);
+
+  @protected
+  CoursePageClass sse_decode_course_page_class(SseDeserializer deserializer);
+
+  @protected
+  CoursePageClasses sse_decode_course_page_classes(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CoursePageCourse sse_decode_course_page_course(SseDeserializer deserializer);
+
+  @protected
+  CoursePageCourses sse_decode_course_page_courses(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  CoursePageDetail sse_decode_course_page_detail(SseDeserializer deserializer);
+
+  @protected
   ExamScheduleData sse_decode_exam_schedule_data(SseDeserializer deserializer);
 
   @protected
@@ -348,6 +459,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   FullAttendanceRecord sse_decode_full_attendance_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GeneralOutingData sse_decode_general_outing_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  GeneralOutingRecord sse_decode_general_outing_record(
     SseDeserializer deserializer,
   );
 
@@ -414,12 +535,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<CourseLecture> sse_decode_list_course_lecture(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CourseMaterial> sse_decode_list_course_material(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CoursePageClass> sse_decode_list_course_page_class(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<CoursePageCourse> sse_decode_list_course_page_course(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ExamScheduleRecord> sse_decode_list_exam_schedule_record(
     SseDeserializer deserializer,
   );
 
   @protected
   List<FullAttendanceRecord> sse_decode_list_full_attendance_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<GeneralOutingRecord> sse_decode_list_general_outing_record(
     SseDeserializer deserializer,
   );
 
@@ -455,6 +601,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<OutingOption> sse_decode_list_outing_option(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<PerExamScheduleRecord> sse_decode_list_per_exam_schedule_record(
     SseDeserializer deserializer,
   );
@@ -478,6 +629,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<WeekendOutingRecord> sse_decode_list_weekend_outing_record(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   MarksData sse_decode_marks_data(SseDeserializer deserializer);
 
   @protected
@@ -495,12 +651,33 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  OutingStudent? sse_decode_opt_box_autoadd_outing_student(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PersistedVtopSession? sse_decode_opt_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   );
 
   @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  OutingApplyResult sse_decode_outing_apply_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  OutingCancelResult sse_decode_outing_cancel_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  OutingOption sse_decode_outing_option(SseDeserializer deserializer);
+
+  @protected
+  OutingStudent sse_decode_outing_student(SseDeserializer deserializer);
 
   @protected
   PerExamScheduleRecord sse_decode_per_exam_schedule_record(
@@ -531,6 +708,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TimetableSlot sse_decode_timetable_slot(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
@@ -544,6 +724,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   VtopError sse_decode_vtop_error(SseDeserializer deserializer);
+
+  @protected
+  WeekendOutingData sse_decode_weekend_outing_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeekendOutingRecord sse_decode_weekend_outing_record(
+    SseDeserializer deserializer,
+  );
 
   @protected
   void
@@ -613,6 +803,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_outing_student(
+    OutingStudent self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_persisted_vtop_session(
     PersistedVtopSession self,
     SseSerializer serializer,
@@ -632,6 +828,51 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_class_kind(ClassKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_course_file_info(
+    CourseFileInfo self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_lecture(CourseLecture self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_course_material(
+    CourseMaterial self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_page_class(
+    CoursePageClass self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_page_classes(
+    CoursePageClasses self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_page_course(
+    CoursePageCourse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_page_courses(
+    CoursePageCourses self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_course_page_detail(
+    CoursePageDetail self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_exam_schedule_data(
@@ -654,6 +895,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_full_attendance_record(
     FullAttendanceRecord self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_general_outing_data(
+    GeneralOutingData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_general_outing_record(
+    GeneralOutingRecord self,
     SseSerializer serializer,
   );
 
@@ -739,6 +992,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_course_lecture(
+    List<CourseLecture> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_course_material(
+    List<CourseMaterial> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_course_page_class(
+    List<CoursePageClass> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_course_page_course(
+    List<CoursePageCourse> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_exam_schedule_record(
     List<ExamScheduleRecord> self,
     SseSerializer serializer,
@@ -747,6 +1024,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_full_attendance_record(
     List<FullAttendanceRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_general_outing_record(
+    List<GeneralOutingRecord> self,
     SseSerializer serializer,
   );
 
@@ -793,6 +1076,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_outing_option(
+    List<OutingOption> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_per_exam_schedule_record(
     List<PerExamScheduleRecord> self,
     SseSerializer serializer,
@@ -823,6 +1112,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_weekend_outing_record(
+    List<WeekendOutingRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_marks_data(MarksData self, SseSerializer serializer);
 
   @protected
@@ -844,6 +1139,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_outing_student(
+    OutingStudent? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_persisted_vtop_session(
     PersistedVtopSession? self,
     SseSerializer serializer,
@@ -851,6 +1152,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_outing_apply_result(
+    OutingApplyResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_outing_cancel_result(
+    OutingCancelResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_outing_option(OutingOption self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_outing_student(OutingStudent self, SseSerializer serializer);
 
   @protected
   void sse_encode_per_exam_schedule_record(
@@ -886,6 +1205,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_timetable_slot(TimetableSlot self, SseSerializer serializer);
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
   @protected
@@ -899,6 +1221,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_vtop_error(VtopError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weekend_outing_data(
+    WeekendOutingData self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_weekend_outing_record(
+    WeekendOutingRecord self,
+    SseSerializer serializer,
+  );
 }
 
 // Section: wire_class

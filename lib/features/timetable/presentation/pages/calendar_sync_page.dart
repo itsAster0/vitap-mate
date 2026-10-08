@@ -1,8 +1,10 @@
 import 'dart:io';
 
+import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/widgets/fit_calendar.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/core/widgets/app_card.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -80,6 +82,13 @@ class CalendarSyncPage extends HookConsumerWidget {
     String formatDate(DateTime dt) {
       return "${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}";
     }
+
+    // Short enough for half-width buttons on narrow phones: "8 Oct", with
+    // the year only when it is not this one.
+    String buttonDate(DateTime dt) => DateFormat(
+      dt.year == DateTime.now().year ? 'd MMM' : 'd MMM yy',
+      'en_US',
+    ).format(dt);
 
     Future<void> showInfo(String title, String description) async {
       if (!context.mounted) return;
@@ -458,7 +467,7 @@ class CalendarSyncPage extends HookConsumerWidget {
                     onPress: loading.value
                         ? null
                         : () => selectingDate.value = _DateSelectionTab.start,
-                    child: Text("Start: ${formatDate(startDate.value)}"),
+                    child: Text("Start · ${buttonDate(startDate.value)}"),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -470,14 +479,15 @@ class CalendarSyncPage extends HookConsumerWidget {
                     onPress: loading.value
                         ? null
                         : () => selectingDate.value = _DateSelectionTab.end,
-                    child: Text("End: ${formatDate(endDate.value)}"),
+                    child: Text("End · ${buttonDate(endDate.value)}"),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Center(
-              child: FCalendar.grid(
+              child: FitCalendar(
+                boxed: true,
                 key: ValueKey(
                   "${selectingDate.value.name}-${calendarFocusDate.year}-${calendarFocusDate.month}",
                 ),

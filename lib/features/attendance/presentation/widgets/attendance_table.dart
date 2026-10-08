@@ -87,8 +87,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
             countedThrough: sync?.countedThrough,
           );
     final unposted =
-        (record.islab() ? classes?.inSessions(record) : classes)?.unposted ??
-        0;
+        (record.islab() ? classes?.inSessions(record) : classes)?.unposted ?? 0;
 
     return ScreenRefresh(
       onRefresh: refresh,

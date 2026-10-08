@@ -73,7 +73,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -2056155509;
+  int get rustContentHash => -462997537;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -89,6 +89,37 @@ abstract class RustLibApi extends BaseApi {
     required String level,
     required String source,
     required String message,
+  });
+
+  Future<OutingApplyResult> crateApiVtopGetClientApplyGeneralOuting({
+    required VtopClient client,
+    required String place,
+    required String purpose,
+    required String outDate,
+    required int outHour,
+    required int outMinute,
+    required String inDate,
+    required int inHour,
+    required int inMinute,
+  });
+
+  Future<OutingApplyResult> crateApiVtopGetClientApplyWeekendOuting({
+    required VtopClient client,
+    required String place,
+    required String purpose,
+    required String date,
+    required String timeSlot,
+    required String contactNumber,
+  });
+
+  Future<OutingCancelResult> crateApiVtopGetClientCancelGeneralOuting({
+    required VtopClient client,
+    required String leaveId,
+  });
+
+  Future<OutingCancelResult> crateApiVtopGetClientCancelWeekendOuting({
+    required VtopClient client,
+    required String bookingId,
   });
 
   PersistedVtopSession crateApiVtopGetClientExportSessionSnapshot({
@@ -119,6 +150,35 @@ abstract class RustLibApi extends BaseApi {
     required VtopClient client,
   });
 
+  Future<CourseFileInfo> crateApiVtopGetClientFetchCourseFileInfo({
+    required VtopClient client,
+    required String path,
+  });
+
+  Future<CoursePageClasses> crateApiVtopGetClientFetchCoursePageClasses({
+    required VtopClient client,
+    required String semesterId,
+    required String courseId,
+  });
+
+  Future<CoursePageCourses> crateApiVtopGetClientFetchCoursePageCourses({
+    required VtopClient client,
+    required String semesterId,
+  });
+
+  Future<CoursePageDetail> crateApiVtopGetClientFetchCoursePageDetail({
+    required VtopClient client,
+    required String semesterId,
+    required String erpId,
+    required String classId,
+  });
+
+  Future<CourseFileInfo> crateApiVtopGetClientFetchCoursePlanInfo({
+    required VtopClient client,
+    required String semesterId,
+    required String classId,
+  });
+
   Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
@@ -129,6 +189,10 @@ abstract class RustLibApi extends BaseApi {
     required String semesterId,
     required String courseId,
     required String courseType,
+  });
+
+  Future<GeneralOutingData> crateApiVtopGetClientFetchGeneralOuting({
+    required VtopClient client,
   });
 
   Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
@@ -153,6 +217,12 @@ abstract class RustLibApi extends BaseApi {
     required String semesterId,
   });
 
+  Future<Uint8List> crateApiVtopGetClientFetchOutingPass({
+    required VtopClient client,
+    required bool weekend,
+    required String passId,
+  });
+
   Future<SemesterData> crateApiVtopGetClientFetchSemesters({
     required VtopClient client,
   });
@@ -160,6 +230,10 @@ abstract class RustLibApi extends BaseApi {
   Future<TimetableData> crateApiVtopGetClientFetchTimetable({
     required VtopClient client,
     required String semesterId,
+  });
+
+  Future<WeekendOutingData> crateApiVtopGetClientFetchWeekendOuting({
+    required VtopClient client,
   });
 
   Future<VtopClient> crateApiVtopGetClientGetVtopClient({
@@ -266,6 +340,207 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<OutingApplyResult> crateApiVtopGetClientApplyGeneralOuting({
+    required VtopClient client,
+    required String place,
+    required String purpose,
+    required String outDate,
+    required int outHour,
+    required int outMinute,
+    required String inDate,
+    required int inHour,
+    required int inMinute,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(place, serializer);
+          sse_encode_String(purpose, serializer);
+          sse_encode_String(outDate, serializer);
+          sse_encode_u_8(outHour, serializer);
+          sse_encode_u_8(outMinute, serializer);
+          sse_encode_String(inDate, serializer);
+          sse_encode_u_8(inHour, serializer);
+          sse_encode_u_8(inMinute, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_outing_apply_result,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientApplyGeneralOutingConstMeta,
+        argValues: [
+          client,
+          place,
+          purpose,
+          outDate,
+          outHour,
+          outMinute,
+          inDate,
+          inHour,
+          inMinute,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientApplyGeneralOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "apply_general_outing",
+        argNames: [
+          "client",
+          "place",
+          "purpose",
+          "outDate",
+          "outHour",
+          "outMinute",
+          "inDate",
+          "inHour",
+          "inMinute",
+        ],
+      );
+
+  @override
+  Future<OutingApplyResult> crateApiVtopGetClientApplyWeekendOuting({
+    required VtopClient client,
+    required String place,
+    required String purpose,
+    required String date,
+    required String timeSlot,
+    required String contactNumber,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(place, serializer);
+          sse_encode_String(purpose, serializer);
+          sse_encode_String(date, serializer);
+          sse_encode_String(timeSlot, serializer);
+          sse_encode_String(contactNumber, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 3,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_outing_apply_result,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientApplyWeekendOutingConstMeta,
+        argValues: [client, place, purpose, date, timeSlot, contactNumber],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientApplyWeekendOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "apply_weekend_outing",
+        argNames: [
+          "client",
+          "place",
+          "purpose",
+          "date",
+          "timeSlot",
+          "contactNumber",
+        ],
+      );
+
+  @override
+  Future<OutingCancelResult> crateApiVtopGetClientCancelGeneralOuting({
+    required VtopClient client,
+    required String leaveId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(leaveId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 4,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_outing_cancel_result,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientCancelGeneralOutingConstMeta,
+        argValues: [client, leaveId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientCancelGeneralOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "cancel_general_outing",
+        argNames: ["client", "leaveId"],
+      );
+
+  @override
+  Future<OutingCancelResult> crateApiVtopGetClientCancelWeekendOuting({
+    required VtopClient client,
+    required String bookingId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(bookingId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 5,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_outing_cancel_result,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientCancelWeekendOutingConstMeta,
+        argValues: [client, bookingId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientCancelWeekendOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "cancel_weekend_outing",
+        argNames: ["client", "bookingId"],
+      );
+
+  @override
   PersistedVtopSession crateApiVtopGetClientExportSessionSnapshot({
     required VtopClient client,
     required BigInt savedAtEpochMs,
@@ -279,7 +554,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_u_64(savedAtEpochMs, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_persisted_vtop_session,
@@ -310,7 +585,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_session_state,
@@ -346,7 +621,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 8,
             port: port_,
           );
         },
@@ -384,7 +659,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 5,
+            funcId: 9,
             port: port_,
           );
         },
@@ -422,7 +697,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 6,
+            funcId: 10,
             port: port_,
           );
         },
@@ -458,7 +733,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 7,
+            funcId: 11,
             port: port_,
           );
         },
@@ -477,6 +752,204 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "fetch_cookies", argNames: ["client"]);
 
   @override
+  Future<CourseFileInfo> crateApiVtopGetClientFetchCourseFileInfo({
+    required VtopClient client,
+    required String path,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 12,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_course_file_info,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchCourseFileInfoConstMeta,
+        argValues: [client, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchCourseFileInfoConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_course_file_info",
+        argNames: ["client", "path"],
+      );
+
+  @override
+  Future<CoursePageClasses> crateApiVtopGetClientFetchCoursePageClasses({
+    required VtopClient client,
+    required String semesterId,
+    required String courseId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          sse_encode_String(courseId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 13,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_course_page_classes,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchCoursePageClassesConstMeta,
+        argValues: [client, semesterId, courseId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageClassesConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_course_page_classes",
+        argNames: ["client", "semesterId", "courseId"],
+      );
+
+  @override
+  Future<CoursePageCourses> crateApiVtopGetClientFetchCoursePageCourses({
+    required VtopClient client,
+    required String semesterId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 14,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_course_page_courses,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchCoursePageCoursesConstMeta,
+        argValues: [client, semesterId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageCoursesConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_course_page_courses",
+        argNames: ["client", "semesterId"],
+      );
+
+  @override
+  Future<CoursePageDetail> crateApiVtopGetClientFetchCoursePageDetail({
+    required VtopClient client,
+    required String semesterId,
+    required String erpId,
+    required String classId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          sse_encode_String(erpId, serializer);
+          sse_encode_String(classId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 15,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_course_page_detail,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchCoursePageDetailConstMeta,
+        argValues: [client, semesterId, erpId, classId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageDetailConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_course_page_detail",
+        argNames: ["client", "semesterId", "erpId", "classId"],
+      );
+
+  @override
+  Future<CourseFileInfo> crateApiVtopGetClientFetchCoursePlanInfo({
+    required VtopClient client,
+    required String semesterId,
+    required String classId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_String(semesterId, serializer);
+          sse_encode_String(classId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 16,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_course_file_info,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchCoursePlanInfoConstMeta,
+        argValues: [client, semesterId, classId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchCoursePlanInfoConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_course_plan_info",
+        argNames: ["client", "semesterId", "classId"],
+      );
+
+  @override
   Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
@@ -493,7 +966,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 8,
+            funcId: 17,
             port: port_,
           );
         },
@@ -535,7 +1008,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 9,
+            funcId: 18,
             port: port_,
           );
         },
@@ -557,6 +1030,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<GeneralOutingData> crateApiVtopGetClientFetchGeneralOuting({
+    required VtopClient client,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 19,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_general_outing_data,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchGeneralOutingConstMeta,
+        argValues: [client],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchGeneralOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_general_outing",
+        argNames: ["client"],
+      );
+
+  @override
   Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
     required VtopClient client,
   }) {
@@ -571,7 +1080,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 10,
+            funcId: 20,
             port: port_,
           );
         },
@@ -609,7 +1118,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 11,
+            funcId: 21,
             port: port_,
           );
         },
@@ -649,7 +1158,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 12,
+            funcId: 22,
             port: port_,
           );
         },
@@ -683,7 +1192,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 13,
+            funcId: 23,
             port: port_,
           );
         },
@@ -718,7 +1227,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 14,
+            funcId: 24,
             port: port_,
           );
         },
@@ -740,6 +1249,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<Uint8List> crateApiVtopGetClientFetchOutingPass({
+    required VtopClient client,
+    required bool weekend,
+    required String passId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          sse_encode_bool(weekend, serializer);
+          sse_encode_String(passId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_prim_u_8_strict,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchOutingPassConstMeta,
+        argValues: [client, weekend, passId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchOutingPassConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_outing_pass",
+        argNames: ["client", "weekend", "passId"],
+      );
+
+  @override
   Future<SemesterData> crateApiVtopGetClientFetchSemesters({
     required VtopClient client,
   }) {
@@ -754,7 +1303,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 15,
+            funcId: 26,
             port: port_,
           );
         },
@@ -789,7 +1338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 16,
+            funcId: 27,
             port: port_,
           );
         },
@@ -811,6 +1360,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<WeekendOutingData> crateApiVtopGetClientFetchWeekendOuting({
+    required VtopClient client,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
+            client,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_weekend_outing_data,
+          decodeErrorData: sse_decode_vtop_error,
+        ),
+        constMeta: kCrateApiVtopGetClientFetchWeekendOutingConstMeta,
+        argValues: [client],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiVtopGetClientFetchWeekendOutingConstMeta =>
+      const TaskConstMeta(
+        debugName: "fetch_weekend_outing",
+        argNames: ["client"],
+      );
+
+  @override
   Future<VtopClient> crateApiVtopGetClientGetVtopClient({
     required String username,
     required String password,
@@ -829,7 +1414,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 29,
             port: port_,
           );
         },
@@ -869,7 +1454,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 18,
+            funcId: 30,
             port: port_,
           );
         },
@@ -911,7 +1496,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 19,
+            funcId: 31,
             port: port_,
           );
         },
@@ -939,7 +1524,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -964,7 +1549,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 33,
             port: port_,
           );
         },
@@ -988,7 +1573,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1010,7 +1595,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_String,
@@ -1041,7 +1626,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 24,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1071,7 +1656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1106,7 +1691,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1142,7 +1727,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_box_autoadd_session_state(session, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1178,7 +1763,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1338,6 +1923,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  OutingStudent dco_decode_box_autoadd_outing_student(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_outing_student(raw);
+  }
+
+  @protected
   PersistedVtopSession dco_decode_box_autoadd_persisted_vtop_session(
     dynamic raw,
   ) {
@@ -1375,6 +1966,124 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ClassKind dco_decode_class_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return ClassKind.values[raw as int];
+  }
+
+  @protected
+  CourseFileInfo dco_decode_course_file_info(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return CourseFileInfo(
+      contentDisposition: dco_decode_String(arr[0]),
+      contentType: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  CourseLecture dco_decode_course_lecture(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return CourseLecture(
+      serial: dco_decode_String(arr[0]),
+      date: dco_decode_String(arr[1]),
+      day: dco_decode_String(arr[2]),
+      topic: dco_decode_String(arr[3]),
+      materials: dco_decode_list_course_material(arr[4]),
+    );
+  }
+
+  @protected
+  CourseMaterial dco_decode_course_material(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return CourseMaterial(
+      label: dco_decode_String(arr[0]),
+      path: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  CoursePageClass dco_decode_course_page_class(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return CoursePageClass(
+      classId: dco_decode_String(arr[0]),
+      erpId: dco_decode_String(arr[1]),
+      classGroup: dco_decode_String(arr[2]),
+      courseCode: dco_decode_String(arr[3]),
+      courseTitle: dco_decode_String(arr[4]),
+      courseType: dco_decode_String(arr[5]),
+      slot: dco_decode_String(arr[6]),
+      faculty: dco_decode_String(arr[7]),
+      facultySchool: dco_decode_String(arr[8]),
+    );
+  }
+
+  @protected
+  CoursePageClasses dco_decode_course_page_classes(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return CoursePageClasses(
+      semesterId: dco_decode_String(arr[0]),
+      courseId: dco_decode_String(arr[1]),
+      classes: dco_decode_list_course_page_class(arr[2]),
+      updateTime: dco_decode_u_64(arr[3]),
+    );
+  }
+
+  @protected
+  CoursePageCourse dco_decode_course_page_course(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return CoursePageCourse(
+      id: dco_decode_String(arr[0]),
+      code: dco_decode_String(arr[1]),
+      title: dco_decode_String(arr[2]),
+      courseType: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  CoursePageCourses dco_decode_course_page_courses(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return CoursePageCourses(
+      semesterId: dco_decode_String(arr[0]),
+      courses: dco_decode_list_course_page_course(arr[1]),
+      updateTime: dco_decode_u_64(arr[2]),
+    );
+  }
+
+  @protected
+  CoursePageDetail dco_decode_course_page_detail(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return CoursePageDetail(
+      semesterId: dco_decode_String(arr[0]),
+      class_: dco_decode_course_page_class(arr[1]),
+      courseId: dco_decode_String(arr[2]),
+      allMaterialsPath: dco_decode_String(arr[3]),
+      generalMaterialsPath: dco_decode_String(arr[4]),
+      syllabusPath: dco_decode_String(arr[5]),
+      hasCoursePlan: dco_decode_bool(arr[6]),
+      lectures: dco_decode_list_course_lecture(arr[7]),
+      updateTime: dco_decode_u_64(arr[8]),
+    );
   }
 
   @protected
@@ -1441,6 +2150,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       dayTime: dco_decode_String(arr[3]),
       status: dco_decode_String(arr[4]),
       remark: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  GeneralOutingData dco_decode_general_outing_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return GeneralOutingData(
+      student: dco_decode_opt_box_autoadd_outing_student(arr[0]),
+      notice: dco_decode_String(arr[1]),
+      records: dco_decode_list_general_outing_record(arr[2]),
+      outHours: dco_decode_list_prim_u_8_strict(arr[3]),
+      inHours: dco_decode_list_prim_u_8_strict(arr[4]),
+      placeMaxLength: dco_decode_u_32(arr[5]),
+      purposeMaxLength: dco_decode_u_32(arr[6]),
+      maxDaysAhead: dco_decode_u_32(arr[7]),
+      maxDaysAway: dco_decode_u_32(arr[8]),
+      updateTime: dco_decode_u_64(arr[9]),
+    );
+  }
+
+  @protected
+  GeneralOutingRecord dco_decode_general_outing_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return GeneralOutingRecord(
+      serial: dco_decode_String(arr[0]),
+      place: dco_decode_String(arr[1]),
+      purpose: dco_decode_String(arr[2]),
+      fromDate: dco_decode_String(arr[3]),
+      fromTime: dco_decode_String(arr[4]),
+      toDate: dco_decode_String(arr[5]),
+      toTime: dco_decode_String(arr[6]),
+      status: dco_decode_String(arr[7]),
+      passId: dco_decode_String(arr[8]),
+      cancelId: dco_decode_String(arr[9]),
     );
   }
 
@@ -1658,6 +2407,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<CourseLecture> dco_decode_list_course_lecture(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_course_lecture).toList();
+  }
+
+  @protected
+  List<CourseMaterial> dco_decode_list_course_material(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_course_material).toList();
+  }
+
+  @protected
+  List<CoursePageClass> dco_decode_list_course_page_class(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_course_page_class).toList();
+  }
+
+  @protected
+  List<CoursePageCourse> dco_decode_list_course_page_course(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_course_page_course).toList();
+  }
+
+  @protected
   List<ExamScheduleRecord> dco_decode_list_exam_schedule_record(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_exam_schedule_record).toList();
@@ -1670,6 +2443,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>)
         .map(dco_decode_full_attendance_record)
+        .toList();
+  }
+
+  @protected
+  List<GeneralOutingRecord> dco_decode_list_general_outing_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_general_outing_record)
         .toList();
   }
 
@@ -1718,6 +2499,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<OutingOption> dco_decode_list_outing_option(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_outing_option).toList();
+  }
+
+  @protected
   List<PerExamScheduleRecord> dco_decode_list_per_exam_schedule_record(
     dynamic raw,
   ) {
@@ -1749,6 +2536,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<TimetableSlot> dco_decode_list_timetable_slot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_timetable_slot).toList();
+  }
+
+  @protected
+  List<WeekendOutingRecord> dco_decode_list_weekend_outing_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_weekend_outing_record)
+        .toList();
   }
 
   @protected
@@ -1812,6 +2607,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  OutingStudent? dco_decode_opt_box_autoadd_outing_student(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_outing_student(raw);
+  }
+
+  @protected
   PersistedVtopSession? dco_decode_opt_box_autoadd_persisted_vtop_session(
     dynamic raw,
   ) {
@@ -1825,6 +2626,59 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_64(raw);
+  }
+
+  @protected
+  OutingApplyResult dco_decode_outing_apply_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return OutingApplyResult(
+      applied: dco_decode_bool(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  OutingCancelResult dco_decode_outing_cancel_result(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return OutingCancelResult(
+      cancelled: dco_decode_bool(arr[0]),
+      message: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  OutingOption dco_decode_outing_option(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return OutingOption(
+      value: dco_decode_String(arr[0]),
+      label: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  OutingStudent dco_decode_outing_student(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return OutingStudent(
+      registrationNumber: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      applicationNo: dco_decode_String(arr[2]),
+      gender: dco_decode_String(arr[3]),
+      hostelBlock: dco_decode_String(arr[4]),
+      roomNumber: dco_decode_String(arr[5]),
+      parentContactNumber: dco_decode_String(arr[6]),
+    );
   }
 
   @protected
@@ -1946,6 +2800,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   BigInt dco_decode_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dcoDecodeU64(raw);
@@ -2001,6 +2861,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw Exception("unreachable");
     }
+  }
+
+  @protected
+  WeekendOutingData dco_decode_weekend_outing_data(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return WeekendOutingData(
+      student: dco_decode_opt_box_autoadd_outing_student(arr[0]),
+      notice: dco_decode_String(arr[1]),
+      records: dco_decode_list_weekend_outing_record(arr[2]),
+      places: dco_decode_list_outing_option(arr[3]),
+      timeSlots: dco_decode_list_outing_option(arr[4]),
+      purposeMaxLength: dco_decode_u_32(arr[5]),
+      maxDaysAhead: dco_decode_u_32(arr[6]),
+      weekdays: dco_decode_list_prim_u_8_strict(arr[7]),
+      updateTime: dco_decode_u_64(arr[8]),
+    );
+  }
+
+  @protected
+  WeekendOutingRecord dco_decode_weekend_outing_record(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 10)
+      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    return WeekendOutingRecord(
+      serial: dco_decode_String(arr[0]),
+      hostelBlock: dco_decode_String(arr[1]),
+      roomNumber: dco_decode_String(arr[2]),
+      place: dco_decode_String(arr[3]),
+      purpose: dco_decode_String(arr[4]),
+      timeSlot: dco_decode_String(arr[5]),
+      date: dco_decode_String(arr[6]),
+      status: dco_decode_String(arr[7]),
+      passId: dco_decode_String(arr[8]),
+      cancelId: dco_decode_String(arr[9]),
+    );
   }
 
   @protected
@@ -2160,6 +3059,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  OutingStudent sse_decode_box_autoadd_outing_student(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_outing_student(deserializer));
+  }
+
+  @protected
   PersistedVtopSession sse_decode_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   ) {
@@ -2201,6 +3108,139 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return ClassKind.values[inner];
+  }
+
+  @protected
+  CourseFileInfo sse_decode_course_file_info(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_contentDisposition = sse_decode_String(deserializer);
+    var var_contentType = sse_decode_String(deserializer);
+    return CourseFileInfo(
+      contentDisposition: var_contentDisposition,
+      contentType: var_contentType,
+    );
+  }
+
+  @protected
+  CourseLecture sse_decode_course_lecture(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_date = sse_decode_String(deserializer);
+    var var_day = sse_decode_String(deserializer);
+    var var_topic = sse_decode_String(deserializer);
+    var var_materials = sse_decode_list_course_material(deserializer);
+    return CourseLecture(
+      serial: var_serial,
+      date: var_date,
+      day: var_day,
+      topic: var_topic,
+      materials: var_materials,
+    );
+  }
+
+  @protected
+  CourseMaterial sse_decode_course_material(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_label = sse_decode_String(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    return CourseMaterial(label: var_label, path: var_path);
+  }
+
+  @protected
+  CoursePageClass sse_decode_course_page_class(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_classId = sse_decode_String(deserializer);
+    var var_erpId = sse_decode_String(deserializer);
+    var var_classGroup = sse_decode_String(deserializer);
+    var var_courseCode = sse_decode_String(deserializer);
+    var var_courseTitle = sse_decode_String(deserializer);
+    var var_courseType = sse_decode_String(deserializer);
+    var var_slot = sse_decode_String(deserializer);
+    var var_faculty = sse_decode_String(deserializer);
+    var var_facultySchool = sse_decode_String(deserializer);
+    return CoursePageClass(
+      classId: var_classId,
+      erpId: var_erpId,
+      classGroup: var_classGroup,
+      courseCode: var_courseCode,
+      courseTitle: var_courseTitle,
+      courseType: var_courseType,
+      slot: var_slot,
+      faculty: var_faculty,
+      facultySchool: var_facultySchool,
+    );
+  }
+
+  @protected
+  CoursePageClasses sse_decode_course_page_classes(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_semesterId = sse_decode_String(deserializer);
+    var var_courseId = sse_decode_String(deserializer);
+    var var_classes = sse_decode_list_course_page_class(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return CoursePageClasses(
+      semesterId: var_semesterId,
+      courseId: var_courseId,
+      classes: var_classes,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  CoursePageCourse sse_decode_course_page_course(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_code = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_courseType = sse_decode_String(deserializer);
+    return CoursePageCourse(
+      id: var_id,
+      code: var_code,
+      title: var_title,
+      courseType: var_courseType,
+    );
+  }
+
+  @protected
+  CoursePageCourses sse_decode_course_page_courses(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_semesterId = sse_decode_String(deserializer);
+    var var_courses = sse_decode_list_course_page_course(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return CoursePageCourses(
+      semesterId: var_semesterId,
+      courses: var_courses,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  CoursePageDetail sse_decode_course_page_detail(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_semesterId = sse_decode_String(deserializer);
+    var var_class_ = sse_decode_course_page_class(deserializer);
+    var var_courseId = sse_decode_String(deserializer);
+    var var_allMaterialsPath = sse_decode_String(deserializer);
+    var var_generalMaterialsPath = sse_decode_String(deserializer);
+    var var_syllabusPath = sse_decode_String(deserializer);
+    var var_hasCoursePlan = sse_decode_bool(deserializer);
+    var var_lectures = sse_decode_list_course_lecture(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return CoursePageDetail(
+      semesterId: var_semesterId,
+      class_: var_class_,
+      courseId: var_courseId,
+      allMaterialsPath: var_allMaterialsPath,
+      generalMaterialsPath: var_generalMaterialsPath,
+      syllabusPath: var_syllabusPath,
+      hasCoursePlan: var_hasCoursePlan,
+      lectures: var_lectures,
+      updateTime: var_updateTime,
+    );
   }
 
   @protected
@@ -2288,6 +3328,64 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       dayTime: var_dayTime,
       status: var_status,
       remark: var_remark,
+    );
+  }
+
+  @protected
+  GeneralOutingData sse_decode_general_outing_data(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_student = sse_decode_opt_box_autoadd_outing_student(deserializer);
+    var var_notice = sse_decode_String(deserializer);
+    var var_records = sse_decode_list_general_outing_record(deserializer);
+    var var_outHours = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_inHours = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_placeMaxLength = sse_decode_u_32(deserializer);
+    var var_purposeMaxLength = sse_decode_u_32(deserializer);
+    var var_maxDaysAhead = sse_decode_u_32(deserializer);
+    var var_maxDaysAway = sse_decode_u_32(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return GeneralOutingData(
+      student: var_student,
+      notice: var_notice,
+      records: var_records,
+      outHours: var_outHours,
+      inHours: var_inHours,
+      placeMaxLength: var_placeMaxLength,
+      purposeMaxLength: var_purposeMaxLength,
+      maxDaysAhead: var_maxDaysAhead,
+      maxDaysAway: var_maxDaysAway,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  GeneralOutingRecord sse_decode_general_outing_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_place = sse_decode_String(deserializer);
+    var var_purpose = sse_decode_String(deserializer);
+    var var_fromDate = sse_decode_String(deserializer);
+    var var_fromTime = sse_decode_String(deserializer);
+    var var_toDate = sse_decode_String(deserializer);
+    var var_toTime = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_passId = sse_decode_String(deserializer);
+    var var_cancelId = sse_decode_String(deserializer);
+    return GeneralOutingRecord(
+      serial: var_serial,
+      place: var_place,
+      purpose: var_purpose,
+      fromDate: var_fromDate,
+      fromTime: var_fromTime,
+      toDate: var_toDate,
+      toTime: var_toTime,
+      status: var_status,
+      passId: var_passId,
+      cancelId: var_cancelId,
     );
   }
 
@@ -2577,6 +3675,62 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<CourseLecture> sse_decode_list_course_lecture(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CourseLecture>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_course_lecture(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CourseMaterial> sse_decode_list_course_material(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CourseMaterial>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_course_material(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CoursePageClass> sse_decode_list_course_page_class(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CoursePageClass>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_course_page_class(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<CoursePageCourse> sse_decode_list_course_page_course(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <CoursePageCourse>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_course_page_course(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ExamScheduleRecord> sse_decode_list_exam_schedule_record(
     SseDeserializer deserializer,
   ) {
@@ -2600,6 +3754,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <FullAttendanceRecord>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_full_attendance_record(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<GeneralOutingRecord> sse_decode_list_general_outing_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <GeneralOutingRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_general_outing_record(deserializer));
     }
     return ans_;
   }
@@ -2699,6 +3867,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<OutingOption> sse_decode_list_outing_option(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <OutingOption>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_outing_option(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<PerExamScheduleRecord> sse_decode_list_per_exam_schedule_record(
     SseDeserializer deserializer,
   ) {
@@ -2757,6 +3939,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <TimetableSlot>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_timetable_slot(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<WeekendOutingRecord> sse_decode_list_weekend_outing_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WeekendOutingRecord>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_weekend_outing_record(deserializer));
     }
     return ans_;
   }
@@ -2843,6 +4039,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  OutingStudent? sse_decode_opt_box_autoadd_outing_student(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_outing_student(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   PersistedVtopSession? sse_decode_opt_box_autoadd_persisted_vtop_session(
     SseDeserializer deserializer,
   ) {
@@ -2864,6 +4073,55 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  OutingApplyResult sse_decode_outing_apply_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_applied = sse_decode_bool(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return OutingApplyResult(applied: var_applied, message: var_message);
+  }
+
+  @protected
+  OutingCancelResult sse_decode_outing_cancel_result(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_cancelled = sse_decode_bool(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return OutingCancelResult(cancelled: var_cancelled, message: var_message);
+  }
+
+  @protected
+  OutingOption sse_decode_outing_option(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_value = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    return OutingOption(value: var_value, label: var_label);
+  }
+
+  @protected
+  OutingStudent sse_decode_outing_student(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_registrationNumber = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_applicationNo = sse_decode_String(deserializer);
+    var var_gender = sse_decode_String(deserializer);
+    var var_hostelBlock = sse_decode_String(deserializer);
+    var var_roomNumber = sse_decode_String(deserializer);
+    var var_parentContactNumber = sse_decode_String(deserializer);
+    return OutingStudent(
+      registrationNumber: var_registrationNumber,
+      name: var_name,
+      applicationNo: var_applicationNo,
+      gender: var_gender,
+      hostelBlock: var_hostelBlock,
+      roomNumber: var_roomNumber,
+      parentContactNumber: var_parentContactNumber,
+    );
   }
 
   @protected
@@ -2994,6 +4252,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getBigUint64();
@@ -3053,6 +4317,62 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
+  }
+
+  @protected
+  WeekendOutingData sse_decode_weekend_outing_data(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_student = sse_decode_opt_box_autoadd_outing_student(deserializer);
+    var var_notice = sse_decode_String(deserializer);
+    var var_records = sse_decode_list_weekend_outing_record(deserializer);
+    var var_places = sse_decode_list_outing_option(deserializer);
+    var var_timeSlots = sse_decode_list_outing_option(deserializer);
+    var var_purposeMaxLength = sse_decode_u_32(deserializer);
+    var var_maxDaysAhead = sse_decode_u_32(deserializer);
+    var var_weekdays = sse_decode_list_prim_u_8_strict(deserializer);
+    var var_updateTime = sse_decode_u_64(deserializer);
+    return WeekendOutingData(
+      student: var_student,
+      notice: var_notice,
+      records: var_records,
+      places: var_places,
+      timeSlots: var_timeSlots,
+      purposeMaxLength: var_purposeMaxLength,
+      maxDaysAhead: var_maxDaysAhead,
+      weekdays: var_weekdays,
+      updateTime: var_updateTime,
+    );
+  }
+
+  @protected
+  WeekendOutingRecord sse_decode_weekend_outing_record(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_serial = sse_decode_String(deserializer);
+    var var_hostelBlock = sse_decode_String(deserializer);
+    var var_roomNumber = sse_decode_String(deserializer);
+    var var_place = sse_decode_String(deserializer);
+    var var_purpose = sse_decode_String(deserializer);
+    var var_timeSlot = sse_decode_String(deserializer);
+    var var_date = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_passId = sse_decode_String(deserializer);
+    var var_cancelId = sse_decode_String(deserializer);
+    return WeekendOutingRecord(
+      serial: var_serial,
+      hostelBlock: var_hostelBlock,
+      roomNumber: var_roomNumber,
+      place: var_place,
+      purpose: var_purpose,
+      timeSlot: var_timeSlot,
+      date: var_date,
+      status: var_status,
+      passId: var_passId,
+      cancelId: var_cancelId,
+    );
   }
 
   @protected
@@ -3191,6 +4511,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_outing_student(
+    OutingStudent self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_outing_student(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_persisted_vtop_session(
     PersistedVtopSession self,
     SseSerializer serializer,
@@ -3227,6 +4556,105 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_class_kind(ClassKind self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_course_file_info(
+    CourseFileInfo self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.contentDisposition, serializer);
+    sse_encode_String(self.contentType, serializer);
+  }
+
+  @protected
+  void sse_encode_course_lecture(CourseLecture self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.date, serializer);
+    sse_encode_String(self.day, serializer);
+    sse_encode_String(self.topic, serializer);
+    sse_encode_list_course_material(self.materials, serializer);
+  }
+
+  @protected
+  void sse_encode_course_material(
+    CourseMaterial self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.label, serializer);
+    sse_encode_String(self.path, serializer);
+  }
+
+  @protected
+  void sse_encode_course_page_class(
+    CoursePageClass self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.classId, serializer);
+    sse_encode_String(self.erpId, serializer);
+    sse_encode_String(self.classGroup, serializer);
+    sse_encode_String(self.courseCode, serializer);
+    sse_encode_String(self.courseTitle, serializer);
+    sse_encode_String(self.courseType, serializer);
+    sse_encode_String(self.slot, serializer);
+    sse_encode_String(self.faculty, serializer);
+    sse_encode_String(self.facultySchool, serializer);
+  }
+
+  @protected
+  void sse_encode_course_page_classes(
+    CoursePageClasses self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.semesterId, serializer);
+    sse_encode_String(self.courseId, serializer);
+    sse_encode_list_course_page_class(self.classes, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_course_page_course(
+    CoursePageCourse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.courseType, serializer);
+  }
+
+  @protected
+  void sse_encode_course_page_courses(
+    CoursePageCourses self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.semesterId, serializer);
+    sse_encode_list_course_page_course(self.courses, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_course_page_detail(
+    CoursePageDetail self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.semesterId, serializer);
+    sse_encode_course_page_class(self.class_, serializer);
+    sse_encode_String(self.courseId, serializer);
+    sse_encode_String(self.allMaterialsPath, serializer);
+    sse_encode_String(self.generalMaterialsPath, serializer);
+    sse_encode_String(self.syllabusPath, serializer);
+    sse_encode_bool(self.hasCoursePlan, serializer);
+    sse_encode_list_course_lecture(self.lectures, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
   }
 
   @protected
@@ -3286,6 +4714,42 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.dayTime, serializer);
     sse_encode_String(self.status, serializer);
     sse_encode_String(self.remark, serializer);
+  }
+
+  @protected
+  void sse_encode_general_outing_data(
+    GeneralOutingData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_outing_student(self.student, serializer);
+    sse_encode_String(self.notice, serializer);
+    sse_encode_list_general_outing_record(self.records, serializer);
+    sse_encode_list_prim_u_8_strict(self.outHours, serializer);
+    sse_encode_list_prim_u_8_strict(self.inHours, serializer);
+    sse_encode_u_32(self.placeMaxLength, serializer);
+    sse_encode_u_32(self.purposeMaxLength, serializer);
+    sse_encode_u_32(self.maxDaysAhead, serializer);
+    sse_encode_u_32(self.maxDaysAway, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_general_outing_record(
+    GeneralOutingRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.place, serializer);
+    sse_encode_String(self.purpose, serializer);
+    sse_encode_String(self.fromDate, serializer);
+    sse_encode_String(self.fromTime, serializer);
+    sse_encode_String(self.toDate, serializer);
+    sse_encode_String(self.toTime, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_String(self.passId, serializer);
+    sse_encode_String(self.cancelId, serializer);
   }
 
   @protected
@@ -3495,6 +4959,54 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_course_lecture(
+    List<CourseLecture> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_course_lecture(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_course_material(
+    List<CourseMaterial> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_course_material(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_course_page_class(
+    List<CoursePageClass> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_course_page_class(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_course_page_course(
+    List<CoursePageCourse> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_course_page_course(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_exam_schedule_record(
     List<ExamScheduleRecord> self,
     SseSerializer serializer,
@@ -3515,6 +5027,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_full_attendance_record(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_general_outing_record(
+    List<GeneralOutingRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_general_outing_record(item, serializer);
     }
   }
 
@@ -3603,6 +5127,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_outing_option(
+    List<OutingOption> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_outing_option(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_per_exam_schedule_record(
     List<PerExamScheduleRecord> self,
     SseSerializer serializer,
@@ -3657,6 +5193,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_timetable_slot(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_weekend_outing_record(
+    List<WeekendOutingRecord> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_weekend_outing_record(item, serializer);
     }
   }
 
@@ -3720,6 +5268,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_outing_student(
+    OutingStudent? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_outing_student(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_persisted_vtop_session(
     PersistedVtopSession? self,
     SseSerializer serializer,
@@ -3740,6 +5301,45 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_box_autoadd_u_64(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_outing_apply_result(
+    OutingApplyResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.applied, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_outing_cancel_result(
+    OutingCancelResult self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.cancelled, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_outing_option(OutingOption self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.value, serializer);
+    sse_encode_String(self.label, serializer);
+  }
+
+  @protected
+  void sse_encode_outing_student(OutingStudent self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.registrationNumber, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_String(self.applicationNo, serializer);
+    sse_encode_String(self.gender, serializer);
+    sse_encode_String(self.hostelBlock, serializer);
+    sse_encode_String(self.roomNumber, serializer);
+    sse_encode_String(self.parentContactNumber, serializer);
   }
 
   @protected
@@ -3830,6 +5430,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
+  }
+
+  @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putBigUint64(self);
@@ -3885,6 +5491,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(field0, serializer);
         sse_encode_u_64(field1, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_weekend_outing_data(
+    WeekendOutingData self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_outing_student(self.student, serializer);
+    sse_encode_String(self.notice, serializer);
+    sse_encode_list_weekend_outing_record(self.records, serializer);
+    sse_encode_list_outing_option(self.places, serializer);
+    sse_encode_list_outing_option(self.timeSlots, serializer);
+    sse_encode_u_32(self.purposeMaxLength, serializer);
+    sse_encode_u_32(self.maxDaysAhead, serializer);
+    sse_encode_list_prim_u_8_strict(self.weekdays, serializer);
+    sse_encode_u_64(self.updateTime, serializer);
+  }
+
+  @protected
+  void sse_encode_weekend_outing_record(
+    WeekendOutingRecord self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.serial, serializer);
+    sse_encode_String(self.hostelBlock, serializer);
+    sse_encode_String(self.roomNumber, serializer);
+    sse_encode_String(self.place, serializer);
+    sse_encode_String(self.purpose, serializer);
+    sse_encode_String(self.timeSlot, serializer);
+    sse_encode_String(self.date, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_String(self.passId, serializer);
+    sse_encode_String(self.cancelId, serializer);
   }
 }
 

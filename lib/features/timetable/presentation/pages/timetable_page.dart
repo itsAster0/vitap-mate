@@ -51,15 +51,16 @@ class TimetablePage extends HookConsumerWidget {
         try {
           final schedule = await ref.read(cachedExamScheduleProvider.future);
           final now = DateTime.now();
-          final examToday = [
-            for (final type in schedule?.exams ?? const []) ...type.records,
-          ].any((exam) {
-            final day = examDayOf(exam);
-            return day != null &&
-                day.year == now.year &&
-                day.month == now.month &&
-                day.day == now.day;
-          });
+          final examToday =
+              [
+                for (final type in schedule?.exams ?? const []) ...type.records,
+              ].any((exam) {
+                final day = examDayOf(exam);
+                return day != null &&
+                    day.year == now.year &&
+                    day.month == now.month &&
+                    day.day == now.day;
+              });
           if (!examToday) return;
           await ref.read(examScheduleProvider.notifier).updatexamschedule();
         } catch (e, st) {

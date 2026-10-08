@@ -7,9 +7,11 @@
 pub mod attendance;
 pub mod biometric;
 pub mod calendar;
+pub mod course_page;
 pub mod exam_schedule;
 pub mod grade_history;
 pub mod grades;
+pub mod hostel;
 pub mod marks;
 pub mod page;
 pub mod timetable;

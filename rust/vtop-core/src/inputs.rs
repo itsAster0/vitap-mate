@@ -153,6 +153,165 @@ impl BiometricDate {
     }
 }
 
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// An outing date in the `DD-Mon-YYYY` form the outing forms post
+/// (jQuery UI's `dd-M-yy`), e.g. `11-Oct-2026`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutingDate(String);
+
+impl OutingDate {
+    pub fn parse(raw: &str) -> VtopResult<Self> {
+        let mut parts = raw.split('-');
+        let (Some(day), Some(month), Some(year), None) =
+            (parts.next(), parts.next(), parts.next(), parts.next())
+        else {
+            return Err(Self::invalid());
+        };
+        let month = MONTHS
+            .iter()
+            .position(|name| *name == month)
+            .ok_or_else(Self::invalid)?;
+        // Reuse the calendar check rather than repeat it.
+        BiometricDate::parse(&format!("{day}/{:02}/{year}", month + 1))
+            .map_err(|_| Self::invalid())?;
+        Ok(Self(raw.to_owned()))
+    }
+
+    fn invalid() -> VtopError {
+        VtopError::ConfigurationError("outing date must look like 11-Oct-2026".to_string())
+    }
+
+    /// Days since 1970-01-01 (Howard Hinnant's days_from_civil).
+    pub fn day_number(&self) -> i64 {
+        let mut parts = self.0.split('-');
+        let day: i64 = parts.next().and_then(|d| d.parse().ok()).unwrap_or(1);
+        let month = parts
+            .next()
+            .and_then(|m| MONTHS.iter().position(|name| *name == m))
+            .map_or(1, |index| index as i64 + 1);
+        let year: i64 = parts.next().and_then(|y| y.parse().ok()).unwrap_or(1970);
+        let year = if month <= 2 { year - 1 } else { year };
+        let era = year.div_euclid(400);
+        let year_of_era = year - era * 400;
+        let day_of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+        let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+        era * 146_097 + day_of_era - 719_468
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A time of day as the general outing form posts it: two-digit hour and
+/// minute fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutingTime {
+    pub hour: u8,
+    pub minute: u8,
+}
+
+impl OutingTime {
+    pub fn new(hour: u8, minute: u8) -> VtopResult<Self> {
+        if hour > 23 || minute > 59 {
+            return Err(VtopError::ConfigurationError(
+                "outing time must be a real time of day".to_string(),
+            ));
+        }
+        Ok(Self { hour, minute })
+    }
+
+    pub fn hour_field(&self) -> String {
+        format!("{:02}", self.hour)
+    }
+
+    pub fn minute_field(&self) -> String {
+        format!("{:02}", self.minute)
+    }
+}
+
+/// A 10-digit mobile number.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContactNumber(String);
+
+impl ContactNumber {
+    pub fn parse(raw: &str) -> VtopResult<Self> {
+        let trimmed = raw.trim();
+        if trimmed.len() != 10 || !trimmed.chars().all(|c| c.is_ascii_digit()) {
+            return Err(VtopError::ConfigurationError(
+                "contact number must be 10 digits".to_string(),
+            ));
+        }
+        Ok(Self(trimmed.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// The id of an accepted outing's pass (`L…` or `W…`), which ends up in a
+/// URL path, so only letters and digits are allowed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutingPassId(String);
+
+impl OutingPassId {
+    pub fn parse(raw: &str) -> VtopResult<Self> {
+        let trimmed = raw.trim();
+        if trimmed.is_empty()
+            || trimmed.len() > 32
+            || !trimmed.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            return Err(VtopError::ConfigurationError(
+                "outing pass id is not valid".to_string(),
+            ));
+        }
+        Ok(Self(trimmed.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A course page download path, as found in its `vtopDownload('…')` links,
+/// e.g. `downloadPdf/AP2026272/AP2026272000046/19/14-07-2026`. Only the
+/// endpoints the course page uses are allowed, with plain path characters,
+/// since the path is put straight into the URL.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CourseFilePath(String);
+
+impl CourseFilePath {
+    const PREFIXES: [&'static str; 3] = [
+        "downloadPdf/",
+        "courseSyllabusDownload/",
+        "academics/common/allCourseMeterialDownload/",
+    ];
+
+    pub fn parse(raw: &str) -> VtopResult<Self> {
+        let path = raw.trim().trim_start_matches('/');
+        let allowed = Self::PREFIXES.iter().any(|prefix| path.starts_with(prefix))
+            && path.len() <= 200
+            && !path.contains("..")
+            && path
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_'));
+        if !allowed {
+            return Err(VtopError::ConfigurationError(
+                "not a course page download".to_string(),
+            ));
+        }
+        Ok(Self(path.to_owned()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// The student registration number VTOP embeds in every signed-in page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RegistrationNumber(String);
@@ -218,5 +377,48 @@ mod tests {
         assert!(!format!("{password:?}").contains("hunter2"));
         let otp = OtpCode::parse("123456").unwrap();
         assert!(!format!("{otp:?}").contains("123456"));
+    }
+
+    #[test]
+    fn outing_inputs() {
+        assert!(OutingDate::parse("11-Oct-2026").is_ok());
+        assert!(OutingDate::parse("29-Feb-2026").is_err());
+        assert!(OutingDate::parse("11-oct-2026").is_err());
+        assert!(OutingDate::parse("2026-10-11").is_err());
+        assert!(OutingTime::new(22, 0).is_ok());
+        assert!(OutingTime::new(24, 0).is_err());
+        assert_eq!(OutingTime::new(6, 5).unwrap().minute_field(), "05");
+        assert!(ContactNumber::parse(" 9876543210 ").is_ok());
+        assert!(ContactNumber::parse("98765abcde").is_err());
+        assert!(OutingPassId::parse("W24859931194").is_ok());
+        assert!(OutingPassId::parse("../x").is_err());
+    }
+
+    #[test]
+    fn course_file_paths_are_limited_to_the_course_page() {
+        assert!(
+            CourseFilePath::parse("downloadPdf/AP2026272/AP2026272000046/19/14-07-2026").is_ok()
+        );
+        assert!(CourseFilePath::parse("courseSyllabusDownload/AM_CSE4007_00100/ETH").is_ok());
+        assert!(CourseFilePath::parse(
+            "academics/common/allCourseMeterialDownload/1/1/AP2026272/AP2026272000046"
+        )
+        .is_ok());
+        assert!(CourseFilePath::parse("downloadPdf/../logout").is_err());
+        assert!(CourseFilePath::parse("hostel/saveOutingForm").is_err());
+        assert!(CourseFilePath::parse("downloadPdf/a?x=1").is_err());
+    }
+
+    #[test]
+    fn outing_date_day_numbers() {
+        assert_eq!(OutingDate::parse("01-Jan-1970").unwrap().day_number(), 0);
+        assert_eq!(
+            OutingDate::parse("11-Oct-2026").unwrap().day_number(),
+            20_737
+        );
+        assert_eq!(
+            OutingDate::parse("01-Mar-2024").unwrap().day_number(),
+            19_783
+        );
     }
 }

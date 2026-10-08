@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
@@ -39,6 +40,41 @@ Future<DocWindow> saveDownloadedFileToDocs({
   final document = await result;
   _docsImports.add(null);
   return document;
+}
+
+/// The document [docId] from Docs, or [download]ed (bytes and the name to
+/// file them under) and saved the first time. Keeps app-fetched files (outing passes,
+/// course material) available offline without fetching them twice.
+Future<DocWindow> keepInDocs({
+  required DocsRepository repository,
+  required String docId,
+  required Future<({List<int> bytes, String fileName})> Function() download,
+}) async {
+  for (final doc in await repository.list()) {
+    if (doc.id == docId && await repository.storedFilePathOf(doc) != null) {
+      return doc;
+    }
+  }
+  final downloaded = await download();
+  final fileName = downloaded.fileName;
+  final safeId = docId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+  final extension = fileName.contains('.')
+      ? '.${fileName.split('.').last}'
+      : '';
+  final file = File(
+    '${(await getTemporaryDirectory()).path}/$safeId$extension',
+  );
+  await file.writeAsBytes(downloaded.bytes, flush: true);
+  try {
+    return await saveDownloadedFileToDocs(
+      repository: repository,
+      sourcePath: file.path,
+      filename: fileName,
+      archiveId: docId,
+    );
+  } finally {
+    if (await file.exists()) await file.delete();
+  }
 }
 
 final _watching = <int>{};

@@ -13,10 +13,12 @@ const VITAP_INTERMEDIATE_CA_PEM: &str = include_str!("../../assets/sectigo_dv_r3
 
 fn default_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
+    // Desktop Firefox on Linux, matching the Firefox headers below. Desktop
+    // so VTOP serves the layout the parser expects; bump with Firefox.
     headers.insert(
         USER_AGENT,
         HeaderValue::from_static(
-            "Mozilla/5.0 (Linux; U; Linux x86_64; en-US) Gecko/20100101 Firefox/130.5",
+            "Mozilla/5.0 (X11; Linux x86_64; rv:157.0) Gecko/20100101 Firefox/157.0",
         ),
     );
     headers.insert(

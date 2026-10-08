@@ -154,6 +154,8 @@ class _TimeButton extends StatelessWidget {
       var picked = initial;
       await showFDialog(
         context: context,
+        // Above the tab shell, so the keyboard inset is counted once.
+        useRootNavigator: true,
         builder: (context, style, animation) => AppDialog(
           animation: animation,
           direction: Axis.horizontal,

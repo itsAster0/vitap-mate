@@ -23,6 +23,10 @@ serde = { workspace = true }
 log = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
+[dev-dependencies]
+# The live benches read a saved session file.
+serde_json = { workspace = true }
+
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
