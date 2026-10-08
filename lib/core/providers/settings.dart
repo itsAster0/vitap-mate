@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
+import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
 part 'settings.g.dart';
@@ -50,6 +51,9 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         vtopServerApiKeySettingKey,
         vtopServerEnabledSettingKey,
         vtopRecentPagesSettingKey,
+        bridgeLinkedSettingKey,
+        bridgeServerSignInSettingKey,
+        bridgeLastFcmTokenSettingKey,
       },
     ),
   );

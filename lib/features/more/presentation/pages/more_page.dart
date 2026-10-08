@@ -157,10 +157,11 @@ class MorePage extends HookConsumerWidget {
             FTileGroup(
               children: [
                 FTile(
-                  prefix: const Icon(FLucideIcons.puzzle),
-                  title: const Text("Chrome Extension"),
+                  prefix: const Icon(FLucideIcons.plug),
+                  title: const Text("Connected apps"),
+                  subtitle: const Text("Browser extension and AI agents (MCP)"),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => push(Paths.chromeExtension),
+                  onPress: () => push(Paths.connectedApps),
                 ),
               ],
             ),

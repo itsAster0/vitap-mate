@@ -1,0 +1,32 @@
+[package]
+name = "vtop-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "FCM cookie bridge, credential vault and VTOP session broker"
+
+[dependencies]
+vtop-core = { path = "../vtop-core" }
+axum = "0.8"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+async-trait = "0.1"
+uuid = { version = "1", features = ["v4"] }
+time = { version = "0.3", features = ["formatting", "parsing"] }
+base64 = "0.22.1"
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2.6"
+aes-gcm = "0.10"
+rand = "0.8"
+gcp_auth = { version = "0.12", features = ["webpki-roots"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+wiremock = "0.6"
+url = "2"

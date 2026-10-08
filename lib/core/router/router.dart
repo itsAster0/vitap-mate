@@ -26,6 +26,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/connected_apps_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
@@ -230,14 +231,22 @@ GoRouter router(Ref ref) {
                     ],
                   ),
                   GoRoute(
-                    path: 'chrome-extension',
-                    name: Paths.chromeExtension,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: const ChromeExtensionPage(),
-                      );
-                    },
+                    path: 'connected-apps',
+                    name: Paths.connectedApps,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const ConnectedAppsPage(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'chrome-extension',
+                        name: Paths.chromeExtension,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: const ChromeExtensionPage(),
+                        ),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'gpa_calculator',

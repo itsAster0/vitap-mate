@@ -1,3 +1,4 @@
+import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'dart:convert';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -86,6 +87,7 @@ class ClassReminderNotificationService {
   static Future<bool> handleNotificationResponse(
     NotificationResponse response,
   ) async {
+    if (await handleBridgeOtpNotificationResponse(response)) return true;
     if (response.actionId == _pauseActionId) {
       await pauseForToday();
       return true;

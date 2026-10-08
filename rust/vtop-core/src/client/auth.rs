@@ -273,11 +273,30 @@ impl VtopClient {
             .map_err(|error| network_error("load_initial_page.text", error))
     }
 
+    /// Asks VTOP whose session this is and returns that registration
+    /// number. Always loads `/vtop/content`, so a registration number the
+    /// caller put in the session state is never trusted. A dead session is
+    /// `SessionExpired`.
+    pub async fn verify_session(&self) -> VtopResult<String> {
+        let _validation = self.validation.lock().await;
+        if !self.check_authenticated_session(true).await? {
+            return Err(VtopError::SessionExpired);
+        }
+        self.registration_number()
+    }
+
     /// Loads `/vtop/content` with the current cookies. On success, stores the
     /// page's CSRF token and registration number and marks the session
     /// signed in. A bounce to the login page clears the session and returns
     /// `Ok(false)`.
     pub(super) async fn validate_authenticated_session(&self) -> VtopResult<bool> {
+        self.check_authenticated_session(false).await
+    }
+
+    /// As [`Self::validate_authenticated_session`]; with
+    /// `server_error_is_error`, an HTTP 5xx is `VtopServerError` instead of
+    /// an expired session, so callers can tell an outage from a dead login.
+    async fn check_authenticated_session(&self, server_error_is_error: bool) -> VtopResult<bool> {
         self.log_cookie_names("validate_authenticated_session.before_request");
         let url = self.config.url("/vtop/content");
         Self::log_request("validate_authenticated_session.send", "GET", &url);
@@ -296,6 +315,9 @@ impl VtopClient {
             .map_err(|error| network_error("validate_authenticated_session.send", error))?;
         let final_url = response.url().to_string();
         let status = response.status();
+        if server_error_is_error && status.is_server_error() && !Self::is_login_url(&final_url) {
+            return Err(VtopError::VtopServerError(format!("HTTP {status}")));
+        }
         if Self::is_login_url(&final_url) || !status.is_success() {
             self.mark_session_expired(
                 "validate_authenticated_session",

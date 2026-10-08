@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "rust",
+  "packages": {
+    "rust": "1.98"
+  },
+  "steps": {
+    "build": {
+      "commands": [
+        "mkdir -p bin",
+        "cargo build --locked --profile server --package vtop-mcp",
+        "cp target/server/vtop-mcp bin"
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "./bin/vtop-mcp",
+    "variables": {
+      "RUST_LOG": "info"
+    }
+  }
+}
