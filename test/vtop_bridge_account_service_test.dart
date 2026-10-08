@@ -247,4 +247,50 @@ void main() {
   test('only the offered phone waits are choices', () {
     expect(BridgeSettings.phoneWaitChoices, [10, 20, 45]);
   });
+
+  group('withFreshVtopSession', () {
+    test('signs in again once when the bridge rejects the session', () async {
+      final forced = <bool>[];
+      final sent = <String>[];
+      final result = await withFreshVtopSession(
+        cookies: ({required bool force}) async {
+          forced.add(force);
+          return force ? 'fresh' : 'stale';
+        },
+        run: (cookies) async {
+          sent.add(cookies);
+          if (cookies == 'stale') {
+            throw const BridgeAccountException(
+              code: 'session_invalid',
+              message: 'VTOP does not accept this session',
+              statusCode: 401,
+            );
+          }
+          return 'ok';
+        },
+      );
+      expect(result, 'ok');
+      expect(forced, [false, true]);
+      expect(sent, ['stale', 'fresh']);
+    });
+
+    test('other errors are not retried', () async {
+      var calls = 0;
+      await expectLater(
+        withFreshVtopSession(
+          cookies: ({required bool force}) async => 'c',
+          run: (_) async {
+            calls++;
+            throw const BridgeAccountException(
+              code: 'key_limit',
+              message: 'too many',
+              statusCode: 409,
+            );
+          },
+        ),
+        throwsA(isA<BridgeAccountException>()),
+      );
+      expect(calls, 1);
+    });
+  });
 }

@@ -183,6 +183,21 @@ bool shouldSyncFcmToken({
   required String? current,
 }) => linked && current != null && current.isNotEmpty && current != lastSent;
 
+/// Runs [run] with the app's VTOP cookies. The app can think it is signed in
+/// after VTOP has dropped the session; when the bridge says so, signs in
+/// again ([cookies] with `force: true`) and tries once more.
+Future<T> withFreshVtopSession<T>({
+  required Future<String> Function({required bool force}) cookies,
+  required Future<T> Function(String cookies) run,
+}) async {
+  try {
+    return await run(await cookies(force: false));
+  } on BridgeAccountException catch (error) {
+    if (error.code != 'session_invalid') rethrow;
+    return run(await cookies(force: true));
+  }
+}
+
 DateTime _dateTimeFromUnixSeconds(Object? value) {
   final seconds = value is int ? value : int.tryParse('$value') ?? 0;
   return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
