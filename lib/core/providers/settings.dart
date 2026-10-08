@@ -54,6 +54,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         bridgeLinkedSettingKey,
         bridgeServerSignInSettingKey,
         bridgeLastFcmTokenSettingKey,
+        bridgeLastSemesterSettingKey,
       },
     ),
   );

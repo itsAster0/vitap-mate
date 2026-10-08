@@ -72,6 +72,12 @@ class ConnectedAppsPage extends HookConsumerWidget {
         final prefs = await ref.read(settingsProvider.future);
         if (!result.linkedHere) {
           await prefs.setBool(bridgeLinkedSettingKey, false);
+        } else if (result.semesterId == null) {
+          // Linked before semesters were shared: send it now.
+          await prefs.remove(bridgeLastSemesterSettingKey);
+          unawaited(
+            syncBridgeSemester((await ref.read(vtopUserProvider.future)).semid),
+          );
         }
         account.value = result;
       } catch (error) {
@@ -117,12 +123,21 @@ class ConnectedAppsPage extends HookConsumerWidget {
           throw StateError('Set up Gmail OTP auto-fetch first.');
         }
       }
+      final semid = (await ref.read(vtopUserProvider.future)).semid;
       await withService(
-        (s, c) => s.link(cookies: c, fcmToken: token, credentials: credentials),
+        (s, c) => s.link(
+          cookies: c,
+          fcmToken: token,
+          credentials: credentials,
+          semesterId: semid,
+        ),
       );
       final prefs = await ref.read(settingsProvider.future);
       await prefs.setBool(bridgeLinkedSettingKey, true);
       await prefs.setString(bridgeLastFcmTokenSettingKey, token);
+      if (semid != null) {
+        await prefs.setString(bridgeLastSemesterSettingKey, semid);
+      }
     }
 
     Future<bool> serverSignInEnabled() async {
