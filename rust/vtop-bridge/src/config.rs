@@ -29,7 +29,7 @@ pub struct Config {
     pub poll_after: Duration,
 }
 
-pub const DEFAULT_PUBLIC_MCP_URL: &str = "https://vtop-mcp-production.up.railway.app/mcp";
+pub const DEFAULT_PUBLIC_MCP_URL: &str = "https://vtop-mcp.aster0.dev/mcp";
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigError(pub String);

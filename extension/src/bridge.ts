@@ -169,3 +169,22 @@ export function interpretSessionResponse(httpStatus: number, body: unknown): Ses
   }
   return { kind: "error", message: friendlyLoginError(httpStatus, JSON.stringify(reply)) };
 }
+
+/** The bridge the extension uses unless another is set; from .env. */
+export const DEFAULT_BRIDGE_URL = (
+  import.meta.env.VITE_BRIDGE_URL ?? "https://vtop-bridge.aster0.dev"
+).replace(/\/+$/, "");
+
+/** The https origin of a bridge URL the user typed, or null. */
+export function normalizeBridgeUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withScheme);
+    if (url.protocol !== "https:" || !url.hostname.includes(".")) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}

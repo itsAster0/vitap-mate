@@ -7,7 +7,7 @@ Students create an access key in VITAP Mate → Settings → Connected apps and
 add the MCP URL it shows (the key is in the path) to their agent:
 
 ```
-https://vtop-mcp-production.up.railway.app/mcp/vtm_…
+https://vtop-mcp.aster0.dev/mcp/vtm_…
 ```
 
 `Authorization: Bearer vtm_…` on `/mcp` works too.

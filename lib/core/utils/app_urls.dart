@@ -5,7 +5,7 @@ library;
 /// The sign-in bridge for the browser extension and AI agents.
 const vtopBridgeBaseUrl = String.fromEnvironment(
   'VTOP_BRIDGE_URL',
-  defaultValue: 'https://vtop-bridge-production.up.railway.app',
+  defaultValue: 'https://vtop-bridge.aster0.dev',
 );
 
 /// Where students download the browser extension.
