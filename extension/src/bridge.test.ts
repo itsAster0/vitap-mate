@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_BRIDGE_URL,
+  normalizeBridgeUrl,
   clampPollAfter,
   friendlyLoginError,
   parseAPIError,
@@ -119,5 +121,20 @@ describe("login redirects", () => {
     expect(isLoginRedirect("https://vtop.vitap.ac.in/vtop/login")).toBe(true);
     expect(isLoginRedirect("https://vtop.vitap.ac.in/vtop/initialProcess")).toBe(true);
     expect(isLoginRedirect("https://vtop.vitap.ac.in/vtop/content")).toBe(false);
+  });
+});
+
+describe("bridge URL setting", () => {
+  it("defaults to the URL from .env", () => {
+    expect(DEFAULT_BRIDGE_URL).toBe("https://vtop-bridge.aster0.dev");
+  });
+
+  it("keeps only an https origin", () => {
+    expect(normalizeBridgeUrl("https://bridge.example.com/")).toBe("https://bridge.example.com");
+    expect(normalizeBridgeUrl("  https://bridge.example.com/v1/x?y#z ")).toBe("https://bridge.example.com");
+    expect(normalizeBridgeUrl("bridge.example.com")).toBe("https://bridge.example.com");
+    expect(normalizeBridgeUrl("http://bridge.example.com")).toBeNull();
+    expect(normalizeBridgeUrl("")).toBeNull();
+    expect(normalizeBridgeUrl("not a url")).toBeNull();
   });
 });

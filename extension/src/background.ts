@@ -1,14 +1,15 @@
 import {
+  DEFAULT_BRIDGE_URL,
   fetchWithTimeout,
   friendlyLoginError,
   interpretSessionResponse,
   isAccessKey,
   isLoginRedirect,
+  normalizeBridgeUrl,
   type CookieEditorCookie,
   validateCookies,
 } from "./bridge";
 
-const API_BASE_URL = "https://vtop-bridge-production.up.railway.app";
 const VTOP_DOMAIN = "vtop.vitap.ac.in";
 const VTOP_CONTENT_URL = "https://vtop.vitap.ac.in/vtop/content";
 
@@ -194,13 +195,13 @@ async function readSessionOutcome(response: Response) {
   return interpretSessionResponse(response.status, json);
 }
 
-async function getSession(key: string, tabId: number | undefined) {
+async function getSession(base: string, key: string, tabId: number | undefined) {
   const headers = { Authorization: `Bearer ${key}` };
 
   let response: Response;
   try {
     response = await fetchWithTimeout(
-      `${API_BASE_URL}/v1/session`,
+      `${base}/v1/session`,
       { method: "POST", headers },
       START_TIMEOUT_MS,
     );
@@ -226,7 +227,7 @@ async function getSession(key: string, tabId: number | undefined) {
     let statusResponse: Response;
     try {
       statusResponse = await fetchWithTimeout(
-        `${API_BASE_URL}/v1/session/requests/${encodeURIComponent(requestId)}`,
+        `${base}/v1/session/requests/${encodeURIComponent(requestId)}`,
         { method: "GET", headers },
         STATUS_TIMEOUT_MS,
       );
@@ -285,10 +286,10 @@ async function sessionBounced() {
   }
 }
 
-async function expireSession(key: string) {
+async function expireSession(base: string, key: string) {
   try {
     await fetchWithTimeout(
-      `${API_BASE_URL}/v1/session/expire`,
+      `${base}/v1/session/expire`,
       { method: "POST", headers: { Authorization: `Bearer ${key}` } },
       STATUS_TIMEOUT_MS,
     );
@@ -305,8 +306,10 @@ async function performLogin(source: "popup" | "content" = "popup") {
     text: "Logging in...",
   });
 
-  const stored = await chrome.storage.local.get(["token", "fmcToken", "autoLogin"]);
+  const stored = await chrome.storage.local.get(["token", "fmcToken", "bridgeUrl"]);
   const key = String(stored.token ?? stored.fmcToken ?? "").trim();
+  // A server set in the popup, else the built-in one.
+  const base = normalizeBridgeUrl(String(stored.bridgeUrl ?? "")) ?? DEFAULT_BRIDGE_URL;
 
   if (!key) {
     throw new Error("Add the access key from VITAP Mate → Connected apps first.");
@@ -320,12 +323,12 @@ async function performLogin(source: "popup" | "content" = "popup") {
 
   console.log("Login source:", source);
 
-  let cookies = await getSession(key, tabId);
+  let cookies = await getSession(base, key, tabId);
   await installCookies(cookies, tabId);
 
   if (await sessionBounced()) {
-    await expireSession(key);
-    cookies = await getSession(key, tabId);
+    await expireSession(base, key);
+    cookies = await getSession(base, key, tabId);
     await installCookies(cookies, tabId);
 
     if (await sessionBounced()) {

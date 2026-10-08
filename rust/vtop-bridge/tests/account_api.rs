@@ -135,7 +135,7 @@ async fn key_create_list_revoke() {
     assert!(key.starts_with("vtm_"));
     assert_eq!(
         created["mcpUrl"],
-        "https://vtop-mcp-production.up.railway.app/mcp"
+        "https://vtop-mcp.aster0.dev/mcp"
     );
     let id = created["id"].as_str().unwrap().to_string();
 

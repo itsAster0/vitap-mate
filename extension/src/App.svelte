@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isAccessKey } from "./bridge";
+  import { DEFAULT_BRIDGE_URL, isAccessKey, normalizeBridgeUrl } from "./bridge";
 
   let token = "";
   let showToken = false;
@@ -7,11 +7,17 @@
   let loading = false;
   let status = "";
   let error = "";
+  let bridgeUrl = DEFAULT_BRIDGE_URL;
+  let savedBridgeUrl = DEFAULT_BRIDGE_URL;
+  let serverMessage = "";
+  let serverError = "";
 
   async function loadSettings() {
-    const stored = await chrome.storage.local.get(["token", "fmcToken", "autoLogin"]);
+    const stored = await chrome.storage.local.get(["token", "fmcToken", "autoLogin", "bridgeUrl"]);
     token = String(stored.token ?? stored.fmcToken ?? "");
     autoLogin = Boolean(stored.autoLogin);
+    savedBridgeUrl = normalizeBridgeUrl(String(stored.bridgeUrl ?? "")) ?? DEFAULT_BRIDGE_URL;
+    bridgeUrl = savedBridgeUrl;
 
     // Migrate older installations without making the implementation name visible.
     if (!stored.token && stored.fmcToken) {
@@ -25,9 +31,40 @@
     await chrome.storage.local.set({ token: token.trim(), autoLogin });
   }
 
+  // Called straight from a click: Chrome only shows its permission prompt
+  // during a user gesture.
+  async function saveServer() {
+    serverMessage = "";
+    serverError = "";
+    const origin = normalizeBridgeUrl(bridgeUrl);
+    if (!origin) {
+      serverError = "Enter an https address, like https://vtop-bridge.example.com";
+      return;
+    }
+    if (origin === DEFAULT_BRIDGE_URL) {
+      await chrome.storage.local.remove("bridgeUrl");
+    } else {
+      const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
+      if (!granted) {
+        serverError = "Chrome needs your permission to reach that server.";
+        return;
+      }
+      await chrome.storage.local.set({ bridgeUrl: origin });
+    }
+    bridgeUrl = savedBridgeUrl = origin;
+    serverMessage = "Saved.";
+  }
+
+  async function useDefaultServer() {
+    await chrome.storage.local.remove("bridgeUrl");
+    bridgeUrl = savedBridgeUrl = DEFAULT_BRIDGE_URL;
+    serverError = "";
+    serverMessage = "Using the default server.";
+  }
+
   async function login() {
     if (!token.trim()) {
-      error = "Paste the token copied from the VITAP Mate app.";
+      error = "Paste the access key from VITAP Mate → Connected apps.";
       return;
     }
 
@@ -61,7 +98,9 @@
       "fmcToken",
       "autoLogin",
       "lastAutoLoginAt",
+      "bridgeUrl",
     ]);
+    bridgeUrl = savedBridgeUrl = DEFAULT_BRIDGE_URL;
     token = "";
     showToken = false;
     autoLogin = false;
@@ -97,7 +136,7 @@
 
   <section class="space-y-4 p-5">
     <div class="rounded-xl border border-indigo-900/70 bg-indigo-950/40 p-3 text-xs leading-5 text-indigo-100">
-      In the VITAP Mate app, open <strong>More → Chrome Extension</strong>, copy your Token, then paste it below.
+      In the VITAP Mate app, open <strong>More → Connected apps</strong>, create an access key, then paste it below.
     </div>
 
     <div class="space-y-2">
@@ -127,6 +166,47 @@
       {/if}
       <p class="text-xs text-slate-500">Create one in VITAP Mate → Connected apps.</p>
     </div>
+
+    <details class="group rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium">
+        <span>Server</span>
+        <span class="truncate text-xs font-normal text-slate-400">
+          {savedBridgeUrl === DEFAULT_BRIDGE_URL ? "Default" : new URL(savedBridgeUrl).host}
+        </span>
+      </summary>
+      <div class="mt-3 space-y-2">
+        <input
+          id="bridge-url"
+          type="url"
+          bind:value={bridgeUrl}
+          placeholder={DEFAULT_BRIDGE_URL}
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Server address"
+          class="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none placeholder:text-slate-500 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
+        />
+        <div class="flex gap-2">
+          <button
+            type="button"
+            on:click={saveServer}
+            class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            disabled={savedBridgeUrl === DEFAULT_BRIDGE_URL && bridgeUrl === DEFAULT_BRIDGE_URL}
+            on:click={useDefaultServer}
+            class="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 hover:bg-slate-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 disabled:opacity-40"
+          >
+            Use default
+          </button>
+        </div>
+        <p class="text-xs text-slate-500">Default: {DEFAULT_BRIDGE_URL}</p>
+        {#if serverMessage}<p class="text-xs text-emerald-300">{serverMessage}</p>{/if}
+        {#if serverError}<p class="text-xs text-rose-300">{serverError}</p>{/if}
+      </div>
+    </details>
 
     <div class="flex items-start gap-3 rounded-xl border border-sky-900/70 bg-sky-950/40 p-3">
       <span class="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)]"></span>
