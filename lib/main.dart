@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/router.dart';
+import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
@@ -37,6 +38,13 @@ class MyApp extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goRouter = ref.watch(routerProvider);
+    // Agents (MCP) default to the semester picked here.
+    ref.listen(vtopUserProvider.select((user) => user.value?.semid), (
+      _,
+      semid,
+    ) {
+      if (semid != null) unawaited(syncBridgeSemester(semid));
+    });
     useEffect(() {
       // A tap on the OTP notification, or a login left waiting for its OTP:
       // finish it with the app's OTP prompt.

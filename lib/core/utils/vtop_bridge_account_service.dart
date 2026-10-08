@@ -9,6 +9,7 @@ import 'package:vitapmate/core/utils/app_urls.dart';
 const bridgeLinkedSettingKey = 'settings_bridge_linked';
 const bridgeServerSignInSettingKey = 'settings_bridge_server_sign_in';
 const bridgeLastFcmTokenSettingKey = 'settings_bridge_last_fcm_token';
+const bridgeLastSemesterSettingKey = 'settings_bridge_last_semester';
 
 /// Where the app keeps the secret the bridge hands out on link. Key, phone
 /// and delete changes need it, so a leaked access key cannot make them.
@@ -236,6 +237,7 @@ class BridgeAccount {
     required this.thisPhone,
     required this.keys,
     this.settings = const BridgeSettings(),
+    this.semesterId,
   });
 
   final String registrationNumber;
@@ -247,6 +249,9 @@ class BridgeAccount {
   final bool thisPhone;
   final List<BridgeKeyInfo> keys;
   final BridgeSettings settings;
+
+  /// The semester the bridge has from this app; agents default to it.
+  final String? semesterId;
 
   bool get linkedHere => linked && thisPhone;
 }
@@ -345,12 +350,14 @@ class VtopBridgeAccountService {
     required String cookies,
     required String fcmToken,
     Map<String, dynamic>? credentials,
+    String? semesterId,
   }) async {
     final body = await _post(
       '/v1/link',
       cookies: cookies,
       body: {
         'fcmToken': fcmToken,
+        ...?(semesterId == null ? null : {'semesterId': semesterId}),
         ...?(credentials == null ? null : {'credentials': credentials}),
       },
     );
@@ -406,6 +413,9 @@ class VtopBridgeAccountService {
       thisPhone: body['thisPhone'] == true,
       keys: keys,
       settings: BridgeSettings.fromJson(body['settings']),
+      semesterId: body['semesterId'] is String
+          ? body['semesterId'] as String
+          : null,
     );
   }
 
@@ -437,6 +447,17 @@ class VtopBridgeAccountService {
       '/v1/account/settings',
       cookies: cookies,
       body: {'settings': settings.toJson()},
+    );
+  }
+
+  Future<void> updateSemester({
+    required String cookies,
+    required String semesterId,
+  }) async {
+    await _post(
+      '/v1/account/semester',
+      cookies: cookies,
+      body: {'semesterId': semesterId},
     );
   }
 

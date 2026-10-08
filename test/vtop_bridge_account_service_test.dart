@@ -347,4 +347,40 @@ void main() {
       expect(await rig.service.savedKey('b'), isNotNull);
     });
   });
+
+  group('semester', () {
+    test('link sends the app semester', () async {
+      final rig = serviceAnswering(200, {'appSecret': 'vta_new'});
+      await rig.service.link(
+        cookies: cookies,
+        fcmToken: 'fcm-1',
+        semesterId: 'AP2026272',
+      );
+      expect(jsonDecode(rig.sent.single.body)['semesterId'], 'AP2026272');
+    });
+
+    test('updateSemester posts it with the app secret', () async {
+      final rig = serviceAnswering(204, {}, secret: 'vta_s');
+      await rig.service.updateSemester(
+        cookies: cookies,
+        semesterId: 'AP2026272',
+      );
+      final body = jsonDecode(rig.sent.single.body) as Map;
+      expect(rig.sent.single.url.path, '/v1/account/semester');
+      expect(body['semesterId'], 'AP2026272');
+      expect(body['appSecret'], 'vta_s');
+    });
+
+    test('account reports the semester the bridge has', () async {
+      final rig = serviceAnswering(200, {
+        'linked': true,
+        'semesterId': 'AP2026271',
+        'keys': [],
+      });
+      expect(
+        (await rig.service.account(cookies: cookies)).semesterId,
+        'AP2026271',
+      );
+    });
+  });
 }
