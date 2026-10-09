@@ -247,7 +247,9 @@ impl VtopTools {
         json_result(&mark_current(data, picked.as_deref()))
     }
 
-    #[tool(description = "Attendance summary for every course in a semester.")]
+    #[tool(
+        description = "Attendance summary for every course in a semester: classes attended, total classes, percentage and debar status (Permitted means allowed into the next exam), with the course_id and course_type that get_full_attendance takes."
+    )]
     async fn get_attendance(
         &self,
         Parameters(args): Parameters<SemesterArgs>,
@@ -264,7 +266,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Class-by-class attendance for one course.")]
+    #[tool(
+        description = "Class-by-class attendance for one course: date, slot, day and time, status and remark of each class."
+    )]
     async fn get_full_attendance(
         &self,
         Parameters(args): Parameters<FullAttendanceArgs>,
@@ -288,7 +292,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Weekly timetable for a semester.")]
+    #[tool(
+        description = "Weekly timetable for a semester: each slot's day, start and end time, course, theory or lab, room, block, faculty and credits, plus the list of registered courses. It is the usual week only; holidays, exam days and other changes are in get_academic_calendar."
+    )]
     async fn get_timetable(
         &self,
         Parameters(args): Parameters<SemesterArgs>,
@@ -305,7 +311,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Internal marks (CAT, quizzes, assignments) for a semester.")]
+    #[tool(
+        description = "Marks for every course in a semester: each assessment (CATs, quizzes, assignments, FAT once published) with max marks, weightage, scored mark and weighted mark."
+    )]
     async fn get_marks(
         &self,
         Parameters(args): Parameters<SemesterArgs>,
@@ -322,7 +330,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Exam schedule (dates, slots, venues, seats) for a semester.")]
+    #[tool(
+        description = "Exam schedule of a semester, grouped by exam type (CAT-1, CAT-2, FAT): date, session, reporting and exam time, venue and seat for each course. Lab FATs are not listed; get_academic_calendar marks those days."
+    )]
     async fn get_exam_schedule(
         &self,
         Parameters(args): Parameters<SemesterArgs>,
@@ -339,7 +349,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Final grades for a semester.")]
+    #[tool(
+        description = "Final grades for a semester: each course's grand total, grade and grading type (RG relative, AG absolute), with the course_id that get_grade_details takes."
+    )]
     async fn get_grades(
         &self,
         Parameters(args): Parameters<SemesterArgs>,
@@ -356,7 +368,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Mark breakdown behind one course's grade.")]
+    #[tool(
+        description = "Mark breakdown behind one course's grade, with the grade ranges (mark cutoffs for each grade) of that class."
+    )]
     async fn get_grade_details(
         &self,
         Parameters(args): Parameters<CourseArgs>,
@@ -379,7 +393,9 @@ impl VtopTools {
         .await
     }
 
-    #[tool(description = "Full grade history and CGPA across all semesters.")]
+    #[tool(
+        description = "Full grade history across all semesters: every course with credits, grade, exam month and earlier attempts, plus CGPA, credits registered and earned, and the count of each grade."
+    )]
     async fn get_grade_history(
         &self,
         Parameters(_): Parameters<NoArgs>,
@@ -389,7 +405,9 @@ impl VtopTools {
             .await
     }
 
-    #[tool(description = "Biometric (hostel/campus entry) log for one day.")]
+    #[tool(
+        description = "Biometric punches for one day: time and venue of each entry, at classes and the hostel."
+    )]
     async fn get_biometric(
         &self,
         Parameters(args): Parameters<DateArgs>,
@@ -410,7 +428,7 @@ impl VtopTools {
 #[tool_router(router = more_tools_router)]
 impl VtopTools {
     #[tool(
-        description = "Academic calendar of a semester: every entry (holidays, exams, instructional days), sorted by date."
+        description = "Academic calendar of a semester, sorted by date: each entry has date (YYYY-MM-DD), kind (Instructional Day, Holiday, No Instructional Day, CAT - I…), group and note (WorkingDay, LAB FAT, a holiday's name…). A day can have several entries."
     )]
     async fn get_academic_calendar(
         &self,
@@ -580,9 +598,62 @@ as semester_id unless the student names another. It is the semester picked in th
 student's app, or else the newest, as VTOP lists them newest first.
 - Ids chain from one tool to the next: get_attendance gives course_id and course_type \
 for get_full_attendance; get_courses gives course_id for get_course_classes, which \
-gives erp_id and class_id for get_course_detail. Dates are DD/MM/YYYY.
-- Attendance below 75% risks being barred from exams. CAT-1 and CAT-2 are the \
-mid-term exams; FAT is the final exam.
+gives erp_id and class_id for get_course_detail.
+- Dates: get_biometric takes DD/MM/YYYY. VTOP returns them in mixed forms: \
+01-Jul-2026 in attendance and exams, 18/07/2026 in biometrics, 2026-10-01 in the \
+academic calendar. Take \"today\" in India time (IST).
+- Attendance is counted per course and type, theory and lab separately; a lab \
+session counts once even when it spans two slots. Approved OD counts as present. \
+It is checked before each CAT and before the FAT: below 75% in a course then means \
+the student is debarred from that next exam; debarred from the FAT, they must \
+re-register the course. The percentage is rounded, so 74.5% \
+counts as 75%. When asked, work out from the attended and total classes how many \
+more the student must attend, or can miss, to stay at 75%. OD is applied by a \
+faculty or club coordinator and can show up days later. Attendance is usually posted \
+the same day, sometimes right after class and sometimes at night.
+- CAT-1 and CAT-2 are the mid-term exams, each covering about two modules of the \
+syllabus; no classes run on CAT days. FAT is the final exam over the full syllabus.
+- Saturday is usually a class day and Sunday a holiday. Before saying whether a day \
+has classes, check get_academic_calendar for that date: it marks holidays, exam days \
+and other changes to the usual timetable.
+- Lab FATs are held in the lab slots of that day's timetable, so the student sits the \
+lab exam in place of that lab class; theory classes that day happen as usual. Lab FAT \
+days are marked only in get_academic_calendar, not in get_exam_schedule.
+- Timetable slots: letter slots such as A1, B2 or TA1 are theory, 50 minutes each; \
+L slots are lab, and a lab session is two back-to-back L slots (100 minutes).
+- Slot times differ by day and slot: read them from get_timetable, never assume them.
+- Course types: ETH, ELA and EPJ are the theory, lab and project parts of one \
+embedded course; TH, LO and PJT are standalone theory, lab and project courses; SS \
+is soft skills. Credits are typically theory 3, lab 1 and embedded 4; read the real \
+value from get_timetable or get_grade_history.
+- Before each semester, students register on VTOP (FFCS), picking their courses, \
+slots and faculty.
+- A year has a Fall and a Winter semester, plus a short summer semester.
+- Theory marks are typically CAT-1 15, CAT-2 15, continuous assessment (quizzes, \
+assignments) 30 and FAT 40, out of 100, but a course can change this, so read the \
+weights from get_marks. Lab courses are typically continuous assessment 60 and lab \
+FAT 40. Passing also needs at least 40% in the FAT itself.
+- Grading is usually relative (S, A, B, C, D, E, F), with absolute grading for small \
+classes. CGPA is credit-weighted, with grade points S=10, A=9, B=8, C=7, D=6, E=5 \
+and F=0. A student who fails a course, or misses its FAT without an approved reason, \
+must re-register it in a later semester; a passed course can also be re-registered to \
+improve the grade. An approved medical or OD absence can get a re-CAT or re-FAT.
+- Faculty names, emails and cabins from VTOP may be shown to the student.
+- Outings: a general outing is a leave; a weekend outing means going out in the \
+morning and returning by night. There is no fixed limit on outings.
+- The biometric log records entries at both classes and the hostel. Hostellers must \
+be back by 8:30 pm and may leave from 5 am (boys) or 6 am (girls); these times can \
+change.
+- Common questions:
+  - Classes today or on a date: get_timetable for that weekday, then \
+get_academic_calendar for that date.
+  - Can I skip a class: the day's classes from get_timetable, each course's \
+attended and total from get_attendance, then the 75% calculation.
+  - Next exam: get_exam_schedule for CATs and theory FATs, get_academic_calendar \
+for lab FATs.
+  - Marks needed in the FAT: the weighted marks so far from get_marks, the FAT's \
+weightage, the 40% FAT minimum, and the grade ranges from get_grade_details once \
+grades exist.
 - The first call can take up to a minute while the student's phone or the server \
 signs in to VTOP; wait for it rather than retrying.
 - Errors: key_unknown means the access key was revoked; phone_unreachable or \
