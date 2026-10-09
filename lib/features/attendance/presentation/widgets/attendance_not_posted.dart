@@ -73,6 +73,7 @@ class AttendanceNotPosted extends ConsumerWidget {
                   now: now,
                   until: exam?.start,
                 ),
+                hideSkips: ref.watch(hideSkipAdviceProvider),
                 examName: exam?.name,
               ),
             ),
@@ -146,6 +147,7 @@ class _CourseBudget extends StatelessWidget {
     required this.next,
     required this.left,
     this.examName,
+    this.hideSkips = false,
   });
 
   final String name;
@@ -155,6 +157,9 @@ class _CourseBudget extends StatelessWidget {
   /// Classes to come, in VTOP's units (two per lab session).
   final int left;
   final String? examName;
+
+  /// Leaves out "can miss".
+  final bool hideSkips;
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +193,7 @@ class _CourseBudget extends StatelessWidget {
               '${examName == null ? '' : ' till $examName'}',
         ),
         // Whole sessions only: missing one costs two classes.
-        ('${lab ? canMiss ~/ 2 : canMiss}', ' can miss'),
+        if (!hideSkips) ('${lab ? canMiss ~/ 2 : canMiss}', ' can miss'),
       ],
     ];
 

@@ -646,6 +646,18 @@ class SettingsPage extends HookConsumerWidget {
               ),
               FTile(
                 prefix: _IconTile(
+                  icon: FLucideIcons.eyeOff,
+                  tone: colors.app.lab,
+                ),
+                title: const Text('Hide Skip Counts'),
+                subtitle: const Text('Show percentages without skip advice'),
+                suffix: FSwitch(
+                  value: ref.watch(hideSkipAdviceProvider),
+                  onChange: (value) => setHideSkipAdvice(ref, value),
+                ),
+              ),
+              FTile(
+                prefix: _IconTile(
                   icon: FLucideIcons.utensils,
                   tone: colors.app.lab,
                 ),

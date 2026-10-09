@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'ccafff297e45c7005d15e8758b6db0f0a16c17c7';
+String _$settingsHash() => r'3522b5a29f931fa37b67333d7c0aac37e87a1793';
 
 /// The optional vtop-server. The API key is kept in plain preferences by
 /// choice; see rust/ARCHITECTURE.md.
@@ -151,6 +151,54 @@ final class ClassesLeftUntilProvider
 }
 
 String _$classesLeftUntilHash() => r'87980823782c1ba0b332a8cbbd5b428259e4a347';
+
+/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
+/// timetable and attendance; percentages and counts stay.
+
+@ProviderFor(hideSkipAdvice)
+final hideSkipAdviceProvider = HideSkipAdviceProvider._();
+
+/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
+/// timetable and attendance; percentages and counts stay.
+
+final class HideSkipAdviceProvider extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
+  /// timetable and attendance; percentages and counts stay.
+  HideSkipAdviceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'hideSkipAdviceProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$hideSkipAdviceHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return hideSkipAdvice(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$hideSkipAdviceHash() => r'13c32575596a76c519bab5db4db9583c8692f6a1';
 
 /// The floating refresh button on the screen edge.
 

@@ -4,7 +4,9 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
@@ -2256,13 +2258,14 @@ class _Rail extends StatelessWidget {
 
 /// Right side of a class card's last line: a small ring filled to the
 /// percentage (notched at 75%) with "84% · skip 3" beside it.
-class _InlineAttendance extends StatelessWidget {
+class _InlineAttendance extends ConsumerWidget {
   const _InlineAttendance({required this.record});
 
   final AttendanceRecord record;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideSkips = ref.watch(hideSkipAdviceProvider);
     final standing = AttendanceStanding.sessions(record);
     final palette = context.theme.colors.app;
     final tone = !standing.isSafe
@@ -2277,7 +2280,7 @@ class _InlineAttendance extends StatelessWidget {
         : 'skip ${standing.canSkip}';
     return Semantics(
       label:
-          '${standing.displayPercent.round()}% attendance, ${standing.advice}',
+          '${standing.displayPercent.round()}% attendance${hideSkips ? '' : ', ${standing.advice}'}',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2290,7 +2293,9 @@ class _InlineAttendance extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            '${standing.displayPercent.round()}% · $hint',
+            hideSkips
+                ? '${standing.displayPercent.round()}%'
+                : '${standing.displayPercent.round()}% · $hint',
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w600,
@@ -2306,13 +2311,14 @@ class _InlineAttendance extends StatelessWidget {
 
 /// Attendance for the time column: a small ring with the percentage, and the
 /// skip/attend hint under it, coloured by the 75% status.
-class _GutterAttendance extends StatelessWidget {
+class _GutterAttendance extends ConsumerWidget {
   const _GutterAttendance({required this.record});
 
   final AttendanceRecord record;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hideSkips = ref.watch(hideSkipAdviceProvider);
     final standing = AttendanceStanding.sessions(record);
     final palette = context.theme.colors.app;
     final tone = !standing.isSafe
@@ -2327,7 +2333,7 @@ class _GutterAttendance extends StatelessWidget {
         : 'skip ${standing.canSkip}';
     return Semantics(
       label:
-          '${standing.displayPercent.round()}% attendance, ${standing.advice}',
+          '${standing.displayPercent.round()}% attendance${hideSkips ? '' : ', ${standing.advice}'}',
       excludeSemantics: true,
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -2356,16 +2362,18 @@ class _GutterAttendance extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 1),
-            Text(
-              hint,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
-                color: tone.onSubtle.withValues(alpha: 0.8),
-                fontFeatures: const [FontFeature.tabularFigures()],
+            if (!hideSkips) ...[
+              const SizedBox(height: 1),
+              Text(
+                hint,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: tone.onSubtle.withValues(alpha: 0.8),
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

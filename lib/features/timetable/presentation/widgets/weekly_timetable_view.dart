@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
@@ -389,16 +391,17 @@ void _showClass(
   );
 }
 
-class _ClassSheet extends StatelessWidget {
+class _ClassSheet extends ConsumerWidget {
   const _ClassSheet({required this.slot, required this.record});
 
   final TimetableSlot slot;
   final AttendanceRecord? record;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final hideSkips = ref.watch(hideSkipAdviceProvider);
     final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
     // Advice in sessions for labs; the x/y line below stays VTOP's own.
     final standing = record == null
@@ -510,18 +513,24 @@ class _ClassSheet extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            standing.advice,
-                            style: typography.body.sm.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colors.foreground,
+                          if (!hideSkips)
+                            Text(
+                              standing.advice,
+                              style: typography.body.sm.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: colors.foreground,
+                              ),
                             ),
-                          ),
                           Text(
                             '${summary!.attended} of ${summary.total} attended',
-                            style: typography.body.xs.copyWith(
-                              color: colors.mutedForeground,
-                            ),
+                            style: hideSkips
+                                ? typography.body.sm.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.foreground,
+                                  )
+                                : typography.body.xs.copyWith(
+                                    color: colors.mutedForeground,
+                                  ),
                           ),
                         ],
                       ),

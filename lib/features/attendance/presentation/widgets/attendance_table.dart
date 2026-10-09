@@ -73,6 +73,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     final history = dataAsync.value;
     final sync = history == null ? null : HistorySync.of(record, history);
     final count = (standing.attended, standing.total);
+    final hideSkips = ref.watch(hideSkipAdviceProvider);
     // Classes held since VTOP's last posted day, known only when the
     // history agrees with the summary (in sessions for labs).
     final timetable = ref.watch(timetableProvider).value;
@@ -191,19 +192,29 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      standing.advice,
-                                      style: typography.body.md.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: colors.foreground,
+                                    if (hideSkips)
+                                      Text(
+                                        '${count.$1} of ${count.$2} attended',
+                                        style: typography.body.md.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colors.foreground,
+                                        ),
+                                      )
+                                    else ...[
+                                      Text(
+                                        standing.advice,
+                                        style: typography.body.md.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colors.foreground,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      '${count.$1} of ${count.$2} attended',
-                                      style: typography.body.xs.copyWith(
-                                        color: colors.mutedForeground,
+                                      Text(
+                                        '${count.$1} of ${count.$2} attended',
+                                        style: typography.body.xs.copyWith(
+                                          color: colors.mutedForeground,
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                     // VTOP updates the history separately;
                                     // flag when it disagrees.
                                     if (sync != null && !sync.inSync)
