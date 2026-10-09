@@ -18,6 +18,7 @@ const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
 const refreshButtonSettingKey = 'settings_refresh_button';
 const classesLeftUntilSettingKey = 'settings_classes_left_until';
 const messTimingsSettingKey = 'settings_mess_timings';
+const hideSkipAdviceSettingKey = 'settings_hide_skip_advice';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -26,6 +27,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         classesLeftUntilSettingKey,
         messTimingsSettingKey,
+        hideSkipAdviceSettingKey,
         "settings_auto_refresh",
         refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,
@@ -118,6 +120,20 @@ Future<void> setClassesLeftUntil(WidgetRef ref, ClassesLeftUntil value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setString(classesLeftUntilSettingKey, value.name);
   ref.invalidate(classesLeftUntilProvider);
+}
+
+/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
+/// timetable and attendance; percentages and counts stay.
+@riverpod
+bool hideSkipAdvice(Ref ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return prefs?.getBool(hideSkipAdviceSettingKey) ?? false;
+}
+
+Future<void> setHideSkipAdvice(WidgetRef ref, bool value) async {
+  final prefs = await ref.read(settingsProvider.future);
+  await prefs.setBool(hideSkipAdviceSettingKey, value);
+  ref.invalidate(hideSkipAdviceProvider);
 }
 
 /// The floating refresh button on the screen edge.

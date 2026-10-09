@@ -71,12 +71,13 @@ class AttendanceCard extends ConsumerWidget {
             countedThrough: sync?.countedThrough,
           );
     final projection = isLab ? classes?.inSessions(record) : classes;
+    final hideSkips = ref.watch(hideSkipAdviceProvider);
 
     final pct = standing.displayPercent;
     return Surface(
       padding: EdgeInsets.zero,
       semanticsLabel:
-          '$name, ${pct.round()} percent, ${standing.attended} of ${standing.total} attended${sync?.inSync == false ? ', history not in sync' : ''}${(projection?.unposted ?? 0) > 0 ? ', ${projection!.unposted} held but not posted yet' : ''}, ${plan.advice}',
+          '$name, ${pct.round()} percent, ${standing.attended} of ${standing.total} attended${sync?.inSync == false ? ', history not in sync' : ''}${(projection?.unposted ?? 0) > 0 ? ', ${projection!.unposted} held but not posted yet' : ''}${hideSkips ? '' : ', ${plan.advice}'}',
       onPress: () => showAttendanceDetails(context, record),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(Radii.lg - 1),
@@ -158,8 +159,10 @@ class AttendanceCard extends ConsumerWidget {
                             standing: standing,
                             outOfSync: sync?.inSync == false,
                           ),
-                          const Spacer(),
-                          _Advice(standing: plan, tone: tone),
+                          if (!hideSkips) ...[
+                            const Spacer(),
+                            _Advice(standing: plan, tone: tone),
+                          ],
                         ],
                       ),
                       if (projection != null) ...[
@@ -168,6 +171,7 @@ class AttendanceCard extends ConsumerWidget {
                           projection: projection,
                           tone: tone,
                           examName: exam?.name,
+                          hideSkips: hideSkips,
                         ),
                       ],
                     ],
@@ -251,6 +255,7 @@ class _SemesterOutlook extends StatelessWidget {
     required this.projection,
     required this.tone,
     this.examName,
+    this.hideSkips = false,
   });
 
   final AttendanceProjection projection;
@@ -258,6 +263,9 @@ class _SemesterOutlook extends StatelessWidget {
 
   /// Set when counting to an exam rather than to the semester's end.
   final String? examName;
+
+  /// Leaves out "to spare" / "needed" / "short of 75%".
+  final bool hideSkips;
 
   @override
   Widget build(BuildContext context) {
@@ -292,12 +300,13 @@ class _SemesterOutlook extends StatelessWidget {
           '${projection.upcoming}',
           examName == null ? ' left' : ' left till $examName',
         ),
-        if (mustAttend == null)
-          (null, null, 'short of 75%')
-        else if (!projection.standing.isSafe)
-          (null, '$mustAttend', ' needed')
-        else
-          (null, '${projection.canMiss}', ' to spare'),
+        if (!hideSkips)
+          if (mustAttend == null)
+            (null, null, 'short of 75%')
+          else if (!projection.standing.isSafe)
+            (null, '$mustAttend', ' needed')
+          else
+            (null, '${projection.canMiss}', ' to spare'),
         (null, '${projection.bestPercent.floor()}%', ' max'),
       ],
     ];
