@@ -98,7 +98,7 @@ void main() {
     expect(find.text('Preferred'), findsOneWidget);
     expect(find.text('Import OAuth JSON'), findsOneWidget);
     expect(find.text('How to get OAuth credentials'), findsOneWidget);
-    expect(find.text('Create or select a Google Cloud project'), findsNothing);
+    expect(find.text('Create a Google Cloud project'), findsNothing);
     expect(find.text('Use shared app access'), findsOneWidget);
     expect(find.text('Fallback'), findsOneWidget);
     expect(find.text(_sharedFallbackWarningForTest), findsOneWidget);
@@ -119,29 +119,23 @@ void main() {
     );
 
     expect(find.text('Get your Google OAuth file'), findsOneWidget);
+    expect(find.text('Create a Google Cloud project'), findsOneWidget);
+    expect(find.text('Add your college email as a test user'), findsOneWidget);
+    expect(find.text('Publish the app'), findsOneWidget);
+    expect(find.text('Recommended'), findsOneWidget);
+    expect(find.textContaining('Done when:'), findsNWidgets(7));
+    expect(find.textContaining('not your college account'), findsOneWidget);
+    expect(find.textContaining('Audience: choose External'), findsOneWidget);
     expect(
-      find.text('Create or select a Google Cloud project'),
+      find.textContaining('Enter your @vitapstudent.ac.in email'),
       findsOneWidget,
     );
-    expect(find.text('Set the audience and test users'), findsOneWidget);
-    expect(find.text('Open Google Cloud'), findsNWidgets(5));
-    expect(find.textContaining('Keep that project selected'), findsOneWidget);
     expect(
-      find.textContaining('Wait until the API overview page appears'),
+      find.textContaining('Pick Desktop app, not Android or Web application'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('This is the name Google shows during consent'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Choose External—not Internal'), findsOneWidget);
-    expect(find.textContaining('@vitapstudent.ac.in'), findsOneWidget);
-    expect(
-      find.textContaining('do not choose Android or Web application'),
-      findsOneWidget,
-    );
-    expect(find.text('Return to Vitap Mate'), findsOneWidget);
-    expect(find.textContaining('loopback OAuth documentation'), findsNothing);
+    expect(find.textContaining('every 7 days'), findsOneWidget);
+    expect(find.text('If something goes wrong'), findsOneWidget);
     expect(find.text('Using a trusted friend’s JSON'), findsOneWidget);
     expect(
       find.textContaining('Never share your access token'),
