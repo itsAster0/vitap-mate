@@ -27,13 +27,6 @@ String statusLabel(OutingStatus status, String raw) => switch (status) {
   OutingStatus.other => raw.toUpperCase(),
 };
 
-/// Who still has to approve a pending request: "Waiting for Warden's
-/// Approval" → "Warden".
-String? pendingWith(String status) => RegExp(
-  r"waiting for (\w+)",
-  caseSensitive: false,
-).firstMatch(status)?.group(1);
-
 /// Small caption above a group of fields.
 class FieldLabel extends StatelessWidget {
   const FieldLabel(this.text, {super.key, this.trailing});
@@ -486,7 +479,9 @@ class OutingRequestCard extends StatelessWidget {
     final colors = context.theme.colors;
     final kind = outingStatus(status);
     final tone = statusTone(context, kind);
-    final waitingOn = kind == OutingStatus.pending ? pendingWith(status) : null;
+    // VTOP's own words, e.g. "Waiting for Approval".
+    final waitingOn = kind == OutingStatus.pending ? status.trim() : null;
+    final typography = context.theme.typography;
     return Surface(
       padding: const EdgeInsets.fromLTRB(
         Space.md + 2,
@@ -495,120 +490,132 @@ class OutingRequestCard extends StatelessWidget {
         Space.md,
       ),
       borderColor: highlight != null ? colors.app.accentTone.base : null,
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        place,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.theme.typography.body.md.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colors.foreground,
+          // The place gets the whole first line; delete sits at its end.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  place,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: typography.body.md.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colors.foreground,
+                  ),
+                ),
+              ),
+              if (onCancel != null) ...[
+                const SizedBox(width: Space.sm),
+                cancelLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(Space.sm),
+                        child: SizedBox.square(
+                          dimension: 14,
+                          child: FCircularProgress(),
+                        ),
+                      )
+                    : FButton.icon(
+                        variant: FButtonVariant.ghost,
+                        size: FButtonSizeVariant.sm,
+                        semanticsLabel: 'Cancel request',
+                        onPress: onCancel,
+                        child: Icon(
+                          FLucideIcons.trash2,
+                          color: colors.app.danger.base,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: Space.sm),
-                    ToneBadge(label: statusLabel(kind, status), tone: tone),
-                    if (highlight != null) ...[
-                      const SizedBox(width: Space.xs),
-                      ToneBadge(label: highlight!, tone: colors.app.accentTone),
-                    ],
-                  ],
+              ],
+            ],
+          ),
+          if (purpose.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              purpose,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: typography.body.sm.copyWith(color: colors.mutedForeground),
+            ),
+          ],
+          const SizedBox(height: Space.xs + 2),
+          for (final (label, text) in when)
+            Row(
+              children: [
+                SizedBox(
+                  width: label == null ? 17 : 38,
+                  child: label == null
+                      ? Icon(
+                          FLucideIcons.clock,
+                          size: 12,
+                          color: colors.mutedForeground,
+                        )
+                      : Text(
+                          label,
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                          ),
+                        ),
                 ),
-                if (purpose.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    purpose,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.theme.typography.body.sm.copyWith(
-                      color: colors.mutedForeground,
+                Expanded(
+                  child: Text(
+                    text,
+                    style: typography.body.xs.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: colors.secondaryForeground,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-                ],
-                const SizedBox(height: Space.xs + 2),
-                for (final (label, text) in when)
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: label == null ? 17 : 38,
-                        child: label == null
-                            ? Icon(
-                                FLucideIcons.clock,
-                                size: 12,
-                                color: colors.mutedForeground,
-                              )
-                            : Text(
-                                label,
-                                style: context.theme.typography.body.xs
-                                    .copyWith(color: colors.mutedForeground),
-                              ),
-                      ),
-                      Expanded(
+                ),
+              ],
+            ),
+          const SizedBox(height: Space.sm),
+          // Status, how soon, who it waits on, and the pass at the end.
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: Space.xs,
+                  runSpacing: Space.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ToneBadge(label: statusLabel(kind, status), tone: tone),
+                    if (highlight != null)
+                      ToneBadge(label: highlight!, tone: colors.app.accentTone),
+                    if (waitingOn != null && waitingOn.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 2),
                         child: Text(
-                          text,
-                          style: context.theme.typography.body.xs.copyWith(
-                            fontWeight: FontWeight.w500,
-                            color: colors.secondaryForeground,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                          waitingOn,
+                          style: typography.body.xs.copyWith(
+                            color: tone.onSubtle,
                           ),
                         ),
                       ),
-                    ],
+                  ],
+                ),
+              ),
+              if (onPass != null) ...[
+                const SizedBox(width: Space.sm),
+                SizedBox(
+                  width: 64,
+                  child: FButton(
+                    variant: FButtonVariant.outline,
+                    size: FButtonSizeVariant.sm,
+                    onPress: passLoading ? null : onPass,
+                    child: passLoading
+                        ? const SizedBox.square(
+                            dimension: 14,
+                            child: FCircularProgress(),
+                          )
+                        : const Text('Pass'),
                   ),
-                if (waitingOn != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    'Waiting on your $waitingOn',
-                    style: context.theme.typography.body.xs.copyWith(
-                      color: tone.onSubtle,
-                    ),
-                  ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
-          if (onPass != null) ...[
-            const SizedBox(width: Space.sm),
-            SizedBox(
-              width: 64,
-              child: FButton(
-                variant: FButtonVariant.outline,
-                size: FButtonSizeVariant.sm,
-                onPress: passLoading ? null : onPass,
-                child: passLoading
-                    ? const SizedBox.square(
-                        dimension: 14,
-                        child: FCircularProgress(),
-                      )
-                    : const Text('Pass'),
-              ),
-            ),
-          ],
-          if (onPass == null && onCancel != null) ...[
-            const SizedBox(width: Space.sm),
-            SizedBox(
-              width: 84,
-              child: FButton(
-                variant: FButtonVariant.destructive,
-                size: FButtonSizeVariant.sm,
-                onPress: cancelLoading ? null : onCancel,
-                child: cancelLoading
-                    ? const SizedBox.square(
-                        dimension: 14,
-                        child: FCircularProgress(),
-                      )
-                    : const Text('Cancel'),
-              ),
-            ),
-          ],
         ],
       ),
     );
