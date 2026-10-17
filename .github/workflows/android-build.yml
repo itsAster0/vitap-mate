@@ -26,9 +26,21 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      # Cargokit builds the Rust library into the Flutter build directory,
+      # not rust/target, so point the cache there.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> ../build/rust_lib_vitapmate/build
+          cache-directories: build/rust_lib_vitapmate/build_tool
+          cache-on-failure: true
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
