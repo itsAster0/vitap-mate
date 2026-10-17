@@ -1,26 +1,28 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show showAdaptiveDialog;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/theme/app_palette.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/features/settings/presentation/email_otp_support.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/email_otp_widgets.dart';
 
 const _sharedWarning =
-    'Fallback only. Shared Google access may be unavailable because of OAuth user limits, rate limits, verification status, or VIT Workspace policy. Try the personal BYOK method first.';
+    'Last resort. Shared Google access may stop working because of Google’s user limits, rate limits, verification status or VIT Workspace policy. Try forwarding or your own key first.';
 
+/// The Email OTP screen: picks how Vitap Mate reads VTOP's OTP mail.
+/// Option 1 is email forwarding, option 2 the student's own Google key,
+/// and shared Google access (only in builds with its key) the last resort.
 class GmailOtpSetupPage extends HookConsumerWidget {
   const GmailOtpSetupPage({
     this.androidByokOverride,
@@ -33,175 +35,32 @@ class GmailOtpSetupPage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final app = colors.app;
     final oauth = ref.read(googleEmailOtpAuthServiceProvider);
-    final credentials = useState<GoogleDesktopOAuthCredentials?>(null);
-    final currentSession = useState<EmailOtpOAuthSession?>(null);
+    final session = useState<EmailOtpOAuthSession?>(null);
+    final forwarding = ref.watch(mailForwardingProvider).value;
     final busy = useState(false);
-    final statusMessage = useState<String?>(null);
-    final byokPoller = useRef<StreamSubscription<EmailOtpOAuthSession>?>(null);
-    final byokPollDetected = useRef(false);
 
-    Future<void> refreshSession() async {
-      currentSession.value = await oauth.loadSession();
+    Future<void> refresh() async {
+      session.value = await oauth.loadSession();
       ref.invalidate(emailOtpReadyProvider);
+      ref.invalidate(anyEmailOtpReadyProvider);
+      ref.invalidate(mailForwardingProvider);
     }
 
     useEffect(() {
-      unawaited(refreshSession());
-      return () {
-        unawaited(byokPoller.value?.cancel());
-        unawaited(oauth.cancelByokSetup());
-      };
-    }, const []);
-
-    useEffect(() {
+      unawaited(refresh());
       final listener = AppLifecycleListener(
-        onResume: () {
-          // The localhost callback may finish while the system browser still
-          // covers the app. Refresh more than once so the completed token
-          // exchange is reflected as soon as the user returns.
-          for (final delay in const [
-            Duration.zero,
-            Duration(milliseconds: 500),
-            Duration(seconds: 2),
-          ]) {
-            unawaited(
-              Future<void>.delayed(delay, () async {
-                if (context.mounted) await refreshSession();
-              }),
-            );
-          }
-        },
+        onResume: () => unawaited(refresh()),
       );
       return listener.dispose;
     }, const []);
 
-    Future<String?> expectedAccountIdentifier() async {
-      // Both personal and shared OAuth must validate against the registration
-      // number extracted after login, not the user's portal login name.
-      var identifier = '';
-      try {
-        await ref.read(vClientProvider.notifier).ensureLogin();
-        identifier = vtopClientRegistrationNumber(
-          client: await ref.read(vClientProvider.future),
-        ).trim();
-      } catch (_) {
-        if (context.mounted) {
-          dispToast(
-            context,
-            'VTOP sign-in required',
-            'Check your saved VTOP credentials in Settings, sign in once, then retry Gmail setup.',
-          );
-        }
-        return null;
-      }
-      if (identifier.isEmpty && context.mounted) {
-        dispToast(
-          context,
-          'Setup failed',
-          'Open Vitap Mate once with your VTOP account, then retry Gmail setup.',
-        );
-      }
-      return identifier.isEmpty ? null : identifier;
-    }
-
-    Future<void> waitUntilAppIsForeground() async {
-      while (context.mounted &&
-          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-      }
-    }
-
-    Future<void> importCredentials() async {
-      if (busy.value) return;
-      busy.value = true;
-      statusMessage.value = null;
-      try {
-        final picked = await FilePicker.pickFile(
-          type: FileType.custom,
-          allowedExtensions: const ['json'],
-        );
-        if (picked == null) return;
-        if (await picked.length() > 64 * 1024) {
-          throw const GoogleDesktopOAuthException(
-            'file_too_large',
-            'The OAuth credential file must be smaller than 64 KB.',
-          );
-        }
-        final Uint8List bytes = await picked.readAsBytes();
-        credentials.value = oauth.parseByokCredentials(bytes);
-        statusMessage.value = 'Desktop OAuth credentials are ready.';
-      } on GoogleDesktopOAuthException catch (error) {
-        credentials.value = null;
-        statusMessage.value = error.message;
-      } catch (_) {
-        credentials.value = null;
-        statusMessage.value =
-            'Could not import this file. Select the Desktop OAuth JSON downloaded from Google.';
-      } finally {
-        busy.value = false;
-      }
-    }
-
-    Future<void> connectByok() async {
-      final selected = credentials.value;
-      if (selected == null || busy.value) return;
-      final accountIdentifier = await expectedAccountIdentifier();
-      if (accountIdentifier == null) return;
-      busy.value = true;
-      statusMessage.value = 'Waiting for Google in your browser…';
-      final previousSession = await oauth.loadSession();
-      await byokPoller.value?.cancel();
-      byokPollDetected.value = false;
-      byokPoller.value = oauth
-          .pollForPersonalSession(
-            clientId: selected.clientId,
-            previousSession: previousSession,
-          )
-          .listen(
-            (session) {
-              byokPollDetected.value = true;
-              if (!context.mounted) return;
-              currentSession.value = session;
-              statusMessage.value = 'Personal Gmail access is connected.';
-              ref.invalidate(emailOtpReadyProvider);
-            },
-            onDone: () {
-              if (!context.mounted || !busy.value || byokPollDetected.value) {
-                return;
-              }
-              statusMessage.value =
-                  'Google setup timed out after five minutes. Retry and keep Vitap Mate running while the browser is open.';
-              busy.value = false;
-              unawaited(oauth.cancelByokSetup());
-            },
-          );
-      try {
-        final result = await oauth.setupByok(
-          credentials: selected,
-          expectedUsername: accountIdentifier,
-          openBrowser: (uri) =>
-              launchUrl(uri, mode: LaunchMode.externalApplication),
-          beforeTokenExchange: waitUntilAppIsForeground,
-          onProgress: (message) {
-            if (context.mounted) statusMessage.value = message;
-          },
-        );
-        statusMessage.value = result.message;
-        if (result.success) {
-          await refreshSession();
-          if (context.mounted) {
-            dispToast(context, 'Connected', result.message);
-          }
-        } else if (context.mounted) {
-          dispToast(context, 'Gmail not connected', result.message);
-        }
-      } finally {
-        await byokPoller.value?.cancel();
-        byokPoller.value = null;
-        byokPollDetected.value = false;
-        busy.value = false;
-      }
+    Future<void> openRoute(String name) async {
+      await context.pushNamed(name);
+      if (context.mounted) await refresh();
     }
 
     Future<void> connectShared() async {
@@ -219,28 +78,26 @@ class GmailOtpSetupPage extends HookConsumerWidget {
             ),
             FButton(
               onPress: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Continue with fallback'),
+              child: const Text('Continue'),
             ),
           ],
         ),
       );
-      if (confirmed != true) return;
-      final accountIdentifier = await expectedAccountIdentifier();
-      if (accountIdentifier == null) return;
+      if (confirmed != true || !context.mounted) return;
+      final account = await gmailAccountIdentifier(context, ref);
+      if (account == null) return;
       busy.value = true;
-      statusMessage.value = 'Starting shared Google authorization…';
       try {
         final result = await oauth.setupIdentityThenGmail(
-          expectedUsername: accountIdentifier,
+          expectedUsername: account,
         );
-        statusMessage.value = result.message;
-        if (result.success) {
-          await refreshSession();
-          if (context.mounted) {
-            dispToast(context, 'Connected', result.message);
-          }
-        } else if (context.mounted) {
-          dispToast(context, 'Gmail not connected', result.message);
+        await refresh();
+        if (context.mounted) {
+          dispToast(
+            context,
+            result.success ? 'Connected' : 'Gmail not connected',
+            result.message,
+          );
         }
       } finally {
         busy.value = false;
@@ -253,7 +110,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
         builder: (dialogContext) => AppDialog(
           title: const Text('Disconnect Gmail?'),
           body: const Text(
-            'This removes the saved OAuth credentials and Gmail tokens from this device.',
+            'This removes the saved Google key and Gmail tokens from this phone.',
           ),
           actions: [
             FButton(
@@ -273,14 +130,13 @@ class GmailOtpSetupPage extends HookConsumerWidget {
       busy.value = true;
       try {
         await oauth.clearSession();
-        statusMessage.value = 'Gmail access was disconnected.';
-        await refreshSession();
+        await refresh();
       } finally {
         busy.value = false;
       }
     }
 
-    Future<void> testLatestEmail() async {
+    Future<void> testGmail() async {
       if (busy.value) return;
       busy.value = true;
       try {
@@ -297,188 +153,220 @@ class GmailOtpSetupPage extends HookConsumerWidget {
           );
         }
       } catch (error) {
-        if (context.mounted) {
-          dispToast(context, 'Gmail test failed', '$error');
-        }
-        await refreshSession();
+        if (context.mounted) dispToast(context, 'Gmail test failed', '$error');
+        await refresh();
       } finally {
         busy.value = false;
       }
     }
 
+    final gmail = session.value;
+    final ownKey = gmail?.authSource == EmailOtpAuthSource.personalByok
+        ? gmail
+        : null;
+    final shared = gmail?.authSource == EmailOtpAuthSource.sharedBuiltIn
+        ? gmail
+        : null;
+    final android = androidByokOverride ?? Platform.isAndroid;
+
+    Widget connectedLine(String text) => Row(
+      children: [
+        Icon(FLucideIcons.circleCheck, size: 16, color: app.success.base),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: typography.body.xs.copyWith(
+              color: app.success.onSubtle,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final (statusTone, statusTitle, statusText) = switch ((gmail, forwarding)) {
+      (final g?, _) => (
+        app.success,
+        'Set up',
+        'OTPs are read from Gmail (${g.email}).',
+      ),
+      (null, final f?) => (
+        app.success,
+        'Set up',
+        f.lastOtpAt == null
+            ? 'Forwarding address ready. Finish the Gmail filter if you haven’t.'
+            : 'OTPs arrive through forwarding.',
+      ),
+      _ => (
+        app.warning,
+        'Not set up',
+        'VTOP asks for an OTP at sign-in. Pick one way for Vitap Mate to read it, so you never type it.',
+      ),
+    };
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
+      padding: const EdgeInsets.fromLTRB(
+        Space.page,
+        Space.sm,
+        Space.page,
+        Space.xl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Gmail OTP Setup',
-            style: context.theme.typography.body.xl.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Connect Gmail directly from this device. Vitap Mate does not send your OAuth credentials or email to a hosted backend.',
-            style: context.theme.typography.body.sm.copyWith(
-              color: context.theme.colors.mutedForeground,
-            ),
-          ),
-          if (currentSession.value case final session?) ...[
-            const SizedBox(height: 16),
-            FAlert(
-              variant: FAlertVariant.primary,
-              title: Text('${session.authSourceLabel} connected'),
-              subtitle: Text(session.email),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              spacing: 8,
-              children: [
-                Expanded(
-                  child: FButton(
-                    variant: FButtonVariant.outline,
-                    onPress: busy.value ? null : testLatestEmail,
-                    child: const Text('Test Gmail'),
+          GuideCallout(
+            icon: gmail != null || forwarding != null
+                ? FLucideIcons.circleCheck
+                : FLucideIcons.mail,
+            tone: statusTone,
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$statusTitle · ',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                ),
-                Expanded(
-                  child: FButton(
-                    variant: FButtonVariant.destructive,
-                    onPress: busy.value ? null : disconnect,
-                    child: const Text('Disconnect'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          if (androidByokOverride ?? Platform.isAndroid) ...[
-            const SizedBox(height: 20),
-            _SectionCard(
-              title: 'Use your own Google access',
-              badge: 'Preferred',
-              children: [
-                const Text(
-                  'Import a Desktop OAuth JSON file, then connect Gmail directly on this device.',
-                ),
-                const SizedBox(height: 12),
-                FTile(
-                  prefix: const Icon(FLucideIcons.bookOpen),
-                  title: Text(
-                    'How to get OAuth credentials',
-                    style: TextStyle(color: context.theme.colors.primary),
-                  ),
-                  subtitle: const Text('Open the step-by-step guide'),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => context.pushNamed(Paths.gmailOauthGuide),
-                ),
-                const SizedBox(height: 14),
-                FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: busy.value ? null : importCredentials,
-                  child: Text(
-                    credentials.value == null
-                        ? 'Import OAuth JSON'
-                        : 'Replace OAuth JSON',
-                  ),
-                ),
-                if (credentials.value case final selected?) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '${selected.projectId} · ${selected.redactedClientId}',
-                    style: context.theme.typography.body.xs.copyWith(
-                      color: context.theme.colors.mutedForeground,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  FButton(
-                    onPress: busy.value ? null : connectByok,
-                    child: const Text('Connect with Google'),
-                  ),
+                  TextSpan(text: statusText),
                 ],
-              ],
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            const FAlert(
-              title: Text('Personal BYOK is Android-only'),
-              subtitle: Text(
-                'This first release supports local BYOK on Android. Use shared access on this platform.',
               ),
+            ),
+          ),
+          const SizedBox(height: Space.lg),
+          OtpMethodCard(
+            highlighted: ownKey == null && forwarding == null,
+            icon: FLucideIcons.forward,
+            iconTone: app.lab,
+            eyebrow: 'OPTION 1 · RECOMMENDED',
+            title: 'Email forwarding',
+            description:
+                'Gmail forwards only VTOP’s OTP mail to your private address. The code reaches this phone sealed; our server can’t read it.',
+            facts: const [
+              ('One-time setup', '~2 min'),
+              ('Who sees mail', 'Mail relay, briefly'),
+            ],
+            points: const [
+              MethodPoint('No Google Cloud project'),
+              MethodPoint('Fills in instantly, even with the app closed'),
+            ],
+            status: forwarding == null
+                ? null
+                : connectedLine(
+                    forwarding.lastOtpAt == null
+                        ? 'Address created · waiting for the first OTP'
+                        : 'Working · ${forwarding.address}',
+                  ),
+            action: FButton(
+              variant: ownKey == null && forwarding == null
+                  ? FButtonVariant.primary
+                  : FButtonVariant.outline,
+              onPress: () => openRoute(Paths.mailForwarding),
+              suffix: const Icon(FLucideIcons.arrowRight),
+              child: Text(
+                forwarding == null ? 'Set up forwarding' : 'Manage forwarding',
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.md),
+          OtpMethodCard(
+            icon: FLucideIcons.keyRound,
+            iconTone: app.accentTone,
+            eyebrow: 'OPTION 2 · MOST CONTROL',
+            title: 'Your own Google key',
+            description:
+                'Make a free Google Cloud key once. Vitap Mate reads the OTP straight from Gmail; nothing passes through our server.',
+            facts: const [
+              ('One-time setup', '~10 min'),
+              ('Who sees mail', 'Only this phone'),
+            ],
+            points: const [
+              MethodPoint('Also works for server sign-in'),
+              MethodPoint('Can move used OTP mail to Trash'),
+              MethodPoint(
+                'Needs a laptop, or Chrome’s desktop mode',
+                caveat: true,
+              ),
+            ],
+            status: ownKey == null
+                ? null
+                : connectedLine('Connected · ${ownKey.email}'),
+            action: ownKey != null
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: FButton(
+                          variant: FButtonVariant.outline,
+                          size: FButtonSizeVariant.sm,
+                          onPress: busy.value ? null : testGmail,
+                          child: const Text('Test Gmail'),
+                        ),
+                      ),
+                      const SizedBox(width: Space.sm),
+                      Expanded(
+                        child: FButton(
+                          variant: FButtonVariant.outline,
+                          size: FButtonSizeVariant.sm,
+                          onPress: busy.value ? null : disconnect,
+                          child: Text(
+                            'Disconnect',
+                            style: TextStyle(color: app.danger.base),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : android
+                ? FButton(
+                    variant: FButtonVariant.outline,
+                    onPress: () => openRoute(Paths.gmailOauthGuide),
+                    suffix: const Icon(FLucideIcons.arrowRight),
+                    child: const Text('Start the guide'),
+                  )
+                : const FAlert(
+                    title: Text('Android only for now'),
+                    subtitle: Text('Use email forwarding on this device.'),
+                  ),
+          ),
+          if (ownKey != null && forwarding != null) ...[
+            const SizedBox(height: Space.sm),
+            Text(
+              'Both are on. Vitap Mate waits for the forwarded code first and falls back to Gmail.',
+              style: typography.body.xs.copyWith(color: colors.mutedForeground),
             ),
           ],
           if (sharedOAuthOverride ?? sharedGoogleOAuthEnabled) ...[
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Use shared app access',
-              badge: 'Fallback',
+            const SizedBox(height: Space.lg),
+            FTileGroup(
               children: [
-                const FAlert(
-                  variant: FAlertVariant.destructive,
-                  title: Text('Shared access may not work'),
-                  subtitle: Text(_sharedWarning),
-                ),
-                const SizedBox(height: 12),
-                FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: busy.value ? null : connectShared,
-                  child: const Text('Use shared fallback'),
+                FTile(
+                  prefix: Icon(
+                    FLucideIcons.users,
+                    color: colors.mutedForeground,
+                  ),
+                  title: const Text('Shared Google access'),
+                  subtitle: Text(
+                    shared != null
+                        ? 'Connected · ${shared.email}'
+                        : 'Last resort · may stop working',
+                  ),
+                  suffix: busy.value
+                      ? const FCircularProgress.pinwheel()
+                      : shared != null
+                      ? FButton(
+                          variant: FButtonVariant.ghost,
+                          size: FButtonSizeVariant.sm,
+                          mainAxisSize: MainAxisSize.min,
+                          onPress: disconnect,
+                          child: const Text('Disconnect'),
+                        )
+                      : const Icon(FLucideIcons.chevronRight),
+                  onPress: busy.value || shared != null ? null : connectShared,
                 ),
               ],
             ),
-          ],
-          if (statusMessage.value case final message?) ...[
-            const SizedBox(height: 14),
-            FAlert(
-              title: Text(busy.value ? 'Working…' : 'Setup status'),
-              subtitle: Text(message),
-            ),
-          ],
-          if (busy.value) ...[
-            const SizedBox(height: 14),
-            const Center(child: FCircularProgress.pinwheel()),
           ],
         ],
       ),
     );
   }
-}
-
-class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.badge,
-    required this.children,
-  });
-
-  final String title;
-  final String badge;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => FCard(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: context.theme.typography.body.lg.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              FBadge(child: Text(badge)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    ),
-  );
 }

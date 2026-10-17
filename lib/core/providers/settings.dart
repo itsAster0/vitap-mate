@@ -19,6 +19,8 @@ const refreshButtonSettingKey = 'settings_refresh_button';
 const classesLeftUntilSettingKey = 'settings_classes_left_until';
 const messTimingsSettingKey = 'settings_mess_timings';
 const hideSkipAdviceSettingKey = 'settings_hide_skip_advice';
+const byokGuideDoneSettingKey = 'settings_byok_guide_done';
+const forwardingGuideDoneSettingKey = 'settings_forwarding_guide_done';
 
 @Riverpod(keepAlive: true)
 Future<SharedPreferencesWithCache> settings(Ref ref) async {
@@ -28,6 +30,8 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         classesLeftUntilSettingKey,
         messTimingsSettingKey,
         hideSkipAdviceSettingKey,
+        byokGuideDoneSettingKey,
+        forwardingGuideDoneSettingKey,
         "settings_auto_refresh",
         refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,

@@ -23,6 +23,11 @@ pub fn new_app_secret() -> String {
     random_token(APP_SECRET_PREFIX)
 }
 
+/// The secret a forwarding mailbox's phone holds.
+pub fn new_mailbox_secret() -> String {
+    random_token("vmb_")
+}
+
 fn random_token(prefix: &str) -> String {
     let mut bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);

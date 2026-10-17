@@ -5,37 +5,37 @@
     
     
       
-      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.000177">
+      <testcase classname="fastlane.lanes" name="0: default_platform" time="0.000193">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="1: Switch to android deploy_internal lane" time="7.7e-05">
+      <testcase classname="fastlane.lanes" name="1: Switch to android deploy_internal lane" time="0.000108">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="2: flutter build appbundle --release --dart-define-from-file=.env.json" time="83.048019">
+      <testcase classname="fastlane.lanes" name="2: flutter build appbundle --release --dart-define-from-file=.env.json" time="53.237125">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="3: upload_to_play_store" time="51.619475">
+      <testcase classname="fastlane.lanes" name="3: upload_to_play_store" time="62.295017">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="4: Switch to android promote_all lane" time="0.000232">
+      <testcase classname="fastlane.lanes" name="4: Switch to android promote_all lane" time="0.000186">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="5: upload_to_play_store" time="6.244189">
+      <testcase classname="fastlane.lanes" name="5: upload_to_play_store" time="14.034953">
         
       </testcase>
     
       
-      <testcase classname="fastlane.lanes" name="6: upload_to_play_store" time="6.033448">
+      <testcase classname="fastlane.lanes" name="6: upload_to_play_store" time="7.158695">
         
       </testcase>
     

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-build-${{ github.ref }}
@@ -129,3 +129,24 @@ jobs:
           path: build/artifacts/vitapmate-x86_64.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish nightly release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          {
+            echo "Automated build of \`${short_sha}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            echo "**$(git log -1 --format=%s)**"
+            echo
+            echo "Not a stable release. Most people should use \`vitapmate-universal.apk\`."
+          } > nightly-notes.md
+
+          gh release delete nightly --yes --cleanup-tag || true
+          gh release create nightly build/artifacts/*.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Nightly ${short_sha}" \
+            --notes-file nightly-notes.md

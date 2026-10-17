@@ -10,7 +10,6 @@ import 'package:http/testing.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
-import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/features/more/presentation/pages/chrome_extension_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/more_page.dart';
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
@@ -20,8 +19,27 @@ import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_p
 import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-const _sharedFallbackWarningForTest =
-    'Fallback only. Shared Google access may be unavailable because of OAuth user limits, rate limits, verification status, or VIT Workspace policy. Try the personal BYOK method first.';
+GoogleEmailOtpAuthService _testOAuthService() {
+  final httpClient = MockClient((_) async => http.Response('{}', 500));
+  return GoogleEmailOtpAuthService(
+    appAuth: const FlutterAppAuth(),
+    storage: const FlutterSecureStorage(),
+    httpClient: httpClient,
+    loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: httpClient),
+  );
+}
+
+Widget _otpScope(GoogleEmailOtpAuthService service, Widget page) =>
+    ProviderScope(
+      overrides: [googleEmailOtpAuthServiceProvider.overrideWithValue(service)],
+      child: MaterialApp(
+        builder: (context, child) => FTheme(
+          data: FTheme.neutral.light.touch,
+          child: FToaster(child: child!),
+        ),
+        home: Scaffold(body: page),
+      ),
+    );
 
 final _emptyGradeHistory = GradeHistoryData(
   student: const GradeHistoryStudentInfo(
@@ -61,167 +79,117 @@ final _emptyTimetable = TimetableData(
 );
 
 void main() {
-  testWidgets('Gmail setup prefers BYOK and clearly labels shared fallback', (
+  testWidgets('Email OTP offers forwarding first, own key second', (
     tester,
   ) async {
     FlutterSecureStorage.setMockInitialValues({});
-    final httpClient = MockClient((_) async => http.Response('{}', 500));
-    final service = GoogleEmailOtpAuthService(
-      appAuth: const FlutterAppAuth(),
-      storage: const FlutterSecureStorage(),
-      httpClient: httpClient,
-      loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: httpClient),
-    );
-
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          googleEmailOtpAuthServiceProvider.overrideWithValue(service),
-        ],
-        child: MaterialApp(
-          builder: (context, child) => FTheme(
-            data: FTheme.neutral.light.touch,
-            child: FToaster(child: child!),
-          ),
-          home: const Scaffold(
-            body: GmailOtpSetupPage(
-              androidByokOverride: true,
-              sharedOAuthOverride: true,
-            ),
-          ),
+      _otpScope(
+        _testOAuthService(),
+        const GmailOtpSetupPage(
+          androidByokOverride: true,
+          sharedOAuthOverride: true,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Use your own Google access'), findsOneWidget);
-    expect(find.text('Preferred'), findsOneWidget);
-    expect(find.text('Import OAuth JSON'), findsOneWidget);
-    expect(find.text('How to get OAuth credentials'), findsOneWidget);
-    expect(find.text('Create a Google Cloud project'), findsNothing);
-    expect(find.text('Use shared app access'), findsOneWidget);
-    expect(find.text('Fallback'), findsOneWidget);
-    expect(find.text(_sharedFallbackWarningForTest), findsOneWidget);
+    expect(find.textContaining('Not set up'), findsOneWidget);
+    expect(find.text('OPTION 1 · RECOMMENDED'), findsOneWidget);
+    expect(find.text('Email forwarding'), findsOneWidget);
+    expect(find.text('Start the guide'), findsOneWidget);
+    expect(find.text('OPTION 2 · MOST CONTROL'), findsOneWidget);
+    expect(find.text('Your own Google key'), findsOneWidget);
+    expect(find.text('Set up forwarding'), findsOneWidget);
+    expect(find.text('Shared Google access'), findsOneWidget);
+    expect(find.text('Last resort · may stop working'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Email forwarding')).dy,
+      lessThan(tester.getTopLeft(find.text('Your own Google key')).dy),
+    );
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Gmail OAuth guide explains Testing and shared JSON safety', (
+  testWidgets('Google key guide walks through steps one at a time', (
     tester,
   ) async {
+    FlutterSecureStorage.setMockInitialValues({});
     await tester.pumpWidget(
-      MaterialApp(
-        builder: (context, child) => FTheme(
-          data: FTheme.neutral.light.touch,
-          child: FToaster(child: child!),
-        ),
-        home: const Scaffold(body: GmailOAuthGuidePage()),
+      _otpScope(
+        _testOAuthService(),
+        const GmailOAuthGuidePage(androidOverride: true),
       ),
     );
+    await tester.pumpAndSettle();
 
-    expect(find.text('Get your Google OAuth file'), findsOneWidget);
+    expect(find.text('Step 1 of 7'), findsOneWidget);
     expect(find.text('Create a Google Cloud project'), findsOneWidget);
     expect(find.text('Add your college email as a test user'), findsOneWidget);
     expect(find.text('Publish the app'), findsOneWidget);
-    expect(find.text('Recommended'), findsOneWidget);
-    expect(find.textContaining('Done when:'), findsNWidgets(7));
+    expect(find.text('Stops weekly re-login'), findsOneWidget);
     expect(find.textContaining('not your college account'), findsOneWidget);
-    expect(find.textContaining('Audience: choose External'), findsOneWidget);
+    // Only the open step shows its details.
+    expect(find.text('Mark done'), findsOneWidget);
+    expect(find.textContaining('Pick Desktop app'), findsNothing);
+    expect(find.text('Import JSON'), findsOneWidget);
+    expect(find.text('Something went wrong?'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Mark done'));
+    await tester.tap(find.text('Mark done'));
+    await tester.pumpAndSettle();
+    expect(find.text('Step 2 of 7'), findsOneWidget);
+    expect(find.text('Tap Enable.'), findsOneWidget);
+
+    await tester.ensureVisible(
+      find.text('Create a Desktop app client, download the JSON'),
+    );
+    await tester.tap(
+      find.text('Create a Desktop app client, download the JSON'),
+    );
+    await tester.pumpAndSettle();
     expect(
-      find.textContaining('Enter your @vitapstudent.ac.in email'),
+      find.textContaining('Pick Desktop app, not Android or Web'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('Pick Desktop app, not Android or Web application'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('every 7 days'), findsOneWidget);
-    expect(find.text('If something goes wrong'), findsOneWidget);
-    expect(find.text('Using a trusted friend’s JSON'), findsOneWidget);
-    expect(
-      find.textContaining('Never share your access token'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('Google hasn’t verified this app'),
-      findsOneWidget,
-    );
-    expect(find.textContaining('gmail.modify'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Gmail setup hides shared access when no build key exists', (
+  testWidgets('Email OTP hides shared access when no build key exists', (
     tester,
   ) async {
     FlutterSecureStorage.setMockInitialValues({});
-    final httpClient = MockClient((_) async => http.Response('{}', 500));
-    final service = GoogleEmailOtpAuthService(
-      appAuth: const FlutterAppAuth(),
-      storage: const FlutterSecureStorage(),
-      httpClient: httpClient,
-      loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: httpClient),
-    );
-
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          googleEmailOtpAuthServiceProvider.overrideWithValue(service),
-        ],
-        child: MaterialApp(
-          builder: (context, child) => FTheme(
-            data: FTheme.neutral.light.touch,
-            child: FToaster(child: child!),
-          ),
-          home: const Scaffold(
-            body: GmailOtpSetupPage(
-              androidByokOverride: true,
-              sharedOAuthOverride: false,
-            ),
-          ),
+      _otpScope(
+        _testOAuthService(),
+        const GmailOtpSetupPage(
+          androidByokOverride: true,
+          sharedOAuthOverride: false,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Use your own Google access'), findsOneWidget);
-    expect(find.text('Use shared app access'), findsNothing);
-    expect(find.text('Use shared fallback'), findsNothing);
+    expect(find.text('Your own Google key'), findsOneWidget);
+    expect(find.text('Shared Google access'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Gmail setup refreshes the saved session when Android resumes', (
+  testWidgets('Email OTP refreshes the saved session when Android resumes', (
     tester,
   ) async {
     FlutterSecureStorage.setMockInitialValues({});
     const storage = FlutterSecureStorage();
-    final httpClient = MockClient((_) async => http.Response('{}', 500));
-    final service = GoogleEmailOtpAuthService(
-      appAuth: const FlutterAppAuth(),
-      storage: storage,
-      httpClient: httpClient,
-      loopbackOAuth: GoogleLoopbackOAuthCoordinator(httpClient: httpClient),
-    );
-
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          googleEmailOtpAuthServiceProvider.overrideWithValue(service),
-        ],
-        child: MaterialApp(
-          builder: (context, child) => FTheme(
-            data: FTheme.neutral.light.touch,
-            child: FToaster(child: child!),
-          ),
-          home: const Scaffold(
-            body: GmailOtpSetupPage(
-              androidByokOverride: true,
-              sharedOAuthOverride: false,
-            ),
-          ),
+      _otpScope(
+        _testOAuthService(),
+        const GmailOtpSetupPage(
+          androidByokOverride: true,
+          sharedOAuthOverride: false,
         ),
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Personal BYOK connected'), findsNothing);
+    expect(find.textContaining('Connected · '), findsNothing);
 
     const session = EmailOtpOAuthSession(
       email: 'student.24mic7076@vitapstudent.ac.in',
@@ -245,12 +213,15 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump(const Duration(milliseconds: 2100));
 
-    expect(find.text('Personal BYOK connected'), findsOneWidget);
-    expect(find.text('student.24mic7076@vitapstudent.ac.in'), findsOneWidget);
+    expect(
+      find.text('Connected · student.24mic7076@vitapstudent.ac.in'),
+      findsOneWidget,
+    );
+    expect(find.text('Test Gmail'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Chrome extension guide explains setup and uses Token wording', (
+  testWidgets('Chrome extension guide explains setup with access keys', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -265,10 +236,8 @@ void main() {
       ),
     );
 
-    expect(find.text('Copy Token'), findsOneWidget);
-    expect(find.text('Reset Token'), findsOneWidget);
-    expect(find.text('Open GitHub release'), findsOneWidget);
     expect(find.text('Download extension.zip'), findsOneWidget);
+    expect(find.text('Paste an access key'), findsOneWidget);
     expect(find.text('Open Chrome extensions'), findsOneWidget);
     expect(find.textContaining('FCM'), findsNothing);
     expect(find.textContaining('FMC'), findsNothing);
@@ -289,29 +258,6 @@ void main() {
 
     expect(find.text('GPA Planner'), findsOneWidget);
     expect(find.text('Chrome Extension'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('More page exposes Chrome Extension when Firebase is ready', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          fcmCookieBridgeAvailableProvider.overrideWith((ref) async => true),
-        ],
-        child: MaterialApp(
-          builder: (context, child) => FTheme(
-            data: FTheme.neutral.light.touch,
-            child: FToaster(child: child!),
-          ),
-          home: const Scaffold(body: MorePage()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Chrome Extension'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

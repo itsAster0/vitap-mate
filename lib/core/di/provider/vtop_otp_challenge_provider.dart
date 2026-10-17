@@ -1,9 +1,11 @@
 import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'dart:async';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -155,6 +157,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   int _autoFetchRunId = 0;
   int _challengeCounter = 0;
   bool _emailAutoFetchAvailable = false;
+
+  /// The OTP comes by forwarded mail (pushed) rather than Gmail polling.
+  bool _useMailForwarding = false;
   String _logContext = 'otp.flow';
 
   @override
@@ -442,18 +447,19 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     _client = null;
     _otpRequiredAt = null;
     _emailAutoFetchAvailable = false;
+    _useMailForwarding = false;
     _completer = null;
     state = const VtopOtpChallengeState.idle();
   }
 
+  /// Forwarded mail comes first (pushed, so it's fastest); Gmail (own key
+  /// or shared access) is the second choice.
   Future<bool> _canAutoFetchFromEmail() async {
     try {
-      final featureFlags = await ref.read(
-        featureFlagsControllerProvider.future,
-      );
-      if (!await featureFlags.isEnabled('2fa-email')) return false;
-      final oauth = ref.read(googleEmailOtpAuthServiceProvider);
-      return oauth.isReady();
+      _useMailForwarding = await ref
+          .read(mailForwardingServiceProvider)
+          .isReady();
+      return _useMailForwarding || await _gmailReady();
     } catch (error, stackTrace) {
       AppLogger.instance.error(
         'client.otp',
@@ -464,7 +470,27 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
   }
 
+  Future<bool> _gmailReady() async {
+    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
+    return await featureFlags.isEnabled('2fa-email') &&
+        await ref.read(googleEmailOtpAuthServiceProvider).isReady();
+  }
+
   Future<void> _runEmailAutoFetch({required int runId}) async {
+    if (_useMailForwarding) return _runMailForwardingAutoFetch(runId: runId);
+    final otp = await _fetchFromGmail(runId: runId);
+    if (otp != null) await submitOtp(otp);
+  }
+
+  /// Polls Gmail for the OTP until it turns up, the challenge ends or
+  /// [stop] says another source found it. As a fallback ([stop] given),
+  /// errors are only logged; on its own, they ask for the code by hand.
+  Future<String?> _fetchFromGmail({
+    required int runId,
+    bool Function()? stop,
+  }) async {
+    bool keepGoing() =>
+        _shouldContinueAutoFetch(runId) && !(stop?.call() ?? false);
     final oauth = ref.read(googleEmailOtpAuthServiceProvider);
     final startedAt = _otpRequiredAt!;
     AppLogger.instance.info(
@@ -473,11 +499,11 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     );
     var delayMs = 1000;
     var attempt = 0;
-    while (_shouldContinueAutoFetch(runId)) {
+    while (keepGoing()) {
       await Future<void>.delayed(Duration(milliseconds: delayMs));
       delayMs = (delayMs * 1.5).round().clamp(1000, 10000);
       attempt++;
-      if (!_shouldContinueAutoFetch(runId)) return;
+      if (!keepGoing()) return null;
 
       state = state.update(autoFetchMessage: 'Waiting for OTP email...');
       try {
@@ -485,22 +511,22 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
           sinceUtc: startedAt,
           deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
         );
-        if (!_shouldContinueAutoFetch(runId)) return;
+        if (!keepGoing()) return null;
         if (otp != null && otp.isNotEmpty) {
           AppLogger.instance.info(
             'client.otp',
             '$_logContext email autofetch found an OTP on attempt $attempt',
           );
-          await submitOtp(otp);
-          return;
+          return otp;
         }
       } catch (error, stackTrace) {
         AppLogger.instance.error(
           'client.otp',
           '$_logContext email autofetch failed on attempt $attempt: $error',
         );
+        if (stop != null) return null;
         Zone.current.handleUncaughtError(error, stackTrace);
-        if (!_shouldContinueAutoFetch(runId)) return;
+        if (!_shouldContinueAutoFetch(runId)) return null;
         state = state.update(
           activity: OtpChallengeActivity.waiting,
           canRetryEmailAutoFetch: true,
@@ -510,9 +536,84 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
               'Could not read OTP from email. Enter OTP manually to continue.',
           clearError: true,
         );
-        return;
+        return null;
       }
     }
+    return null;
+  }
+
+  /// Waits for the forwarded OTP mail: pushed over FCM, and pulled from the
+  /// bridge every 2 s and on resume in case the push is slow or held back.
+  /// With Gmail also connected, reads Gmail too if nothing came in 30 s.
+  Future<void> _runMailForwardingAutoFetch({required int runId}) async {
+    final service = ref.read(mailForwardingServiceProvider);
+    final startedAt = _otpRequiredAt!;
+    AppLogger.instance.info(
+      'client.otp',
+      '$_logContext waiting for a forwarded OTP from ${startedAt.toIso8601String()}',
+    );
+    state = state.update(autoFetchMessage: 'Waiting for the OTP email...');
+
+    final found = Completer<String?>();
+    void take(MailOtpPayload payload) {
+      if (!found.isCompleted && payload.isOtpFor(startedAt)) {
+        found.complete(payload.code);
+      }
+    }
+
+    var pulling = false;
+    Future<void> pull() async {
+      if (found.isCompleted || pulling) return;
+      pulling = true;
+      try {
+        final payload = await service.pullInbox();
+        if (payload != null) take(payload);
+      } catch (error) {
+        AppLogger.instance.warning(
+          'client.otp',
+          '$_logContext forwarded OTP pull failed: $error',
+        );
+      } finally {
+        pulling = false;
+      }
+    }
+
+    final subscription = mailOtpEvents.listen(take);
+    final lifecycle = AppLifecycleListener(onResume: () => unawaited(pull()));
+    final poll = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => unawaited(pull()),
+    );
+    // Ends the wait when the challenge is cancelled, expires or moves on.
+    final watch = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_shouldContinueAutoFetch(runId) && !found.isCompleted) {
+        found.complete(null);
+      }
+    });
+    // A push may have landed just before the challenge started listening.
+    unawaited(pull());
+    final gmailFallback = Timer(const Duration(seconds: 30), () async {
+      if (found.isCompleted || !await _gmailReady()) return;
+      AppLogger.instance.info(
+        'client.otp',
+        '$_logContext no forwarded OTP yet; reading Gmail too',
+      );
+      final otp = await _fetchFromGmail(
+        runId: runId,
+        stop: () => found.isCompleted,
+      );
+      if (otp != null && !found.isCompleted) found.complete(otp);
+    });
+
+    final code = await found.future;
+    await subscription.cancel();
+    lifecycle.dispose();
+    watch.cancel();
+    gmailFallback.cancel();
+    poll.cancel();
+    if (code == null || !_shouldContinueAutoFetch(runId)) return;
+    AppLogger.instance.info('client.otp', '$_logContext forwarded OTP arrived');
+    await submitOtp(code);
   }
 
   bool _shouldContinueAutoFetch(int runId) {

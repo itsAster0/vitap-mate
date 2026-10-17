@@ -27,9 +27,14 @@ pub struct Config {
     pub listen: SocketAddr,
     /// Poll interval suggested to the extension.
     pub poll_after: Duration,
+    /// Bearer secret the mail Worker presents. `None` turns the relay off.
+    pub mail_relay_secret: Option<String>,
+    /// Domain of the `vtop-otp-<id>@…` forwarding addresses.
+    pub mail_domain: String,
 }
 
 pub const DEFAULT_PUBLIC_MCP_URL: &str = "https://vtop-mcp.aster0.dev/mcp";
+pub const DEFAULT_MAIL_DOMAIN: &str = "aster0.dev";
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ConfigError(pub String);
@@ -115,7 +120,24 @@ impl Config {
             .map(|url| url.trim().to_string())
             .filter(|url| !url.is_empty())
             .unwrap_or_else(|| DEFAULT_PUBLIC_MCP_URL.to_string());
+        let mail_relay_secret = lookup("MAIL_RELAY_SECRET")
+            .map(|secret| secret.trim().to_string())
+            .filter(|secret| !secret.is_empty());
+        if mail_relay_secret
+            .as_ref()
+            .is_some_and(|secret| secret.len() < 32)
+        {
+            return Err(ConfigError(
+                "MAIL_RELAY_SECRET must be at least 32 characters".into(),
+            ));
+        }
+        let mail_domain = lookup("MAIL_DOMAIN")
+            .map(|domain| domain.trim().to_lowercase())
+            .filter(|domain| !domain.is_empty())
+            .unwrap_or_else(|| DEFAULT_MAIL_DOMAIN.to_string());
         Ok(Self {
+            mail_relay_secret,
+            mail_domain,
             public_mcp_url,
             public_base_url,
             credentials_json,
@@ -189,6 +211,16 @@ mod tests {
         assert_eq!(c.listen.port(), 8080);
         assert_eq!(c.vault_key, [0u8; 32]);
         assert!(c.allowed_origins.is_empty());
+        assert!(c.mail_relay_secret.is_none());
+        assert_eq!(c.mail_domain, "aster0.dev");
+    }
+
+    #[test]
+    fn mail_relay_secret_must_be_long() {
+        assert!(config(&[("MAIL_RELAY_SECRET", "short")]).is_err());
+        let secret = "s".repeat(32);
+        let c = config(&[("MAIL_RELAY_SECRET", &secret)]).unwrap();
+        assert_eq!(c.mail_relay_secret.as_deref(), Some(secret.as_str()));
     }
 
     #[test]

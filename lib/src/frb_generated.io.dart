@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/email_otp.dart';
+import 'api/mail_otp.dart';
 import 'api/native_logs.dart';
 import 'api/simple.dart';
 import 'api/vtop/types.dart';
@@ -253,6 +254,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<WeekendOutingRecord> dco_decode_list_weekend_outing_record(dynamic raw);
+
+  @protected
+  MailOtpKeypair dco_decode_mail_otp_keypair(dynamic raw);
 
   @protected
   MarksData dco_decode_marks_data(dynamic raw);
@@ -632,6 +636,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<WeekendOutingRecord> sse_decode_list_weekend_outing_record(
     SseDeserializer deserializer,
   );
+
+  @protected
+  MailOtpKeypair sse_decode_mail_otp_keypair(SseDeserializer deserializer);
 
   @protected
   MarksData sse_decode_marks_data(SseDeserializer deserializer);
@@ -1114,6 +1121,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_weekend_outing_record(
     List<WeekendOutingRecord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_mail_otp_keypair(
+    MailOtpKeypair self,
     SseSerializer serializer,
   );
 
