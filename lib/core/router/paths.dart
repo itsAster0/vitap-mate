@@ -11,6 +11,7 @@ class Paths {
   static final gmailOtpSetup = "gmailOtpSetup";
   static final connectedApps = "connectedApps";
   static final gmailOauthGuide = "gmailOauthGuide";
+  static final mailForwarding = "mailForwarding";
   static final studentProjects = "studentProjects";
   static final marks = "marks";
   static final grades = "grades";

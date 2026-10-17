@@ -11,18 +11,16 @@ vitapmate is an unofficial Android client for VIT-AP students. It reads academic
 
 ## Install
 
-[Open the Android build workflow](https://github.com/itsKryxen/vitap-mate/actions/workflows/android-build.yml?query=branch%3Amain), select the newest successful run, and download an artifact from its **Artifacts** section. GitHub may ask you to sign in.
+[Download the latest nightly build](https://github.com/itsKryxen/vitap-mate/releases/tag/nightly) and open the APK on the Android device. No GitHub sign-in or unzipping needed. The nightly release is rebuilt automatically on every push to `main`.
 
-Most people should use `vitapmate-universal-apk`. Extract the downloaded ZIP, then open the APK on the Android device.
+Most people should use `vitapmate-universal.apk`.
 
-| Artifact | Device |
+| APK | Device |
 | --- | --- |
-| `vitapmate-universal-apk` | Any supported Android device |
-| `vitapmate-arm64-v8a-apk` | Most current Android phones |
-| `vitapmate-armeabi-v7a-apk` | Older 32-bit Android phones |
-| `vitapmate-x86_64-apk` | Android emulators and Intel devices |
-
-Workflow artifacts expire after 30 days. If a download has expired, use a newer successful run.
+| `vitapmate-universal.apk` | Any supported Android device |
+| `vitapmate-arm64-v8a.apk` | Most current Android phones |
+| `vitapmate-armeabi-v7a.apk` | Older 32-bit Android phones |
+| `vitapmate-x86_64.apk` | Android emulators and Intel devices |
 
 ## Features
 
@@ -160,7 +158,7 @@ Firebase needs all five `FIREBASE_ANDROID_*` values shown above. They can be cop
 
 ### Android cannot install the APK
 
-Extract the workflow artifact before opening the APK. Android may also ask for permission to install apps from the browser or file manager.
+Android may ask for permission to install apps from the browser or file manager.
 
 A GitHub build and the old Play Store build may use different signatures. If Android reports a signature conflict, removing the installed copy resolves it but also removes that copy's local app data.
 

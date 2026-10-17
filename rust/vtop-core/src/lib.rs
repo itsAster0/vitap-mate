@@ -13,6 +13,7 @@ pub mod config;
 pub mod error;
 pub mod gmail;
 pub mod inputs;
+pub mod mail_seal;
 pub mod parser;
 pub mod session;
 pub mod types;

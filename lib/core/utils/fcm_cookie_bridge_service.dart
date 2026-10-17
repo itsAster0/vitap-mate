@@ -15,6 +15,7 @@ import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
@@ -100,10 +101,13 @@ Future<void> _startVtopCookieBridgeListener() async {
   FirebaseMessaging.instance.onTokenRefresh.listen((token) {
     log('FCM token refreshed (${token.length} chars)', name: 'fcm.cookie');
     unawaited(syncBridgeFcmToken(token));
+    unawaited(_syncMailForwardingFcmToken(token));
   });
 
   try {
-    await syncBridgeFcmToken(await FirebaseMessaging.instance.getToken());
+    final token = await FirebaseMessaging.instance.getToken();
+    unawaited(_syncMailForwardingFcmToken(token));
+    await syncBridgeFcmToken(token);
   } catch (error, stackTrace) {
     log(
       'Failed to sync the FCM token with the vtop-bridge',
@@ -122,8 +126,26 @@ Future<void> vtopCookieBridgeBackgroundHandler(RemoteMessage message) async {
   await handleVtopCookieBridgeMessage(message.data);
 }
 
+Future<void> _syncMailForwardingFcmToken(String? token) async {
+  try {
+    await MailForwardingService().syncFcmToken(token);
+  } catch (error) {
+    log(
+      'Failed to sync the FCM token for mail forwarding: $error',
+      name: 'mail.otp',
+    );
+  }
+}
+
 Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
   final type = '${data['type'] ?? ''}';
+  if (type == mailOtpMessageType) {
+    // Opened here; the OTP prompt or the setup page listening in this
+    // isolate takes it. A background isolate has no listener, and the
+    // prompt pulls the box from the bridge when the app is back.
+    await MailForwardingService().handlePush(data);
+    return;
+  }
   if (type != _cookieRequestType) return;
 
   final requestId = '${data['requestId'] ?? ''}'.trim();

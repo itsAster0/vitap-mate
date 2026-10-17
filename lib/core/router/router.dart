@@ -27,6 +27,7 @@ import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.d
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/connected_apps_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/mail_forwarding_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
@@ -342,6 +343,14 @@ GoRouter router(Ref ref) {
                     pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
                       child: const GmailOAuthGuidePage(),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'mail-forwarding',
+                    name: Paths.mailForwarding,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const MailForwardingPage(),
                     ),
                   ),
                   GoRoute(

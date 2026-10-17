@@ -11,6 +11,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 
 part 'google_email_oauth_service.g.dart';
@@ -65,16 +66,24 @@ GoogleEmailOtpAuthService googleEmailOtpAuthService(Ref ref) {
   );
 }
 
+/// Gmail access is connected (own key or shared). Server sign-in needs it.
 @Riverpod(keepAlive: true)
 Future<bool> emailOtpReady(Ref ref) {
   return ref.watch(googleEmailOtpAuthServiceProvider).isReady();
+}
+
+/// Some way of reading the OTP is set up: Gmail or a forwarding address.
+@Riverpod(keepAlive: true)
+Future<bool> anyEmailOtpReady(Ref ref) async {
+  return await ref.watch(emailOtpReadyProvider.future) ||
+      await ref.watch(mailForwardingServiceProvider).isReady();
 }
 
 @Riverpod(keepAlive: true)
 Future<bool> emailOtpSetupNeeded(Ref ref) async {
   final flags = await ref.watch(featureFlagsControllerProvider.future);
   if (!await flags.isEnabled('2fa-email')) return false;
-  return !await ref.watch(emailOtpReadyProvider.future);
+  return !await ref.watch(anyEmailOtpReadyProvider.future);
 }
 
 class EmailOtpSetupResult {

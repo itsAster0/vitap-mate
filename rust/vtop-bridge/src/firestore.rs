@@ -14,8 +14,9 @@ use time::OffsetDateTime;
 
 use crate::google::TokenSource;
 use crate::store::{
-    apply_completion, AccountDoc, CompleteError, Completion, KeyDoc, RequestDoc, RequestStatus,
-    Store, StoreError, ACCESS_KEYS, ACCOUNTS, FCM_INDEX, REQUESTS,
+    apply_completion, AccountDoc, CompleteError, Completion, KeyDoc, MailboxDoc, RequestDoc,
+    RequestStatus, Store, StoreError, ACCESS_KEYS, ACCOUNTS, FCM_INDEX, MAILBOXES, MAILBOX_OWNERS,
+    REQUESTS,
 };
 
 pub const DEFAULT_BASE_URL: &str = "https://firestore.googleapis.com/v1";
@@ -163,6 +164,35 @@ pub fn key_from_fields(hash: &str, fields: &Map<String, Value>) -> Option<KeyDoc
 }
 
 // ---- REST -----------------------------------------------------------------
+
+pub fn mailbox_fields(doc: &MailboxDoc) -> Value {
+    let mut fields = Map::new();
+    fields.insert("publicKey".into(), string(&doc.public_key));
+    fields.insert("fcmToken".into(), string(&doc.fcm_token));
+    fields.insert("secretHash".into(), string(&doc.secret_hash));
+    put_opt(&mut fields, "ownerHash", &doc.owner_hash);
+    put_opt(&mut fields, "sealed", &doc.sealed);
+    if let Some(sealed_at) = doc.sealed_at {
+        fields.insert("sealedAt".into(), timestamp(sealed_at));
+    }
+    fields.insert("createdAt".into(), timestamp(doc.created_at));
+    fields.insert("updatedAt".into(), timestamp(doc.updated_at));
+    Value::Object(fields)
+}
+
+pub fn mailbox_from_fields(id: &str, fields: &Map<String, Value>) -> Option<MailboxDoc> {
+    Some(MailboxDoc {
+        id: id.to_string(),
+        public_key: read_string(fields, "publicKey")?,
+        fcm_token: read_string(fields, "fcmToken")?,
+        secret_hash: read_string(fields, "secretHash")?,
+        owner_hash: read_string(fields, "ownerHash"),
+        sealed: read_string(fields, "sealed"),
+        sealed_at: read_timestamp(fields, "sealedAt"),
+        created_at: read_timestamp(fields, "createdAt").unwrap_or(0),
+        updated_at: read_timestamp(fields, "updatedAt").unwrap_or(0),
+    })
+}
 
 fn store_error(context: &str, error: impl std::fmt::Display) -> StoreError {
     StoreError(format!("firestore {context}: {error}"))
@@ -467,6 +497,39 @@ impl Store for FirestoreStore {
             self.delete_doc(REQUESTS, &id).await?;
         }
         self.delete_doc(ACCOUNTS, registration_number).await
+    }
+
+    async fn get_mailbox(&self, id: &str) -> Result<Option<MailboxDoc>, StoreError> {
+        Ok(self
+            .fetch(MAILBOXES, id)
+            .await?
+            .and_then(|fetched| mailbox_from_fields(id, &fetched.fields)))
+    }
+
+    async fn put_mailbox(&self, doc: &MailboxDoc) -> Result<(), StoreError> {
+        self.patch(MAILBOXES, &doc.id, mailbox_fields(doc)).await
+    }
+
+    async fn delete_mailbox(&self, id: &str) -> Result<(), StoreError> {
+        self.delete_doc(MAILBOXES, id).await
+    }
+
+    async fn get_mailbox_owner(&self, owner_hash: &str) -> Result<Option<String>, StoreError> {
+        Ok(self
+            .fetch(MAILBOX_OWNERS, owner_hash)
+            .await?
+            .and_then(|fetched| read_string(&fetched.fields, "mailboxId")))
+    }
+
+    async fn put_mailbox_owner(&self, owner_hash: &str, id: &str) -> Result<(), StoreError> {
+        let mut fields = Map::new();
+        fields.insert("mailboxId".into(), string(id));
+        self.patch(MAILBOX_OWNERS, owner_hash, Value::Object(fields))
+            .await
+    }
+
+    async fn delete_mailbox_owner(&self, owner_hash: &str) -> Result<(), StoreError> {
+        self.delete_doc(MAILBOX_OWNERS, owner_hash).await
     }
 
     async fn health(&self) -> Result<(), StoreError> {

@@ -1,114 +1,118 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/theme/app_palette.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/features/settings/presentation/email_otp_support.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/email_otp_widgets.dart';
 
 class _Step {
   const _Step({
     required this.title,
     required this.actions,
     required this.doneWhen,
-    this.badge,
     this.warning,
-    this.url,
-    this.linkLabel,
+    this.link,
+    this.badge,
   });
 
   final String title;
-  final String? badge;
   final List<String> actions;
-  final String? warning;
   final String doneWhen;
-  final String? url;
-  final String? linkLabel;
+  final String? warning;
+  final GuideLink? link;
+  final String? badge;
 }
 
 const _steps = <_Step>[
   _Step(
     title: 'Create a Google Cloud project',
     actions: [
-      'Open the link and sign in with your personal Gmail (…@gmail.com), not your college account.',
+      'Sign in with your personal Gmail (…@gmail.com), not your college account.',
       'Project name: anything, e.g. vitap-mate. Leave Location as “No organization”.',
-      'Tap Create, wait a few seconds, then pick the new project in the project picker at the top.',
+      'Tap Create, wait a few seconds, then pick the new project in the picker at the top.',
     ],
-    doneWhen: 'The project picker at the top shows your new project.',
-    url: 'https://console.cloud.google.com/projectcreate',
-    linkLabel: 'Create project',
+    doneWhen: 'the project picker at the top shows your new project.',
+    link: GuideLink('https://console.cloud.google.com/projectcreate'),
   ),
   _Step(
     title: 'Turn on the Gmail API',
     actions: [
-      'Check that the project picker at the top still shows your project.',
+      'Check the project picker at the top still shows your project.',
       'Tap Enable.',
     ],
-    doneWhen: 'The page shows “API Enabled” or a Manage button.',
-    url: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
-    linkLabel: 'Open Gmail API',
+    doneWhen: 'the page shows “API Enabled” or a Manage button.',
+    link: GuideLink(
+      'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
+    ),
   ),
   _Step(
     title: 'Set up the consent screen',
     actions: [
-      'Tap Get started. If you see an already filled Branding form instead, this step is done.',
-      'App information: App name “Vitap Mate”, support email = your Gmail. Next.',
-      'Audience: choose External. Next.',
-      'Contact information: your Gmail. Next, tick the policy box, then Create.',
+      'Tap Get started. Already see a filled Branding form? This step is done.',
+      'App name “Vitap Mate”, support email = your Gmail. Next.',
+      'Audience: External. Next.',
+      'Contact: your Gmail. Tick the policy box, then Create.',
     ],
-    warning:
-        'Choose External. Internal is only for Workspace organisations and will not work here.',
-    doneWhen: 'You land on the Google Auth Platform overview page.',
-    url: 'https://console.cloud.google.com/auth/branding',
-    linkLabel: 'Open consent screen',
+    warning: 'Pick External. Internal only works for Workspace organisations.',
+    doneWhen: 'you land on the Google Auth Platform overview.',
+    link: GuideLink('https://console.cloud.google.com/auth/branding'),
   ),
   _Step(
     title: 'Add your college email as a test user',
     actions: [
       'Scroll to Test users and tap Add users.',
       'Enter your @vitapstudent.ac.in email and tap Save.',
-      'Sharing this project with friends? Add their college emails here too.',
+      'Sharing this project with friends? Add their college emails too.',
     ],
-    doneWhen: 'Your college email is listed under Test users.',
-    url: 'https://console.cloud.google.com/auth/audience',
-    linkLabel: 'Open Audience',
+    doneWhen: 'your college email is listed under Test users.',
+    link: GuideLink('https://console.cloud.google.com/auth/audience'),
   ),
   _Step(
-    title: 'Create a Desktop app client and download the JSON',
+    title: 'Create a Desktop app client, download the JSON',
     actions: [
       'Tap Create client.',
       'Application type: Desktop app. Name: anything. Tap Create.',
-      'In the popup that appears, tap Download JSON.',
-      'Move the file to this phone if you used a computer (Drive, Telegram saved messages, USB).',
+      'In the popup, tap Download JSON.',
+      'Used a computer? Move the file to this phone (Drive, Telegram saved messages, USB).',
     ],
     warning:
-        'Pick Desktop app, not Android or Web application. Download the JSON from the popup right away: Google will not show the client secret again after you close it. If you missed it, create a new client.',
-    doneWhen:
-        'A file named like client_secret_….json is in this phone’s Downloads.',
-    url: 'https://console.cloud.google.com/auth/clients',
-    linkLabel: 'Open Clients',
+        'Pick Desktop app, not Android or Web. Download the JSON from the popup right away: Google never shows the secret again. Missed it? Create a new client.',
+    doneWhen: 'a client_secret_….json file is in this phone’s Downloads.',
+    link: GuideLink('https://console.cloud.google.com/auth/clients'),
   ),
   _Step(
     title: 'Publish the app',
-    badge: 'Recommended',
+    badge: 'Stops weekly re-login',
     actions: [
       'Under Publishing status, tap Publish app, then Confirm.',
-      'You do not need to submit for verification. Ignore that prompt.',
+      'Skip the verification prompt. You don’t need it.',
     ],
     warning:
-        'While the status is Testing, Google ends the connection every 7 days and OTP autofill stops until you reconnect. Publishing stops that. If Google or VIT blocks publishing, stay in Testing and reconnect each week.',
+        'While the status is Testing, Google ends the connection every 7 days. If VIT blocks publishing, stay in Testing and reconnect each week.',
     doneWhen: 'Publishing status says “In production”.',
-    url: 'https://console.cloud.google.com/auth/audience',
-    linkLabel: 'Open Audience',
+    link: GuideLink('https://console.cloud.google.com/auth/audience'),
   ),
   _Step(
     title: 'Connect in Vitap Mate',
     actions: [
-      'Go back to Gmail OTP Setup, tap Import OAuth JSON and pick the downloaded file.',
-      'Tap Connect with Google and choose your @vitapstudent.ac.in account.',
-      '“Google hasn’t verified this app”: check the app name is yours (or your trusted friend’s), then tap Continue (or Advanced → Go to Vitap Mate).',
-      'Make sure the Gmail permission is ticked, then tap Continue.',
-      'Come back to Vitap Mate when the browser says you can close it.',
+      'Tap Import JSON below and pick the downloaded file.',
+      'Tap Connect Google and choose your @vitapstudent.ac.in account.',
+      '“Google hasn’t verified this app”: check the app name is yours, then Continue (or Advanced → Go to Vitap Mate).',
+      'Tick the Gmail permission, then Continue. Come back when the browser says you can close it.',
     ],
-    doneWhen:
-        'Gmail OTP Setup shows “Personal BYOK connected”. Tap Test Gmail to confirm.',
+    doneWhen: 'this screen says Gmail is connected.',
   ),
 ];
 
@@ -119,7 +123,7 @@ const _troubleshooting = <(String, String)>[
   ),
   (
     '“Use your @vitapstudent.ac.in email”',
-    'You signed in with a personal account in the Google picker. Retry and choose your college account.',
+    'You chose a personal account in the Google picker. Retry and choose your college account.',
   ),
   (
     '“Create a Desktop app OAuth client”',
@@ -127,7 +131,7 @@ const _troubleshooting = <(String, String)>[
   ),
   (
     'Gmail check fails right after sign-in',
-    'The Gmail API is not enabled in this project (step 2). It can take a minute to apply after enabling.',
+    'The Gmail API is not on in this project (step 2). It can take a minute to apply.',
   ),
   (
     'Worked, then stopped after a week',
@@ -135,272 +139,343 @@ const _troubleshooting = <(String, String)>[
   ),
   (
     'Error 403: org_internal',
-    'The audience is set to Internal. Open Audience and switch it to External (step 3).',
+    'The audience is Internal. Open Audience and switch it to External (step 3).',
   ),
   (
-    'Access blocked by your admin / admin_policy_enforced',
-    'VIT’s Workspace policy is blocking the app. Vitap Mate cannot work around this; use the shared fallback.',
+    'Access blocked by your admin',
+    'VIT’s Workspace policy blocks the app. Use email forwarding instead.',
+  ),
+  (
+    'Using a friend’s JSON?',
+    'It works and gives them no access to your Gmail, but they must add your college email as a test user unless their app is published. They can revoke it any time.',
+  ),
+  (
+    'Why does the permission sound broad?',
+    'gmail.modify lets Vitap Mate read VTOP’s OTP mail and move a used one to Trash. It never deletes mail for good, and your tokens stay on this phone.',
   ),
 ];
 
-class GmailOAuthGuidePage extends StatelessWidget {
-  const GmailOAuthGuidePage({super.key});
+/// Option 2: the student's own Google OAuth client. A guided checklist
+/// with the import and connect actions pinned under it.
+class GmailOAuthGuidePage extends HookConsumerWidget {
+  const GmailOAuthGuidePage({this.androidOverride, super.key});
 
-  Future<void> _openExternal(BuildContext context, String rawUrl) async {
-    final opened = await launchUrl(
-      Uri.parse(rawUrl),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && context.mounted) {
-      dispToast(context, 'Could not open link', 'Try again in your browser.');
-    }
-  }
+  final bool? androidOverride;
 
   @override
-  Widget build(BuildContext context) {
-    final muted = context.theme.typography.body.sm.copyWith(
-      color: context.theme.colors.mutedForeground,
-    );
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 32),
-      child: Column(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final app = colors.app;
+    final oauth = ref.read(googleEmailOtpAuthServiceProvider);
+    final steps = useGuideSteps(ref, byokGuideDoneSettingKey);
+    final openStep = useState<int?>(null);
+    final credentials = useState<GoogleDesktopOAuthCredentials?>(null);
+    final session = useState<EmailOtpOAuthSession?>(null);
+    final busy = useState(false);
+    final status = useState<String?>(null);
+    final poller = useRef<StreamSubscription<EmailOtpOAuthSession>?>(null);
+    final pollDetected = useRef(false);
+    final current = openStep.value ?? steps.firstOpen(_steps.length);
+
+    Future<void> refreshSession() async {
+      session.value = await oauth.loadSession();
+      ref.invalidate(emailOtpReadyProvider);
+      ref.invalidate(anyEmailOtpReadyProvider);
+    }
+
+    useEffect(() {
+      unawaited(refreshSession());
+      return () {
+        unawaited(poller.value?.cancel());
+        unawaited(oauth.cancelByokSetup());
+      };
+    }, const []);
+
+    useEffect(() {
+      // The loopback callback may finish while the browser still covers
+      // the app; check again a few times after coming back.
+      final listener = AppLifecycleListener(
+        onResume: () {
+          for (final delay in const [
+            Duration.zero,
+            Duration(milliseconds: 500),
+            Duration(seconds: 2),
+          ]) {
+            unawaited(
+              Future<void>.delayed(delay, () async {
+                if (context.mounted) await refreshSession();
+              }),
+            );
+          }
+        },
+      );
+      return listener.dispose;
+    }, const []);
+
+    Future<void> waitUntilForeground() async {
+      while (context.mounted &&
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+
+    Future<void> importJson() async {
+      if (busy.value) return;
+      busy.value = true;
+      status.value = null;
+      try {
+        final picked = await FilePicker.pickFile(
+          type: FileType.custom,
+          allowedExtensions: const ['json'],
+        );
+        if (picked == null) return;
+        if (await picked.length() > 64 * 1024) {
+          throw const GoogleDesktopOAuthException(
+            'file_too_large',
+            'The OAuth file must be smaller than 64 KB.',
+          );
+        }
+        final Uint8List bytes = await picked.readAsBytes();
+        credentials.value = oauth.parseByokCredentials(bytes);
+        status.value = null;
+      } on GoogleDesktopOAuthException catch (error) {
+        credentials.value = null;
+        status.value = error.message;
+      } catch (_) {
+        credentials.value = null;
+        status.value =
+            'Could not read this file. Pick the Desktop app JSON from step 5.';
+      } finally {
+        busy.value = false;
+      }
+    }
+
+    Future<void> connect() async {
+      final selected = credentials.value;
+      if (selected == null || busy.value) return;
+      final account = await gmailAccountIdentifier(context, ref);
+      if (account == null) return;
+      busy.value = true;
+      status.value = 'Waiting for Google in your browser…';
+      final previous = await oauth.loadSession();
+      await poller.value?.cancel();
+      pollDetected.value = false;
+      poller.value = oauth
+          .pollForPersonalSession(
+            clientId: selected.clientId,
+            previousSession: previous,
+          )
+          .listen(
+            (found) {
+              pollDetected.value = true;
+              if (!context.mounted) return;
+              session.value = found;
+              status.value = null;
+              ref.invalidate(emailOtpReadyProvider);
+            },
+            onDone: () {
+              if (!context.mounted || !busy.value || pollDetected.value) {
+                return;
+              }
+              status.value =
+                  'Google took longer than five minutes. Retry and keep Vitap Mate running while the browser is open.';
+              busy.value = false;
+              unawaited(oauth.cancelByokSetup());
+            },
+          );
+      try {
+        final result = await oauth.setupByok(
+          credentials: selected,
+          expectedUsername: account,
+          openBrowser: (uri) =>
+              launchUrl(uri, mode: LaunchMode.externalApplication),
+          beforeTokenExchange: waitUntilForeground,
+          onProgress: (message) {
+            if (context.mounted) status.value = message;
+          },
+        );
+        if (result.success) {
+          status.value = null;
+          await refreshSession();
+          steps.setAll(_steps.length);
+          if (context.mounted) dispToast(context, 'Connected', result.message);
+        } else {
+          status.value = result.message;
+          if (context.mounted) {
+            dispToast(context, 'Gmail not connected', result.message);
+          }
+        }
+      } finally {
+        await poller.value?.cancel();
+        poller.value = null;
+        pollDetected.value = false;
+        busy.value = false;
+      }
+    }
+
+    final connected = session.value;
+    final android = androidOverride ?? Platform.isAndroid;
+
+    Widget bottomBar() {
+      if (connected != null) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            GuideCallout(
+              icon: FLucideIcons.circleCheck,
+              tone: app.success,
+              child: Text('Gmail connected · ${connected.email}'),
+            ),
+            const SizedBox(height: Space.sm),
+            FButton(onPress: () => context.pop(), child: const Text('Done')),
+          ],
+        );
+      }
+      if (!android) {
+        return const FAlert(
+          title: Text('Your own key is Android-only for now'),
+          subtitle: Text('Use email forwarding on this device.'),
+        );
+      }
+      final selected = credentials.value;
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Get your Google OAuth file',
-            style: context.theme.typography.body.xl.copyWith(
-              fontWeight: FontWeight.w700,
+          if (status.value case final message?) ...[
+            Row(
+              children: [
+                if (busy.value) ...[
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: FCircularProgress.pinwheel(),
+                  ),
+                  const SizedBox(width: Space.sm),
+                ],
+                Expanded(
+                  child: Text(
+                    message,
+                    style: typography.body.xs.copyWith(
+                      color: busy.value
+                          ? colors.mutedForeground
+                          : app.danger.onSubtle,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'You will create a free Google Cloud project, download one Desktop app JSON file and import it on Gmail OTP Setup. This is an OAuth client, not an API key. About 5 minutes, no card needed.',
-            style: muted,
-          ),
-          const SizedBox(height: 16),
-          const FAlert(
-            title: Text('Before you start'),
-            subtitle: Text(
-              'Two accounts are involved. Your personal Gmail owns the Cloud project. Your @vitapstudent.ac.in account is the one that connects. College accounts usually cannot create Cloud projects. A laptop is easier: the Cloud console is cramped on a phone.',
-            ),
-          ),
-          const SizedBox(height: 16),
-          for (var index = 0; index < _steps.length; index++) ...[
-            _GuideStep(
-              number: '${index + 1}',
-              step: _steps[index],
-              onOpen: _steps[index].url == null
-                  ? null
-                  : () => _openExternal(context, _steps[index].url!),
-            ),
-            if (index != _steps.length - 1) const SizedBox(height: 14),
+            const SizedBox(height: Space.sm),
           ],
-          const SizedBox(height: 20),
-          _Troubleshooting(),
-          const SizedBox(height: 16),
-          const FAlert(
-            title: Text('Using a trusted friend’s JSON'),
-            subtitle: Text(
-              'This works and does not give your friend access to your Gmail, but they must add your college email as a test user (step 4) unless their app is published. They control the client and can revoke it at any time. Never share your access token or refresh token.',
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: FButton(
+                  variant: FButtonVariant.outline,
+                  onPress: busy.value ? null : importJson,
+                  prefix: const Icon(FLucideIcons.fileJson),
+                  child: Text(selected == null ? 'Import JSON' : 'Replace'),
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: FButton(
+                  onPress: busy.value || selected == null ? null : connect,
+                  child: const Text('Connect Google'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const FAlert(
-            title: Text('Why the permission sounds broad'),
-            subtitle: Text(
-              'Vitap Mate requests gmail.modify so it can read VTOP OTP emails and move a used OTP email to Trash when Delete After Reading is on. It never permanently deletes mail, and your tokens stay on this device.',
-            ),
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Space.xs + 2),
           Text(
-            'Android note: this uses a Desktop OAuth loopback redirect, which may fail on some devices. Keep Vitap Mate running in the background while the browser is open.',
-            style: context.theme.typography.body.xs.copyWith(
-              color: context.theme.colors.mutedForeground,
-            ),
+            selected == null
+                ? 'Import the JSON from step 5 to connect.'
+                : '${selected.projectId} · ${selected.redactedClientId}',
+            textAlign: TextAlign.center,
+            style: typography.body.xs.copyWith(color: colors.mutedForeground),
           ),
         ],
-      ),
-    );
-  }
-}
+      );
+    }
 
-class _GuideStep extends StatelessWidget {
-  const _GuideStep({
-    required this.number,
-    required this.step,
-    required this.onOpen,
-  });
-
-  final String number;
-  final _Step step;
-  final VoidCallback? onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.theme.colors;
-    final small = context.theme.typography.body.sm;
-    return FCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              Space.page,
+              Space.sm,
+              Space.page,
+              Space.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    number,
-                    style: small.copyWith(
-                      color: colors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                Text(
+                  'Option 2 · about 10 minutes, once. Vitap Mate then reads the OTP from Gmail on this phone.',
+                  style: typography.body.sm.copyWith(
+                    color: colors.mutedForeground,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      step.title,
-                      style: context.theme.typography.body.lg.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.25,
-                      ),
-                    ),
+                const SizedBox(height: Space.lg),
+                GuideProgress(
+                  done: steps.done,
+                  total: _steps.length,
+                  current: current,
+                ),
+                const SizedBox(height: Space.lg),
+                GuideCallout(
+                  icon: FLucideIcons.monitor,
+                  tone: app.accentTone,
+                  child: const Text(
+                    'Easiest on a laptop. On this phone, open each link in Chrome and turn on ⋮ → Desktop site. Your personal Gmail owns the project; your college account connects.',
                   ),
                 ),
-                if (step.badge case final badge?) ...[
-                  const SizedBox(width: 8),
-                  FBadge(child: Text(badge)),
+                const SizedBox(height: Space.md),
+                for (final (index, step) in _steps.indexed) ...[
+                  GuideStepTile(
+                    number: index + 1,
+                    title: step.title,
+                    done: steps.done.contains(index),
+                    open: index == current,
+                    onTap: () => openStep.value = index,
+                    onToggleDone: () {
+                      final finishing = !steps.done.contains(index);
+                      steps.toggle(index);
+                      // Move on to the next open step.
+                      openStep.value = finishing ? null : index;
+                    },
+                    actions: step.actions,
+                    warning: step.warning,
+                    doneWhen: step.doneWhen,
+                    link: step.link,
+                    badge: step.badge,
+                  ),
+                  const SizedBox(height: Space.sm),
                 ],
+                const SizedBox(height: Space.md),
+                const GuideTroubleshooting(items: _troubleshooting),
               ],
             ),
-            const SizedBox(height: 12),
-            for (final (index, action) in step.actions.indexed)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      child: Text(
-                        '${String.fromCharCode(97 + index)}.',
-                        style: small.copyWith(color: colors.mutedForeground),
-                      ),
-                    ),
-                    Expanded(child: Text(action, style: small)),
-                  ],
-                ),
-              ),
-            if (step.warning case final warning?) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: colors.destructive.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      FLucideIcons.triangleAlert,
-                      size: 16,
-                      color: colors.destructive,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        warning,
-                        style: context.theme.typography.body.xs.copyWith(
-                          color: colors.foreground,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(FLucideIcons.circleCheck, size: 16, color: colors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Done when: ${step.doneWhen}',
-                    style: context.theme.typography.body.xs.copyWith(
-                      color: colors.mutedForeground,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            if (onOpen != null) ...[
-              const SizedBox(height: 14),
-              FButton(
-                size: FButtonSizeVariant.sm,
-                variant: FButtonVariant.outline,
-                onPress: onOpen,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(step.linkLabel ?? 'Open Google Cloud'),
-                    const SizedBox(width: 8),
-                    const Icon(FLucideIcons.externalLink, size: 16),
-                  ],
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
-    );
-  }
-}
-
-class _Troubleshooting extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final typography = context.theme.typography;
-    return FCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'If something goes wrong',
-              style: typography.body.lg.copyWith(fontWeight: FontWeight.w700),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.background,
+            border: Border(top: BorderSide(color: colors.border)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Space.page,
+              Space.md,
+              Space.page,
+              Space.md,
             ),
-            const SizedBox(height: 10),
-            for (final (index, (symptom, fix)) in _troubleshooting.indexed) ...[
-              if (index != 0) const FDivider(),
-              Text(
-                symptom,
-                style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                fix,
-                style: typography.body.xs.copyWith(
-                  color: context.theme.colors.mutedForeground,
-                ),
-              ),
-            ],
-          ],
+            child: bottomBar(),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

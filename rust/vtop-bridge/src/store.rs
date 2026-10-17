@@ -12,6 +12,9 @@ pub const REQUESTS: &str = "bridge_requests";
 pub const ACCOUNTS: &str = "accounts";
 pub const FCM_INDEX: &str = "fcm_index";
 pub const ACCESS_KEYS: &str = "access_keys";
+pub const MAILBOXES: &str = "mail_otp_boxes";
+/// Owner hash → mailbox id, so a new phone can take its address back.
+pub const MAILBOX_OWNERS: &str = "mail_otp_owners";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RequestStatus {
@@ -141,6 +144,27 @@ pub struct KeyDoc {
     pub last_used_at: Option<u64>,
 }
 
+/// A forwarding mailbox (`vtop-otp-<id>@…`). The bridge holds the phone's
+/// public key and at most one sealed box it cannot open. No `Debug`: it
+/// holds the FCM token.
+#[derive(Clone, PartialEq, Eq)]
+pub struct MailboxDoc {
+    pub id: String,
+    /// The phone's X25519 public key, base64url.
+    pub public_key: String,
+    pub fcm_token: String,
+    /// SHA-256 hex of the secret the phone holds.
+    pub secret_hash: String,
+    /// Keyed hash of the owner's registration number, set once a phone
+    /// proved it with a live VTOP session. Never the number itself.
+    pub owner_hash: Option<String>,
+    /// The latest sealed box the Worker delivered.
+    pub sealed: Option<String>,
+    pub sealed_at: Option<u64>,
+    pub created_at: u64,
+    pub updated_at: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreError(pub String);
 
@@ -196,6 +220,16 @@ pub trait Store: Send + Sync {
     async fn delete_key(&self, hash: &str) -> Result<(), StoreError>;
     /// Removes the account, its keys and its requests.
     async fn delete_account(&self, registration_number: &str) -> Result<(), StoreError>;
+    async fn get_mailbox(&self, id: &str) -> Result<Option<MailboxDoc>, StoreError>;
+    /// Creates or replaces a mailbox.
+    async fn put_mailbox(&self, doc: &MailboxDoc) -> Result<(), StoreError>;
+    /// A missing mailbox is not an error.
+    async fn delete_mailbox(&self, id: &str) -> Result<(), StoreError>;
+    /// The mailbox id an owner hash points at.
+    async fn get_mailbox_owner(&self, owner_hash: &str) -> Result<Option<String>, StoreError>;
+    async fn put_mailbox_owner(&self, owner_hash: &str, id: &str) -> Result<(), StoreError>;
+    /// A missing entry is not an error.
+    async fn delete_mailbox_owner(&self, owner_hash: &str) -> Result<(), StoreError>;
 }
 
 pub fn tokens_equal(expected: &str, actual: &str) -> bool {
@@ -236,6 +270,8 @@ pub struct MemoryStore {
     accounts: Mutex<HashMap<String, AccountDoc>>,
     fcm_index: Mutex<HashMap<String, String>>,
     keys: Mutex<HashMap<String, KeyDoc>>,
+    mailboxes: Mutex<HashMap<String, MailboxDoc>>,
+    mailbox_owners: Mutex<HashMap<String, String>>,
     /// When set, every call fails with this error.
     pub fail: Mutex<Option<String>>,
 }
@@ -363,6 +399,46 @@ impl Store for MemoryStore {
             .lock()
             .unwrap()
             .retain(|_, request| request.account.as_deref() != Some(registration_number));
+        Ok(())
+    }
+
+    async fn get_mailbox(&self, id: &str) -> Result<Option<MailboxDoc>, StoreError> {
+        self.check()?;
+        Ok(self.mailboxes.lock().unwrap().get(id).cloned())
+    }
+
+    async fn put_mailbox(&self, doc: &MailboxDoc) -> Result<(), StoreError> {
+        self.check()?;
+        self.mailboxes
+            .lock()
+            .unwrap()
+            .insert(doc.id.clone(), doc.clone());
+        Ok(())
+    }
+
+    async fn delete_mailbox(&self, id: &str) -> Result<(), StoreError> {
+        self.check()?;
+        self.mailboxes.lock().unwrap().remove(id);
+        Ok(())
+    }
+
+    async fn get_mailbox_owner(&self, owner_hash: &str) -> Result<Option<String>, StoreError> {
+        self.check()?;
+        Ok(self.mailbox_owners.lock().unwrap().get(owner_hash).cloned())
+    }
+
+    async fn put_mailbox_owner(&self, owner_hash: &str, id: &str) -> Result<(), StoreError> {
+        self.check()?;
+        self.mailbox_owners
+            .lock()
+            .unwrap()
+            .insert(owner_hash.to_string(), id.to_string());
+        Ok(())
+    }
+
+    async fn delete_mailbox_owner(&self, owner_hash: &str) -> Result<(), StoreError> {
+        self.check()?;
+        self.mailbox_owners.lock().unwrap().remove(owner_hash);
         Ok(())
     }
 }

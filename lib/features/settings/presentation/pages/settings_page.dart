@@ -427,6 +427,7 @@ class SettingsPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final showDebugFeatures = useState(false);
     final isEmailOtpReady = useState<bool?>(null);
+    final isGmailOtpReady = useState(false);
     final isEmailOtpBusy = useState(false);
     final isEmailOtpTestBusy = useState(false);
     final isEmailOtpFeatureEnabled = useState(false);
@@ -448,9 +449,11 @@ class SettingsPage extends HookConsumerWidget {
           isEmailOtpReady.value = false;
           return;
         }
-        isEmailOtpReady.value = await ref
-            .read(googleEmailOtpAuthServiceProvider)
-            .isReady();
+        ref
+          ..invalidate(emailOtpReadyProvider)
+          ..invalidate(anyEmailOtpReadyProvider);
+        isGmailOtpReady.value = await ref.read(emailOtpReadyProvider.future);
+        isEmailOtpReady.value = await ref.read(anyEmailOtpReadyProvider.future);
       } catch (error, stackTrace) {
         log(
           'Failed to refresh Email OTP ready state',
@@ -541,13 +544,13 @@ class SettingsPage extends HookConsumerWidget {
                     icon: FLucideIcons.mail,
                     tone: colors.app.warning,
                   ),
-                  title: const Text('Gmail Autofetch'),
+                  title: const Text('Email OTP'),
                   subtitle: isEmailOtpReady.value == true
                       ? Text(
-                          'Connected · tap to manage',
+                          'Set up · tap to manage',
                           style: TextStyle(color: colors.app.success.onSubtle),
                         )
-                      : const Text('Auto-fill OTPs from Gmail'),
+                      : const Text('Auto-fill the VTOP sign-in OTP'),
                   suffix: isEmailOtpBusy.value
                       ? const FCircularProgress.pinwheel()
                       : isEmailOtpReady.value == true
@@ -557,11 +560,11 @@ class SettingsPage extends HookConsumerWidget {
                           size: FButtonSizeVariant.sm,
                           mainAxisSize: MainAxisSize.min,
                           onPress: openGmailSetup,
-                          child: const Text('Connect'),
+                          child: const Text('Set up'),
                         ),
                   onPress: isEmailOtpBusy.value ? null : openGmailSetup,
                 ),
-                if (isEmailOtpReady.value == true)
+                if (isGmailOtpReady.value)
                   FTile(
                     prefix: _IconTile(
                       icon: FLucideIcons.trash2,
@@ -578,7 +581,7 @@ class SettingsPage extends HookConsumerWidget {
                       },
                     ),
                   ),
-                if (isEmailOtpReady.value == true && showDebugFeatures.value)
+                if (isGmailOtpReady.value && showDebugFeatures.value)
                   FTile(
                     prefix: _IconTile(
                       icon: FLucideIcons.mailCheck,

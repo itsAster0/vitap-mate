@@ -244,10 +244,13 @@ Widget _buildHeader(
         data = "GPA Planner";
         break;
       case "gmail-otp-setup":
-        data = "Gmail OTP Setup";
+        data = "Email OTP";
         break;
       case "gmail-oauth-guide":
-        data = "Google OAuth Guide";
+        data = "Your own Google key";
+        break;
+      case "mail-forwarding":
+        data = "Email forwarding";
         break;
       case "how-it-works":
         data = "How It's Calculated";

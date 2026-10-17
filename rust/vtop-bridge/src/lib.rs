@@ -14,6 +14,7 @@ pub mod gmail;
 pub mod google;
 pub mod keys;
 pub mod login;
+pub mod mail_otp;
 pub mod requests;
 pub mod session_api;
 pub mod store;
@@ -135,6 +136,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/v1/account/delete", post(account_api::delete_account))
         .route("/v1/account/settings", post(account_api::update_settings))
         .route("/v1/account/semester", post(account_api::update_semester))
+        .route("/v1/mail-otp/register", post(mail_otp::register))
+        .route("/v1/mail-otp/update", post(mail_otp::update))
+        .route("/v1/mail-otp/delete", post(mail_otp::delete))
+        .route("/v1/mail-otp/owner", post(mail_otp::claim_owner))
+        .route("/v1/mail-otp/reclaim", post(mail_otp::reclaim))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             requests::rate_limit,
@@ -143,6 +149,11 @@ pub fn router(state: Arc<AppState>) -> Router {
         .merge(session_routes)
         .merge(account_routes)
         .route("/healthz", get(healthz))
+        .route("/v1/mail-otp/inbox", post(mail_otp::inbox))
+        .route(
+            "/v1/mail-otp/relay/{id}",
+            get(mail_otp::relay_key).post(mail_otp::relay_deliver),
+        )
         .route("/cookie", cookie_start)
         .route(
             "/cookie/status/{request_id}",
