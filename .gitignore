@@ -50,3 +50,6 @@ keystore.properties
 /android/fastlane/key.json
 /android/app/google-services.json
 .env.json
+
+# Wrangler local cache
+.wrangler/
