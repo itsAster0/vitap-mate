@@ -34,6 +34,13 @@ FALLBACK_FORWARD = ""
 enabled = true
 invocation_logs = true
 
+# Request traces, including Durable Object calls (kept 7 days). Every
+# request while traffic is low; lower the rate as it grows, since stored
+# spans count toward Observability usage from 1 Dec 2026.
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+
 [[durable_objects.bindings]]
 name = "DEVICE"
 class_name = "Device"
