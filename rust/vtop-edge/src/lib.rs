@@ -24,10 +24,11 @@
 mod account;
 pub mod account_state;
 mod device;
+mod engine;
 mod fcm;
 pub mod mail;
-pub mod state;
 mod sql;
+pub mod state;
 mod store;
 
 use serde::Deserialize;
@@ -43,6 +44,7 @@ use worker::{
 
 pub use account::Account;
 pub use device::Device;
+pub use engine::Engine;
 pub use fcm::FcmToken;
 use state::{fcm_token, is_device_id, public_key, MailboxDoc};
 pub use store::{Index, Mailbox};
@@ -325,7 +327,22 @@ pub(crate) async fn engine_post(
     init.with_method(Method::Post)
         .with_headers(headers)
         .with_body(Some(serde_json::to_string(body)?.into()));
-    let request = Request::new_with_init(&format!("{}{path}", var(env, "BRIDGE_URL")?), &init)?;
+    engine_send(env, "BRIDGE_URL", path, &init).await
+}
+
+/// Sends a request to the engine: to the container (`IN_CONTAINER`) or to
+/// the address in `service`.
+async fn engine_send(env: &Env, service: &str, path: &str, init: &RequestInit) -> Result<Response> {
+    let base = var(env, service)?;
+    if base == engine::IN_CONTAINER {
+        let request = Request::new_with_init(&format!("http://engine{path}"), init)?;
+        return env
+            .durable_object("ENGINE")?
+            .get_by_name("engine")?
+            .fetch_with_request(request)
+            .await;
+    }
+    let request = Request::new_with_init(&format!("{base}{path}"), init)?;
     worker::Fetch::Request(request).send().await
 }
 
@@ -392,8 +409,12 @@ async fn session_owner(
     let Some(cookies) = session.map(|s| s.cookies.trim()).filter(|c| !c.is_empty()) else {
         return Ok(Err(bad_request("session.cookies is required.")?));
     };
-    let mut response =
-        engine_post(env, "/internal/mail-otp/owner", &json!({ "cookies": cookies })).await?;
+    let mut response = engine_post(
+        env,
+        "/internal/mail-otp/owner",
+        &json!({ "cookies": cookies }),
+    )
+    .await?;
     match response.status_code() {
         200 => {
             #[derive(Deserialize)]
@@ -662,6 +683,22 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             };
             with_cors(response, origin.as_deref(), &env)
         }
+        // Engine-only: reaches the container whatever BRIDGE_URL says, to
+        // try it before switching.
+        (_, path) if path.starts_with("/internal/engine/") => {
+            if !is_engine(&req, &env) {
+                return error(401, "unauthorized", "The engine secret is required.");
+            }
+            let inner = path.trim_start_matches("/internal/engine").to_string();
+            let request = Request::new_with_init(
+                &format!("http://engine{inner}"),
+                RequestInit::new().with_method(req.method()),
+            )?;
+            env.durable_object("ENGINE")?
+                .get_by_name("engine")?
+                .fetch_with_request(request)
+                .await
+        }
         (_, path) if path.starts_with("/internal/") => error(404, "not_found", "No such route."),
         (_, path) if path == "/mcp" || path.starts_with("/mcp/") => {
             pass_on(req, &env, "MCP_URL").await
@@ -674,7 +711,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 /// the caller's address for its rate limits.
 async fn pass_on(mut req: Request, env: &Env, service: &str) -> Result<Response> {
     let url = req.url()?;
-    let mut target = format!("{}{}", var(env, service)?, url.path());
+    let mut target = url.path().to_string();
     if let Some(query) = url.query() {
         target = format!("{target}?{query}");
     }
@@ -698,9 +735,7 @@ async fn pass_on(mut req: Request, env: &Env, service: &str) -> Result<Response>
             init.with_body(Some(js_sys::Uint8Array::from(body.as_slice()).into()));
         }
     }
-    worker::Fetch::Request(Request::new_with_init(&target, &init)?)
-        .send()
-        .await
+    engine_send(env, service, &target, &init).await
 }
 
 /// The catch-all. Throwing makes the sending server retry later.

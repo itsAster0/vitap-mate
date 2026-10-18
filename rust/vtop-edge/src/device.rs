@@ -154,13 +154,9 @@ impl Device {
         let db = self.db().await?;
         // Numbered in SQL, so appends running at the same time never share
         // a number.
-        let seq = sql::first(
-            &db,
-            "UPDATE device SET seq = seq + 1 RETURNING seq",
-            vec![],
-        )?
-        .and_then(|row| sql::int(&row, "seq"))
-        .ok_or("no device")?;
+        let seq = sql::first(&db, "UPDATE device SET seq = seq + 1 RETURNING seq", vec![])?
+            .and_then(|row| sql::int(&row, "seq"))
+            .ok_or("no device")?;
         let doc = self.doc().await?.ok_or("no device")?;
         let event = Event {
             seq,
@@ -342,7 +338,11 @@ impl DurableObject for Device {
     async fn alarm(&self) -> Result<Response> {
         let cutoff = now().saturating_sub(EVENT_TTL_SECS);
         let db = self.db().await?;
-        sql::run(&db, "DELETE FROM events WHERE at < ?", vec![sql::v_int(cutoff)])?;
+        sql::run(
+            &db,
+            "DELETE FROM events WHERE at < ?",
+            vec![sql::v_int(cutoff)],
+        )?;
         let remaining = sql::first(&db, "SELECT COUNT(*) AS n FROM events", vec![])?
             .and_then(|row| sql::int(&row, "n"))
             .unwrap_or(0);

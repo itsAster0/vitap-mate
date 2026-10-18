@@ -4,6 +4,8 @@
 #   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
 #   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
 #                              /internal/*
+#   VAULT_KEY                  the engine's sealing key, passed to its
+#                              container
 name = "vitapmate-edge"
 main = "build/worker/shim.mjs"
 compatibility_date = "2026-10-01"
@@ -14,11 +16,12 @@ routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
 command = "sh build.sh"
 
 [vars]
-# Every address the edge uses; nothing is hard-coded.
+# Every address the edge uses; nothing is hard-coded. BRIDGE_URL and
+# MCP_URL take "container" to use the engine's container (see `Engine`).
 MAIL_DOMAIN = "aster0.dev"
-BRIDGE_URL = "https://vtop-bridge-edge-production.up.railway.app"
+BRIDGE_URL = "container"
 FCM_URL = "https://fcm.googleapis.com"
-MCP_URL = "https://vtop-bridge-edge-production.up.railway.app"
+MCP_URL = "container"
 # This Worker's own address, for links it hands out.
 PUBLIC_URL = "https://vmate-api.aster0.dev"
 PUBLIC_MCP_URL = "https://vmate-api.aster0.dev/mcp"
@@ -51,6 +54,19 @@ class_name = "FcmToken"
 name = "ACCOUNT"
 class_name = "Account"
 
+[[durable_objects.bindings]]
+name = "ENGINE"
+class_name = "Engine"
+
+# The engine (vtop-bridge), built from the Cargo workspace.
+[[containers]]
+class_name = "Engine"
+image = "../Dockerfile.engine"
+image_build_context = ".."
+# 1/4 vCPU, 1 GiB.
+instance_type = "basic"
+max_instances = 2
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken"]
@@ -68,3 +84,7 @@ new_sqlite_classes = ["Account"]
 [[migrations]]
 tag = "v4"
 deleted_classes = ["Doc", "DocSet"]
+
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["Engine"]

@@ -383,18 +383,33 @@ fn request_from(row: &sql::Row) -> Option<RequestRecord> {
 /// The `account` row's columns besides `id`.
 fn account_columns(doc: &AccountRecord) -> Vec<(&'static str, SqlStorageValue)> {
     vec![
-        ("app_secret_hash", sql::v_opt_text(doc.app_secret_hash.as_deref())),
-        ("always_use_vault", sql::v_flag(doc.settings.always_use_vault)),
+        (
+            "app_secret_hash",
+            sql::v_opt_text(doc.app_secret_hash.as_deref()),
+        ),
+        (
+            "always_use_vault",
+            sql::v_flag(doc.settings.always_use_vault),
+        ),
         ("phone_wait_secs", sql::v_int(doc.settings.phone_wait_secs)),
-        ("vault_ttl_secs", sql::v_opt_int(doc.settings.vault_ttl_secs)),
+        (
+            "vault_ttl_secs",
+            sql::v_opt_int(doc.settings.vault_ttl_secs),
+        ),
         ("semester_id", sql::v_opt_text(doc.semester_id.as_deref())),
         ("device_id", sql::v_opt_text(doc.device_id.as_deref())),
         ("mailbox_id", sql::v_opt_text(doc.mailbox_id.as_deref())),
         ("sealed_vault", sql::v_opt_text(doc.sealed_vault.as_deref())),
         ("vault_saved_at", sql::v_opt_int(doc.vault_saved_at)),
-        ("sealed_session", sql::v_opt_text(doc.sealed_session.as_deref())),
+        (
+            "sealed_session",
+            sql::v_opt_text(doc.sealed_session.as_deref()),
+        ),
         ("session_saved_at", sql::v_opt_int(doc.session_saved_at)),
-        ("credentials_rejected_at", sql::v_opt_int(doc.credentials_rejected_at)),
+        (
+            "credentials_rejected_at",
+            sql::v_opt_int(doc.credentials_rejected_at),
+        ),
         ("created_at", sql::v_int(doc.created_at)),
         ("updated_at", sql::v_int(doc.updated_at)),
         ("window_start", sql::v_int(doc.window.0)),
@@ -449,8 +464,12 @@ fn write_changes(db: &SqlStorage, base: &AccountRecord, doc: &AccountRecord) -> 
         .map(|(now, _)| now)
         .collect();
     if !changed.is_empty() {
-        let set: Vec<String> = changed.iter().map(|(name, _)| format!("{name} = ?")).collect();
-        let mut values: Vec<SqlStorageValue> = changed.into_iter().map(|(_, value)| value).collect();
+        let set: Vec<String> = changed
+            .iter()
+            .map(|(name, _)| format!("{name} = ?"))
+            .collect();
+        let mut values: Vec<SqlStorageValue> =
+            changed.into_iter().map(|(_, value)| value).collect();
         values.push(sql::v_text(&doc.id));
         sql::run(
             db,
@@ -460,7 +479,11 @@ fn write_changes(db: &SqlStorage, base: &AccountRecord, doc: &AccountRecord) -> 
     }
     for key in &base.keys {
         if !doc.keys.iter().any(|k| k.hash == key.hash) {
-            sql::run(db, "DELETE FROM keys WHERE hash = ?", vec![sql::v_text(&key.hash)])?;
+            sql::run(
+                db,
+                "DELETE FROM keys WHERE hash = ?",
+                vec![sql::v_text(&key.hash)],
+            )?;
         }
     }
     for key in &doc.keys {
@@ -629,11 +652,13 @@ impl Account {
             return Ok(None);
         }
         let db = self.db().await?;
-        Ok(
-            sql::first(&db, "SELECT * FROM requests WHERE id = ?", vec![sql::v_text(id)])?
-                .as_ref()
-                .and_then(request_from),
-        )
+        Ok(sql::first(
+            &db,
+            "SELECT * FROM requests WHERE id = ?",
+            vec![sql::v_text(id)],
+        )?
+        .as_ref()
+        .and_then(request_from))
     }
 
     async fn put_request(&self, request: &RequestRecord) -> Result<()> {
@@ -676,8 +701,10 @@ impl Account {
 
     async fn pending_id(&self) -> Result<Option<String>> {
         let db = self.db().await?;
-        Ok(sql::first(&db, "SELECT request_id FROM pending LIMIT 1", vec![])?
-            .and_then(|row| sql::text(&row, "request_id")))
+        Ok(
+            sql::first(&db, "SELECT request_id FROM pending LIMIT 1", vec![])?
+                .and_then(|row| sql::text(&row, "request_id")),
+        )
     }
 
     async fn set_pending(&self, id: &str) -> Result<()> {
@@ -1127,7 +1154,10 @@ impl Account {
             return bad_request("session.cookies is required.");
         };
         let mut existing = existing;
-        if let Some(doc) = existing.as_mut().filter(|doc| doc.mailbox_id != call.mailbox_id) {
+        if let Some(doc) = existing
+            .as_mut()
+            .filter(|doc| doc.mailbox_id != call.mailbox_id)
+        {
             doc.mailbox_id = call.mailbox_id.clone();
             self.save(doc).await?;
         }

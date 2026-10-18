@@ -1,3 +1,6 @@
 target
 **/*.html.local
 **/.env*
+**/build
+**/node_modules
+**/.wrangler

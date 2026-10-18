@@ -33,13 +33,16 @@ async fn main() {
     });
     // The MCP tools run here too, with sessions from the edge under each
     // caller's own key; the edge sends `/mcp` on to this service.
-    let mcp = vtop_mcp::mcp_router(
+    // Sessions are kept a few minutes, so a run of tool calls asks the edge
+    // (and VTOP, to check it) once.
+    let sessions = vtop_mcp::bridge::CachedSessions::new(
         Arc::new(vtop_mcp::bridge::BridgeClient::new(
             reqwest::Client::new(),
             config.edge_url.clone(),
         )),
         Duration::from_secs(300),
     );
+    let mcp = vtop_mcp::mcp_router(Arc::new(sessions), Duration::from_secs(300));
     let state = Arc::new(AppState::new(
         config,
         Parts {
@@ -54,7 +57,16 @@ async fn main() {
     ));
     tracing::info!("starting vtop-engine on {listen}");
 
-    let listener = match tokio::net::TcpListener::bind(listen).await {
+    // Hosts without IPv6 (some containers) refuse `[::]`; take IPv4 there.
+    let ipv4 = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen.port()));
+    let bound = match tokio::net::TcpListener::bind(listen).await {
+        Err(error) if listen.is_ipv6() => {
+            tracing::info!("cannot bind {listen} ({error}); using {ipv4}");
+            tokio::net::TcpListener::bind(ipv4).await
+        }
+        bound => bound,
+    };
+    let listener = match bound {
         Ok(listener) => listener,
         Err(error) => {
             eprintln!("vtop-engine: cannot bind {listen}: {error}");
