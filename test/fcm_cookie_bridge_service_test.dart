@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 
 void main() {
@@ -102,29 +101,6 @@ void main() {
   });
 
   group('bridge credentials payload', () {
-    EmailOtpOAuthSession gmail({
-      EmailOtpAuthSource source = EmailOtpAuthSource.sharedBuiltIn,
-      List<String> scopes = const [
-        'https://www.googleapis.com/auth/gmail.modify',
-      ],
-      String refreshToken = 'refresh-1',
-    }) {
-      return EmailOtpOAuthSession(
-        email: 'me@example.com',
-        accessToken: 'access',
-        refreshToken: refreshToken,
-        scopes: scopes,
-        accessTokenExpiryEpochMs: 0,
-        authSource: source,
-        oauthClientId: source == EmailOtpAuthSource.personalByok
-            ? 'byok.apps.googleusercontent.com'
-            : null,
-        oauthClientSecret: source == EmailOtpAuthSource.personalByok
-            ? 'byok-secret'
-            : null,
-      );
-    }
-
     test('payload is null when not requested', () {
       expect(
         bridgeCredentialsPayload(
@@ -132,108 +108,35 @@ void main() {
           serverSignIn: true,
           username: 'yaswanth314',
           password: 'pw',
-          gmail: gmail(),
-          deleteAfterReading: true,
-          sharedClientId: 'shared.apps.googleusercontent.com',
+          forwarding: true,
         ),
         isNull,
       );
     });
 
-    test('payload is null without a Gmail session', () {
+    test('payload is null without email forwarding', () {
       expect(
         bridgeCredentialsPayload(
           wantCredentials: true,
           serverSignIn: true,
           username: 'yaswanth314',
           password: 'pw',
-          gmail: null,
-          deleteAfterReading: true,
-          sharedClientId: 'shared.apps.googleusercontent.com',
+          forwarding: false,
         ),
         isNull,
       );
     });
 
-    test('payload is null without gmail.modify scope or refresh token', () {
-      for (final session in [
-        gmail(scopes: const ['openid']),
-        gmail(refreshToken: ''),
-      ]) {
-        expect(
-          bridgeCredentialsPayload(
-            wantCredentials: true,
-            serverSignIn: true,
-            username: 'yaswanth314',
-            password: 'pw',
-            gmail: session,
-            deleteAfterReading: true,
-            sharedClientId: 'shared.apps.googleusercontent.com',
-          ),
-          isNull,
-        );
-      }
-    });
-
-    test('payload is null for the shared client when it is not configured', () {
+    test('payload is username and password only', () {
       expect(
         bridgeCredentialsPayload(
           wantCredentials: true,
           serverSignIn: true,
-          username: 'yaswanth314',
+          username: ' yaswanth314 ',
           password: 'pw',
-          gmail: gmail(),
-          deleteAfterReading: true,
-          sharedClientId: '',
+          forwarding: true,
         ),
-        isNull,
-      );
-    });
-
-    test('shared payload uses built-in client id and no secret', () {
-      expect(
-        bridgeCredentialsPayload(
-          wantCredentials: true,
-          serverSignIn: true,
-          username: 'yaswanth314',
-          password: 'pw',
-          gmail: gmail(),
-          deleteAfterReading: true,
-          sharedClientId: 'shared.apps.googleusercontent.com',
-        ),
-        {
-          'username': 'yaswanth314',
-          'password': 'pw',
-          'gmail': {
-            'refresh_token': 'refresh-1',
-            'client_id': 'shared.apps.googleusercontent.com',
-            'delete_after_reading': true,
-          },
-        },
-      );
-    });
-
-    test('byok payload carries client secret', () {
-      expect(
-        bridgeCredentialsPayload(
-          wantCredentials: true,
-          serverSignIn: true,
-          username: 'yaswanth314',
-          password: 'pw',
-          gmail: gmail(source: EmailOtpAuthSource.personalByok),
-          deleteAfterReading: false,
-          sharedClientId: 'shared.apps.googleusercontent.com',
-        ),
-        {
-          'username': 'yaswanth314',
-          'password': 'pw',
-          'gmail': {
-            'refresh_token': 'refresh-1',
-            'client_id': 'byok.apps.googleusercontent.com',
-            'client_secret': 'byok-secret',
-            'delete_after_reading': false,
-          },
-        },
+        {'username': 'yaswanth314', 'password': 'pw'},
       );
     });
   });
@@ -245,15 +148,7 @@ void main() {
         serverSignIn: false,
         username: 'yaswanth314',
         password: 'pw',
-        gmail: EmailOtpOAuthSession(
-          email: 'me@example.com',
-          accessToken: 'a',
-          refreshToken: 'r',
-          scopes: const ['https://www.googleapis.com/auth/gmail.modify'],
-          accessTokenExpiryEpochMs: 0,
-        ),
-        deleteAfterReading: true,
-        sharedClientId: 'shared.apps.googleusercontent.com',
+        forwarding: true,
       ),
       isNull,
     );

@@ -122,6 +122,17 @@ pub fn router_with_cache(
     key_ttl: Duration,
 ) -> Router {
     let _ = config;
+    Router::new()
+        .route(
+            "/health",
+            get(|| async { Json(serde_json::json!({ "status": "ok", "service": "vtop-mcp" })) }),
+        )
+        .merge(mcp_router(source, key_ttl))
+}
+
+/// Only `/mcp` (and `/mcp/<key>`), for a service that has its own health
+/// route: the engine serves the tools itself this way.
+pub fn mcp_router(source: Arc<dyn SessionSource>, key_ttl: Duration) -> Router {
     let cache = Arc::new(KeyCache {
         source: source.clone(),
         ttl: key_ttl,
@@ -140,13 +151,8 @@ pub fn router_with_cache(
         Arc::new(NeverSessionManager::default()),
         mcp_config,
     );
-    let protected = Router::new()
-        .nest_service("/mcp", mcp)
-        .layer(middleware::from_fn_with_state(cache, require_bearer));
     Router::new()
-        .route(
-            "/health",
-            get(|| async { Json(serde_json::json!({ "status": "ok", "service": "vtop-mcp" })) }),
-        )
-        .merge(protected)
+        .nest_service("/mcp", mcp)
+        // Only `/mcp`: other paths of a service that merges this stay 404.
+        .route_layer(middleware::from_fn_with_state(cache, require_bearer))
 }

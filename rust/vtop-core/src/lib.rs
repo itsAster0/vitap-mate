@@ -13,11 +13,11 @@ pub mod config;
 pub mod error;
 pub mod gmail;
 pub mod inputs;
-pub mod mail_seal;
 pub mod parser;
 pub mod session;
 pub mod types;
 
+pub use vtop_shared::mail_seal;
 pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use error::{VtopError, VtopResult};
