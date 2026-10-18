@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
@@ -542,8 +543,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     return null;
   }
 
-  /// Waits for the forwarded OTP mail: pushed over FCM, and pulled from the
-  /// bridge every 2 s and on resume in case the push is slow or held back.
+  /// Waits for the forwarded OTP mail: over the edge's socket or FCM, and
+  /// pulled every 2 s while no socket is open, in case a push is slow or
+  /// held back, and on resume.
   /// With Gmail also connected, reads Gmail too if nothing came in 30 s.
   Future<void> _runMailForwardingAutoFetch({required int runId}) async {
     final service = ref.read(mailForwardingServiceProvider);
@@ -580,10 +582,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
     final subscription = mailOtpEvents.listen(take);
     final lifecycle = AppLifecycleListener(onResume: () => unawaited(pull()));
-    final poll = Timer.periodic(
-      const Duration(seconds: 2),
-      (_) => unawaited(pull()),
-    );
+    final poll = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!EdgeEventChannel.instance.connected.value) unawaited(pull());
+    });
     // Ends the wait when the challenge is cancelled, expires or moves on.
     final watch = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!_shouldContinueAutoFetch(runId) && !found.isCompleted) {

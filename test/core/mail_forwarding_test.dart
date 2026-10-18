@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitapmate/core/utils/edge/edge_device.dart';
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 
 class _MemoryStore implements MailForwardingStore {
@@ -18,6 +21,22 @@ class _MemoryStore implements MailForwardingStore {
   Future<void> delete() async => value = null;
 }
 
+class _MemoryDevices implements EdgeDeviceStore {
+  EdgeDevice? value;
+
+  @override
+  Future<EdgeDevice?> read() async => value;
+
+  @override
+  Future<void> write(EdgeDevice device) async => value = device;
+}
+
+const _device = EdgeDevice(
+  id: '0123456789abcdef0123456789abcdef',
+  secret: 'vdv_secret',
+  fcmToken: 'old',
+);
+
 const _forwarding = MailForwarding(
   id: 'k3f9x2ab7q',
   address: 'vtop-otp-k3f9x2ab7q@aster0.dev',
@@ -27,6 +46,8 @@ const _forwarding = MailForwarding(
 );
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('MailOtpPayload', () {
     test('reads an OTP box', () {
       final payload = MailOtpPayload.fromJson(
@@ -66,29 +87,103 @@ void main() {
     });
   });
 
+  group('EdgeEvent', () {
+    test('reads socket events and FCM data alike', () {
+      final socket = EdgeEvent.fromJson({
+        'seq': 4,
+        'kind': 'mail_otp',
+        'mailbox': 'k3f9x2ab7q',
+      })!;
+      expect((socket.seq, socket.kind), (4, 'mail_otp'));
+      final push = EdgeEvent.fromJson({'seq': '4', 'type': 'mail_otp'})!;
+      expect((push.seq, push.kind), (4, 'mail_otp'));
+      expect(EdgeEvent.fromJson({'type': 'mail_otp'}), isNull);
+    });
+
+    test('each sequence number is handled once', () async {
+      final handled = <int>[];
+      EdgeEventChannel.instance.on(
+        'test_kind',
+        (e) async => handled.add(e.seq),
+      );
+      final event = EdgeEvent(seq: 9001, kind: 'test_kind', data: const {});
+      await EdgeEventChannel.instance.accept(event);
+      await EdgeEventChannel.instance.accept(event);
+      expect(handled, [9001]);
+    });
+  });
+
   group('MailForwardingService', () {
-    test('syncs a changed FCM token only', () async {
-      final store = _MemoryStore()..value = _forwarding;
-      final calls = <Map<String, dynamic>>[];
+    test('syncs a changed FCM token to the install only', () async {
+      final devices = _MemoryDevices()..value = _device;
+      final calls = <(String, Map<String, dynamic>)>[];
+      final client = MockClient((request) async {
+        calls.add((
+          request.url.path,
+          jsonDecode(request.body) as Map<String, dynamic>,
+        ));
+        return http.Response('', 204);
+      });
       final service = MailForwardingService(
-        client: MockClient((request) async {
-          expect(request.url.path, '/v1/mail-otp/update');
-          calls.add(jsonDecode(request.body) as Map<String, dynamic>);
-          return http.Response('', 204);
-        }),
-        baseUrl: 'https://bridge.example',
-        store: store,
+        client: client,
+        baseUrl: 'https://edge.example',
+        store: _MemoryStore()..value = _forwarding,
+        devices: EdgeDeviceService(
+          client: client,
+          baseUrl: 'https://edge.example',
+          store: devices,
+        ),
       );
       await service.syncFcmToken('old');
       expect(calls, isEmpty);
       await service.syncFcmToken('new');
-      expect(calls.single, {
-        'id': 'k3f9x2ab7q',
-        'secret': 'vmb_secret',
+      expect(calls.single.$1, '/v1/devices/update');
+      expect(calls.single.$2, {
+        'id': _device.id,
+        'secret': 'vdv_secret',
         'fcmToken': 'new',
       });
-      expect(store.value!.fcmToken, 'new');
+      expect(devices.value!.fcmToken, 'new');
     });
+
+    test(
+      'an install the edge lost registers again and the address follows',
+      () async {
+        final devices = _MemoryDevices()..value = _device;
+        final paths = <String>[];
+        final client = MockClient((request) async {
+          paths.add(request.url.path);
+          return switch (request.url.path) {
+            '/v1/devices/update' => http.Response(
+              '{"code":"unknown_device","error":"gone"}',
+              404,
+            ),
+            '/v1/devices/register' => http.Response(
+              '{"id":"fedcba9876543210fedcba9876543210","secret":"vdv_new"}',
+              201,
+            ),
+            _ => http.Response('', 204),
+          };
+        });
+        final service = MailForwardingService(
+          client: client,
+          baseUrl: 'https://edge.example',
+          store: _MemoryStore()..value = _forwarding,
+          devices: EdgeDeviceService(
+            client: client,
+            baseUrl: 'https://edge.example',
+            store: devices,
+          ),
+        );
+        await service.syncFcmToken('new');
+        expect(paths, [
+          '/v1/devices/update',
+          '/v1/devices/register',
+          '/v1/mail-otp/update',
+        ]);
+        expect(devices.value!.secret, 'vdv_new');
+      },
+    );
 
     test('remove forgets the address even when the bridge lost it', () async {
       final store = _MemoryStore()..value = _forwarding;
@@ -97,7 +192,7 @@ void main() {
           (_) async =>
               http.Response('{"code":"mailbox_not_found","error":"gone"}', 404),
         ),
-        baseUrl: 'https://bridge.example',
+        baseUrl: 'https://edge.example',
         store: store,
       );
       await service.remove();
@@ -107,7 +202,7 @@ void main() {
     test('an empty inbox is null', () async {
       final service = MailForwardingService(
         client: MockClient((_) async => http.Response('{"sealed":null}', 200)),
-        baseUrl: 'https://bridge.example',
+        baseUrl: 'https://edge.example',
         store: _MemoryStore()..value = _forwarding,
       );
       expect(await service.pullInbox(), isNull);

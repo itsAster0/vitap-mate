@@ -61,41 +61,7 @@ pub struct RequestDoc {
     pub expires_at: u64,
 }
 
-/// How the bridge serves an account's sessions; the student picks these in
-/// the app.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountSettings {
-    /// Sign in with saved credentials as soon as a session is needed,
-    /// without asking the phone first.
-    pub always_use_vault: bool,
-    /// When not `always_use_vault`: how long the phone gets to answer
-    /// before the server signs in with saved credentials.
-    pub phone_wait_secs: u64,
-    /// How long saved credentials are kept after they were last sent;
-    /// `None` keeps them until VTOP or Google rejects them.
-    pub vault_ttl_secs: Option<u64>,
-}
-
-impl Default for AccountSettings {
-    fn default() -> Self {
-        Self {
-            always_use_vault: true,
-            phone_wait_secs: 20,
-            vault_ttl_secs: None,
-        }
-    }
-}
-
-impl AccountSettings {
-    pub const PHONE_WAIT_CHOICES: [u64; 3] = [10, 20, 45];
-    pub const VAULT_TTL_CHOICES: [Option<u64>; 3] = [Some(86_400), Some(172_800), None];
-
-    pub fn is_valid(&self) -> bool {
-        Self::PHONE_WAIT_CHOICES.contains(&self.phone_wait_secs)
-            && Self::VAULT_TTL_CHOICES.contains(&self.vault_ttl_secs)
-    }
-}
+pub use vtop_shared::account::AccountSettings;
 
 /// An account. Every secret field is sealed. No `Debug`.
 #[derive(Clone, PartialEq, Eq)]

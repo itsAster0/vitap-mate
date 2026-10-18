@@ -1,11 +1,32 @@
-//! Logs in to VTOP with saved credentials, answering the OTP from Gmail.
+//! Signs in to VTOP with saved credentials, the OTP coming from the
+//! student's forwarded mail.
 
 use std::time::Duration;
 
 use async_trait::async_trait;
-use vtop_core::gmail::{GmailAccess, GmailOtpError};
 use vtop_core::inputs::{Password, Username};
 use vtop_core::{SessionState, VtopClient, VtopConfig, VtopError, VtopResult};
+
+/// Where a sign-in gets VTOP's emailed OTP from.
+#[async_trait]
+pub trait OtpCodes: Send + Sync {
+    /// A code from mail sent after `issued_at` that is not in `tried`, or
+    /// `None` when none comes within `remaining`.
+    async fn next(&self, issued_at: u64, remaining: Duration, tried: Vec<String>)
+        -> Option<String>;
+}
+
+/// Signs in with saved credentials, the OTP from `codes`.
+#[async_trait]
+pub trait ForwardedLogin: Send + Sync {
+    async fn login(
+        &self,
+        username: &str,
+        password: &str,
+        codes: &dyn OtpCodes,
+        wait: Duration,
+    ) -> Result<SessionState, LoginError>;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LoginError {
@@ -15,30 +36,15 @@ pub enum LoginError {
     Failed(String),
 }
 
-#[async_trait]
-pub trait VtopLogin: Send + Sync {
-    async fn login(
-        &self,
-        username: &str,
-        password: &str,
-        gmail: GmailAccess,
-        wait: Duration,
-    ) -> Result<SessionState, LoginError>;
-}
-
-/// Maps the result of `login_with_gmail_otp`.
-pub fn map_outcome(
-    result: VtopResult<()>,
-    gmail_error: Option<GmailOtpError>,
-) -> Result<(), LoginError> {
+/// Maps how a sign-in ended.
+pub fn map_outcome(result: VtopResult<()>) -> Result<(), LoginError> {
     match result {
         Ok(()) => Ok(()),
         Err(VtopError::InvalidCredentials) => Err(LoginError::InvalidCredentials),
-        // Gmail had no usable OTP email, so the login is stuck at the OTP.
-        Err(VtopError::OTPRequired(..)) => Err(LoginError::Failed(format!(
-            "otp_not_found: {}",
-            gmail_error.map_or("none", GmailOtpError::code)
-        ))),
+        // No usable code came, so the sign-in is stuck at the OTP.
+        Err(VtopError::OTPRequired(..)) => Err(LoginError::Failed(
+            "otp_not_found: no forwarded OTP".into(),
+        )),
         Err(error) => Err(LoginError::Failed(error.to_string())),
     }
 }
@@ -48,12 +54,12 @@ pub struct CoreLogin {
 }
 
 #[async_trait]
-impl VtopLogin for CoreLogin {
+impl ForwardedLogin for CoreLogin {
     async fn login(
         &self,
         username: &str,
         password: &str,
-        gmail: GmailAccess,
+        codes: &dyn OtpCodes,
         wait: Duration,
     ) -> Result<SessionState, LoginError> {
         let invalid_input = |error: VtopError| LoginError::Failed(error.to_string());
@@ -64,8 +70,12 @@ impl VtopLogin for CoreLogin {
                 Password::parse(password).map_err(invalid_input)?,
             )
             .map_err(invalid_input)?;
-        let outcome = client.login_with_gmail_otp(Some(&gmail), wait).await;
-        map_outcome(outcome.result, outcome.gmail_error)?;
+        let result = client
+            .login_with_otp_from(wait, |issued_at, remaining, tried| {
+                codes.next(issued_at, remaining, tried)
+            })
+            .await;
+        map_outcome(result)?;
         Ok(client.session_state())
     }
 }
@@ -75,41 +85,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn success_is_ok() {
-        assert_eq!(map_outcome(Ok(()), None), Ok(()));
-    }
-
-    #[test]
-    fn invalid_credentials_map() {
+    fn outcomes() {
+        assert_eq!(map_outcome(Ok(())), Ok(()));
         assert_eq!(
-            map_outcome(Err(VtopError::InvalidCredentials), None),
+            map_outcome(Err(VtopError::InvalidCredentials)),
             Err(LoginError::InvalidCredentials)
         );
-    }
-
-    #[test]
-    fn otp_still_required_names_the_gmail_reason() {
-        let result = map_outcome(
-            Err(VtopError::OTPRequired("enter OTP".into(), 5)),
-            Some(GmailOtpError::NotFound),
+        assert_eq!(
+            map_outcome(Err(VtopError::OTPRequired("enter OTP".into(), 5))),
+            Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()))
         );
         assert_eq!(
-            result,
-            Err(LoginError::Failed(
-                "otp_not_found: gmail_otp_not_found".into()
-            ))
-        );
-        let result = map_outcome(Err(VtopError::OTPRequired("enter OTP".into(), 5)), None);
-        assert_eq!(
-            result,
-            Err(LoginError::Failed("otp_not_found: none".into()))
-        );
-    }
-
-    #[test]
-    fn other_errors_are_failed() {
-        assert_eq!(
-            map_outcome(Err(VtopError::NetworkError), None),
+            map_outcome(Err(VtopError::NetworkError)),
             Err(LoginError::Failed("Network connection error".into()))
         );
     }

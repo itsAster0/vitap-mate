@@ -1,6 +1,7 @@
 //! Login that answers VTOP's security OTP from Gmail by itself.
 
 use std::collections::HashSet;
+use std::future::Future;
 use std::time::{Duration, Instant};
 
 use log::Level;
@@ -84,6 +85,47 @@ impl VtopClient {
                         gmail_error: None,
                     }
                 }
+            }
+        }
+    }
+
+    /// Logs in, and if VTOP asks for the emailed security OTP, asks
+    /// `next_code` for one (with when the OTP was issued, how long is left,
+    /// and the codes VTOP already rejected) and submits it, until VTOP takes
+    /// one or `wait` runs out. `Err(OTPRequired)` when no code came: the
+    /// session is then waiting for [`VtopClient::submit_security_otp`].
+    pub async fn login_with_otp_from<F, Fut>(
+        &mut self,
+        wait: Duration,
+        mut next_code: F,
+    ) -> VtopResult<()>
+    where
+        F: FnMut(u64, Duration, Vec<String>) -> Fut,
+        Fut: Future<Output = Option<String>>,
+    {
+        let (message, issued_at) = match self.login().await {
+            Err(VtopError::OTPRequired(message, issued_at)) => (message, issued_at),
+            other => return other,
+        };
+        let deadline = Instant::now() + wait;
+        let mut tried = Vec::new();
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(VtopError::OTPRequired(message, issued_at));
+            }
+            let Some(code) = next_code(issued_at, remaining, tried.clone()).await else {
+                self.auth_log(Level::Info, "otp.forwarded", "no OTP arrived in time");
+                return Err(VtopError::OTPRequired(message, issued_at));
+            };
+            match self.submit_security_otp(&code).await {
+                Ok(()) => {
+                    self.auth_log(Level::Info, "otp.forwarded", "forwarded OTP accepted");
+                    return Ok(());
+                }
+                // An older mail's code: the challenge stays open.
+                Err(VtopError::AuthenticationFailed(_)) => tried.push(code),
+                Err(error) => return Err(error),
             }
         }
     }

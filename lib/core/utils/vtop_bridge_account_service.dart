@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/app_urls.dart';
 
 const bridgeLinkedSettingKey = 'settings_bridge_linked';
@@ -238,6 +239,8 @@ class BridgeAccount {
     required this.keys,
     this.settings = const BridgeSettings(),
     this.semesterId,
+    this.vaultSavedAt,
+    this.credentialsRejectedAt,
   });
 
   final String registrationNumber;
@@ -252,6 +255,12 @@ class BridgeAccount {
 
   /// The semester the bridge has from this app; agents default to it.
   final String? semesterId;
+
+  /// When the usable saved credentials were sent.
+  final DateTime? vaultSavedAt;
+
+  /// When VTOP last refused the saved credentials (they are dropped then).
+  final DateTime? credentialsRejectedAt;
 
   bool get linkedHere => linked && thisPhone;
 }
@@ -351,18 +360,50 @@ class VtopBridgeAccountService {
     required String fcmToken,
     Map<String, dynamic>? credentials,
     String? semesterId,
+    EdgeDevice? device,
   }) async {
     final body = await _post(
       '/v1/link',
       cookies: cookies,
       body: {
         'fcmToken': fcmToken,
+        // Session requests then arrive as events of this install.
+        ...?(device == null
+            ? null
+            : {'deviceId': device.id, 'deviceSecret': device.secret}),
         ...?(semesterId == null ? null : {'semesterId': semesterId}),
         ...?(credentials == null ? null : {'credentials': credentials}),
       },
     );
     final secret = body['appSecret'];
     if (secret is String && secret.isNotEmpty) await _secrets.write(secret);
+  }
+
+  /// VTOP turned the saved password down on this phone: the server stops
+  /// signing in with its copy too. Needs no session (there is none now);
+  /// the app secret proves the phone. Does nothing when not linked.
+  Future<void> reportCredentialsRejected({
+    required String registrationNumber,
+  }) async {
+    final secret = await _secrets.read();
+    if (secret == null || registrationNumber.trim().isEmpty) return;
+    final response = await _client
+        .post(
+          Uri.parse('$_baseUrl/v1/account/credentials-rejected'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'registrationNumber': registrationNumber.trim(),
+            'appSecret': secret,
+          }),
+        )
+        .timeout(_timeout);
+    if (response.statusCode >= 300) {
+      throw BridgeAccountException(
+        code: 'http_${response.statusCode}',
+        message: 'The server did not take the report.',
+        statusCode: response.statusCode,
+      );
+    }
   }
 
   Future<BridgeKey> createKey({
@@ -416,6 +457,12 @@ class VtopBridgeAccountService {
       semesterId: body['semesterId'] is String
           ? body['semesterId'] as String
           : null,
+      vaultSavedAt: body['vaultSavedAt'] == null
+          ? null
+          : _dateTimeFromUnixSeconds(body['vaultSavedAt']),
+      credentialsRejectedAt: body['credentialsRejectedAt'] == null
+          ? null
+          : _dateTimeFromUnixSeconds(body['credentialsRejectedAt']),
     );
   }
 
@@ -424,14 +471,22 @@ class VtopBridgeAccountService {
     await _keys.remove(id);
   }
 
+  /// With [device], the account also moves to that install (after the app
+  /// had to register a new one).
   Future<void> updateFcmToken({
     required String cookies,
     required String fcmToken,
+    EdgeDevice? device,
   }) async {
     await _post(
       '/v1/account/fcm-token',
       cookies: cookies,
-      body: {'fcmToken': fcmToken},
+      body: {
+        'fcmToken': fcmToken,
+        ...?(device == null
+            ? null
+            : {'deviceId': device.id, 'deviceSecret': device.secret}),
+      },
     );
   }
 

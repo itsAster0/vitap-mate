@@ -8,6 +8,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/router.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/general_utils.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
@@ -29,6 +31,10 @@ Future<void> main() async {
   Workmanager().initialize(callbackDispatcher);
 
   fileDownloaderConfig();
+  EdgeEventChannel.instance
+    ..on(mailOtpMessageType, handleMailOtpEvent)
+    ..on(vtopCookieRequestType, handleVtopCookieRequestEvent)
+    ..start();
 
   runApp(const ProviderScope(child: MyApp()));
 }
