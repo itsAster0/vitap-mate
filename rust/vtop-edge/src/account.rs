@@ -738,15 +738,21 @@ impl Account {
             Ok(doc) => doc,
             Err(response) => return Ok(response),
         };
-        let label = doc
-            .keys
-            .iter()
-            .find(|key| key.hash == call.key_hash)
-            .map(|key| key.label.clone());
+        let key = doc.keys.iter().find(|key| key.hash == call.key_hash);
+        let now = now();
+        // Read-only: how a session for this key will be made, for clients
+        // to show. Changing it stays in the app.
         Response::from_json(&json!({
             "registrationNumber": doc.id,
-            "keyLabel": label,
+            "keyLabel": key.map(|key| key.label.clone()),
+            "keyCreatedAt": key.map(|key| key.created_at),
+            "keyLastUsedAt": key.and_then(|key| key.last_used_at),
             "semesterId": doc.semester_id,
+            "settings": doc.settings,
+            "phoneLinked": doc.device_id.is_some(),
+            "savedCredentials": doc.usable_vault(now).is_some(),
+            "vaultSavedAt": doc.usable_vault(now).and(doc.vault_saved_at),
+            "credentialsRejectedAt": doc.credentials_rejected_at,
         }))
     }
 
