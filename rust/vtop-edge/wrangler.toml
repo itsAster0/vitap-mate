@@ -70,8 +70,8 @@ class_name = "Engine"
 class_name = "Engine"
 image = "../Dockerfile.engine"
 image_build_context = ".."
-# 1/4 vCPU, 1 GiB.
-instance_type = "basic"
+# 1/16 vCPU, 256 MiB: the engine peaks around 18 MiB and a few % CPU.
+instance_type = "lite"
 max_instances = 2
 
 [[migrations]]
