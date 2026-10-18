@@ -1,5 +1,4 @@
-//! Stand-ins for Google and VTOP, for this crate's tests and for
-//! integration tests.
+//! Stand-ins for VTOP, for this crate's tests.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -7,11 +6,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use vtop_core::gmail::GmailAccess;
 use vtop_core::SessionState;
 
-use crate::gmail::{FreshToken, GmailGrant, GmailRefresher, RefreshError};
-use crate::login::{LoginError, VtopLogin};
+use crate::login::{ForwardedLogin, LoginError, OtpCodes};
 
 pub fn session(cookies: &str) -> SessionState {
     SessionState {
@@ -23,37 +20,10 @@ pub fn session(cookies: &str) -> SessionState {
     }
 }
 
-/// Answers every refresh with `result`.
-pub struct FakeRefresher {
-    pub result: Mutex<Result<(), RefreshError>>,
-    pub calls: AtomicUsize,
-}
-
-impl Default for FakeRefresher {
-    fn default() -> Self {
-        Self {
-            result: Mutex::new(Ok(())),
-            calls: AtomicUsize::new(0),
-        }
-    }
-}
-
-#[async_trait]
-impl GmailRefresher for FakeRefresher {
-    async fn refresh(&self, _grant: &GmailGrant) -> Result<FreshToken, RefreshError> {
-        self.calls.fetch_add(1, Ordering::SeqCst);
-        self.result.lock().unwrap().clone().map(|()| FreshToken {
-            access_token: "access".into(),
-            expires_at: vtop_core::now_unix() + 3599,
-        })
-    }
-}
-
-/// Answers logins from a queue (then with the last answer), after `delay`.
+/// Answers sign-ins from a queue (then with the last answer).
 pub struct FakeLogin {
     pub results: Mutex<VecDeque<Result<SessionState, LoginError>>>,
     pub calls: AtomicUsize,
-    pub delay: Duration,
 }
 
 impl FakeLogin {
@@ -61,7 +31,6 @@ impl FakeLogin {
         Self {
             results: Mutex::new(VecDeque::from([result])),
             calls: AtomicUsize::new(0),
-            delay: Duration::ZERO,
         }
     }
 
@@ -80,17 +49,28 @@ impl Default for FakeLogin {
     }
 }
 
+/// Asks `codes` once (as a real sign-in would when VTOP wants an OTP)
+/// unless the queued answer is `InvalidCredentials`, then answers from the
+/// queue; with no code it fails as a real sign-in would.
 #[async_trait]
-impl VtopLogin for FakeLogin {
+impl ForwardedLogin for FakeLogin {
     async fn login(
         &self,
         _username: &str,
         _password: &str,
-        _gmail: GmailAccess,
-        _wait: Duration,
+        codes: &dyn OtpCodes,
+        wait: Duration,
     ) -> Result<SessionState, LoginError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        tokio::time::sleep(self.delay).await;
+        let next = self.results.lock().unwrap().front().cloned();
+        if !matches!(next, Some(Err(LoginError::InvalidCredentials)))
+            && codes
+                .next(vtop_core::now_unix(), wait, Vec::new())
+                .await
+                .is_none()
+        {
+            return Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()));
+        }
         let mut results = self.results.lock().unwrap();
         if results.len() > 1 {
             results.pop_front().unwrap()

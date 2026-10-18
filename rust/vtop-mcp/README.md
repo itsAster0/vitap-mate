@@ -1,21 +1,23 @@
 # vtop-mcp
 
-An MCP server for VTOP. Every tool is read-only except `get_session`, which hands a
-signed-in session to a browser. It runs `vtop-core` against a session it
-gets from `vtop-bridge`, so it never sees a password.
+The MCP tools for VTOP, as a library: the engine (`vtop-bridge`) serves
+them at `/mcp`, and the edge sends `/mcp` on to it. Every tool is read-only
+except `get_session`, which hands a signed-in session to a browser. It runs
+`vtop-core` against a session it gets from the edge with the caller's own
+key, so it never sees a password.
 
 Students create an access key in VITAP Mate → Settings → Connected apps and
 add the MCP URL it shows (the key is in the path) to their agent:
 
 ```
-https://vtop-mcp.aster0.dev/mcp/vtm_…
+https://vmate-api.aster0.dev/mcp/vtm_…
 ```
 
 `Authorization: Bearer vtm_…` on `/mcp` works too.
 
 Transport is streamable HTTP, stateless, JSON responses. Keys are checked
-against the bridge (`/v1/whoami`, cached 5 minutes). When VTOP rejects a
-session, the server asks the bridge to expire it and retries once.
+against the edge (`/v1/whoami`, cached 5 minutes). When VTOP rejects a
+session, the server asks the edge to expire it and retries once.
 
 ## Tools
 
@@ -42,17 +44,12 @@ session, the server asks the bridge to expire it and retries once.
 
 ## Configuration
 
-| Variable     | Default | Notes                                              |
-| ------------ | ------- | -------------------------------------------------- |
-| `BRIDGE_URL` | —       | required; on Railway the bridge's private address |
-| `PORT`       | 8080    | listens on `[::]`                                  |
+None of its own: the engine mounts it when `EDGE_URL` is set, and gets
+sessions from that edge.
 
-## Run and test
+## Test
 
 ```sh
 cd rust
 cargo test -p vtop-mcp
-BRIDGE_URL=http://localhost:8090 cargo run -p vtop-mcp
 ```
-
-Railway builds it with Railpack from `rust/railpack.vtop-mcp.json`.

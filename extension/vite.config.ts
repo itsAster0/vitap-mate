@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
     bridgeHostPermission(
       loadEnv(mode, __dirname, "VITE_").VITE_BRIDGE_URL ??
-        "https://vtop-bridge.aster0.dev",
+        "https://vmate-api.aster0.dev",
     ),
   ],
   base: "./",

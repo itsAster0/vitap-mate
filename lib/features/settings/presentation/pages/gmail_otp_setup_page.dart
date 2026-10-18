@@ -248,6 +248,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
             points: const [
               MethodPoint('No Google Cloud project'),
               MethodPoint('Fills in instantly, even with the app closed'),
+              MethodPoint('Lets the server sign in for you, if you turn it on'),
             ],
             status: forwarding == null
                 ? null
@@ -280,8 +281,11 @@ class GmailOtpSetupPage extends HookConsumerWidget {
               ('Who sees mail', 'Only this phone'),
             ],
             points: const [
-              MethodPoint('Also works for server sign-in'),
               MethodPoint('Can move used OTP mail to Trash'),
+              MethodPoint(
+                'Only this phone; server sign-in needs forwarding',
+                caveat: true,
+              ),
               MethodPoint(
                 'Needs a laptop, or Chrome’s desktop mode',
                 caveat: true,

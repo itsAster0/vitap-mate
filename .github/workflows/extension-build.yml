@@ -1,0 +1,108 @@
+name: Extension Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "extension/**"
+      - ".github/workflows/extension-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: extension-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-extension:
+    name: Build extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: extension/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Test
+        run: pnpm test
+
+      # Uses the server URL in extension/.env.
+      - name: Build
+        run: pnpm build
+
+      # Chrome shows version_name on the extensions page, so a build can be
+      # matched to its commit. The manifest version itself is bumped by hand.
+      - name: Stamp the commit
+        run: |
+          version=$(jq -r .version dist/manifest.json)
+          jq --arg name "$version (${GITHUB_SHA::7})" '.version_name = $name' \
+            dist/manifest.json > dist/manifest.tmp
+          mv dist/manifest.tmp dist/manifest.json
+
+      - name: Package
+        run: |
+          rm -f extension.zip
+          zip -qr extension.zip dist
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-extension
+          path: extension/extension.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      # Replaces extension.zip on the `extension-latest` release in place:
+      # the app links to that release, so the link keeps working. The
+      # hand-made `extension` release is left alone.
+      - name: Publish to the extension-latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(jq -r .version dist/manifest.json)
+          short_sha="${GITHUB_SHA::7}"
+          {
+            echo "Browser extension ${version}, built from \`${short_sha}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            echo "**$(git log -1 --format=%s)**"
+            echo
+            echo "Download \`extension.zip\`, unzip it, then in Chrome open \`chrome://extensions\`,"
+            echo "turn on Developer mode and choose **Load unpacked** on the \`dist\` folder."
+            echo "Updating: replace the folder and press the reload button on the extension's card."
+          } > release-notes.md
+
+          if gh release view extension-latest >/dev/null 2>&1; then
+            gh release upload extension-latest extension.zip --clobber
+            gh release edit extension-latest \
+              --title "Browser extension ${version} (${short_sha})" \
+              --notes-file release-notes.md
+          else
+            gh release create extension-latest extension.zip \
+              --target "$GITHUB_SHA" \
+              --latest=false \
+              --title "Browser extension ${version} (${short_sha})" \
+              --notes-file release-notes.md
+          fi

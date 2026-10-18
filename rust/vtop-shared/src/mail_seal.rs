@@ -7,7 +7,7 @@
 //! The key is HKDF-SHA256 over the X25519 shared secret, salted with the
 //! ephemeral and recipient public keys, info [`INFO`]. The mailbox id is the
 //! associated data, so a box cannot be replayed to another mailbox.
-//! `workers/mail-otp/src/seal.js` implements the same format.
+//! The app opens boxes through this module; the edge Worker seals with it.
 
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};

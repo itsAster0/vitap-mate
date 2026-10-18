@@ -178,3 +178,113 @@ impl SessionSource for BridgeClient {
         }
     }
 }
+
+/// Keeps each key's session for `ttl`, so tools called one after another
+/// skip the trip to the edge (and the edge's VTOP check of its cached
+/// session). When VTOP rejects a kept session, the tools call `expire`,
+/// which drops it here too and fetches a fresh one.
+pub struct CachedSessions {
+    inner: std::sync::Arc<dyn SessionSource>,
+    ttl: Duration,
+    kept: tokio::sync::Mutex<std::collections::HashMap<String, (Instant, SessionState)>>,
+}
+
+impl CachedSessions {
+    pub fn new(inner: std::sync::Arc<dyn SessionSource>, ttl: Duration) -> Self {
+        Self {
+            inner,
+            ttl,
+            kept: Default::default(),
+        }
+    }
+}
+
+#[async_trait]
+impl SessionSource for CachedSessions {
+    async fn whoami(&self, key: &str) -> Result<Option<Identity>, String> {
+        self.inner.whoami(key).await
+    }
+
+    async fn session(&self, key: &str) -> Result<SessionState, String> {
+        {
+            let mut kept = self.kept.lock().await;
+            kept.retain(|_, (at, _)| at.elapsed() < self.ttl);
+            if let Some((_, session)) = kept.get(key) {
+                return Ok(session.clone());
+            }
+        }
+        let session = self.inner.session(key).await?;
+        // Only a signed-in session is worth reusing, not one waiting on an OTP.
+        if session.otp_issued_at.is_none() {
+            self.kept
+                .lock()
+                .await
+                .insert(key.to_string(), (Instant::now(), session.clone()));
+        }
+        Ok(session)
+    }
+
+    async fn expire(&self, key: &str) -> Result<(), String> {
+        self.kept.lock().await.remove(key);
+        self.inner.expire(key).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use super::*;
+
+    #[derive(Default)]
+    struct Counting {
+        sessions: AtomicUsize,
+        expires: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SessionSource for Counting {
+        async fn whoami(&self, _key: &str) -> Result<Option<Identity>, String> {
+            Ok(None)
+        }
+        async fn session(&self, key: &str) -> Result<SessionState, String> {
+            let n = self.sessions.fetch_add(1, Ordering::SeqCst);
+            Ok(SessionState {
+                cookies: format!("{key}-{n}"),
+                csrf_token: None,
+                registration_number: None,
+                otp_issued_at: None,
+                logged_in_at: None,
+            })
+        }
+        async fn expire(&self, _key: &str) -> Result<(), String> {
+            self.expires.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn keeps_a_session_until_expired() {
+        let inner = Arc::new(Counting::default());
+        let cached = CachedSessions::new(inner.clone(), Duration::from_secs(60));
+        let first = cached.session("a").await.unwrap();
+        assert_eq!(cached.session("a").await.unwrap(), first);
+        assert_eq!(inner.sessions.load(Ordering::SeqCst), 1);
+        // Another key gets its own.
+        assert_ne!(cached.session("b").await.unwrap(), first);
+        cached.expire("a").await.unwrap();
+        assert_eq!(inner.expires.load(Ordering::SeqCst), 1);
+        assert_ne!(cached.session("a").await.unwrap(), first);
+        assert_eq!(inner.sessions.load(Ordering::SeqCst), 3);
+    }
+
+    #[tokio::test]
+    async fn fetches_again_after_the_ttl() {
+        let inner = Arc::new(Counting::default());
+        let cached = CachedSessions::new(inner.clone(), Duration::ZERO);
+        cached.session("a").await.unwrap();
+        cached.session("a").await.unwrap();
+        assert_eq!(inner.sessions.load(Ordering::SeqCst), 2);
+    }
+}

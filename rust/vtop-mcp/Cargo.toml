@@ -2,7 +2,7 @@
 name = "vtop-mcp"
 version = "0.1.0"
 edition = "2021"
-description = "MCP server exposing VTOP data through sessions from vtop-bridge"
+description = "VTOP MCP tools, served by the engine (vtop-bridge) behind the edge's /mcp"
 
 [dependencies]
 vtop-core = { path = "../vtop-core" }
@@ -12,7 +12,6 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 async-trait = "0.1"
 sha2 = "0.10"
 rmcp = { version = "3", features = ["server", "macros", "transport-streamable-http-server"] }
