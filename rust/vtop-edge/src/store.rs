@@ -321,7 +321,11 @@ impl Mailbox {
             // Sleeps until /waiter-result wakes it or time runs out, then
             // looks again.
             let (woken, parked) = oneshot::channel();
-            self.wake.borrow_mut().entry(key.clone()).or_default().push(woken);
+            self.wake
+                .borrow_mut()
+                .entry(key.clone())
+                .or_default()
+                .push(woken);
             let timeout = worker::Delay::from(Duration::from_secs(left));
             if let Either::Right(_) = select(parked, timeout).await {
                 if let Some(list) = self.wake.borrow_mut().get_mut(&key) {
@@ -349,7 +353,11 @@ impl Index {
                 self.state.storage().delete_all().await?;
                 sql::create(&db, INDEX_SCHEMA)?;
                 if let Some(value) = old {
-                    sql::run(&db, "INSERT INTO entry (value) VALUES (?)", vec![sql::v_text(&value)])?;
+                    sql::run(
+                        &db,
+                        "INSERT INTO entry (value) VALUES (?)",
+                        vec![sql::v_text(&value)],
+                    )?;
                 }
             }
             self.ready.set(true);
@@ -378,7 +386,11 @@ impl DurableObject for Index {
             Method::Put => {
                 let value = req.text().await?;
                 sql::run(&db, "DELETE FROM entry", vec![])?;
-                sql::run(&db, "INSERT INTO entry (value) VALUES (?)", vec![sql::v_text(&value)])?;
+                sql::run(
+                    &db,
+                    "INSERT INTO entry (value) VALUES (?)",
+                    vec![sql::v_text(&value)],
+                )?;
                 Ok(Response::empty()?.with_status(204))
             }
             // Deletes only while it still holds the value given.

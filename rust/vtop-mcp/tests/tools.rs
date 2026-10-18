@@ -96,6 +96,27 @@ async fn retry_gives_up_after_second_expiry() {
 }
 
 #[tokio::test]
+async fn http_error_gets_a_fresh_session() {
+    // VTOP answers 404 for a session it dropped.
+    let source = FakeSource::new();
+    let calls = AtomicUsize::new(0);
+    let result = with_retry(source.as_ref(), KEY, |_client| {
+        let call = calls.fetch_add(1, Ordering::SeqCst);
+        async move {
+            if call == 0 {
+                Err(VtopError::VtopServerError("VTOP returned HTTP 404".into()))
+            } else {
+                Ok(5)
+            }
+        }
+    })
+    .await;
+    assert_eq!(result, Ok(5));
+    assert_eq!(source.sessions.load(Ordering::SeqCst), 2);
+    assert_eq!(source.expires.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
 async fn other_errors_are_not_retried() {
     let source = FakeSource::new();
     let result: Result<(), String> = with_retry(source.as_ref(), KEY, |_client| async {
