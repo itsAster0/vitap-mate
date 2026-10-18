@@ -71,6 +71,52 @@ fn put_opt(fields: &mut Map<String, Value>, name: &str, value: &Option<String>) 
     }
 }
 
+/// Every document of `collection`, as (id, fields).
+pub async fn list_documents(
+    http: &reqwest::Client,
+    tokens: &Arc<dyn TokenSource>,
+    collection: &str,
+) -> Result<Vec<(String, Map<String, Value>)>, String> {
+    let url = format!(
+        "{DEFAULT_BASE_URL}/projects/{}/databases/(default)/documents/{collection}",
+        tokens.project_id()
+    );
+    let mut docs = Vec::new();
+    let mut page = String::new();
+    loop {
+        let token = tokens.token().await.map_err(|e| e.to_string())?;
+        let mut request = http
+            .get(&url)
+            .bearer_auth(token)
+            .query(&[("pageSize", "300")]);
+        if !page.is_empty() {
+            request = request.query(&[("pageToken", page.as_str())]);
+        }
+        let response = request
+            .send()
+            .await
+            .map_err(|e| e.without_url().to_string())?;
+        if !response.status().is_success() {
+            return Err(format!("listing {collection}: {}", response.status()));
+        }
+        let body: Value = response.json().await.map_err(|e| e.to_string())?;
+        for doc in body["documents"].as_array().into_iter().flatten() {
+            let Some(id) = doc["name"]
+                .as_str()
+                .and_then(|name| name.rsplit('/').next())
+            else {
+                continue;
+            };
+            let fields = doc["fields"].as_object().cloned().unwrap_or_default();
+            docs.push((id.to_string(), fields));
+        }
+        match body["nextPageToken"].as_str() {
+            Some(next) if !next.is_empty() => page = next.to_string(),
+            _ => return Ok(docs),
+        }
+    }
+}
+
 pub fn request_fields(doc: &RequestDoc) -> Value {
     let mut fields = Map::new();
     put_opt(&mut fields, "responseToken", &doc.response_token);

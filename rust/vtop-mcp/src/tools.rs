@@ -20,7 +20,9 @@ use crate::bridge::SessionSource;
 pub struct Caller(pub String);
 
 /// Runs `call` with a client for `username`'s session. When VTOP says the
-/// session expired, drops it at the bridge and tries once more.
+/// session expired, or answers with an HTTP error (it gives 404 for a
+/// session it dropped, e.g. after use from another address), drops the
+/// session (here and at the edge) and tries once more with a fresh one.
 pub async fn with_retry<T, F, Fut>(
     source: &dyn SessionSource,
     username: &str,
@@ -37,7 +39,7 @@ where
             .with_session(&session)
             .map_err(|error| error.to_string())?;
         match call(client).await {
-            Err(VtopError::SessionExpired) if !retried => {
+            Err(VtopError::SessionExpired | VtopError::VtopServerError(_)) if !retried => {
                 retried = true;
                 source.expire(username).await?;
             }

@@ -36,7 +36,7 @@ const _troubleshooting = <(String, String)>[
   ),
   (
     'Still asked to type the OTP',
-    'Check the filter’s From is exactly $_vtopSender and “Forward it to” is ticked. Mail sent before the filter is not forwarded.',
+    'In Gmail, Settings → Filters: the filter’s From must be exactly $_vtopSender and its action must say “Forward to” your address. A filter that only marks mail as read forwards nothing. Mail sent before the filter is not forwarded.',
   ),
   (
     'New phone or reinstalled the app',
@@ -44,7 +44,7 @@ const _troubleshooting = <(String, String)>[
   ),
   (
     'VTOP didn’t ask for an OTP',
-    'VTOP doesn’t ask on every sign-in. If Gmail’s confirmation reached this phone in step 2, forwarding works; the next OTP will come the same way.',
+    'VTOP doesn’t ask on every sign-in. Gmail’s confirmation in step 2 only proves the address; also check in Settings → Filters that the filter says “Forward to” your address.',
   ),
 ];
 

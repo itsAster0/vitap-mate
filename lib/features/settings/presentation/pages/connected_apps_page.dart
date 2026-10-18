@@ -11,7 +11,9 @@ import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/edge/edge_device.dart';
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
+import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -95,17 +97,15 @@ class ConnectedAppsPage extends HookConsumerWidget {
     Future<Map<String, dynamic>?> consentCredentials() async {
       final user = await ref.read(vtopUserProvider.future);
       if (user is! ConfiguredVtopUser) return null;
-      final gmail = await ref
-          .read(googleEmailOtpAuthServiceProvider)
-          .loadSession();
+      final forwarding = await ref
+          .read(mailForwardingServiceProvider)
+          .isReady();
       return bridgeCredentialsPayload(
         wantCredentials: true,
         serverSignIn: true,
         username: user.username,
         password: user.password,
-        gmail: gmail,
-        deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
-        sharedClientId: googleOauthClientId,
+        forwarding: forwarding,
       );
     }
 
@@ -120,18 +120,26 @@ class ConnectedAppsPage extends HookConsumerWidget {
       if (withCredentials) {
         credentials = await consentCredentials();
         if (credentials == null) {
-          throw StateError('Set up Gmail OTP auto-fetch first.');
+          throw StateError('Set up OTP email forwarding first.');
         }
       }
       final semid = (await ref.read(vtopUserProvider.future)).semid;
-      await withService(
-        (s, c) => s.link(
+      final device = await EdgeDeviceService().ensure(token);
+      await withService((s, c) async {
+        // The server keeps credentials only for the owner of a forwarding
+        // address, so tie it to this student first.
+        if (credentials != null) {
+          await ref.read(mailForwardingServiceProvider).claimOwner(cookies: c);
+        }
+        await s.link(
           cookies: c,
           fcmToken: token,
           credentials: credentials,
           semesterId: semid,
-        ),
-      );
+          device: device,
+        );
+      });
+      unawaited(EdgeEventChannel.instance.connect());
       final prefs = await ref.read(settingsProvider.future);
       await prefs.setBool(bridgeLinkedSettingKey, true);
       await prefs.setString(bridgeLastFcmTokenSettingKey, token);
@@ -221,6 +229,12 @@ class ConnectedAppsPage extends HookConsumerWidget {
         final prefs = await ref.read(settingsProvider.future);
         if (on) {
           await linkPhone(withCredentials: true);
+          final saved = await withService((s, c) => s.account(cookies: c));
+          if (!saved.savedCredentials) {
+            throw StateError(
+              'The server could not keep your password. Check OTP email forwarding and try again.',
+            );
+          }
         } else {
           await withService((s, c) => s.forgetCredentials(cookies: c));
         }
@@ -236,7 +250,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
     Future<void> clearCredentials() async {
       final ok = await confirm(
         'Clear saved credentials?',
-        'The server deletes your password and Gmail access and turns offline sign-in off. Your phone signs in instead.',
+        'The server deletes your password and turns offline sign-in off. Your phone signs in instead.',
         'Clear',
       );
       if (ok) await toggleServerSignIn(false);
@@ -292,7 +306,8 @@ class ConnectedAppsPage extends HookConsumerWidget {
     final signInOn = useFuture(
       useMemoized(serverSignInEnabled, [current, busy.value]),
     );
-    final gmailReady = ref.watch(emailOtpReadyProvider).value ?? false;
+    // The server reads the OTP from forwarded mail.
+    final forwardingReady = ref.watch(mailForwardingProvider).value != null;
     final offlineOn =
         (signInOn.data ?? false) && (current?.savedCredentials ?? false);
     // Settings change only from the linked phone (they need its secret).
@@ -360,76 +375,66 @@ class ConnectedAppsPage extends HookConsumerWidget {
                     icon: FLucideIcons.keyRound,
                     tone: colors.app.accentTone,
                   ),
-                  title: const Text('Offline sign-in'),
-                  subtitle: Text(
-                    gmailReady
-                        ? 'Server can sign in without your phone'
-                        : 'Needs Gmail OTP auto-fetch',
+                  title: const Text('Server sign-in'),
+                  subtitle: _SignInStatus(
+                    on: offlineOn,
+                    forwardingReady: forwardingReady,
+                    account: current,
                   ),
                   suffix: FSwitch(
                     value: offlineOn,
-                    onChange: busy.value || !gmailReady
+                    onChange: busy.value || !forwardingReady
                         ? null
                         : toggleServerSignIn,
                   ),
                 ),
                 if (offlineOn && settings != null) ...[
-                  FTile(
+                  FSelectMenuTile<int>(
+                    key: ValueKey(
+                      'first-${settings.alwaysUseVault}-${settings.phoneWaitSecs}',
+                    ),
                     prefix: _IconBox(
                       icon: FLucideIcons.zap,
                       tone: colors.app.accentTone,
                     ),
-                    title: const Text('Always use saved credentials'),
-                    subtitle: Text(
-                      settings.alwaysUseVault
-                          ? 'Server signs in right away'
-                          : 'Your phone is asked first',
+                    title: FTappable(child: const Text('Who signs in first')),
+                    subtitle: Text(_firstLabel(settings)),
+                    enabled: !busy.value,
+                    selectControl: FMultiValueControl.managedRadio(
+                      // 0: the server; otherwise the phone's seconds.
+                      initial: settings.alwaysUseVault
+                          ? 0
+                          : settings.phoneWaitSecs,
+                      onChange: (value) {
+                        if (value.isEmpty) return;
+                        final next = value.first == 0
+                            ? settings.copyWith(alwaysUseVault: true)
+                            : settings.copyWith(
+                                alwaysUseVault: false,
+                                phoneWaitSecs: value.first,
+                              );
+                        if (next == settings) return;
+                        saveSettings(next);
+                      },
                     ),
-                    suffix: FSwitch(
-                      value: settings.alwaysUseVault,
-                      onChange: busy.value
-                          ? null
-                          : (on) => saveSettings(
-                              settings.copyWith(alwaysUseVault: on),
-                            ),
-                    ),
+                    menu: [
+                      const FSelectTile(title: Text('Server'), value: 0),
+                      for (final secs in BridgeSettings.phoneWaitChoices)
+                        FSelectTile(
+                          title: Text('Phone · $secs s'),
+                          value: secs,
+                        ),
+                    ],
                   ),
-                  if (!settings.alwaysUseVault)
-                    FSelectMenuTile<int>(
-                      key: ValueKey('wait-${settings.phoneWaitSecs}'),
-                      prefix: _IconBox(
-                        icon: FLucideIcons.timer,
-                        tone: colors.app.accentTone,
-                      ),
-                      title: FTappable(child: const Text('Wait for phone')),
-                      subtitle: Text(
-                        'Phone gets ${settings.phoneWaitSecs} s, then the server signs in',
-                      ),
-                      enabled: !busy.value,
-                      selectControl: FMultiValueControl.managedRadio(
-                        initial: settings.phoneWaitSecs,
-                        onChange: (value) {
-                          if (value.isEmpty ||
-                              value.first == settings.phoneWaitSecs) {
-                            return;
-                          }
-                          saveSettings(
-                            settings.copyWith(phoneWaitSecs: value.first),
-                          );
-                        },
-                      ),
-                      menu: [
-                        for (final secs in BridgeSettings.phoneWaitChoices)
-                          FSelectTile(title: Text('$secs s'), value: secs),
-                      ],
-                    ),
                   FSelectMenuTile<int>(
                     key: ValueKey('ttl-${settings.vaultTtlSecs}'),
                     prefix: _IconBox(
                       icon: FLucideIcons.hourglass,
                       tone: colors.app.accentTone,
                     ),
-                    title: FTappable(child: const Text('Keep for')),
+                    title: FTappable(
+                      child: const Text('Forget password after'),
+                    ),
                     subtitle: Text(_ttlLabel(settings.vaultTtlSecs)),
                     enabled: !busy.value,
                     selectControl: FMultiValueControl.managedRadio(
@@ -456,7 +461,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
                       icon: FLucideIcons.eraser,
                       tone: colors.app.warning,
                     ),
-                    title: const Text('Clear saved credentials'),
+                    title: const Text('Forget password now'),
                     subtitle: const Text('Your phone signs in instead'),
                     onPress: busy.value ? null : clearCredentials,
                   ),
@@ -466,7 +471,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(4, Space.sm, 4, 0),
               child: Text(
-                'Off: the server never has your password and asks your phone each time. On: the server keeps your password and Gmail access encrypted and signs in itself, reading the OTP from Gmail. Either way, a session is checked with VTOP before an app gets it.',
+                'Off: your phone answers every request. On: the server keeps your password sealed and signs in itself with your forwarded OTP.',
                 style: muted,
               ),
             ),
@@ -548,7 +553,8 @@ class ConnectedAppsPage extends HookConsumerWidget {
                             'Could not reconnect',
                             () async => linkPhone(
                               withCredentials:
-                                  await serverSignInEnabled() && gmailReady,
+                                  await serverSignInEnabled() &&
+                                  forwardingReady,
                             ),
                           );
                         },
@@ -760,12 +766,77 @@ class _IconBox extends StatelessWidget {
 }
 
 String _ttlChoice(int? secs) => switch (secs) {
-  null => 'Until it stops working',
+  null => 'Never',
   86400 => '1 day',
   172800 => '2 days',
   _ => '${secs ~/ 3600} h',
 };
 
 String _ttlLabel(int? secs) => secs == null
-    ? 'Until VTOP or Google rejects it'
-    : '${_ttlChoice(secs)} after your phone last sent it';
+    ? 'Never, until VTOP rejects it'
+    : '${_ttlChoice(secs)} after your phone sent it';
+
+String _firstLabel(BridgeSettings settings) => settings.alwaysUseVault
+    ? 'Server, right away'
+    : 'Phone, then server after ${settings.phoneWaitSecs} s';
+
+String _ago(DateTime time) {
+  final elapsed = DateTime.now().difference(time);
+  if (elapsed.inMinutes < 1) return 'just now';
+  if (elapsed.inHours < 1) return '${elapsed.inMinutes} min ago';
+  if (elapsed.inDays < 1) return '${elapsed.inHours} h ago';
+  return '${elapsed.inDays} d ago';
+}
+
+/// What server sign-in can do right now: saved, refused by VTOP, or
+/// waiting on forwarding (with a way to set it up).
+class _SignInStatus extends StatelessWidget {
+  const _SignInStatus({
+    required this.on,
+    required this.forwardingReady,
+    required this.account,
+  });
+
+  final bool on;
+  final bool forwardingReady;
+  final BridgeAccount? account;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final saved = account?.vaultSavedAt;
+    final rejected = account?.credentialsRejectedAt;
+    if (on) {
+      return Text(
+        saved == null ? 'Password saved' : 'Password saved · ${_ago(saved)}',
+      );
+    }
+    if (!forwardingReady) {
+      return GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => context.pushNamed(Paths.mailForwarding),
+        child: Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(text: 'Needs email forwarding · '),
+              TextSpan(
+                text: 'Set up',
+                style: TextStyle(
+                  color: colors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (rejected != null) {
+      return Text(
+        'VTOP rejected your password ${_ago(rejected)}',
+        style: TextStyle(color: colors.destructive),
+      );
+    }
+    return const Text('Off · your phone signs in');
+  }
+}

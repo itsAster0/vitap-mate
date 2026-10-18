@@ -61,17 +61,24 @@ jobs:
           fi
 
           printf '%s' "$ENV_JSON" > .env.json
-          jq -e '
+          # Prints only the names of missing keys, never values.
+          missing=$(jq -r '
             . as $env |
-            all([
-              "FCM_COOKIE_CALLBACK_URL",
+            [
               "FIREBASE_ANDROID_API_KEY",
               "FIREBASE_ANDROID_APP_ID",
               "FIREBASE_MESSAGING_SENDER_ID",
               "FIREBASE_PROJECT_ID",
-              "FIREBASE_STORAGE_BUCKET"
-            ][]; ($env[.] // "") != "")
-          ' .env.json
+              "FIREBASE_STORAGE_BUCKET",
+              "VTOP_BRIDGE_URL",
+              "VTOP_EDGE_URL"
+            ][] | select(($env[.] // "") == "")
+          ' .env.json)
+          if [ -n "$missing" ]; then
+            echo "ENV_JSON is missing:"
+            echo "$missing"
+            exit 1
+          fi
 
       - name: Configure Android signing
         env:

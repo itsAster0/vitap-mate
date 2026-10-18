@@ -142,9 +142,29 @@ export function isLoginRedirect(url: string) {
   }
 }
 
+/** Who works on a pending request: the phone, the server, or neither yet. */
+export type SessionStage = "phone" | "server" | "starting";
+
+/** Where a ready session came from. */
+export type SessionSource = {
+  /** Who signed in to VTOP. */
+  from: "phone" | "server" | "unknown";
+  /** Handed out again from the server's cache rather than made now. */
+  cached: boolean;
+  /** When it was made (ms), if known. */
+  madeAt?: number;
+};
+
 export type SessionOutcome =
-  | { kind: "ready"; cookies: CookieEditorCookie[] }
-  | { kind: "pending"; requestId: string | undefined; pollAfterMs: number }
+  | { kind: "ready"; cookies: CookieEditorCookie[]; source: SessionSource }
+  | {
+      kind: "pending";
+      requestId: string | undefined;
+      pollAfterMs: number;
+      stage: SessionStage;
+      /** When the server takes over from a phone that hasn't answered (ms). */
+      serverDueAt: number | undefined;
+    }
   | { kind: "error"; message: string };
 
 type SessionReply = {
@@ -153,18 +173,57 @@ type SessionReply = {
   error?: string;
   requestId?: string;
   pollAfterMs?: number;
+  stage?: string;
+  serverDueAt?: string | null;
   cookies?: CookieEditorCookie[];
+  source?: { from?: string; cached?: boolean; madeAt?: string | null };
 };
+
+function sourceOf(value: SessionReply["source"]): SessionSource {
+  const from = value?.from === "phone" || value?.from === "server" ? value.from : "unknown";
+  return { from, cached: Boolean(value?.cached), madeAt: timeOf(value?.madeAt) };
+}
+
+function stageOf(value: unknown): SessionStage {
+  return value === "phone" || value === "server" ? value : "starting";
+}
+
+function timeOf(value: unknown): number | undefined {
+  const time = typeof value === "string" ? Date.parse(value) : NaN;
+  return Number.isFinite(time) ? time : undefined;
+}
+
+/** What to tell the student while a request is pending. */
+export function progressText(
+  stage: SessionStage,
+  serverDueAt: number | undefined,
+  now: number = Date.now(),
+) {
+  if (stage === "server") {
+    return "The server is signing in to VTOP. It may wait for the OTP email…";
+  }
+  if (stage === "phone") {
+    const left = serverDueAt === undefined ? 0 : Math.ceil((serverDueAt - now) / 1000);
+    return left > 0
+      ? `Waiting for your phone… (the server takes over in ${left} s)`
+      : "Waiting for your phone…";
+  }
+  return "Starting sign-in…";
+}
 
 /** Reads a reply from `POST /v1/session` or `GET /v1/session/requests/{id}`. */
 export function interpretSessionResponse(httpStatus: number, body: unknown): SessionOutcome {
   const reply = (typeof body === "object" && body !== null ? body : {}) as SessionReply;
-  if (reply.status === "ready") return { kind: "ready", cookies: reply.cookies ?? [] };
+  if (reply.status === "ready") {
+    return { kind: "ready", cookies: reply.cookies ?? [], source: sourceOf(reply.source) };
+  }
   if (httpStatus === 202 || reply.status === "pending") {
     return {
       kind: "pending",
       requestId: reply.requestId,
       pollAfterMs: clampPollAfter(reply.pollAfterMs ?? 1500),
+      stage: stageOf(reply.stage),
+      serverDueAt: timeOf(reply.serverDueAt),
     };
   }
   return { kind: "error", message: friendlyLoginError(httpStatus, JSON.stringify(reply)) };
@@ -172,7 +231,7 @@ export function interpretSessionResponse(httpStatus: number, body: unknown): Ses
 
 /** The bridge the extension uses unless another is set; from .env. */
 export const DEFAULT_BRIDGE_URL = (
-  import.meta.env.VITE_BRIDGE_URL ?? "https://vtop-bridge.aster0.dev"
+  import.meta.env.VITE_BRIDGE_URL ?? "https://vmate-api.aster0.dev"
 ).replace(/\/+$/, "");
 
 /** The https origin of a bridge URL the user typed, or null. */

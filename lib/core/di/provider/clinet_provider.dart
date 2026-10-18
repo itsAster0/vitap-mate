@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
@@ -11,6 +12,7 @@ import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -216,6 +218,8 @@ class VClient extends _$VClient {
             .read(vtopusersutilsProvider.notifier)
             .vtopUserSave(user.rejectCredentials());
         ref.invalidate(vtopUserProvider);
+        // The server must not keep trying the same password either.
+        unawaited(_reportCredentialsRejected(user.username));
       }
       if (uname != null &&
           uname.isNotEmpty &&
@@ -232,5 +236,22 @@ class VClient extends _$VClient {
 
       rethrow;
     }
+  }
+}
+
+Future<void> _reportCredentialsRejected(String? username) async {
+  if (username == null || username.trim().isEmpty) return;
+  final client = http.Client();
+  try {
+    await VtopBridgeAccountService(
+      client: client,
+    ).reportCredentialsRejected(registrationNumber: username);
+  } catch (error) {
+    AppLogger.instance.warning(
+      'client.auth',
+      'could not tell the server about rejected credentials: $error',
+    );
+  } finally {
+    client.close();
   }
 }

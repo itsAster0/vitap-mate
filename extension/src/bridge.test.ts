@@ -4,6 +4,7 @@ import {
   normalizeBridgeUrl,
   clampPollAfter,
   friendlyLoginError,
+  progressText,
   parseAPIError,
   validateCookies,
 } from "./bridge";
@@ -68,17 +69,26 @@ describe("session responses", () => {
     ).toEqual({
       kind: "ready",
       cookies: [{ domain: "vtop.vitap.ac.in", name: "JSESSIONID", value: "a" }],
+      source: { from: "unknown", cached: false, madeAt: undefined },
     });
   });
 
   it("reads a pending request", () => {
     expect(
       interpretSessionResponse(202, { status: "pending", requestId: "r1", pollAfterMs: 1500 }),
-    ).toEqual({ kind: "pending", requestId: "r1", pollAfterMs: 1500 });
+    ).toEqual({
+      kind: "pending",
+      requestId: "r1",
+      pollAfterMs: 1500,
+      stage: "starting",
+      serverDueAt: undefined,
+    });
     expect(interpretSessionResponse(202, { status: "pending" })).toEqual({
       kind: "pending",
       requestId: undefined,
       pollAfterMs: 1500,
+      stage: "starting",
+      serverDueAt: undefined,
     });
   });
 
@@ -126,7 +136,7 @@ describe("login redirects", () => {
 
 describe("bridge URL setting", () => {
   it("defaults to the URL from .env", () => {
-    expect(DEFAULT_BRIDGE_URL).toBe("https://vtop-bridge.aster0.dev");
+    expect(DEFAULT_BRIDGE_URL).toBe("https://vmate-api.aster0.dev");
   });
 
   it("keeps only an https origin", () => {
@@ -136,5 +146,46 @@ describe("bridge URL setting", () => {
     expect(normalizeBridgeUrl("http://bridge.example.com")).toBeNull();
     expect(normalizeBridgeUrl("")).toBeNull();
     expect(normalizeBridgeUrl("not a url")).toBeNull();
+  });
+
+  it("reads the stage of a pending request", () => {
+    const outcome = interpretSessionResponse(202, {
+      status: "pending",
+      requestId: "r",
+      stage: "phone",
+      serverDueAt: "2026-10-18T10:00:10Z",
+    });
+    expect(outcome).toMatchObject({ kind: "pending", stage: "phone" });
+    if (outcome.kind !== "pending") throw new Error("not pending");
+    expect(outcome.serverDueAt).toBe(Date.parse("2026-10-18T10:00:10Z"));
+    // Older servers send no stage.
+    expect(interpretSessionResponse(202, { status: "pending" })).toMatchObject({
+      stage: "starting",
+      serverDueAt: undefined,
+    });
+  });
+
+  it("reads where a session came from", () => {
+    expect(
+      interpretSessionResponse(200, {
+        status: "ready",
+        cookies: [],
+        source: { from: "server", cached: true, madeAt: "2026-10-18T10:00:00Z" },
+      }),
+    ).toMatchObject({
+      kind: "ready",
+      source: { from: "server", cached: true, madeAt: Date.parse("2026-10-18T10:00:00Z") },
+    });
+    // Older servers say nothing.
+    expect(interpretSessionResponse(200, { status: "ready", cookies: [] })).toMatchObject({
+      source: { from: "unknown", cached: false },
+    });
+  });
+
+  it("says who it is waiting for", () => {
+    expect(progressText("server", undefined)).toContain("server is signing in");
+    expect(progressText("phone", 10_000, 0)).toContain("takes over in 10 s");
+    expect(progressText("phone", 0, 5_000)).toBe("Waiting for your phone…");
+    expect(progressText("starting", undefined)).toBe("Starting sign-in…");
   });
 });

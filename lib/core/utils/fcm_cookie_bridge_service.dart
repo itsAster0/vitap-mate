@@ -14,7 +14,8 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/core/utils/edge/edge_device.dart';
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
@@ -25,7 +26,8 @@ import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
 
-const _cookieRequestType = 'vtop_cookie_request';
+/// A request for this phone's VTOP session, from an agent or the extension.
+const vtopCookieRequestType = 'vtop_cookie_request';
 const _vtopDomain = 'vtop.vitap.ac.in';
 
 bool get fcmCookieBridgePlatformSupported =>
@@ -142,12 +144,37 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
   if (type == mailOtpMessageType) {
     // Opened here; the OTP prompt or the setup page listening in this
     // isolate takes it. A background isolate has no listener, and the
-    // prompt pulls the box from the bridge when the app is back.
-    await MailForwardingService().handlePush(data);
+    // socket catches up when the app is back. The same event may also
+    // come over the socket; its sequence number is handled once.
+    final event = EdgeEvent.fromJson(data);
+    if (event == null) {
+      await MailForwardingService().handlePush(data);
+      return;
+    }
+    await (EdgeEventChannel.instance
+          ..on(mailOtpMessageType, handleMailOtpEvent))
+        .accept(event);
     return;
   }
-  if (type != _cookieRequestType) return;
+  if (type != vtopCookieRequestType) return;
+  // From the edge it is an event of this install: the socket may bring it
+  // too, and it is answered once.
+  final event = EdgeEvent.fromJson(data);
+  if (event != null) {
+    await (EdgeEventChannel.instance
+          ..on(vtopCookieRequestType, handleVtopCookieRequestEvent))
+        .accept(event);
+    return;
+  }
+  await answerVtopCookieRequest(data);
+}
 
+/// A cookie request that came as an edge event (socket or push).
+Future<void> handleVtopCookieRequestEvent(EdgeEvent event) =>
+    answerVtopCookieRequest(event.data);
+
+/// Answers a cookie request with this phone's VTOP session.
+Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
   final requestId = '${data['requestId'] ?? ''}'.trim();
   final responseToken = '${data['responseToken'] ?? ''}'.trim();
   final callbackUrl = _resolveCookieCallbackUrl(data);
@@ -277,21 +304,20 @@ Future<_PreparedCookieBridgePayload> _authenticatedCookieEditorCookies({
   }
 }
 
-/// The credentials to hand the bridge: only when it asked, the user turned
-/// on offline sign-in, and Gmail OTP access is set up.
+/// The credentials to hand the server: only when it asked, the user turned
+/// on offline sign-in, and OTP email forwarding is set up (the server reads
+/// the OTP from forwarded mail).
 Future<Map<String, dynamic>?> bridgeCredentialsFor(
   ProviderContainer container,
   VtopUserEntity user, {
   required bool wantCredentials,
 }) async {
   if (!wantCredentials) return null;
-  EmailOtpOAuthSession? gmail;
+  bool forwarding;
   try {
-    gmail = await container
-        .read(googleEmailOtpAuthServiceProvider)
-        .loadSession();
+    forwarding = await container.read(mailForwardingServiceProvider).isReady();
   } catch (_) {
-    gmail = null;
+    forwarding = false;
   }
   final prefs = await container.read(settingsProvider.future);
   return bridgeCredentialsPayload(
@@ -299,9 +325,7 @@ Future<Map<String, dynamic>?> bridgeCredentialsFor(
     serverSignIn: prefs.getBool(bridgeServerSignInSettingKey) ?? false,
     username: user.username?.trim() ?? '',
     password: user is ConfiguredVtopUser ? user.password : '',
-    gmail: gmail,
-    deleteAfterReading: container.read(emailOtpDeleteAfterReadingProvider),
-    sharedClientId: googleOauthClientId,
+    forwarding: forwarding,
   );
 }
 
@@ -352,11 +376,19 @@ Future<void> syncBridgeFcmToken(String? token) async {
     final current = token!;
 
     final cookieHeader = await _headlessVtopCookieHeader(container);
+    // The install this token belongs to, registered again if the edge lost
+    // it; without one the account keeps its old install.
+    EdgeDevice? device;
+    try {
+      device = await EdgeDeviceService().ensure(current);
+    } catch (_) {}
     final client = http.Client();
     try {
-      await VtopBridgeAccountService(
-        client: client,
-      ).updateFcmToken(cookies: cookieHeader, fcmToken: current);
+      await VtopBridgeAccountService(client: client).updateFcmToken(
+        cookies: cookieHeader,
+        fcmToken: current,
+        device: device,
+      );
     } finally {
       client.close();
     }
@@ -449,52 +481,25 @@ String cookieEditorJsonFromHeader(String cookieHeader) {
   ).convert(cookieEditorCookiesFromHeader(cookieHeader));
 }
 
-/// Credentials the cookie bridge may hand to the callback server so it can
-/// log in on its own. Null unless every required piece is present; secrets
-/// are never logged here.
+/// Credentials the phone may hand the server so it can sign in on its own.
+/// Null unless every required piece is present; secrets are never logged
+/// here.
 Map<String, dynamic>? bridgeCredentialsPayload({
   required bool wantCredentials,
   required bool serverSignIn,
   required String username,
   required String password,
-  required EmailOtpOAuthSession? gmail,
-  required bool deleteAfterReading,
-  required String sharedClientId,
+  required bool forwarding,
 }) {
   final trimmedUsername = username.trim();
   if (!wantCredentials ||
       !serverSignIn ||
+      !forwarding ||
       trimmedUsername.isEmpty ||
-      gmail == null ||
-      !gmail.hasGmailScope ||
-      gmail.refreshToken.isEmpty ||
       password.trim().isEmpty) {
     return null;
   }
-
-  String clientId;
-  String? clientSecret;
-  switch (gmail.authSource) {
-    case EmailOtpAuthSource.personalByok:
-      clientId = gmail.oauthClientId?.trim() ?? '';
-      if (clientId.isEmpty) return null;
-      final secret = gmail.oauthClientSecret?.trim() ?? '';
-      clientSecret = secret.isEmpty ? null : secret;
-    case EmailOtpAuthSource.sharedBuiltIn:
-      if (sharedClientId.isEmpty) return null;
-      clientId = sharedClientId;
-  }
-
-  return {
-    'username': trimmedUsername,
-    'password': password,
-    'gmail': <String, dynamic>{
-      'refresh_token': gmail.refreshToken,
-      'client_id': clientId,
-      ...?(clientSecret == null ? null : {'client_secret': clientSecret}),
-      'delete_after_reading': deleteAfterReading,
-    },
-  };
+  return {'username': trimmedUsername, 'password': password};
 }
 
 class CookieCallbackException implements Exception {

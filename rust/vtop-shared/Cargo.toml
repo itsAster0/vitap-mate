@@ -1,0 +1,20 @@
+[package]
+name = "vtop-shared"
+version = "0.1.0"
+edition = "2021"
+description = "Formats shared by the app, the edge Worker and the engine: no I/O, builds for native and wasm."
+
+[dependencies]
+aes-gcm = "0.10"
+base64 = "0.22.1"
+hex = "0.4"
+hkdf = "0.12"
+rand = "0.8"
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+

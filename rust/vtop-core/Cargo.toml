@@ -5,6 +5,7 @@ edition = "2021"
 description = "VTOP client, session handling and HTML parsers, with no FFI dependencies"
 
 [dependencies]
+vtop-shared = { path = "../vtop-shared" }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -16,11 +17,6 @@ urlencoding = "2"
 httpdate = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 thiserror = "2"
-x25519-dalek = { version = "2", features = ["static_secrets"] }
-hkdf = "0.12"
-sha2 = "0.10"
-aes-gcm = "0.10"
-rand = "0.8"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util"] }

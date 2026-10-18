@@ -1,0 +1,97 @@
+# The Cloudflare edge (Rust, workers-rs). Deploy from this directory:
+#   npx wrangler deploy
+# Secrets (wrangler secret put):
+#   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
+#   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
+#                              /internal/*
+#   VAULT_KEY                  the engine's sealing key, passed to its
+#                              container
+name = "vitapmate-edge"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-10-01"
+workers_dev = false
+routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
+
+[build]
+command = "sh build.sh"
+
+[vars]
+# Every address the edge uses; nothing is hard-coded. BRIDGE_URL and
+# MCP_URL take "container" to use the engine's container (see `Engine`).
+MAIL_DOMAIN = "aster0.dev"
+BRIDGE_URL = "container"
+FCM_URL = "https://fcm.googleapis.com"
+MCP_URL = "container"
+# This Worker's own address, for links it hands out.
+PUBLIC_URL = "https://vmate-api.aster0.dev"
+PUBLIC_MCP_URL = "https://vmate-api.aster0.dev/mcp"
+# Comma-separated origins allowed by CORS; empty allows every origin.
+ALLOWED_ORIGINS = ""
+# Where other @MAIL_DOMAIN mail goes; empty rejects it.
+FALLBACK_FORWARD = ""
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+# Request traces, including Durable Object calls (kept 7 days). Every
+# request while traffic is low; lower the rate as it grows, since stored
+# spans count toward Observability usage from 1 Dec 2026.
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+
+[[durable_objects.bindings]]
+name = "DEVICE"
+class_name = "Device"
+
+[[durable_objects.bindings]]
+name = "MAILBOX"
+class_name = "Mailbox"
+
+[[durable_objects.bindings]]
+name = "INDEX"
+class_name = "Index"
+
+[[durable_objects.bindings]]
+name = "FCM_TOKEN"
+class_name = "FcmToken"
+
+[[durable_objects.bindings]]
+name = "ACCOUNT"
+class_name = "Account"
+
+[[durable_objects.bindings]]
+name = "ENGINE"
+class_name = "Engine"
+
+# The engine (vtop-bridge), built from the Cargo workspace.
+[[containers]]
+class_name = "Engine"
+image = "../Dockerfile.engine"
+image_build_context = ".."
+# 1/16 vCPU, 256 MiB: the engine peaks around 18 MiB and a few % CPU.
+instance_type = "lite"
+max_instances = 2
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Doc", "DocSet"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Account"]
+
+# Doc and DocSet held the engine's storage while accounts moved over; the
+# Account objects replaced them. This erases their data.
+[[migrations]]
+tag = "v4"
+deleted_classes = ["Doc", "DocSet"]
+
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["Engine"]

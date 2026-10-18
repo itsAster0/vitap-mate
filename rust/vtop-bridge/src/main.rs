@@ -1,11 +1,9 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use tracing_subscriber::EnvFilter;
 use vtop_bridge::config::Config;
-use vtop_bridge::fcm::{self, FcmMessenger};
-use vtop_bridge::firestore::{FirestoreStore, DEFAULT_BASE_URL};
-use vtop_bridge::gmail::{GoogleOAuthRefresher, DEFAULT_TOKEN_URL};
-use vtop_bridge::google::{ServiceAccountTokens, TokenSource};
+use vtop_bridge::engine::HttpEdge;
 use vtop_bridge::login::CoreLogin;
 use vtop_bridge::verify::CoreVerifier;
 use vtop_bridge::{router, AppState, Parts};
@@ -23,62 +21,64 @@ async fn main() {
     let config = match Config::from_env() {
         Ok(config) => config,
         Err(error) => {
-            eprintln!("vtop-bridge: {error}");
+            eprintln!("vtop-engine: {error}");
             std::process::exit(2);
         }
     };
     let listen = config.listen;
-    let tokens: Arc<dyn TokenSource> =
-        match ServiceAccountTokens::from_json(&config.credentials_json) {
-            Ok(tokens) => Arc::new(tokens),
-            Err(error) => {
-                eprintln!("vtop-bridge: {error}");
-                std::process::exit(2);
-            }
-        };
-    let http = reqwest::Client::new();
-    let store = Arc::new(FirestoreStore::new(
-        http.clone(),
-        tokens.clone(),
-        DEFAULT_BASE_URL.into(),
-    ));
-    let messenger = Arc::new(FcmMessenger::new(
-        http.clone(),
-        tokens,
-        fcm::DEFAULT_BASE_URL.into(),
-    ));
-    let refresher = Arc::new(GoogleOAuthRefresher::new(http, DEFAULT_TOKEN_URL.into()));
-    let login = Arc::new(CoreLogin {
-        config: vtop_core::VtopConfig::default(),
+    let edge = Arc::new(HttpEdge {
+        http: reqwest::Client::new(),
+        base_url: config.edge_url.clone(),
+        secret: config.mail_relay_secret.clone(),
     });
-    let verifier = Arc::new(CoreVerifier {
-        config: vtop_core::VtopConfig::default(),
-    });
-    tracing::info!("starting vtop-bridge on {listen}");
+    // The MCP tools run here too, with sessions from the edge under each
+    // caller's own key; the edge sends `/mcp` on to this service.
+    // Sessions are kept a few minutes, so a run of tool calls asks the edge
+    // (and VTOP, to check it) once.
+    let sessions = vtop_mcp::bridge::CachedSessions::new(
+        Arc::new(vtop_mcp::bridge::BridgeClient::new(
+            reqwest::Client::new(),
+            config.edge_url.clone(),
+        )),
+        Duration::from_secs(300),
+    );
+    let mcp = vtop_mcp::mcp_router(Arc::new(sessions), Duration::from_secs(300));
+    let state = Arc::new(AppState::new(
+        config,
+        Parts {
+            forwarded_login: Arc::new(CoreLogin {
+                config: vtop_core::VtopConfig::default(),
+            }),
+            verifier: Arc::new(CoreVerifier {
+                config: vtop_core::VtopConfig::default(),
+            }),
+            edge,
+        },
+    ));
+    tracing::info!("starting vtop-engine on {listen}");
 
-    let listener = match tokio::net::TcpListener::bind(listen).await {
+    // Hosts without IPv6 (some containers) refuse `[::]`; take IPv4 there.
+    let ipv4 = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen.port()));
+    let bound = match tokio::net::TcpListener::bind(listen).await {
+        Err(error) if listen.is_ipv6() => {
+            tracing::info!("cannot bind {listen} ({error}); using {ipv4}");
+            tokio::net::TcpListener::bind(ipv4).await
+        }
+        bound => bound,
+    };
+    let listener = match bound {
         Ok(listener) => listener,
         Err(error) => {
-            eprintln!("vtop-bridge: cannot bind {listen}: {error}");
+            eprintln!("vtop-engine: cannot bind {listen}: {error}");
             std::process::exit(1);
         }
     };
-    let app = router(Arc::new(AppState::new(
-        config,
-        Parts {
-            store,
-            messenger,
-            refresher,
-            login,
-            verifier,
-        },
-    )))
-    .into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let app = router(state).merge(mcp);
     if let Err(error) = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
     {
-        eprintln!("vtop-bridge: {error}");
+        eprintln!("vtop-engine: {error}");
         std::process::exit(1);
     }
 }

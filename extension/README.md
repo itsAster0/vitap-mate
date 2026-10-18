@@ -10,7 +10,7 @@ installs the cookies and opens VTOP. It never sees a password.
 The bridge address comes from `.env`:
 
 ```
-VITE_BRIDGE_URL=https://vtop-bridge.aster0.dev
+VITE_BRIDGE_URL=https://vmate-api.aster0.dev
 ```
 
 The build writes its origin into the manifest's `host_permissions`. Students
