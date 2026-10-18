@@ -11,8 +11,7 @@ workers_dev = false
 routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
 
 [build]
-# Stripping removes the table wasm-bindgen's catch wrappers need.
-command = "cargo install -q worker-build && CARGO_PROFILE_RELEASE_STRIP=false worker-build --release"
+command = "sh build.sh"
 
 [vars]
 # Every address the edge uses; nothing is hard-coded.
