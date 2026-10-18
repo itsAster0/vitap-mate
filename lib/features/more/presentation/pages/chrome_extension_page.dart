@@ -120,14 +120,21 @@ class ChromeExtensionPage extends HookConsumerWidget {
                   number: '5',
                   title: 'Paste an access key',
                   description:
-                      'Go back to Connected apps, create a key, and paste it into the extension.',
+                      'Create a key in Connected apps. Click the VITAP Mate icon in Chrome’s toolbar (pin it from the puzzle menu) and paste the key.',
+                ),
+                Divider(height: 1),
+                _InstructionRow(
+                  number: '6',
+                  title: 'Sign in to VTOP',
+                  description:
+                      'Press Sign in in the extension, or the VITAP Mate button next to Student on the VTOP login page. It shows each step as your phone or the server signs in.',
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Keep your access key private. You can revoke it any time in Connected apps.',
+            'To update, download again, replace the dist folder, and press reload on the extension’s card in chrome://extensions. Keep your access key private; you can revoke it any time in Connected apps.',
             style: context.theme.typography.body.sm.copyWith(
               color: context.theme.colors.mutedForeground,
             ),

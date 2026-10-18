@@ -346,14 +346,35 @@ impl RequestRecord {
         self.error = Some(error.to_string());
     }
 
+    /// Who is working on a pending request, for clients to say what they
+    /// wait for: the server signing in, the phone, or neither yet.
+    pub fn stage(&self) -> &'static str {
+        if self.vault_started {
+            "server"
+        } else if self.phone_asked {
+            "phone"
+        } else {
+            "starting"
+        }
+    }
+
+    /// The pending reply's progress fields. `serverDueAt` is when the
+    /// server takes over from a phone that has not answered.
+    fn progress(&self) -> Value {
+        let due = self
+            .vault_due_at
+            .filter(|_| !self.vault_started)
+            .map(rfc3339);
+        json!({ "status": "pending", "stage": self.stage(), "serverDueAt": due })
+    }
+
     /// The pending reply of `POST /v1/session`.
     pub fn started_view(&self) -> Value {
-        json!({
-            "status": "pending",
-            "requestId": self.id,
-            "pollAfterMs": POLL_AFTER_MS,
-            "expiresAt": rfc3339(self.expires_at),
-        })
+        let mut view = self.progress();
+        view["requestId"] = json!(self.id);
+        view["pollAfterMs"] = json!(POLL_AFTER_MS);
+        view["expiresAt"] = json!(rfc3339(self.expires_at));
+        view
     }
 
     /// The reply of a poll, and its status code.
@@ -365,7 +386,7 @@ impl RequestRecord {
             );
         }
         match self.status {
-            RequestStatus::Pending => (202, json!({ "status": "pending" })),
+            RequestStatus::Pending => (202, self.progress()),
             RequestStatus::Success => (200, ready(self.cookies.as_deref().unwrap_or_default())),
             RequestStatus::Error => {
                 let error = self.error.clone().unwrap_or_default();
@@ -520,6 +541,14 @@ mod tests {
         let mut r = RequestRecord::new("r".into(), "h".into(), NOW);
         assert!(r.pending(NOW));
         assert_eq!(r.poll_view(NOW).0, 202);
+        assert_eq!(r.poll_view(NOW).1["stage"], "starting");
+        r.phone_asked = true;
+        r.vault_due_at = Some(NOW + 10);
+        assert_eq!(r.poll_view(NOW).1["stage"], "phone");
+        assert_eq!(r.started_view()["serverDueAt"], rfc3339(NOW + 10));
+        r.vault_started = true;
+        assert_eq!(r.poll_view(NOW).1["stage"], "server");
+        assert!(r.poll_view(NOW).1["serverDueAt"].is_null());
         assert_eq!(r.poll_view(NOW + REQUEST_TIMEOUT_SECS).0, 410);
         r.fail(vtop_shared::account::PHONE_UNREACHABLE);
         let (status, body) = r.poll_view(NOW);

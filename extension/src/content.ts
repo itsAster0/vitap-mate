@@ -45,6 +45,39 @@ function hideOverlay(delay = 1200) {
   }, delay);
 }
 
+/**
+ * After the extension is reloaded or updated, the copy of this script
+ * already in open tabs loses its link to the extension, and every
+ * `chrome.*` call throws "Extension context invalidated".
+ */
+function extensionAlive() {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+/** Messages the background, or asks for a reload if this tab is stale. */
+function sendToBackground(message: unknown, onReply?: (reply: any) => void) {
+  if (!extensionAlive()) {
+    document.getElementById("vtop-mate-panel-launcher")?.remove();
+    showOverlay("VITAP Mate was updated. Refresh this page to use it.");
+    hideOverlay(4000);
+    return;
+  }
+  try {
+    chrome.runtime.sendMessage(message, (reply) => {
+      // Reading lastError stops Chrome logging it when nobody answers.
+      void chrome.runtime.lastError;
+      onReply?.(reply);
+    });
+  } catch {
+    showOverlay("VITAP Mate was updated. Refresh this page to use it.");
+    hideOverlay(4000);
+  }
+}
+
 function isVtopRootPage() {
   return (
     window.location.hostname === "vtop.vitap.ac.in" &&
@@ -61,7 +94,7 @@ function isVtopPageOutsideContent() {
 }
 
 async function maybeAutoLogin() {
-  if (!isVtopRootPage()) return;
+  if (!isVtopRootPage() || !extensionAlive()) return;
 
   const result = await chrome.storage.local.get([
     "token",
@@ -86,21 +119,90 @@ async function maybeAutoLogin() {
   await chrome.storage.local.set({ lastAutoLoginAt: now });
   showOverlay("Auto login running...");
 
-  chrome.runtime.sendMessage(
-    { type: "LOGIN_WITH_TOKEN", source: "content" },
-    (response) => {
-      if (!response?.ok) {
-        showOverlay(`Auto login failed: ${response?.error ?? "Unknown error"}`);
-        hideOverlay(3500);
-      }
-    },
+  sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
+    if (!response?.ok) {
+      showOverlay(`Auto login failed: ${response?.error ?? "Unknown error"}`);
+      hideOverlay(3500);
+    }
+  });
+}
+
+const INLINE_ID = "vtop-mate-signin";
+
+/**
+ * Puts a "VITAP Mate" button next to the sign-in button on VTOP's Student
+ * card. VTOP loads that card after the page, so this runs again whenever
+ * the page changes.
+ */
+function addStudentCardButton() {
+  if (!extensionAlive() || document.getElementById(INLINE_ID)) return;
+  const studentButton = document.querySelector<HTMLButtonElement>(
+    "#stdForm button[type=submit]",
   );
+  if (!studentButton) return;
+
+  const button = document.createElement("button");
+  button.id = INLINE_ID;
+  button.type = "button";
+  button.title = "Sign in with VITAP Mate";
+  button.setAttribute("aria-label", "Sign in with VITAP Mate");
+  // Same size as VTOP's button so both fit side by side on the card.
+  button.className = "btn fw-bold ms-1";
+  button.style.background = "#4f46e5";
+  button.style.borderColor = "#6366f1";
+  button.style.color = "#ffffff";
+  button.style.display = "inline-flex";
+  button.style.alignItems = "center";
+  button.style.justifyContent = "center";
+  button.style.verticalAlign = "top";
+  button.style.width = `${studentButton.offsetWidth || 40}px`;
+  button.style.height = `${studentButton.offsetHeight || 38}px`;
+  button.style.padding = "0";
+
+  const icon = document.createElement("img");
+  icon.src = chrome.runtime.getURL("icons/icon-32.png");
+  icon.alt = "";
+  icon.style.width = "22px";
+  icon.style.height = "22px";
+  icon.style.borderRadius = "4px";
+  button.append(icon);
+
+  // The card is a link that submits VTOP's own form; keep the click here.
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!extensionAlive()) {
+      sendToBackground({});
+      return;
+    }
+    const stored = await chrome.storage.local.get(["token", "fmcToken"]);
+    if (!String(stored.token ?? stored.fmcToken ?? "").trim()) {
+      sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
+      return;
+    }
+    button.disabled = true;
+    button.style.opacity = "0.6";
+    showOverlay("Signing in with VITAP Mate…");
+    sendToBackground({ type: "LOGIN_WITH_TOKEN", source: "content" }, (response) => {
+      button.disabled = false;
+      button.style.opacity = "";
+      if (!response?.ok) hideOverlay(3500);
+    });
+  });
+
+  studentButton.insertAdjacentElement("afterend", button);
+  document.getElementById("vtop-mate-panel-launcher")?.remove();
 }
 
 function createPanelLauncher() {
   if (!isVtopPageOutsideContent()) return;
 
-  if (document.getElementById("vtop-mate-panel-launcher")) return;
+  if (
+    document.getElementById("vtop-mate-panel-launcher") ||
+    document.getElementById(INLINE_ID)
+  ) {
+    return;
+  }
 
   const button = document.createElement("button");
   button.id = "vtop-mate-panel-launcher";
@@ -119,9 +221,7 @@ function createPanelLauncher() {
   button.style.boxShadow = "0 10px 25px rgba(0,0,0,0.35)";
   button.style.cursor = "pointer";
   button.addEventListener("click", () => {
-    chrome.runtime.sendMessage({
-      type: "OPEN_EXTENSION_PANEL",
-    });
+    sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
   });
 
   document.documentElement.appendChild(button);
@@ -142,5 +242,13 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+addStudentCardButton();
 createPanelLauncher();
 maybeAutoLogin();
+
+if (isVtopPageOutsideContent()) {
+  new MutationObserver(() => addStudentCardButton()).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
