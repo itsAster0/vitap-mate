@@ -68,27 +68,39 @@ async fn require_bearer(
     mut request: Request,
     next: Next,
 ) -> Response {
-    // The key comes from `Authorization: Bearer`, or from the path
-    // (`/mcp/<key>`) for agents that only take a URL.
-    let from_header = request
+    // The key comes only from `Authorization: Bearer`, never the URL, so it
+    // stays out of logs and agent configs that show the URL. A key still in
+    // the path (`/mcp/<key>`, the old form) gets told where it goes now.
+    let in_path = request
+        .uri()
+        .path()
+        .strip_prefix("/mcp/")
+        .is_some_and(|rest| !rest.trim_matches('/').is_empty());
+    if in_path {
+        return (
+            StatusCode::UNAUTHORIZED,
+            [(header::WWW_AUTHENTICATE, "Bearer")],
+            Json(serde_json::json!({
+                "error": "the access key no longer goes in the URL: use the URL `/mcp` and send the key as the header `Authorization: Bearer vtm_…`"
+            })),
+        )
+            .into_response();
+    }
+    let presented = request
         .headers()
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim)
-        .filter(|key| !key.is_empty());
-    let from_path = request
-        .uri()
-        .path()
-        .strip_prefix("/mcp/")
-        .map(|rest| rest.split('/').next().unwrap_or_default().trim())
-        .filter(|key| !key.is_empty());
-    let presented = from_header.or(from_path).unwrap_or_default().to_string();
+        .unwrap_or_default()
+        .to_string();
     let unauthorized = || {
         (
             StatusCode::UNAUTHORIZED,
             [(header::WWW_AUTHENTICATE, "Bearer")],
-            Json(serde_json::json!({ "error": "missing, unknown or revoked access key" })),
+            Json(serde_json::json!({
+                "error": "missing, unknown or revoked access key; send it as `Authorization: Bearer vtm_…`"
+            })),
         )
             .into_response()
     };
@@ -130,7 +142,7 @@ pub fn router_with_cache(
         .merge(mcp_router(source, key_ttl))
 }
 
-/// Only `/mcp` (and `/mcp/<key>`), for a service that has its own health
+/// Only `/mcp`, for a service that has its own health
 /// route: the engine serves the tools itself this way.
 pub fn mcp_router(source: Arc<dyn SessionSource>, key_ttl: Duration) -> Router {
     let cache = Arc::new(KeyCache {

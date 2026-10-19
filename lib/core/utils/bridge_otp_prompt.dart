@@ -353,6 +353,7 @@ Future<void> _answerPending(
     cookies: cookieEditorCookiesFromHeader(cookieHeader),
     username: username,
     fcmToken: fcmToken,
+    deviceId: await currentEdgeDeviceId(),
     credentials: credentials,
   );
   await clearPendingBridgeOtp();

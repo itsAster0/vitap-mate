@@ -125,6 +125,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
       }
       final semid = (await ref.read(vtopUserProvider.future)).semid;
       final device = await EdgeDeviceService().ensure(token);
+      final label = await currentDeviceLabel();
       await withService((s, c) async {
         // The server keeps credentials only for the owner of a forwarding
         // address, so tie it to this student first.
@@ -137,6 +138,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
           credentials: credentials,
           semesterId: semid,
           device: device,
+          label: label,
         );
       });
       unawaited(EdgeEventChannel.instance.connect());
@@ -195,16 +197,36 @@ class ConnectedAppsPage extends HookConsumerWidget {
       return result ?? false;
     }
 
-    /// Linking from an install without the app secret revokes every key, so
-    /// ask first when the account is already linked from elsewhere.
+    /// Linking adds this phone next to the others; only when the account
+    /// is full does it push one out, so ask first then.
     Future<bool> okToRelink() async {
       final current = account.value;
-      if (current == null || !current.linked || current.thisPhone) return true;
+      if (current == null || current.thisPhone) return true;
+      if (current.phoneCount < _maxPhones) return true;
       return confirm(
         'Link this phone?',
-        'The account is linked from another install. Linking here revokes all its access keys and forgets saved credentials.',
+        'The account already has $_maxPhones phones linked. Linking here unlinks the one used least recently.',
         'Link',
       );
+    }
+
+    Future<void> removePhone(BridgePhone phone) async {
+      final name = phone.label ?? 'this phone';
+      final ok = await confirm(
+        phone.thisPhone ? 'Unlink this phone?' : 'Unlink $name?',
+        phone.thisPhone
+            ? 'Connected apps stop asking this phone for sessions. Your other phones keep working.'
+            : 'It stops getting session requests. Link it again from the app on that phone.',
+        'Unlink',
+      );
+      if (!ok) return;
+      await run('Could not unlink', () async {
+        await withService((s, c) => s.removePhone(cookies: c, phone: phone));
+        if (phone.thisPhone) {
+          final prefs = await ref.read(settingsProvider.future);
+          await prefs.setBool(bridgeLinkedSettingKey, false);
+        }
+      });
     }
 
     Future<void> createKey() async {
@@ -347,7 +369,7 @@ class ConnectedAppsPage extends HookConsumerWidget {
           ),
           const SizedBox(height: Space.xs),
           Text(
-            'One access key works in the browser extension and in AI agents (MCP). Your phone signs in for them when needed.',
+            'One access key works in the browser extension and in AI agents (MCP). The phone that created a key signs in for it when needed.',
             style: muted,
           ),
           if (loading.value && current == null) ...[
@@ -489,7 +511,13 @@ class ConnectedAppsPage extends HookConsumerWidget {
                       tone: colors.app.accentTone,
                     ),
                     title: Text(key.label),
-                    subtitle: Text('${key.id} · ${_lastUsed(key.lastUsedAt)}'),
+                    subtitle: Text(
+                      [
+                        key.id,
+                        ?_keyPhone(key, current!.phones),
+                        _lastUsed(key.lastUsedAt),
+                      ].join(' · '),
+                    ),
                     onLongPress: busy.value ? null : () => showSavedKey(key),
                     suffix: FButton.icon(
                       variant: FButtonVariant.ghost,
@@ -513,6 +541,45 @@ class ConnectedAppsPage extends HookConsumerWidget {
                 ),
               ],
             ),
+            // An older server lists no phones: nothing to show then.
+            if (current != null &&
+                current.linkedHere &&
+                current.phones.isNotEmpty) ...[
+              SectionHeader(
+                title: 'Linked phones',
+                trailing: Text('${current.phones.length}/$_maxPhones'),
+              ),
+              FTileGroup(
+                divider: FItemDivider.indented,
+                children: [
+                  for (final phone in current.phones)
+                    FTile(
+                      prefix: _IconBox(
+                        icon: FLucideIcons.smartphone,
+                        tone: phone.thisPhone
+                            ? colors.app.success
+                            : colors.app.accentTone,
+                      ),
+                      title: Text(phone.label ?? 'Phone ${phone.id}'),
+                      subtitle: Text(
+                        phone.thisPhone ? 'This phone' : _seen(phone.seenAt),
+                      ),
+                      suffix: FButton.icon(
+                        variant: FButtonVariant.ghost,
+                        onPress: busy.value ? null : () => removePhone(phone),
+                        child: const Icon(FLucideIcons.unlink),
+                      ),
+                    ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, Space.sm, 4, 0),
+                child: Text(
+                  'A key asks only the phone that created it. Unlink a phone and its keys can no longer reach a phone. To add one, open Connected apps on it and tap Link this phone.',
+                  style: muted,
+                ),
+              ),
+            ],
             const SectionHeader(title: 'Get the apps'),
             FTileGroup(
               children: [
@@ -537,12 +604,16 @@ class ConnectedAppsPage extends HookConsumerWidget {
                     icon: FLucideIcons.smartphone,
                     tone: colors.app.warning,
                   ),
-                  title: const Text('Reconnect this phone'),
+                  title: Text(
+                    current?.linkedHere ?? false
+                        ? 'Reconnect this phone'
+                        : 'Link this phone',
+                  ),
                   subtitle: Text(switch (current) {
                     BridgeAccount(linkedHere: true) =>
                       'Updates this phone\'s notification token',
                     BridgeAccount(linked: true) =>
-                      'Linked from another install; this revokes its keys',
+                      'Adds it next to your other linked phones',
                     _ => 'Your phone is not linked yet',
                   }),
                   onPress: busy.value
@@ -578,6 +649,28 @@ class ConnectedAppsPage extends HookConsumerWidget {
       ),
     );
   }
+}
+
+/// Which phone a key asks, when the server says and it is still linked.
+String? _keyPhone(BridgeKeyInfo key, List<BridgePhone> phones) {
+  final id = key.phoneId;
+  if (id == null || phones.isEmpty) return null;
+  for (final phone in phones) {
+    if (phone.id == id) {
+      return phone.thisPhone ? 'this phone' : phone.label ?? 'phone $id';
+    }
+  }
+  return 'phone unlinked';
+}
+
+/// Phones one account may link; the edge's `MAX_PHONES`.
+const _maxPhones = 5;
+
+String _seen(DateTime at) {
+  final ago = DateTime.now().toUtc().difference(at);
+  if (ago.inHours < 1) return 'seen just now';
+  if (ago.inDays < 1) return 'seen ${ago.inHours}h ago';
+  return 'seen ${ago.inDays}d ago';
 }
 
 String _lastUsed(DateTime? at) {
@@ -657,12 +750,14 @@ Future<void> _showKey(
         children: [
           Text(
             fresh
-                ? 'Paste the key into the browser extension, or the MCP URL into your AI agent. Long-press it in the list to show it again on this phone.'
-                : 'Paste the key into the browser extension, or the MCP URL into your AI agent.',
+                ? 'Paste the key into the browser extension. For an AI agent, add the MCP URL and send the key in the Authorization header. Long-press it in the list to show it again on this phone.'
+                : 'Paste the key into the browser extension. For an AI agent, add the MCP URL and send the key in the Authorization header.',
           ),
           const SizedBox(height: Space.md),
           _CopyRow(label: 'Access key', value: key.key),
-          _CopyRow(label: 'MCP URL (contains the key)', value: key.agentUrl),
+          _CopyRow(label: 'MCP URL', value: key.mcpUrl),
+          _CopyRow(label: 'MCP header', value: key.authHeader),
+          _CopyRow(label: 'Claude Code', value: key.claudeCodeCommand),
         ],
       ),
       actions: [

@@ -698,6 +698,19 @@ async fn mail_owner(mut req: Request, env: &Env) -> Result<Response> {
         Ok(owner) => owner,
         Err(response) => return Ok(response),
     };
+    // The student already has another live address: that is the one their
+    // Gmail filter forwards to, so it keeps the account. The app joins it.
+    let mut index = call(&owner_stub(env, &owner)?, Method::Get, "", None).await?;
+    if index.status_code() == 200 {
+        let existing = index.text().await?;
+        if existing != doc.id && load_mailbox(env, &existing).await?.is_some() {
+            return error(
+                409,
+                "address_exists",
+                "This VTOP account already has a forwarding address; use that one.",
+            );
+        }
+    }
     if let Some(previous) = doc.owner_hash.clone().filter(|hash| *hash != owner) {
         forget_owner(env, &previous, &doc.id).await?;
     }

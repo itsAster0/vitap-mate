@@ -150,8 +150,13 @@ class BridgeKey {
   final String key;
   final String mcpUrl;
 
-  /// The MCP URL with the key in it, for agents that only take a URL.
-  String get agentUrl => '$mcpUrl/$key';
+  /// The header MCP agents send the key in; the URL never carries it.
+  String get authHeader => 'Authorization: Bearer $key';
+
+  /// Adds the MCP server to Claude Code with the key in the header.
+  String get claudeCodeCommand =>
+      'claude mcp add --transport http vtop $mcpUrl '
+      '--header "Authorization: Bearer $key"';
 }
 
 class BridgeKeyInfo {
@@ -160,12 +165,36 @@ class BridgeKeyInfo {
     required this.label,
     required this.createdAt,
     required this.lastUsedAt,
+    this.phoneId,
   });
 
   final String id;
   final String label;
   final DateTime createdAt;
   final DateTime? lastUsedAt;
+
+  /// The phone that created it ([BridgePhone.id]), the only one asked for
+  /// its sessions; null for keys from before, which ask every phone.
+  final String? phoneId;
+}
+
+/// A phone linked to the account; each is asked for sessions.
+class BridgePhone {
+  const BridgePhone({
+    required this.id,
+    required this.label,
+    required this.addedAt,
+    required this.seenAt,
+    required this.thisPhone,
+  });
+
+  final String id;
+
+  /// The name the phone gave itself ("OnePlus CPH2573"), if any.
+  final String? label;
+  final DateTime addedAt;
+  final DateTime seenAt;
+  final bool thisPhone;
 }
 
 /// How the bridge serves this account's sessions.
@@ -238,6 +267,8 @@ class BridgeAccount {
     required this.phoneLinked,
     required this.thisPhone,
     required this.keys,
+    this.phones = const [],
+    this.phoneCount = 0,
     this.settings = const BridgeSettings(),
     this.semesterId,
     this.vaultSavedAt,
@@ -249,9 +280,15 @@ class BridgeAccount {
   final bool savedCredentials;
   final bool phoneLinked;
 
-  /// This install holds the account's app secret.
+  /// This install is one of the linked phones.
   final bool thisPhone;
   final List<BridgeKeyInfo> keys;
+
+  /// The linked phones; listed only to a linked phone.
+  final List<BridgePhone> phones;
+
+  /// How many phones are linked, shown to any phone.
+  final int phoneCount;
   final BridgeSettings settings;
 
   /// The semester the bridge has from this app; agents default to it.
@@ -367,12 +404,15 @@ class VtopBridgeAccountService {
     return decoded;
   }
 
+  /// Links this phone next to any already linked; [label] names it in the
+  /// phone list.
   Future<void> link({
     required String cookies,
     required String fcmToken,
     Map<String, dynamic>? credentials,
     String? semesterId,
     EdgeDevice? device,
+    String? label,
   }) async {
     final body = await _post(
       '/v1/link',
@@ -385,6 +425,7 @@ class VtopBridgeAccountService {
             : {'deviceId': device.id, 'deviceSecret': device.secret}),
         ...?(semesterId == null ? null : {'semesterId': semesterId}),
         ...?(credentials == null ? null : {'credentials': credentials}),
+        ...?(label == null ? null : {'label': label}),
       },
     );
     final secret = body['appSecret'];
@@ -452,6 +493,7 @@ class VtopBridgeAccountService {
             lastUsedAt: raw['lastUsedAt'] == null
                 ? null
                 : _dateTimeFromUnixSeconds(raw['lastUsedAt']),
+            phoneId: raw['phoneId'] is String ? raw['phoneId'] as String : null,
           ),
         );
       }
@@ -459,6 +501,24 @@ class VtopBridgeAccountService {
     if (body['thisPhone'] == true) {
       await _keys.retainOnly({for (final key in keys) key.id});
     }
+    final phones = <BridgePhone>[];
+    final rawPhones = body['phones'];
+    if (rawPhones is List) {
+      for (final raw in rawPhones) {
+        if (raw is! Map) continue;
+        final label = raw['label'];
+        phones.add(
+          BridgePhone(
+            id: '${raw['id'] ?? ''}',
+            label: label is String && label.isNotEmpty ? label : null,
+            addedAt: _dateTimeFromUnixSeconds(raw['addedAt']),
+            seenAt: _dateTimeFromUnixSeconds(raw['seenAt']),
+            thisPhone: raw['thisPhone'] == true,
+          ),
+        );
+      }
+    }
+    final phoneCount = body['phoneCount'];
     return BridgeAccount(
       registrationNumber: '${body['registrationNumber'] ?? ''}',
       linked: body['linked'] == true,
@@ -466,6 +526,8 @@ class VtopBridgeAccountService {
       phoneLinked: body['phoneLinked'] == true,
       thisPhone: body['thisPhone'] == true,
       keys: keys,
+      phones: phones,
+      phoneCount: phoneCount is int ? phoneCount : phones.length,
       settings: BridgeSettings.fromJson(body['settings']),
       semesterId: body['semesterId'] is String
           ? body['semesterId'] as String
@@ -527,6 +589,20 @@ class VtopBridgeAccountService {
       cookies: cookies,
       body: {'semesterId': semesterId},
     );
+  }
+
+  /// Unlinks a phone; it is no longer asked for sessions. Unlinking this
+  /// one also forgets its app secret.
+  Future<void> removePhone({
+    required String cookies,
+    required BridgePhone phone,
+  }) async {
+    await _post(
+      '/v1/account/remove-phone',
+      cookies: cookies,
+      body: {'id': phone.id},
+    );
+    if (phone.thisPhone) await _secrets.delete();
   }
 
   Future<void> deleteAccount({required String cookies}) async {

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
@@ -223,6 +224,9 @@ class SettingsPage extends HookConsumerWidget {
       if (confirmed != true) return;
 
       await clearStoredVtopSession(username);
+      // The client keeps its cookies in memory and saves them back on the
+      // next request; a new one starts signed out.
+      ref.invalidate(vClientProvider);
       if (context.mounted) {
         dispToast(context, "Cleared", "Saved VTOP cookies were cleared.");
       }

@@ -290,9 +290,10 @@ async fn key_checks_are_cached_and_a_revoked_key_fails_after_the_cache_expires()
     );
 }
 
-/// Agents that take only a URL put the key in the path.
+/// The key is only taken from the header; one in the path is turned away
+/// with a pointer to the header, without asking the bridge.
 #[tokio::test]
-async fn key_in_the_url_path_works_without_a_header() {
+async fn key_in_the_url_path_is_told_to_use_the_header() {
     let source = Arc::new(RecordingSource::default());
     let request = |path: String| {
         Request::post(path)
@@ -307,16 +308,21 @@ async fn key_in_the_url_path_works_without_a_header() {
             ))
             .unwrap()
     };
-    let ok = router(&config(), source.clone())
+    let in_path = router(&config(), source.clone())
         .oneshot(request(format!("/mcp/{KEY}")))
         .await
         .unwrap();
-    assert_eq!(ok.status(), StatusCode::OK);
-    let wrong = router(&config(), source)
-        .oneshot(request("/mcp/vtm_wrong".into()))
-        .await
-        .unwrap();
-    assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(in_path.status(), StatusCode::UNAUTHORIZED);
+    let body: Value =
+        serde_json::from_slice(&in_path.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap()
+            .contains("Authorization: Bearer"),
+        "{body}"
+    );
+    assert_eq!(*source.whoami_calls.lock().unwrap(), 0);
 }
 
 #[tokio::test]

@@ -17,6 +17,11 @@ pub const REQUEST_KEEP_SECS: u64 = 600;
 pub const POLL_AFTER_MS: u64 = 1500;
 /// Session requests one account may make per minute.
 pub const ACCOUNT_RATE_PER_MINUTE: u32 = 60;
+/// Phones one account may link. Linking one more drops the one seen least
+/// recently.
+pub const MAX_PHONES: usize = 5;
+/// `seen_at` is written at most this often.
+const PHONE_SEEN_EVERY_SECS: u64 = 3600;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyRecord {
@@ -25,6 +30,31 @@ pub struct KeyRecord {
     pub created_at: u64,
     #[serde(default)]
     pub last_used_at: Option<u64>,
+    /// The install of the phone that created it: the only phone its
+    /// session requests go to. None for keys from before keys had one;
+    /// those ask every linked phone.
+    #[serde(default)]
+    pub device_id: Option<String>,
+}
+
+/// One linked app install: its own app secret, and the install session
+/// requests are pushed to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PhoneRecord {
+    pub device_id: String,
+    pub secret_hash: String,
+    /// What the app calls itself ("OnePlus CPH2573"), for the phone list.
+    #[serde(default)]
+    pub label: Option<String>,
+    pub added_at: u64,
+    #[serde(default)]
+    pub seen_at: u64,
+}
+
+/// The short id a phone is shown and removed by; the device id itself
+/// stays private.
+pub fn phone_id(device_id: &str) -> String {
+    key_id(&vtop_shared::tokens::hash(device_id)).to_string()
 }
 
 /// One student's account. Secrets are sealed by the engine with `VAULT_KEY`,
@@ -33,15 +63,20 @@ pub struct KeyRecord {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountRecord {
     pub id: String,
+    /// The one phone of accounts from before several could link; moved to
+    /// [`Self::phones`] when read ([`Self::adopt_legacy_phone`]).
     #[serde(default)]
     pub app_secret_hash: Option<String>,
     #[serde(default)]
     pub settings: AccountSettings,
     #[serde(default)]
     pub semester_id: Option<String>,
-    /// The install pushes go to.
+    /// The legacy phone's install; see [`Self::app_secret_hash`].
     #[serde(default)]
     pub device_id: Option<String>,
+    /// The linked phones; each is asked for sessions.
+    #[serde(default)]
+    pub phones: Vec<PhoneRecord>,
     /// The student's forwarding address, so the dashboard leads from the
     /// registration number to it (its Index is named by a keyed hash).
     #[serde(default)]
@@ -102,6 +137,7 @@ impl AccountRecord {
             settings: AccountSettings::default(),
             semester_id: None,
             device_id: None,
+            phones: Vec::new(),
             mailbox_id: None,
             sealed_vault: None,
             vault_saved_at: None,
@@ -173,13 +209,106 @@ impl AccountRecord {
         self.usable_vault(now).is_none() || self.settings.vault_ttl_secs.is_some()
     }
 
-    pub fn app_secret_matches(&self, presented: Option<&str>) -> bool {
-        match (&self.app_secret_hash, presented.map(str::trim)) {
-            (Some(expected), Some(secret)) if !secret.is_empty() => {
-                vtop_shared::tokens::hashes_equal(expected, &vtop_shared::tokens::hash(secret))
-            }
-            _ => false,
+    /// Moves the phone of a record from before several could link into
+    /// [`Self::phones`]; true when there was one.
+    pub fn adopt_legacy_phone(&mut self) -> bool {
+        let (Some(secret_hash), device) = (self.app_secret_hash.take(), self.device_id.take())
+        else {
+            self.device_id = None;
+            return false;
+        };
+        // A secret without an install cannot be asked; it links again.
+        let Some(device_id) = device else {
+            return true;
+        };
+        if !self.phones.iter().any(|p| p.device_id == device_id) {
+            self.phones.push(PhoneRecord {
+                device_id,
+                secret_hash,
+                label: None,
+                added_at: self.created_at,
+                seen_at: self.updated_at,
+            });
         }
+        true
+    }
+
+    pub fn linked(&self) -> bool {
+        !self.phones.is_empty()
+    }
+
+    /// The linked phone holding this app secret.
+    pub fn phone_by_secret(&self, presented: Option<&str>) -> Option<usize> {
+        let secret = presented.map(str::trim).filter(|s| !s.is_empty())?;
+        let hash = vtop_shared::tokens::hash(secret);
+        self.phones
+            .iter()
+            .position(|p| vtop_shared::tokens::hashes_equal(&p.secret_hash, &hash))
+    }
+
+    /// Adds `phone`, replacing an earlier entry for the same install; the
+    /// least recently seen go while there are too many. The new one stays.
+    pub fn add_phone(&mut self, phone: PhoneRecord) {
+        self.phones.retain(|p| p.device_id != phone.device_id);
+        while self.phones.len() >= MAX_PHONES {
+            let oldest = self
+                .phones
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, p)| p.seen_at.max(p.added_at))
+                .map(|(i, _)| i)
+                .expect("phones is not empty");
+            self.phones.remove(oldest);
+        }
+        self.phones.push(phone);
+    }
+
+    /// Unlinks the phone with this short id.
+    pub fn remove_phone(&mut self, id: &str) -> Option<PhoneRecord> {
+        let id = id.trim();
+        if id.is_empty() {
+            return None;
+        }
+        let at = self
+            .phones
+            .iter()
+            .position(|p| phone_id(&p.device_id) == id)?;
+        Some(self.phones.remove(at))
+    }
+
+    /// The installs a key's session requests go to: the phone that
+    /// created it (none once that phone is unlinked), or every linked
+    /// phone for keys from before keys had one.
+    pub fn phones_for_key(&self, hash: &str) -> Vec<&str> {
+        let owner = self
+            .keys
+            .iter()
+            .find(|key| key.hash == hash)
+            .and_then(|key| key.device_id.as_deref());
+        self.phones
+            .iter()
+            .map(|p| p.device_id.as_str())
+            .filter(|device| owner.is_none_or(|owner| owner == *device))
+            .collect()
+    }
+
+    /// A phone moved to another install: its keys follow it.
+    pub fn phone_moved(&mut self, from: &str, to: &str) {
+        for key in &mut self.keys {
+            if key.device_id.as_deref() == Some(from) {
+                key.device_id = Some(to.to_string());
+            }
+        }
+    }
+
+    /// Records a visit of a phone; true when that changed what is stored.
+    pub fn touch_phone(&mut self, index: usize, now: u64) -> bool {
+        let phone = &mut self.phones[index];
+        if now.saturating_sub(phone.seen_at) < PHONE_SEEN_EVERY_SECS {
+            return false;
+        }
+        phone.seen_at = now;
+        true
     }
 
     pub fn has_key(&self, hash: &str) -> bool {
@@ -203,7 +332,13 @@ impl AccountRecord {
     }
 
     /// False when the account has the most keys allowed.
-    pub fn add_key(&mut self, hash: String, label: String, now: u64) -> bool {
+    pub fn add_key(
+        &mut self,
+        hash: String,
+        label: String,
+        device_id: Option<String>,
+        now: u64,
+    ) -> bool {
         if self.keys.len() >= MAX_KEYS_PER_ACCOUNT {
             return false;
         }
@@ -212,6 +347,7 @@ impl AccountRecord {
             label,
             created_at: now,
             last_used_at: None,
+            device_id,
         });
         true
     }
@@ -237,9 +373,27 @@ impl AccountRecord {
         hits < ACCOUNT_RATE_PER_MINUTE
     }
 
-    /// What `/v1/account` shows. Keys only to the linked phone.
-    pub fn view(&self, this_phone: bool, forwarding: bool, now: u64) -> Value {
-        let keys: Vec<Value> = if this_phone {
+    /// What `/v1/account` shows. Keys and the phone list only to a linked
+    /// phone (`this_phone`, its index).
+    pub fn view(&self, this_phone: Option<usize>, forwarding: bool, now: u64) -> Value {
+        let phones: Vec<Value> = match this_phone {
+            Some(me) => self
+                .phones
+                .iter()
+                .enumerate()
+                .map(|(i, phone)| {
+                    json!({
+                        "id": phone_id(&phone.device_id),
+                        "label": phone.label,
+                        "addedAt": phone.added_at,
+                        "seenAt": phone.seen_at.max(phone.added_at),
+                        "thisPhone": i == me,
+                    })
+                })
+                .collect(),
+            None => Vec::new(),
+        };
+        let keys: Vec<Value> = if this_phone.is_some() {
             self.keys
                 .iter()
                 .map(|key| {
@@ -248,6 +402,7 @@ impl AccountRecord {
                         "label": key.label,
                         "createdAt": key.created_at,
                         "lastUsedAt": key.last_used_at,
+                        "phoneId": key.device_id.as_deref().map(phone_id),
                     })
                 })
                 .collect()
@@ -258,13 +413,15 @@ impl AccountRecord {
             "registrationNumber": self.id,
             "settings": self.settings,
             "semesterId": self.semester_id,
-            "linked": self.app_secret_hash.is_some(),
+            "linked": self.linked(),
             "savedCredentials": self.usable_vault(now).is_some(),
             "vaultSavedAt": self.usable_vault(now).and(self.vault_saved_at),
             "credentialsRejectedAt": self.credentials_rejected_at,
             "forwarding": forwarding,
-            "phoneLinked": self.device_id.is_some(),
-            "thisPhone": this_phone,
+            "phoneLinked": self.linked(),
+            "phoneCount": self.phones.len(),
+            "thisPhone": this_phone.is_some(),
+            "phones": phones,
             "keys": keys,
         })
     }
@@ -328,6 +485,9 @@ pub struct RequestRecord {
     /// Who made the session, once answered: `phone` or `server`.
     #[serde(default)]
     pub source: Option<String>,
+    /// The installs this request may ask: the key's phone.
+    #[serde(default)]
+    pub phones: Vec<String>,
 }
 
 impl RequestRecord {
@@ -345,6 +505,7 @@ impl RequestRecord {
             phone_asked: false,
             phone_error: None,
             source: None,
+            phones: Vec::new(),
         }
     }
 
@@ -503,7 +664,7 @@ mod tests {
         a.reject_credentials(NOW + 5);
         assert_eq!(a.usable_vault(NOW + 5), None);
         assert_eq!(a.credentials_rejected_at, Some(NOW + 5));
-        assert_eq!(a.view(false, false, NOW)["credentialsRejectedAt"], NOW + 5);
+        assert_eq!(a.view(None, false, NOW)["credentialsRejectedAt"], NOW + 5);
         a.save_vault("w".into(), NOW + 9);
         assert_eq!(a.credentials_rejected_at, None);
     }
@@ -533,9 +694,9 @@ mod tests {
     fn keys_limits_touches_and_revokes() {
         let mut a = account();
         for n in 0..MAX_KEYS_PER_ACCOUNT {
-            assert!(a.add_key(format!("{n:02}abcdefgh"), "k".into(), NOW));
+            assert!(a.add_key(format!("{n:02}abcdefgh"), "k".into(), None, NOW));
         }
-        assert!(!a.add_key("x".into(), "k".into(), NOW));
+        assert!(!a.add_key("x".into(), "k".into(), None, NOW));
         assert!(a.has_key("03abcdefgh"));
         assert!(a.touch_key("03abcdefgh", NOW));
         assert!(!a.touch_key("03abcdefgh", NOW + 59));
@@ -543,26 +704,110 @@ mod tests {
         assert_eq!(a.revoke_key("03abcdef").as_deref(), Some("03abcdefgh"));
         assert!(!a.has_key("03abcdefgh"));
         assert_eq!(a.revoke_key(""), None);
-        let view = a.view(true, true, NOW);
+        a.add_phone(phone("d1", "vta_x"));
+        let view = a.view(Some(0), true, NOW);
         assert_eq!(
             view["keys"].as_array().unwrap().len(),
             MAX_KEYS_PER_ACCOUNT - 1
         );
         assert_eq!(view["keys"][0]["id"], "00abcdef");
-        assert!(a.view(false, true, NOW)["keys"]
+        assert!(a.view(None, true, NOW)["keys"]
             .as_array()
             .unwrap()
             .is_empty());
     }
 
+    fn phone(device: &str, secret: &str) -> PhoneRecord {
+        PhoneRecord {
+            device_id: device.into(),
+            secret_hash: vtop_shared::tokens::hash(secret),
+            label: None,
+            added_at: NOW,
+            seen_at: NOW,
+        }
+    }
+
     #[test]
     fn app_secret() {
         let mut a = account();
-        assert!(!a.app_secret_matches(Some("vta_x")));
+        assert_eq!(a.phone_by_secret(Some("vta_x")), None);
+        a.add_phone(phone("d1", "vta_x"));
+        a.add_phone(phone("d2", "vta_y"));
+        assert_eq!(a.phone_by_secret(Some(" vta_x ")), Some(0));
+        assert_eq!(a.phone_by_secret(Some("vta_y")), Some(1));
+        assert_eq!(a.phone_by_secret(Some("vta_z")), None);
+        assert_eq!(a.phone_by_secret(None), None);
+    }
+
+    #[test]
+    fn several_phones_link_and_unlink() {
+        let mut a = account();
+        for n in 0..MAX_PHONES {
+            let mut p = phone(&format!("d{n}"), &format!("vta_{n}"));
+            p.seen_at = NOW + n as u64;
+            a.add_phone(p);
+        }
+        // Linking the same install again replaces it, not adds.
+        a.add_phone(phone("d3", "vta_new"));
+        assert_eq!(a.phones.len(), MAX_PHONES);
+        assert_eq!(a.phone_by_secret(Some("vta_3")), None);
+        // One more drops the least recently seen (d0).
+        a.add_phone(phone("d9", "vta_9"));
+        assert_eq!(a.phones.len(), MAX_PHONES);
+        assert!(a.phones.iter().all(|p| p.device_id != "d0"));
+        let view = a.view(a.phone_by_secret(Some("vta_9")), false, NOW);
+        assert_eq!(view["phones"].as_array().unwrap().len(), MAX_PHONES);
+        assert_eq!(view["phones"][MAX_PHONES - 1]["thisPhone"], true);
+        assert!(a.view(None, false, NOW)["phones"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert_eq!(a.view(None, false, NOW)["phoneCount"], MAX_PHONES);
+        let removed = a.remove_phone(&phone_id("d9")).unwrap();
+        assert_eq!(removed.device_id, "d9");
+        assert_eq!(a.remove_phone(&phone_id("d9")), None);
+        assert_eq!(a.remove_phone(""), None);
+        assert!(a.touch_phone(0, NOW + 7200));
+        assert!(!a.touch_phone(0, NOW + 7201));
+    }
+
+    #[test]
+    fn a_key_asks_only_the_phone_that_made_it() {
+        let mut a = account();
+        a.add_phone(phone("d1", "vta_1"));
+        a.add_phone(phone("d2", "vta_2"));
+        a.add_key("mine".into(), "k".into(), Some("d2".into()), NOW);
+        a.add_key("old".into(), "k".into(), None, NOW);
+        assert_eq!(a.phones_for_key("mine"), vec!["d2"]);
+        assert_eq!(a.phones_for_key("old"), vec!["d1", "d2"]);
+        assert_eq!(
+            a.view(Some(0), false, NOW)["keys"][0]["phoneId"],
+            phone_id("d2")
+        );
+        a.phone_moved("d2", "d3");
+        a.phones[1].device_id = "d3".into();
+        assert_eq!(a.phones_for_key("mine"), vec!["d3"]);
+        a.remove_phone(&phone_id("d3"));
+        assert!(a.phones_for_key("mine").is_empty());
+    }
+
+    #[test]
+    fn the_one_phone_of_older_accounts_carries_over() {
+        let mut a = account();
         a.app_secret_hash = Some(vtop_shared::tokens::hash("vta_x"));
-        assert!(a.app_secret_matches(Some(" vta_x ")));
-        assert!(!a.app_secret_matches(Some("vta_y")));
-        assert!(!a.app_secret_matches(None));
+        a.device_id = Some("d1".into());
+        assert!(a.adopt_legacy_phone());
+        assert_eq!(a.phone_by_secret(Some("vta_x")), Some(0));
+        assert_eq!(a.phones[0].device_id, "d1");
+        assert_eq!(
+            (a.app_secret_hash.clone(), a.device_id.clone()),
+            (None, None)
+        );
+        assert!(!a.adopt_legacy_phone());
+        // Without an install there is nothing to ask: it links again.
+        a.app_secret_hash = Some("h".into());
+        assert!(a.adopt_legacy_phone());
+        assert_eq!(a.phones.len(), 1);
     }
 
     #[test]
