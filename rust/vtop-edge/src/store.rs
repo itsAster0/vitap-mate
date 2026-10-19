@@ -1,7 +1,8 @@
 //! Durable Objects that hold one record each.
 //!
-//! `Mailbox`: a forwarding address, named by its id. A delivered box is
-//! cleared by an alarm once it can no longer be collected. While the
+//! `Mailbox`: a forwarding address, named by its id, and the installs it
+//! forwards to (`members`, as JSON). A delivered box is cleared by an
+//! alarm once it can no longer be collected. While the
 //! engine signs its student in, it waits here for the next OTP, sealed to a
 //! key made for that sign-in (a "waiter").
 //! `Index`: one lookup value, named by what it indexes (`owner:<hash>`).
@@ -14,13 +15,12 @@ use futures_channel::oneshot;
 use futures_util::future::{select, Either};
 
 use serde::Deserialize;
-use vtop_shared::mailbox::SEALED_TTL_SECS;
 use worker::{
     durable_object, DurableObject, Env, Method, Request, Response, Result, SqlStorage, State,
 };
 
 use crate::sql;
-use crate::state::{MailboxDoc, Waiter, WAITER_TTL_SECS};
+use crate::state::{MailboxDoc, MailboxMember, Waiter, WAITER_TTL_SECS};
 use crate::{error, now};
 
 /// The longest one wait lasts.
@@ -55,17 +55,34 @@ CREATE TABLE IF NOT EXISTS waiters (
     results TEXT NOT NULL
 )";
 
+/// A stored address. One from before `members` existed had one install in
+/// its own columns; that install becomes its first member.
 fn mailbox_from(row: &sql::Row) -> Option<MailboxDoc> {
+    let created_at = sql::int(row, "created_at")?;
+    let updated_at = sql::int(row, "updated_at")?;
+    let mut members: Vec<MailboxMember> = sql::text(row, "members")
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default();
+    if members.is_empty() {
+        if let Some(secret_hash) = sql::text(row, "secret_hash").filter(|s| !s.is_empty()) {
+            members.push(MailboxMember {
+                device_id: sql::text(row, "device_id")?,
+                secret_hash,
+                public_key: sql::text(row, "public_key")?,
+                label: None,
+                sealed: sql::text(row, "sealed"),
+                sealed_at: sql::int(row, "sealed_at"),
+                added_at: created_at,
+                seen_at: updated_at,
+            });
+        }
+    }
     Some(MailboxDoc {
         id: sql::text(row, "id")?,
-        secret_hash: sql::text(row, "secret_hash")?,
-        public_key: sql::text(row, "public_key")?,
-        device_id: sql::text(row, "device_id")?,
         owner_hash: sql::text(row, "owner_hash"),
-        sealed: sql::text(row, "sealed"),
-        sealed_at: sql::int(row, "sealed_at"),
-        created_at: sql::int(row, "created_at")?,
-        updated_at: sql::int(row, "updated_at")?,
+        members,
+        created_at,
+        updated_at,
     })
 }
 
@@ -85,13 +102,14 @@ impl Mailbox {
         if !self.ready.get() {
             if sql::needs_schema(&db)? {
                 // The address itself is kept, so Gmail needs no change.
-                let old: Option<MailboxDoc> = self.state.storage().get("doc").await.ok().flatten();
+                let old: Option<sql::Row> = self.state.storage().get("doc").await.ok().flatten();
                 self.state.storage().delete_all().await?;
                 sql::create(&db, MAILBOX_SCHEMA)?;
-                if let Some(doc) = old {
+                if let Some(doc) = old.as_ref().and_then(mailbox_from) {
                     write_mailbox(&db, &doc)?;
                 }
             }
+            sql::add_column(&db, "mailbox", "members TEXT")?;
             self.ready.set(true);
         }
         Ok(db)
@@ -113,8 +131,8 @@ impl Mailbox {
 
     async fn save(&self, doc: &MailboxDoc) -> Result<()> {
         write_mailbox(&self.db().await?, doc)?;
-        if let Some(at) = doc.sealed_at {
-            let due = (at + SEALED_TTL_SECS + 1).saturating_sub(now());
+        if let Some(at) = doc.next_expiry() {
+            let due = at.saturating_sub(now());
             self.state
                 .storage()
                 .set_alarm(Duration::from_secs(due.max(1)))
@@ -124,20 +142,17 @@ impl Mailbox {
     }
 }
 
+/// The single-install columns stay empty: `members` holds every install.
 fn write_mailbox(db: &SqlStorage, doc: &MailboxDoc) -> Result<()> {
     sql::run(db, "DELETE FROM mailbox", vec![])?;
     sql::run(
         db,
-        "INSERT INTO mailbox (id, secret_hash, public_key, device_id, owner_hash, sealed,
-             sealed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO mailbox (id, secret_hash, public_key, device_id, owner_hash, members,
+             created_at, updated_at) VALUES (?, '', '', '', ?, ?, ?, ?)",
         vec![
             sql::v_text(&doc.id),
-            sql::v_text(&doc.secret_hash),
-            sql::v_text(&doc.public_key),
-            sql::v_text(&doc.device_id),
             sql::v_opt_text(doc.owner_hash.as_deref()),
-            sql::v_opt_text(doc.sealed.as_deref()),
-            sql::v_opt_int(doc.sealed_at),
+            sql::v_text(&serde_json::to_string(&doc.members)?),
             sql::v_int(doc.created_at),
             sql::v_int(doc.updated_at),
         ],
@@ -174,18 +189,33 @@ impl DurableObject for Mailbox {
                 self.save(&doc).await?;
                 Ok(Response::empty()?.with_status(201))
             }
+            // One box per install, each sealed to its own key.
             (Method::Post, "/deliver") => {
                 #[derive(Deserialize)]
-                struct Deliver {
+                #[serde(rename_all = "camelCase")]
+                struct SealedFor {
+                    device_id: String,
                     sealed: String,
+                }
+                #[derive(Deserialize)]
+                struct Deliver {
+                    boxes: Vec<SealedFor>,
                 }
                 let body: Deliver = req.json().await?;
                 let Some(mut doc) = self.doc().await? else {
                     return error(404, "mailbox_not_found", "No such forwarding address.");
                 };
                 let at = now();
-                doc.sealed = Some(body.sealed);
-                doc.sealed_at = Some(at);
+                for delivered in body.boxes {
+                    if let Some(member) = doc
+                        .members
+                        .iter_mut()
+                        .find(|m| m.device_id == delivered.device_id)
+                    {
+                        member.sealed = Some(delivered.sealed);
+                        member.sealed_at = Some(at);
+                    }
+                }
                 doc.updated_at = at;
                 self.save(&doc).await?;
                 Response::from_json(&doc)
@@ -221,9 +251,7 @@ impl DurableObject for Mailbox {
     async fn alarm(&self) -> Result<Response> {
         self.waiters().await?;
         if let Some(mut doc) = self.doc().await? {
-            if doc.fresh_sealed(now()).is_none() && doc.sealed.is_some() {
-                doc.sealed = None;
-                doc.sealed_at = None;
+            if doc.clear_expired(now()) {
                 write_mailbox(&self.db().await?, &doc)?;
             }
         }

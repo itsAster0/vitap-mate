@@ -10,6 +10,7 @@ import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 
 part 'vtop_otp_challenge_provider.g.dart';
 
@@ -18,6 +19,94 @@ const _otpChallengeTimeout = Duration(minutes: 3);
 enum OtpChallengeActivity { waiting, submitting, resending, fetchingEmail }
 
 enum OtpChallengePresentation { expanded, minimized }
+
+/// Where the OTP is read from.
+enum OtpSource {
+  /// Typed by hand: no email auto-fill is set up.
+  manual,
+
+  /// Read from the student's Gmail inbox.
+  gmail,
+
+  /// Forwarded to the student's VITAP Mate address and pushed to the phone.
+  forwarding,
+}
+
+/// What the prompt shows about the OTP being fetched.
+class OtpFetchProgress {
+  const OtpFetchProgress({
+    required this.source,
+    required this.requestedAt,
+    this.account,
+    this.checks = 0,
+    this.lastCheckAt,
+    this.gmailFallbackAvailable = false,
+    this.gmailFallback = false,
+    this.deleteAfterReading = false,
+    this.problem,
+  });
+
+  /// After this long without a forwarded OTP, Gmail is read too.
+  static const gmailFallbackAfter = Duration(seconds: 30);
+
+  final OtpSource source;
+
+  /// When VTOP was asked for the OTP (or asked again).
+  final DateTime requestedAt;
+
+  /// The Gmail address read, or the forwarding address.
+  final String? account;
+
+  /// Inbox checks so far: Gmail reads, or forwarded-mail pulls.
+  final int checks;
+  final DateTime? lastCheckAt;
+
+  /// Forwarding only: Gmail is connected too, so it is read after
+  /// [gmailFallbackAfter].
+  final bool gmailFallbackAvailable;
+
+  /// Forwarding only: Gmail is being read now as well.
+  final bool gmailFallback;
+
+  /// Gmail: the OTP mail goes to Trash once read.
+  final bool deleteAfterReading;
+
+  /// The last check failed; checking goes on.
+  final String? problem;
+
+  OtpFetchProgress checked({String? problem}) => OtpFetchProgress(
+    source: source,
+    requestedAt: requestedAt,
+    account: account,
+    checks: checks + 1,
+    lastCheckAt: DateTime.now().toUtc(),
+    gmailFallbackAvailable: gmailFallbackAvailable,
+    gmailFallback: gmailFallback,
+    deleteAfterReading: deleteAfterReading,
+    problem: problem,
+  );
+
+  OtpFetchProgress withGmailFallback() => OtpFetchProgress(
+    source: source,
+    requestedAt: requestedAt,
+    account: account,
+    checks: checks,
+    lastCheckAt: lastCheckAt,
+    gmailFallbackAvailable: gmailFallbackAvailable,
+    gmailFallback: true,
+    deleteAfterReading: deleteAfterReading,
+    problem: problem,
+  );
+
+  /// The same source, from a new request: counts start again.
+  OtpFetchProgress restarted(DateTime requestedAt) => OtpFetchProgress(
+    source: source,
+    requestedAt: requestedAt,
+    account: account,
+    gmailFallbackAvailable: gmailFallbackAvailable,
+    deleteAfterReading: deleteAfterReading,
+  );
+}
 
 sealed class VtopOtpChallengeState {
   const VtopOtpChallengeState();
@@ -32,6 +121,7 @@ sealed class VtopOtpChallengeState {
     bool canRetryEmailAutoFetch = false,
     String? autoFetchMessage,
     String? errorMessage,
+    OtpFetchProgress? progress,
   }) {
     if (remainingSeconds < 0) {
       throw ArgumentError.value(
@@ -55,6 +145,7 @@ sealed class VtopOtpChallengeState {
       canRetryEmailAutoFetch: canRetryEmailAutoFetch,
       autoFetchMessage: autoFetchMessage,
       errorMessage: errorMessage,
+      progress: progress,
     );
   }
 
@@ -78,6 +169,7 @@ sealed class VtopOtpChallengeState {
   String get message;
   String? get autoFetchMessage;
   String? get errorMessage;
+  OtpFetchProgress? get progress;
 
   VtopOtpChallengeState update({
     OtpChallengeActivity? activity,
@@ -87,6 +179,7 @@ sealed class VtopOtpChallengeState {
     String? message,
     String? autoFetchMessage,
     String? errorMessage,
+    OtpFetchProgress? progress,
     bool clearAutoFetchMessage = false,
     bool clearError = false,
   }) {
@@ -105,6 +198,7 @@ sealed class VtopOtpChallengeState {
           ? null
           : (autoFetchMessage ?? this.autoFetchMessage),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      progress: progress ?? this.progress,
     );
   }
 }
@@ -122,6 +216,8 @@ final class IdleOtpChallenge extends VtopOtpChallengeState {
   String? get autoFetchMessage => null;
   @override
   String? get errorMessage => null;
+  @override
+  OtpFetchProgress? get progress => null;
 }
 
 final class ActiveOtpChallenge extends VtopOtpChallengeState {
@@ -133,6 +229,7 @@ final class ActiveOtpChallenge extends VtopOtpChallengeState {
     required this.message,
     this.autoFetchMessage,
     this.errorMessage,
+    this.progress,
   });
 
   final OtpChallengeActivity activity;
@@ -147,6 +244,8 @@ final class ActiveOtpChallenge extends VtopOtpChallengeState {
   final String? autoFetchMessage;
   @override
   final String? errorMessage;
+  @override
+  final OtpFetchProgress? progress;
 }
 
 @Riverpod(keepAlive: true)
@@ -184,6 +283,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     _logContext = logContext ?? 'otp.flow#${++_challengeCounter}';
     final canAutoFetchFromEmail = await _canAutoFetchFromEmail();
     _emailAutoFetchAvailable = canAutoFetchFromEmail;
+    final progress = await _progressFor(
+      canAutoFetchFromEmail: canAutoFetchFromEmail,
+      requestedAt: _otpRequiredAt!,
+    );
     if (state.isActive && _completer != null && !_completer!.isCompleted) {
       AppLogger.instance.info(
         'client.otp',
@@ -200,6 +303,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
             ? 'Trying to get OTP from email...'
             : null,
         clearAutoFetchMessage: !canAutoFetchFromEmail,
+        progress: progress,
         clearError: true,
       );
       return _completer!.future;
@@ -223,6 +327,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       autoFetchMessage: canAutoFetchFromEmail
           ? 'Trying to get OTP from email...'
           : null,
+      progress: progress,
     );
     _startTicker();
     if (canAutoFetchFromEmail) {
@@ -358,6 +463,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         autoFetchMessage: _emailAutoFetchAvailable
             ? 'Trying to get OTP from email...'
             : null,
+        progress: state.progress?.restarted(requestedAt),
         clearError: true,
       );
       _startTicker();
@@ -457,9 +563,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   /// or shared access) is the second choice.
   Future<bool> _canAutoFetchFromEmail() async {
     try {
-      _useMailForwarding = await ref
-          .read(mailForwardingServiceProvider)
-          .isReady();
+      _useMailForwarding =
+          !await isOnDeviceMode() &&
+          await ref.read(mailForwardingServiceProvider).isReady();
       return _useMailForwarding || await _gmailReady();
     } catch (error, stackTrace) {
       AppLogger.instance.error(
@@ -469,6 +575,53 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       Zone.current.handleUncaughtError(error, stackTrace);
       return false;
     }
+  }
+
+  /// What the prompt shows for the source [_canAutoFetchFromEmail] chose.
+  Future<OtpFetchProgress> _progressFor({
+    required bool canAutoFetchFromEmail,
+    required DateTime requestedAt,
+  }) async {
+    if (!canAutoFetchFromEmail) {
+      return OtpFetchProgress(
+        source: OtpSource.manual,
+        requestedAt: requestedAt,
+      );
+    }
+    try {
+      if (_useMailForwarding) {
+        final forwarding = await ref.read(mailForwardingServiceProvider).load();
+        return OtpFetchProgress(
+          source: OtpSource.forwarding,
+          requestedAt: requestedAt,
+          account: forwarding?.address,
+          gmailFallbackAvailable: await _gmailReady(),
+        );
+      }
+      final session = await ref
+          .read(googleEmailOtpAuthServiceProvider)
+          .loadSession();
+      return OtpFetchProgress(
+        source: OtpSource.gmail,
+        requestedAt: requestedAt,
+        account: session?.email,
+        deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
+      );
+    } catch (_) {
+      return OtpFetchProgress(
+        source: _useMailForwarding ? OtpSource.forwarding : OtpSource.gmail,
+        requestedAt: requestedAt,
+      );
+    }
+  }
+
+  /// Updates the progress while the prompt is up.
+  void _updateProgress(
+    OtpFetchProgress Function(OtpFetchProgress progress) change,
+  ) {
+    final progress = state.progress;
+    if (!state.isActive || progress == null) return;
+    state = state.update(progress: change(progress));
   }
 
   Future<bool> _gmailReady() async {
@@ -513,6 +666,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
           deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
         );
         if (!keepGoing()) return null;
+        // Forwarded-mail pulls are the checks while Gmail is a fallback.
+        if (stop == null) _updateProgress((p) => p.checked());
         if (otp != null && otp.isNotEmpty) {
           AppLogger.instance.info(
             'client.otp',
@@ -525,7 +680,12 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
           'client.otp',
           '$_logContext email autofetch failed on attempt $attempt: $error',
         );
-        if (stop != null) return null;
+        if (stop != null) {
+          _updateProgress(
+            (p) => p.checked(problem: 'Could not read Gmail too.'),
+          );
+          return null;
+        }
         Zone.current.handleUncaughtError(error, stackTrace);
         if (!_shouldContinueAutoFetch(runId)) return null;
         state = state.update(
@@ -569,11 +729,17 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       pulling = true;
       try {
         final payload = await service.pullInbox();
+        _updateProgress((p) => p.checked());
         if (payload != null) take(payload);
       } catch (error) {
         AppLogger.instance.warning(
           'client.otp',
           '$_logContext forwarded OTP pull failed: $error',
+        );
+        _updateProgress(
+          (p) => p.checked(
+            problem: 'Could not reach the VITAP Mate server; still trying.',
+          ),
         );
       } finally {
         pulling = false;
@@ -593,12 +759,13 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     });
     // A push may have landed just before the challenge started listening.
     unawaited(pull());
-    final gmailFallback = Timer(const Duration(seconds: 30), () async {
+    final gmailFallback = Timer(OtpFetchProgress.gmailFallbackAfter, () async {
       if (found.isCompleted || !await _gmailReady()) return;
       AppLogger.instance.info(
         'client.otp',
         '$_logContext no forwarded OTP yet; reading Gmail too',
       );
+      _updateProgress((p) => p.withGmailFallback());
       final otp = await _fetchFromGmail(
         runId: runId,
         stop: () => found.isCompleted,

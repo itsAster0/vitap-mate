@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' show log;
 
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -89,6 +92,57 @@ class MailForwarding {
           : null,
       ownerClaimed: json['ownerClaimed'] == true,
     );
+  }
+}
+
+/// One install an address forwards to, as the edge lists them.
+class MailForwardingDevice {
+  const MailForwardingDevice({
+    required this.deviceId,
+    required this.label,
+    required this.addedAt,
+    required this.seenAt,
+    required this.thisDevice,
+  });
+
+  final String deviceId;
+
+  /// The name the install gave itself ("OnePlus CPH2573"), if any.
+  final String? label;
+  final DateTime addedAt;
+  final DateTime seenAt;
+  final bool thisDevice;
+
+  static MailForwardingDevice? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final deviceId = json['deviceId'], label = json['label'];
+    final addedAt = json['addedAt'], seenAt = json['seenAt'];
+    if (deviceId is! String || addedAt is! int) return null;
+    DateTime at(int seconds) =>
+        DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+    return MailForwardingDevice(
+      deviceId: deviceId,
+      label: label is String && label.isNotEmpty ? label : null,
+      addedAt: at(addedAt),
+      seenAt: at(seenAt is int && seenAt > 0 ? seenAt : addedAt),
+      thisDevice: json['thisDevice'] == true,
+    );
+  }
+}
+
+/// This install's name in the device list: maker and model, or null.
+Future<String?> currentDeviceLabel() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+  try {
+    final info = await DeviceInfoPlugin().androidInfo;
+    final brand = info.brand.isEmpty
+        ? ''
+        : '${info.brand[0].toUpperCase()}${info.brand.substring(1)} ';
+    final name = '$brand${info.model}'.trim();
+    if (name.isEmpty) return null;
+    return info.isPhysicalDevice ? name : 'Emulator ($name)';
+  } catch (_) {
+    return null;
   }
 }
 
@@ -208,16 +262,22 @@ class MailForwardingService {
     String baseUrl = vtopEdgeBaseUrl,
     MailForwardingStore store = const SecureMailForwardingStore(),
     EdgeDeviceService? devices,
+    Future<String?> Function() deviceLabel = currentDeviceLabel,
+    MailOtpKeypair Function() keypair = mailOtpGenerateKeypair,
   }) : _client = client ?? http.Client(),
        _baseUrl = baseUrl,
        _store = store,
        _devices =
-           devices ?? EdgeDeviceService(client: client, baseUrl: baseUrl);
+           devices ?? EdgeDeviceService(client: client, baseUrl: baseUrl),
+       _deviceLabel = deviceLabel,
+       _keypair = keypair;
 
   final http.Client _client;
   final String _baseUrl;
   final MailForwardingStore _store;
   final EdgeDeviceService _devices;
+  final Future<String?> Function() _deviceLabel;
+  final MailOtpKeypair Function() _keypair;
 
   Future<MailForwarding?> load() => _store.read();
 
@@ -254,12 +314,14 @@ class MailForwardingService {
   /// Creates a new forwarding address with a fresh keypair, replacing any
   /// previous one on this phone.
   Future<MailForwarding> register({required String fcmToken}) async {
-    final keypair = mailOtpGenerateKeypair();
+    final keypair = _keypair();
     final device = await _device(fcmToken);
+    final label = await _deviceLabel();
     final body = await _post('register', {
       'publicKey': keypair.publicKey,
       'deviceId': device.id,
       'deviceSecret': device.secret,
+      'label': ?label,
     });
     final id = body['id'], address = body['address'], secret = body['secret'];
     if (id is! String || address is! String || secret is! String) {
@@ -296,14 +358,16 @@ class MailForwardingService {
     await _store.write(forwarding.copyWith(ownerClaimed: true));
   }
 
-  /// Moves the address of the student signed in with [cookies] to this
-  /// phone, with a new key pair. Null when they have none on the edge.
+  /// Adds this install to the address of the student signed in with
+  /// [cookies], with its own key pair; their other devices keep getting
+  /// OTPs too. Null when they have no address on the edge.
   Future<MailForwarding?> reclaim({
     required String cookies,
     required String fcmToken,
   }) async {
-    final keypair = mailOtpGenerateKeypair();
+    final keypair = _keypair();
     final device = await _device(fcmToken);
+    final label = await _deviceLabel();
     final Map<String, dynamic> body;
     try {
       body = await _post('reclaim', {
@@ -311,6 +375,7 @@ class MailForwardingService {
         'publicKey': keypair.publicKey,
         'deviceId': device.id,
         'deviceSecret': device.secret,
+        'label': ?label,
       });
     } on MailForwardingException catch (error) {
       if (error.mailboxGone) return null;
@@ -363,21 +428,57 @@ class MailForwardingService {
     EdgeEventChannel.instance.restart();
   }
 
-  /// Deletes the address on the edge and forgets it here. Mail still
-  /// forwarded to it is rejected from then on.
-  Future<void> remove() async {
+  /// Takes this install off the address and forgets it here. With
+  /// [everywhere], or when no other device uses it, the address itself is
+  /// deleted: mail forwarded to it is rejected from then on.
+  Future<void> remove({bool everywhere = false}) async {
     final forwarding = await _store.read();
     if (forwarding == null) return;
-    await _deleteRemote(forwarding);
+    await _deleteRemote(forwarding, everywhere: everywhere);
     await _store.delete();
   }
 
-  Future<void> _deleteRemote(MailForwarding forwarding) async {
+  Future<void> _deleteRemote(
+    MailForwarding forwarding, {
+    bool everywhere = false,
+  }) async {
     try {
-      await _post('delete', {'id': forwarding.id, 'secret': forwarding.secret});
+      await _post('delete', {
+        'id': forwarding.id,
+        'secret': forwarding.secret,
+        if (everywhere) 'everywhere': true,
+      });
     } on MailForwardingException catch (error) {
       if (!error.mailboxGone) rethrow;
     }
+  }
+
+  /// Forgets this phone's copy without calling the edge: for an address
+  /// the edge no longer lets this install use.
+  Future<void> forgetLocal() => _store.delete();
+
+  /// The devices this address forwards to, this one included.
+  Future<List<MailForwardingDevice>> devices() async {
+    final forwarding = await _store.read();
+    if (forwarding == null) return const [];
+    final body = await _post('devices', {
+      'id': forwarding.id,
+      'secret': forwarding.secret,
+    });
+    final list = body['devices'];
+    if (list is! List) return const [];
+    return [for (final item in list) ?MailForwardingDevice.fromJson(item)];
+  }
+
+  /// Takes another device off the address; it stops getting OTPs.
+  Future<void> removeDevice(String deviceId) async {
+    final forwarding = await _store.read();
+    if (forwarding == null) return;
+    await _post('devices/remove', {
+      'id': forwarding.id,
+      'secret': forwarding.secret,
+      'removeDevice': deviceId,
+    });
   }
 
   /// The latest box the edge holds (kept 5 minutes), opened. For when a

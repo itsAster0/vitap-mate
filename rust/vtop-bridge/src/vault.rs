@@ -1,4 +1,4 @@
-//! Seals secrets for Firestore with AES-256-GCM. A sealed value is
+//! Seals secrets for the edge's Account objects with AES-256-GCM. A sealed value is
 //! `base64(nonce || ciphertext)`; the associated data names the document it
 //! belongs to, so a blob copied into another document does not open.
 

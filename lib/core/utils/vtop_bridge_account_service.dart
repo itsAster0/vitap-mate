@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/app_urls.dart';
 
@@ -317,11 +318,22 @@ class VtopBridgeAccountService {
 
   static const _timeout = Duration(seconds: 15);
 
+  Future<void> _ensureServerAllowed() async {
+    if (await isOnDeviceMode()) {
+      throw const BridgeAccountException(
+        code: OnDeviceModeException.code,
+        message: OnDeviceModeException.message,
+        statusCode: 0,
+      );
+    }
+  }
+
   Future<Map<String, dynamic>> _post(
     String path, {
     required String cookies,
     Map<String, dynamic>? body,
   }) async {
+    await _ensureServerAllowed();
     final secret = await _secrets.read();
     final response = await _client
         .post(
@@ -385,6 +397,7 @@ class VtopBridgeAccountService {
   Future<void> reportCredentialsRejected({
     required String registrationNumber,
   }) async {
+    if (await isOnDeviceMode()) return;
     final secret = await _secrets.read();
     if (secret == null || registrationNumber.trim().isEmpty) return;
     final response = await _client

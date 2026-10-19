@@ -61,7 +61,11 @@ pub fn add_column(db: &SqlStorage, table: &str, column: &str) -> Result<()> {
     if run(db, &format!("SELECT {name} FROM {table} LIMIT 0"), vec![]).is_ok() {
         return Ok(());
     }
-    run(db, &format!("ALTER TABLE {table} ADD COLUMN {column}"), vec![])
+    run(
+        db,
+        &format!("ALTER TABLE {table} ADD COLUMN {column}"),
+        vec![],
+    )
 }
 
 pub fn text(row: &Row, column: &str) -> Option<String> {

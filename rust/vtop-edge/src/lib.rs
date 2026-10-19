@@ -46,7 +46,7 @@ pub use account::Account;
 pub use device::Device;
 pub use engine::Engine;
 pub use fcm::FcmToken;
-use state::{fcm_token, is_device_id, public_key, MailboxDoc};
+use state::{fcm_token, is_device_id, member_label, public_key, MailboxDoc, MailboxMember};
 pub use store::{Index, Mailbox};
 
 pub fn now() -> u64 {
@@ -291,6 +291,15 @@ struct MailBody {
     fcm_token: Option<String>,
     #[serde(default)]
     session: Option<SessionBody>,
+    /// What the app calls this install, for the device list.
+    #[serde(default)]
+    label: Option<String>,
+    /// `delete`: the address itself, for every install.
+    #[serde(default)]
+    everywhere: bool,
+    /// `devices/remove`: the install to take off the address.
+    #[serde(default)]
+    remove_device: Option<String>,
     #[serde(flatten)]
     device: DeviceRef,
 }
@@ -301,14 +310,41 @@ async fn mail_body(req: &mut Request) -> std::result::Result<MailBody, Result<Re
         .map_err(|_| bad_request("Invalid JSON body."))
 }
 
-/// The mailbox the body's id and secret open.
-async fn owned(env: &Env, body: &MailBody) -> Result<Option<MailboxDoc>> {
+/// The mailbox the body's id and secret open, and which of its installs
+/// the secret is. Records the visit, so quiet installs can be told apart.
+async fn owned(env: &Env, body: &MailBody) -> Result<Option<(MailboxDoc, usize)>> {
     if body.secret.is_empty() {
         return Ok(None);
     }
-    Ok(load_mailbox(env, &body.id)
-        .await?
-        .filter(|doc| tokens::hashes_equal(&doc.secret_hash, &tokens::hash(&body.secret))))
+    let Some(mut doc) = load_mailbox(env, &body.id).await? else {
+        return Ok(None);
+    };
+    let Some(index) = doc.member_by_secret(&tokens::hash(&body.secret)) else {
+        return Ok(None);
+    };
+    if doc.touch(index, now()) {
+        save_mailbox(env, &doc).await?;
+    }
+    Ok(Some((doc, index)))
+}
+
+fn new_member(
+    device_id: String,
+    secret: &str,
+    key: String,
+    label: Option<&str>,
+    now: u64,
+) -> MailboxMember {
+    MailboxMember {
+        device_id,
+        secret_hash: tokens::hash(secret),
+        public_key: key,
+        label: member_label(label),
+        sealed: None,
+        sealed_at: None,
+        added_at: now,
+        seen_at: now,
+    }
 }
 
 /// Posts to the engine with the shared secret.
@@ -481,12 +517,14 @@ async fn mail_register(mut req: Request, env: &Env) -> Result<Response> {
         let id = new_id();
         let doc = MailboxDoc {
             id: id.clone(),
-            secret_hash: tokens::hash(&secret),
-            public_key: key.clone(),
-            device_id: device_id.clone(),
             owner_hash: None,
-            sealed: None,
-            sealed_at: None,
+            members: vec![new_member(
+                device_id.clone(),
+                &secret,
+                key.clone(),
+                body.label.as_deref(),
+                now,
+            )],
             created_at: now,
             updated_at: now,
         };
@@ -514,7 +552,7 @@ async fn mail_update(mut req: Request, env: &Env) -> Result<Response> {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let Some(mut doc) = owned(env, &body).await? else {
+    let Some((mut doc, index)) = owned(env, &body).await? else {
         return unknown_mailbox();
     };
     let key = match public_key(body.public_key.as_deref()) {
@@ -525,20 +563,24 @@ async fn mail_update(mut req: Request, env: &Env) -> Result<Response> {
         Ok(token) => token,
         Err(message) => return bad_request(message),
     };
+    let label = member_label(body.label.as_deref());
     let moves = body.device.device_id.is_some();
-    if key.is_none() && fcm.is_none() && !moves {
+    if key.is_none() && fcm.is_none() && label.is_none() && !moves {
         return bad_request("Nothing to update.");
     }
     if let Some(key) = key {
-        doc.set_public_key(key);
+        doc.members[index].set_public_key(key);
+    }
+    if label.is_some() {
+        doc.members[index].label = label;
     }
     if moves {
         match resolve_device(env, &body.device, fcm).await? {
-            Ok(id) => doc.device_id = id,
+            Ok(id) => doc.members[index].device_id = id,
             Err(message) => return bad_request(message),
         }
     } else if let Some(token) = fcm {
-        set_device_fcm(env, &doc.device_id, &token).await?;
+        set_device_fcm(env, &doc.members[index].device_id, &token).await?;
     }
     doc.updated_at = now();
     save_mailbox(env, &doc).await?;
@@ -550,14 +592,81 @@ async fn mail_delete(mut req: Request, env: &Env) -> Result<Response> {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let Some(doc) = owned(env, &body).await? else {
+    let Some((mut doc, index)) = owned(env, &body).await? else {
         return unknown_mailbox();
     };
+    if !body.everywhere && doc.members.len() > 1 {
+        doc.members.remove(index);
+        doc.updated_at = now();
+        save_mailbox(env, &doc).await?;
+        worker::console_log!("mail-otp: a device left a mailbox");
+        return Ok(Response::empty()?.with_status(204));
+    }
+    delete_mailbox(env, &doc).await?;
+    Ok(Response::empty()?.with_status(204))
+}
+
+async fn delete_mailbox(env: &Env, doc: &MailboxDoc) -> Result<()> {
     if let Some(owner) = &doc.owner_hash {
         forget_owner(env, owner, &doc.id).await?;
     }
     call(&mailbox_stub(env, &doc.id)?, Method::Delete, "/doc", None).await?;
     worker::console_log!("mail-otp: deleted a mailbox");
+    Ok(())
+}
+
+/// The installs an address forwards to, for the app's device list.
+async fn mail_devices(mut req: Request, env: &Env) -> Result<Response> {
+    let body = match mail_body(&mut req).await {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let Some((doc, index)) = owned(env, &body).await? else {
+        return unknown_mailbox();
+    };
+    let devices: Vec<_> = doc
+        .members
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            json!({
+                "deviceId": m.device_id,
+                "label": m.label,
+                "addedAt": m.added_at,
+                "seenAt": m.seen_at,
+                "thisDevice": i == index,
+            })
+        })
+        .collect();
+    Response::from_json(&json!({ "devices": devices }))
+}
+
+/// Takes another install off the address; it stops getting OTPs.
+async fn mail_remove_device(mut req: Request, env: &Env) -> Result<Response> {
+    let body = match mail_body(&mut req).await {
+        Ok(body) => body,
+        Err(response) => return response,
+    };
+    let Some((mut doc, index)) = owned(env, &body).await? else {
+        return unknown_mailbox();
+    };
+    let Some(target) = body.remove_device.as_deref() else {
+        return bad_request("removeDevice is required.");
+    };
+    let Some(position) = doc.members.iter().position(|m| m.device_id == target) else {
+        return error(
+            404,
+            "unknown_device",
+            "That device does not use this address.",
+        );
+    };
+    if position == index {
+        return bad_request("Use delete to take this device off the address.");
+    }
+    doc.members.remove(position);
+    doc.updated_at = now();
+    save_mailbox(env, &doc).await?;
+    worker::console_log!("mail-otp: a device was removed from a mailbox");
     Ok(Response::empty()?.with_status(204))
 }
 
@@ -566,10 +675,10 @@ async fn mail_inbox(mut req: Request, env: &Env) -> Result<Response> {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let Some(doc) = owned(env, &body).await? else {
+    let Some((doc, index)) = owned(env, &body).await? else {
         return unknown_mailbox();
     };
-    Response::from_json(&match doc.fresh_sealed(now()) {
+    Response::from_json(&match doc.members[index].fresh_sealed(now()) {
         Some((sealed, at)) => json!({ "sealed": sealed, "receivedAt": at }),
         None => json!({ "sealed": null }),
     })
@@ -582,7 +691,7 @@ async fn mail_owner(mut req: Request, env: &Env) -> Result<Response> {
         Ok(body) => body,
         Err(response) => return response,
     };
-    let Some(mut doc) = owned(env, &body).await? else {
+    let Some((mut doc, _)) = owned(env, &body).await? else {
         return unknown_mailbox();
     };
     let owner = match session_owner(env, body.session.as_ref()).await? {
@@ -605,8 +714,8 @@ async fn mail_owner(mut req: Request, env: &Env) -> Result<Response> {
     Ok(Response::empty()?.with_status(204))
 }
 
-/// Moves the caller's own address to this install: new key and secret. A
-/// box sealed for the old key is dropped; the old secret stops working.
+/// Adds this install to the caller's own address, with its own key and
+/// secret. The other installs keep getting OTPs.
 async fn mail_reclaim(mut req: Request, env: &Env) -> Result<Response> {
     let body = match mail_body(&mut req).await {
         Ok(body) => body,
@@ -641,14 +750,14 @@ async fn mail_reclaim(mut req: Request, env: &Env) -> Result<Response> {
         Err(message) => return bad_request(message),
     };
     let secret = tokens::random_token(MAILBOX_SECRET_PREFIX);
-    doc.secret_hash = tokens::hash(&secret);
-    doc.public_key = key;
-    doc.device_id = device_id;
-    doc.sealed = None;
-    doc.sealed_at = None;
-    doc.updated_at = now();
+    let now = now();
+    doc.add_member(
+        new_member(device_id, &secret, key, body.label.as_deref(), now),
+        now,
+    );
+    doc.updated_at = now;
     save_mailbox(env, &doc).await?;
-    worker::console_log!("mail-otp: a mailbox moved to a new phone");
+    worker::console_log!("mail-otp: a device joined a mailbox");
     mailbox_reply(env, &doc.id, &secret, 200)
 }
 
@@ -670,6 +779,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
         (Method::Post, "/v1/mail-otp/inbox") => mail_inbox(req, &env).await,
         (Method::Post, "/v1/mail-otp/owner") => mail_owner(req, &env).await,
         (Method::Post, "/v1/mail-otp/reclaim") => mail_reclaim(req, &env).await,
+        (Method::Post, "/v1/mail-otp/devices") => mail_devices(req, &env).await,
+        (Method::Post, "/v1/mail-otp/devices/remove") => mail_remove_device(req, &env).await,
         (Method::Post, "/internal/mail-otp/await") => mail_await(req, &env).await,
         (_, path) if path.starts_with("/internal/accounts/") => {
             account::internal(req, &env, path).await
@@ -763,13 +874,22 @@ async fn email(message: ForwardableEmailMessage, env: Env, _ctx: Context) -> Res
         return Ok(());
     };
     let plaintext = serde_json::to_vec(&payload)?;
-    let sealed = mail_seal::seal(&doc.public_key, &id, &plaintext)
-        .map_err(|e| worker::Error::RustError(format!("seal: {e:?}")))?;
-    let mut delivered = call(
+    // Sealed once per install, each to its own key.
+    let mut boxes = Vec::with_capacity(doc.members.len());
+    for member in &doc.members {
+        let sealed = mail_seal::seal(&member.public_key, &id, &plaintext)
+            .map_err(|e| worker::Error::RustError(format!("seal: {e:?}")))?;
+        boxes.push((member.device_id.clone(), sealed));
+    }
+    let body: Vec<_> = boxes
+        .iter()
+        .map(|(device_id, sealed)| json!({ "deviceId": device_id, "sealed": sealed }))
+        .collect();
+    let delivered = call(
         &mailbox_stub(&env, &id)?,
         Method::Post,
         "/deliver",
-        Some(json!({ "sealed": sealed }).to_string()),
+        Some(json!({ "boxes": body }).to_string()),
     )
     .await?;
     if delivered.status_code() != 200 {
@@ -778,27 +898,29 @@ async fn email(message: ForwardableEmailMessage, env: Env, _ctx: Context) -> Res
     // The code is stored now. What follows is best effort: an error here
     // must not make the mail server send it again (a second push for the
     // same code).
-    let device_id = match delivered.json::<MailboxDoc>().await {
-        Ok(delivered) => delivered.device_id,
-        Err(_) => doc.device_id,
-    };
     if matches!(payload, mail::Payload::Otp { .. }) {
         if let Err(e) = hand_to_waiters(&env, &id, &payload, &plaintext).await {
             worker::console_log!("mail-otp: handing to a server sign-in failed: {e}");
         }
     }
-    let event = json!({ "body": EventBody::MailOtp { mailbox: id.clone(), sealed } });
-    let appended = match device_stub(&env, &device_id) {
-        Ok(stub) => call(&stub, Method::Post, "/append", Some(event.to_string()))
-            .await
-            .map(|response| response.status_code()),
-        Err(e) => Err(e),
-    };
-    if !matches!(appended, Ok(200)) {
-        // The box is kept; the app still pulls it from /inbox.
-        worker::console_log!("mail-otp: event append failed: {appended:?}");
+    for (device_id, sealed) in boxes {
+        let event = json!({ "body": EventBody::MailOtp { mailbox: id.clone(), sealed } });
+        let appended = match device_stub(&env, &device_id) {
+            Ok(stub) => call(&stub, Method::Post, "/append", Some(event.to_string()))
+                .await
+                .map(|response| response.status_code()),
+            Err(e) => Err(e),
+        };
+        if !matches!(appended, Ok(200)) {
+            // The box is kept; the app still pulls it from /inbox.
+            worker::console_log!("mail-otp: event append failed: {appended:?}");
+        }
     }
-    worker::console_log!("mail-otp: relayed a {}", payload.kind());
+    worker::console_log!(
+        "mail-otp: relayed a {} to {} device(s)",
+        payload.kind(),
+        doc.members.len()
+    );
     Ok(())
 }
 

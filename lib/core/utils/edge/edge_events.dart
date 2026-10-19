@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/utils/app_urls.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 
 /// One entry of this install's event log on the edge.
 class EdgeEvent {
@@ -92,7 +93,7 @@ class EdgeEventChannel {
   /// also after registering, to start listening at once.
   Future<void> connect() async {
     if (!_foreground || _socket != null || _connecting) return;
-    if (vtopEdgeBaseUrl.isEmpty) return;
+    if (vtopEdgeBaseUrl.isEmpty || await isOnDeviceMode()) return;
     _connecting = true;
     try {
       final device = await _devices.load();
@@ -153,6 +154,9 @@ class EdgeEventChannel {
       if (parsed != null) unawaited(accept(parsed, advance: true));
     } catch (_) {}
   }
+
+  /// Closes the socket and stays closed until [connect].
+  void stop() => _close();
 
   void _onDropped() {
     _close();

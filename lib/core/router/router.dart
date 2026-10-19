@@ -34,6 +34,7 @@ import 'package:vitapmate/features/settings/presentation/pages/notification_mana
 import 'package:vitapmate/features/settings/presentation/pages/logs_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
+import 'package:vitapmate/core/widgets/server_feature_gate.dart';
 part 'router.g.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -236,7 +237,10 @@ GoRouter router(Ref ref) {
                     name: Paths.connectedApps,
                     pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
-                      child: const ConnectedAppsPage(),
+                      child: const ServerFeatureGate(
+                        feature: 'Connected apps',
+                        child: ConnectedAppsPage(),
+                      ),
                     ),
                     routes: [
                       GoRoute(
@@ -244,7 +248,10 @@ GoRouter router(Ref ref) {
                         name: Paths.chromeExtension,
                         pageBuilder: (context, state) => SlideFadePage<void>(
                           key: state.pageKey,
-                          child: const ChromeExtensionPage(),
+                          child: const ServerFeatureGate(
+                            feature: 'The browser extension',
+                            child: ChromeExtensionPage(),
+                          ),
                         ),
                       ),
                     ],
@@ -350,7 +357,10 @@ GoRouter router(Ref ref) {
                     name: Paths.mailForwarding,
                     pageBuilder: (context, state) => SlideFadePage<void>(
                       key: state.pageKey,
-                      child: const MailForwardingPage(),
+                      child: const ServerFeatureGate(
+                        feature: 'OTP mail forwarding',
+                        child: MailForwardingPage(),
+                      ),
                     ),
                   ),
                   GoRoute(

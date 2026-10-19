@@ -73,6 +73,7 @@ class MailForwardingPage extends HookConsumerWidget {
     final busy = useState(false);
     final checking = useState(false);
     final confirmation = useState<MailOtpPayload?>(null);
+    final devices = useState<List<MailForwardingDevice>?>(null);
     final steps = useGuideSteps(ref, forwardingGuideDoneSettingKey);
     final openStep = useState<int?>(null);
     final current = openStep.value ?? steps.firstOpen(_stepCount);
@@ -80,11 +81,31 @@ class MailForwardingPage extends HookConsumerWidget {
     // latest steps through this.
     final latestSteps = useRef(steps)..value = steps;
 
+    /// Set below; the edge-rejected case joins the address again.
+    final rejoin = useRef<Future<void> Function()?>(null);
+
+    Future<void> loadDevices() async {
+      if (forwarding.value == null) {
+        devices.value = null;
+        return;
+      }
+      try {
+        devices.value = await service.devices();
+      } on MailForwardingException catch (error) {
+        // Another install took the address before addresses could have
+        // several devices: this copy's secret is dead. Join it again.
+        if (error.mailboxGone) await rejoin.value?.call();
+      } catch (_) {
+        // The list is extra; the address works without it.
+      }
+    }
+
     Future<void> reload() async {
       forwarding.value = await service.load();
       loaded.value = true;
       ref.invalidate(mailForwardingProvider);
       ref.invalidate(anyEmailOtpReadyProvider);
+      unawaited(loadDevices());
     }
 
     Future<void> checkNow({bool quiet = false}) async {
@@ -136,6 +157,16 @@ class MailForwardingPage extends HookConsumerWidget {
       return found;
     }
 
+    rejoin.value = () async {
+      await service.forgetLocal();
+      forwarding.value = null;
+      devices.value = null;
+      try {
+        await reclaimAddress(signIn: false);
+      } catch (_) {}
+      if (forwarding.value == null) await reload();
+    };
+
     useEffect(() {
       unawaited(() async {
         await reload();
@@ -148,7 +179,7 @@ class MailForwardingPage extends HookConsumerWidget {
               dispToast(
                 context,
                 'Your address is back',
-                'Forwarded OTPs now come to this phone.',
+                'Forwarded OTPs now come to this device too.',
               );
             }
           } catch (_) {}
@@ -201,7 +232,7 @@ class MailForwardingPage extends HookConsumerWidget {
           found == null ? 'No address found' : 'Your address is back',
           found == null
               ? 'Your VTOP account has no forwarding address yet. Create one.'
-              : 'Forwarded OTPs now come to this phone.',
+              : 'Forwarded OTPs now come to this device too.',
         );
       } catch (error) {
         if (context.mounted) {
@@ -231,32 +262,50 @@ class MailForwardingPage extends HookConsumerWidget {
       }
     }
 
+    /// Other devices on the address get a choice: leave it to them, or
+    /// delete it for everyone.
     Future<void> remove() async {
-      final confirmed = await showAdaptiveDialog<bool>(
+      final others = (devices.value ?? const <MailForwardingDevice>[])
+          .where((d) => !d.thisDevice)
+          .length;
+      final choice = await showAdaptiveDialog<bool>(
         context: context,
         builder: (dialogContext) => AppDialog(
-          title: const Text('Remove your forwarding address?'),
-          body: const Text(
-            'Mail forwarded to it is rejected from now on. Also delete the Gmail filter so Gmail stops trying.',
+          title: Text(
+            others == 0
+                ? 'Remove your forwarding address?'
+                : 'Remove the address from this device?',
+          ),
+          body: Text(
+            others == 0
+                ? 'Mail forwarded to it is rejected from now on. Also delete the Gmail filter so Gmail stops trying.'
+                : 'Your ${others == 1 ? 'other device keeps' : '$others other devices keep'} getting OTPs. '
+                      'Delete the address to stop forwarding everywhere; then also delete the Gmail filter.',
           ),
           actions: [
             FButton(
               variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(dialogContext).pop(false),
+              onPress: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
+            if (others > 0)
+              FButton(
+                variant: FButtonVariant.outline,
+                onPress: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Remove from this device'),
+              ),
             FButton(
               variant: FButtonVariant.destructive,
               onPress: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Remove'),
+              child: Text(others == 0 ? 'Remove' : 'Delete everywhere'),
             ),
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (choice == null) return;
       busy.value = true;
       try {
-        await service.remove();
+        await service.remove(everywhere: choice);
         steps.setAll(0);
         confirmation.value = null;
         await reload();
@@ -268,7 +317,7 @@ class MailForwardingPage extends HookConsumerWidget {
     }
 
     if (!loaded.value) {
-      return const Center(child: FCircularProgress.pinwheel());
+      return const Center(child: FCircularProgress());
     }
 
     final privacy = GuideCallout(
@@ -339,10 +388,8 @@ class MailForwardingPage extends HookConsumerWidget {
             FButton(
               onPress: busy.value ? null : create,
               prefix: busy.value
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: FCircularProgress.pinwheel(),
+                  ? const FCircularProgress(
+                      size: FCircularProgressSizeVariant.sm,
                     )
                   : const Icon(FLucideIcons.plus),
               child: const Text('Create my address'),
@@ -362,11 +409,7 @@ class MailForwardingPage extends HookConsumerWidget {
     final confirmationBox = confirm == null
         ? Row(
             children: [
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: FCircularProgress.pinwheel(),
-              ),
+              const FCircularProgress(size: FCircularProgressSizeVariant.xs),
               const SizedBox(width: Space.sm),
               Expanded(
                 child: Text(
@@ -511,6 +554,22 @@ class MailForwardingPage extends HookConsumerWidget {
             step,
             const SizedBox(height: Space.sm),
           ],
+          if (devices.value case final list? when list.isNotEmpty) ...[
+            const SizedBox(height: Space.md),
+            _DeviceList(
+              devices: list,
+              onRemove: (device) async {
+                try {
+                  await service.removeDevice(device.deviceId);
+                  await loadDevices();
+                } catch (error) {
+                  if (context.mounted) {
+                    dispToast(context, 'Could not remove', '$error');
+                  }
+                }
+              },
+            ),
+          ],
           const SizedBox(height: Space.md),
           const GuideTroubleshooting(items: _troubleshooting),
           const SizedBox(height: Space.lg),
@@ -527,6 +586,64 @@ class MailForwardingPage extends HookConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The devices that get this address's OTPs. Another one is added by
+/// opening this page there and choosing "I already have an address".
+class _DeviceList extends StatelessWidget {
+  const _DeviceList({required this.devices, required this.onRemove});
+
+  final List<MailForwardingDevice> devices;
+  final Future<void> Function(MailForwardingDevice device) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          devices.length == 1
+              ? 'OTPs go to this device'
+              : 'OTPs go to ${devices.length} devices',
+          style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: Space.xs),
+        Text(
+          'To add another, open this page on it and tap “I already have an address”.',
+          style: typography.body.xs.copyWith(color: colors.mutedForeground),
+        ),
+        const SizedBox(height: Space.sm),
+        FTileGroup(
+          children: [
+            for (final device in devices)
+              FTile(
+                prefix: Icon(
+                  device.thisDevice
+                      ? FLucideIcons.smartphone
+                      : FLucideIcons.monitorSmartphone,
+                ),
+                title: Text(
+                  device.thisDevice
+                      ? '${device.label ?? 'This device'} (this device)'
+                      : device.label ?? 'Another device',
+                ),
+                subtitle: Text(
+                  'Added ${_ago(device.addedAt)} · last used ${_ago(device.seenAt)}',
+                ),
+                suffix: device.thisDevice
+                    ? null
+                    : FButton.icon(
+                        onPress: () => onRemove(device),
+                        child: const Icon(FLucideIcons.x),
+                      ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

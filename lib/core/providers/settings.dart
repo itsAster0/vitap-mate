@@ -6,6 +6,7 @@ import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 part 'settings.g.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
@@ -61,6 +62,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         bridgeServerSignInSettingKey,
         bridgeLastFcmTokenSettingKey,
         bridgeLastSemesterSettingKey,
+        onDeviceModeSettingKey,
       },
     ),
   );

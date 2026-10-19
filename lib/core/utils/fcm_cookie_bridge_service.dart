@@ -12,6 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
@@ -35,12 +36,17 @@ bool get fcmCookieBridgePlatformSupported =>
 
 final fcmCookieBridgeAvailableProvider = FutureProvider<bool>((ref) async {
   if (!fcmCookieBridgePlatformSupported) return false;
+  // Firebase is not started in on-device mode; the entry points stay so a
+  // tap explains how to get them back.
+  if (ref.watch(onDeviceModeProvider)) return true;
   return ensureFirebaseReady();
 });
 
 bool _foregroundListenerStarted = false;
 
+/// Starts Firebase; false in on-device mode or when this build has none.
 Future<bool> ensureFirebaseReady() async {
+  if (await isOnDeviceMode()) return false;
   if (Firebase.apps.isNotEmpty) return true;
 
   try {
@@ -94,7 +100,11 @@ void startVtopCookieBridgeListener() {
 }
 
 Future<void> _startVtopCookieBridgeListener() async {
-  if (!await ensureFirebaseReady()) return;
+  if (!await ensureFirebaseReady()) {
+    // On-device mode or no Firebase: leave it to [resumeServerFeatures].
+    _foregroundListenerStarted = false;
+    return;
+  }
 
   FirebaseMessaging.onMessage.listen((message) {
     unawaited(handleVtopCookieBridgeMessage(message.data));
@@ -106,6 +116,10 @@ Future<void> _startVtopCookieBridgeListener() async {
     unawaited(_syncMailForwardingFcmToken(token));
   });
 
+  await _syncFcmTokens();
+}
+
+Future<void> _syncFcmTokens() async {
   try {
     final token = await FirebaseMessaging.instance.getToken();
     unawaited(_syncMailForwardingFcmToken(token));
@@ -118,6 +132,36 @@ Future<void> _startVtopCookieBridgeListener() async {
       stackTrace: stackTrace,
     );
   }
+}
+
+/// On-device mode turned on: closes the event socket and drops this
+/// install's push token, so the server can no longer reach the phone.
+Future<void> pauseServerFeatures() async {
+  EdgeEventChannel.instance.stop();
+  if (Firebase.apps.isEmpty) return;
+  try {
+    await FirebaseMessaging.instance.setAutoInitEnabled(false);
+    await FirebaseMessaging.instance.deleteToken();
+  } catch (error) {
+    log('Failed to drop the FCM token: $error', name: 'fcm.cookie');
+  }
+}
+
+/// On-device mode turned off: what launch would have started.
+Future<void> resumeServerFeatures() async {
+  if (await ensureFirebaseReady()) {
+    try {
+      await FirebaseMessaging.instance.setAutoInitEnabled(true);
+    } catch (_) {}
+    FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
+    if (_foregroundListenerStarted) {
+      // Listening already; the token was dropped, so send the new one.
+      unawaited(_syncFcmTokens());
+    } else {
+      startVtopCookieBridgeListener();
+    }
+  }
+  unawaited(EdgeEventChannel.instance.connect());
 }
 
 @pragma('vm:entry-point')
@@ -140,6 +184,8 @@ Future<void> _syncMailForwardingFcmToken(String? token) async {
 }
 
 Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
+  // A push sent before on-device mode was turned on.
+  if (await isOnDeviceMode()) return;
   final type = '${data['type'] ?? ''}';
   if (type == mailOtpMessageType) {
     // Opened here; the OTP prompt or the setup page listening in this
@@ -175,6 +221,7 @@ Future<void> handleVtopCookieRequestEvent(EdgeEvent event) =>
 
 /// Answers a cookie request with this phone's VTOP session.
 Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
+  if (await isOnDeviceMode()) return;
   final requestId = '${data['requestId'] ?? ''}'.trim();
   final responseToken = '${data['responseToken'] ?? ''}'.trim();
   final callbackUrl = _resolveCookieCallbackUrl(data);
@@ -361,6 +408,7 @@ Future<String> _headlessVtopCookieHeader(ProviderContainer container) async {
 /// linked one and the token changed. Runs headless, so it never throws and
 /// never logs tokens or cookies.
 Future<void> syncBridgeFcmToken(String? token) async {
+  if (await isOnDeviceMode()) return;
   final container = ProviderContainer(
     overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
   );
@@ -409,6 +457,7 @@ Future<void> syncBridgeFcmToken(String? token) async {
 /// agents default to it. Like [syncBridgeFcmToken]: only when linked and
 /// changed, headless, never throws.
 Future<void> syncBridgeSemester(String? semesterId) async {
+  if (await isOnDeviceMode()) return;
   final container = ProviderContainer(
     overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
   );

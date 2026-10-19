@@ -1,19 +1,12 @@
 //! The engine: all VTOP work for the Cloudflare edge, nothing stored. It
 //! checks whose a session is, seals saved credentials, signs in with them
 //! (the OTP from forwarded mail) and serves the MCP tools. See `engine`.
-//!
-//! `edge_import`, `firestore`, `google` and `store` are only
-//! for the one-off `accounts-to-edge` import.
 
 pub mod config;
-pub mod edge_import;
 pub mod engine;
 pub mod error;
 pub mod fakes;
-pub mod firestore;
-pub mod google;
 pub mod login;
-pub mod store;
 pub mod vault;
 pub mod verify;
 

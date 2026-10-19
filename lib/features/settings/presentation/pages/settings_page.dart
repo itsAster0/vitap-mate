@@ -35,6 +35,9 @@ import 'package:vitapmate/features/settings/presentation/widgets/vtop_server_dia
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
+import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/core/widgets/server_feature_gate.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -513,10 +516,23 @@ class SettingsPage extends HookConsumerWidget {
                 ),
                 title: const Text('Data Source'),
                 subtitle: Text(
-                  vtopDataSourceLabel(ref.watch(vtopServerSettingsProvider)),
+                  ref.watch(onDeviceModeProvider)
+                      ? 'On device'
+                      : vtopDataSourceLabel(
+                          ref.watch(vtopServerSettingsProvider),
+                        ),
                 ),
                 suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => showVtopServerDialog(context, ref),
+                onPress: () async {
+                  if (await ensureServerAllowed(
+                        context,
+                        ref,
+                        feature: 'A server data source',
+                      ) &&
+                      context.mounted) {
+                    await showVtopServerDialog(context, ref);
+                  }
+                },
               ),
               FTile(
                 prefix: _IconTile(
@@ -601,6 +617,23 @@ class SettingsPage extends HookConsumerWidget {
                           },
                   ),
               ],
+            ],
+          ),
+          SectionHeader(title: 'Privacy'),
+          FTileGroup(
+            children: [
+              FTile(
+                prefix: _IconTile(
+                  icon: FLucideIcons.shieldCheck,
+                  tone: colors.app.success,
+                ),
+                title: const Text('On-device Mode'),
+                subtitle: const Text('Only talk to VTOP; no server features'),
+                suffix: FSwitch(
+                  value: ref.watch(onDeviceModeProvider),
+                  onChange: (value) => _setOnDeviceMode(context, ref, value),
+                ),
+              ),
             ],
           ),
           SectionHeader(title: 'Display'),
@@ -1091,6 +1124,58 @@ class _MiniApp extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Turning on-device mode on asks first: it lists what stops working, and
+/// what stays on the server until removed there.
+Future<void> _setOnDeviceMode(
+  BuildContext context,
+  WidgetRef ref,
+  bool value,
+) async {
+  if (!value) {
+    await setOnDeviceMode(ref, false);
+    return;
+  }
+  final prefs = await ref.read(settingsProvider.future);
+  final linked = prefs.getBool(bridgeLinkedSettingKey) ?? false;
+  if (!context.mounted) return;
+  final confirmed = await showAdaptiveDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogContext) => AppDialog(
+      title: const Text('Turn On On-device Mode?'),
+      body: Text(
+        'The app will only talk to VTOP (and Google, if you read OTPs from '
+        'Gmail). These stop working until you turn it off: the browser '
+        'extension, AI agents (MCP), OTP mail forwarding, server sign-in '
+        'and a server data source.'
+        '${linked ? '\n\nYour account on the VITAP Mate server, with any '
+                  'saved password and access keys, stays there. To remove '
+                  'it, delete it in Connected apps first.' : ''}',
+      ),
+      actions: [
+        FButton(
+          onPress: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Turn On'),
+        ),
+        FButton(
+          variant: FButtonVariant.outline,
+          onPress: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Cancel'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  await setOnDeviceMode(ref, true);
+  if (context.mounted) {
+    dispToast(
+      context,
+      'On-device mode is on',
+      'Vitap Mate now only talks to VTOP.',
     );
   }
 }

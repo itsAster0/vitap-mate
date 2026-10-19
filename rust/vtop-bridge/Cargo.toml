@@ -16,11 +16,8 @@ serde_json = { workspace = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 async-trait = "0.1"
-time = { version = "0.3", features = ["formatting", "parsing"] }
 base64 = "0.22.1"
-subtle = "2.6"
 aes-gcm = "0.10"
-gcp_auth = { version = "0.12", features = ["webpki-roots"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
