@@ -27,8 +27,9 @@ pub struct KeyRecord {
     pub last_used_at: Option<u64>,
 }
 
-/// One student's account. Secrets are sealed by the engine with a key the
-/// edge never has.
+/// One student's account. Secrets are sealed by the engine with `VAULT_KEY`,
+/// an edge secret the edge passes to the engine: storage alone does not
+/// open them, but whoever controls the Worker can.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountRecord {
     pub id: String,

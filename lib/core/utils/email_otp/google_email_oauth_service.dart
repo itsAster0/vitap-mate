@@ -13,6 +13,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 
 part 'google_email_oauth_service.g.dart';
 
@@ -76,7 +77,8 @@ Future<bool> emailOtpReady(Ref ref) {
 @Riverpod(keepAlive: true)
 Future<bool> anyEmailOtpReady(Ref ref) async {
   return await ref.watch(emailOtpReadyProvider.future) ||
-      await ref.watch(mailForwardingServiceProvider).isReady();
+      (!ref.watch(onDeviceModeProvider) &&
+          await ref.watch(mailForwardingServiceProvider).isReady());
 }
 
 @Riverpod(keepAlive: true)

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/src/api/mail_otp.dart';
 
 class _MemoryStore implements MailForwardingStore {
   MailForwarding? value;
@@ -197,6 +198,91 @@ void main() {
       );
       await service.remove();
       expect(store.value, isNull);
+    });
+
+    ({
+      MailForwardingService service,
+      List<(String, Map<String, dynamic>)> calls,
+    })
+    recording(String answer, {_MemoryStore? store}) {
+      final calls = <(String, Map<String, dynamic>)>[];
+      final client = MockClient((request) async {
+        calls.add((
+          request.url.path,
+          jsonDecode(request.body) as Map<String, dynamic>,
+        ));
+        return http.Response(answer, 200);
+      });
+      return (
+        service: MailForwardingService(
+          client: client,
+          baseUrl: 'https://edge.example',
+          store: store ?? (_MemoryStore()..value = _forwarding),
+          devices: EdgeDeviceService(
+            client: client,
+            baseUrl: 'https://edge.example',
+            store: _MemoryDevices()..value = _device,
+          ),
+          deviceLabel: () async => 'OnePlus CPH2573',
+          keypair: () => const MailOtpKeypair(secret: 'sk', publicKey: 'pk'),
+        ),
+        calls: calls,
+      );
+    }
+
+    test('joining an address sends this device\'s name', () async {
+      final store = _MemoryStore();
+      final rig = recording(
+        '{"id":"k3f9x2ab7q","address":"vtop-otp-k3f9x2ab7q@aster0.dev","secret":"vmb_new"}',
+        store: store,
+      );
+      await rig.service.reclaim(cookies: 'JSESSIONID=a', fcmToken: 'old');
+      final (path, body) = rig.calls.single;
+      expect(path, '/v1/mail-otp/reclaim');
+      expect(body['label'], 'OnePlus CPH2573');
+      expect(body['deviceId'], _device.id);
+      expect(store.value!.secret, 'vmb_new');
+    });
+
+    test('lists the devices on the address', () async {
+      final rig = recording(
+        jsonEncode({
+          'devices': [
+            {
+              'deviceId': 'a' * 32,
+              'label': 'OnePlus CPH2573',
+              'addedAt': 1760000000,
+              'seenAt': 1760003600,
+              'thisDevice': true,
+            },
+            {'deviceId': 'b' * 32, 'label': null, 'addedAt': 1760000000},
+            {'junk': true},
+          ],
+        }),
+      );
+      final devices = await rig.service.devices();
+      expect(devices, hasLength(2));
+      expect(devices.first.thisDevice, isTrue);
+      expect(devices.first.label, 'OnePlus CPH2573');
+      expect(devices.last.label, isNull);
+      expect(devices.last.seenAt, devices.last.addedAt);
+      expect(rig.calls.single.$2, {'id': 'k3f9x2ab7q', 'secret': 'vmb_secret'});
+    });
+
+    test('removes another device by id', () async {
+      final rig = recording('');
+      await rig.service.removeDevice('b' * 32);
+      expect(rig.calls.single.$1, '/v1/mail-otp/devices/remove');
+      expect(rig.calls.single.$2['removeDevice'], 'b' * 32);
+    });
+
+    test('leaving keeps the address unless asked to delete it', () async {
+      final leave = recording('');
+      await leave.service.remove();
+      expect(leave.calls.single.$2.containsKey('everywhere'), isFalse);
+      final delete = recording('');
+      await delete.service.remove(everywhere: true);
+      expect(delete.calls.single.$2['everywhere'], isTrue);
     });
 
     test('an empty inbox is null', () async {

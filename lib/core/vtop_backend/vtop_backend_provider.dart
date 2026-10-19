@@ -13,6 +13,8 @@ import 'package:vitapmate/core/vtop_backend/relogin_vtop_backend.dart';
 import 'package:vitapmate/core/vtop_backend/remote_vtop_backend.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
+import 'package:vitapmate/core/providers/on_device_mode.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
 
 part 'vtop_backend_provider.g.dart';
 
@@ -26,7 +28,9 @@ bool vtopLoginPromptAllowed(Ref ref) => true;
 /// retry. Rebuilt when the setting changes.
 @Riverpod(keepAlive: true)
 VtopBackend vtopBackend(Ref ref) {
-  final server = ref.watch(vtopServerSettingsProvider);
+  final server = ref.watch(onDeviceModeProvider)
+      ? VtopServerSettings.disabled
+      : ref.watch(vtopServerSettingsProvider);
   final VtopBackend inner = server.isEnabled
       ? RemoteVtopBackend(
           settings: server,
@@ -61,7 +65,9 @@ VtopBackend vtopBackend(Ref ref) {
 /// Logs in on the device, or through the server when one is configured.
 @Riverpod(keepAlive: true)
 VtopAuthenticator vtopAuthenticator(Ref ref) {
-  final server = ref.watch(vtopServerSettingsProvider);
+  final server = ref.watch(onDeviceModeProvider)
+      ? VtopServerSettings.disabled
+      : ref.watch(vtopServerSettingsProvider);
   if (!server.isEnabled) return const LocalVtopAuthenticator();
   return RemoteVtopAuthenticator(
     settings: server,

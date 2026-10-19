@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/utils/app_urls.dart';
 
 /// This install as the edge knows it. Events for it (forwarded OTPs, …)
@@ -87,6 +88,12 @@ Future<Map<String, dynamic>> edgePost(
     throw const EdgeException(
       'not_configured',
       'This build has no VTOP_EDGE_URL.',
+    );
+  }
+  if (await isOnDeviceMode()) {
+    throw const EdgeException(
+      OnDeviceModeException.code,
+      OnDeviceModeException.message,
     );
   }
   final response = await client
