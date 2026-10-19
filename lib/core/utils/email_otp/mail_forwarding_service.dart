@@ -209,6 +209,9 @@ class MailForwardingException implements Exception {
   /// The bridge no longer knows this mailbox (or the secret is wrong).
   bool get mailboxGone => code == 'mailbox_not_found';
 
+  /// The student already has another address; join that one instead.
+  bool get addressExists => code == 'address_exists';
+
   @override
   String toString() => message;
 }

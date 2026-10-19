@@ -1,11 +1,12 @@
 //! Accounts on the edge: one `Account` object per student, named by the
-//! registration number. It holds the linked phone's secret, access keys,
+//! registration number. It holds the linked phones' secrets, access keys,
 //! settings, the sealed session cache and saved credentials, and the
 //! session requests of agents and the extension.
 //!
 //! A session request is answered from the cache (checked with VTOP by the
-//! engine), or left pending while the phone is asked (an event on its
-//! install) and/or the engine signs in with saved credentials, the OTP read
+//! engine), or left pending while the phone that created the key is asked
+//! (an event on its install; every linked phone for keys from before keys
+//! had one) and/or the engine signs in with saved credentials, the OTP read
 //! from the student's forwarded mail. Server sign-in therefore needs email
 //! forwarding: credentials are only kept for students who set it up.
 //!
@@ -16,7 +17,7 @@
 //! - The phone's answer to a request: `POST /v1/session/answer?account=`.
 //! - The app, with a live VTOP session: `/v1/link`, `/v1/keys`,
 //!   `/v1/keys/revoke`, `/v1/account`, `/v1/account/{fcm-token,
-//!   forget-credentials,delete,settings,semester}`. And with only its app
+//!   forget-credentials,delete,settings,semester,remove-phone}`. And with only its app
 //!   secret: `/v1/account/credentials-rejected` (VTOP turned the password
 //!   down on the phone, so the server must stop trying it too).
 //! - The engine: `/internal/accounts/login-done`, `/internal/accounts/import`.
@@ -43,10 +44,11 @@ use worker::{
 };
 
 use crate::account_state::{
-    plan, ready, AccountRecord, KeyRecord, Plan, RequestRecord, RequestStatus, Snapshot,
-    REQUEST_KEEP_SECS,
+    plan, ready, AccountRecord, KeyRecord, PhoneRecord, Plan, RequestRecord, RequestStatus,
+    Snapshot, REQUEST_KEEP_SECS,
 };
 use crate::sql;
+use crate::state::member_label;
 use crate::{
     bad_request, call, create_device, device_matches, device_stub, engine_post, error, now,
     owner_stub, set_device_fcm, var,
@@ -171,6 +173,7 @@ pub async fn handle(mut req: Request, env: &Env, path: &str) -> Result<Response>
                 "/v1/account/delete" => "delete",
                 "/v1/account/settings" => "settings",
                 "/v1/account/semester" => "semester",
+                "/v1/account/remove-phone" => "remove-phone",
                 _ => return error(404, "not_found", "No such route."),
             };
             with_session(req, env, op).await
@@ -304,7 +307,8 @@ CREATE TABLE IF NOT EXISTS keys (
     hash TEXT PRIMARY KEY,
     label TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    last_used_at INTEGER
+    last_used_at INTEGER,
+    device_id TEXT
 );
 CREATE TABLE IF NOT EXISTS requests (
     id TEXT PRIMARY KEY,
@@ -318,11 +322,32 @@ CREATE TABLE IF NOT EXISTS requests (
     vault_started INTEGER NOT NULL,
     phone_asked INTEGER NOT NULL,
     phone_error TEXT,
-    source TEXT
+    source TEXT,
+    phones TEXT
 );
-CREATE TABLE IF NOT EXISTS pending (request_id TEXT NOT NULL)";
+CREATE TABLE IF NOT EXISTS pending (request_id TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS phones (
+    device_id TEXT PRIMARY KEY,
+    secret_hash TEXT NOT NULL,
+    label TEXT,
+    added_at INTEGER NOT NULL,
+    seen_at INTEGER NOT NULL
+)";
 
-fn account_from(row: &sql::Row, keys: Vec<KeyRecord>) -> Option<AccountRecord> {
+/// Made by objects created before several phones could link.
+const PHONES_TABLE: &str = "CREATE TABLE IF NOT EXISTS phones (
+    device_id TEXT PRIMARY KEY,
+    secret_hash TEXT NOT NULL,
+    label TEXT,
+    added_at INTEGER NOT NULL,
+    seen_at INTEGER NOT NULL
+)";
+
+fn account_from(
+    row: &sql::Row,
+    keys: Vec<KeyRecord>,
+    phones: Vec<PhoneRecord>,
+) -> Option<AccountRecord> {
     Some(AccountRecord {
         id: sql::text(row, "id")?,
         app_secret_hash: sql::text(row, "app_secret_hash"),
@@ -333,6 +358,7 @@ fn account_from(row: &sql::Row, keys: Vec<KeyRecord>) -> Option<AccountRecord> {
         },
         semester_id: sql::text(row, "semester_id"),
         device_id: sql::text(row, "device_id"),
+        phones,
         mailbox_id: sql::text(row, "mailbox_id"),
         sealed_vault: sql::text(row, "sealed_vault"),
         vault_saved_at: sql::int(row, "vault_saved_at"),
@@ -357,6 +383,17 @@ fn key_from(row: &sql::Row) -> Option<KeyRecord> {
         label: sql::text(row, "label")?,
         created_at: sql::int(row, "created_at")?,
         last_used_at: sql::int(row, "last_used_at"),
+        device_id: sql::text(row, "device_id"),
+    })
+}
+
+fn phone_from(row: &sql::Row) -> Option<PhoneRecord> {
+    Some(PhoneRecord {
+        device_id: sql::text(row, "device_id")?,
+        secret_hash: sql::text(row, "secret_hash")?,
+        label: sql::text(row, "label"),
+        added_at: sql::int(row, "added_at")?,
+        seen_at: sql::int(row, "seen_at").unwrap_or(0),
     })
 }
 
@@ -381,6 +418,15 @@ fn request_from(row: &sql::Row) -> Option<RequestRecord> {
         phone_asked: sql::flag(row, "phone_asked"),
         phone_error: sql::text(row, "phone_error"),
         source: sql::text(row, "source"),
+        phones: sql::text(row, "phones")
+            .map(|joined| {
+                joined
+                    .split(',')
+                    .filter(|d| !d.is_empty())
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default(),
     })
 }
 
@@ -428,12 +474,29 @@ fn account_columns(doc: &AccountRecord) -> Vec<(&'static str, SqlStorageValue)> 
 fn put_key(db: &SqlStorage, key: &KeyRecord) -> Result<()> {
     sql::run(
         db,
-        "INSERT OR REPLACE INTO keys (hash, label, created_at, last_used_at) VALUES (?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO keys (hash, label, created_at, last_used_at, device_id)
+         VALUES (?, ?, ?, ?, ?)",
         vec![
             sql::v_text(&key.hash),
             sql::v_text(&key.label),
             sql::v_int(key.created_at),
             sql::v_opt_int(key.last_used_at),
+            sql::v_opt_text(key.device_id.as_deref()),
+        ],
+    )
+}
+
+fn put_phone(db: &SqlStorage, phone: &PhoneRecord) -> Result<()> {
+    sql::run(
+        db,
+        "INSERT OR REPLACE INTO phones (device_id, secret_hash, label, added_at, seen_at)
+         VALUES (?, ?, ?, ?, ?)",
+        vec![
+            sql::v_text(&phone.device_id),
+            sql::v_text(&phone.secret_hash),
+            sql::v_opt_text(phone.label.as_deref()),
+            sql::v_int(phone.added_at),
+            sql::v_int(phone.seen_at),
         ],
     )
 }
@@ -457,6 +520,10 @@ fn write_account(db: &SqlStorage, doc: &AccountRecord) -> Result<()> {
     sql::run(db, "DELETE FROM keys", vec![])?;
     for key in &doc.keys {
         put_key(db, key)?;
+    }
+    sql::run(db, "DELETE FROM phones", vec![])?;
+    for phone in &doc.phones {
+        put_phone(db, phone)?;
     }
     Ok(())
 }
@@ -501,14 +568,29 @@ fn write_changes(db: &SqlStorage, base: &AccountRecord, doc: &AccountRecord) -> 
             // that is still there.
             Some(before) if before != key => sql::run(
                 db,
-                "UPDATE keys SET label = ?, last_used_at = ? WHERE hash = ?",
+                "UPDATE keys SET label = ?, last_used_at = ?, device_id = ? WHERE hash = ?",
                 vec![
                     sql::v_text(&key.label),
                     sql::v_opt_int(key.last_used_at),
+                    sql::v_opt_text(key.device_id.as_deref()),
                     sql::v_text(&key.hash),
                 ],
             )?,
             Some(_) => {}
+        }
+    }
+    for phone in &base.phones {
+        if !doc.phones.iter().any(|p| p.device_id == phone.device_id) {
+            sql::run(
+                db,
+                "DELETE FROM phones WHERE device_id = ?",
+                vec![sql::v_text(&phone.device_id)],
+            )?;
+        }
+    }
+    for phone in &doc.phones {
+        if base.phones.iter().all(|p| p != phone) {
+            put_phone(db, phone)?;
         }
     }
     Ok(())
@@ -581,6 +663,9 @@ struct Answer {
     username: Option<String>,
     #[serde(default)]
     fcm_token: Option<String>,
+    /// The install answering, so its token can be updated.
+    #[serde(default)]
+    device_id: Option<String>,
     #[serde(default)]
     credentials: Option<Credentials>,
 }
@@ -627,6 +712,9 @@ impl Account {
             // Columns added after the first accounts were made.
             sql::add_column(&db, "account", "session_source TEXT")?;
             sql::add_column(&db, "requests", "source TEXT")?;
+            sql::add_column(&db, "keys", "device_id TEXT")?;
+            sql::add_column(&db, "requests", "phones TEXT")?;
+            sql::run(&db, PHONES_TABLE, vec![])?;
             self.ready.set(true);
         }
         Ok(db)
@@ -641,10 +729,17 @@ impl Account {
             .iter()
             .filter_map(key_from)
             .collect();
-        Ok(account_from(&row, keys).map(|mut doc| {
-            doc.mark_loaded();
-            doc
-        }))
+        let phones = sql::rows(&db, "SELECT * FROM phones ORDER BY added_at", vec![])?
+            .iter()
+            .filter_map(phone_from)
+            .collect();
+        let Some(mut doc) = account_from(&row, keys, phones) else {
+            return Ok(None);
+        };
+        doc.mark_loaded();
+        // Saved by whatever this request saves next.
+        doc.adopt_legacy_phone();
+        Ok(Some(doc))
     }
 
     async fn save(&self, doc: &mut AccountRecord) -> Result<()> {
@@ -677,8 +772,8 @@ impl Account {
             &self.db().await?,
             "INSERT OR REPLACE INTO requests (id, response_token, status, cookies, error,
                  created_at, expires_at, vault_due_at, vault_started, phone_asked, phone_error,
-                 source)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 source, phones)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             vec![
                 sql::v_text(&request.id),
                 sql::v_text(&request.response_token),
@@ -692,6 +787,7 @@ impl Account {
                 sql::v_flag(request.phone_asked),
                 sql::v_opt_text(request.phone_error.as_deref()),
                 sql::v_opt_text(request.source.as_deref()),
+                sql::v_text(&request.phones.join(",")),
             ],
         )
     }
@@ -762,7 +858,7 @@ impl Account {
             "keyLastUsedAt": key.and_then(|key| key.last_used_at),
             "semesterId": doc.semester_id,
             "settings": doc.settings,
-            "phoneLinked": doc.device_id.is_some(),
+            "phoneLinked": doc.linked(),
             "savedCredentials": doc.usable_vault(now).is_some(),
             "vaultSavedAt": doc.usable_vault(now).and(doc.vault_saved_at),
             "credentialsRejectedAt": doc.credentials_rejected_at,
@@ -815,9 +911,15 @@ impl Account {
         // Recorded before any network call, so a session call that comes
         // in meanwhile joins this request instead of starting another.
         let mut request = RequestRecord::new(new_request_id(), tokens::random_token(""), now);
+        request.phones = doc
+            .phones_for_key(&call.key_hash)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         self.put_request(&request).await?;
         self.set_pending(&request.id).await?;
-        self.begin(&mut doc, &mut request, now).await;
+        let phones = request.phones.clone();
+        self.begin(&mut doc, &mut request, &phones, now).await;
         self.save(&mut doc).await?;
         // The phone or the engine may have finished it already.
         if self
@@ -831,16 +933,23 @@ impl Account {
         pending(&request)
     }
 
-    /// Asks the phone and/or starts a sign-in, in the order the settings
-    /// choose.
-    async fn begin(&self, doc: &mut AccountRecord, request: &mut RequestRecord, now: u64) {
+    /// Asks the key's phones and/or starts a sign-in, in the order the
+    /// settings choose.
+    async fn begin(
+        &self,
+        doc: &mut AccountRecord,
+        request: &mut RequestRecord,
+        phones: &[String],
+        now: u64,
+    ) {
         match plan(&doc.settings, doc.usable_vault(now).is_some()) {
             Plan::VaultFirst => {
                 if !self.start_login(doc, request, now).await {
-                    self.ask_phone_or_fail(doc, request, now).await;
+                    self.ask_phone_or_fail(doc, request, phones, now).await;
                 }
             }
-            Plan::PhoneFirst { wait_secs } => match self.ask_phone(doc, request, now).await {
+            Plan::PhoneFirst { wait_secs } => match self.ask_phone(doc, request, phones, now).await
+            {
                 Ok(()) => request.vault_due_at = Some(now + wait_secs),
                 Err(message) => {
                     request.phone_error = Some(message.to_string());
@@ -849,26 +958,34 @@ impl Account {
                     }
                 }
             },
-            Plan::PhoneOnly => self.ask_phone_or_fail(doc, request, now).await,
+            Plan::PhoneOnly => self.ask_phone_or_fail(doc, request, phones, now).await,
         }
     }
 
-    async fn ask_phone_or_fail(&self, doc: &AccountRecord, request: &mut RequestRecord, now: u64) {
-        if let Err(message) = self.ask_phone(doc, request, now).await {
+    async fn ask_phone_or_fail(
+        &self,
+        doc: &AccountRecord,
+        request: &mut RequestRecord,
+        phones: &[String],
+        now: u64,
+    ) {
+        if let Err(message) = self.ask_phone(doc, request, phones, now).await {
             request.fail(message);
         }
     }
 
-    /// An event on the phone's install; it answers at `/v1/session/answer`.
+    /// An event on each of `phones` (installs); the first to answer at
+    /// `/v1/session/answer` wins.
     async fn ask_phone(
         &self,
         doc: &AccountRecord,
         request: &mut RequestRecord,
+        phones: &[String],
         now: u64,
     ) -> std::result::Result<(), &'static str> {
-        let Some(device) = doc.device_id.as_deref() else {
+        if phones.is_empty() {
             return Err(PHONE_UNREACHABLE);
-        };
+        }
         let Ok(base) = var(&self.env, "PUBLIC_URL") else {
             return Err(PHONE_UNAVAILABLE);
         };
@@ -878,28 +995,26 @@ impl Account {
             callback_url: format!("{base}/v1/session/answer?account={}", doc.id),
             want_credentials: if doc.want_credentials(now) { "1" } else { "0" }.to_string(),
         };
-        let appended = match device_stub(&self.env, device) {
-            Ok(stub) => {
-                call(
-                    &stub,
-                    Method::Post,
-                    "/append",
-                    Some(json!({ "body": event }).to_string()),
-                )
-                .await
+        let body = json!({ "body": event }).to_string();
+        let mut failure = PHONE_UNREACHABLE;
+        for device in phones {
+            let appended = match device_stub(&self.env, device) {
+                Ok(stub) => call(&stub, Method::Post, "/append", Some(body.clone())).await,
+                Err(e) => Err(e),
+            };
+            match appended {
+                Ok(response) if response.status_code() == 200 => request.phone_asked = true,
+                Ok(_) => {}
+                Err(e) => {
+                    worker::console_log!("account: asking a phone failed: {e}");
+                    failure = PHONE_UNAVAILABLE;
+                }
             }
-            Err(e) => Err(e),
-        };
-        match appended {
-            Ok(response) if response.status_code() == 200 => {
-                request.phone_asked = true;
-                Ok(())
-            }
-            Ok(_) => Err(PHONE_UNREACHABLE),
-            Err(e) => {
-                worker::console_log!("account: asking the phone failed: {e}");
-                Err(PHONE_UNAVAILABLE)
-            }
+        }
+        if request.phone_asked {
+            Ok(())
+        } else {
+            Err(failure)
         }
     }
 
@@ -1003,7 +1118,8 @@ impl Account {
         };
         if let (Some(reason), Some(request)) = (fallback, request.as_mut()) {
             if request.pending(now) && !request.phone_asked {
-                if let Err(message) = self.ask_phone(&doc, request, now).await {
+                let phones = request.phones.clone();
+                if let Err(message) = self.ask_phone(&doc, request, &phones, now).await {
                     request.fail(reason.unwrap_or(message));
                 }
             } else if request.pending(now) && request.phone_error.is_some() {
@@ -1097,11 +1213,16 @@ impl Account {
         if let Some(sealed) = checked.sealed_session.clone() {
             doc.save_session(sealed, now, "phone");
         }
-        if let (Some(token), Some(device)) = (
-            usable_text(answer.fcm_token.as_deref()),
-            doc.device_id.clone(),
-        ) {
-            set_device_fcm(&self.env, &device, &token).await?;
+        // Which phone answered is known only when it says so, or when
+        // there is just one.
+        let answered_by = match usable_text(answer.device_id.as_deref()) {
+            Some(device) => doc.phones.iter().find(|p| p.device_id == device),
+            None if doc.phones.len() == 1 => doc.phones.first(),
+            None => None,
+        };
+        if let (Some(token), Some(phone)) = (usable_text(answer.fcm_token.as_deref()), answered_by)
+        {
+            set_device_fcm(&self.env, &phone.device_id, &token).await?;
         }
         if let Some(credentials) = answer.credentials {
             let username = usable_text(Some(&credentials.username))
@@ -1159,7 +1280,7 @@ impl Account {
 
         if op == "credentials-rejected" {
             return match existing {
-                Some(mut doc) if doc.app_secret_matches(body.app_secret.as_deref()) => {
+                Some(mut doc) if doc.phone_by_secret(body.app_secret.as_deref()).is_some() => {
                     doc.reject_credentials(now);
                     self.save(&mut doc).await?;
                     worker::console_log!("account: the phone reported rejected credentials");
@@ -1183,10 +1304,8 @@ impl Account {
         let id = account_id(checked.registration_number.as_deref().unwrap_or_default());
         let this_phone = existing
             .as_ref()
-            .is_some_and(|doc| doc.app_secret_matches(body.app_secret.as_deref()));
-        let linked = existing
-            .as_ref()
-            .is_some_and(|doc| doc.app_secret_hash.is_some());
+            .and_then(|doc| doc.phone_by_secret(body.app_secret.as_deref()));
+        let linked = existing.as_ref().is_some_and(AccountRecord::linked);
 
         match op {
             "link" => {
@@ -1194,7 +1313,12 @@ impl Account {
                     .await
             }
             "account" => {
-                let doc = existing.unwrap_or_else(|| AccountRecord::new(&id, now));
+                let mut doc = existing.unwrap_or_else(|| AccountRecord::new(&id, now));
+                if let Some(me) = this_phone {
+                    if doc.touch_phone(me, now) {
+                        self.save(&mut doc).await?;
+                    }
+                }
                 Response::from_json(&doc.view(this_phone, call.forwarding, now))
             }
             "forget-credentials" => {
@@ -1207,14 +1331,21 @@ impl Account {
             _ if !linked && op != "revoke-key" && op != "delete" => {
                 error(409, "not_linked", "Link this account from the app first.")
             }
-            _ if !this_phone => app_secret_invalid(),
             _ => {
                 let mut doc = existing.unwrap_or_else(|| AccountRecord::new(&id, now));
-                self.linked_op(op, &mut doc, body, now).await
+                // Revoking and deleting work before any phone is linked;
+                // the rest need a linked phone's secret.
+                match this_phone {
+                    Some(me) => self.linked_op(op, &mut doc, Some(me), body, now).await,
+                    None if !linked => self.linked_op(op, &mut doc, None, body, now).await,
+                    None => app_secret_invalid(),
+                }
             }
         }
     }
 
+    /// Links this install, next to any phones linked already; linking it
+    /// again hands it a new secret.
     async fn link(
         &self,
         existing: Option<AccountRecord>,
@@ -1224,9 +1355,9 @@ impl Account {
         body: AppBody,
         now: u64,
     ) -> Result<Response> {
-        let same_app = existing
+        let me = existing
             .as_ref()
-            .is_some_and(|doc| doc.app_secret_matches(body.app_secret.as_deref()));
+            .and_then(|doc| doc.phone_by_secret(body.app_secret.as_deref()));
         let semester = match body.semester_id.as_deref().map(semester_id) {
             Some(None) => return bad_request("semesterId is not a VTOP semester id."),
             Some(Some(semester)) => Some(semester),
@@ -1234,6 +1365,7 @@ impl Account {
         };
         let fcm = usable_text(body.fcm_token.as_deref());
         let mut doc = existing.unwrap_or_else(|| AccountRecord::new(&id, now));
+        let previous = me.map(|i| doc.phones[i].clone());
 
         let device = match (&body.device_id, &body.device_secret) {
             (Some(device), Some(secret)) => {
@@ -1249,7 +1381,7 @@ impl Account {
                 let Some(token) = fcm else {
                     return bad_request("fcmToken, or deviceId and deviceSecret, are required.");
                 };
-                match doc.device_id.clone().filter(|_| same_app) {
+                match previous.as_ref().map(|p| p.device_id.clone()) {
                     Some(device) => {
                         set_device_fcm(&self.env, &device, &token).await?;
                         device
@@ -1259,15 +1391,23 @@ impl Account {
             }
         };
 
-        if !same_app {
-            // A new install: nothing the old one handed out keeps working.
-            self.drop_keys(&mut doc).await?;
-            doc.clear_vault();
-            worker::console_log!("account: linked a new app; keys revoked");
+        // The install may have moved (a new one after a reinstall of the
+        // push token): its old entry goes.
+        if let Some(previous) = &previous {
+            doc.phones.retain(|p| p.device_id != previous.device_id);
+        }
+        if let Some(previous) = previous.as_ref().filter(|p| p.device_id != device) {
+            doc.phone_moved(&previous.device_id, &device);
         }
         let secret = new_app_secret();
-        doc.app_secret_hash = Some(tokens::hash(&secret));
-        doc.device_id = Some(device);
+        doc.add_phone(PhoneRecord {
+            device_id: device,
+            secret_hash: tokens::hash(&secret),
+            label: member_label(body.label.as_deref())
+                .or_else(|| previous.as_ref().and_then(|p| p.label.clone())),
+            added_at: previous.as_ref().map_or(now, |p| p.added_at),
+            seen_at: now,
+        });
         if let Some(sealed) = checked.sealed_session {
             doc.save_session(sealed, now, "phone");
         }
@@ -1293,18 +1433,26 @@ impl Account {
         }))
     }
 
+    /// `me`: the calling phone, or none while the account has no linked
+    /// phone (only revoking and deleting get here then).
     async fn linked_op(
         &self,
         op: &str,
         doc: &mut AccountRecord,
+        me: Option<usize>,
         body: AppBody,
         now: u64,
     ) -> Result<Response> {
+        if me.is_none() && op != "revoke-key" && op != "delete" {
+            return app_secret_invalid();
+        }
         match op {
             "create-key" => {
                 let key = new_key();
                 let hash = tokens::hash(&key);
-                if !doc.add_key(hash.clone(), key_label(body.label.as_deref()), now) {
+                // Only this phone is asked for the key's sessions.
+                let phone = me.map(|i| doc.phones[i].device_id.clone());
+                if !doc.add_key(hash.clone(), key_label(body.label.as_deref()), phone, now) {
                     return error(
                         409,
                         "key_limit",
@@ -1337,25 +1485,47 @@ impl Account {
                 let Some(token) = usable_text(body.fcm_token.as_deref()) else {
                     return bad_request("fcmToken is required.");
                 };
+                let Some(me) = me else {
+                    return app_secret_invalid();
+                };
+                let before = Some(doc.phones[me].device_id.clone());
                 match (&body.device_id, &body.device_secret) {
                     (Some(device), Some(secret)) => {
                         if !device_matches(&self.env, device, secret).await? {
                             return bad_request("Unknown device.");
                         }
                         set_device_fcm(&self.env, device, &token).await?;
-                        doc.device_id = Some(device.clone());
+                        doc.phones[me].device_id = device.clone();
                     }
                     _ => {
-                        let known = match doc.device_id.clone() {
-                            Some(device) => set_device_fcm(&self.env, &device, &token).await?,
-                            None => false,
-                        };
+                        let device = doc.phones[me].device_id.clone();
                         // The install is gone: make one for this token, so
                         // the phone can still be asked.
-                        if !known {
-                            doc.device_id = Some(create_device(&self.env, token).await?.0);
+                        if !set_device_fcm(&self.env, &device, &token).await? {
+                            doc.phones[me].device_id = create_device(&self.env, token).await?.0;
                         }
                     }
+                }
+                let moved = doc.phones[me].device_id.clone();
+                if let Some(from) = before.filter(|from| *from != moved) {
+                    doc.phone_moved(&from, &moved);
+                }
+                // Another entry for the install it moved to is this phone.
+                let mut seen = false;
+                doc.phones.retain(|p| {
+                    let keep = p.device_id != moved || !seen;
+                    seen |= p.device_id == moved;
+                    keep
+                });
+                self.save(doc).await?;
+                Ok(Response::empty()?.with_status(204))
+            }
+            "remove-phone" => {
+                if doc
+                    .remove_phone(body.id.as_deref().unwrap_or_default())
+                    .is_none()
+                {
+                    return error(404, "phone_not_found", "No such phone on this account.");
                 }
                 self.save(doc).await?;
                 Ok(Response::empty()?.with_status(204))
@@ -1479,7 +1649,7 @@ fn app_secret_invalid() -> Result<Response> {
     error(
         403,
         "app_secret_invalid",
-        "This phone is not the linked one; reconnect it from the app.",
+        "This phone is not linked to the account; link it from the app.",
     )
 }
 

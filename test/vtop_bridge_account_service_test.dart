@@ -75,7 +75,12 @@ void main() {
     expect(key.id, 'abcd1234');
     expect(key.key, startsWith('vtm_'));
     expect(key.mcpUrl, 'https://mcp.test/mcp');
-    expect(key.agentUrl, 'https://mcp.test/mcp/${key.key}');
+    expect(key.authHeader, 'Authorization: Bearer ${key.key}');
+    expect(
+      key.claudeCodeCommand,
+      'claude mcp add --transport http vtop https://mcp.test/mcp '
+      '--header "Authorization: Bearer ${key.key}"',
+    );
     expect(jsonDecode(rig.sent.single.body)['label'], 'Laptop');
   });
 
@@ -123,6 +128,57 @@ void main() {
     ]);
     expect(jsonDecode(rig.sent[0].body)['id'], 'abcd1234');
     expect(jsonDecode(rig.sent[1].body)['fcmToken'], 'fcm-2');
+  });
+
+  test('account lists the linked phones', () async {
+    final rig = serviceAnswering(200, {
+      'registrationNumber': '22BCE0001',
+      'linked': true,
+      'thisPhone': true,
+      'phoneCount': 2,
+      'phones': [
+        {
+          'id': 'aaaa1111',
+          'label': 'Pixel 8',
+          'addedAt': 1790000000,
+          'seenAt': 1790000100,
+          'thisPhone': false,
+        },
+        {
+          'id': 'bbbb2222',
+          'label': null,
+          'addedAt': 1790000000,
+          'seenAt': 1790000000,
+          'thisPhone': true,
+        },
+      ],
+      'keys': [],
+    });
+    final account = await rig.service.account(cookies: cookies);
+    expect(account.phoneCount, 2);
+    expect(account.phones.map((p) => p.label), ['Pixel 8', null]);
+    expect(account.phones.last.thisPhone, isTrue);
+    expect(
+      account.phones.first.seenAt,
+      DateTime.fromMillisecondsSinceEpoch(1790000100 * 1000, isUtc: true),
+    );
+  });
+
+  test('removePhone forgets the app secret only for this phone', () async {
+    final rig = serviceAnswering(204, {}, secret: 'vta_mine');
+    BridgePhone phone({required bool here}) => BridgePhone(
+      id: here ? 'bbbb2222' : 'aaaa1111',
+      label: null,
+      addedAt: DateTime.utc(2026),
+      seenAt: DateTime.utc(2026),
+      thisPhone: here,
+    );
+    await rig.service.removePhone(cookies: cookies, phone: phone(here: false));
+    expect(rig.sent.single.url.path, '/v1/account/remove-phone');
+    expect(jsonDecode(rig.sent.single.body)['id'], 'aaaa1111');
+    expect(await rig.secrets.read(), 'vta_mine');
+    await rig.service.removePhone(cookies: cookies, phone: phone(here: true));
+    expect(await rig.secrets.read(), isNull);
   });
 
   test('errors carry the bridge code', () async {
@@ -310,7 +366,8 @@ void main() {
       await rig.service.createKey(cookies: cookies, label: 'Laptop');
       final saved = await rig.service.savedKey('abcd1234');
       expect(saved?.key, key);
-      expect(saved?.agentUrl, 'https://mcp.test/mcp/$key');
+      expect(saved?.mcpUrl, 'https://mcp.test/mcp');
+      expect(saved?.authHeader, 'Authorization: Bearer $key');
       expect(await rig.service.savedKey('other'), isNull);
     });
 

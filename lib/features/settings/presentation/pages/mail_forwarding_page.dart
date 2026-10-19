@@ -129,19 +129,6 @@ class MailForwardingPage extends HookConsumerWidget {
       }
     }
 
-    /// Lets the bridge know whose address this is, once, when VTOP is
-    /// already signed in. Best effort: retried on the next visit.
-    Future<void> claimOwnerQuietly() async {
-      final current = forwarding.value;
-      if (current == null || current.ownerClaimed) return;
-      final cookies = await vtopCookies(ref, signIn: false);
-      if (cookies == null) return;
-      try {
-        await service.claimOwner(cookies: cookies);
-        await reload();
-      } catch (_) {}
-    }
-
     /// Moves this student's address to this phone. Null when they have
     /// none, or VTOP isn't signed in ([signIn] false).
     Future<MailForwarding?> reclaimAddress({required bool signIn}) async {
@@ -155,6 +142,37 @@ class MailForwardingPage extends HookConsumerWidget {
         await reload();
       }
       return found;
+    }
+
+    /// Lets the bridge know whose address this is, once, when VTOP is
+    /// already signed in. Best effort: retried on the next visit. When the
+    /// student turns out to have an older address, that one is what Gmail
+    /// forwards to: this new one is dropped and the old one joined.
+    Future<void> claimOwnerQuietly() async {
+      final current = forwarding.value;
+      if (current == null || current.ownerClaimed) return;
+      final cookies = await vtopCookies(ref, signIn: false);
+      if (cookies == null) return;
+      try {
+        await service.claimOwner(cookies: cookies);
+        await reload();
+      } on MailForwardingException catch (error) {
+        if (!error.addressExists) return;
+        try {
+          await service.remove();
+          final found = await reclaimAddress(signIn: false);
+          if (found == null) await reload();
+          if (found != null && context.mounted) {
+            dispToast(
+              context,
+              'You already have an address',
+              'Switched to it: your Gmail filter already forwards there.',
+            );
+          }
+        } catch (_) {
+          await reload();
+        }
+      } catch (_) {}
     }
 
     rejoin.value = () async {
@@ -249,6 +267,19 @@ class MailForwardingPage extends HookConsumerWidget {
       try {
         final token = await pushToken();
         if (token == null) return;
+        // A student who already has an address gets it back rather than a
+        // second one: their Gmail filter forwards to the old one.
+        final found = await reclaimAddress(signIn: true);
+        if (found != null) {
+          if (context.mounted) {
+            dispToast(
+              context,
+              'You already have an address',
+              'Using it on this device too. Gmail is already set up for it.',
+            );
+          }
+          return;
+        }
         await service.register(fcmToken: token);
         steps.setAll(0);
         await reload();

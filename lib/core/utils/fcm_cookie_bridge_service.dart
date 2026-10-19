@@ -289,6 +289,7 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
       error: callbackError,
       username: username,
       fcmToken: fcmToken,
+      deviceId: await currentEdgeDeviceId(),
       credentials: credentials,
     );
     log('Completed cookie request $requestId', name: 'fcm.cookie');
@@ -564,6 +565,16 @@ class CookieCallbackException implements Exception {
 bool isRetryableCookieCallbackStatus(int statusCode) =>
     statusCode == 408 || statusCode == 429 || statusCode >= 500;
 
+/// This install's id on the edge, so an answer says which linked phone
+/// sent it; null when there is none or it cannot be read.
+Future<String?> currentEdgeDeviceId() async {
+  try {
+    return (await EdgeDeviceService().load())?.id;
+  } catch (_) {
+    return null;
+  }
+}
+
 Future<void> postCookieCallbackWithRetry({
   required String callbackUrl,
   required String requestId,
@@ -572,6 +583,7 @@ Future<void> postCookieCallbackWithRetry({
   String? error,
   String? username,
   String? fcmToken,
+  String? deviceId,
   Map<String, dynamic>? credentials,
   http.Client? client,
   Future<void> Function(Duration duration)? delay,
@@ -586,6 +598,7 @@ Future<void> postCookieCallbackWithRetry({
     ...?((error?.trim().isEmpty ?? true) ? null : {'error': error}),
     ...?((username?.trim().isEmpty ?? true) ? null : {'username': username}),
     ...?((fcmToken?.trim().isEmpty ?? true) ? null : {'fcmToken': fcmToken}),
+    ...?((deviceId?.isEmpty ?? true) ? null : {'deviceId': deviceId}),
     ...?(credentials == null ? null : {'credentials': credentials}),
   });
 

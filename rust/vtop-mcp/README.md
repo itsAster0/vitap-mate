@@ -7,13 +7,21 @@ except `get_session`, which hands a signed-in session to a browser. It runs
 key, so it never sees a password.
 
 Students create an access key in VITAP Mate → Settings → Connected apps and
-add the MCP URL it shows (the key is in the path) to their agent:
+add the MCP URL to their agent, with the key in the `Authorization` header:
 
 ```
-https://vmate-api.aster0.dev/mcp/vtm_…
+URL:    https://vmate-api.aster0.dev/mcp
+Header: Authorization: Bearer vtm_…
 ```
 
-`Authorization: Bearer vtm_…` on `/mcp` works too.
+For Claude Code:
+
+```sh
+claude mcp add --transport http vtop https://vmate-api.aster0.dev/mcp \
+  --header "Authorization: Bearer vtm_…"
+```
+
+The key is only read from the header; a key in the URL is not accepted.
 
 Transport is streamable HTTP, stateless, JSON responses. Keys are checked
 against the edge (`/v1/whoami`, cached 5 minutes). When VTOP rejects a
