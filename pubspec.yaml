@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.3.1+2301035
+version: 2.3.1+2301036
 environment:
   sdk: ^3.11.0
 # Dependencies specify other packages that your package needs in order to work.
@@ -94,6 +94,12 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/icon/icon.png"
+  # Adaptive icon so Android 12+ splash and One UI don't put the square
+  # icon on a white plate. The art is full-bleed with the mascot inside
+  # the safe zone, so it fills the mask with no inset.
+  adaptive_icon_foreground: "assets/icon/icon.png"
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_background: "#3A31AE"
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
