@@ -572,3 +572,114 @@ async fn outing_actions_are_sent_once() {
     assert_eq!(mock.hits("/vtop/hostel/StudentGeneralOuting"), 1);
     assert_eq!(mock.hits("/vtop/hostel/deleteGeneralOutingInfo"), 1);
 }
+
+/// A transport like the phone's: a bare client that follows no redirects,
+/// keeps no cookies and adds no headers. Records what it was asked to send.
+#[derive(Debug, Default)]
+struct RecordingTransport {
+    sent: Mutex<Vec<transport::TransportRequest>>,
+}
+
+impl Transport for RecordingTransport {
+    fn send(&self, request: transport::TransportRequest) -> transport::TransportFuture<'_> {
+        self.sent.lock().unwrap().push(request.clone());
+        Box::pin(async move {
+            let client = reqwest::Client::builder()
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .unwrap();
+            let mut builder = client.request(request.method.parse().unwrap(), &request.url);
+            for (name, value) in &request.headers {
+                builder = builder.header(name, value);
+            }
+            let response = builder
+                .body(request.body)
+                .send()
+                .await
+                .map_err(|error| TransportError::other(error.to_string()))?;
+            let status = response.status().as_u16();
+            let url = response.url().to_string();
+            let headers = response
+                .headers()
+                .iter()
+                .map(|(name, value)| (name.to_string(), value.to_str().unwrap().to_string()))
+                .collect();
+            let body = response.bytes().await.unwrap().to_vec();
+            Ok(transport::TransportResponse {
+                status,
+                url,
+                headers,
+                body,
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_transport_gets_cookies_redirects_and_default_headers() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let recorder = Arc::new(RecordingTransport::default());
+    let client = VtopClient::builder()
+        .config(config(base.clone()))
+        .transport(recorder.clone())
+        .with_session(&SessionState {
+            cookies: "JSESSIONID=abc".into(),
+            csrf_token: None,
+            registration_number: None,
+            otp_issued_at: None,
+            logged_in_at: None,
+        })
+        .unwrap();
+
+    let response = client
+        .send_request(client.http.get(format!("{base}/set-then-redirect")))
+        .await
+        .unwrap();
+
+    assert!(response.url().path().ends_with("/echo-cookie"));
+    let sent = response.text().await.unwrap();
+    assert!(
+        sent.contains("JSESSIONID=abc") && sent.contains("SERVERID=s9"),
+        "{sent}"
+    );
+    let requests = recorder.sent.lock().unwrap();
+    assert_eq!(requests.len(), 2, "the redirect is followed by VtopClient");
+    for request in requests.iter() {
+        let user_agent = request
+            .headers
+            .iter()
+            .find(|(name, _)| name == "user-agent")
+            .map(|(_, value)| value.as_str());
+        assert!(user_agent.is_some_and(|ua| ua.contains("Firefox")));
+    }
+}
+
+#[tokio::test]
+async fn a_transport_gets_multipart_bodies_read_out() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let recorder = Arc::new(RecordingTransport::default());
+    let client = VtopClient::builder()
+        .config(config(base.clone()))
+        .transport(recorder.clone())
+        .with_session(&full_state(Some(1)))
+        .unwrap();
+    let form = reqwest::multipart::Form::new().text("field", "value-42");
+
+    let _ = client
+        .send_request(client.http.post(format!("{base}/echo-cookie")).multipart(form))
+        .await
+        .unwrap();
+
+    let requests = recorder.sent.lock().unwrap();
+    let body = String::from_utf8_lossy(&requests[0].body);
+    assert!(body.contains("value-42"), "{body}");
+    let content_type = requests[0]
+        .headers
+        .iter()
+        .find(|(name, _)| name == "content-type")
+        .map(|(_, value)| value.as_str())
+        .unwrap();
+    assert!(content_type.starts_with("multipart/form-data; boundary="));
+}

@@ -1,6 +1,7 @@
 pub mod email_otp;
 pub mod mail_otp;
 pub mod native_logs;
+pub mod platform_http;
 pub mod simple;
 pub mod vtop;
 pub mod vtop_get_client;

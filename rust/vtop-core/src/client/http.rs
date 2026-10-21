@@ -11,7 +11,13 @@ use crate::error::{VtopError, VtopResult};
 /// Intermediate CA VTOP sometimes fails to send in its chain.
 const VITAP_INTERMEDIATE_CA_PEM: &str = include_str!("../../assets/sectigo_dv_r36.pem");
 
-fn default_headers() -> HeaderMap {
+/// Headers every VTOP request carries, built once.
+pub(super) fn default_headers() -> &'static HeaderMap {
+    static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
+    HEADERS.get_or_init(build_default_headers)
+}
+
+fn build_default_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
     // Desktop Firefox on Linux, matching the Firefox headers below. Desktop
     // so VTOP serves the layout the parser expects; bump with Firefox.
@@ -65,7 +71,7 @@ pub(super) fn shared_client(config: &VtopConfig) -> VtopResult<Client> {
 
 fn build_client(config: &VtopConfig) -> VtopResult<Client> {
     let mut builder = Client::builder()
-        .default_headers(default_headers())
+        .default_headers(default_headers().clone())
         // Redirects are followed by VtopClient so it can collect the
         // Set-Cookie headers of every hop into its own jar.
         .redirect(Policy::none())

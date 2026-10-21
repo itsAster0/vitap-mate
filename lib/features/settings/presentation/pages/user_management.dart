@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/providers/vtop_proxy.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -20,7 +19,7 @@ import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dar
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/user_card.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/core/utils/vtop_platform_http.dart';
 
 class UserBox extends HookConsumerWidget {
   const UserBox({super.key});
@@ -444,10 +443,9 @@ class UserPassChange extends HookConsumerWidget {
 
                               isLoading.value = true;
                               try {
-                                final client = await getVtopClient(
+                                final client = await createVtopClient(
                                   username: newUsername,
                                   password: newPassword,
-                                  baseUrl: await currentVtopBaseUrl(),
                                 );
                                 if (!context.mounted) return;
                                 await loginWithSecurityOtpPrompt(

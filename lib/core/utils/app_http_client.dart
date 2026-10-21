@@ -5,6 +5,7 @@ import 'package:cupertino_http/cupertino_http.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:vitapmate/core/utils/app_urls.dart';
 
 /// The HTTP client for the VITAP Mate server: Cronet on Android and
 /// NSURLSession on iOS, both of which speak HTTP/3 (QUIC). On a
@@ -24,6 +25,14 @@ http.Client createAppHttpClient() {
         cacheMode: CacheMode.disabled,
         enableHttp2: true,
         enableQuic: true,
+        // Try HTTP/3 to the default server from the first connection.
+        // Otherwise Cronet only learns it from Alt-Svc after opening an
+        // HTTP/2 connection, which it then keeps reusing.
+        quicHints: [
+          if (Uri.tryParse(defaultServerUrl)?.host case final host?
+              when host.isNotEmpty)
+            (host, 443, 443),
+        ],
       ),
       closeEngine: true,
     );
