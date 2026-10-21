@@ -1,5 +1,6 @@
 // One Durable Object per app install: its FCM token, its event log and,
-// while the app is in front, its WebSocket. Every event gets the next
+// while the app is in front, its WebSocket (the app's own, or the Worker's
+// when the app reads server-sent events, see event-stream.ts). Every event gets the next
 // sequence number and goes out over the socket and FCM; the app applies
 // each number once and reads what it missed from `/v1/events?after=`.
 

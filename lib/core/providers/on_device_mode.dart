@@ -40,7 +40,7 @@ final onDeviceModeProvider = Provider<bool>((ref) {
 });
 
 /// Saves the switch, then stops or restarts the server features that run
-/// on their own (event socket, push token).
+/// on their own (event stream, push token).
 Future<void> setOnDeviceMode(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
   await prefs.setBool(onDeviceModeSettingKey, value);

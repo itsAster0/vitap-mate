@@ -21,19 +21,7 @@ String appHttpClientName() => Platform.isAndroid
 http.Client createAppHttpClient() {
   if (Platform.isAndroid) {
     return CronetClient.fromCronetEngine(
-      CronetEngine.build(
-        cacheMode: CacheMode.disabled,
-        enableHttp2: true,
-        enableQuic: true,
-        // Try HTTP/3 to the default server from the first connection.
-        // Otherwise Cronet only learns it from Alt-Svc after opening an
-        // HTTP/2 connection, which it then keeps reusing.
-        quicHints: [
-          if (Uri.tryParse(defaultServerUrl)?.host case final host?
-              when host.isNotEmpty)
-            (host, 443, 443),
-        ],
-      ),
+      _buildCronetEngine(),
       closeEngine: true,
     );
   }
@@ -45,10 +33,33 @@ http.Client createAppHttpClient() {
   return IOClient();
 }
 
+CronetEngine _buildCronetEngine() => CronetEngine.build(
+  cacheMode: CacheMode.disabled,
+  enableHttp2: true,
+  enableQuic: true,
+  // Try HTTP/3 to the default server from the first connection.
+  // Otherwise Cronet only learns it from Alt-Svc after opening an
+  // HTTP/2 connection, which it then keeps reusing.
+  quicHints: [
+    if (Uri.tryParse(defaultServerUrl)?.host case final host?
+        when host.isNotEmpty)
+      (host, 443, 443),
+  ],
+);
+
+/// The Cronet engine behind [sharedAppHttpClient] on Android, null
+/// elsewhere. Kept for its net log (see `cronet_net_log.dart`).
+final CronetEngine? sharedCronetEngine = Platform.isAndroid
+    ? _buildCronetEngine()
+    : null;
+
 /// One client per isolate, built on first use and never closed, so
 /// connections are reused. Code without a Ref (background isolates, ad hoc
 /// services) uses this too; a Cronet engine per call would be costly.
-final http.Client sharedAppHttpClient = createAppHttpClient();
+final http.Client sharedAppHttpClient = switch (sharedCronetEngine) {
+  final engine? => CronetClient.fromCronetEngine(engine),
+  null => createAppHttpClient(),
+};
 
 /// [sharedAppHttpClient], overridable in tests.
 final appHttpClientProvider = Provider<http.Client>(

@@ -4,8 +4,8 @@
 //   in memory, the code sealed to the phone's key, and the box handed to
 //   that install's event log. The edge never keeps anything readable.
 // - `fetch`: app routes for mailboxes (`/v1/mail-otp/*`), installs
-//   (`/v1/devices/*`) and the event channel (`GET /v1/events`, a WebSocket
-//   or a catch-up read). `/mcp` goes on to the engine (`MCP_URL`), which
+//   (`/v1/devices/*`) and the event channel (`GET /v1/events`: server-sent
+//   events, a WebSocket or a catch-up read). `/mcp` goes on to the engine (`MCP_URL`), which
 //   serves the MCP tools, so clients only ever talk to this host.
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
@@ -21,6 +21,7 @@
 // owner hash is made with.
 
 import * as account from "./account";
+import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
 import {
   type Env,
@@ -129,11 +130,26 @@ async function deviceUpdate(req: Request, env: Env): Promise<Response> {
 }
 
 /** Hands the request to the install's object, which checks the secret and
- * answers with a socket or a catch-up page. */
-function events(req: Request, env: Env): Promise<Response> | Response {
+ * answers with a socket or a catch-up page. An `Accept: text/event-stream`
+ * request gets server-sent events, read here from a socket to the object. */
+async function events(req: Request, env: Env): Promise<Response> {
   const id = new URL(req.url).searchParams.get("device") ?? "";
   if (!isDeviceId(id)) return unknownDevice();
-  return deviceStub(env, id).fetch(req);
+  const device = deviceStub(env, id);
+  if (!req.headers.get("accept")?.includes("text/event-stream")) return device.fetch(req);
+
+  const headers = new Headers(req.headers);
+  headers.set("upgrade", "websocket");
+  const res = await device.fetch(new Request(req.url, { headers }));
+  // Not a socket: the object's refusal, passed on.
+  if (!res.webSocket) return res;
+  return new Response(eventStream(res.webSocket), {
+    headers: {
+      "content-type": "text/event-stream",
+      // `no-transform` keeps Cloudflare from compressing, which buffers.
+      "cache-control": "no-store, no-transform",
+    },
+  });
 }
 
 // ---- mailboxes --------------------------------------------------------------
