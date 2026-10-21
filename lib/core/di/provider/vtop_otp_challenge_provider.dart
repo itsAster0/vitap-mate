@@ -768,8 +768,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     return null;
   }
 
-  /// Waits for the forwarded OTP mail: over the edge's socket or FCM, and
-  /// pulled every 2 s while no socket is open, in case a push is slow or
+  /// Waits for the forwarded OTP mail: over the edge's event stream or FCM, and
+  /// pulled every 2 s while no stream is open, in case a push is slow or
   /// held back, and on resume.
   /// With Gmail also connected, reads Gmail too if nothing came in 30 s.
   Future<void> _runMailForwardingAutoFetch({required int runId}) async {

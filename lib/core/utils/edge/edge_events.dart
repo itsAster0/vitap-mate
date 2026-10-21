@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' show log;
-import 'dart:io';
+import 'dart:io' show HttpException;
 import 'dart:math' show Random, min;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/providers/server_url.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 
@@ -23,7 +25,7 @@ class EdgeEvent {
   /// The whole event as sent, `seq` and `kind` included.
   final Map<String, dynamic> data;
 
-  /// From a socket frame's `event`, or an FCM data map (strings only,
+  /// From a stream frame's `event`, or an FCM data map (strings only,
   /// `type` for `kind`).
   static EdgeEvent? fromJson(Map<String, dynamic> json) {
     final seq = int.tryParse('${json['seq'] ?? ''}');
@@ -35,10 +37,12 @@ class EdgeEvent {
 
 typedef EdgeEventHandler = Future<void> Function(EdgeEvent event);
 
-/// The live link to the edge. While the app is in front a WebSocket is
-/// open and events arrive on it at once; in the background Android may
-/// kill sockets, so FCM carries them and the socket catches up on what it
-/// missed when the app comes back. Both paths go through [accept], which
+/// The live link to the edge. While the app is in front a server-sent
+/// event stream is open and events arrive on it at once. It is read on
+/// [sharedAppHttpClient], so it rides the HTTP/3 connection the app's other
+/// calls use, and its heartbeat keeps that connection from going idle. In
+/// the background Android may kill connections, so FCM carries events and
+/// the stream catches up on what it missed when the app comes back. Both paths go through [accept], which
 /// hands each sequence number to the handler once.
 class EdgeEventChannel {
   EdgeEventChannel._();
@@ -52,22 +56,25 @@ class EdgeEventChannel {
   /// background isolate and a restarted app see them too.
   static const _handledKey = 'edge_events_handled_v1';
   static const _handledKept = 128;
-  static const _pingEvery = Duration(seconds: 15);
+
+  /// How often the edge sends a heartbeat; two missed ones drop the link.
+  static const _heartbeat = Duration(seconds: 15);
   static const _maxBackoff = Duration(seconds: 30);
 
-  /// Whether a socket is open and answering pings. While it is, nothing
+  /// Whether a stream is open and beating. While it is, nothing
   /// needs to poll.
   final connected = ValueNotifier<bool>(false);
 
   final _handlers = <String, EdgeEventHandler>{};
   final _seen = <int>{};
   final _devices = EdgeDeviceService();
-  WebSocket? _socket;
+  StreamSubscription<String>? _stream;
   String? _deviceId;
-  Timer? _ping;
+  Timer? _watchdog;
   Timer? _retry;
   AppLifecycleListener? _lifecycle;
-  DateTime _lastPong = DateTime.now();
+  DateTime _lastBeat = DateTime.now();
+  final _data = StringBuffer();
   var _failures = 0;
   var _foreground = true;
   var _connecting = false;
@@ -89,10 +96,10 @@ class EdgeEventChannel {
     unawaited(connect());
   }
 
-  /// Opens the socket if this install is registered and none is open;
+  /// Opens the stream if this install is registered and none is open;
   /// also after registering, to start listening at once.
   Future<void> connect() async {
-    if (!_foreground || _socket != null || _connecting) return;
+    if (!_foreground || _stream != null || _connecting) return;
     if (await isOnDeviceMode()) return;
     _connecting = true;
     try {
@@ -101,51 +108,74 @@ class EdgeEventChannel {
       final after = await _cursor(device.id);
       final server = await currentServerUrl();
       final url = Uri.parse(server).replace(
-        scheme: server.startsWith('http://') ? 'ws' : 'wss',
         path: '/v1/events',
         queryParameters: {'device': device.id, 'after': '$after'},
       );
-      final socket = await WebSocket.connect(
-        url.toString(),
-        headers: {'Authorization': 'Bearer ${device.secret}'},
-      ).timeout(const Duration(seconds: 15));
+      final request = http.Request('GET', url)
+        ..headers.addAll({
+          'Accept': 'text/event-stream',
+          'Authorization': 'Bearer ${device.secret}',
+        });
+      final response = await sharedAppHttpClient
+          .send(request)
+          .timeout(const Duration(seconds: 15));
+      final type = response.headers['content-type'] ?? '';
+      if (response.statusCode != 200 || !type.startsWith('text/event-stream')) {
+        unawaited(response.stream.listen(null).cancel());
+        throw HttpException('HTTP ${response.statusCode} ($type)', uri: url);
+      }
       if (!_foreground) {
-        await socket.close(1000);
+        unawaited(response.stream.listen(null).cancel());
         return;
       }
-      _socket = socket;
       _deviceId = device.id;
       _failures = 0;
-      _lastPong = DateTime.now();
+      _lastBeat = DateTime.now();
+      _data.clear();
       connected.value = true;
-      socket.listen(
-        _onFrame,
-        onDone: _onDropped,
-        onError: (_) => _onDropped(),
-        cancelOnError: true,
-      );
-      _ping = Timer.periodic(_pingEvery, (_) => _sendPing());
+      _stream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(
+            _onLine,
+            onDone: _onDropped,
+            onError: (_) => _onDropped(),
+            cancelOnError: true,
+          );
+      _watchdog = Timer.periodic(_heartbeat, (_) => _checkBeat());
     } catch (error) {
-      log('Event socket failed: $error', name: 'edge.events');
+      log('Event stream failed: $error', name: 'edge.events');
       _scheduleRetry();
     } finally {
       _connecting = false;
     }
   }
 
-  void _sendPing() {
-    // Two pings without a pong: the link is dead even if no one said so.
-    if (DateTime.now().difference(_lastPong) > _pingEvery * 2) {
-      log('Event socket stopped answering', name: 'edge.events');
+  void _checkBeat() {
+    // Two beats missed: the link is dead even if no one said so.
+    if (DateTime.now().difference(_lastBeat) > _heartbeat * 2) {
+      log('Event stream stopped beating', name: 'edge.events');
       _onDropped();
-      return;
     }
-    _socket?.add('ping');
   }
 
-  void _onFrame(dynamic frame) {
-    _lastPong = DateTime.now();
-    if (frame is! String || frame == 'pong') return;
+  /// One line of the stream: `data:` lines make up a frame, a blank line
+  /// ends it, and `:` lines are the heartbeat.
+  void _onLine(String line) {
+    _lastBeat = DateTime.now();
+    if (line.isEmpty) {
+      if (_data.isEmpty) return;
+      final frame = _data.toString();
+      _data.clear();
+      _onFrame(frame);
+    } else if (line.startsWith('data:')) {
+      if (_data.isNotEmpty) _data.write('\n');
+      final value = line.substring(5);
+      _data.write(value.startsWith(' ') ? value.substring(1) : value);
+    }
+  }
+
+  void _onFrame(String frame) {
     try {
       final json = jsonDecode(frame);
       if (json is! Map<String, dynamic> || json['type'] != 'event') return;
@@ -156,7 +186,7 @@ class EdgeEventChannel {
     } catch (_) {}
   }
 
-  /// Closes the socket and stays closed until [connect].
+  /// Closes the stream and stays closed until [connect].
   void stop() => _close();
 
   void _onDropped() {
@@ -165,14 +195,15 @@ class EdgeEventChannel {
   }
 
   void _close() {
-    _ping?.cancel();
-    _ping = null;
+    _watchdog?.cancel();
+    _watchdog = null;
     _retry?.cancel();
     _retry = null;
-    final socket = _socket;
-    _socket = null;
+    // Cancelling the subscription cancels the request, ending the stream.
+    final stream = _stream;
+    _stream = null;
     connected.value = false;
-    if (socket != null) unawaited(socket.close(1000).catchError((_) {}));
+    if (stream != null) unawaited(stream.cancel().catchError((_) {}));
   }
 
   void _scheduleRetry() {
@@ -192,7 +223,7 @@ class EdgeEventChannel {
   }
 
   /// Hands [event] to its handler unless this sequence number was handled
-  /// already. Socket events arrive in order, so they also [advance] where
+  /// already. Stream events arrive in order, so they also [advance] where
   /// the next catch-up starts; a push may skip ahead and does not.
   Future<void> accept(EdgeEvent event, {bool advance = false}) async {
     final prefs = await SharedPreferences.getInstance();

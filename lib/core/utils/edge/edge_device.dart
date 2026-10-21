@@ -8,7 +8,7 @@ import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/utils/app_http_client.dart';
 
 /// This install as the edge knows it. Events for it (forwarded OTPs, …)
-/// go to its FCM token and, while the app is open, its WebSocket.
+/// go to its FCM token and, while the app is open, its event stream.
 class EdgeDevice {
   const EdgeDevice({
     required this.id,

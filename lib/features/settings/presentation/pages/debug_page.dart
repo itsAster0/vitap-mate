@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' show log;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -12,6 +13,7 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/cronet_net_log.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
@@ -34,6 +36,7 @@ class DebugPage extends HookConsumerWidget {
     final reuseTtl = ref.watch(vtopSessionReuseTtlProvider);
     final gmailReady = ref.watch(emailOtpReadyProvider).value ?? false;
     final otpTestBusy = useState(false);
+    final netLogRecording = useValueListenable(CronetNetLog.recording);
 
     FTile tile(
       String title,
@@ -66,6 +69,21 @@ class DebugPage extends HookConsumerWidget {
               ),
             ],
           ),
+          if (CronetNetLog.available) ...[
+            const SectionHeader(title: 'Network'),
+            FTileGroup(
+              children: [
+                tile(
+                  netLogRecording ? 'Stop and Save Net Log' : 'Record Net Log',
+                  FLucideIcons.activity,
+                  () => _toggleNetLog(context),
+                  subtitle: netLogRecording
+                      ? 'Recording: use the app, then tap to save'
+                      : 'Why requests use HTTP/2 or HTTP/3',
+                ),
+              ],
+            ),
+          ],
           const SectionHeader(title: 'Session'),
           FTileGroup(
             divider: FItemDivider.indented,
@@ -143,6 +161,52 @@ class DebugPage extends HookConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// Starts Cronet's net log, or stops it and saves the file where the user
+/// picks.
+Future<void> _toggleNetLog(BuildContext context) async {
+  try {
+    if (!CronetNetLog.recording.value) {
+      await CronetNetLog.start();
+      if (context.mounted) {
+        dispToast(
+          context,
+          'Recording',
+          'Reproduce the issue, then come back to save the log.',
+        );
+      }
+      return;
+    }
+    final bytes = await CronetNetLog.stop();
+    if (bytes == null || bytes.isEmpty) {
+      if (context.mounted) {
+        dispToast(context, 'No Log', 'Cronet wrote nothing to save.');
+      }
+      return;
+    }
+    final stamp = DateTime.now()
+        .toIso8601String()
+        .split('.')
+        .first
+        .replaceAll(':', '-');
+    final saved = await FilePicker.saveFile(
+      fileName: 'cronet-netlog-$stamp.json',
+      bytes: bytes,
+      mimeType: 'application/json',
+    );
+    if (saved != null && context.mounted) {
+      dispToast(context, 'Saved', 'Open it at netlog-viewer.appspot.com.');
+    }
+  } catch (error, stackTrace) {
+    log(
+      'Cronet net log failed',
+      name: 'settings.netlog',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    if (context.mounted) disCommonToast(context, error);
   }
 }
 

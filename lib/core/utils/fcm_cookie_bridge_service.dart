@@ -136,7 +136,7 @@ Future<void> _syncFcmTokens() async {
   }
 }
 
-/// On-device mode turned on: closes the event socket and drops this
+/// On-device mode turned on: closes the event stream and drops this
 /// install's push token, so the server can no longer reach the phone.
 Future<void> pauseServerFeatures() async {
   EdgeEventChannel.instance.stop();
@@ -192,8 +192,8 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
   if (type == mailOtpMessageType) {
     // Opened here; the OTP prompt or the setup page listening in this
     // isolate takes it. A background isolate has no listener, and the
-    // socket catches up when the app is back. The same event may also
-    // come over the socket; its sequence number is handled once.
+    // stream catches up when the app is back. The same event may also
+    // come over the stream; its sequence number is handled once.
     final event = EdgeEvent.fromJson(data);
     if (event == null) {
       await MailForwardingService().handlePush(data);
@@ -214,7 +214,7 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
     return;
   }
   if (type != vtopCookieRequestType) return;
-  // From the edge it is an event of this install: the socket may bring it
+  // From the edge it is an event of this install: the stream may bring it
   // too, and it is answered once.
   final event = EdgeEvent.fromJson(data);
   if (event != null) {
@@ -226,7 +226,7 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
   await answerVtopCookieRequest(data);
 }
 
-/// A cookie request that came as an edge event (socket or push).
+/// A cookie request that came as an edge event (stream or push).
 Future<void> handleVtopCookieRequestEvent(EdgeEvent event) =>
     answerVtopCookieRequest(event.data);
 

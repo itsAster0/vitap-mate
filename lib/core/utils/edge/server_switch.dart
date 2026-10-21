@@ -35,7 +35,7 @@ class ServerSwitch {
   final Future<void> Function(bool linked) setLinked;
   final Future<bool> Function() onDeviceMode;
 
-  /// Stop and restart the event socket and push token.
+  /// Stop and restart the event stream and push token.
   final Future<void> Function() pause;
   final Future<void> Function() resume;
 
