@@ -8,19 +8,30 @@ import { error } from "./common";
 
 export const VTOP_ORIGIN = "https://vtop.vitap.ac.in";
 
-/** Request headers VTOP gets from the phone; the rest are Cloudflare's or
- * would describe the proxy. */
-const FORWARDED = [
-  "accept",
-  "accept-language",
-  "content-type",
-  "cookie",
-  "user-agent",
-  "x-requested-with",
-  "sec-fetch-dest",
-  "sec-fetch-mode",
-  "sec-fetch-site",
-];
+/** Headers the phone sends that must NOT reach VTOP: hop-by-hop headers, the
+ * ones that would describe the proxy instead of the phone, and the client-IP
+ * headers Cloudflare adds (anything `cf-*` is stripped too). Everything else
+ * is forwarded, so the proxied request matches what the phone sends direct.
+ * `origin`/`referer` are forwarded but reoriginated to VTOP. */
+const STRIP = new Set([
+  "host",
+  "content-length",
+  "connection",
+  "proxy-connection",
+  "keep-alive",
+  "transfer-encoding",
+  "upgrade",
+  "te",
+  "trailer",
+  "x-forwarded-for",
+  "x-forwarded-proto",
+  "x-forwarded-host",
+  "x-real-ip",
+  "true-client-ip",
+  "forwarded",
+  "via",
+  "cdn-loop",
+]);
 
 export function isVtopPath(path: string): boolean {
   return path === "/vtop" || path.startsWith("/vtop/");
@@ -49,18 +60,15 @@ export async function proxyVtop(
   const proxy = url.origin;
 
   const headers = new Headers();
-  for (const name of FORWARDED) {
-    const value = req.headers.get(name);
-    if (value !== null) headers.set(name, value);
-  }
-  for (const name of ["origin", "referer"]) {
-    const value = req.headers.get(name);
-    if (value !== null) headers.set(name, reorigin(value, proxy, VTOP_ORIGIN));
-  }
-  // VTOP sees Cloudflare's address; this names the phone's, which VTOP
-  // records in its sign-in history. (With X-Real-IP too it lists it twice.)
-  const phone = req.headers.get("cf-connecting-ip");
-  if (phone) headers.set("x-forwarded-for", phone);
+  req.headers.forEach((value, name) => {
+    if (STRIP.has(name) || name.startsWith("cf-")) return;
+    headers.set(
+      name,
+      name === "origin" || name === "referer"
+        ? reorigin(value, proxy, VTOP_ORIGIN)
+        : value,
+    );
+  });
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
   const upstream = await fetcher(
     new Request(`${VTOP_ORIGIN}${url.pathname}${url.search}`, {

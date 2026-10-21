@@ -23,6 +23,10 @@ describe("proxyVtop", () => {
         "content-type": "application/x-www-form-urlencoded",
         origin: PROXY,
         referer: `${PROXY}/vtop/open/page`,
+        "upgrade-insecure-requests": "1",
+        "sec-fetch-user": "?1",
+        priority: "u=0, i",
+        host: PROXY.replace("https://", ""),
         "cf-connecting-ip": "1.2.3.4",
       },
       body: "a=b",
@@ -34,6 +38,12 @@ describe("proxyVtop", () => {
     expect(sent.headers.get("cookie")).toBe("JSESSIONID=a");
     expect(sent.headers.get("origin")).toBe(VTOP_ORIGIN);
     expect(sent.headers.get("referer")).toBe(`${VTOP_ORIGIN}/vtop/open/page`);
+    // Browser headers the phone sends pass straight through (parity with
+    // a direct request); hop/host/Cloudflare headers do not.
+    expect(sent.headers.get("upgrade-insecure-requests")).toBe("1");
+    expect(sent.headers.get("sec-fetch-user")).toBe("?1");
+    expect(sent.headers.get("priority")).toBe("u=0, i");
+    expect(sent.headers.get("host")).not.toBe(PROXY.replace("https://", ""));
     expect(sent.headers.get("cf-connecting-ip")).toBeNull();
     expect(sent.redirect).toBe("manual");
     expect(await sent.text()).toBe("a=b");
@@ -60,13 +70,22 @@ describe("proxyVtop", () => {
     expect(res.status).toBe(404);
     expect(seen).toHaveLength(0);
   });
-  it("tells VTOP the phone's address, for its sign-in history", async () => {
+  it("does not forward the phone's address; VTOP sees Cloudflare", async () => {
     const { seen, fetcher } = capture(new Response("ok"));
     await proxyVtop(
-      new Request(`${PROXY}/vtop/login`, { headers: { "cf-connecting-ip": "49.15.2.3" } }),
+      new Request(`${PROXY}/vtop/login`, {
+        headers: {
+          "cf-connecting-ip": "49.15.2.3",
+          "x-forwarded-for": "49.15.2.3",
+          "x-real-ip": "49.15.2.3",
+          "true-client-ip": "49.15.2.3",
+        },
+      }),
       fetcher,
     );
-    expect(seen[0].headers.get("x-forwarded-for")).toBe("49.15.2.3");
+    expect(seen[0].headers.get("true-client-ip")).toBeNull();
+    expect(seen[0].headers.get("x-forwarded-for")).toBeNull();
     expect(seen[0].headers.get("x-real-ip")).toBeNull();
+    expect(seen[0].headers.get("cf-connecting-ip")).toBeNull();
   });
 });

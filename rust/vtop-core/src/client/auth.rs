@@ -143,7 +143,11 @@ impl VtopClient {
 
         if !response_url.contains("error") {
             let (csrf, registration_number) = page::extract_session_fields(&response_text);
-            let csrf = csrf.ok_or_else(|| VtopError::ParseError("CSRF token not found".into()))?;
+            let csrf = csrf.ok_or_else(|| {
+                VtopError::ParseError(
+                    "VTOP's response after sign-in was missing its session token".into(),
+                )
+            })?;
             let registration_number = RegistrationNumber::parse(
                 &registration_number.ok_or(VtopError::RegistrationParsingError)?,
             )?;
@@ -198,8 +202,12 @@ impl VtopClient {
     async fn load_login_page(&self, open_session: bool) -> VtopResult<String> {
         if open_session {
             let landing = self.load_initial_page().await?;
-            let csrf = page::extract_csrf_token(&landing)
-                .ok_or_else(|| VtopError::ParseError("CSRF token not found".to_string()))?;
+            let csrf = page::extract_csrf_token(&landing).ok_or_else(|| {
+                VtopError::VtopServerError(format!(
+                    "VTOP's sign-in page loaded without a security token ({} characters). This is usually a temporary VTOP or network problem — please try again.",
+                    landing.chars().count()
+                ))
+            })?;
             self.state().session.set_csrf_token(csrf);
         }
         let csrf = self
@@ -331,7 +339,9 @@ impl VtopClient {
             .map_err(|error| network_error("validate_authenticated_session.text", error))?;
 
         let (csrf, registration_number) = page::extract_session_fields(&content);
-        let csrf = csrf.ok_or_else(|| VtopError::ParseError("CSRF token not found".into()))?;
+        let csrf = csrf.ok_or_else(|| {
+            VtopError::ParseError("VTOP's session page was missing its token".into())
+        })?;
         let registration_number = RegistrationNumber::parse(
             &registration_number.ok_or(VtopError::RegistrationParsingError)?,
         )?;

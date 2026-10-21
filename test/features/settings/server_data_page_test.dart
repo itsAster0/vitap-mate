@@ -14,9 +14,7 @@ void main() {
     tester,
   ) async {
     SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.withData({
-          bridgeLinkedSettingKey: true,
-        });
+        InMemorySharedPreferencesAsync.withData({bridgeLinkedSettingKey: true});
     final container = ProviderContainer(
       retry: (_, _) => null,
       overrides: [

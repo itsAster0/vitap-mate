@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/exceptions.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 String _authFailedMessage(Object e) {
@@ -96,6 +97,12 @@ void disCommonToast(BuildContext context, Object e) {
       title: 'Feature Disabled',
       description: 'Please try again in a while Or Update the app',
     );
+  } else if (e is VtopError) {
+    _showAppToast(
+      context,
+      title: 'VTOP Problem',
+      description: vtopErrorMessage(e),
+    );
   } else {
     log('Unexpected error in disCommonToast: $e');
     _showAppToast(
@@ -139,6 +146,12 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       context,
       title: 'Feature Disabled',
       description: 'Please try again in a while',
+    );
+  } else if (e is VtopError) {
+    _showAppToast(
+      context,
+      title: 'Login Problem',
+      description: vtopErrorMessage(e),
     );
   } else {
     _showAppToast(
