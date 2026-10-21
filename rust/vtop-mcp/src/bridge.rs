@@ -84,6 +84,8 @@ impl BridgeClient {
                 .http
                 .request(method.clone(), format!("{}{path}", self.base_url))
                 .bearer_auth(key)
+                // So the account shows this key was used by an AI agent.
+                .header("x-vtop-client", "mcp")
                 .timeout(CALL_TIMEOUT)
                 .send()
                 .await;

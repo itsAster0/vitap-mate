@@ -17,6 +17,7 @@ import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 const _gradeOrder = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'N'];
 
@@ -360,9 +361,8 @@ class _CgpaHero extends StatelessWidget {
                       const SizedBox(width: Space.xs),
                       Text(
                         '${e.key} ${e.value}',
-                        style: typography.body.xs.copyWith(
+                        style: typography.body.xs.nums(
                           color: colors.mutedForeground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],
@@ -436,11 +436,10 @@ class _GpaTrend extends StatelessWidget {
                       child: Text(
                         points[i].$2.toStringAsFixed(2),
                         textAlign: TextAlign.center,
-                        style: typography.body.xs.copyWith(
+                        style: typography.body.xs.nums(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w600,
                           color: colors.foreground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -531,10 +530,9 @@ class _Stat extends StatelessWidget {
               : number == number.roundToDouble()
               ? number.toStringAsFixed(0)
               : number.toString(),
-          style: typography.body.lg.copyWith(
+          style: typography.body.lg.nums(
             fontWeight: FontWeight.w500,
             color: colors.foreground,
-            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ],
@@ -676,11 +674,10 @@ class _CourseCard extends HookWidget {
                           credits == credits.roundToDouble()
                               ? credits.toStringAsFixed(0)
                               : '$credits',
-                          style: typography.body.lg.copyWith(
+                          style: typography.body.lg.nums(
                             height: 1.1,
                             fontWeight: FontWeight.w600,
                             color: colors.foreground,
-                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                         Text(

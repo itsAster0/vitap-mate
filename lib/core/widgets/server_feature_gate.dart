@@ -65,26 +65,14 @@ Future<bool> ensureServerAllowed(
   required String feature,
 }) async {
   if (!ref.read(onDeviceModeProvider)) return true;
-  final turnOff = await showAdaptiveDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) => AppDialog(
-      title: const Text(_serverNeededTitle),
-      body: Text(_serverNeededMessage(feature)),
-      actions: [
-        FButton(
-          onPress: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Turn off on-device mode'),
-        ),
-        FButton(
-          variant: FButtonVariant.outline,
-          onPress: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancel'),
-        ),
-      ],
-    ),
+  final turnOff = await confirm(
+    context,
+    title: _serverNeededTitle,
+    body: _serverNeededMessage(feature),
+    action: 'Turn off on-device mode',
+    actionFirst: true,
   );
-  if (turnOff != true) return false;
+  if (!turnOff) return false;
   await setOnDeviceMode(ref, false);
   return true;
 }

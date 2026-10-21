@@ -30,6 +30,9 @@ class _MemoryDevices implements EdgeDeviceStore {
 
   @override
   Future<void> write(EdgeDevice device) async => value = device;
+
+  @override
+  Future<void> delete() async => value = null;
 }
 
 const _device = EdgeDevice(
@@ -185,6 +188,66 @@ void main() {
         expect(devices.value!.secret, 'vdv_new');
       },
     );
+
+    for (final (name, lost) in [
+      (
+        'unknown_device',
+        http.Response(
+          '{"code":"unknown_device","error":"This install is not registered."}',
+          404,
+        ),
+      ),
+      (
+        'the older 400 reply',
+        http.Response('{"code":"bad_request","error":"Unknown device."}', 400),
+      ),
+    ]) {
+      test(
+        'creating an address with a lost install registers again ($name)',
+        () async {
+          final devices = _MemoryDevices()..value = _device;
+          final calls = <(String, Map<String, dynamic>)>[];
+          var registers = 0;
+          final client = MockClient((request) async {
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            calls.add((request.url.path, body));
+            switch (request.url.path) {
+              case '/v1/devices/register':
+                return http.Response(
+                  '{"id":"fedcba9876543210fedcba9876543210","secret":"vdv_new"}',
+                  201,
+                );
+              case '/v1/mail-otp/register':
+                registers++;
+                if (body['deviceId'] == _device.id) return lost;
+                return http.Response(
+                  '{"id":"k3f9x2ab7q","address":"vtop-otp-k3f9x2ab7q@aster0.dev","secret":"vmb_new"}',
+                  200,
+                );
+            }
+            return http.Response('', 204);
+          });
+          final store = _MemoryStore();
+          final service = MailForwardingService(
+            client: client,
+            baseUrl: 'https://edge.example',
+            store: store,
+            devices: EdgeDeviceService(
+              client: client,
+              baseUrl: 'https://edge.example',
+              store: devices,
+            ),
+            deviceLabel: () async => null,
+            keypair: () => const MailOtpKeypair(secret: 'sk', publicKey: 'pk'),
+          );
+          await service.register(fcmToken: 'old');
+          expect(registers, 2);
+          expect(devices.value!.id, 'fedcba9876543210fedcba9876543210');
+          expect(calls.last.$2['deviceSecret'], 'vdv_new');
+          expect(store.value!.secret, 'vmb_new');
+        },
+      );
+    }
 
     test('remove forgets the address even when the bridge lost it', () async {
       final store = _MemoryStore()..value = _forwarding;

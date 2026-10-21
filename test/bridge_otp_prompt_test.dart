@@ -13,7 +13,7 @@ void main() {
     state: SessionState(
       cookies: 'JSESSIONID=a',
       csrfToken: 'csrf',
-      registrationNumber: '24MIC7076',
+      registrationNumber: '23ABC4567',
       otpIssuedAt: BigInt.from(1790000000),
     ),
     createdAtMs: createdAtMs,
@@ -37,14 +37,24 @@ void main() {
 
   test('a pending OTP goes stale after ten minutes', () {
     final p = pending(createdAtMs: 0);
-    expect(p.isStaleAt(DateTime.fromMillisecondsSinceEpoch(9 * 60 * 1000)), isFalse);
-    expect(p.isStaleAt(DateTime.fromMillisecondsSinceEpoch(10 * 60 * 1000 + 1)), isTrue);
+    expect(
+      p.isStaleAt(DateTime.fromMillisecondsSinceEpoch(9 * 60 * 1000)),
+      isFalse,
+    );
+    expect(
+      p.isStaleAt(DateTime.fromMillisecondsSinceEpoch(10 * 60 * 1000 + 1)),
+      isTrue,
+    );
   });
 
   test('notification responses are classified', () {
     final payload = jsonEncode({'type': bridgeOtpPayloadType});
     expect(
-      classifyBridgeOtpResponse(payload: payload, actionId: bridgeOtpReplyActionId, input: ' 123456 '),
+      classifyBridgeOtpResponse(
+        payload: payload,
+        actionId: bridgeOtpReplyActionId,
+        input: ' 123456 ',
+      ),
       const BridgeOtpResponse.reply('123456'),
     );
     expect(
@@ -52,13 +62,24 @@ void main() {
       const BridgeOtpResponse.tap(),
     );
     expect(
-      classifyBridgeOtpResponse(payload: payload, actionId: bridgeOtpReplyActionId, input: 'abc'),
+      classifyBridgeOtpResponse(
+        payload: payload,
+        actionId: bridgeOtpReplyActionId,
+        input: 'abc',
+      ),
       const BridgeOtpResponse.invalidReply(),
     );
     expect(
-      classifyBridgeOtpResponse(payload: '{"type":"class_reminder"}', actionId: null, input: null),
+      classifyBridgeOtpResponse(
+        payload: '{"type":"class_reminder"}',
+        actionId: null,
+        input: null,
+      ),
       isNull,
     );
-    expect(classifyBridgeOtpResponse(payload: null, actionId: null, input: null), isNull);
+    expect(
+      classifyBridgeOtpResponse(payload: null, actionId: null, input: null),
+      isNull,
+    );
   });
 }

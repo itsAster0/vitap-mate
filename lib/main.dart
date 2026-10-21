@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:vitapmate/core/utils/users/saved_credentials.dart';
+import 'package:vitapmate/core/utils/edge/credentials_rejected.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +36,7 @@ Future<void> main() async {
   EdgeEventChannel.instance
     ..on(mailOtpMessageType, handleMailOtpEvent)
     ..on(vtopCookieRequestType, handleVtopCookieRequestEvent)
+    ..on(credentialsRejectedType, handleCredentialsRejectedEvent)
     ..start();
 
   runApp(const ProviderScope(child: MyApp()));
@@ -55,6 +58,14 @@ class MyApp extends HookConsumerWidget {
       // A tap on the OTP notification, or a login left waiting for its OTP:
       // finish it with the app's OTP prompt.
       final container = ProviderScope.containerOf(context, listen: false);
+      // While the app runs, a rejected password updates its own user.
+      EdgeEventChannel.instance.on(
+        credentialsRejectedType,
+        (event) => handleCredentialsRejectedEvent(
+          event,
+          reject: () => rejectSavedCredentialsIn(container),
+        ),
+      );
       void answer() => unawaited(answerPendingBridgeOtpInApp(container));
       bridgeOtpTapSignal.addListener(answer);
       answer();

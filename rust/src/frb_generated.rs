@@ -1788,6 +1788,7 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
                 <Option<crate::api::vtop::types::PersistedVtopSession>>::sse_decode(
                     &mut deserializer,
                 );
+            let api_base_url = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1796,6 +1797,7 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
                             api_username,
                             api_password,
                             api_persisted_session,
+                            api_base_url,
                         )
                         .await?;
                         Ok(output_ok)

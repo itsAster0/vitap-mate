@@ -5,6 +5,7 @@ import 'package:vitapmate/core/widgets/fit_calendar.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/outing/domain/outing_rules.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 Tone statusTone(BuildContext context, OutingStatus status) {
   final colors = context.theme.colors;
@@ -158,10 +159,9 @@ class ChoicePill extends StatelessWidget {
               child: Text(
                 label,
                 maxLines: 1,
-                style: context.theme.typography.body.sm.copyWith(
+                style: context.theme.typography.body.sm.nums(
                   fontWeight: FontWeight.w600,
                   color: fg,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
@@ -216,12 +216,11 @@ class PickerField extends StatelessWidget {
                 text ?? placeholder,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: context.theme.typography.body.sm.copyWith(
+                style: context.theme.typography.body.sm.nums(
                   fontWeight: text == null ? FontWeight.w400 : FontWeight.w500,
                   color: text == null
                       ? colors.mutedForeground
                       : colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
@@ -414,12 +413,9 @@ class OutingRulesPanel extends StatelessWidget {
                           const SizedBox(height: 1),
                           Text(
                             value,
-                            style: typography.body.sm.copyWith(
+                            style: typography.body.sm.nums(
                               fontWeight: FontWeight.w600,
                               color: colors.foreground,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                         ],
@@ -562,10 +558,9 @@ class OutingRequestCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     text,
-                    style: typography.body.xs.copyWith(
+                    style: typography.body.xs.nums(
                       fontWeight: FontWeight.w500,
                       color: colors.secondaryForeground,
-                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),

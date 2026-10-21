@@ -11,6 +11,7 @@ import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// The attendance list before VTOP posts any: each timetabled course with
 /// how many classes it has left and how many can be missed at 75%, from
@@ -73,7 +74,7 @@ class AttendanceNotPosted extends ConsumerWidget {
                   now: now,
                   until: exam?.start,
                 ),
-                hideSkips: ref.watch(hideSkipAdviceProvider),
+                hideSkips: !ref.watch(showSkipAdviceProvider),
                 examName: exam?.name,
               ),
             ),
@@ -165,10 +166,7 @@ class _CourseBudget extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final base = typography.body.xs.copyWith(
-      color: colors.mutedForeground,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final base = typography.body.xs.nums(color: colors.mutedForeground);
     final strong = base.copyWith(
       fontWeight: FontWeight.w600,
       color: colors.foreground,

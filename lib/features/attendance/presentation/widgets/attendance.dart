@@ -15,6 +15,7 @@ import 'package:vitapmate/features/calendar/presentation/providers/academic_cale
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// One course in the attendance list: ring, name, and what to do next.
 class AttendanceCard extends ConsumerWidget {
@@ -71,7 +72,7 @@ class AttendanceCard extends ConsumerWidget {
             countedThrough: sync?.countedThrough,
           );
     final projection = isLab ? classes?.inSessions(record) : classes;
-    final hideSkips = ref.watch(hideSkipAdviceProvider);
+    final hideSkips = !ref.watch(showSkipAdviceProvider);
 
     final pct = standing.displayPercent;
     return Surface(
@@ -139,11 +140,8 @@ class AttendanceCard extends ConsumerWidget {
                               next == null ? code.trim() : 'Next: $next',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: typography.body.xs.copyWith(
+                              style: typography.body.xs.nums(
                                 color: colors.mutedForeground,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures(),
-                                ],
                               ),
                             ),
                           ),
@@ -203,10 +201,7 @@ class _ClassCount extends StatelessWidget {
       children: [
         Text(
           '${standing.attended}/${standing.total} attended',
-          style: typography.body.sm.copyWith(
-            color: colors.mutedForeground,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          style: typography.body.sm.nums(color: colors.mutedForeground),
         ),
         if (outOfSync) ...[
           const SizedBox(width: Space.xs + 2),
@@ -273,9 +268,8 @@ class _SemesterOutlook extends StatelessWidget {
     final left = projection.left;
     final mustAttend = projection.mustAttend;
     final short = left > 0 && mustAttend == null;
-    final base = context.theme.typography.body.xs.copyWith(
+    final base = context.theme.typography.body.xs.nums(
       color: colors.mutedForeground,
-      fontFeatures: const [FontFeature.tabularFigures()],
     );
     final strong = base.copyWith(
       fontWeight: FontWeight.w600,

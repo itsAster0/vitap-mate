@@ -7,7 +7,7 @@ import 'dart:math' show Random, min;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
+import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 
@@ -93,14 +93,15 @@ class EdgeEventChannel {
   /// also after registering, to start listening at once.
   Future<void> connect() async {
     if (!_foreground || _socket != null || _connecting) return;
-    if (vtopEdgeBaseUrl.isEmpty || await isOnDeviceMode()) return;
+    if (await isOnDeviceMode()) return;
     _connecting = true;
     try {
       final device = await _devices.load();
       if (device == null) return;
       final after = await _cursor(device.id);
-      final url = Uri.parse(vtopEdgeBaseUrl).replace(
-        scheme: vtopEdgeBaseUrl.startsWith('http://') ? 'ws' : 'wss',
+      final server = await currentServerUrl();
+      final url = Uri.parse(server).replace(
+        scheme: server.startsWith('http://') ? 'ws' : 'wss',
         path: '/v1/events',
         queryParameters: {'device': device.id, 'after': '$after'},
       );

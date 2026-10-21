@@ -56,6 +56,14 @@ FullAttendanceData withoutLatestEntry(FullAttendanceData data) {
   return data.copyWith(records: [...data.records]..removeAt(index));
 }
 
+/// Whether [history] should be fetched again for [record]: it was never
+/// saved, or its counts no longer match the summary. A matching history is
+/// complete, so refetching it would only repeat what is saved.
+bool historyNeedsRefresh(
+  AttendanceRecord record,
+  FullAttendanceData? history,
+) => history == null || !HistorySync.of(record, history).inSync;
+
 /// How a course's class-by-class history lines up with its summary counts.
 /// VTOP updates the two separately (and each is cached on its own), so they
 /// can disagree for a while.

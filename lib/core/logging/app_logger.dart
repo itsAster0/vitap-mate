@@ -125,3 +125,14 @@ class AppLogger extends ChangeNotifier {
     notifyListeners();
   }
 }
+
+/// [AppLogger] with the source fixed, for one-line calls.
+class SourceLogger {
+  const SourceLogger(this.source);
+
+  final String source;
+
+  void info(String message) => AppLogger.instance.info(source, message);
+  void warning(String message) => AppLogger.instance.warning(source, message);
+  void error(String message) => AppLogger.instance.error(source, message);
+}

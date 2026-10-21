@@ -1640,6 +1640,267 @@ as String,
 
 }
 
+
+/// @nodoc
+mixin _$CourseFileInfo {
+
+ String get contentDisposition; String get contentType;
+/// Create a copy of CourseFileInfo
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CourseFileInfoCopyWith<CourseFileInfo> get copyWith => _$CourseFileInfoCopyWithImpl<CourseFileInfo>(this as CourseFileInfo, _$identity);
+
+  /// Serializes this CourseFileInfo to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CourseFileInfo&&(identical(other.contentDisposition, contentDisposition) || other.contentDisposition == contentDisposition)&&(identical(other.contentType, contentType) || other.contentType == contentType));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,contentDisposition,contentType);
+
+@override
+String toString() {
+  return 'CourseFileInfo(contentDisposition: $contentDisposition, contentType: $contentType)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CourseFileInfoCopyWith<$Res>  {
+  factory $CourseFileInfoCopyWith(CourseFileInfo value, $Res Function(CourseFileInfo) _then) = _$CourseFileInfoCopyWithImpl;
+@useResult
+$Res call({
+ String contentDisposition, String contentType
+});
+
+
+
+
+}
+/// @nodoc
+class _$CourseFileInfoCopyWithImpl<$Res>
+    implements $CourseFileInfoCopyWith<$Res> {
+  _$CourseFileInfoCopyWithImpl(this._self, this._then);
+
+  final CourseFileInfo _self;
+  final $Res Function(CourseFileInfo) _then;
+
+/// Create a copy of CourseFileInfo
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? contentDisposition = null,Object? contentType = null,}) {
+  return _then(_self.copyWith(
+contentDisposition: null == contentDisposition ? _self.contentDisposition : contentDisposition // ignore: cast_nullable_to_non_nullable
+as String,contentType: null == contentType ? _self.contentType : contentType // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [CourseFileInfo].
+extension CourseFileInfoPatterns on CourseFileInfo {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _CourseFileInfo value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _CourseFileInfo() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _CourseFileInfo value)  $default,){
+final _that = this;
+switch (_that) {
+case _CourseFileInfo():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _CourseFileInfo value)?  $default,){
+final _that = this;
+switch (_that) {
+case _CourseFileInfo() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String contentDisposition,  String contentType)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _CourseFileInfo() when $default != null:
+return $default(_that.contentDisposition,_that.contentType);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String contentDisposition,  String contentType)  $default,) {final _that = this;
+switch (_that) {
+case _CourseFileInfo():
+return $default(_that.contentDisposition,_that.contentType);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String contentDisposition,  String contentType)?  $default,) {final _that = this;
+switch (_that) {
+case _CourseFileInfo() when $default != null:
+return $default(_that.contentDisposition,_that.contentType);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _CourseFileInfo implements CourseFileInfo {
+  const _CourseFileInfo({required this.contentDisposition, required this.contentType});
+  factory _CourseFileInfo.fromJson(Map<String, dynamic> json) => _$CourseFileInfoFromJson(json);
+
+@override final  String contentDisposition;
+@override final  String contentType;
+
+/// Create a copy of CourseFileInfo
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$CourseFileInfoCopyWith<_CourseFileInfo> get copyWith => __$CourseFileInfoCopyWithImpl<_CourseFileInfo>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$CourseFileInfoToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _CourseFileInfo&&(identical(other.contentDisposition, contentDisposition) || other.contentDisposition == contentDisposition)&&(identical(other.contentType, contentType) || other.contentType == contentType));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,contentDisposition,contentType);
+
+@override
+String toString() {
+  return 'CourseFileInfo(contentDisposition: $contentDisposition, contentType: $contentType)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$CourseFileInfoCopyWith<$Res> implements $CourseFileInfoCopyWith<$Res> {
+  factory _$CourseFileInfoCopyWith(_CourseFileInfo value, $Res Function(_CourseFileInfo) _then) = __$CourseFileInfoCopyWithImpl;
+@override @useResult
+$Res call({
+ String contentDisposition, String contentType
+});
+
+
+
+
+}
+/// @nodoc
+class __$CourseFileInfoCopyWithImpl<$Res>
+    implements _$CourseFileInfoCopyWith<$Res> {
+  __$CourseFileInfoCopyWithImpl(this._self, this._then);
+
+  final _CourseFileInfo _self;
+  final $Res Function(_CourseFileInfo) _then;
+
+/// Create a copy of CourseFileInfo
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? contentDisposition = null,Object? contentType = null,}) {
+  return _then(_CourseFileInfo(
+contentDisposition: null == contentDisposition ? _self.contentDisposition : contentDisposition // ignore: cast_nullable_to_non_nullable
+as String,contentType: null == contentType ? _self.contentType : contentType // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
 /// @nodoc
 mixin _$CourseLecture {
 
@@ -1650,6 +1911,8 @@ mixin _$CourseLecture {
 @pragma('vm:prefer-inline')
 $CourseLectureCopyWith<CourseLecture> get copyWith => _$CourseLectureCopyWithImpl<CourseLecture>(this as CourseLecture, _$identity);
 
+  /// Serializes this CourseLecture to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1657,7 +1920,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CourseLecture&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.date, date) || other.date == date)&&(identical(other.day, day) || other.day == day)&&(identical(other.topic, topic) || other.topic == topic)&&const DeepCollectionEquality().equals(other.materials, materials));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,date,day,topic,const DeepCollectionEquality().hash(materials));
 
@@ -1830,11 +2093,11 @@ return $default(_that.serial,_that.date,_that.day,_that.topic,_that.materials);c
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CourseLecture implements CourseLecture {
   const _CourseLecture({required this.serial, required this.date, required this.day, required this.topic, required final  List<CourseMaterial> materials}): _materials = materials;
-  
+  factory _CourseLecture.fromJson(Map<String, dynamic> json) => _$CourseLectureFromJson(json);
 
 @override final  String serial;
 @override final  String date;
@@ -1854,14 +2117,17 @@ class _CourseLecture implements CourseLecture {
 @pragma('vm:prefer-inline')
 _$CourseLectureCopyWith<_CourseLecture> get copyWith => __$CourseLectureCopyWithImpl<_CourseLecture>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CourseLectureToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CourseLecture&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.date, date) || other.date == date)&&(identical(other.day, day) || other.day == day)&&(identical(other.topic, topic) || other.topic == topic)&&const DeepCollectionEquality().equals(other._materials, _materials));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,date,day,topic,const DeepCollectionEquality().hash(_materials));
 
@@ -1909,6 +2175,7 @@ as List<CourseMaterial>,
 
 }
 
+
 /// @nodoc
 mixin _$CourseMaterial {
 
@@ -1919,6 +2186,8 @@ mixin _$CourseMaterial {
 @pragma('vm:prefer-inline')
 $CourseMaterialCopyWith<CourseMaterial> get copyWith => _$CourseMaterialCopyWithImpl<CourseMaterial>(this as CourseMaterial, _$identity);
 
+  /// Serializes this CourseMaterial to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -1926,7 +2195,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CourseMaterial&&(identical(other.label, label) || other.label == label)&&(identical(other.path, path) || other.path == path));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,label,path);
 
@@ -2096,11 +2365,11 @@ return $default(_that.label,_that.path);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CourseMaterial implements CourseMaterial {
   const _CourseMaterial({required this.label, required this.path});
-  
+  factory _CourseMaterial.fromJson(Map<String, dynamic> json) => _$CourseMaterialFromJson(json);
 
 @override final  String label;
 @override final  String path;
@@ -2111,14 +2380,17 @@ class _CourseMaterial implements CourseMaterial {
 @pragma('vm:prefer-inline')
 _$CourseMaterialCopyWith<_CourseMaterial> get copyWith => __$CourseMaterialCopyWithImpl<_CourseMaterial>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CourseMaterialToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CourseMaterial&&(identical(other.label, label) || other.label == label)&&(identical(other.path, path) || other.path == path));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,label,path);
 
@@ -2163,6 +2435,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$CoursePageClass {
 
@@ -2173,6 +2446,8 @@ mixin _$CoursePageClass {
 @pragma('vm:prefer-inline')
 $CoursePageClassCopyWith<CoursePageClass> get copyWith => _$CoursePageClassCopyWithImpl<CoursePageClass>(this as CoursePageClass, _$identity);
 
+  /// Serializes this CoursePageClass to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2180,7 +2455,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CoursePageClass&&(identical(other.classId, classId) || other.classId == classId)&&(identical(other.erpId, erpId) || other.erpId == erpId)&&(identical(other.classGroup, classGroup) || other.classGroup == classGroup)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseTitle, courseTitle) || other.courseTitle == courseTitle)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.facultySchool, facultySchool) || other.facultySchool == facultySchool));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,classId,erpId,classGroup,courseCode,courseTitle,courseType,slot,faculty,facultySchool);
 
@@ -2357,11 +2632,11 @@ return $default(_that.classId,_that.erpId,_that.classGroup,_that.courseCode,_tha
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CoursePageClass implements CoursePageClass {
   const _CoursePageClass({required this.classId, required this.erpId, required this.classGroup, required this.courseCode, required this.courseTitle, required this.courseType, required this.slot, required this.faculty, required this.facultySchool});
-  
+  factory _CoursePageClass.fromJson(Map<String, dynamic> json) => _$CoursePageClassFromJson(json);
 
 @override final  String classId;
 @override final  String erpId;
@@ -2379,14 +2654,17 @@ class _CoursePageClass implements CoursePageClass {
 @pragma('vm:prefer-inline')
 _$CoursePageClassCopyWith<_CoursePageClass> get copyWith => __$CoursePageClassCopyWithImpl<_CoursePageClass>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CoursePageClassToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CoursePageClass&&(identical(other.classId, classId) || other.classId == classId)&&(identical(other.erpId, erpId) || other.erpId == erpId)&&(identical(other.classGroup, classGroup) || other.classGroup == classGroup)&&(identical(other.courseCode, courseCode) || other.courseCode == courseCode)&&(identical(other.courseTitle, courseTitle) || other.courseTitle == courseTitle)&&(identical(other.courseType, courseType) || other.courseType == courseType)&&(identical(other.slot, slot) || other.slot == slot)&&(identical(other.faculty, faculty) || other.faculty == faculty)&&(identical(other.facultySchool, facultySchool) || other.facultySchool == facultySchool));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,classId,erpId,classGroup,courseCode,courseTitle,courseType,slot,faculty,facultySchool);
 
@@ -2438,6 +2716,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$CoursePageClasses {
 
@@ -2448,6 +2727,8 @@ mixin _$CoursePageClasses {
 @pragma('vm:prefer-inline')
 $CoursePageClassesCopyWith<CoursePageClasses> get copyWith => _$CoursePageClassesCopyWithImpl<CoursePageClasses>(this as CoursePageClasses, _$identity);
 
+  /// Serializes this CoursePageClasses to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2455,7 +2736,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CoursePageClasses&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&const DeepCollectionEquality().equals(other.classes, classes)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,courseId,const DeepCollectionEquality().hash(classes),updateTime);
 
@@ -2627,11 +2908,11 @@ return $default(_that.semesterId,_that.courseId,_that.classes,_that.updateTime);
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CoursePageClasses implements CoursePageClasses {
   const _CoursePageClasses({required this.semesterId, required this.courseId, required final  List<CoursePageClass> classes, required this.updateTime}): _classes = classes;
-  
+  factory _CoursePageClasses.fromJson(Map<String, dynamic> json) => _$CoursePageClassesFromJson(json);
 
 @override final  String semesterId;
 @override final  String courseId;
@@ -2650,14 +2931,17 @@ class _CoursePageClasses implements CoursePageClasses {
 @pragma('vm:prefer-inline')
 _$CoursePageClassesCopyWith<_CoursePageClasses> get copyWith => __$CoursePageClassesCopyWithImpl<_CoursePageClasses>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CoursePageClassesToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CoursePageClasses&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&const DeepCollectionEquality().equals(other._classes, _classes)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,courseId,const DeepCollectionEquality().hash(_classes),updateTime);
 
@@ -2704,6 +2988,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$CoursePageCourse {
 
@@ -2714,6 +2999,8 @@ mixin _$CoursePageCourse {
 @pragma('vm:prefer-inline')
 $CoursePageCourseCopyWith<CoursePageCourse> get copyWith => _$CoursePageCourseCopyWithImpl<CoursePageCourse>(this as CoursePageCourse, _$identity);
 
+  /// Serializes this CoursePageCourse to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2721,7 +3008,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CoursePageCourse&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.title, title) || other.title == title)&&(identical(other.courseType, courseType) || other.courseType == courseType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,id,code,title,courseType);
 
@@ -2893,11 +3180,11 @@ return $default(_that.id,_that.code,_that.title,_that.courseType);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CoursePageCourse implements CoursePageCourse {
   const _CoursePageCourse({required this.id, required this.code, required this.title, required this.courseType});
-  
+  factory _CoursePageCourse.fromJson(Map<String, dynamic> json) => _$CoursePageCourseFromJson(json);
 
 @override final  String id;
 @override final  String code;
@@ -2910,14 +3197,17 @@ class _CoursePageCourse implements CoursePageCourse {
 @pragma('vm:prefer-inline')
 _$CoursePageCourseCopyWith<_CoursePageCourse> get copyWith => __$CoursePageCourseCopyWithImpl<_CoursePageCourse>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CoursePageCourseToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CoursePageCourse&&(identical(other.id, id) || other.id == id)&&(identical(other.code, code) || other.code == code)&&(identical(other.title, title) || other.title == title)&&(identical(other.courseType, courseType) || other.courseType == courseType));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,id,code,title,courseType);
 
@@ -2964,6 +3254,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$CoursePageCourses {
 
@@ -2974,6 +3265,8 @@ mixin _$CoursePageCourses {
 @pragma('vm:prefer-inline')
 $CoursePageCoursesCopyWith<CoursePageCourses> get copyWith => _$CoursePageCoursesCopyWithImpl<CoursePageCourses>(this as CoursePageCourses, _$identity);
 
+  /// Serializes this CoursePageCourses to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -2981,7 +3274,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CoursePageCourses&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&const DeepCollectionEquality().equals(other.courses, courses)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,const DeepCollectionEquality().hash(courses),updateTime);
 
@@ -3152,11 +3445,11 @@ return $default(_that.semesterId,_that.courses,_that.updateTime);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CoursePageCourses implements CoursePageCourses {
   const _CoursePageCourses({required this.semesterId, required final  List<CoursePageCourse> courses, required this.updateTime}): _courses = courses;
-  
+  factory _CoursePageCourses.fromJson(Map<String, dynamic> json) => _$CoursePageCoursesFromJson(json);
 
 @override final  String semesterId;
  final  List<CoursePageCourse> _courses;
@@ -3174,14 +3467,17 @@ class _CoursePageCourses implements CoursePageCourses {
 @pragma('vm:prefer-inline')
 _$CoursePageCoursesCopyWith<_CoursePageCourses> get copyWith => __$CoursePageCoursesCopyWithImpl<_CoursePageCourses>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CoursePageCoursesToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CoursePageCourses&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&const DeepCollectionEquality().equals(other._courses, _courses)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,const DeepCollectionEquality().hash(_courses),updateTime);
 
@@ -3227,6 +3523,7 @@ as BigInt,
 
 }
 
+
 /// @nodoc
 mixin _$CoursePageDetail {
 
@@ -3237,6 +3534,8 @@ mixin _$CoursePageDetail {
 @pragma('vm:prefer-inline')
 $CoursePageDetailCopyWith<CoursePageDetail> get copyWith => _$CoursePageDetailCopyWithImpl<CoursePageDetail>(this as CoursePageDetail, _$identity);
 
+  /// Serializes this CoursePageDetail to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -3244,7 +3543,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is CoursePageDetail&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.class_, class_) || other.class_ == class_)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.allMaterialsPath, allMaterialsPath) || other.allMaterialsPath == allMaterialsPath)&&(identical(other.generalMaterialsPath, generalMaterialsPath) || other.generalMaterialsPath == generalMaterialsPath)&&(identical(other.syllabusPath, syllabusPath) || other.syllabusPath == syllabusPath)&&(identical(other.hasCoursePlan, hasCoursePlan) || other.hasCoursePlan == hasCoursePlan)&&const DeepCollectionEquality().equals(other.lectures, lectures)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,class_,courseId,allMaterialsPath,generalMaterialsPath,syllabusPath,hasCoursePlan,const DeepCollectionEquality().hash(lectures),updateTime);
 
@@ -3430,11 +3729,11 @@ return $default(_that.semesterId,_that.class_,_that.courseId,_that.allMaterialsP
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _CoursePageDetail implements CoursePageDetail {
   const _CoursePageDetail({required this.semesterId, required this.class_, required this.courseId, required this.allMaterialsPath, required this.generalMaterialsPath, required this.syllabusPath, required this.hasCoursePlan, required final  List<CourseLecture> lectures, required this.updateTime}): _lectures = lectures;
-  
+  factory _CoursePageDetail.fromJson(Map<String, dynamic> json) => _$CoursePageDetailFromJson(json);
 
 @override final  String semesterId;
 @override final  CoursePageClass class_;
@@ -3458,14 +3757,17 @@ class _CoursePageDetail implements CoursePageDetail {
 @pragma('vm:prefer-inline')
 _$CoursePageDetailCopyWith<_CoursePageDetail> get copyWith => __$CoursePageDetailCopyWithImpl<_CoursePageDetail>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$CoursePageDetailToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _CoursePageDetail&&(identical(other.semesterId, semesterId) || other.semesterId == semesterId)&&(identical(other.class_, class_) || other.class_ == class_)&&(identical(other.courseId, courseId) || other.courseId == courseId)&&(identical(other.allMaterialsPath, allMaterialsPath) || other.allMaterialsPath == allMaterialsPath)&&(identical(other.generalMaterialsPath, generalMaterialsPath) || other.generalMaterialsPath == generalMaterialsPath)&&(identical(other.syllabusPath, syllabusPath) || other.syllabusPath == syllabusPath)&&(identical(other.hasCoursePlan, hasCoursePlan) || other.hasCoursePlan == hasCoursePlan)&&const DeepCollectionEquality().equals(other._lectures, _lectures)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,semesterId,class_,courseId,allMaterialsPath,generalMaterialsPath,syllabusPath,hasCoursePlan,const DeepCollectionEquality().hash(_lectures),updateTime);
 
@@ -4943,6 +5245,7 @@ $OutingStudentCopyWith<$Res>? get student {
 }
 }
 
+
 /// @nodoc
 mixin _$GeneralOutingRecord {
 
@@ -4953,6 +5256,8 @@ mixin _$GeneralOutingRecord {
 @pragma('vm:prefer-inline')
 $GeneralOutingRecordCopyWith<GeneralOutingRecord> get copyWith => _$GeneralOutingRecordCopyWithImpl<GeneralOutingRecord>(this as GeneralOutingRecord, _$identity);
 
+  /// Serializes this GeneralOutingRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -4960,7 +5265,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is GeneralOutingRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.place, place) || other.place == place)&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.fromDate, fromDate) || other.fromDate == fromDate)&&(identical(other.fromTime, fromTime) || other.fromTime == fromTime)&&(identical(other.toDate, toDate) || other.toDate == toDate)&&(identical(other.toTime, toTime) || other.toTime == toTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.passId, passId) || other.passId == passId)&&(identical(other.cancelId, cancelId) || other.cancelId == cancelId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,place,purpose,fromDate,fromTime,toDate,toTime,status,passId,cancelId);
 
@@ -5138,11 +5443,11 @@ return $default(_that.serial,_that.place,_that.purpose,_that.fromDate,_that.from
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _GeneralOutingRecord implements GeneralOutingRecord {
   const _GeneralOutingRecord({required this.serial, required this.place, required this.purpose, required this.fromDate, required this.fromTime, required this.toDate, required this.toTime, required this.status, required this.passId, required this.cancelId});
-  
+  factory _GeneralOutingRecord.fromJson(Map<String, dynamic> json) => _$GeneralOutingRecordFromJson(json);
 
 @override final  String serial;
 @override final  String place;
@@ -5161,14 +5466,17 @@ class _GeneralOutingRecord implements GeneralOutingRecord {
 @pragma('vm:prefer-inline')
 _$GeneralOutingRecordCopyWith<_GeneralOutingRecord> get copyWith => __$GeneralOutingRecordCopyWithImpl<_GeneralOutingRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$GeneralOutingRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _GeneralOutingRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.place, place) || other.place == place)&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.fromDate, fromDate) || other.fromDate == fromDate)&&(identical(other.fromTime, fromTime) || other.fromTime == fromTime)&&(identical(other.toDate, toDate) || other.toDate == toDate)&&(identical(other.toTime, toTime) || other.toTime == toTime)&&(identical(other.status, status) || other.status == status)&&(identical(other.passId, passId) || other.passId == passId)&&(identical(other.cancelId, cancelId) || other.cancelId == cancelId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,place,purpose,fromDate,fromTime,toDate,toTime,status,passId,cancelId);
 
@@ -8874,6 +9182,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$OutingApplyResult {
 
@@ -8884,6 +9193,8 @@ mixin _$OutingApplyResult {
 @pragma('vm:prefer-inline')
 $OutingApplyResultCopyWith<OutingApplyResult> get copyWith => _$OutingApplyResultCopyWithImpl<OutingApplyResult>(this as OutingApplyResult, _$identity);
 
+  /// Serializes this OutingApplyResult to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -8891,7 +9202,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is OutingApplyResult&&(identical(other.applied, applied) || other.applied == applied)&&(identical(other.message, message) || other.message == message));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,applied,message);
 
@@ -9061,11 +9372,11 @@ return $default(_that.applied,_that.message);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _OutingApplyResult implements OutingApplyResult {
   const _OutingApplyResult({required this.applied, required this.message});
-  
+  factory _OutingApplyResult.fromJson(Map<String, dynamic> json) => _$OutingApplyResultFromJson(json);
 
 @override final  bool applied;
 @override final  String message;
@@ -9076,14 +9387,17 @@ class _OutingApplyResult implements OutingApplyResult {
 @pragma('vm:prefer-inline')
 _$OutingApplyResultCopyWith<_OutingApplyResult> get copyWith => __$OutingApplyResultCopyWithImpl<_OutingApplyResult>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$OutingApplyResultToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutingApplyResult&&(identical(other.applied, applied) || other.applied == applied)&&(identical(other.message, message) || other.message == message));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,applied,message);
 
@@ -9128,6 +9442,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$OutingCancelResult {
 
@@ -9138,6 +9453,8 @@ mixin _$OutingCancelResult {
 @pragma('vm:prefer-inline')
 $OutingCancelResultCopyWith<OutingCancelResult> get copyWith => _$OutingCancelResultCopyWithImpl<OutingCancelResult>(this as OutingCancelResult, _$identity);
 
+  /// Serializes this OutingCancelResult to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -9145,7 +9462,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is OutingCancelResult&&(identical(other.cancelled, cancelled) || other.cancelled == cancelled)&&(identical(other.message, message) || other.message == message));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,cancelled,message);
 
@@ -9315,11 +9632,11 @@ return $default(_that.cancelled,_that.message);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _OutingCancelResult implements OutingCancelResult {
   const _OutingCancelResult({required this.cancelled, required this.message});
-  
+  factory _OutingCancelResult.fromJson(Map<String, dynamic> json) => _$OutingCancelResultFromJson(json);
 
 @override final  bool cancelled;
 @override final  String message;
@@ -9330,14 +9647,17 @@ class _OutingCancelResult implements OutingCancelResult {
 @pragma('vm:prefer-inline')
 _$OutingCancelResultCopyWith<_OutingCancelResult> get copyWith => __$OutingCancelResultCopyWithImpl<_OutingCancelResult>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$OutingCancelResultToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutingCancelResult&&(identical(other.cancelled, cancelled) || other.cancelled == cancelled)&&(identical(other.message, message) || other.message == message));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,cancelled,message);
 
@@ -9382,6 +9702,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$OutingOption {
 
@@ -9392,6 +9713,8 @@ mixin _$OutingOption {
 @pragma('vm:prefer-inline')
 $OutingOptionCopyWith<OutingOption> get copyWith => _$OutingOptionCopyWithImpl<OutingOption>(this as OutingOption, _$identity);
 
+  /// Serializes this OutingOption to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -9399,7 +9722,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is OutingOption&&(identical(other.value, value) || other.value == value)&&(identical(other.label, label) || other.label == label));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,value,label);
 
@@ -9569,11 +9892,11 @@ return $default(_that.value,_that.label);case _:
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _OutingOption implements OutingOption {
   const _OutingOption({required this.value, required this.label});
-  
+  factory _OutingOption.fromJson(Map<String, dynamic> json) => _$OutingOptionFromJson(json);
 
 @override final  String value;
 @override final  String label;
@@ -9584,14 +9907,17 @@ class _OutingOption implements OutingOption {
 @pragma('vm:prefer-inline')
 _$OutingOptionCopyWith<_OutingOption> get copyWith => __$OutingOptionCopyWithImpl<_OutingOption>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$OutingOptionToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutingOption&&(identical(other.value, value) || other.value == value)&&(identical(other.label, label) || other.label == label));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,value,label);
 
@@ -9636,6 +9962,7 @@ as String,
 
 }
 
+
 /// @nodoc
 mixin _$OutingStudent {
 
@@ -9646,6 +9973,8 @@ mixin _$OutingStudent {
 @pragma('vm:prefer-inline')
 $OutingStudentCopyWith<OutingStudent> get copyWith => _$OutingStudentCopyWithImpl<OutingStudent>(this as OutingStudent, _$identity);
 
+  /// Serializes this OutingStudent to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -9653,7 +9982,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is OutingStudent&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.name, name) || other.name == name)&&(identical(other.applicationNo, applicationNo) || other.applicationNo == applicationNo)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.hostelBlock, hostelBlock) || other.hostelBlock == hostelBlock)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.parentContactNumber, parentContactNumber) || other.parentContactNumber == parentContactNumber));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,registrationNumber,name,applicationNo,gender,hostelBlock,roomNumber,parentContactNumber);
 
@@ -9828,11 +10157,11 @@ return $default(_that.registrationNumber,_that.name,_that.applicationNo,_that.ge
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _OutingStudent implements OutingStudent {
   const _OutingStudent({required this.registrationNumber, required this.name, required this.applicationNo, required this.gender, required this.hostelBlock, required this.roomNumber, required this.parentContactNumber});
-  
+  factory _OutingStudent.fromJson(Map<String, dynamic> json) => _$OutingStudentFromJson(json);
 
 @override final  String registrationNumber;
 @override final  String name;
@@ -9848,14 +10177,17 @@ class _OutingStudent implements OutingStudent {
 @pragma('vm:prefer-inline')
 _$OutingStudentCopyWith<_OutingStudent> get copyWith => __$OutingStudentCopyWithImpl<_OutingStudent>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$OutingStudentToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _OutingStudent&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.name, name) || other.name == name)&&(identical(other.applicationNo, applicationNo) || other.applicationNo == applicationNo)&&(identical(other.gender, gender) || other.gender == gender)&&(identical(other.hostelBlock, hostelBlock) || other.hostelBlock == hostelBlock)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.parentContactNumber, parentContactNumber) || other.parentContactNumber == parentContactNumber));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,registrationNumber,name,applicationNo,gender,hostelBlock,roomNumber,parentContactNumber);
 
@@ -12123,6 +12455,7 @@ $OutingStudentCopyWith<$Res>? get student {
 }
 }
 
+
 /// @nodoc
 mixin _$WeekendOutingRecord {
 
@@ -12133,6 +12466,8 @@ mixin _$WeekendOutingRecord {
 @pragma('vm:prefer-inline')
 $WeekendOutingRecordCopyWith<WeekendOutingRecord> get copyWith => _$WeekendOutingRecordCopyWithImpl<WeekendOutingRecord>(this as WeekendOutingRecord, _$identity);
 
+  /// Serializes this WeekendOutingRecord to a JSON map.
+  Map<String, dynamic> toJson();
 
 
 @override
@@ -12140,7 +12475,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is WeekendOutingRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.hostelBlock, hostelBlock) || other.hostelBlock == hostelBlock)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.place, place) || other.place == place)&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.timeSlot, timeSlot) || other.timeSlot == timeSlot)&&(identical(other.date, date) || other.date == date)&&(identical(other.status, status) || other.status == status)&&(identical(other.passId, passId) || other.passId == passId)&&(identical(other.cancelId, cancelId) || other.cancelId == cancelId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,hostelBlock,roomNumber,place,purpose,timeSlot,date,status,passId,cancelId);
 
@@ -12318,11 +12653,11 @@ return $default(_that.serial,_that.hostelBlock,_that.roomNumber,_that.place,_tha
 }
 
 /// @nodoc
-
+@JsonSerializable()
 
 class _WeekendOutingRecord implements WeekendOutingRecord {
   const _WeekendOutingRecord({required this.serial, required this.hostelBlock, required this.roomNumber, required this.place, required this.purpose, required this.timeSlot, required this.date, required this.status, required this.passId, required this.cancelId});
-  
+  factory _WeekendOutingRecord.fromJson(Map<String, dynamic> json) => _$WeekendOutingRecordFromJson(json);
 
 @override final  String serial;
 @override final  String hostelBlock;
@@ -12341,14 +12676,17 @@ class _WeekendOutingRecord implements WeekendOutingRecord {
 @pragma('vm:prefer-inline')
 _$WeekendOutingRecordCopyWith<_WeekendOutingRecord> get copyWith => __$WeekendOutingRecordCopyWithImpl<_WeekendOutingRecord>(this, _$identity);
 
-
+@override
+Map<String, dynamic> toJson() {
+  return _$WeekendOutingRecordToJson(this, );
+}
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _WeekendOutingRecord&&(identical(other.serial, serial) || other.serial == serial)&&(identical(other.hostelBlock, hostelBlock) || other.hostelBlock == hostelBlock)&&(identical(other.roomNumber, roomNumber) || other.roomNumber == roomNumber)&&(identical(other.place, place) || other.place == place)&&(identical(other.purpose, purpose) || other.purpose == purpose)&&(identical(other.timeSlot, timeSlot) || other.timeSlot == timeSlot)&&(identical(other.date, date) || other.date == date)&&(identical(other.status, status) || other.status == status)&&(identical(other.passId, passId) || other.passId == passId)&&(identical(other.cancelId, cancelId) || other.cancelId == cancelId));
 }
 
-
+@JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode => Object.hash(runtimeType,serial,hostelBlock,roomNumber,place,purpose,timeSlot,date,status,passId,cancelId);
 

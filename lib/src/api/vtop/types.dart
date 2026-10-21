@@ -103,25 +103,16 @@ sealed class CalendarEntry with _$CalendarEntry {
 
 enum ClassKind { theory, lab }
 
-class CourseFileInfo {
-  final String contentDisposition;
-  final String contentType;
+@freezed
+@meta.immutable
+sealed class CourseFileInfo with _$CourseFileInfo {
+  const factory CourseFileInfo({
+    required String contentDisposition,
+    required String contentType,
+  }) = _CourseFileInfo;
 
-  const CourseFileInfo({
-    required this.contentDisposition,
-    required this.contentType,
-  });
-
-  @override
-  int get hashCode => contentDisposition.hashCode ^ contentType.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CourseFileInfo &&
-          runtimeType == other.runtimeType &&
-          contentDisposition == other.contentDisposition &&
-          contentType == other.contentType;
+  factory CourseFileInfo.fromJson(Map<String, dynamic> json) =>
+      _$CourseFileInfoFromJson(json);
 }
 
 @freezed
@@ -134,6 +125,9 @@ sealed class CourseLecture with _$CourseLecture {
     required String topic,
     required List<CourseMaterial> materials,
   }) = _CourseLecture;
+
+  factory CourseLecture.fromJson(Map<String, dynamic> json) =>
+      _$CourseLectureFromJson(json);
 }
 
 @freezed
@@ -141,6 +135,9 @@ sealed class CourseLecture with _$CourseLecture {
 sealed class CourseMaterial with _$CourseMaterial {
   const factory CourseMaterial({required String label, required String path}) =
       _CourseMaterial;
+
+  factory CourseMaterial.fromJson(Map<String, dynamic> json) =>
+      _$CourseMaterialFromJson(json);
 }
 
 @freezed
@@ -157,6 +154,9 @@ sealed class CoursePageClass with _$CoursePageClass {
     required String faculty,
     required String facultySchool,
   }) = _CoursePageClass;
+
+  factory CoursePageClass.fromJson(Map<String, dynamic> json) =>
+      _$CoursePageClassFromJson(json);
 }
 
 @freezed
@@ -168,6 +168,9 @@ sealed class CoursePageClasses with _$CoursePageClasses {
     required List<CoursePageClass> classes,
     required BigInt updateTime,
   }) = _CoursePageClasses;
+
+  factory CoursePageClasses.fromJson(Map<String, dynamic> json) =>
+      _$CoursePageClassesFromJson(json);
 }
 
 @freezed
@@ -179,6 +182,9 @@ sealed class CoursePageCourse with _$CoursePageCourse {
     required String title,
     required String courseType,
   }) = _CoursePageCourse;
+
+  factory CoursePageCourse.fromJson(Map<String, dynamic> json) =>
+      _$CoursePageCourseFromJson(json);
 }
 
 @freezed
@@ -189,6 +195,9 @@ sealed class CoursePageCourses with _$CoursePageCourses {
     required List<CoursePageCourse> courses,
     required BigInt updateTime,
   }) = _CoursePageCourses;
+
+  factory CoursePageCourses.fromJson(Map<String, dynamic> json) =>
+      _$CoursePageCoursesFromJson(json);
 }
 
 @freezed
@@ -205,6 +214,9 @@ sealed class CoursePageDetail with _$CoursePageDetail {
     required List<CourseLecture> lectures,
     required BigInt updateTime,
   }) = _CoursePageDetail;
+
+  factory CoursePageDetail.fromJson(Map<String, dynamic> json) =>
+      _$CoursePageDetailFromJson(json);
 }
 
 @freezed
@@ -306,6 +318,9 @@ sealed class GeneralOutingRecord with _$GeneralOutingRecord {
     required String passId,
     required String cancelId,
   }) = _GeneralOutingRecord;
+
+  factory GeneralOutingRecord.fromJson(Map<String, dynamic> json) =>
+      _$GeneralOutingRecordFromJson(json);
 }
 
 @freezed
@@ -532,6 +547,9 @@ sealed class OutingApplyResult with _$OutingApplyResult {
     required bool applied,
     required String message,
   }) = _OutingApplyResult;
+
+  factory OutingApplyResult.fromJson(Map<String, dynamic> json) =>
+      _$OutingApplyResultFromJson(json);
 }
 
 @freezed
@@ -541,6 +559,9 @@ sealed class OutingCancelResult with _$OutingCancelResult {
     required bool cancelled,
     required String message,
   }) = _OutingCancelResult;
+
+  factory OutingCancelResult.fromJson(Map<String, dynamic> json) =>
+      _$OutingCancelResultFromJson(json);
 }
 
 @freezed
@@ -548,6 +569,9 @@ sealed class OutingCancelResult with _$OutingCancelResult {
 sealed class OutingOption with _$OutingOption {
   const factory OutingOption({required String value, required String label}) =
       _OutingOption;
+
+  factory OutingOption.fromJson(Map<String, dynamic> json) =>
+      _$OutingOptionFromJson(json);
 }
 
 @freezed
@@ -562,6 +586,9 @@ sealed class OutingStudent with _$OutingStudent {
     required String roomNumber,
     required String parentContactNumber,
   }) = _OutingStudent;
+
+  factory OutingStudent.fromJson(Map<String, dynamic> json) =>
+      _$OutingStudentFromJson(json);
 }
 
 @freezed
@@ -734,4 +761,7 @@ sealed class WeekendOutingRecord with _$WeekendOutingRecord {
     required String passId,
     required String cancelId,
   }) = _WeekendOutingRecord;
+
+  factory WeekendOutingRecord.fromJson(Map<String, dynamic> json) =>
+      _$WeekendOutingRecordFromJson(json);
 }

@@ -7,6 +7,7 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
@@ -135,8 +136,11 @@ class StaleRefresher {
           course.courseId,
         ).future,
       );
+      final history = await repo.loadCache();
+      // A history matching the summary is complete; skip its request.
+      if (!historyNeedsRefresh(course, history)) continue;
       await step(
-        (await repo.loadCache())?.updateTime,
+        history?.updateTime,
         () => _ref
             .read(
               fullAttendanceProvider(

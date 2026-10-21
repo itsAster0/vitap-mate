@@ -52,4 +52,39 @@ void main() {
       expect(user.password, ' secret with spaces ');
     });
   });
+
+  group('registration number', () {
+    test('rides through toJson/fromJson', () {
+      final user = VtopUserEntity.configured(
+        username: 'TESTUSER',
+        password: 'secret',
+        semesterId: 'semester',
+      ).withRegistrationNumber('22BCE0001');
+      expect(user.registrationNumber, '22BCE0001');
+      final back = VtopUserEntity.fromJson(user.toJson());
+      expect(back.registrationNumber, '22BCE0001');
+    });
+
+    test('is unknown until a login provides it', () {
+      final user = VtopUserEntity.configured(
+        username: 'TESTUSER',
+        password: 'secret',
+        semesterId: 'semester',
+      );
+      expect(user.registrationNumber, isNull);
+    });
+
+    test('is dropped when the credentials change, learnt again on next login',
+        () {
+      final user = VtopUserEntity.configured(
+        username: 'TESTUSER',
+        password: 'secret',
+        semesterId: 'semester',
+      ).withRegistrationNumber('22BCE0001');
+      expect(user.withCredentials('TESTUSER', 'new').registrationNumber,
+          isNull);
+      // The semester changing keeps the known number.
+      expect(user.withSemester('other').registrationNumber, '22BCE0001');
+    });
+  });
 }

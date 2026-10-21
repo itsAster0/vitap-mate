@@ -27,11 +27,55 @@ fn course_row(cells: &[ElementRef<'_>]) -> MarksRecord {
     }
 }
 
+/// Pieces of a title for a natural order: "Experiment-2" before
+/// "Experiment-10", case ignored.
+fn natural_key(title: &str) -> Vec<(u8, u64, String)> {
+    let mut key = Vec::new();
+    let mut chars = title.chars().peekable();
+    while let Some(&c) = chars.peek() {
+        let digits = c.is_ascii_digit();
+        let mut piece = String::new();
+        while let Some(&c) = chars.peek() {
+            if c.is_ascii_digit() != digits {
+                break;
+            }
+            piece.push(c);
+            chars.next();
+        }
+        key.push(if digits {
+            (0, piece.parse().unwrap_or(u64::MAX), String::new())
+        } else {
+            (1, 0, piece.to_lowercase())
+        });
+    }
+    key
+}
+
+/// VTOP lists a course's marks in a different order from one fetch to the
+/// next; a fixed order keeps the data (and its hash) the same when nothing
+/// changed. Rows are numbered again in that order.
+fn in_fixed_order(mut marks: Vec<MarksRecordEach>) -> Vec<MarksRecordEach> {
+    marks.sort_by_cached_key(|m| {
+        (
+            natural_key(&m.markstitle),
+            natural_key(&m.maxmarks),
+            natural_key(&m.weightage),
+            m.scoredmark.clone(),
+            m.status.clone(),
+            m.remark.clone(),
+        )
+    });
+    for (index, mark) in marks.iter_mut().enumerate() {
+        mark.serial = (index + 1).to_string();
+    }
+    marks
+}
+
 fn mark_rows(container: Option<&ElementRef<'_>>) -> Vec<MarksRecordEach> {
     let Some(container) = container else {
         return Vec::new();
     };
-    container
+    let rows = container
         .select(&MARK_ROW)
         .map(|row| {
             let cells: Vec<_> = row.select(&TD).collect();
@@ -47,7 +91,8 @@ fn mark_rows(container: Option<&ElementRef<'_>>) -> Vec<MarksRecordEach> {
                 remark: cell(7),
             }
         })
-        .collect()
+        .collect();
+    in_fixed_order(rows)
 }
 
 pub fn parse_marks(html: &str, sem: &str) -> MarksData {

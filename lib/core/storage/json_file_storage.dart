@@ -7,7 +7,11 @@ class JsonFileStorage {
   final String username;
   late final Future<Directory> _storageDir = _initStorageDir();
 
-  JsonFileStorage({required this.username});
+  /// Where the per-user folders go; the app support directory by default.
+  final Future<Directory> Function() _root;
+
+  JsonFileStorage({required this.username, Future<Directory> Function()? root})
+    : _root = root ?? getApplicationSupportDirectory;
 
   String _normalize(String value) {
     return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
@@ -21,7 +25,7 @@ class JsonFileStorage {
   }
 
   Future<Directory> _getUserDir(String name, {bool create = true}) async {
-    final root = await getApplicationSupportDirectory();
+    final root = await _root();
     final safeUser = _normalize(username.isEmpty ? 'NO_USERNAME' : username);
     final dir = Directory('${root.path}/$name/$safeUser');
     if (create && !await dir.exists()) {
@@ -60,14 +64,24 @@ class JsonFileStorage {
     if (!await file.exists()) return null;
     final raw = await file.readAsString();
     if (raw.trim().isEmpty) return null;
-    final decoded = jsonDecode(raw);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(raw);
+    } on FormatException {
+      // A file cut short (from before writes were atomic) is a cache miss.
+      return null;
+    }
     if (decoded is Map<String, dynamic>) return decoded;
     return null;
   }
 
+  /// Writes beside the file, then renames over it, so a write cut short
+  /// (the app killed mid-sync) leaves the old file instead of half a new one.
   Future<void> writeJson(String key, Map<String, dynamic> data) async {
     final file = await _fileFor(key);
-    await file.writeAsString(jsonEncode(data), flush: true);
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsString(jsonEncode(data), flush: true);
+    await temp.rename(file.path);
   }
 
   Future<void> delete(String key) async {

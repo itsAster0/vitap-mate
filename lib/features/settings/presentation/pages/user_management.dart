@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/core/providers/vtop_proxy.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -446,6 +447,7 @@ class UserPassChange extends HookConsumerWidget {
                                 final client = await getVtopClient(
                                   username: newUsername,
                                   password: newPassword,
+                                  baseUrl: await currentVtopBaseUrl(),
                                 );
                                 if (!context.mounted) return;
                                 await loginWithSecurityOtpPrompt(

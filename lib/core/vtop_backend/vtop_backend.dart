@@ -1,60 +1,15 @@
-import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
 
-/// Where VTOP data comes from. Repositories fetch through this and do not
-/// know whether the page is fetched and parsed on the device ([LocalVtopBackend])
-/// or by a vtop-server ([RemoteVtopBackend]).
-///
-/// Login always happens on the device; a remote backend reuses the device's
-/// VTOP session cookie.
+/// Where VTOP data comes from. Data sources fetch through this and do not
+/// know how the page is fetched ([LocalVtopBackend]: the phone's client,
+/// to VTOP or through the server's proxy). Pages are described once, in
+/// `vtop_queries.dart`; no backend knows their names.
 abstract interface class VtopBackend {
-  /// Short name for logs: `local` or `server`.
+  /// Short name for logs.
   String get name;
 
-  /// Fetches [pages] for [semesterId] ahead of the individual calls, when the
-  /// backend can do that more cheaply in one go (vtop-server's
-  /// `/v1/refresh`). The following fetch calls then use the results. A
-  /// no-op for the local backend.
-  Future<void> prefetch(String semesterId, Set<VtopPage> pages);
+  Future<T> fetch<T>(VtopQuery<T> query);
 
-  Future<SemesterData> semesters();
-  Future<AttendanceData> attendance(String semesterId);
-  Future<FullAttendanceData> fullAttendance({
-    required String semesterId,
-    required String courseId,
-    required String courseType,
-  });
-  Future<TimetableData> timetable(String semesterId);
-  Future<MarksData> marks(String semesterId);
-  Future<ExamScheduleData> examSchedule(String semesterId);
-
-  /// Every month of the semester's academic calendar.
-  Future<AcademicCalendarData> academicCalendar(String semesterId);
-  Future<GradeViewData> gradeView(String semesterId);
-  Future<GradeDetailsData> gradeViewDetails({
-    required String semesterId,
-    required String courseId,
-  });
-  Future<GradeHistoryData> gradeHistory();
-
-  /// [date] is `DD/MM/YYYY`.
-  Future<BiometricData> biometricHistory(String date);
-}
-
-/// Pages [VtopBackend.prefetch] can fetch ahead.
-enum VtopPage {
-  semesters('semesters'),
-  attendance('attendance'),
-  timetable('timetable'),
-  marks('marks'),
-  examSchedule('exam_schedule'),
-  grades('grades'),
-
-  /// Per-class attendance of every course (one VTOP request per course on
-  /// the server, but a single round trip for the phone).
-  fullAttendance('full_attendance');
-
-  const VtopPage(this.serverName);
-
-  /// The part name vtop-server's `/v1/refresh` uses.
-  final String serverName;
+  /// Changes VTOP. Never retried except after an expired session.
+  Future<T> run<T>(VtopAction<T> action);
 }

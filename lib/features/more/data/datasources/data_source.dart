@@ -2,6 +2,7 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 
 class ExamScheduleDataSource {
@@ -41,7 +42,7 @@ class ExamScheduleDataSource {
       action: 'fetchExamSchedule semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_fetchSchedule_$semid',
-        () async => _backend().examSchedule(semid),
+        () async => _backend().fetch(VtopQueries.examSchedule(semid)),
       ),
     );
   }
@@ -80,7 +81,7 @@ class MarksDataSource {
       action: 'fetchMarks semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_marks_$semid',
-        () async => _backend().marks(semid),
+        () async => _backend().fetch(VtopQueries.marks(semid)),
       ),
     );
   }
@@ -132,15 +133,24 @@ class GradesDataSource {
     );
   }
 
-  Future<void> saveGradeDetails(GradeDetailsData data, String semid) async {
-    await _globalAsyncQueue.run(
-      'toStorage_grades_details_${semid}_${data.courseId}',
-      () async {
-        final current = await _storage.readJson('grades_details_$semid') ?? {};
-        current[data.courseId] = data.toJson();
-        await _storage.writeJson('grades_details_$semid', current);
-      },
+  /// Every course's details share one file per semester, so saves take
+  /// turns; two at once would each write back what the other had not seen.
+  Future<void> _gradeDetailsWrites = Future.value();
+
+  Future<void> saveGradeDetails(GradeDetailsData data, String semid) {
+    final write = _gradeDetailsWrites.then(
+      (_) => _globalAsyncQueue.run(
+        'toStorage_grades_details_${semid}_${data.courseId}',
+        () async {
+          final current =
+              await _storage.readJson('grades_details_$semid') ?? {};
+          current[data.courseId] = data.toJson();
+          await _storage.writeJson('grades_details_$semid', current);
+        },
+      ),
     );
+    _gradeDetailsWrites = write.catchError((_) {});
+    return write;
   }
 
   Future<GradeViewData> fetchGradeView(String semid) async {
@@ -149,7 +159,7 @@ class GradesDataSource {
       action: 'fetchGradeView semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_grades_$semid',
-        () async => _backend().gradeView(semid),
+        () async => _backend().fetch(VtopQueries.grades(semid)),
       ),
     );
   }
@@ -163,8 +173,9 @@ class GradesDataSource {
       action: 'fetchGradeDetails semid=$semid courseId=$courseId',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_details_${semid}_$courseId',
-        () async =>
-            _backend().gradeViewDetails(semesterId: semid, courseId: courseId),
+        () async => _backend().fetch(
+          VtopQueries.gradeDetails(semid, courseId: courseId),
+        ),
       ),
     );
   }
@@ -231,7 +242,7 @@ class GradeHistoryDataSource {
       action: 'fetchGradeHistory',
       run: () => _globalAsyncQueue.run(
         'vtop_grade_history',
-        () async => _backend().gradeHistory(),
+        () async => _backend().fetch(VtopQueries.gradeHistory()),
       ),
     );
   }
@@ -274,7 +285,7 @@ class BiometricHistoryDataSource {
       action: 'fetchBiometricHistory date=$date',
       run: () => _globalAsyncQueue.run(
         'vtop_biometric_history_$date',
-        () async => _backend().biometricHistory(date),
+        () async => _backend().fetch(VtopQueries.biometric(date)),
       ),
     );
   }

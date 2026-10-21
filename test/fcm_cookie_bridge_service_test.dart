@@ -106,7 +106,7 @@ void main() {
         bridgeCredentialsPayload(
           wantCredentials: false,
           serverSignIn: true,
-          username: 'yaswanth314',
+          username: 'student123',
           password: 'pw',
           forwarding: true,
         ),
@@ -119,7 +119,7 @@ void main() {
         bridgeCredentialsPayload(
           wantCredentials: true,
           serverSignIn: true,
-          username: 'yaswanth314',
+          username: 'student123',
           password: 'pw',
           forwarding: false,
         ),
@@ -132,11 +132,11 @@ void main() {
         bridgeCredentialsPayload(
           wantCredentials: true,
           serverSignIn: true,
-          username: ' yaswanth314 ',
+          username: ' student123 ',
           password: 'pw',
           forwarding: true,
         ),
-        {'username': 'yaswanth314', 'password': 'pw'},
+        {'username': 'student123', 'password': 'pw'},
       );
     });
   });
@@ -146,7 +146,7 @@ void main() {
       bridgeCredentialsPayload(
         wantCredentials: true,
         serverSignIn: false,
-        username: 'yaswanth314',
+        username: 'student123',
         password: 'pw',
         forwarding: true,
       ),

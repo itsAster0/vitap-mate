@@ -13,6 +13,7 @@ import 'package:vitapmate/features/background/stale_refresh.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/widgets/timetable_view_toggle_button.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
 
 class ShellLayout extends HookConsumerWidget {
   final Widget child;
@@ -217,8 +218,13 @@ Widget _buildHeader(
       case "notification-management":
         data = "Notifications";
         break;
-      case "logs":
-        data = "Logs";
+      case "debug":
+        data = switch (path.split('/').last) {
+          'activity' => 'Activity',
+          'diagnostics' => 'Diagnostics',
+          'logs' => 'Logs',
+          _ => 'Debug',
+        };
         break;
       case "exam_schedule":
         data = "Exam Schedule";
@@ -235,10 +241,8 @@ Widget _buildHeader(
       case "outing":
         data = path.endsWith('/pass') ? "Outing Pass" : "Outing";
         break;
-      case "connected-apps":
-        data = path.endsWith('/chrome-extension')
-            ? "Browser extension"
-            : "Connected apps";
+      case "server":
+        data = serverHeaderTitle(path);
         break;
       case "gpa_calculator":
         data = "GPA Planner";

@@ -48,6 +48,7 @@ keystore.properties
 /android/app/profile
 /android/app/release
 /android/fastlane/key.json
+/android/fastlane/report.xml
 /android/app/google-services.json
 .env.json
 

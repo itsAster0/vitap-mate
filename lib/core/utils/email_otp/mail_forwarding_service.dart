@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart'
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
+import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/src/api/mail_otp.dart';
@@ -199,7 +199,7 @@ class MailOtpPayload {
   }
 }
 
-class MailForwardingException implements Exception {
+class MailForwardingException implements Exception, UnknownDeviceError {
   const MailForwardingException(this.code, this.message, {this.statusCode});
 
   final String code;
@@ -211,6 +211,10 @@ class MailForwardingException implements Exception {
 
   /// The student already has another address; join that one instead.
   bool get addressExists => code == 'address_exists';
+
+  /// The edge does not know this install; see [isUnknownDevice].
+  @override
+  bool get unknownDevice => isUnknownDevice(code, message, statusCode);
 
   @override
   String toString() => message;
@@ -262,7 +266,7 @@ Future<void> handleMailOtpEvent(EdgeEvent event) async {
 class MailForwardingService {
   MailForwardingService({
     http.Client? client,
-    String baseUrl = vtopEdgeBaseUrl,
+    String? baseUrl,
     MailForwardingStore store = const SecureMailForwardingStore(),
     EdgeDeviceService? devices,
     Future<String?> Function() deviceLabel = currentDeviceLabel,
@@ -276,7 +280,9 @@ class MailForwardingService {
        _keypair = keypair;
 
   final http.Client _client;
-  final String _baseUrl;
+
+  /// Fixed for tests; otherwise the server URL in use at each call.
+  final String? _baseUrl;
   final MailForwardingStore _store;
   final EdgeDeviceService _devices;
   final Future<String?> Function() _deviceLabel;
@@ -291,7 +297,8 @@ class MailForwardingService {
     Map<String, dynamic> body,
   ) async {
     try {
-      return await edgePost(_client, _baseUrl, '/v1/mail-otp/$path', body);
+      final base = _baseUrl ?? await currentServerUrl();
+      return await edgePost(_client, base, '/v1/mail-otp/$path', body);
     } on EdgeException catch (error) {
       throw MailForwardingException(
         error.code,
@@ -301,10 +308,14 @@ class MailForwardingService {
     }
   }
 
-  /// This install on the edge, registered first if needed.
-  Future<EdgeDevice> _device(String fcmToken) async {
+  /// Runs [call] with this install, registering it again when the edge
+  /// lost it (see [EdgeDeviceService.withInstall]).
+  Future<T> _withDevice<T>(
+    String fcmToken,
+    Future<T> Function(EdgeDevice device) call,
+  ) async {
     try {
-      return await _devices.ensure(fcmToken);
+      return await _devices.withInstall(fcmToken, call);
     } on EdgeException catch (error) {
       throw MailForwardingException(
         error.code,
@@ -318,14 +329,16 @@ class MailForwardingService {
   /// previous one on this phone.
   Future<MailForwarding> register({required String fcmToken}) async {
     final keypair = _keypair();
-    final device = await _device(fcmToken);
     final label = await _deviceLabel();
-    final body = await _post('register', {
-      'publicKey': keypair.publicKey,
-      'deviceId': device.id,
-      'deviceSecret': device.secret,
-      'label': ?label,
-    });
+    final body = await _withDevice(
+      fcmToken,
+      (device) => _post('register', {
+        'publicKey': keypair.publicKey,
+        'deviceId': device.id,
+        'deviceSecret': device.secret,
+        'label': ?label,
+      }),
+    );
     final id = body['id'], address = body['address'], secret = body['secret'];
     if (id is! String || address is! String || secret is! String) {
       throw const MailForwardingException(
@@ -369,17 +382,19 @@ class MailForwardingService {
     required String fcmToken,
   }) async {
     final keypair = _keypair();
-    final device = await _device(fcmToken);
     final label = await _deviceLabel();
     final Map<String, dynamic> body;
     try {
-      body = await _post('reclaim', {
-        'session': {'cookies': cookies},
-        'publicKey': keypair.publicKey,
-        'deviceId': device.id,
-        'deviceSecret': device.secret,
-        'label': ?label,
-      });
+      body = await _withDevice(
+        fcmToken,
+        (device) => _post('reclaim', {
+          'session': {'cookies': cookies},
+          'publicKey': keypair.publicKey,
+          'deviceId': device.id,
+          'deviceSecret': device.secret,
+          'label': ?label,
+        }),
+      );
     } on MailForwardingException catch (error) {
       if (error.mailboxGone) return null;
       rethrow;

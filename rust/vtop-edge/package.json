@@ -1,0 +1,24 @@
+{
+  "name": "vtop-edge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p .",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "fflate": "0.8.2",
+    "postal-mime": "4.0.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261001.1",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3",
+    "wrangler": "4.147.0"
+  }
+}

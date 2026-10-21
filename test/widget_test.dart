@@ -192,7 +192,7 @@ void main() {
     expect(find.textContaining('Connected · '), findsNothing);
 
     const session = EmailOtpOAuthSession(
-      email: 'student.24mic7076@vitapstudent.ac.in',
+      email: 'student.23abc4567@vitapstudent.ac.in',
       accessToken: 'access',
       refreshToken: 'refresh',
       scopes: ['https://www.googleapis.com/auth/gmail.modify'],
@@ -214,7 +214,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 2100));
 
     expect(
-      find.text('Connected · student.24mic7076@vitapstudent.ac.in'),
+      find.text('Connected · student.23abc4567@vitapstudent.ac.in'),
       findsOneWidget,
     );
     expect(find.text('Test Gmail'), findsOneWidget);

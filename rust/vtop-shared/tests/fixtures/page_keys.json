@@ -1,0 +1,7 @@
+[
+  {"name": "timetable", "args": {}, "key": "timetable"},
+  {"name": "grade_details", "args": {"course_id": "CSE1001"}, "key": "grade_details?course_id=CSE1001"},
+  {"name": "full_attendance", "args": {"course_type": "ETH", "course_id": "AP2026001"}, "key": "full_attendance?course_id=AP2026001&course_type=ETH"},
+  {"name": "biometric", "args": {"date": "20/10/2026"}, "key": "biometric?date=20%2F10%2F2026"},
+  {"name": "course_file_info", "args": {"path": "a b/c?d=e&f%g~é"}, "key": "course_file_info?path=a%20b%2Fc%3Fd%3De%26f%25g~%C3%A9"}
+]

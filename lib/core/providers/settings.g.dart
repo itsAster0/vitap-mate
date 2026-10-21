@@ -48,63 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'6952fe420022806fc96de428590553ebf43a7d51';
-
-/// The optional vtop-server. The API key is kept in plain preferences by
-/// choice; see rust/ARCHITECTURE.md.
-
-@ProviderFor(vtopServerSettings)
-final vtopServerSettingsProvider = VtopServerSettingsProvider._();
-
-/// The optional vtop-server. The API key is kept in plain preferences by
-/// choice; see rust/ARCHITECTURE.md.
-
-final class VtopServerSettingsProvider
-    extends
-        $FunctionalProvider<
-          VtopServerSettings,
-          VtopServerSettings,
-          VtopServerSettings
-        >
-    with $Provider<VtopServerSettings> {
-  /// The optional vtop-server. The API key is kept in plain preferences by
-  /// choice; see rust/ARCHITECTURE.md.
-  VtopServerSettingsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'vtopServerSettingsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$vtopServerSettingsHash();
-
-  @$internal
-  @override
-  $ProviderElement<VtopServerSettings> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  VtopServerSettings create(Ref ref) {
-    return vtopServerSettings(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(VtopServerSettings value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<VtopServerSettings>(value),
-    );
-  }
-}
-
-String _$vtopServerSettingsHash() =>
-    r'8f0025ef6f3ae780df89b4c11271de4a5282cba4';
+String _$settingsHash() => r'd467b7380ff98ca857369c39f9df8c989609da90';
 
 @ProviderFor(classesLeftUntil)
 final classesLeftUntilProvider = ClassesLeftUntilProvider._();
@@ -152,32 +96,35 @@ final class ClassesLeftUntilProvider
 
 String _$classesLeftUntilHash() => r'87980823782c1ba0b332a8cbbd5b428259e4a347';
 
-/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
-/// timetable and attendance; percentages and counts stay.
+/// Shows skip advice ("Can skip 3", "6 to spare", "need 2") in the
+/// timetable and attendance; off by default, when only percentages and
+/// counts show.
 
-@ProviderFor(hideSkipAdvice)
-final hideSkipAdviceProvider = HideSkipAdviceProvider._();
+@ProviderFor(showSkipAdvice)
+final showSkipAdviceProvider = ShowSkipAdviceProvider._();
 
-/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
-/// timetable and attendance; percentages and counts stay.
+/// Shows skip advice ("Can skip 3", "6 to spare", "need 2") in the
+/// timetable and attendance; off by default, when only percentages and
+/// counts show.
 
-final class HideSkipAdviceProvider extends $FunctionalProvider<bool, bool, bool>
+final class ShowSkipAdviceProvider extends $FunctionalProvider<bool, bool, bool>
     with $Provider<bool> {
-  /// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
-  /// timetable and attendance; percentages and counts stay.
-  HideSkipAdviceProvider._()
+  /// Shows skip advice ("Can skip 3", "6 to spare", "need 2") in the
+  /// timetable and attendance; off by default, when only percentages and
+  /// counts show.
+  ShowSkipAdviceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'hideSkipAdviceProvider',
+        name: r'showSkipAdviceProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$hideSkipAdviceHash();
+  String debugGetCreateSourceHash() => _$showSkipAdviceHash();
 
   @$internal
   @override
@@ -186,7 +133,7 @@ final class HideSkipAdviceProvider extends $FunctionalProvider<bool, bool, bool>
 
   @override
   bool create(Ref ref) {
-    return hideSkipAdvice(ref);
+    return showSkipAdvice(ref);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -198,7 +145,7 @@ final class HideSkipAdviceProvider extends $FunctionalProvider<bool, bool, bool>
   }
 }
 
-String _$hideSkipAdviceHash() => r'13c32575596a76c519bab5db4db9583c8692f6a1';
+String _$showSkipAdviceHash() => r'cdf7758648fadeedc727f0f8a21934da80d763e1';
 
 /// The floating refresh button on the screen edge.
 

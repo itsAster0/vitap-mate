@@ -239,7 +239,7 @@ void main() {
       'polls secure storage until a new personal session is saved',
       () async {
         const previous = EmailOtpOAuthSession(
-          email: 'student.24mic7076@vitapstudent.ac.in',
+          email: 'student.23abc4567@vitapstudent.ac.in',
           accessToken: 'old-access',
           refreshToken: 'old-refresh',
           scopes: ['https://www.googleapis.com/auth/gmail.modify'],
@@ -248,7 +248,7 @@ void main() {
           oauthClientId: 'personal.apps.googleusercontent.com',
         );
         const replacement = EmailOtpOAuthSession(
-          email: 'student.24mic7076@vitapstudent.ac.in',
+          email: 'student.23abc4567@vitapstudent.ac.in',
           accessToken: 'new-access',
           refreshToken: 'new-refresh',
           scopes: ['https://www.googleapis.com/auth/gmail.modify'],
@@ -398,7 +398,7 @@ void main() {
             projectId: 'project',
             clientSecret: 'secret',
           ),
-          expectedUsername: '24MIC7076',
+          expectedUsername: '23ABC4567',
           openBrowser: (authorizationUri) async {
             final redirect = Uri.parse(
               authorizationUri.queryParameters['redirect_uri']!,
@@ -442,7 +442,7 @@ void main() {
         final idTokenPayload = base64Url
             .encode(
               utf8.encode(
-                jsonEncode({'email': 'student.24mic7076@vitapstudent.ac.in'}),
+                jsonEncode({'email': 'student.23abc4567@vitapstudent.ac.in'}),
               ),
             )
             .replaceAll('=', '');
@@ -490,7 +490,7 @@ void main() {
             projectId: 'project',
             clientSecret: 'secret',
           ),
-          expectedUsername: '24MIC7076',
+          expectedUsername: '23ABC4567',
           openBrowser: (authorizationUri) async {
             final redirect = Uri.parse(
               authorizationUri.queryParameters['redirect_uri']!,

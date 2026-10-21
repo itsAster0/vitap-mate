@@ -23,7 +23,11 @@ pub fn mail_otp_generate_keypair() -> MailOtpKeypair {
 /// `ConfigurationError` with code `mail_otp_malformed` or
 /// `mail_otp_rejected` (wrong key or mailbox).
 #[flutter_rust_bridge::frb(sync)]
-pub fn mail_otp_open(secret: String, mailbox_id: String, sealed: String) -> Result<String, VtopError> {
+pub fn mail_otp_open(
+    secret: String,
+    mailbox_id: String,
+    sealed: String,
+) -> Result<String, VtopError> {
     let bytes = mail_seal::open(&secret, &mailbox_id, &sealed).map_err(|error| {
         VtopError::ConfigurationError(
             match error {

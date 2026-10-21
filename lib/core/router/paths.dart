@@ -10,6 +10,11 @@ class Paths {
   static final settings = "settings";
   static final gmailOtpSetup = "gmailOtpSetup";
   static final connectedApps = "connectedApps";
+  static final server = "server";
+  static final serverApps = "serverApps";
+  static final serverPhones = "serverPhones";
+  static final serverAddress = "serverAddress";
+  static final serverData = "serverData";
   static final gmailOauthGuide = "gmailOauthGuide";
   static final mailForwarding = "mailForwarding";
   static final studentProjects = "studentProjects";
@@ -27,7 +32,8 @@ class Paths {
   static final vtopweb = "vtopweb";
   static final notificationManagement = "notificationManagement";
   static final calendarSync = "calendarSync";
-  static final logs = "logs";
+  static final debug = "debug";
+  static final debugLogs = "debugLogs";
   static final gpaCalculator = "gpaCalculator";
   static final docs = "docs";
   static final docView = "docView";

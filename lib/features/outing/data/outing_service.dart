@@ -1,32 +1,38 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/utils/vtop_client_call.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
 final outingServiceProvider = Provider<OutingService>(OutingService.new);
 
-/// Outing requests go straight from the phone to VTOP, even when a
-/// vtop-server is configured: they change things on VTOP, and the device
-/// already holds the session.
+/// Outing forms, requests and passes, through the backend the mode says
+/// (the server or the phone).
 class OutingService {
   OutingService(this._ref);
 
   final Ref _ref;
 
-  /// An expired session is caught while loading the form, before anything
-  /// is posted, so the retry in [withVtopClient] is safe for applications.
-  Future<T> _run<T>(Future<T> Function(VtopClient client) call) =>
-      withVtopClient(_ref, call);
-
   Future<GeneralOutingData> general() =>
-      _run((client) => vtop_api.fetchGeneralOuting(client: client));
+      _ref.read(vtopBackendProvider).fetch(VtopQueries.generalOuting());
 
   Future<WeekendOutingData> weekend() =>
-      _run((client) => vtop_api.fetchWeekendOuting(client: client));
+      _ref.read(vtopBackendProvider).fetch(VtopQueries.weekendOuting());
+
+  /// Sends [action] once. It may have reached VTOP even when it fails (a
+  /// dropped connection, a timeout), so the list it changes is reloaded to
+  /// show what VTOP has.
+  Future<T> _act<T>(VtopAction<T> action, {required bool weekend}) async {
+    try {
+      return await _ref.read(vtopBackendProvider).run(action);
+    } catch (_) {
+      _ref.invalidate(weekend ? weekendOutingProvider : generalOutingProvider);
+      rethrow;
+    }
+  }
 
   Future<OutingApplyResult> applyGeneral({
     required String place,
@@ -34,9 +40,8 @@ class OutingService {
     required DateTime leaving,
     required DateTime returning,
     required String Function(DateTime) formatDate,
-  }) => _run(
-    (client) => vtop_api.applyGeneralOuting(
-      client: client,
+  }) => _act(
+    VtopActions.applyGeneralOuting(
       place: place,
       purpose: purpose,
       outDate: formatDate(leaving),
@@ -46,6 +51,7 @@ class OutingService {
       inHour: returning.hour,
       inMinute: returning.minute,
     ),
+    weekend: false,
   );
 
   Future<OutingApplyResult> applyWeekend({
@@ -54,15 +60,15 @@ class OutingService {
     required String date,
     required String timeSlot,
     required String contactNumber,
-  }) => _run(
-    (client) => vtop_api.applyWeekendOuting(
-      client: client,
+  }) => _act(
+    VtopActions.applyWeekendOuting(
       place: place,
       purpose: purpose,
       date: date,
       timeSlot: timeSlot,
       contactNumber: contactNumber,
     ),
+    weekend: true,
   );
 
   /// Cancels a request VTOP still lets the student delete; [cancelId] is
@@ -70,10 +76,11 @@ class OutingService {
   Future<OutingCancelResult> cancel({
     required bool weekend,
     required String cancelId,
-  }) => _run(
-    (client) => weekend
-        ? vtop_api.cancelWeekendOuting(client: client, bookingId: cancelId)
-        : vtop_api.cancelGeneralOuting(client: client, leaveId: cancelId),
+  }) => _act(
+    weekend
+        ? VtopActions.cancelWeekendOuting(cancelId)
+        : VtopActions.cancelGeneralOuting(cancelId),
+    weekend: weekend,
   );
 
   /// The pass as a document in Docs, downloaded the first time only, so it
@@ -86,22 +93,20 @@ class OutingService {
     repository: await _ref.read(docsRepositoryProvider.future),
     docId: 'outing-pass-$passId',
     download: () async => (
-      bytes: await _run(
-        (client) => vtop_api.fetchOutingPass(
-          client: client,
-          weekend: weekend,
-          passId: passId,
-        ),
-      ),
+      bytes: await _ref
+          .read(vtopBackendProvider)
+          .fetch(VtopQueries.outingPass(weekend: weekend, passId: passId)),
       fileName: '$name.pdf',
     ),
   );
 }
 
+// `read`, not `watch`: the service never changes, and it reloads these
+// after a failed action, which a watch would make a cycle.
 final generalOutingProvider = FutureProvider.autoDispose<GeneralOutingData>(
-  (ref) => ref.watch(outingServiceProvider).general(),
+  (ref) => ref.read(outingServiceProvider).general(),
 );
 
 final weekendOutingProvider = FutureProvider.autoDispose<WeekendOutingData>(
-  (ref) => ref.watch(outingServiceProvider).weekend(),
+  (ref) => ref.read(outingServiceProvider).weekend(),
 );

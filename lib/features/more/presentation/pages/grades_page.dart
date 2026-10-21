@@ -19,6 +19,7 @@ import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/features/more/presentation/providers/grades_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 class GradesPage extends HookConsumerWidget {
   const GradesPage({super.key});
@@ -322,10 +323,9 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                     children: [
                       Text(
                         c.grandTotal,
-                        style: typography.body.lg.copyWith(
+                        style: typography.body.lg.nums(
                           fontWeight: FontWeight.w500,
                           color: colors.foreground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       Text(
@@ -654,9 +654,7 @@ class _CutoffChip extends StatelessWidget {
             ),
           ],
         ),
-        style: context.theme.typography.body.xs.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
+        style: context.theme.typography.body.xs.nums(),
       ),
     );
   }
@@ -708,10 +706,9 @@ class _MarkRow extends StatelessWidget {
                     ),
                   ],
                 ),
-                style: typography.body.sm.copyWith(
+                style: typography.body.sm.nums(
                   fontWeight: FontWeight.w500,
                   color: colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -729,10 +726,7 @@ class _MarkRow extends StatelessWidget {
               const SizedBox(width: Space.md),
               Text(
                 '${mark.weightageMark.trim()} of ${mark.weightage.trim()}',
-                style: typography.body.xs.copyWith(
-                  color: colors.mutedForeground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: typography.body.xs.nums(color: colors.mutedForeground),
               ),
             ],
           ),
@@ -939,9 +933,8 @@ class _SemesterSummary extends StatelessWidget {
                       const SizedBox(width: Space.xs),
                       Text(
                         '${e.key} ${e.value}',
-                        style: typography.body.xs.copyWith(
+                        style: typography.body.xs.nums(
                           color: colors.mutedForeground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],

@@ -156,7 +156,7 @@ async fn live_bench() {
     let mut samples = Vec::new();
 
     let started = Instant::now();
-    let mut client = api::get_vtop_client(username.clone(), password.clone(), None)
+    let mut client = api::get_vtop_client(username.clone(), password.clone(), None, None)
         .await
         .expect("client");
     login_with_otp_prompt(&mut client).await.expect("login");
@@ -278,7 +278,7 @@ async fn live_bench() {
     // Cold start from a saved session: new client, restored cookie, first fetch.
     let snapshot = api::export_session_snapshot(&client, 0);
     let started = Instant::now();
-    let restored = api::get_vtop_client(username, password, Some(snapshot))
+    let restored = api::get_vtop_client(username, password, Some(snapshot), None)
         .await
         .expect("restored client");
     let restored_result = api::fetch_attendance(&restored, semester.clone()).await;
@@ -329,7 +329,7 @@ async fn live_hostel_dump() {
             .expect("session json")
     });
     let has_session = saved.is_some();
-    let mut client = api::get_vtop_client(username, password, saved)
+    let mut client = api::get_vtop_client(username, password, saved, None)
         .await
         .expect("client");
     if !has_session {
@@ -433,7 +433,7 @@ async fn live_course_page_dump() {
             .expect("session json")
     });
     let has_session = saved.is_some();
-    let mut client = api::get_vtop_client(username, password, saved)
+    let mut client = api::get_vtop_client(username, password, saved, None)
         .await
         .expect("client");
     if !has_session {

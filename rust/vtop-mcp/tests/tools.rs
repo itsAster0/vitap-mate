@@ -382,3 +382,16 @@ fn a_session_becomes_browser_cookies() {
         ])
     );
 }
+
+#[tokio::test]
+async fn bridge_calls_say_they_come_from_mcp() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/session/expire"))
+        .and(header("x-vtop-client", "mcp"))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&server)
+        .await;
+    client(&server).expire(KEY).await.unwrap();
+}

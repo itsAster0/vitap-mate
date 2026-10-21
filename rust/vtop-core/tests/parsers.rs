@@ -121,6 +121,40 @@ fn marks_fixture() {
 }
 
 #[test]
+fn marks_order_from_vtop_does_not_matter() {
+    // VTOP lists a course's marks in a different order from one fetch to
+    // the next, numbering the rows as it goes.
+    let html = fixture("marks");
+    let cat = "<tr class=\"tableContent-level1\"><td>1</td><td>CAT-1</td>";
+    let quiz = "<tr class=\"tableContent-level1\"><td>2</td><td>\tQuiz 1";
+    let (start, end) = (html.find(cat).unwrap(), html.find(quiz).unwrap());
+    let quiz_end = end + html[end..].find("</tr>").unwrap() + "</tr>".len();
+    let cat_row = &html[start..end];
+    let quiz_row = &html[end..quiz_end];
+    let swapped = format!(
+        "{}{}\n        {}{}",
+        &html[..start],
+        quiz_row.replacen("<td>2</td>", "<td>1</td>", 1),
+        cat_row.trim_end().replacen("<td>1</td>", "<td>2</td>", 1),
+        &html[quiz_end..],
+    );
+
+    let mut a = marks::parse_marks(&html, "S");
+    let mut b = marks::parse_marks(&swapped, "S");
+    (a.update_time, b.update_time) = (0, 0);
+    assert_eq!(
+        serde_json::to_value(&a).unwrap(),
+        serde_json::to_value(&b).unwrap()
+    );
+    let titles: Vec<_> = b.records[0]
+        .marks
+        .iter()
+        .map(|m| (m.serial.as_str(), m.markstitle.as_str()))
+        .collect();
+    assert_eq!(titles, [("1", "CAT-1"), ("2", "Quiz 1")]);
+}
+
+#[test]
 fn exam_schedule_fixture() {
     let data = exam_schedule::parse_schedule(&fixture("exam_schedule"), "AP2026271");
     assert_eq!(data.exams.len(), 2);

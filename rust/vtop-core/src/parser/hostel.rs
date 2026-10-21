@@ -410,7 +410,7 @@ mod tests {
 
     fn general_page(form_open: bool, rows: &str) -> String {
         let student = if form_open {
-            r##"<input value="24MIC7076" id="regNo" name="regNo" readonly />
+            r##"<input value="23ABC4567" id="regNo" name="regNo" readonly />
                <input value="A STUDENT" id="name" />
                <input value="2024751891" id="applicationNo" />
                <input value="MALE" id="gender" />
@@ -458,7 +458,7 @@ mod tests {
             format!(r##"<a data-url="/vtop/hostel/downloadLeavePass/{pass}">x</a>"##)
         };
         format!(
-            r##"<tr><td {ROW_STYLE}>1</td><td>24MIC7076</td><td>{place} </td>
+            r##"<tr><td {ROW_STYLE}>1</td><td>23ABC4567</td><td>{place} </td>
             <td>ugadi
                trip</td><td>2026-03-18 00:00:00.0</td><td>01:00 PM</td>
             <td>2026-03-22 00:00:00.0</td><td>09:00 PM</td><td> </td>
@@ -495,7 +495,7 @@ mod tests {
     fn reads_general_form_limits_from_the_page() {
         let data = parse_general_outing(&general_page(true, ""));
         let student = data.student.expect("form is open");
-        assert_eq!(student.registration_number, "24MIC7076");
+        assert_eq!(student.registration_number, "23ABC4567");
         assert_eq!(student.hostel_block, "MH-2");
         assert_eq!(data.out_hours, vec![6, 22]);
         // The commented-out 21 must not count.
@@ -526,7 +526,7 @@ mod tests {
 
     const WEEKEND_PAGE: &str = r##"
         <input type="hidden" id="jsonBom" value="" />
-        <input value="24MIC7076" id="regNo" />
+        <input value="23ABC4567" id="regNo" />
         <span style="font-size: 20px; color: red; text-align: center;"></span>
         <select name="outPlace" id="outPlace">
           <option value="Vijayawada">Vijayawada</option>
@@ -541,7 +541,7 @@ mod tests {
           <th>Room Number</th><th>Place Of Visit</th><th>Purpose Of Visit</th>
           <th>Time</th><!-- <th>Contact Number</th> --><th>Date</th>
           <th>Action</th><th>Status</th><th>Download OutPass</th></tr></thead>
-        <tbody><tr><td>1</td><td>24MIC7076</td><td>MH-4</td><td>211</td>
+        <tbody><tr><td>1</td><td>23ABC4567</td><td>MH-4</td><td>211</td>
           <td>Vijayawada</td><td>Movie </td><td>9:30 AM- 3:30PM</td>
           <td>2026-03-29</td><td></td>
           <td><span><span style="color: green;">Outing
@@ -617,7 +617,7 @@ mod tests {
     /// beside one it does not.
     fn cancellable_page(with_cancellable: bool) -> String {
         let cancellable = if with_cancellable {
-            r##"<tr><td>1</td><td>24MIC7076</td><td>Home</td><td>Holidays</td>
+            r##"<tr><td>1</td><td>23ABC4567</td><td>Home</td><td>Holidays</td>
               <td>2026-10-17 00:00:00.0</td><td>11:30 AM</td>
               <td>2026-10-21 00:00:00.0</td><td>08:00 PM</td>
               <td><span> <button id="eventsbtn" class="btn btn-danger btn-sm"
@@ -635,7 +635,7 @@ mod tests {
               <th>Purpose Of Visit</th><th>From Date</th><th>From Time</th>
               <th>To Date</th><th>To Time</th><th>Action</th><th>Status</th>
               <th>Download OutPass</th></tr></thead><tbody>{cancellable}
-              <tr><td>2</td><td>24MIC7076</td><td>Home</td><td>summer vacation</td>
+              <tr><td>2</td><td>23ABC4567</td><td>Home</td><td>summer vacation</td>
               <td>2026-05-16 00:00:00.0</td><td>06:00 AM</td>
               <td>2026-07-16 00:00:00.0</td><td>08:00 PM</td><td> </td>
               <td><span><span style="color: red;">Waiting for Warden's Approval</span></span></td>

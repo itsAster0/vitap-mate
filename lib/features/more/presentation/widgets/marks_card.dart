@@ -7,6 +7,7 @@ import 'package:vitapmate/core/utils/extention.dart';
 import 'package:vitapmate/core/utils/weightage_totals.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// Tone for a score percentage: strong, fine, or needs work.
 Tone scoreTone(BuildContext context, double percent) {
@@ -107,12 +108,9 @@ class MarksCard extends HookWidget {
                                 ),
                               ],
                             ),
-                            style: typography.body.lg.copyWith(
+                            style: typography.body.lg.nums(
                               height: 1.2,
                               fontWeight: FontWeight.w500,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                           if (hasMarks)
@@ -137,9 +135,8 @@ class MarksCard extends HookWidget {
                           totals.possible >= 100
                               ? 'All assessed'
                               : '${_fmt(100 - totals.possible)} marks to come',
-                          style: typography.body.xs.copyWith(
+                          style: typography.body.xs.nums(
                             color: colors.mutedForeground,
-                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
                       ),
@@ -336,10 +333,7 @@ class _AssessmentRow extends StatelessWidget {
                     ),
                   ],
                 ),
-                style: typography.body.sm.copyWith(
-                  color: colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: typography.body.sm.nums(color: colors.foreground),
               ),
             ],
           ),
@@ -356,10 +350,7 @@ class _AssessmentRow extends StatelessWidget {
               const SizedBox(width: Space.md),
               Text(
                 'Weighted ${mark.weightagemark} / ${mark.weightage}',
-                style: typography.body.xs.copyWith(
-                  color: colors.mutedForeground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: typography.body.xs.nums(color: colors.mutedForeground),
               ),
             ],
           ),

@@ -22,6 +22,7 @@ import 'package:vitapmate/features/attendance/presentation/widgets/attendance.da
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance_cal.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 enum _Tab { history, planner }
 
@@ -73,7 +74,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     final history = dataAsync.value;
     final sync = history == null ? null : HistorySync.of(record, history);
     final count = (standing.attended, standing.total);
-    final hideSkips = ref.watch(hideSkipAdviceProvider);
+    final hideSkips = !ref.watch(showSkipAdviceProvider);
     // Classes held since VTOP's last posted day, known only when the
     // history agrees with the summary (in sessions for labs).
     final timetable = ref.watch(timetableProvider).value;
@@ -446,11 +447,7 @@ class _Insights extends StatelessWidget {
     children: [
       TextSpan(
         text: '$value',
-        style: TextStyle(
-          fontWeight: FontWeight.w700,
-          color: tone.onSubtle,
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
+        style: numStyle(fontWeight: FontWeight.w700, color: tone.onSubtle),
       ),
       TextSpan(text: ' $label'),
     ],
@@ -656,16 +653,13 @@ class _MonthCalendar extends HookWidget {
                                     ),
                                     child: Text(
                                       '$day',
-                                      style: typography.body.xs.copyWith(
+                                      style: typography.body.xs.nums(
                                         fontWeight: tone != null
                                             ? FontWeight.w700
                                             : FontWeight.w400,
                                         color:
                                             tone?.onSubtle ??
                                             colors.mutedForeground,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
                                       ),
                                     ),
                                   ),
@@ -798,11 +792,10 @@ class _HistoryRow extends StatelessWidget {
               children: [
                 Text(
                   date == null ? '–' : DateFormat('d').format(date),
-                  style: typography.body.lg.copyWith(
+                  style: typography.body.lg.nums(
                     height: 1.1,
                     fontWeight: FontWeight.w700,
                     color: colors.foreground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 Text(
@@ -846,10 +839,7 @@ class _HistoryRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '$time · Slot ${record.slot}',
-                  style: typography.body.xs.copyWith(
-                    color: colors.mutedForeground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: typography.body.xs.nums(color: colors.mutedForeground),
                 ),
                 if (record.remark.trim().isNotEmpty)
                   Text(

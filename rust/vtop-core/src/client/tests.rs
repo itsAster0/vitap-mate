@@ -7,13 +7,23 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use super::*;
-use crate::inputs::SemesterId;
+use crate::inputs::{OutingPassId, SemesterId};
 
 const CONTENT_PAGE: &str = r#"<html><input name="_csrf" value="csrf-1">
 <input type="hidden" name="authorizedIDX" value="22BCE0001"></html>"#;
 const ATTENDANCE_PAGE: &str = r#"<table><tr><th>h</th></tr>
 <tr><td>1</td><td>PC</td><td>Maths</td><td>MAT1001</td><td>Dr X</td><td>10</td><td>12</td><td>83%</td><td>0</td><td>-</td>
 <td><a onclick="javascript:processViewAttendanceDetail('AP2026','22BCE0001','AP2026001','ETH');">view</a></td></tr></table>"#;
+
+/// A general outing list with one request VTOP still lets be cancelled.
+const OUTING_PAGE: &str = r#"<table id="BookingRequests"><thead><tr>
+<th>S.No</th><th>Registration Number</th><th>Place Of Visit</th><th>Purpose Of Visit</th>
+<th>From Date</th><th>From Time</th><th>To Date</th><th>To Time</th><th>Action</th>
+<th>Status</th><th>Download OutPass</th></tr></thead><tbody>
+<tr><td>1</td><td>22BCE0001</td><td>Home</td><td>Holidays</td><td>2026-10-17 00:00:00.0</td>
+<td>11:30 AM</td><td>2026-10-21 00:00:00.0</td><td>08:00 PM</td>
+<td><button onclick="deleteStudentBookingInfo(this.getAttribute('data-bookingId'));"
+data-bookingId="L1">x</button></td><td>Waiting</td><td></td></tr></tbody></table>"#;
 
 /// Counts requests per path and answers with canned pages.
 #[derive(Clone, Default)]
@@ -23,6 +33,10 @@ struct MockVtop {
     expired: Arc<Mutex<bool>>,
     /// How many upcoming requests get an HTTP 503 before normal answers.
     failures_left: Arc<Mutex<usize>>,
+    /// Signed-in pages answer 404, as VTOP does for some dead sessions.
+    not_found: Arc<Mutex<bool>>,
+    /// A path that always answers HTTP 503.
+    down: Arc<Mutex<Option<&'static str>>>,
 }
 
 impl MockVtop {
@@ -88,6 +102,12 @@ impl MockVtop {
                 return "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_string();
             }
         }
+        if *self.down.lock().unwrap() == Some(path) {
+            return "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_string();
+        }
+        if *self.not_found.lock().unwrap() && path == "/vtop/processViewStudentAttendance" {
+            return "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n".to_string();
+        }
         if *self.expired.lock().unwrap() && path != "/vtop/login" {
             return "HTTP/1.1 302 Found\r\nLocation: /vtop/login\r\nContent-Length: 0\r\n\r\n"
                 .to_string();
@@ -95,6 +115,7 @@ impl MockVtop {
         let body = match path {
             "/vtop/content" => CONTENT_PAGE,
             "/vtop/processViewStudentAttendance" => ATTENDANCE_PAGE,
+            "/vtop/hostel/StudentGeneralOuting" => OUTING_PAGE,
             _ => "<html>login</html>",
         };
         format!(
@@ -296,6 +317,23 @@ fn full_state(logged_in_at: Option<u64>) -> SessionState {
         otp_issued_at: None,
         logged_in_at,
     }
+}
+
+#[tokio::test]
+async fn a_404_on_a_signed_in_page_expires_the_session() {
+    // A session VTOP dropped can get 404 instead of the login page; callers
+    // then sign in again (the app) or try the next session (the server).
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&full_state(None))
+        .unwrap();
+    *mock.not_found.lock().unwrap() = true;
+
+    let result = client.attendance(&semester()).await;
+
+    assert_eq!(result.unwrap_err(), VtopError::SessionExpired);
 }
 
 #[tokio::test]
@@ -512,4 +550,25 @@ async fn verify_session_on_login_redirect_is_expired() {
         client.verify_session().await.unwrap_err(),
         VtopError::SessionExpired
     );
+}
+
+#[tokio::test]
+async fn outing_actions_are_sent_once() {
+    // A read that gets a 5xx is asked again; a post that changes VTOP is
+    // not, since VTOP may have acted on it before failing.
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&full_state(None))
+        .unwrap();
+    *mock.down.lock().unwrap() = Some("/vtop/hostel/deleteGeneralOutingInfo");
+
+    let result = client
+        .cancel_general_outing(&OutingPassId::parse("L1").unwrap())
+        .await;
+
+    assert!(result.is_err());
+    assert_eq!(mock.hits("/vtop/hostel/StudentGeneralOuting"), 1);
+    assert_eq!(mock.hits("/vtop/hostel/deleteGeneralOutingInfo"), 1);
 }

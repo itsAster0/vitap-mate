@@ -2,6 +2,7 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/core/utils/cached_repository.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -40,7 +41,7 @@ class AcademicCalendarDataSource {
       action: 'fetchAcademicCalendar semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_fetchAcademicCalendar_$semid',
-        () async => _backend().academicCalendar(semid),
+        () async => _backend().fetch(VtopQueries.academicCalendar(semid)),
       ),
     );
   }

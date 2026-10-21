@@ -3,6 +3,17 @@
   "name": "VITAP Mate – VTOP Sign In",
   "version": "1.4.0",
   "description": "Sign in to VTOP with an access key from the VITAP Mate app.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "vtop-signin@vitapmate",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": [
+          "authenticationInfo"
+        ]
+      }
+    }
+  },
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -15,6 +26,9 @@
   },
   "background": {
     "service_worker": "background.js",
+    "scripts": [
+      "background.js"
+    ],
     "type": "module"
   },
   "permissions": [

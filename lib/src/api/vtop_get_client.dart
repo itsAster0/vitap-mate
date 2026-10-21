@@ -14,10 +14,12 @@ Future<VtopClient> getVtopClient({
   required String username,
   required String password,
   PersistedVtopSession? persistedSession,
+  String? baseUrl,
 }) => RustLib.instance.api.crateApiVtopGetClientGetVtopClient(
   username: username,
   password: password,
   persistedSession: persistedSession,
+  baseUrl: baseUrl,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>

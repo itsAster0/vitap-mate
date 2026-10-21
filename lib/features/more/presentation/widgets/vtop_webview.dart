@@ -135,30 +135,13 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
     }
     _promptOpen = true;
     try {
-      final retry = await showFDialog<bool>(
-        context: context,
-        // Above the tab shell, so the keyboard inset is counted once.
-        useRootNavigator: true,
-        builder: (context, style, animation) => AppDialog(
-          animation: animation,
-          title: const Text('Login expired'),
-          body: const Text(
-            'VTOP could not restore your session. Try signing in again?',
-          ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              onPress: () => Navigator.of(context).pop(true),
-              child: const Text('Try again'),
-            ),
-          ],
-        ),
+      final retry = await confirm(
+        context,
+        title: 'Login expired',
+        body: 'VTOP could not restore your session. Try signing in again?',
+        action: 'Try again',
       );
-      if (retry == true && mounted) await _forceLogin();
+      if (retry && mounted) await _forceLogin();
     } finally {
       _promptOpen = false;
     }

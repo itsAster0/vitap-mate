@@ -26,7 +26,12 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/features/more/presentation/pages/gpa_calculator_page.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview.dart';
 import 'package:vitapmate/features/settings/presentation/pages/settings_page.dart';
-import 'package:vitapmate/features/settings/presentation/pages/connected_apps_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/server/server_address_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/server/server_data_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/server/server_apps_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/server/server_phones_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/debug_page.dart';
+import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/mail_forwarding_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
@@ -235,26 +240,7 @@ GoRouter router(Ref ref) {
                   GoRoute(
                     path: 'connected-apps',
                     name: Paths.connectedApps,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const ServerFeatureGate(
-                        feature: 'Connected apps',
-                        child: ConnectedAppsPage(),
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'chrome-extension',
-                        name: Paths.chromeExtension,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: const ServerFeatureGate(
-                            feature: 'The browser extension',
-                            child: ChromeExtensionPage(),
-                          ),
-                        ),
-                      ),
-                    ],
+                    redirect: (_, _) => serverPagePath,
                   ),
                   GoRoute(
                     path: 'gpa_calculator',
@@ -327,6 +313,80 @@ GoRouter router(Ref ref) {
                 ),
                 routes: [
                   GoRoute(
+                    path: 'server',
+                    name: Paths.server,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const ServerPage(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'apps',
+                        name: Paths.serverApps,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: const ServerAppsPage(),
+                        ),
+                        routes: [
+                          GoRoute(
+                            path: 'chrome-extension',
+                            name: Paths.chromeExtension,
+                            pageBuilder: (context, state) =>
+                                SlideFadePage<void>(
+                                  key: state.pageKey,
+                                  child: const ServerFeatureGate(
+                                    feature: 'The browser extension',
+                                    child: ChromeExtensionPage(),
+                                  ),
+                                ),
+                          ),
+                        ],
+                      ),
+                      GoRoute(
+                        path: 'phones',
+                        name: Paths.serverPhones,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: const ServerPhonesPage(),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'address',
+                        name: Paths.serverAddress,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: const ServerAddressPage(),
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'data',
+                        name: Paths.serverData,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: const ServerDataPage(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'debug',
+                    name: Paths.debug,
+                    pageBuilder: (context, state) => SlideFadePage<void>(
+                      key: state.pageKey,
+                      child: const DebugPage(),
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: 'logs',
+                        name: Paths.debugLogs,
+                        pageBuilder: (context, state) => SlideFadePage<void>(
+                          key: state.pageKey,
+                          child: LogsPage(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
                     path: 'calendar-sync',
                     name: Paths.calendarSync,
                     pageBuilder: (context, state) {
@@ -370,16 +430,6 @@ GoRouter router(Ref ref) {
                       return SlideFadePage<void>(
                         key: state.pageKey,
                         child: NotificationManagementPage(),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'logs',
-                    name: Paths.logs,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: LogsPage(),
                       );
                     },
                   ),

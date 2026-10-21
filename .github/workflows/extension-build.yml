@@ -22,6 +22,11 @@ jobs:
     defaults:
       run:
         working-directory: extension
+    # AMO API keys for signing the Firefox build. Without them the Firefox
+    # steps still lint, but nothing is signed or published.
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
 
     steps:
       - name: Check out repository
@@ -74,6 +79,37 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # AMO never signs the same version twice, so the Firefox copy gets the
+      # run number as a fourth version part.
+      - name: Prepare Firefox build
+        run: |
+          rm -rf dist-firefox
+          cp -r dist dist-firefox
+          version=$(jq -r .version dist/manifest.json)
+          jq --arg v "$version.$GITHUB_RUN_NUMBER" '.version = $v' \
+            dist/manifest.json > dist-firefox/manifest.json
+
+      - name: Lint for Firefox
+        run: pnpm exec web-ext lint --source-dir dist-firefox --self-hosted
+
+      # Unlisted: Mozilla signs it automatically and we host the .xpi ourselves.
+      - name: Sign for Firefox
+        if: env.AMO_JWT_ISSUER != ''
+        run: |
+          pnpm exec web-ext sign --source-dir dist-firefox --channel unlisted \
+            --artifacts-dir web-ext-artifacts \
+            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+          mv web-ext-artifacts/*.xpi extension.xpi
+
+      - name: Upload Firefox artifact
+        if: env.AMO_JWT_ISSUER != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-extension-firefox
+          path: extension/extension.xpi
+          if-no-files-found: error
+          retention-days: 30
+
       # Replaces extension.zip on the `extension-latest` release in place:
       # the app links to that release, so the link keeps working. The
       # hand-made `extension` release is left alone.
@@ -92,15 +128,22 @@ jobs:
             echo "Download \`extension.zip\`, unzip it, then in Chrome open \`chrome://extensions\`,"
             echo "turn on Developer mode and choose **Load unpacked** on the \`dist\` folder."
             echo "Updating: replace the folder and press the reload button on the extension's card."
+            if [ -f extension.xpi ]; then
+              echo
+              echo "Firefox: open \`extension.xpi\` in Firefox and accept the install prompt."
+            fi
           } > release-notes.md
 
+          assets=(extension.zip)
+          if [ -f extension.xpi ]; then assets+=(extension.xpi); fi
+
           if gh release view extension-latest >/dev/null 2>&1; then
-            gh release upload extension-latest extension.zip --clobber
+            gh release upload extension-latest "${assets[@]}" --clobber
             gh release edit extension-latest \
               --title "Browser extension ${version} (${short_sha})" \
               --notes-file release-notes.md
           else
-            gh release create extension-latest extension.zip \
+            gh release create extension-latest "${assets[@]}" \
               --target "$GITHUB_SHA" \
               --latest=false \
               --title "Browser extension ${version} (${short_sha})" \

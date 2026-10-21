@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vitapmate/core/theme/app_palette.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// Opens [url] outside the app; toasts when nothing can open it.
 Future<void> openExternalLink(BuildContext context, String url) async {
@@ -591,12 +592,10 @@ class CopyValue extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: (large ? typography.body.md : typography.body.sm)
-                      .copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: large ? 1 : null,
-                      ),
+                  style: (large ? typography.body.md : typography.body.sm).nums(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: large ? 1 : null,
+                  ),
                 ),
               ],
             ),

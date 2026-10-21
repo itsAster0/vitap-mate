@@ -2,7 +2,7 @@
 name = "vtop-shared"
 version = "0.1.0"
 edition = "2021"
-description = "Formats shared by the app, the edge Worker and the engine: no I/O, builds for native and wasm."
+description = "Formats shared by the app and the engine (the edge Worker keeps a TypeScript copy): no I/O, builds for native and wasm."
 
 [dependencies]
 aes-gcm = "0.10"

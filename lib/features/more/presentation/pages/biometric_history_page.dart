@@ -14,6 +14,7 @@ import 'package:vitapmate/core/widgets/data_updated_footer.dart';
 import 'package:vitapmate/features/more/presentation/providers/biometric_history_provider.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 class BiometricHistoryPage extends ConsumerStatefulWidget {
   const BiometricHistoryPage({super.key});
@@ -377,10 +378,9 @@ class _PunchRow extends StatelessWidget {
               padding: const EdgeInsets.only(top: Space.md),
               child: Text(
                 _hm(record.punchTime),
-                style: typography.body.sm.copyWith(
+                style: typography.body.sm.nums(
                   fontWeight: FontWeight.w500,
                   color: colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),

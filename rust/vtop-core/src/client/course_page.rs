@@ -187,7 +187,7 @@ impl VtopClient {
 
 /// VTOP's response headers for a course page download: what a browser
 /// knows when it hands a download to the system download manager.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct CourseFileInfo {
     /// Raw `Content-Disposition`, which carries the file name and extension
     /// the link itself does not show.

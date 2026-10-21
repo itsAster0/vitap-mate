@@ -143,7 +143,10 @@ export async function installCookies(
   await report("Setting cookies...");
   try {
     for (const cookie of cookies) {
-      await setCookieFromCookieEditorFormat(api, cookie);
+      // The sender's store id is Chrome's ("0"); Firefox names its stores
+      // differently and rejects it. Without one, the browser uses its own.
+      const { storeId: _, ...forThisBrowser } = cookie;
+      await setCookieFromCookieEditorFormat(api, forThisBrowser);
     }
   } catch (err) {
     try {

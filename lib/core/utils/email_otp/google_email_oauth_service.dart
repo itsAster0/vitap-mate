@@ -10,7 +10,11 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/core/utils/email_otp/email_otp_oauth_session.dart';
+import 'package:vitapmate/core/utils/email_otp/gmail_message.dart';
 import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
+
+export 'package:vitapmate/core/utils/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
@@ -86,149 +90,6 @@ Future<bool> emailOtpSetupNeeded(Ref ref) async {
   final flags = await ref.watch(featureFlagsControllerProvider.future);
   if (!await flags.isEnabled('2fa-email')) return false;
   return !await ref.watch(anyEmailOtpReadyProvider.future);
-}
-
-class EmailOtpSetupResult {
-  const EmailOtpSetupResult({
-    required this.success,
-    required this.message,
-    this.email,
-  });
-
-  final bool success;
-  final String message;
-  final String? email;
-}
-
-class LatestInfoEmail {
-  const LatestInfoEmail({
-    required this.receivedAt,
-    required this.subject,
-    required this.snippet,
-    this.otp,
-  });
-
-  final DateTime receivedAt;
-  final String subject;
-  final String snippet;
-  final String? otp;
-}
-
-enum EmailOtpAuthSource { sharedBuiltIn, personalByok }
-
-class EmailOtpOAuthSession {
-  const EmailOtpOAuthSession({
-    required this.email,
-    required this.accessToken,
-    required this.refreshToken,
-    required this.scopes,
-    required this.accessTokenExpiryEpochMs,
-    this.schemaVersion = 2,
-    this.authSource = EmailOtpAuthSource.sharedBuiltIn,
-    this.oauthClientId,
-    this.oauthClientSecret,
-  });
-
-  final String email;
-  final String accessToken;
-  final String refreshToken;
-  final List<String> scopes;
-  final int accessTokenExpiryEpochMs;
-  final int schemaVersion;
-  final EmailOtpAuthSource authSource;
-  final String? oauthClientId;
-  final String? oauthClientSecret;
-
-  String get authSourceLabel => switch (authSource) {
-    EmailOtpAuthSource.personalByok => 'Personal BYOK',
-    EmailOtpAuthSource.sharedBuiltIn => 'Shared fallback',
-  };
-
-  bool get hasGmailScope =>
-      scopes.contains('https://www.googleapis.com/auth/gmail.modify');
-
-  bool get isExpired => expiresWithin(const Duration(seconds: 30));
-
-  /// True when the access token is expired or will be within [margin].
-  bool expiresWithin(Duration margin) {
-    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
-    return accessTokenExpiryEpochMs <= now + margin.inMilliseconds;
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'accessToken': accessToken,
-      'refreshToken': refreshToken,
-      'scopes': scopes,
-      'accessTokenExpiryEpochMs': accessTokenExpiryEpochMs,
-      'schemaVersion': schemaVersion,
-      'authSource': authSource.name,
-      if (oauthClientId != null) 'oauthClientId': oauthClientId,
-      if (oauthClientSecret != null) 'oauthClientSecret': oauthClientSecret,
-    };
-  }
-
-  static EmailOtpOAuthSession? fromJson(Map<String, dynamic> raw) {
-    final email = (raw['email'] as String?)?.trim();
-    final accessToken = (raw['accessToken'] as String?)?.trim();
-    final refreshToken = (raw['refreshToken'] as String?)?.trim();
-    final expiry = raw['accessTokenExpiryEpochMs'];
-    final scopesRaw = raw['scopes'];
-    if (email == null ||
-        email.isEmpty ||
-        accessToken == null ||
-        accessToken.isEmpty ||
-        refreshToken == null ||
-        refreshToken.isEmpty ||
-        expiry is! int ||
-        scopesRaw is! List<dynamic>) {
-      return null;
-    }
-    final scopes = scopesRaw.whereType<String>().toList(growable: false);
-    final sourceName = raw['authSource'] as String?;
-    final authSource = EmailOtpAuthSource.values.firstWhere(
-      (value) => value.name == sourceName,
-      orElse: () => EmailOtpAuthSource.sharedBuiltIn,
-    );
-    return EmailOtpOAuthSession(
-      email: email,
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-      scopes: scopes,
-      accessTokenExpiryEpochMs: expiry,
-      schemaVersion: raw['schemaVersion'] is int
-          ? raw['schemaVersion'] as int
-          : 1,
-      authSource: authSource,
-      oauthClientId: (raw['oauthClientId'] as String?)?.trim(),
-      oauthClientSecret: (raw['oauthClientSecret'] as String?)?.trim(),
-    );
-  }
-
-  EmailOtpOAuthSession copyWith({
-    String? accessToken,
-    String? refreshToken,
-    List<String>? scopes,
-    int? accessTokenExpiryEpochMs,
-    int? schemaVersion,
-    EmailOtpAuthSource? authSource,
-    String? oauthClientId,
-    String? oauthClientSecret,
-  }) {
-    return EmailOtpOAuthSession(
-      email: email,
-      accessToken: accessToken ?? this.accessToken,
-      refreshToken: refreshToken ?? this.refreshToken,
-      scopes: scopes ?? this.scopes,
-      accessTokenExpiryEpochMs:
-          accessTokenExpiryEpochMs ?? this.accessTokenExpiryEpochMs,
-      schemaVersion: schemaVersion ?? this.schemaVersion,
-      authSource: authSource ?? this.authSource,
-      oauthClientId: oauthClientId ?? this.oauthClientId,
-      oauthClientSecret: oauthClientSecret ?? this.oauthClientSecret,
-    );
-  }
 }
 
 class GoogleEmailOtpAuthService {
@@ -375,11 +236,7 @@ class GoogleEmailOtpAuthService {
       );
       if (validationMessage != null) {
         await _revokeToken(tokens.refreshToken);
-        return EmailOtpSetupResult(
-          success: false,
-          message: validationMessage,
-          email: email,
-        );
+        return EmailOtpSetupResult.failed(validationMessage, email: email);
       }
 
       stage = 'checking Gmail access';
@@ -417,13 +274,12 @@ class GoogleEmailOtpAuthService {
           'Google access was approved, but it could not be saved securely on this device. Unlock the device, restart Vitap Mate, and retry.',
         );
       }
-      return EmailOtpSetupResult(
-        success: true,
-        message: 'Personal Gmail access is connected.',
+      return EmailOtpSetupResult.ok(
+        'Personal Gmail access is connected.',
         email: email,
       );
     } on GoogleDesktopOAuthException catch (error) {
-      return EmailOtpSetupResult(success: false, message: error.message);
+      return EmailOtpSetupResult.failed(error.message);
     } catch (error, stackTrace) {
       log(
         'Personal OAuth setup failed while $stage',
@@ -432,10 +288,7 @@ class GoogleEmailOtpAuthService {
         stackTrace: stackTrace,
       );
       debugPrint('Gmail BYOK failed while $stage (${error.runtimeType}).');
-      return EmailOtpSetupResult(
-        success: false,
-        message: _byokFailureMessage(stage, error),
-      );
+      return EmailOtpSetupResult.failed(_byokFailureMessage(stage, error));
     }
   }
 
@@ -453,9 +306,8 @@ class GoogleEmailOtpAuthService {
     required String expectedUsername,
   }) async {
     if (googleOauthClientId.isEmpty) {
-      return const EmailOtpSetupResult(
-        success: false,
-        message: 'Shared Google access is not configured in this build.',
+      return const EmailOtpSetupResult.failed(
+        'Shared Google access is not configured in this build.',
       );
     }
     try {
@@ -474,9 +326,8 @@ class GoogleEmailOtpAuthService {
         ),
       );
       if (identityTokens.accessToken == null) {
-        return const EmailOtpSetupResult(
-          success: false,
-          message: 'Google sign-in was cancelled.',
+        return const EmailOtpSetupResult.failed(
+          'Google sign-in was cancelled.',
         );
       }
 
@@ -485,9 +336,8 @@ class GoogleEmailOtpAuthService {
         idToken: identityTokens.idToken,
       );
       if (email == null || email.isEmpty) {
-        return const EmailOtpSetupResult(
-          success: false,
-          message: 'Could not read your Google account email.',
+        return const EmailOtpSetupResult.failed(
+          'Could not read your Google account email.',
         );
       }
       final validationMessage = _validateCollegeAccount(
@@ -495,15 +345,10 @@ class GoogleEmailOtpAuthService {
         expectedUsername: expectedUsername,
       );
       if (validationMessage != null) {
-        return EmailOtpSetupResult(
-          success: false,
-          message: validationMessage,
-          email: email,
-        );
+        return EmailOtpSetupResult.failed(validationMessage, email: email);
       }
-      return EmailOtpSetupResult(
-        success: true,
-        message: 'Email verified. Continue to token step.',
+      return EmailOtpSetupResult.ok(
+        'Email verified. Continue to token step.',
         email: email,
       );
     } catch (error, stackTrace) {
@@ -513,10 +358,7 @@ class GoogleEmailOtpAuthService {
         error: error,
         stackTrace: stackTrace,
       );
-      return EmailOtpSetupResult(
-        success: false,
-        message: _friendlyOauthError(error),
-      );
+      return EmailOtpSetupResult.failed(_friendlyOauthError(error));
     }
   }
 
@@ -524,9 +366,8 @@ class GoogleEmailOtpAuthService {
     required String email,
   }) async {
     if (googleOauthClientId.isEmpty) {
-      return const EmailOtpSetupResult(
-        success: false,
-        message: 'Shared Google access is not configured in this build.',
+      return const EmailOtpSetupResult.failed(
+        'Shared Google access is not configured in this build.',
       );
     }
     try {
@@ -549,9 +390,8 @@ class GoogleEmailOtpAuthService {
         ),
       );
       if (gmailTokens.accessToken == null) {
-        return const EmailOtpSetupResult(
-          success: false,
-          message: 'Gmail permission setup was cancelled.',
+        return const EmailOtpSetupResult.failed(
+          'Gmail permission setup was cancelled.',
         );
       }
       final grantedScopes = gmailTokens.scopes?.isNotEmpty == true
@@ -560,22 +400,19 @@ class GoogleEmailOtpAuthService {
       if (!grantedScopes.contains(
         'https://www.googleapis.com/auth/gmail.modify',
       )) {
-        return const EmailOtpSetupResult(
-          success: false,
-          message:
-              'Google sign-in completed, but Gmail access was not granted. Retry and approve the Gmail permission.',
+        return const EmailOtpSetupResult.failed(
+          'Google sign-in completed, but Gmail access was not granted. Retry and approve the Gmail permission.',
         );
       }
       try {
         await _verifyGmailAccess(gmailTokens.accessToken!);
       } on GoogleDesktopOAuthException catch (error) {
-        return EmailOtpSetupResult(success: false, message: error.message);
+        return EmailOtpSetupResult.failed(error.message);
       }
       final refreshToken = (gmailTokens.refreshToken ?? '').trim();
       if (refreshToken.isEmpty) {
-        return const EmailOtpSetupResult(
-          success: false,
-          message: 'Could not get a refresh token for Gmail access.',
+        return const EmailOtpSetupResult.failed(
+          'Could not get a refresh token for Gmail access.',
         );
       }
       final expiry =
@@ -594,9 +431,8 @@ class GoogleEmailOtpAuthService {
         key: _oauthStorageKey,
         value: jsonEncode(session.toJson()),
       );
-      return EmailOtpSetupResult(
-        success: true,
-        message: 'Email OTP autofetch is enabled.',
+      return EmailOtpSetupResult.ok(
+        'Email OTP autofetch is enabled.',
         email: email,
       );
     } catch (error, stackTrace) {
@@ -606,10 +442,7 @@ class GoogleEmailOtpAuthService {
         error: error,
         stackTrace: stackTrace,
       );
-      return EmailOtpSetupResult(
-        success: false,
-        message: _friendlyOauthError(error),
-      );
+      return EmailOtpSetupResult.failed(_friendlyOauthError(error));
     }
   }
 
@@ -723,7 +556,7 @@ class GoogleEmailOtpAuthService {
 
   /// VTOP's OTP from Gmail sent after [sinceUtc], or null when it has not
   /// arrived yet. Reading and parsing run in Rust (`vtop_core::gmail`), the
-  /// same code vtop-server uses; this side only supplies a fresh token.
+  /// same code the server engine uses; this side only supplies a fresh token.
   ///
   /// A rejected token is refreshed once and retried before Gmail is
   /// disconnected, since a 401 usually just means the token expired.
@@ -773,20 +606,6 @@ class GoogleEmailOtpAuthService {
     return found.code;
   }
 
-  /// An access token for vtop-server to read the OTP during a server login,
-  /// valid for at least [minValidity] (the server may wait a while for the
-  /// email). Null when Gmail is not connected.
-  Future<({String accessToken, int expiresAtUnix})?> accessForServerLogin({
-    Duration minValidity = const Duration(minutes: 3),
-  }) async {
-    final session = await refreshIfNeeded(minValidity: minValidity);
-    if (session == null || !session.hasGmailScope) return null;
-    return (
-      accessToken: session.accessToken,
-      expiresAtUnix: session.accessTokenExpiryEpochMs ~/ 1000,
-    );
-  }
-
   String? _gmailErrorCode(VtopError error) =>
       error.maybeWhen(configurationError: (code) => code, orElse: () => null);
 
@@ -828,30 +647,31 @@ class GoogleEmailOtpAuthService {
       listResponse.body,
       session.accessToken,
     );
-    if (latest == null || !_isFromVtopOtpSender(latest)) return null;
+    if (latest == null || !isFromVtopOtpSender(latest)) return null;
 
     final internalDateMs = int.tryParse('${latest['internalDate']}') ?? 0;
     final receivedAt = DateTime.fromMillisecondsSinceEpoch(
       internalDateMs,
       isUtc: true,
     );
-    final text = _extractMessageText(latest);
+    final text = gmailMessageText(latest);
     final collapsed = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     final snippet = collapsed.length > 500
         ? '${collapsed.substring(0, 500)}...'
         : collapsed;
     final otp = RegExp(r'(?<!\d)(\d{6})(?!\d)').firstMatch(text)?.group(1);
-    if (otp != null) {
-      await _handleReadOtpMessage(
-        latest,
-        session.accessToken,
+    final id = latest['id'] as String?;
+    if (otp != null && id != null && id.isNotEmpty) {
+      await _tidyUp(
+        accessToken: session.accessToken,
+        messageId: id,
         deleteAfterReading: deleteAfterReading,
       );
     }
 
     return LatestInfoEmail(
       receivedAt: receivedAt,
-      subject: _messageHeader(latest, 'subject') ?? '(no subject)',
+      subject: gmailHeader(latest, 'subject') ?? '(no subject)',
       snippet: snippet.isEmpty ? '(empty message)' : snippet,
       otp: otp,
     );
@@ -881,76 +701,6 @@ class GoogleEmailOtpAuthService {
     return message;
   }
 
-  Future<void> _markMessageAsRead(
-    Map<String, dynamic> message,
-    String accessToken,
-  ) async {
-    final id = message['id'] as String?;
-    if (id == null || id.isEmpty) return;
-    try {
-      final response = await _http.post(
-        Uri.parse(
-          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id/modify',
-        ),
-        headers: {
-          'Authorization': 'Bearer $accessToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'removeLabelIds': ['UNREAD'],
-        }),
-      );
-      if (response.statusCode != 200) {
-        log(
-          'Failed to mark OTP email as read (status ${response.statusCode}).',
-          name: 'email_otp.gmail',
-        );
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to mark OTP email as read',
-        name: 'email_otp.gmail',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
-  Future<void> _handleReadOtpMessage(
-    Map<String, dynamic> message,
-    String accessToken, {
-    required bool deleteAfterReading,
-  }) async {
-    if (!deleteAfterReading) {
-      await _markMessageAsRead(message, accessToken);
-      return;
-    }
-
-    final id = message['id'] as String?;
-    if (id == null || id.isEmpty) return;
-    try {
-      final response = await _http.post(
-        Uri.parse(
-          'https://gmail.googleapis.com/gmail/v1/users/me/messages/$id/trash',
-        ),
-        headers: {'Authorization': 'Bearer $accessToken'},
-      );
-      if (response.statusCode != 200) {
-        log(
-          'Failed to move OTP email to Trash (status ${response.statusCode}).',
-          name: 'email_otp.gmail',
-        );
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to move OTP email to Trash',
-        name: 'email_otp.gmail',
-        error: error,
-        stackTrace: stackTrace,
-      );
-    }
-  }
-
   Future<void> _verifyGmailAccess(String accessToken) async {
     final response = await _http
         .get(
@@ -975,28 +725,25 @@ class GoogleEmailOtpAuthService {
     }
     if (response.statusCode == 403) {
       final message = _gmailAccessFailureMessage(response);
-      final normalized = response.body.toLowerCase();
-      final apiCanBeEnabledWithoutReconnecting =
-          normalized.contains('accessnotconfigured') ||
-          normalized.contains('service_disabled') ||
-          normalized.contains('api has not been used') ||
-          normalized.contains('gmail api has not been used');
-      if (!apiCanBeEnabledWithoutReconnecting) {
+      // A disabled API can be enabled without reconnecting.
+      if (!_gmailApiDisabled(response.body.toLowerCase())) {
         await clearSession();
       }
       throw StateError(message);
     }
   }
 
+  static bool _gmailApiDisabled(String body) =>
+      body.contains('accessnotconfigured') ||
+      body.contains('service_disabled') ||
+      body.contains('api has not been used');
+
   String _gmailAccessFailureMessage(http.Response response) {
     final body = response.body.toLowerCase();
     if (response.statusCode == 401) {
       return 'Google authorization expired or was revoked. Reconnect Gmail.';
     }
-    if (body.contains('accessnotconfigured') ||
-        body.contains('service_disabled') ||
-        body.contains('api has not been used') ||
-        body.contains('gmail api has not been used')) {
+    if (_gmailApiDisabled(body)) {
       return 'The Gmail API is not enabled for this Google Cloud project. Enable Gmail API, wait a minute, then retry.';
     }
     if (body.contains('admin_policy_enforced') ||
@@ -1030,48 +777,35 @@ class GoogleEmailOtpAuthService {
     final byIdToken = _emailFromIdToken(idToken);
     if (byIdToken != null && byIdToken.isNotEmpty) return byIdToken;
 
+    // The OpenID userinfo first, then the Gmail profile; a network error is
+    // only thrown once both have been tried.
     Object? networkError;
-    try {
-      final response = await _http
-          .get(
-            Uri.parse('https://openidconnect.googleapis.com/v1/userinfo'),
-            headers: {'Authorization': 'Bearer $accessToken'},
-          )
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode == 200) {
+    for (final (url, field) in const [
+      ('https://openidconnect.googleapis.com/v1/userinfo', 'email'),
+      (
+        'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+        'emailAddress',
+      ),
+    ]) {
+      try {
+        final response = await _http
+            .get(
+              Uri.parse(url),
+              headers: {'Authorization': 'Bearer $accessToken'},
+            )
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode != 200) continue;
         final json = jsonDecode(response.body);
-        if (json is Map<String, dynamic>) {
-          final email = (json['email'] as String?)?.trim();
-          if (email != null && email.isNotEmpty) return email;
-        }
+        if (json is! Map<String, dynamic>) continue;
+        final email = (json[field] as String?)?.trim();
+        if (email != null && email.isNotEmpty) return email;
+      } on TimeoutException catch (error) {
+        networkError = error;
+      } on SocketException catch (error) {
+        networkError = error;
+      } on http.ClientException catch (error) {
+        networkError = error;
       }
-    } on TimeoutException catch (error) {
-      networkError = error;
-    } on SocketException catch (error) {
-      networkError = error;
-    } on http.ClientException catch (error) {
-      networkError = error;
-    }
-
-    try {
-      final response = await _http
-          .get(
-            Uri.parse('https://gmail.googleapis.com/gmail/v1/users/me/profile'),
-            headers: {'Authorization': 'Bearer $accessToken'},
-          )
-          .timeout(const Duration(seconds: 20));
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        if (json is Map<String, dynamic>) {
-          return (json['emailAddress'] as String?)?.trim();
-        }
-      }
-    } on TimeoutException catch (error) {
-      networkError = error;
-    } on SocketException catch (error) {
-      networkError = error;
-    } on http.ClientException catch (error) {
-      networkError = error;
     }
     if (networkError != null) throw networkError;
     return null;
@@ -1154,90 +888,6 @@ class GoogleEmailOtpAuthService {
         .toList(growable: false);
     if (parts.isEmpty) return '';
     return parts.last.toLowerCase();
-  }
-
-  bool _isFromVtopOtpSender(Map<String, dynamic> message) {
-    final payload = message['payload'];
-    if (payload is! Map<String, dynamic>) return false;
-    final headers = payload['headers'];
-    if (headers is! List<dynamic>) return false;
-    for (final item in headers) {
-      if (item is! Map<String, dynamic>) continue;
-      final name = '${item['name']}'.toLowerCase();
-      if (name != 'from') continue;
-      final value = '${item['value']}'.toLowerCase();
-      if (value.contains('noreply.sdc@vitap.ac.in')) return true;
-    }
-    return false;
-  }
-
-  String? _messageHeader(Map<String, dynamic> message, String headerName) {
-    final payload = message['payload'];
-    if (payload is! Map<String, dynamic>) return null;
-    final headers = payload['headers'];
-    if (headers is! List<dynamic>) return null;
-    for (final item in headers) {
-      if (item is! Map<String, dynamic>) continue;
-      final name = '${item['name']}'.toLowerCase();
-      if (name == headerName.toLowerCase()) {
-        return '${item['value']}'.trim();
-      }
-    }
-    return null;
-  }
-
-  String _extractMessageText(Map<String, dynamic> message) {
-    final buffer = StringBuffer();
-    final snippet = message['snippet'];
-    if (snippet is String && snippet.isNotEmpty) {
-      buffer.writeln(snippet);
-    }
-    final payload = message['payload'];
-    if (payload is Map<String, dynamic>) {
-      _appendPayloadText(payload, buffer);
-    }
-    return _decodeQuotedPrintable(buffer.toString());
-  }
-
-  void _appendPayloadText(Map<String, dynamic> payload, StringBuffer buffer) {
-    final body = payload['body'];
-    if (body is Map<String, dynamic>) {
-      final encoded = body['data'];
-      if (encoded is String && encoded.isNotEmpty) {
-        final text = _decodeBase64Url(encoded);
-        if (text.isNotEmpty) {
-          buffer.writeln(text);
-        }
-      }
-    }
-    final parts = payload['parts'];
-    if (parts is! List<dynamic>) return;
-    for (final part in parts) {
-      if (part is! Map<String, dynamic>) continue;
-      _appendPayloadText(part, buffer);
-    }
-  }
-
-  String _decodeBase64Url(String value) {
-    final normalized = base64Url.normalize(value);
-    try {
-      return utf8.decode(base64Url.decode(normalized), allowMalformed: true);
-    } catch (_) {
-      return '';
-    }
-  }
-
-  String _decodeQuotedPrintable(String input) {
-    final softBreakReplaced = input.replaceAll(RegExp(r'=\r?\n'), '');
-    return softBreakReplaced.replaceAllMapped(RegExp(r'=([0-9A-Fa-f]{2})'), (
-      match,
-    ) {
-      final hex = match.group(1);
-      if (hex == null) return '';
-      final code = int.tryParse(hex, radix: 16);
-      if (code == null) return '';
-      return String.fromCharCode(code);
-    });
   }
 
   String _friendlyOauthError(Object error) {

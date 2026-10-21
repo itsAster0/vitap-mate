@@ -17,11 +17,11 @@ pub mod parser;
 pub mod session;
 pub mod types;
 
-pub use vtop_shared::mail_seal;
 pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use error::{VtopError, VtopResult};
 pub use session::SessionState;
+pub use vtop_shared::mail_seal;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
