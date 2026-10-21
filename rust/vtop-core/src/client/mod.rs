@@ -261,6 +261,12 @@ impl VtopClient {
                 context,
                 &format!("VTOP returned HTTP {status} at {final_url}"),
             );
+            // A 4xx here is how VTOP answers some dead sessions (a 404
+            // rather than the login page): say so, so the caller signs in
+            // again or tries another session instead of giving up.
+            if status.is_client_error() {
+                return Err(VtopError::SessionExpired);
+            }
             return Err(server_error(
                 context,
                 format!("VTOP returned HTTP {status}"),

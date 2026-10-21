@@ -364,32 +364,15 @@ class CalendarSyncPage extends HookConsumerWidget {
 
       final timetable = await ref.read(timetableProvider.future);
       if (!context.mounted) return;
-      final confirmed = await showAdaptiveDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => AppDialog(
-          title: const Text("Clear Synced Events"),
-          body: Text(
-            "This removes only events synced by this app for semester ${timetable.semesterId} in the selected calendar.",
-          ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () =>
-                  Navigator.of(context, rootNavigator: true).pop(false),
-              child: const Text("Cancel"),
-            ),
-            FButton(
-              variant: FButtonVariant.destructive,
-              onPress: () =>
-                  Navigator.of(context, rootNavigator: true).pop(true),
-              child: const Text("Clear"),
-            ),
-          ],
-        ),
+      final confirmed = await confirm(
+        context,
+        title: 'Clear Synced Events',
+        body:
+            'This removes only events synced by this app for semester ${timetable.semesterId} in the selected calendar.',
+        action: 'Clear',
+        destructive: true,
       );
-
-      if (confirmed != true) return;
+      if (!confirmed) return;
 
       final selectedCalendar = selectedCalendarId.value;
       if (selectedCalendar == null || selectedCalendar.isEmpty) {

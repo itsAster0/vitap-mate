@@ -11,6 +11,7 @@ import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// The whole week on one screen: a compact grid with a column per class day.
 /// Blocks show course code and room; tap one for the full details.
@@ -138,14 +139,11 @@ class WeeklyTimetableView extends HookWidget {
                           child: Text(
                             _hourLabel(m),
                             textAlign: TextAlign.right,
-                            style: TextStyle(
+                            style: numStyle(
                               fontSize: 10,
                               height: 1,
                               fontWeight: FontWeight.w500,
                               color: colors.mutedForeground,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                         ),
@@ -280,12 +278,11 @@ class _DayHeader extends StatelessWidget {
               const SizedBox(height: 1),
               Text(
                 '${date.day}',
-                style: TextStyle(
+                style: numStyle(
                   fontSize: 15,
                   height: 1.2,
                   fontWeight: FontWeight.w700,
                   color: isToday ? colors.primaryForeground : colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -343,12 +340,11 @@ class _Block extends StatelessWidget {
                   child: Text(
                     slot.courseCode,
                     maxLines: 1,
-                    style: TextStyle(
+                    style: numStyle(
                       fontSize: 10,
                       height: 1.15,
                       fontWeight: FontWeight.w700,
                       color: colors.foreground,
-                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
@@ -357,12 +353,11 @@ class _Block extends StatelessWidget {
                     slot.roomNo,
                     maxLines: 1,
                     overflow: TextOverflow.clip,
-                    style: TextStyle(
+                    style: numStyle(
                       fontSize: 9.5,
                       height: 1.2,
                       fontWeight: FontWeight.w500,
                       color: tone.onSubtle,
-                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 if (isLab && c.maxHeight >= 44) ...[
@@ -401,7 +396,7 @@ class _ClassSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final hideSkips = ref.watch(hideSkipAdviceProvider);
+    final hideSkips = !ref.watch(showSkipAdviceProvider);
     final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
     // Advice in sessions for labs; the x/y line below stays VTOP's own.
     final standing = record == null
@@ -500,11 +495,10 @@ class _ClassSheet extends ConsumerWidget {
                       marker: attendanceThreshold / 100,
                       child: Text(
                         '${standing.displayPercent.round()}',
-                        style: TextStyle(
+                        style: numStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: tone.onSubtle,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),

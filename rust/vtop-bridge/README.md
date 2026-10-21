@@ -33,7 +33,7 @@ forgets them from the app.
 
 ## Configuration
 
-Set by the edge when it starts the container (`vtop-edge/src/engine.rs`):
+Set by the edge when it starts the container (`vtop-edge/src/engine.ts`):
 
 | Variable            | Default | Notes                                        |
 | ------------------- | ------- | -------------------------------------------- |

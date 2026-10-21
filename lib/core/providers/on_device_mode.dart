@@ -1,6 +1,6 @@
 /// On-device mode: the app talks to VTOP (and to Google, for Gmail OTPs read
 /// on the phone) and nothing else. Every feature that needs the VITAP Mate
-/// server or a vtop-server is off: connected apps (browser extension, AI
+/// server is off: connected apps (browser extension, AI
 /// agents), OTP mail forwarding, the event channel and push messages, and a
 /// server data source.
 library;

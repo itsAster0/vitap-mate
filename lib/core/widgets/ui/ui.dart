@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/material.dart' show CircularProgressIndicator;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/theme/app_palette.dart';
 import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 export 'package:vitapmate/core/theme/app_palette.dart';
 
@@ -146,19 +148,31 @@ class ToneBadge extends StatelessWidget {
           ],
           Text(
             label,
-            style: TextStyle(
+            style: numStyle(
               fontSize: 10.5,
               height: 1.3,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
               color: fg,
-              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// A centered loading spinner in the primary colour.
+class Spinner extends StatelessWidget {
+  const Spinner({super.key});
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: CircularProgressIndicator(
+      color: context.theme.colors.primary,
+      strokeWidth: 3,
+    ),
+  );
 }
 
 /// Section title with an optional trailing widget (count, action).
@@ -359,12 +373,8 @@ class CountUp extends StatelessWidget {
       tween: Tween(begin: 0, end: value),
       duration: _reduceMotion(context) ? Duration.zero : Motion.slow * 2,
       curve: Curves.easeOutCubic,
-      builder: (context, v, _) => Text(
-        '${v.toStringAsFixed(decimals)}$suffix',
-        style: style.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
-      ),
+      builder: (context, v, _) =>
+          Text('${v.toStringAsFixed(decimals)}$suffix', style: style.nums()),
     );
   }
 }
@@ -654,16 +664,13 @@ class Segmented<T> extends StatelessWidget {
                                   ),
                                   child: Text(
                                     '${c[i]}',
-                                    style: TextStyle(
+                                    style: numStyle(
                                       fontSize: 11,
                                       height: 1.3,
                                       fontWeight: FontWeight.w700,
                                       color: segment == value
                                           ? colors.app.accentTone.onSubtle
                                           : colors.mutedForeground,
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures(),
-                                      ],
                                     ),
                                   ),
                                 ),
@@ -745,10 +752,9 @@ class CountStepper extends StatelessWidget {
               '$value',
               key: ValueKey(value),
               textAlign: TextAlign.center,
-              style: context.theme.typography.body.lg.copyWith(
+              style: context.theme.typography.body.lg.nums(
                 fontWeight: FontWeight.w700,
                 color: enabled ? colors.foreground : colors.mutedForeground,
-                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),

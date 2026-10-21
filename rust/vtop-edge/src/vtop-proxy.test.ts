@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+
+import { proxyVtop, VTOP_ORIGIN } from "./vtop-proxy";
+
+const PROXY = "https://edge.example";
+
+function capture(response: Response) {
+  const seen: Request[] = [];
+  const fetcher = async (req: Request) => {
+    seen.push(req);
+    return response.clone();
+  };
+  return { seen, fetcher };
+}
+
+describe("proxyVtop", () => {
+  it("sends the request to VTOP as the phone would, cookies and body included", async () => {
+    const { seen, fetcher } = capture(new Response("ok"));
+    const req = new Request(`${PROXY}/vtop/login?x=1`, {
+      method: "POST",
+      headers: {
+        cookie: "JSESSIONID=a",
+        "content-type": "application/x-www-form-urlencoded",
+        origin: PROXY,
+        referer: `${PROXY}/vtop/open/page`,
+        "cf-connecting-ip": "1.2.3.4",
+      },
+      body: "a=b",
+    });
+    await proxyVtop(req, fetcher);
+    const sent = seen[0];
+    expect(sent.url).toBe(`${VTOP_ORIGIN}/vtop/login?x=1`);
+    expect(sent.method).toBe("POST");
+    expect(sent.headers.get("cookie")).toBe("JSESSIONID=a");
+    expect(sent.headers.get("origin")).toBe(VTOP_ORIGIN);
+    expect(sent.headers.get("referer")).toBe(`${VTOP_ORIGIN}/vtop/open/page`);
+    expect(sent.headers.get("cf-connecting-ip")).toBeNull();
+    expect(sent.redirect).toBe("manual");
+    expect(await sent.text()).toBe("a=b");
+  });
+
+  it("keeps redirects and cookies on the proxy, so the phone stays on it", async () => {
+    const headers = new Headers({ location: `${VTOP_ORIGIN}/vtop/content` });
+    headers.append("set-cookie", "JSESSIONID=n; Path=/vtop; Domain=vtop.vitap.ac.in; Secure; HttpOnly");
+    headers.append("set-cookie", "SERVERID=s; Domain=.vitap.ac.in; Path=/");
+    const { fetcher } = capture(new Response(null, { status: 302, headers }));
+    const res = await proxyVtop(new Request(`${PROXY}/vtop/login`), fetcher);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(`${PROXY}/vtop/content`);
+    expect(res.headers.getSetCookie()).toEqual([
+      "JSESSIONID=n; Path=/vtop; Secure; HttpOnly",
+      "SERVERID=s; Path=/",
+    ]);
+  });
+
+  it("forwards only VTOP's own paths", async () => {
+    const { seen, fetcher } = capture(new Response("ok"));
+    const res = await proxyVtop(new Request(`${PROXY}/vtop/../v1/x`), fetcher);
+    // URL parsing has already resolved `..`: not a VTOP path, not forwarded.
+    expect(res.status).toBe(404);
+    expect(seen).toHaveLength(0);
+  });
+  it("tells VTOP the phone's address, for its sign-in history", async () => {
+    const { seen, fetcher } = capture(new Response("ok"));
+    await proxyVtop(
+      new Request(`${PROXY}/vtop/login`, { headers: { "cf-connecting-ip": "49.15.2.3" } }),
+      fetcher,
+    );
+    expect(seen[0].headers.get("x-forwarded-for")).toBe("49.15.2.3");
+    expect(seen[0].headers.get("x-real-ip")).toBeNull();
+  });
+});

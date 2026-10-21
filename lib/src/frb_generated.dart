@@ -241,6 +241,7 @@ abstract class RustLibApi extends BaseApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
+    String? baseUrl,
   });
 
   Future<GmailOtpCode?> crateApiEmailOtpGmailFindOtp({
@@ -1409,6 +1410,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String username,
     required String password,
     PersistedVtopSession? persistedSession,
+    String? baseUrl,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1420,6 +1422,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             persistedSession,
             serializer,
           );
+          sse_encode_opt_String(baseUrl, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1433,7 +1436,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientGetVtopClientConstMeta,
-        argValues: [username, password, persistedSession],
+        argValues: [username, password, persistedSession, baseUrl],
         apiImpl: this,
       ),
     );
@@ -1442,7 +1445,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientGetVtopClientConstMeta =>
       const TaskConstMeta(
         debugName: "get_vtop_client",
-        argNames: ["username", "password", "persistedSession"],
+        argNames: ["username", "password", "persistedSession", "baseUrl"],
       );
 
   @override

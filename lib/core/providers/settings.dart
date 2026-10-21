@@ -5,7 +5,6 @@ import 'package:vitapmate/services/class_reminder_notification_service.dart';
 import 'package:vitapmate/services/exam_reminder_notification_service.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 part 'settings.g.dart';
 
@@ -13,13 +12,10 @@ const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
 const timetableViewModeSettingKey = 'settings_timetable_view_mode';
 const emailOtpBannerDismissedSettingKey = 'settings_email_otp_banner_dismissed';
-const vtopServerUrlSettingKey = 'settings_vtop_server_url';
-const vtopServerApiKeySettingKey = 'settings_vtop_server_api_key';
-const vtopServerEnabledSettingKey = 'settings_vtop_server_enabled';
 const refreshButtonSettingKey = 'settings_refresh_button';
 const classesLeftUntilSettingKey = 'settings_classes_left_until';
 const messTimingsSettingKey = 'settings_mess_timings';
-const hideSkipAdviceSettingKey = 'settings_hide_skip_advice';
+const showSkipAdviceSettingKey = 'settings_show_skip_advice';
 const byokGuideDoneSettingKey = 'settings_byok_guide_done';
 const forwardingGuideDoneSettingKey = 'settings_forwarding_guide_done';
 
@@ -30,7 +26,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
       allowList: {
         classesLeftUntilSettingKey,
         messTimingsSettingKey,
-        hideSkipAdviceSettingKey,
+        showSkipAdviceSettingKey,
         byokGuideDoneSettingKey,
         forwardingGuideDoneSettingKey,
         "settings_auto_refresh",
@@ -54,53 +50,17 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
         vtopDesktopModeSettingKey,
-        vtopServerUrlSettingKey,
-        vtopServerApiKeySettingKey,
-        vtopServerEnabledSettingKey,
+        'settings_server_url',
+        'settings_vtop_proxy',
+        bridgeServerSignInSettingKey,
         vtopRecentPagesSettingKey,
         bridgeLinkedSettingKey,
-        bridgeServerSignInSettingKey,
         bridgeLastFcmTokenSettingKey,
         bridgeLastSemesterSettingKey,
         onDeviceModeSettingKey,
       },
     ),
   );
-}
-
-/// The optional vtop-server. The API key is kept in plain preferences by
-/// choice; see rust/ARCHITECTURE.md.
-@riverpod
-VtopServerSettings vtopServerSettings(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  final url = prefs?.getString(vtopServerUrlSettingKey) ?? '';
-  return VtopServerSettings(
-    url: url,
-    apiKey: prefs?.getString(vtopServerApiKeySettingKey) ?? '',
-    // Installs from before the switch existed: a saved URL meant "on".
-    enabled: prefs?.getBool(vtopServerEnabledSettingKey) ?? url.isNotEmpty,
-  );
-}
-
-Future<void> setVtopServerSettings(
-  WidgetRef ref,
-  VtopServerSettings value,
-) async {
-  final prefs = await ref.read(settingsProvider.future);
-  // URL and key are kept when the switch is off, so turning it back on
-  // needs no retyping.
-  await prefs.setBool(vtopServerEnabledSettingKey, value.enabled);
-  if (value.hasUrl) {
-    await prefs.setString(vtopServerUrlSettingKey, value.url.trim());
-  } else {
-    await prefs.remove(vtopServerUrlSettingKey);
-  }
-  if (value.hasApiKey) {
-    await prefs.setString(vtopServerApiKeySettingKey, value.apiKey.trim());
-  } else {
-    await prefs.remove(vtopServerApiKeySettingKey);
-  }
-  ref.invalidate(vtopServerSettingsProvider);
 }
 
 /// How far ahead "classes left" on the attendance cards counts.
@@ -128,18 +88,19 @@ Future<void> setClassesLeftUntil(WidgetRef ref, ClassesLeftUntil value) async {
   ref.invalidate(classesLeftUntilProvider);
 }
 
-/// Hides skip advice ("Can skip 3", "6 to spare", "need 2") from the
-/// timetable and attendance; percentages and counts stay.
+/// Shows skip advice ("Can skip 3", "6 to spare", "need 2") in the
+/// timetable and attendance; off by default, when only percentages and
+/// counts show.
 @riverpod
-bool hideSkipAdvice(Ref ref) {
+bool showSkipAdvice(Ref ref) {
   final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool(hideSkipAdviceSettingKey) ?? false;
+  return prefs?.getBool(showSkipAdviceSettingKey) ?? false;
 }
 
-Future<void> setHideSkipAdvice(WidgetRef ref, bool value) async {
+Future<void> setShowSkipAdvice(WidgetRef ref, bool value) async {
   final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(hideSkipAdviceSettingKey, value);
-  ref.invalidate(hideSkipAdviceProvider);
+  await prefs.setBool(showSkipAdviceSettingKey, value);
+  ref.invalidate(showSkipAdviceProvider);
 }
 
 /// The floating refresh button on the screen edge.

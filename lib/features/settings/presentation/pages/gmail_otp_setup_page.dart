@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart' show showAdaptiveDialog;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -65,25 +64,13 @@ class GmailOtpSetupPage extends HookConsumerWidget {
 
     Future<void> connectShared() async {
       if (busy.value) return;
-      final confirmed = await showAdaptiveDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AppDialog(
-          title: const Text('Use shared Google access?'),
-          body: const Text(_sharedWarning),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              onPress: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
+      final confirmed = await confirm(
+        context,
+        title: 'Use shared Google access?',
+        body: _sharedWarning,
+        action: 'Continue',
       );
-      if (confirmed != true || !context.mounted) return;
+      if (!confirmed || !context.mounted) return;
       final account = await gmailAccountIdentifier(context, ref);
       if (account == null) return;
       busy.value = true;
@@ -105,28 +92,15 @@ class GmailOtpSetupPage extends HookConsumerWidget {
     }
 
     Future<void> disconnect() async {
-      final confirmed = await showAdaptiveDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AppDialog(
-          title: const Text('Disconnect Gmail?'),
-          body: const Text(
+      final confirmed = await confirm(
+        context,
+        title: 'Disconnect Gmail?',
+        body:
             'This removes the saved Google key and Gmail tokens from this phone.',
-          ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              variant: FButtonVariant.destructive,
-              onPress: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Disconnect'),
-            ),
-          ],
-        ),
+        action: 'Disconnect',
+        destructive: true,
       );
-      if (confirmed != true) return;
+      if (!confirmed) return;
       busy.value = true;
       try {
         await oauth.clearSession();

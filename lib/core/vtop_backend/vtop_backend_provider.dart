@@ -1,20 +1,16 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/core/utils/users/vtop_users_utils.dart';
+import 'package:vitapmate/core/utils/users/saved_credentials.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
-import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
-import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
-import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/vtop_backend/local_vtop_backend.dart';
+import 'package:vitapmate/core/utils/edge/server_status.dart';
 import 'package:vitapmate/core/vtop_backend/relogin_vtop_backend.dart';
-import 'package:vitapmate/core/vtop_backend/remote_vtop_backend.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
-import 'package:vitapmate/core/providers/on_device_mode.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_server_settings.dart';
+import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'vtop_backend_provider.g.dart';
 
@@ -23,82 +19,71 @@ part 'vtop_backend_provider.g.dart';
 @Riverpod(keepAlive: true)
 bool vtopLoginPromptAllowed(Ref ref) => true;
 
-/// The server when one is configured in Settings, otherwise the bundled
-/// Rust library. Either way an expired session triggers one re-login and
-/// retry. Rebuilt when the setting changes.
+/// Who this phone is to the server: its app secret and the student's
+/// registration number. Null when the phone is not linked.
+Future<EdgeIdentity?> edgeIdentity(Ref ref) async {
+  final secret = await const SecureBridgeAppSecretStore().read();
+  if (secret == null || secret.isEmpty) return null;
+  var number = await _knownRegistrationNumber(ref);
+  if (number == null) {
+    // Not learnt yet: sign in once (the login saves it). Never the
+    // username, which can differ from the registration number.
+    try {
+      await ref
+          .read(vClientProvider.notifier)
+          .ensureLogin(promptForOtp: ref.read(vtopLoginPromptAllowedProvider));
+    } catch (_) {
+      return null;
+    }
+    number = await _knownRegistrationNumber(ref);
+  }
+  if (number == null) return null;
+  return (appSecret: secret, registrationNumber: number.toUpperCase());
+}
+
+/// The registration number already known, from the saved account or a live
+/// session, trimmed; null when neither has it yet.
+Future<String?> _knownRegistrationNumber(Ref ref) async {
+  final saved = (await ref.read(
+    vtopUserProvider.future,
+  )).registrationNumber?.trim();
+  if (saved != null && saved.isNotEmpty) return saved;
+  final session = (await _deviceSession(ref))?.registrationNumber?.trim();
+  return (session != null && session.isNotEmpty) ? session : null;
+}
+
+Future<SessionState?> _deviceSession(Ref ref) async {
+  final client = await ref.read(vClientProvider.future);
+  if (!await vtop_api.fetchIsAuth(client: client)) return null;
+  return vtop_api.exportSessionState(client: client);
+}
+
+/// VTOP through the phone's own client (directly, or through the server's
+/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
+/// one re-login and retry.
 @Riverpod(keepAlive: true)
 VtopBackend vtopBackend(Ref ref) {
-  final server = ref.watch(onDeviceModeProvider)
-      ? VtopServerSettings.disabled
-      : ref.watch(vtopServerSettingsProvider);
-  final VtopBackend inner = server.isEnabled
-      ? RemoteVtopBackend(
-          settings: server,
-          session: () async {
-            final client = await ref.read(vClientProvider.future);
-            if (!await vtop_api.fetchIsAuth(client: client)) return null;
-            return vtop_api.exportSessionState(client: client);
-          },
-          onSessionChanged: (session) async {
-            // VTOP rotated cookies during a server request: keep the phone's
-            // client and saved session in step with what VTOP now expects.
-            final client = await ref.read(vClientProvider.future);
-            vtop_api.vtopClientResumeSession(client: client, session: session);
-            await saveStoredVtopSession(
-              createPersistedVtopSessionSnapshot(client: client),
-            );
-          },
-        )
-      : LocalVtopBackend(() => ref.read(vClientProvider.future));
-
   return ReloginVtopBackend(
-    inner,
+    LocalVtopBackend(() => ref.read(vClientProvider.future)),
     relogin: () => ref
         .read(vClientProvider.notifier)
         .ensureLogin(
           force: true,
           promptForOtp: ref.read(vtopLoginPromptAllowedProvider),
         ),
+    // VTOP turned the saved password down: mark it, so the app asks again.
+    onCredentialsRejected: () async {
+      final users = ref.read(vtopusersutilsProvider.notifier);
+      if (await rejectSavedCredentials(
+        load: users.vtopUserDefault,
+        save: users.vtopUserSave,
+      )) {
+        ref.invalidate(vtopUserProvider);
+      }
+    },
   );
 }
 
-/// Logs in on the device, or through the server when one is configured.
+/// Logs in on the device.
 @Riverpod(keepAlive: true)
-VtopAuthenticator vtopAuthenticator(Ref ref) {
-  final server = ref.watch(onDeviceModeProvider)
-      ? VtopServerSettings.disabled
-      : ref.watch(vtopServerSettingsProvider);
-  if (!server.isEnabled) return const LocalVtopAuthenticator();
-  return RemoteVtopAuthenticator(
-    settings: server,
-    gmail: () async {
-      final canUseGmail = await ref
-          .read(vtopOtpChallengeProvider.notifier)
-          .canAutoFetchFromEmail();
-      if (!canUseGmail) return null;
-      final access = await ref
-          .read(googleEmailOtpAuthServiceProvider)
-          .accessForServerLogin();
-      if (access == null) return null;
-      return (
-        accessToken: access.accessToken,
-        expiresAtUnix: access.expiresAtUnix,
-        deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
-      );
-    },
-    onGmailTokenRejected: () async {
-      await ref
-          .read(googleEmailOtpAuthServiceProvider)
-          .refreshIfNeeded(force: true);
-    },
-    credentials: () async {
-      final user = await ref.read(vtopUserProvider.future);
-      if (user is! StoredVtopUser) {
-        throw const VtopError.configurationError(
-          'A configured VTOP account is required.',
-        );
-      }
-      return (username: user.username, password: user.password);
-    },
-  );
-}
+VtopAuthenticator vtopAuthenticator(Ref ref) => const LocalVtopAuthenticator();

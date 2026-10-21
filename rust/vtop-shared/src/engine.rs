@@ -11,8 +11,6 @@ pub const SEAL: &str = "/engine/seal";
 /// Engine: signs in with saved credentials; answers at once and reports
 /// to the edge's [`LOGIN_DONE`] when finished.
 pub const LOGIN: &str = "/engine/login";
-/// Engine: fetches and parses VTOP pages for a session.
-pub const FETCH: &str = "/engine/fetch";
 /// Edge: the outcome of a [`LOGIN`].
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.

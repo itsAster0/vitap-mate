@@ -1,5 +1,5 @@
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
-import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 /// Signs in again and retries once when a fetch fails with
@@ -11,12 +11,24 @@ import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 ///
 /// When several fetches fail at once they share one re-login, and a fetch
 /// that started before a re-login finished just retries on the new session.
+///
+/// A rejected password ([VtopError.invalidCredentials]), from the server's
+/// sign-in or the phone's, goes to [onCredentialsRejected] and is never
+/// retried.
 class ReloginVtopBackend implements VtopBackend {
-  ReloginVtopBackend(this._inner, {required Future<void> Function() relogin})
-    : _relogin = relogin;
+  ReloginVtopBackend(
+    this._inner, {
+    required Future<void> Function() relogin,
+    Future<void> Function()? onCredentialsRejected,
+  }) : _relogin = relogin,
+       _onCredentialsRejected = onCredentialsRejected;
 
   final VtopBackend _inner;
   final Future<void> Function() _relogin;
+  final Future<void> Function()? _onCredentialsRejected;
+
+  /// The backend this one retries for.
+  VtopBackend get inner => _inner;
 
   /// Bumped after every successful re-login.
   int _generation = 0;
@@ -25,7 +37,19 @@ class ReloginVtopBackend implements VtopBackend {
   @override
   String get name => _inner.name;
 
+  /// Runs [fetch], signing in again and retrying once on an expired session.
+  Future<T> retrying<T>(Future<T> Function() fetch) => _guard(fetch);
+
   Future<T> _guard<T>(Future<T> Function() fetch) async {
+    try {
+      return await _retrying(fetch);
+    } on VtopError_InvalidCredentials {
+      await _onCredentialsRejected?.call();
+      rethrow;
+    }
+  }
+
+  Future<T> _retrying<T>(Future<T> Function() fetch) async {
     final startedAt = _generation;
     try {
       return await fetch();
@@ -47,61 +71,10 @@ class ReloginVtopBackend implements VtopBackend {
   }
 
   @override
-  Future<void> prefetch(String semesterId, Set<VtopPage> pages) =>
-      _guard(() => _inner.prefetch(semesterId, pages));
+  Future<T> fetch<T>(VtopQuery<T> query) => _guard(() => _inner.fetch(query));
 
+  /// Safe to send again: an expired session means VTOP refused it before
+  /// running it.
   @override
-  Future<SemesterData> semesters() => _guard(_inner.semesters);
-
-  @override
-  Future<AttendanceData> attendance(String semesterId) =>
-      _guard(() => _inner.attendance(semesterId));
-
-  @override
-  Future<FullAttendanceData> fullAttendance({
-    required String semesterId,
-    required String courseId,
-    required String courseType,
-  }) => _guard(
-    () => _inner.fullAttendance(
-      semesterId: semesterId,
-      courseId: courseId,
-      courseType: courseType,
-    ),
-  );
-
-  @override
-  Future<TimetableData> timetable(String semesterId) =>
-      _guard(() => _inner.timetable(semesterId));
-
-  @override
-  Future<MarksData> marks(String semesterId) =>
-      _guard(() => _inner.marks(semesterId));
-
-  @override
-  Future<ExamScheduleData> examSchedule(String semesterId) =>
-      _guard(() => _inner.examSchedule(semesterId));
-
-  @override
-  Future<AcademicCalendarData> academicCalendar(String semesterId) =>
-      _guard(() => _inner.academicCalendar(semesterId));
-
-  @override
-  Future<GradeViewData> gradeView(String semesterId) =>
-      _guard(() => _inner.gradeView(semesterId));
-
-  @override
-  Future<GradeDetailsData> gradeViewDetails({
-    required String semesterId,
-    required String courseId,
-  }) => _guard(
-    () => _inner.gradeViewDetails(semesterId: semesterId, courseId: courseId),
-  );
-
-  @override
-  Future<GradeHistoryData> gradeHistory() => _guard(_inner.gradeHistory);
-
-  @override
-  Future<BiometricData> biometricHistory(String date) =>
-      _guard(() => _inner.biometricHistory(date));
+  Future<T> run<T>(VtopAction<T> action) => _guard(() => _inner.run(action));
 }

@@ -120,6 +120,151 @@ Map<String, dynamic> _$CalendarEntryToJson(_CalendarEntry instance) =>
       'note': instance.note,
     };
 
+_CourseFileInfo _$CourseFileInfoFromJson(Map<String, dynamic> json) =>
+    _CourseFileInfo(
+      contentDisposition: json['contentDisposition'] as String,
+      contentType: json['contentType'] as String,
+    );
+
+Map<String, dynamic> _$CourseFileInfoToJson(_CourseFileInfo instance) =>
+    <String, dynamic>{
+      'contentDisposition': instance.contentDisposition,
+      'contentType': instance.contentType,
+    };
+
+_CourseLecture _$CourseLectureFromJson(Map<String, dynamic> json) =>
+    _CourseLecture(
+      serial: json['serial'] as String,
+      date: json['date'] as String,
+      day: json['day'] as String,
+      topic: json['topic'] as String,
+      materials: (json['materials'] as List<dynamic>)
+          .map((e) => CourseMaterial.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$CourseLectureToJson(_CourseLecture instance) =>
+    <String, dynamic>{
+      'serial': instance.serial,
+      'date': instance.date,
+      'day': instance.day,
+      'topic': instance.topic,
+      'materials': instance.materials,
+    };
+
+_CourseMaterial _$CourseMaterialFromJson(Map<String, dynamic> json) =>
+    _CourseMaterial(
+      label: json['label'] as String,
+      path: json['path'] as String,
+    );
+
+Map<String, dynamic> _$CourseMaterialToJson(_CourseMaterial instance) =>
+    <String, dynamic>{'label': instance.label, 'path': instance.path};
+
+_CoursePageClass _$CoursePageClassFromJson(Map<String, dynamic> json) =>
+    _CoursePageClass(
+      classId: json['classId'] as String,
+      erpId: json['erpId'] as String,
+      classGroup: json['classGroup'] as String,
+      courseCode: json['courseCode'] as String,
+      courseTitle: json['courseTitle'] as String,
+      courseType: json['courseType'] as String,
+      slot: json['slot'] as String,
+      faculty: json['faculty'] as String,
+      facultySchool: json['facultySchool'] as String,
+    );
+
+Map<String, dynamic> _$CoursePageClassToJson(_CoursePageClass instance) =>
+    <String, dynamic>{
+      'classId': instance.classId,
+      'erpId': instance.erpId,
+      'classGroup': instance.classGroup,
+      'courseCode': instance.courseCode,
+      'courseTitle': instance.courseTitle,
+      'courseType': instance.courseType,
+      'slot': instance.slot,
+      'faculty': instance.faculty,
+      'facultySchool': instance.facultySchool,
+    };
+
+_CoursePageClasses _$CoursePageClassesFromJson(Map<String, dynamic> json) =>
+    _CoursePageClasses(
+      semesterId: json['semesterId'] as String,
+      courseId: json['courseId'] as String,
+      classes: (json['classes'] as List<dynamic>)
+          .map((e) => CoursePageClass.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$CoursePageClassesToJson(_CoursePageClasses instance) =>
+    <String, dynamic>{
+      'semesterId': instance.semesterId,
+      'courseId': instance.courseId,
+      'classes': instance.classes,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_CoursePageCourse _$CoursePageCourseFromJson(Map<String, dynamic> json) =>
+    _CoursePageCourse(
+      id: json['id'] as String,
+      code: json['code'] as String,
+      title: json['title'] as String,
+      courseType: json['courseType'] as String,
+    );
+
+Map<String, dynamic> _$CoursePageCourseToJson(_CoursePageCourse instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'code': instance.code,
+      'title': instance.title,
+      'courseType': instance.courseType,
+    };
+
+_CoursePageCourses _$CoursePageCoursesFromJson(Map<String, dynamic> json) =>
+    _CoursePageCourses(
+      semesterId: json['semesterId'] as String,
+      courses: (json['courses'] as List<dynamic>)
+          .map((e) => CoursePageCourse.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$CoursePageCoursesToJson(_CoursePageCourses instance) =>
+    <String, dynamic>{
+      'semesterId': instance.semesterId,
+      'courses': instance.courses,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_CoursePageDetail _$CoursePageDetailFromJson(Map<String, dynamic> json) =>
+    _CoursePageDetail(
+      semesterId: json['semesterId'] as String,
+      class_: CoursePageClass.fromJson(json['class_'] as Map<String, dynamic>),
+      courseId: json['courseId'] as String,
+      allMaterialsPath: json['allMaterialsPath'] as String,
+      generalMaterialsPath: json['generalMaterialsPath'] as String,
+      syllabusPath: json['syllabusPath'] as String,
+      hasCoursePlan: json['hasCoursePlan'] as bool,
+      lectures: (json['lectures'] as List<dynamic>)
+          .map((e) => CourseLecture.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$CoursePageDetailToJson(_CoursePageDetail instance) =>
+    <String, dynamic>{
+      'semesterId': instance.semesterId,
+      'class_': instance.class_,
+      'courseId': instance.courseId,
+      'allMaterialsPath': instance.allMaterialsPath,
+      'generalMaterialsPath': instance.generalMaterialsPath,
+      'syllabusPath': instance.syllabusPath,
+      'hasCoursePlan': instance.hasCoursePlan,
+      'lectures': instance.lectures,
+      'updateTime': instance.updateTime.toString(),
+    };
+
 _ExamScheduleData _$ExamScheduleDataFromJson(Map<String, dynamic> json) =>
     _ExamScheduleData(
       exams: (json['exams'] as List<dynamic>)
@@ -210,6 +355,35 @@ Map<String, dynamic> _$FullAttendanceRecordToJson(
   'dayTime': instance.dayTime,
   'status': instance.status,
   'remark': instance.remark,
+};
+
+_GeneralOutingRecord _$GeneralOutingRecordFromJson(Map<String, dynamic> json) =>
+    _GeneralOutingRecord(
+      serial: json['serial'] as String,
+      place: json['place'] as String,
+      purpose: json['purpose'] as String,
+      fromDate: json['fromDate'] as String,
+      fromTime: json['fromTime'] as String,
+      toDate: json['toDate'] as String,
+      toTime: json['toTime'] as String,
+      status: json['status'] as String,
+      passId: json['passId'] as String,
+      cancelId: json['cancelId'] as String,
+    );
+
+Map<String, dynamic> _$GeneralOutingRecordToJson(
+  _GeneralOutingRecord instance,
+) => <String, dynamic>{
+  'serial': instance.serial,
+  'place': instance.place,
+  'purpose': instance.purpose,
+  'fromDate': instance.fromDate,
+  'fromTime': instance.fromTime,
+  'toDate': instance.toDate,
+  'toTime': instance.toTime,
+  'status': instance.status,
+  'passId': instance.passId,
+  'cancelId': instance.cancelId,
 };
 
 _GradeCourseRecord _$GradeCourseRecordFromJson(Map<String, dynamic> json) =>
@@ -507,6 +681,58 @@ Map<String, dynamic> _$MarksRecordEachToJson(_MarksRecordEach instance) =>
       'remark': instance.remark,
     };
 
+_OutingApplyResult _$OutingApplyResultFromJson(Map<String, dynamic> json) =>
+    _OutingApplyResult(
+      applied: json['applied'] as bool,
+      message: json['message'] as String,
+    );
+
+Map<String, dynamic> _$OutingApplyResultToJson(_OutingApplyResult instance) =>
+    <String, dynamic>{'applied': instance.applied, 'message': instance.message};
+
+_OutingCancelResult _$OutingCancelResultFromJson(Map<String, dynamic> json) =>
+    _OutingCancelResult(
+      cancelled: json['cancelled'] as bool,
+      message: json['message'] as String,
+    );
+
+Map<String, dynamic> _$OutingCancelResultToJson(_OutingCancelResult instance) =>
+    <String, dynamic>{
+      'cancelled': instance.cancelled,
+      'message': instance.message,
+    };
+
+_OutingOption _$OutingOptionFromJson(Map<String, dynamic> json) =>
+    _OutingOption(
+      value: json['value'] as String,
+      label: json['label'] as String,
+    );
+
+Map<String, dynamic> _$OutingOptionToJson(_OutingOption instance) =>
+    <String, dynamic>{'value': instance.value, 'label': instance.label};
+
+_OutingStudent _$OutingStudentFromJson(Map<String, dynamic> json) =>
+    _OutingStudent(
+      registrationNumber: json['registrationNumber'] as String,
+      name: json['name'] as String,
+      applicationNo: json['applicationNo'] as String,
+      gender: json['gender'] as String,
+      hostelBlock: json['hostelBlock'] as String,
+      roomNumber: json['roomNumber'] as String,
+      parentContactNumber: json['parentContactNumber'] as String,
+    );
+
+Map<String, dynamic> _$OutingStudentToJson(_OutingStudent instance) =>
+    <String, dynamic>{
+      'registrationNumber': instance.registrationNumber,
+      'name': instance.name,
+      'applicationNo': instance.applicationNo,
+      'gender': instance.gender,
+      'hostelBlock': instance.hostelBlock,
+      'roomNumber': instance.roomNumber,
+      'parentContactNumber': instance.parentContactNumber,
+    };
+
 _PerExamScheduleRecord _$PerExamScheduleRecordFromJson(
   Map<String, dynamic> json,
 ) => _PerExamScheduleRecord(
@@ -638,3 +864,32 @@ Map<String, dynamic> _$TimetableSlotToJson(_TimetableSlot instance) =>
     };
 
 const _$ClassKindEnumMap = {ClassKind.theory: 'theory', ClassKind.lab: 'lab'};
+
+_WeekendOutingRecord _$WeekendOutingRecordFromJson(Map<String, dynamic> json) =>
+    _WeekendOutingRecord(
+      serial: json['serial'] as String,
+      hostelBlock: json['hostelBlock'] as String,
+      roomNumber: json['roomNumber'] as String,
+      place: json['place'] as String,
+      purpose: json['purpose'] as String,
+      timeSlot: json['timeSlot'] as String,
+      date: json['date'] as String,
+      status: json['status'] as String,
+      passId: json['passId'] as String,
+      cancelId: json['cancelId'] as String,
+    );
+
+Map<String, dynamic> _$WeekendOutingRecordToJson(
+  _WeekendOutingRecord instance,
+) => <String, dynamic>{
+  'serial': instance.serial,
+  'hostelBlock': instance.hostelBlock,
+  'roomNumber': instance.roomNumber,
+  'place': instance.place,
+  'purpose': instance.purpose,
+  'timeSlot': instance.timeSlot,
+  'date': instance.date,
+  'status': instance.status,
+  'passId': instance.passId,
+  'cancelId': instance.cancelId,
+};

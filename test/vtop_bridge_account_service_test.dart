@@ -3,7 +3,19 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+
+class _Devices implements EdgeDeviceStore {
+  _Devices(this.value);
+  EdgeDevice? value;
+  @override
+  Future<EdgeDevice?> read() async => value;
+  @override
+  Future<void> write(EdgeDevice device) async => value = device;
+  @override
+  Future<void> delete() async => value = null;
+}
 
 void main() {
   const base = 'https://bridge.test';
@@ -63,6 +75,49 @@ void main() {
       (jsonDecode(rig.sent.single.body) as Map).containsKey('credentials'),
       isFalse,
     );
+  });
+
+  test('linking with a lost install registers it again and retries', () async {
+    const stale = EdgeDevice(
+      id: '0123456789abcdef0123456789abcdef',
+      secret: 'vdv_old',
+      fcmToken: 'fcm-1',
+    );
+    final devices = _Devices(stale);
+    final linkedWith = <Object?>[];
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      if (request.url.path == '/v1/devices/register') {
+        return http.Response(
+          '{"id":"fedcba9876543210fedcba9876543210","secret":"vdv_new"}',
+          201,
+        );
+      }
+      linkedWith.add(body['deviceSecret']);
+      return body['deviceSecret'] == 'vdv_old'
+          ? http.Response(
+              '{"code":"bad_request","error":"Unknown device."}',
+              400,
+            )
+          : http.Response('{"appSecret":"vta_x"}', 200);
+    });
+    final service = VtopBridgeAccountService(
+      client: client,
+      baseUrl: base,
+      secrets: MemoryBridgeAppSecretStore(null),
+      keys: MemoryBridgeKeyStash(),
+    );
+    await EdgeDeviceService(
+      client: client,
+      baseUrl: base,
+      store: devices,
+    ).withInstall(
+      'fcm-1',
+      (device) =>
+          service.link(cookies: cookies, fcmToken: 'fcm-1', device: device),
+    );
+    expect(linkedWith, ['vdv_old', 'vdv_new']);
+    expect(devices.value!.secret, 'vdv_new');
   });
 
   test('createKey returns the key once with the MCP URL', () async {

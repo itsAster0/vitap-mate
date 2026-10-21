@@ -9,6 +9,7 @@ import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 class _Row {
   final int id;
@@ -190,10 +191,9 @@ class GpaCalculatorPage extends HookConsumerWidget {
                     stroke: 7,
                     child: Text(
                       semesterGpa.toStringAsFixed(2),
-                      style: typography.body.lg.copyWith(
+                      style: typography.body.lg.nums(
                         fontWeight: FontWeight.w600,
                         color: colors.foreground,
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ),
@@ -237,11 +237,8 @@ class GpaCalculatorPage extends HookConsumerWidget {
                             children: [
                               Text(
                                 currentCgpa!.value.toStringAsFixed(2),
-                                style: typography.body.md.copyWith(
+                                style: typography.body.md.nums(
                                   color: colors.mutedForeground,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
-                                  ],
                                 ),
                               ),
                               Padding(
@@ -260,12 +257,9 @@ class GpaCalculatorPage extends HookConsumerWidget {
                                 curve: Curves.easeOutCubic,
                                 builder: (context, v, _) => Text(
                                   v.toStringAsFixed(2),
-                                  style: typography.body.lg.copyWith(
+                                  style: typography.body.lg.nums(
                                     fontWeight: FontWeight.w600,
                                     color: colors.foreground,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
                                   ),
                                 ),
                               ),
@@ -396,10 +390,9 @@ class GpaCalculatorPage extends HookConsumerWidget {
                       child: Text(
                         targetValue.toStringAsFixed(2),
                         textAlign: TextAlign.center,
-                        style: typography.body.lg.copyWith(
+                        style: typography.body.lg.nums(
                           fontWeight: FontWeight.w600,
                           color: colors.foreground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),
@@ -442,10 +435,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                             const TextSpan(text: ' semester GPA'),
                           ],
                         ),
-                  style: typography.body.sm.copyWith(
-                    color: colors.mutedForeground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: typography.body.sm.nums(color: colors.mutedForeground),
                 ),
               ],
             ),
@@ -593,10 +583,9 @@ class _CourseRowCard extends StatelessWidget {
                 child: Text(
                   '${_formatCredits(row.credits)} cr',
                   textAlign: TextAlign.center,
-                  style: typography.body.sm.copyWith(
+                  style: typography.body.sm.nums(
                     fontWeight: FontWeight.w500,
                     color: colors.foreground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),

@@ -315,7 +315,7 @@ class UserCard extends HookConsumerWidget {
   }
 }
 
-/// "PRIYA SHARMA" → "Priya Sharma".
+/// "JANE MARY DOE" → "Jane Mary Doe".
 String _titleCase(String value) => value
     .toLowerCase()
     .split(' ')

@@ -15,6 +15,7 @@ import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 class AcademicCalendarPage extends HookConsumerWidget {
   const AcademicCalendarPage({super.key});
@@ -270,9 +271,8 @@ class _Outlook extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    final base = context.theme.typography.body.sm.copyWith(
+    final base = context.theme.typography.body.sm.nums(
       color: colors.mutedForeground,
-      fontFeatures: const [FontFeature.tabularFigures()],
     );
     final strong = base.copyWith(
       fontWeight: FontWeight.w600,
@@ -412,12 +412,11 @@ class _MonthGrid extends StatelessWidget {
                   : null,
               child: Text(
                 '${day.day}',
-                style: typography.body.sm.copyWith(
+                style: typography.body.sm.nums(
                   fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
                   color: off || isPast
                       ? colors.mutedForeground
                       : colors.foreground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),
@@ -760,11 +759,10 @@ class _EventRow extends StatelessWidget {
                       ),
                       Text(
                         '${event.first.day}',
-                        style: typography.body.lg.copyWith(
+                        style: typography.body.lg.nums(
                           height: 1.15,
                           fontWeight: FontWeight.w600,
                           color: colors.foreground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],
@@ -789,11 +787,8 @@ class _EventRow extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(
                             subtitle,
-                            style: typography.body.xs.copyWith(
+                            style: typography.body.xs.nums(
                               color: colors.mutedForeground,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                         ),
@@ -863,10 +858,9 @@ class _PartCard extends StatelessWidget {
             width: 120,
             child: Text(
               days,
-              style: typography.body.xs.copyWith(
+              style: typography.body.xs.nums(
                 fontWeight: FontWeight.w600,
                 color: colors.mutedForeground,
-                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),

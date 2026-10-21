@@ -62,3 +62,44 @@ class AppDialog extends StatelessWidget {
     ),
   );
 }
+
+/// A yes/no question: true only when [action] is pressed. [body] is a
+/// widget or a message. [destructive] colours the action red; [actionFirst]
+/// puts it above [cancel].
+Future<bool> confirm(
+  BuildContext context, {
+  required String title,
+  required Object body,
+  required String action,
+  String cancel = 'Cancel',
+  bool destructive = false,
+  bool actionFirst = false,
+  Axis direction = Axis.vertical,
+}) async {
+  final confirmed = await showFDialog<bool>(
+    context: context,
+    useRootNavigator: true,
+    builder: (dialogContext, _, animation) {
+      final yes = FButton(
+        variant: destructive
+            ? FButtonVariant.destructive
+            : FButtonVariant.primary,
+        onPress: () => Navigator.of(dialogContext).pop(true),
+        child: Text(action),
+      );
+      final no = FButton(
+        variant: FButtonVariant.outline,
+        onPress: () => Navigator.of(dialogContext).pop(false),
+        child: Text(cancel),
+      );
+      return AppDialog(
+        animation: animation,
+        direction: direction,
+        title: Text(title),
+        body: body is Widget ? body : Text('$body'),
+        actions: actionFirst ? [yes, no] : [no, yes],
+      );
+    },
+  );
+  return confirmed ?? false;
+}

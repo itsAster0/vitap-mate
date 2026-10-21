@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/providers/on_device_mode.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
+import 'package:vitapmate/core/providers/server_url.dart';
 
 /// This install as the edge knows it. Events for it (forwarded OTPs, …)
 /// go to its FCM token and, while the app is open, its WebSocket.
@@ -37,14 +37,28 @@ class EdgeDevice {
   }
 }
 
-class EdgeException implements Exception {
+/// The edge does not know this install (its data was reset, or the install
+/// was registered with another server). Edges before `unknown_device` was
+/// used everywhere answered 400 "Unknown device." on the mailbox and link
+/// routes.
+bool isUnknownDevice(String code, String message, int? statusCode) =>
+    code == 'unknown_device' ||
+    (statusCode == 400 && message.trim() == 'Unknown device.');
+
+/// An error a call can fail with when the edge lost this install.
+abstract interface class UnknownDeviceError {
+  bool get unknownDevice;
+}
+
+class EdgeException implements Exception, UnknownDeviceError {
   const EdgeException(this.code, this.message, {this.statusCode});
 
   final String code;
   final String message;
   final int? statusCode;
 
-  bool get unknownDevice => code == 'unknown_device';
+  @override
+  bool get unknownDevice => isUnknownDevice(code, message, statusCode);
 
   @override
   String toString() => message;
@@ -53,6 +67,7 @@ class EdgeException implements Exception {
 abstract class EdgeDeviceStore {
   Future<EdgeDevice?> read();
   Future<void> write(EdgeDevice device);
+  Future<void> delete();
 }
 
 class SecureEdgeDeviceStore implements EdgeDeviceStore {
@@ -75,6 +90,9 @@ class SecureEdgeDeviceStore implements EdgeDeviceStore {
   @override
   Future<void> write(EdgeDevice device) =>
       _storage.write(key: _key, value: jsonEncode(device.toJson()));
+
+  @override
+  Future<void> delete() => _storage.delete(key: _key);
 }
 
 /// Posts JSON to the edge; errors come back as [EdgeException].
@@ -85,10 +103,7 @@ Future<Map<String, dynamic>> edgePost(
   Map<String, dynamic> body,
 ) async {
   if (baseUrl.isEmpty) {
-    throw const EdgeException(
-      'not_configured',
-      'This build has no VTOP_EDGE_URL.',
-    );
+    throw const EdgeException('not_configured', 'No server URL is set.');
   }
   if (await isOnDeviceMode()) {
     throw const EdgeException(
@@ -125,15 +140,19 @@ Future<Map<String, dynamic>> edgePost(
 class EdgeDeviceService {
   EdgeDeviceService({
     http.Client? client,
-    String baseUrl = vtopEdgeBaseUrl,
+    String? baseUrl,
     EdgeDeviceStore store = const SecureEdgeDeviceStore(),
   }) : _client = client ?? http.Client(),
        _baseUrl = baseUrl,
        _store = store;
 
   final http.Client _client;
-  final String _baseUrl;
+
+  /// Fixed for tests; otherwise the server URL in use at each call.
+  final String? _baseUrl;
   final EdgeDeviceStore _store;
+
+  Future<String> _base() async => _baseUrl ?? await currentServerUrl();
 
   Future<EdgeDevice?> load() => _store.read();
 
@@ -146,10 +165,27 @@ class EdgeDeviceService {
     return await _store.read() ?? current;
   }
 
+  /// Runs [call] with this install; when the edge no longer knows it, the
+  /// install registers again and [call] runs once more with the new one.
+  Future<T> withInstall<T>(
+    String fcmToken,
+    Future<T> Function(EdgeDevice device) call,
+  ) async {
+    try {
+      return await call(await ensure(fcmToken));
+    } on UnknownDeviceError catch (error) {
+      if (!error.unknownDevice) rethrow;
+    }
+    return call(await _register(fcmToken));
+  }
+
   Future<EdgeDevice> _register(String fcmToken) async {
-    final body = await edgePost(_client, _baseUrl, '/v1/devices/register', {
-      'fcmToken': fcmToken,
-    });
+    final body = await edgePost(
+      _client,
+      await _base(),
+      '/v1/devices/register',
+      {'fcmToken': fcmToken},
+    );
     final id = body['id'], secret = body['secret'];
     if (id is! String || secret is! String) {
       throw const EdgeException(
@@ -170,7 +206,7 @@ class EdgeDeviceService {
     final current = await _store.read();
     if (current == null || current.fcmToken == token) return null;
     try {
-      await edgePost(_client, _baseUrl, '/v1/devices/update', {
+      await edgePost(_client, await _base(), '/v1/devices/update', {
         'id': current.id,
         'secret': current.secret,
         'fcmToken': token,

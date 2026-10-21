@@ -1,4 +1,3 @@
-import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart'
@@ -12,6 +11,7 @@ import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/utils/app_errors.dart';
 import 'package:vitapmate/core/utils/vtop_login_with_otp.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
+import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
@@ -97,8 +97,6 @@ Future<bool> syncVtopData({
     ).ensureLogin(promptForOtp: promptForOtp);
     final List<Future<bool>> futures = [];
 
-    // Decide what is stale first, so a vtop-server can fetch all of it in
-    // one /v1/refresh call before the per-page refreshes run.
     final timetable = await (await read(
       timetableRepositoryProvider.future,
     )).load();
@@ -114,17 +112,6 @@ Future<bool> syncVtopData({
     )).loadCache();
     final refreshSemesters =
         force || semids == null || !fresh(semids.updateTime);
-
-    await read(vtopBackendProvider).prefetch(user.semid!, {
-      if (refreshTimetable) VtopPage.timetable,
-      if (refreshMarks) VtopPage.marks,
-      if (refreshExamSchedule) VtopPage.examSchedule,
-      if (refreshSemesters) VtopPage.semesters,
-      VtopPage.attendance,
-      // A manual update refreshes every course's detail; fetch them in the
-      // same call instead of one request per course.
-      if (force) VtopPage.fullAttendance,
-    });
 
     if (refreshTimetable) {
       futures.add(
@@ -298,9 +285,12 @@ Future<(bool, AttendanceData?)> _attendanceSync(
             fullAttendanceRepositoryProvider(i.courseType, i.courseId).future,
           );
           final fullAttendance = await fullAttendanceRepo.loadCache();
+          // One VTOP request per course: skip those just fetched or already
+          // matching the summary.
           if (!force &&
               fullAttendance != null &&
-              fresh(fullAttendance.updateTime)) {
+              (fresh(fullAttendance.updateTime) ||
+                  !historyNeedsRefresh(i, fullAttendance))) {
             return true;
           }
           return _retryer(

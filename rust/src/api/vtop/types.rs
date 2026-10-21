@@ -354,7 +354,7 @@ pub struct _GradeHistoryData {
     pub update_time: u64,
 }
 
-#[frb(mirror(OutingStudent), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(OutingStudent), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _OutingStudent {
     pub registration_number: String,
     pub name: String,
@@ -365,13 +365,13 @@ pub struct _OutingStudent {
     pub parent_contact_number: String,
 }
 
-#[frb(mirror(OutingOption), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(OutingOption), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _OutingOption {
     pub value: String,
     pub label: String,
 }
 
-#[frb(mirror(GeneralOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(GeneralOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _GeneralOutingRecord {
     pub serial: String,
     pub place: String,
@@ -399,7 +399,7 @@ pub struct _GeneralOutingData {
     pub update_time: u64,
 }
 
-#[frb(mirror(WeekendOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(WeekendOutingRecord), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _WeekendOutingRecord {
     pub serial: String,
     pub hostel_block: String,
@@ -426,13 +426,13 @@ pub struct _WeekendOutingData {
     pub update_time: u64,
 }
 
-#[frb(mirror(OutingApplyResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(OutingApplyResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _OutingApplyResult {
     pub applied: bool,
     pub message: String,
 }
 
-#[frb(mirror(CoursePageCourse), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CoursePageCourse), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CoursePageCourse {
     pub id: String,
     pub code: String,
@@ -440,14 +440,14 @@ pub struct _CoursePageCourse {
     pub course_type: String,
 }
 
-#[frb(mirror(CoursePageCourses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CoursePageCourses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CoursePageCourses {
     pub semester_id: String,
     pub courses: Vec<CoursePageCourse>,
     pub update_time: u64,
 }
 
-#[frb(mirror(CoursePageClass), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CoursePageClass), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CoursePageClass {
     pub class_id: String,
     pub erp_id: String,
@@ -460,7 +460,7 @@ pub struct _CoursePageClass {
     pub faculty_school: String,
 }
 
-#[frb(mirror(CoursePageClasses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CoursePageClasses), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CoursePageClasses {
     pub semester_id: String,
     pub course_id: String,
@@ -468,13 +468,13 @@ pub struct _CoursePageClasses {
     pub update_time: u64,
 }
 
-#[frb(mirror(CourseMaterial), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CourseMaterial), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CourseMaterial {
     pub label: String,
     pub path: String,
 }
 
-#[frb(mirror(CourseLecture), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CourseLecture), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CourseLecture {
     pub serial: String,
     pub date: String,
@@ -483,7 +483,7 @@ pub struct _CourseLecture {
     pub materials: Vec<CourseMaterial>,
 }
 
-#[frb(mirror(CoursePageDetail), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(CoursePageDetail), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CoursePageDetail {
     pub semester_id: String,
     pub class: CoursePageClass,
@@ -496,13 +496,13 @@ pub struct _CoursePageDetail {
     pub update_time: u64,
 }
 
-#[frb(mirror(CourseFileInfo))]
+#[frb(mirror(CourseFileInfo), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _CourseFileInfo {
     pub content_disposition: String,
     pub content_type: String,
 }
 
-#[frb(mirror(OutingCancelResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta))]
+#[frb(mirror(OutingCancelResult), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
 pub struct _OutingCancelResult {
     pub cancelled: bool,
     pub message: String,

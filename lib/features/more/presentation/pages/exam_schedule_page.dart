@@ -17,6 +17,7 @@ import 'package:vitapmate/features/more/domain/exam_time.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 class ExamSchedulePage extends HookConsumerWidget {
   const ExamSchedulePage({super.key});
@@ -318,11 +319,10 @@ class _DateColumn extends StatelessWidget {
         children: [
           Text(
             '${day.day}',
-            style: typography.body.lg.copyWith(
+            style: typography.body.lg.nums(
               height: 1.1,
               fontWeight: FontWeight.w700,
               color: muted ? colors.mutedForeground : colors.foreground,
-              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
           Text(
@@ -455,10 +455,7 @@ class _ExamCard extends HookWidget {
             const SizedBox(width: Space.md),
             Text(
               formatClock(exam.examTime.split('-').first, context),
-              style: typography.body.xs.copyWith(
-                color: colors.mutedForeground,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+              style: typography.body.xs.nums(color: colors.mutedForeground),
             ),
           ],
         ),
@@ -518,10 +515,9 @@ class _ExamCard extends HookWidget {
                   children: [
                     Text(
                       formatClock(exam.examTime.split('-').first, context),
-                      style: typography.body.md.copyWith(
+                      style: typography.body.md.nums(
                         fontWeight: FontWeight.w500,
                         color: colors.foreground,
-                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                     if (exam.examTime.contains('-'))
@@ -609,10 +605,9 @@ class _Fact extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: typography.body.sm.copyWith(
+            style: typography.body.sm.nums(
               fontWeight: FontWeight.w600,
               color: colors.foreground,
-              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],

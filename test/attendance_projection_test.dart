@@ -336,6 +336,27 @@ void main() {
       expect(trimmed.records.map((r) => r.date), ['29-09-2026', '26-09-2026']);
     });
 
+    test('a history that matches its summary needs no refetch', () {
+      expect(
+        historyNeedsRefresh(
+          _record('ETH', attended: 2, total: 3),
+          history(rows),
+        ),
+        isFalse,
+      );
+    });
+
+    test('a missing or out-of-sync history needs a refetch', () {
+      expect(historyNeedsRefresh(_record('ETH'), null), isTrue);
+      expect(
+        historyNeedsRefresh(
+          _record('ETH', attended: 3, total: 4),
+          history(rows),
+        ),
+        isTrue,
+      );
+    });
+
     test('a summary ahead of the history is out of sync', () {
       final sync = HistorySync.of(
         _record('ETH', attended: 3, total: 4),

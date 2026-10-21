@@ -412,7 +412,7 @@ class MailForwardingPage extends HookConsumerWidget {
               icon: FLucideIcons.circleAlert,
               tone: app.warning,
               child: const Text(
-                'Works only in the app, not for server sign-in. Some college accounts don’t allow forwarding; the guide shows how to check.',
+                'The app and the server both read forwarded OTPs, so server sign-in works too. Some college accounts don’t allow forwarding; the guide shows how to check.',
               ),
             ),
             const SizedBox(height: Space.xl),

@@ -11,6 +11,7 @@ import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 const _sheetPrefKey = 'mess_menu_sheet';
 
@@ -35,12 +36,7 @@ class MessMenuView extends HookConsumerWidget {
     );
 
     if (menu.connectionState != ConnectionState.done) {
-      return Center(
-        child: CircularProgressIndicator(
-          color: context.theme.colors.primary,
-          strokeWidth: 3,
-        ),
-      );
+      return const Spinner();
     }
     final data = menu.data;
     if (data == null) {
@@ -397,7 +393,7 @@ class _WeekStrip extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             '${date.day}',
-                            style: TextStyle(
+                            style: numStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
                               color: isSelected
@@ -405,9 +401,6 @@ class _WeekStrip extends StatelessWidget {
                                   : isToday
                                   ? colors.app.accent
                                   : colors.foreground,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
                         ],
@@ -475,10 +468,7 @@ class _MealCard extends StatelessWidget {
                 range,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: typography.body.xs.copyWith(
-                  color: colors.mutedForeground,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                style: typography.body.xs.nums(color: colors.mutedForeground),
               ),
             ),
             if (status == _MealStatus.now)

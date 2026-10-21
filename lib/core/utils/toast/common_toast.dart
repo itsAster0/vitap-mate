@@ -42,7 +42,12 @@ void _showAppToast(
     context: context,
     alignment: FToastAlignment.bottomCenter,
     title: Text(title),
-    description: Text(description),
+    // Long errors would push the toast off the screen.
+    description: Text(
+      description,
+      maxLines: 5,
+      overflow: TextOverflow.ellipsis,
+    ),
     onDismiss: onDismiss,
     suffixBuilder: (context, entry) => IntrinsicHeight(
       child: FButton(onPress: entry.dismiss, child: const Text('Aye')),

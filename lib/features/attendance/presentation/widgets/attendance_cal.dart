@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// "What if" planner: choose how many upcoming classes to attend or skip and
 /// see where the percentage lands. Current counts can be corrected too.
@@ -197,10 +198,7 @@ class AttendancePlanner extends HookWidget {
                 ),
                 Text(
                   '${predicted.attended} of ${predicted.total} classes',
-                  style: typography.body.xs.copyWith(
-                    color: colors.mutedForeground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  style: typography.body.xs.nums(color: colors.mutedForeground),
                 ),
               ],
             ),
@@ -379,11 +377,10 @@ class _Figure extends StatelessWidget {
           curve: Curves.easeOutCubic,
           builder: (context, v, _) => Text(
             '${v.toStringAsFixed(decimals)}%',
-            style: typography.display.xl2.copyWith(
+            style: typography.display.xl2.nums(
               height: 1.1,
               fontWeight: FontWeight.w800,
               color: color,
-              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ),

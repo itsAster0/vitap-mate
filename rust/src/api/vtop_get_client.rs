@@ -26,8 +26,15 @@ pub async fn get_vtop_client(
     username: String,
     password: String,
     persisted_session: Option<PersistedVtopSession>,
+    base_url: Option<String>,
 ) -> Result<VtopClient, VtopError> {
+    // A base URL other than VTOP's is the server's proxy of it (compressed).
+    let mut config = vtop_core::VtopConfig::default();
+    if let Some(url) = base_url.filter(|url| !url.trim().is_empty()) {
+        config.base_url = url.trim().trim_end_matches('/').to_string();
+    }
     let inner = vtop_core::VtopClient::builder()
+        .config(config)
         .with_credentials(Username::parse(&username)?, Password::parse(&password)?)?;
     if let Some(session) = persisted_session {
         inner.restore_persisted_session(&session)?;

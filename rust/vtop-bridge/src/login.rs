@@ -42,9 +42,9 @@ pub fn map_outcome(result: VtopResult<()>) -> Result<(), LoginError> {
         Ok(()) => Ok(()),
         Err(VtopError::InvalidCredentials) => Err(LoginError::InvalidCredentials),
         // No usable code came, so the sign-in is stuck at the OTP.
-        Err(VtopError::OTPRequired(..)) => Err(LoginError::Failed(
-            "otp_not_found: no forwarded OTP".into(),
-        )),
+        Err(VtopError::OTPRequired(..)) => {
+            Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()))
+        }
         Err(error) => Err(LoginError::Failed(error.to_string())),
     }
 }

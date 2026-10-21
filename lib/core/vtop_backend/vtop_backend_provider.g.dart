@@ -58,23 +58,12 @@ final class VtopLoginPromptAllowedProvider
 String _$vtopLoginPromptAllowedHash() =>
     r'6bc03c9f869e783d91d2f15c72f9f13820fd0b97';
 
-/// The server when one is configured in Settings, otherwise the bundled
-/// Rust library. Either way an expired session triggers one re-login and
-/// retry. Rebuilt when the setting changes.
-
 @ProviderFor(vtopBackend)
 final vtopBackendProvider = VtopBackendProvider._();
-
-/// The server when one is configured in Settings, otherwise the bundled
-/// Rust library. Either way an expired session triggers one re-login and
-/// retry. Rebuilt when the setting changes.
 
 final class VtopBackendProvider
     extends $FunctionalProvider<VtopBackend, VtopBackend, VtopBackend>
     with $Provider<VtopBackend> {
-  /// The server when one is configured in Settings, otherwise the bundled
-  /// Rust library. Either way an expired session triggers one re-login and
-  /// retry. Rebuilt when the setting changes.
   VtopBackendProvider._()
     : super(
         from: null,
@@ -108,14 +97,14 @@ final class VtopBackendProvider
   }
 }
 
-String _$vtopBackendHash() => r'70818e45e756ccba5150c4d894bbc084471a0030';
+String _$vtopBackendHash() => r'dd8143cb5d767b27288bf9b2d8ba97888239342c';
 
-/// Logs in on the device, or through the server when one is configured.
+/// Logs in on the device; the edge signs in on its own when it fetches.
 
 @ProviderFor(vtopAuthenticator)
 final vtopAuthenticatorProvider = VtopAuthenticatorProvider._();
 
-/// Logs in on the device, or through the server when one is configured.
+/// Logs in on the device; the edge signs in on its own when it fetches.
 
 final class VtopAuthenticatorProvider
     extends
@@ -125,7 +114,7 @@ final class VtopAuthenticatorProvider
           VtopAuthenticator
         >
     with $Provider<VtopAuthenticator> {
-  /// Logs in on the device, or through the server when one is configured.
+  /// Logs in on the device; the edge signs in on its own when it fetches.
   VtopAuthenticatorProvider._()
     : super(
         from: null,
@@ -160,4 +149,4 @@ final class VtopAuthenticatorProvider
   }
 }
 
-String _$vtopAuthenticatorHash() => r'74365ea9fe169017c23ba7e9d2d0fe24526d4387';
+String _$vtopAuthenticatorHash() => r'c937bb644bb340d647d6c7ad4241010639fc8136';

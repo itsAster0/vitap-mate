@@ -1,7 +1,6 @@
 import 'dart:developer';
 
 import 'package:app_settings/app_settings.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -43,7 +42,6 @@ class NotificationManagementPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pauseDaysController = useTextEditingController(text: "1");
-    final debugDelayController = useTextEditingController(text: "0");
     final classReminderSettings = ref.watch(classReminderSettingsProvider);
     final examReminderSettings = ref.watch(examReminderSettingsProvider);
     final changeAlertsSettings = ref.watch(changeAlertsSettingsProvider);
@@ -83,61 +81,6 @@ class NotificationManagementPage extends HookConsumerWidget {
                     );
                   },
                 ),
-                if (kDebugMode)
-                  FTile(
-                    prefix: Icon(FLucideIcons.bug),
-                    title: const Text("Test Notification (Debug)"),
-                    suffix: const Text("Send"),
-                    onPress: () async {
-                      await showFDialog(
-                        context: context,
-                        // Above the tab shell, so the keyboard inset is counted once.
-                        useRootNavigator: true,
-                        builder: (context, style, animation) => AppDialog(
-                          animation: animation,
-                          direction: Axis.horizontal,
-                          title: const Text("Debug Notification Delay"),
-                          body: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text("Delay in seconds (0 = immediate)."),
-                              const SizedBox(height: 8),
-                              FTextField(
-                                control: FTextFieldControl.managed(
-                                  controller: debugDelayController,
-                                ),
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            FButton(
-                              variant: FButtonVariant.outline,
-                              onPress: () => Navigator.of(context).pop(),
-                              child: const Text("Cancel"),
-                            ),
-                            FButton(
-                              onPress: () async {
-                                final status = await Permission.notification
-                                    .request();
-                                final granted = status.isGranted;
-                                if (!granted) return;
-                                final delay =
-                                    int.tryParse(
-                                      debugDelayController.text.trim(),
-                                    ) ??
-                                    0;
-                                if (context.mounted) {
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              child: const Text("Send"),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
                 FTile(
                   prefix: Icon(FLucideIcons.bell),
                   title: const Text("Class Reminders"),

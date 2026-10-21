@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:developer' show log;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
@@ -10,21 +9,13 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/providers/theme_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/featureflags/feature_flags.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
-import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/background/controller.dart';
 import 'package:vitapmate/features/background/sync.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
@@ -32,358 +23,14 @@ import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dar
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/mess_timings_sheet.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/vtop_server_dialog.dart';
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
-import 'package:vitapmate/core/widgets/server_feature_gate.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
-
-  Future<void> _copySavedCookies(BuildContext context, WidgetRef ref) async {
-    try {
-      final user = await ref.read(vtopUserProvider.future);
-      final username = user.username;
-      if (username == null || username.isEmpty) {
-        if (context.mounted) {
-          dispToast(context, "No Account", "Sign in first to copy cookies.");
-        }
-        return;
-      }
-
-      final stored = await loadStoredVtopSession(username);
-      final cookies = stored?.snapshot.cookies?.trim() ?? '';
-      if (cookies.isEmpty) {
-        if (context.mounted) {
-          dispToast(
-            context,
-            "No Saved Cookies",
-            "No saved session cookies found. Refresh data once and try again.",
-          );
-        }
-        return;
-      }
-
-      final cookieEditorJson = cookieEditorJsonFromHeader(cookies);
-      if (cookieEditorJson == '[]') {
-        if (context.mounted) {
-          dispToast(
-            context,
-            "Invalid Cookie Data",
-            "Saved cookie header could not be converted for Cookie-Editor.",
-          );
-        }
-        return;
-      }
-
-      await Clipboard.setData(ClipboardData(text: cookieEditorJson));
-      if (context.mounted) {
-        dispToast(context, "Copied", "Cookie-Editor JSON copied to clipboard.");
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to copy saved cookies',
-        name: 'settings',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(context, "Failed", "Could not copy cookies right now.");
-      }
-    }
-  }
-
-  Future<void> _copyFcmToken(BuildContext context) async {
-    try {
-      final token = await getFcmTokenForCopy();
-      if (token == null || token.trim().isEmpty) {
-        if (context.mounted) {
-          dispToast(context, "No Token", "Could not get your Token right now.");
-        }
-        return;
-      }
-
-      await Clipboard.setData(ClipboardData(text: token));
-      if (context.mounted) {
-        dispToast(context, "Copied", "Token copied to clipboard.");
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to copy FCM token',
-        name: 'settings.fcm',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(context, "Failed", "Could not copy your Token right now.");
-      }
-    }
-  }
-
-  /// Developer tool: removes the newest row from every course's saved
-  /// history, so it disagrees with the summary. A refresh restores it.
-  Future<void> _dropLatestHistoryEntries(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    try {
-      final attendance = await (await ref.read(
-        attendanceRepositoryProvider.future,
-      )).loadCache();
-      var dropped = 0;
-      for (final course in attendance?.records ?? <AttendanceRecord>[]) {
-        final repo = await ref.read(
-          fullAttendanceRepositoryProvider(
-            course.courseType,
-            course.courseId,
-          ).future,
-        );
-        final history = await repo.loadCache();
-        if (history == null) continue;
-        final trimmed = withoutLatestEntry(history);
-        if (trimmed.records.length == history.records.length) continue;
-        await repo.saveCache(trimmed);
-        dropped++;
-        ref.invalidate(
-          cachedFullAttendanceProvider(course.courseType, course.courseId),
-        );
-        ref.invalidate(
-          fullAttendanceProvider(course.courseType, course.courseId),
-        );
-      }
-      if (context.mounted) {
-        dispToast(
-          context,
-          'History Trimmed',
-          'Dropped the latest entry from $dropped courses.',
-        );
-      }
-    } catch (e) {
-      if (context.mounted) disCommonToast(context, e);
-    }
-  }
-
-  /// Developer tool: saves the attendance summary with no courses, as before
-  /// VTOP posts any. A refresh restores it.
-  Future<void> _clearAttendance(BuildContext context, WidgetRef ref) async {
-    try {
-      final repo = await ref.read(attendanceRepositoryProvider.future);
-      final attendance = await repo.loadCache();
-      if (attendance != null) {
-        await repo.saveCache(attendance.copyWith(records: const []));
-      }
-      ref.invalidate(attendanceProvider);
-      if (context.mounted) {
-        dispToast(context, 'Attendance Cleared', 'Refresh to bring it back.');
-      }
-    } catch (e) {
-      if (context.mounted) disCommonToast(context, e);
-    }
-  }
-
-  Future<void> _clearSavedCookies(BuildContext context, WidgetRef ref) async {
-    try {
-      final user = await ref.read(vtopUserProvider.future);
-      final username = user.username;
-      if (username == null || username.isEmpty) {
-        if (context.mounted) {
-          dispToast(context, "No Account", "Sign in first to clear cookies.");
-        }
-        return;
-      }
-
-      if (!context.mounted) return;
-      final confirmed = await showAdaptiveDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        builder: (_) => AppDialog(
-          title: const Text('Clear Saved Cookies?'),
-          body: const Text(
-            'This removes the saved VTOP session cookies for your account. You may need to sign in again.',
-          ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () =>
-                  Navigator.of(context, rootNavigator: true).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              variant: FButtonVariant.destructive,
-              onPress: () =>
-                  Navigator.of(context, rootNavigator: true).pop(true),
-              child: const Text('Clear'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true) return;
-
-      await clearStoredVtopSession(username);
-      // The client keeps its cookies in memory and saves them back on the
-      // next request; a new one starts signed out.
-      ref.invalidate(vClientProvider);
-      if (context.mounted) {
-        dispToast(context, "Cleared", "Saved VTOP cookies were cleared.");
-      }
-    } catch (error, stackTrace) {
-      log(
-        'Failed to clear saved cookies',
-        name: 'settings',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(context, "Failed", "Could not clear cookies right now.");
-      }
-    }
-  }
-
-  Future<void> _openVtopSessionReuseTtlDialog(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final currentTtl = ref.read(vtopSessionReuseTtlProvider);
-
-    await showAdaptiveDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) {
-        return HookBuilder(
-          builder: (dialogContext) {
-            final controller = useTextEditingController(
-              text: currentTtl.inMinutes.toString(),
-            );
-            final errorText = useState<String?>(null);
-
-            return AppDialog(
-              title: const Text('VTOP Session Reuse'),
-              body: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Enter how long saved cookies can be reused.'),
-                  const SizedBox(height: 8),
-                  FTextField(
-                    control: FTextFieldControl.managed(controller: controller),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                  if (errorText.value != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      errorText.value!,
-                      style: dialogContext.theme.typography.body.sm.copyWith(
-                        color: dialogContext.theme.colors.destructive,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                FButton(
-                  variant: FButtonVariant.outline,
-                  onPress: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FButton(
-                  onPress: () async {
-                    final minutes = int.tryParse(controller.text.trim());
-                    if (minutes == null || minutes <= 0) {
-                      errorText.value = 'Enter minutes greater than 0.';
-                      return;
-                    }
-
-                    await setVtopSessionReuseTtl(
-                      ref,
-                      Duration(minutes: minutes),
-                    );
-                    if (!dialogContext.mounted) return;
-                    Navigator.of(dialogContext).pop();
-                    if (context.mounted) {
-                      dispToast(
-                        context,
-                        'Saved',
-                        'VTOP sessions will be reused for $minutes minutes.',
-                      );
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
-    try {
-      final latest = await ref
-          .read(googleEmailOtpAuthServiceProvider)
-          .fetchLatestInfoEmail(
-            deleteAfterReading: ref.read(emailOtpDeleteAfterReadingProvider),
-          );
-      if (!context.mounted) return;
-
-      await showAdaptiveDialog<void>(
-        context: context,
-        builder: (dialogContext) {
-          if (latest == null) {
-            return AppDialog(
-              title: const Text('Latest OTP Email'),
-              body: const Text('No emails from info1@vitap.ac.in were found.'),
-              actions: [
-                FButton(
-                  onPress: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Close'),
-                ),
-              ],
-            );
-          }
-
-          final localTime = latest.receivedAt.toLocal().toString();
-          return AppDialog(
-            title: const Text('Latest OTP Email'),
-            body: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Subject: ${latest.subject}'),
-                const SizedBox(height: 6),
-                Text('Received: $localTime'),
-                const SizedBox(height: 6),
-                Text('OTP: ${latest.otp ?? 'Not found'}'),
-                const SizedBox(height: 12),
-                Text(latest.snippet),
-              ],
-            ),
-            actions: [
-              FButton(
-                onPress: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
-              ),
-            ],
-          );
-        },
-      );
-    } catch (error, stackTrace) {
-      log(
-        'Failed to fetch latest info1 email',
-        name: 'settings.email_otp',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) {
-        dispToast(context, "Test Failed", "$error");
-      }
-    }
-  }
 
   void _invalidateVtopDataProviders(WidgetRef ref) {
     ref.invalidate(attendanceProvider);
@@ -515,31 +162,6 @@ class SettingsPage extends HookConsumerWidget {
             children: [
               FTile(
                 prefix: _IconTile(
-                  icon: FLucideIcons.arrowDownUp,
-                  tone: colors.app.accentTone,
-                ),
-                title: const Text('Data Source'),
-                subtitle: Text(
-                  ref.watch(onDeviceModeProvider)
-                      ? 'On device'
-                      : vtopDataSourceLabel(
-                          ref.watch(vtopServerSettingsProvider),
-                        ),
-                ),
-                suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () async {
-                  if (await ensureServerAllowed(
-                        context,
-                        ref,
-                        feature: 'A server data source',
-                      ) &&
-                      context.mounted) {
-                    await showVtopServerDialog(context, ref);
-                  }
-                },
-              ),
-              FTile(
-                prefix: _IconTile(
                   icon: FLucideIcons.cloudDownload,
                   tone: colors.app.accentTone,
                 ),
@@ -601,30 +223,12 @@ class SettingsPage extends HookConsumerWidget {
                       },
                     ),
                   ),
-                if (isGmailOtpReady.value && showDebugFeatures.value)
-                  FTile(
-                    prefix: _IconTile(
-                      icon: FLucideIcons.mailCheck,
-                      tone: colors.app.warning,
-                    ),
-                    title: const Text('Test Latest OTP Email'),
-                    subtitle: const Text('Fetch the latest VTOP OTP email'),
-                    suffix: isEmailOtpTestBusy.value
-                        ? const FCircularProgress.pinwheel()
-                        : const Icon(FLucideIcons.chevronRight),
-                    onPress: isEmailOtpTestBusy.value
-                        ? null
-                        : () async {
-                            isEmailOtpTestBusy.value = true;
-                            await _testLatestInfoEmail(context, ref);
-                            isEmailOtpTestBusy.value = false;
-                          },
-                  ),
               ],
             ],
           ),
           SectionHeader(title: 'Privacy'),
           FTileGroup(
+            divider: FItemDivider.indented,
             children: [
               FTile(
                 prefix: _IconTile(
@@ -637,6 +241,16 @@ class SettingsPage extends HookConsumerWidget {
                   value: ref.watch(onDeviceModeProvider),
                   onChange: (value) => _setOnDeviceMode(context, ref, value),
                 ),
+              ),
+              FTile(
+                prefix: _IconTile(
+                  icon: FLucideIcons.server,
+                  tone: colors.app.accentTone,
+                ),
+                title: const Text('Server'),
+                subtitle: const Text('VTOP data, sign-in and connected apps'),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () => GoRouter.of(context).pushNamed(Paths.server),
               ),
             ],
           ),
@@ -685,15 +299,12 @@ class SettingsPage extends HookConsumerWidget {
                 ],
               ),
               FTile(
-                prefix: _IconTile(
-                  icon: FLucideIcons.eyeOff,
-                  tone: colors.app.lab,
-                ),
-                title: const Text('Hide Skip Counts'),
-                subtitle: const Text('Show percentages without skip advice'),
+                prefix: _IconTile(icon: FLucideIcons.eye, tone: colors.app.lab),
+                title: const Text('Show Skip Counts'),
+                subtitle: const Text('How many classes you can skip or need'),
                 suffix: FSwitch(
-                  value: ref.watch(hideSkipAdviceProvider),
-                  onChange: (value) => setHideSkipAdvice(ref, value),
+                  value: ref.watch(showSkipAdviceProvider),
+                  onChange: (value) => setShowSkipAdvice(ref, value),
                 ),
               ),
               FTile(
@@ -787,63 +398,15 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
-          if (showDebugFeatures.value) SectionHeader(title: 'Developer Tools'),
           if (showDebugFeatures.value)
             FTileGroup(
-              divider: FItemDivider.indented,
               children: [
                 FTile(
-                  prefix: const Icon(FLucideIcons.timer),
-                  title: const Text('VTOP Session Reuse'),
-                  subtitle: Text(
-                    'Reuse saved cookies for ${initialVtopSessionReuseTtl.inMinutes} minutes',
-                  ),
+                  prefix: const Icon(FLucideIcons.bug),
+                  title: const Text('Debug'),
+                  subtitle: const Text('Activity, diagnostics, logs and tools'),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _openVtopSessionReuseTtlDialog(context, ref),
-                ),
-                FTile(
-                  prefix: const Icon(FLucideIcons.radio),
-                  title: const Text('Copy Token'),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _copyFcmToken(context),
-                ),
-                FTile(
-                  prefix: const Icon(FLucideIcons.copy),
-                  title: const Text('Copy Saved Cookies'),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _copySavedCookies(context, ref),
-                ),
-                FTile(
-                  prefix: const Icon(FLucideIcons.trash2),
-                  title: const Text('Clear Saved Cookies'),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _clearSavedCookies(context, ref),
-                ),
-                FTile(
-                  prefix: const Icon(FLucideIcons.calendarX),
-                  title: const Text('Drop Latest History Entry'),
-                  subtitle: const Text(
-                    'Every course, saved until the next refresh',
-                  ),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _dropLatestHistoryEntries(context, ref),
-                ),
-                FTile(
-                  prefix: const Icon(FLucideIcons.clipboardX),
-                  title: const Text('Clear Attendance'),
-                  subtitle: const Text(
-                    'Show it as not posted, until the next refresh',
-                  ),
-                  suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => _clearAttendance(context, ref),
-                ),
-                FTile(
-                  prefix: const Icon(Icons.receipt_long_outlined),
-                  title: const Text('Logs'),
-                  suffix: Icon(FLucideIcons.chevronRight),
-                  onPress: () {
-                    GoRouter.of(context).pushNamed(Paths.logs);
-                  },
+                  onPress: () => GoRouter.of(context).pushNamed(Paths.debug),
                 ),
               ],
             ),
@@ -1146,34 +709,21 @@ Future<void> _setOnDeviceMode(
   final prefs = await ref.read(settingsProvider.future);
   final linked = prefs.getBool(bridgeLinkedSettingKey) ?? false;
   if (!context.mounted) return;
-  final confirmed = await showAdaptiveDialog<bool>(
-    context: context,
-    barrierDismissible: true,
-    builder: (dialogContext) => AppDialog(
-      title: const Text('Turn On On-device Mode?'),
-      body: Text(
-        'The app will only talk to VTOP (and Google, if you read OTPs from '
+  final confirmed = await confirm(
+    context,
+    title: 'Turn On On-device Mode?',
+    action: 'Turn On',
+    actionFirst: true,
+    body:
+        ('The app will only talk to VTOP (and Google, if you read OTPs from '
         'Gmail). These stop working until you turn it off: the browser '
         'extension, AI agents (MCP), OTP mail forwarding, server sign-in '
         'and a server data source.'
         '${linked ? '\n\nYour account on the VITAP Mate server, with any '
                   'saved password and access keys, stays there. To remove '
-                  'it, delete it in Connected apps first.' : ''}',
-      ),
-      actions: [
-        FButton(
-          onPress: () => Navigator.of(dialogContext).pop(true),
-          child: const Text('Turn On'),
-        ),
-        FButton(
-          variant: FButtonVariant.outline,
-          onPress: () => Navigator.of(dialogContext).pop(false),
-          child: const Text('Cancel'),
-        ),
-      ],
-    ),
+                  'it, delete it in Connected apps first.' : ''}'),
   );
-  if (confirmed != true) return;
+  if (!confirmed) return;
   await setOnDeviceMode(ref, true);
   if (context.mounted) {
     dispToast(

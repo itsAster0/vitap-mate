@@ -334,31 +334,18 @@ class _PassCard extends HookConsumerWidget {
     final cancelling = useState(false);
 
     Future<void> cancel() async {
-      final sure = await showFDialog<bool>(
-        context: context,
-        useRootNavigator: true,
-        builder: (dialogContext, _, animation) => AppDialog(
-          animation: animation,
-          title: const Text('Cancel this request?'),
-          body: Text(
+      final sure = await confirm(
+        context,
+        title: 'Cancel this request?',
+        body:
             '$place · $purpose\nIt is removed from VTOP. To go later, '
             'you will have to apply again.',
-          ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.destructive,
-              onPress: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Cancel request'),
-            ),
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Keep it'),
-            ),
-          ],
-        ),
+        action: 'Cancel request',
+        cancel: 'Keep it',
+        destructive: true,
+        actionFirst: true,
       );
-      if (sure != true || !context.mounted) return;
+      if (!sure || !context.mounted) return;
       cancelling.value = true;
       try {
         final result = await ref

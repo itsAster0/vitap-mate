@@ -12,70 +12,54 @@ Future<bool> confirmApplication(
   required String title,
   required List<(String, String)> rows,
   required String footnote,
-}) async {
-  final confirmed = await showFDialog<bool>(
-    context: context,
-    // Above the tab shell, so the keyboard inset is counted once.
-    useRootNavigator: true,
-    builder: (dialogContext, _, animation) {
-      final colors = dialogContext.theme.colors;
-      final typography = dialogContext.theme.typography;
-      return AppDialog(
-        animation: animation,
-        title: Text(title),
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (label, value) in rows)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Space.xs + 2),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 72,
-                      child: Text(
-                        label,
-                        style: typography.body.sm.copyWith(
-                          color: colors.mutedForeground,
-                        ),
-                      ),
+}) {
+  final colors = context.theme.colors;
+  final typography = context.theme.typography;
+  return confirm(
+    context,
+    title: title,
+    action: 'Apply',
+    cancel: 'Edit',
+    actionFirst: true,
+    body: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (label, value) in rows)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Space.xs + 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 72,
+                  child: Text(
+                    label,
+                    style: typography.body.sm.copyWith(
+                      color: colors.mutedForeground,
                     ),
-                    Expanded(
-                      child: Text(
-                        value,
-                        style: typography.body.sm.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colors.foreground,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            const SizedBox(height: Space.sm),
-            Text(
-              footnote,
-              style: typography.body.xs.copyWith(color: colors.mutedForeground),
+                Expanded(
+                  child: Text(
+                    value,
+                    style: typography.body.sm.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colors.foreground,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+        const SizedBox(height: Space.sm),
+        Text(
+          footnote,
+          style: typography.body.xs.copyWith(color: colors.mutedForeground),
         ),
-        actions: [
-          FButton(
-            onPress: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Apply'),
-          ),
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Edit'),
-          ),
-        ],
-      );
-    },
+      ],
+    ),
   );
-  return confirmed ?? false;
 }
 
 /// The shell of an apply sheet: handle, title, scrolling fields, VTOP's

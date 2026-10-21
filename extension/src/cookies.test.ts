@@ -96,4 +96,18 @@ describe("cookies", () => {
     ).rejects.toThrow("unexpected domain");
     expect(jar.values()).toEqual({ JSESSIONID: "old" });
   });
+
+  it("leaves the cookie store to the browser (Firefox has no store \"0\")", async () => {
+    const jar = fakeJar([]);
+    const set = jar.api.set;
+    // As Firefox does: only its own store names are valid.
+    jar.api.set = async (details) => {
+      if (details.storeId !== undefined && details.storeId !== "firefox-default") {
+        throw new Error(`Invalid cookie store id: "${details.storeId}"`);
+      }
+      return set(details);
+    };
+    await installCookies(jar.api, [{ ...fresh("JSESSIONID", "new"), storeId: "0" }]);
+    expect(jar.values()).toEqual({ JSESSIONID: "new" });
+  });
 });

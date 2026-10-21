@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// Opens [AttendanceGuidePage] inside the current tab, so the timetable and
 /// attendance tabs each keep their own back stack.
@@ -359,14 +360,8 @@ class _SampleCard extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final tone = colors.app.success;
-    final muted = typography.body.sm.copyWith(
-      color: colors.mutedForeground,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    final small = typography.body.xs.copyWith(
-      color: colors.mutedForeground,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+    final muted = typography.body.sm.nums(color: colors.mutedForeground);
+    final small = typography.body.xs.nums(color: colors.mutedForeground);
     final strong = small.copyWith(
       fontWeight: FontWeight.w600,
       color: colors.foreground,
@@ -618,11 +613,10 @@ class _Term extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: typography.body.md.copyWith(
+                    style: typography.body.md.nums(
                       height: 1.3,
                       fontWeight: FontWeight.w600,
                       color: colors.foreground,
-                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(height: 3),
@@ -640,10 +634,9 @@ class _Term extends StatelessWidget {
                       ),
                       child: Text(
                         math!,
-                        style: typography.body.xs.copyWith(
+                        style: typography.body.xs.nums(
                           fontWeight: FontWeight.w500,
                           color: colors.foreground,
-                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                     ),

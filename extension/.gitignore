@@ -25,3 +25,8 @@ dist-ssr
 
 # Packed extension
 extension.zip
+
+# Firefox builds
+dist-firefox
+web-ext-artifacts
+extension.xpi

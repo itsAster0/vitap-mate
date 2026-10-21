@@ -161,7 +161,7 @@ class MorePage extends HookConsumerWidget {
                   title: const Text("Connected apps"),
                   subtitle: const Text("Browser extension and AI agents (MCP)"),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => push(Paths.connectedApps),
+                  onPress: () => push(Paths.serverApps),
                 ),
               ],
             ),

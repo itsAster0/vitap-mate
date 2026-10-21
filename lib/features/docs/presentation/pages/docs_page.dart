@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/theme/app_palette.dart';
+import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:open_file/open_file.dart';
@@ -252,12 +252,7 @@ class DocsPage extends HookConsumerWidget {
           ),
           Expanded(
             child: windowsAsync.when(
-              loading: () => Center(
-                child: CircularProgressIndicator(
-                  color: context.theme.colors.primary,
-                  strokeWidth: 3,
-                ),
-              ),
+              loading: () => const Spinner(),
               error: (e, _) => _CenterInfo(
                 icon: FLucideIcons.triangleAlert,
                 title: 'Unable to load documents',

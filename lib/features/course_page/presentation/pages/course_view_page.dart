@@ -14,6 +14,7 @@ import 'package:vitapmate/features/course_page/data/course_page_service.dart';
 import 'package:vitapmate/features/course_page/domain/course_page_logic.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// Upcoming lectures shown before "show all".
 const _upcomingShown = 3;
@@ -730,11 +731,10 @@ class _LectureTile extends StatelessWidget {
               children: [
                 Text(
                   date == null ? '—' : '${date.day}',
-                  style: context.theme.typography.body.lg.copyWith(
+                  style: context.theme.typography.body.lg.nums(
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                     color: faded ? colors.mutedForeground : colors.foreground,
-                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
                 Text(

@@ -1,14 +1,15 @@
-/// URLs of the services the app talks to, set at build time through
-/// `.env.json` (`--dart-define-from-file=.env.json`). None is built in: a
-/// build without one leaves that feature unavailable.
+/// URLs of the services the app talks to. The VITAP Mate server has a
+/// built-in default, which a build can change through `.env.json`
+/// (`--dart-define-from-file=.env.json`) and the user in Settings → Privacy
+/// → Server (see `core/providers/server_url.dart`).
 library;
 
-/// The sign-in bridge for the browser extension and AI agents.
-const vtopBridgeBaseUrl = String.fromEnvironment('VTOP_BRIDGE_URL');
-
-/// The Cloudflare edge: forwarding addresses, installs and the event
-/// channel (`/v1/events`).
-const vtopEdgeBaseUrl = String.fromEnvironment('VTOP_EDGE_URL');
+/// The VITAP Mate server: installs, the event channel, OTP forwarding,
+/// sign-in for connected apps, and VTOP data.
+const defaultServerUrl = String.fromEnvironment(
+  'VTOP_SERVER_URL',
+  defaultValue: 'https://vmate-api.aster0.dev',
+);
 
 /// Where students download the browser extension.
 const extensionDownloadUrl = String.fromEnvironment('VTOP_EXTENSION_URL');

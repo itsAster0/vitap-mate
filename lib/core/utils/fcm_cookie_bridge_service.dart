@@ -16,6 +16,7 @@ import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
+import 'package:vitapmate/core/utils/edge/credentials_rejected.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
@@ -200,6 +201,15 @@ Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
     await (EdgeEventChannel.instance
           ..on(mailOtpMessageType, handleMailOtpEvent))
         .accept(event);
+    return;
+  }
+  if (type == credentialsRejectedType) {
+    final event = EdgeEvent.fromJson(data);
+    if (event != null) {
+      await (EdgeEventChannel.instance
+            ..on(credentialsRejectedType, handleCredentialsRejectedEvent))
+          .accept(event);
+    }
     return;
   }
   if (type != vtopCookieRequestType) return;
@@ -688,6 +698,38 @@ class FcmCookieNotificationService {
         ?.createNotificationChannel(_channel);
 
     _initialized = true;
+  }
+
+  static const int _alertId = 9003;
+  static const AndroidNotificationChannel _alerts = AndroidNotificationChannel(
+    'server_alerts_v1',
+    'Server alerts',
+    description: 'Problems with signing in on the VITAP Mate server',
+    importance: Importance.high,
+  );
+
+  /// A notification the user should act on (the server could not sign in).
+  static Future<void> showServerAlert(String title, String body) async {
+    await ensureInitialized();
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(_alerts);
+    await _notifications.show(
+      id: _alertId,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          _alerts.id,
+          _alerts.name,
+          channelDescription: _alerts.description,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+      ),
+    );
   }
 
   static Future<void> showProgress() async {

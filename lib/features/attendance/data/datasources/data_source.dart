@@ -2,6 +2,7 @@ import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/storage/json_file_storage.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 
 class AttendanceDataSource {
@@ -44,7 +45,7 @@ class AttendanceDataSource {
     String courseId,
   ) async {
     await _globalAsyncQueue.run(
-      'toStorage_fullattendance_$semid',
+      'toStorage_fullattendance_${semid}_${courseType}_$courseId',
       () => _storage.writeJson(
         'full_attendance_${semid}_${courseType}_$courseId',
         attendance.toJson(),
@@ -83,7 +84,7 @@ class AttendanceDataSource {
       action: 'fetchAttendance semid=$semid',
       run: () => _globalAsyncQueue.run(
         'vtop_attendance_$semid',
-        () async => _backend().attendance(semid),
+        () async => _backend().fetch(VtopQueries.attendance(semid)),
       ),
     );
   }
@@ -98,10 +99,12 @@ class AttendanceDataSource {
       action: 'fetchFullAttendance semid=$semid courseId=$courseId',
       run: () => _globalAsyncQueue.run(
         'vtop_fullattendance_${semid}_${courseType}_$courseId',
-        () async => _backend().fullAttendance(
-          semesterId: semid,
-          courseId: courseId,
-          courseType: courseType,
+        () async => _backend().fetch(
+          VtopQueries.fullAttendance(
+            semid,
+            courseId: courseId,
+            courseType: courseType,
+          ),
         ),
       ),
     );

@@ -1,13 +1,15 @@
-//! Sealed boxes for forwarded OTP mail. The mail Worker seals the code to
-//! the phone's X25519 public key; vtop-bridge only ever relays the box, and
-//! the private key never leaves the phone.
+//! Sealed boxes for forwarded OTP mail. The edge Worker seals the code to
+//! a public key: the phone's, or one the engine made for a sign-in. Neither
+//! private key leaves its holder.
 //!
 //! Box v1, base64url without padding:
 //! `0x01 | ephemeral public key (32) | nonce (12) | AES-256-GCM ciphertext`.
 //! The key is HKDF-SHA256 over the X25519 shared secret, salted with the
 //! ephemeral and recipient public keys, info [`INFO`]. The mailbox id is the
 //! associated data, so a box cannot be replayed to another mailbox.
-//! The app opens boxes through this module; the edge Worker seals with it.
+//! The app and the engine open boxes through this module; the edge seals
+//! with its TypeScript copy (`vtop-edge/src/shared/mail-seal.ts`), checked
+//! against [`tests::VECTOR_BOX`].
 
 use aes_gcm::aead::{Aead, Payload};
 use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
@@ -137,8 +139,8 @@ pub fn open(secret: &str, mailbox_id: &str, sealed: &str) -> Result<Vec<u8>, Sea
 mod tests {
     use super::*;
 
-    /// Fixed inputs shared with the Worker's test, which must produce
-    /// [`VECTOR_BOX`] byte for byte.
+    /// Fixed inputs shared with the edge's test (`mail-seal.test.ts`),
+    /// which must produce [`VECTOR_BOX`] byte for byte.
     pub const VECTOR_SECRET: [u8; 32] = [7; 32];
     pub const VECTOR_EPHEMERAL: [u8; 32] = [9; 32];
     pub const VECTOR_NONCE: [u8; 12] = [3; 12];

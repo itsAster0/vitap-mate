@@ -24,8 +24,8 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault, SessionCheck,
-    SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
+    LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
+    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
 };
 use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
@@ -540,6 +540,7 @@ mod tests {
         (crate::router(state.clone()), state)
     }
 
+
     async fn post(app: &axum::Router, uri: &str, auth: &str, body: Value) -> (StatusCode, Value) {
         let request = Request::builder()
             .method("POST")
@@ -588,16 +589,16 @@ mod tests {
             &app,
             "/engine/session",
             RELAY,
-            json!({"cookies": "REG=24mic0000"}),
+            json!({"cookies": "REG=23abc4567"}),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "valid");
-        assert_eq!(body["registrationNumber"], "24MIC0000");
-        assert_eq!(body["cookies"], "REG=24mic0000");
+        assert_eq!(body["registrationNumber"], "23ABC4567");
+        assert_eq!(body["cookies"], "REG=23abc4567");
         assert_eq!(
             body["ownerHash"],
-            owner_hash(&state.config.vault_key, "24MIC0000")
+            owner_hash(&state.config.vault_key, "23ABC4567")
         );
 
         // The sealed copy checks out for that account only.
@@ -606,11 +607,11 @@ mod tests {
             &app,
             "/engine/session",
             RELAY,
-            json!({"sealedSession": sealed, "account": "24MIC0000"}),
+            json!({"sealedSession": sealed, "account": "23ABC4567"}),
         )
         .await;
         assert_eq!(body["status"], "valid");
-        assert_eq!(body["cookies"], "REG=24mic0000");
+        assert_eq!(body["cookies"], "REG=23abc4567");
         let (_, body) = post(
             &app,
             "/engine/session",
@@ -758,7 +759,7 @@ mod tests {
             ..FakeEdge::default()
         });
         let (app, _) = engine_app(edge.clone(), FakeLogin::default());
-        let other = sealed_vault(&app, "24MIC0000").await;
+        let other = sealed_vault(&app, "23ABC4567").await;
         post(
             &app,
             "/engine/login",
@@ -772,12 +773,12 @@ mod tests {
             ..FakeEdge::default()
         });
         let (app, _) = engine_app(edge.clone(), FakeLogin::default());
-        let theirs = sealed_vault(&app, "24MIC0000").await;
+        let theirs = sealed_vault(&app, "23ABC4567").await;
         post(
             &app,
             "/engine/login",
             RELAY,
-            json!({"account": "24MIC0000", "sealedVault": theirs, "requestId": "r"}),
+            json!({"account": "23ABC4567", "sealedVault": theirs, "requestId": "r"}),
         )
         .await;
         assert!(wait_for_done(&edge).await.outcome == LoginOutcome::VaultUnusable);
@@ -790,13 +791,13 @@ mod tests {
             &app,
             "/internal/mail-otp/owner",
             RELAY,
-            json!({"cookies": "REG=24mic0000"}),
+            json!({"cookies": "REG=23abc4567"}),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(
             body["ownerHash"],
-            owner_hash(&state.config.vault_key, "24MIC0000")
+            owner_hash(&state.config.vault_key, "23ABC4567")
         );
         let (status, _) = post(
             &app,
@@ -818,7 +819,10 @@ mod tests {
             .accounts_sealer()
             .open_json("accounts/A", &sealed)
             .unwrap();
-        assert_eq!((vault.username.as_str(), vault.password.as_str()), ("u", "p"));
+        assert_eq!(
+            (vault.username.as_str(), vault.password.as_str()),
+            ("u", "p")
+        );
     }
 
     #[tokio::test]

@@ -7,11 +7,13 @@ sealed class VtopUserEntity {
     required String username,
     required String password,
     required String semesterId,
+    String? registrationNumber,
   }) {
     return ConfiguredVtopUser._(
       username: _requiredValue(username, 'username'),
       password: _requiredSecret(password),
       semesterId: _requiredValue(semesterId, 'semesterId'),
+      registrationNumber: _optional(registrationNumber),
     );
   }
 
@@ -19,11 +21,13 @@ sealed class VtopUserEntity {
     required String username,
     required String password,
     required String semesterId,
+    String? registrationNumber,
   }) {
     return RejectedVtopUser._(
       username: _requiredValue(username, 'username'),
       password: _requiredSecret(password),
       semesterId: _requiredValue(semesterId, 'semesterId'),
+      registrationNumber: _optional(registrationNumber),
     );
   }
 
@@ -39,6 +43,7 @@ sealed class VtopUserEntity {
     if (username.isEmpty || password.trim().isEmpty || semesterId.isEmpty) {
       return const VtopUserEntity.unconfigured();
     }
+    final registrationNumber = _optional(json['registrationNumber'] as String?);
 
     final rejected = state == 'credentialsRejected' || json['isValid'] == false;
     return rejected
@@ -46,11 +51,13 @@ sealed class VtopUserEntity {
             username: username,
             password: password,
             semesterId: semesterId,
+            registrationNumber: registrationNumber,
           )
         : VtopUserEntity.configured(
             username: username,
             password: password,
             semesterId: semesterId,
+            registrationNumber: registrationNumber,
           );
   }
 
@@ -58,11 +65,19 @@ sealed class VtopUserEntity {
   String? get password;
   String? get semid;
 
+  /// The student's VTOP registration number, which can differ from the
+  /// login [username]. Unknown (null) until a sign-in provides it; saved
+  /// with the account so the app need not sign in just to learn it.
+  String? get registrationNumber;
+
   bool get isValid => this is ConfiguredVtopUser;
   bool get isConfigured => this is! UnconfiguredVtopUser;
 
   VtopUserEntity withSemester(String semesterId);
   VtopUserEntity withCredentials(String username, String password);
+
+  /// The same account with its registration number now known.
+  VtopUserEntity withRegistrationNumber(String registrationNumber);
   VtopUserEntity rejectCredentials();
   Map<String, dynamic> toJson();
 
@@ -80,6 +95,11 @@ sealed class VtopUserEntity {
     }
     return value;
   }
+
+  static String? _optional(String? value) {
+    final trimmed = value?.trim();
+    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+  }
 }
 
 final class UnconfiguredVtopUser extends VtopUserEntity {
@@ -91,11 +111,15 @@ final class UnconfiguredVtopUser extends VtopUserEntity {
   String? get password => null;
   @override
   String? get semid => null;
+  @override
+  String? get registrationNumber => null;
 
   @override
   VtopUserEntity withSemester(String semesterId) => this;
   @override
   VtopUserEntity withCredentials(String username, String password) => this;
+  @override
+  VtopUserEntity withRegistrationNumber(String registrationNumber) => this;
   @override
   VtopUserEntity rejectCredentials() => this;
   @override
@@ -107,6 +131,7 @@ sealed class StoredVtopUser extends VtopUserEntity {
     required this.username,
     required this.password,
     required String semesterId,
+    required this.registrationNumber,
   }) : semid = semesterId;
 
   @override
@@ -115,6 +140,8 @@ sealed class StoredVtopUser extends VtopUserEntity {
   final String password;
   @override
   final String semid;
+  @override
+  final String? registrationNumber;
 }
 
 final class ConfiguredVtopUser extends StoredVtopUser {
@@ -122,6 +149,7 @@ final class ConfiguredVtopUser extends StoredVtopUser {
     required super.username,
     required super.password,
     required super.semesterId,
+    required super.registrationNumber,
   });
 
   @override
@@ -129,6 +157,7 @@ final class ConfiguredVtopUser extends StoredVtopUser {
     username: username,
     password: password,
     semesterId: semesterId,
+    registrationNumber: registrationNumber,
   );
   @override
   VtopUserEntity withCredentials(String username, String password) =>
@@ -138,10 +167,19 @@ final class ConfiguredVtopUser extends StoredVtopUser {
         semesterId: semid,
       );
   @override
+  VtopUserEntity withRegistrationNumber(String registrationNumber) =>
+      VtopUserEntity.configured(
+        username: username,
+        password: password,
+        semesterId: semid,
+        registrationNumber: registrationNumber,
+      );
+  @override
   VtopUserEntity rejectCredentials() => VtopUserEntity.credentialsRejected(
     username: username,
     password: password,
     semesterId: semid,
+    registrationNumber: registrationNumber,
   );
   @override
   Map<String, dynamic> toJson() => {
@@ -149,6 +187,7 @@ final class ConfiguredVtopUser extends StoredVtopUser {
     'username': username,
     'password': password,
     'semesterId': semid,
+    if (registrationNumber != null) 'registrationNumber': registrationNumber,
   };
 }
 
@@ -157,6 +196,7 @@ final class RejectedVtopUser extends StoredVtopUser {
     required super.username,
     required super.password,
     required super.semesterId,
+    required super.registrationNumber,
   });
 
   @override
@@ -165,6 +205,7 @@ final class RejectedVtopUser extends StoredVtopUser {
         username: username,
         password: password,
         semesterId: semesterId,
+        registrationNumber: registrationNumber,
       );
   @override
   VtopUserEntity withCredentials(String username, String password) =>
@@ -172,6 +213,14 @@ final class RejectedVtopUser extends StoredVtopUser {
         username: username,
         password: password,
         semesterId: semid,
+      );
+  @override
+  VtopUserEntity withRegistrationNumber(String registrationNumber) =>
+      VtopUserEntity.credentialsRejected(
+        username: username,
+        password: password,
+        semesterId: semid,
+        registrationNumber: registrationNumber,
       );
   @override
   VtopUserEntity rejectCredentials() => this;
@@ -181,5 +230,6 @@ final class RejectedVtopUser extends StoredVtopUser {
     'username': username,
     'password': password,
     'semesterId': semid,
+    if (registrationNumber != null) 'registrationNumber': registrationNumber,
   };
 }

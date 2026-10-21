@@ -1,5 +1,6 @@
-# The Cloudflare edge (Rust, workers-rs). Deploy from this directory:
-#   npx wrangler deploy
+# The Cloudflare edge, in TypeScript.
+# Deploy from this directory:
+#   pnpm install && pnpm exec wrangler deploy
 # Secrets (wrangler secret put):
 #   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
 #   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
@@ -7,13 +8,10 @@
 #   VAULT_KEY                  the engine's sealing key, passed to its
 #                              container
 name = "vitapmate-edge"
-main = "build/worker/shim.mjs"
+main = "src/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
 routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
-
-[build]
-command = "sh build.sh"
 
 [vars]
 # Every address the edge uses; nothing is hard-coded. BRIDGE_URL and
@@ -22,9 +20,8 @@ MAIL_DOMAIN = "aster0.dev"
 BRIDGE_URL = "container"
 FCM_URL = "https://fcm.googleapis.com"
 MCP_URL = "container"
-# This Worker's own address, for links it hands out.
+# This Worker's own address, for links it hands out; MCP clients get its /mcp.
 PUBLIC_URL = "https://vmate-api.aster0.dev"
-PUBLIC_MCP_URL = "https://vmate-api.aster0.dev/mcp"
 # Comma-separated origins allowed by CORS; empty allows every origin.
 ALLOWED_ORIGINS = ""
 # Where other @MAIL_DOMAIN mail goes; empty rejects it.
@@ -72,7 +69,12 @@ image = "../Dockerfile.engine"
 image_build_context = ".."
 # 1/16 vCPU, 256 MiB: the engine peaks around 18 MiB and a few % CPU.
 instance_type = "lite"
-max_instances = 2
+# Five: VTOP data refreshes (`/engine/fetch`) run here too; watch CPU and
+# cold starts in Observability and adjust.
+max_instances = 5
+
+[containers.constraints]
+regions = ["APAC"]
 
 [[migrations]]
 tag = "v1"

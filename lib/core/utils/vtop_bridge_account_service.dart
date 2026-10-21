@@ -6,7 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
+import 'package:vitapmate/core/providers/server_url.dart';
 
 const bridgeLinkedSettingKey = 'settings_bridge_linked';
 const bridgeServerSignInSettingKey = 'settings_bridge_server_sign_in';
@@ -128,7 +128,7 @@ class MemoryBridgeKeyStash extends BridgeKeyStash {
   Future<void> writeAll(Map<String, BridgeKey> keys) async => _keys = {...keys};
 }
 
-class BridgeAccountException implements Exception {
+class BridgeAccountException implements Exception, UnknownDeviceError {
   const BridgeAccountException({
     required this.code,
     required this.message,
@@ -138,6 +138,9 @@ class BridgeAccountException implements Exception {
   final String code;
   final String message;
   final int statusCode;
+
+  @override
+  bool get unknownDevice => isUnknownDevice(code, message, statusCode);
 
   @override
   String toString() => message;
@@ -336,7 +339,7 @@ DateTime _dateTimeFromUnixSeconds(Object? value) {
 class VtopBridgeAccountService {
   VtopBridgeAccountService({
     required http.Client client,
-    String baseUrl = vtopBridgeBaseUrl,
+    String? baseUrl,
     BridgeAppSecretStore secrets = const SecureBridgeAppSecretStore(),
     BridgeKeyStash? keys,
   }) : _client = client,
@@ -345,7 +348,9 @@ class VtopBridgeAccountService {
        _keys = keys ?? SecureBridgeKeyStash();
 
   final http.Client _client;
-  final String _baseUrl;
+
+  /// Fixed for tests; otherwise the server URL in use at each call.
+  final String? _baseUrl;
   final BridgeAppSecretStore _secrets;
   final BridgeKeyStash _keys;
 
@@ -354,6 +359,8 @@ class VtopBridgeAccountService {
   Future<BridgeKey?> savedKey(String id) => _keys.read(id);
 
   static const _timeout = Duration(seconds: 15);
+
+  Future<String> _base() async => _baseUrl ?? await currentServerUrl();
 
   Future<void> _ensureServerAllowed() async {
     if (await isOnDeviceMode()) {
@@ -374,7 +381,7 @@ class VtopBridgeAccountService {
     final secret = await _secrets.read();
     final response = await _client
         .post(
-          Uri.parse('$_baseUrl$path'),
+          Uri.parse('${await _base()}$path'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'session': {'cookies': cookies},
@@ -443,7 +450,7 @@ class VtopBridgeAccountService {
     if (secret == null || registrationNumber.trim().isEmpty) return;
     final response = await _client
         .post(
-          Uri.parse('$_baseUrl/v1/account/credentials-rejected'),
+          Uri.parse('${await _base()}/v1/account/credentials-rejected'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'registrationNumber': registrationNumber.trim(),

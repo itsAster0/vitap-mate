@@ -7,6 +7,7 @@ import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
+import 'package:vitapmate/core/widgets/ui/text_nums.dart';
 
 /// Start of each meal, breakfast to dinner: "7:15 · 12:30 · 4:30 · 7:15".
 String messTimingsSummary(MealWindows windows) {
@@ -203,10 +204,9 @@ class _TimeButton extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: context.theme.typography.body.sm.copyWith(
+          style: context.theme.typography.body.sm.nums(
             fontWeight: FontWeight.w500,
             color: colors.foreground,
-            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
       ),

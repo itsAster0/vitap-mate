@@ -69,9 +69,7 @@ jobs:
               "FIREBASE_ANDROID_APP_ID",
               "FIREBASE_MESSAGING_SENDER_ID",
               "FIREBASE_PROJECT_ID",
-              "FIREBASE_STORAGE_BUCKET",
-              "VTOP_BRIDGE_URL",
-              "VTOP_EDGE_URL"
+              "FIREBASE_STORAGE_BUCKET"
             ][] | select(($env[.] // "") == "")
           ' .env.json)
           if [ -n "$missing" ]; then
