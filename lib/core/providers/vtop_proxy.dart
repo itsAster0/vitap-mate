@@ -25,8 +25,7 @@ String? vtopBaseUrlFor({
 Future<String?> currentVtopBaseUrl() async {
   final bool proxy;
   try {
-    proxy =
-        await SharedPreferencesAsync().getBool(vtopProxySettingKey) ?? true;
+    proxy = await SharedPreferencesAsync().getBool(vtopProxySettingKey) ?? true;
   } catch (_) {
     return null;
   }
