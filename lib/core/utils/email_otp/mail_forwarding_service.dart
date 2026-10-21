@@ -12,6 +12,7 @@ import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/src/api/mail_otp.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 
 part 'mail_forwarding_service.g.dart';
 
@@ -271,7 +272,7 @@ class MailForwardingService {
     EdgeDeviceService? devices,
     Future<String?> Function() deviceLabel = currentDeviceLabel,
     MailOtpKeypair Function() keypair = mailOtpGenerateKeypair,
-  }) : _client = client ?? http.Client(),
+  }) : _client = client ?? sharedAppHttpClient,
        _baseUrl = baseUrl,
        _store = store,
        _devices =

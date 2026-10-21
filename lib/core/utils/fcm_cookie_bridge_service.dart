@@ -27,6 +27,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/frb_generated.dart';
 import 'package:vitapmate/services/class_reminder_notification_service.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 
 /// A request for this phone's VTOP session, from an agent or the extension.
 const vtopCookieRequestType = 'vtop_cookie_request';
@@ -441,16 +442,9 @@ Future<void> syncBridgeFcmToken(String? token) async {
     try {
       device = await EdgeDeviceService().ensure(current);
     } catch (_) {}
-    final client = http.Client();
-    try {
-      await VtopBridgeAccountService(client: client).updateFcmToken(
-        cookies: cookieHeader,
-        fcmToken: current,
-        device: device,
-      );
-    } finally {
-      client.close();
-    }
+    await VtopBridgeAccountService(
+      client: sharedAppHttpClient,
+    ).updateFcmToken(cookies: cookieHeader, fcmToken: current, device: device);
     await prefs.setString(bridgeLastFcmTokenSettingKey, current);
   } catch (error, stackTrace) {
     log(
@@ -483,14 +477,9 @@ Future<void> syncBridgeSemester(String? semesterId) async {
     }
     final current = semesterId!;
     final cookieHeader = await _headlessVtopCookieHeader(container);
-    final client = http.Client();
-    try {
-      await VtopBridgeAccountService(
-        client: client,
-      ).updateSemester(cookies: cookieHeader, semesterId: current);
-    } finally {
-      client.close();
-    }
+    await VtopBridgeAccountService(
+      client: sharedAppHttpClient,
+    ).updateSemester(cookies: cookieHeader, semesterId: current);
     await prefs.setString(bridgeLastSemesterSettingKey, current);
   } catch (error, stackTrace) {
     log(
@@ -598,8 +587,7 @@ Future<void> postCookieCallbackWithRetry({
   http.Client? client,
   Future<void> Function(Duration duration)? delay,
 }) async {
-  final ownedClient = client == null;
-  final httpClient = client ?? http.Client();
+  final httpClient = client ?? sharedAppHttpClient;
   final wait = delay ?? Future<void>.delayed;
   final body = jsonEncode({
     'requestId': requestId,
@@ -612,46 +600,42 @@ Future<void> postCookieCallbackWithRetry({
     ...?(credentials == null ? null : {'credentials': credentials}),
   });
 
-  try {
-    Object? lastError;
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      try {
-        final response = await httpClient
-            .post(
-              Uri.parse(callbackUrl),
-              headers: {'Content-Type': 'application/json'},
-              body: body,
-            )
-            .timeout(const Duration(seconds: 15));
-        if (response.statusCode >= 200 && response.statusCode < 300) return;
+  Object? lastError;
+  for (var attempt = 1; attempt <= 3; attempt++) {
+    try {
+      final response = await httpClient
+          .post(
+            Uri.parse(callbackUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 15));
+      if (response.statusCode >= 200 && response.statusCode < 300) return;
 
-        final exception = CookieCallbackException(
-          response.statusCode,
-          retryable: isRetryableCookieCallbackStatus(response.statusCode),
-        );
-        if (!exception.retryable) throw exception;
-        lastError = exception;
-      } on CookieCallbackException catch (exception) {
-        if (!exception.retryable) rethrow;
-        lastError = exception;
-      } on TimeoutException catch (exception) {
-        lastError = exception;
-      } on http.ClientException catch (exception) {
-        lastError = exception;
-      }
-
-      if (attempt < 3) {
-        log(
-          'Retrying cookie callback for request $requestId after attempt $attempt',
-          name: 'fcm.cookie',
-        );
-        await wait(Duration(seconds: 1 << (attempt - 1)));
-      }
+      final exception = CookieCallbackException(
+        response.statusCode,
+        retryable: isRetryableCookieCallbackStatus(response.statusCode),
+      );
+      if (!exception.retryable) throw exception;
+      lastError = exception;
+    } on CookieCallbackException catch (exception) {
+      if (!exception.retryable) rethrow;
+      lastError = exception;
+    } on TimeoutException catch (exception) {
+      lastError = exception;
+    } on http.ClientException catch (exception) {
+      lastError = exception;
     }
-    throw StateError('Cookie callback failed after 3 attempts: $lastError');
-  } finally {
-    if (ownedClient) httpClient.close();
+
+    if (attempt < 3) {
+      log(
+        'Retrying cookie callback for request $requestId after attempt $attempt',
+        name: 'fcm.cookie',
+      );
+      await wait(Duration(seconds: 1 << (attempt - 1)));
+    }
   }
+  throw StateError('Cookie callback failed after 3 attempts: $lastError');
 }
 
 class FcmCookieNotificationService {
