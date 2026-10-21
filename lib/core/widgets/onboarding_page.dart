@@ -4,7 +4,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/vtop_proxy.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/router/paths.dart';
@@ -16,6 +15,7 @@ import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/core/utils/vtop_platform_http.dart';
 
 late VtopClient _globalClient;
 late String _globalUsername;
@@ -119,10 +119,9 @@ class Step1 extends HookConsumerWidget {
       isloading.value = true;
 
       try {
-        final client = await getVtopClient(
+        final client = await createVtopClient(
           username: username.text,
           password: password.text,
-          baseUrl: await currentVtopBaseUrl(),
         );
         if (!context.mounted) return;
         await loginWithSecurityOtpPrompt(context: context, client: client);

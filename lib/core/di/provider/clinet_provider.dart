@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
-import 'package:vitapmate/core/providers/vtop_proxy.dart';
 import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
@@ -20,6 +19,7 @@ import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
 import 'package:vitapmate/core/utils/app_http_client.dart';
+import 'package:vitapmate/core/utils/vtop_platform_http.dart';
 part 'clinet_provider.g.dart';
 
 const _auth = SourceLogger('client.auth');
@@ -55,11 +55,10 @@ class VClient extends _$VClient {
       }
     }
 
-    return getVtopClient(
+    return createVtopClient(
       username: uname,
       password: user.password,
       persistedSession: persistedSession,
-      baseUrl: await currentVtopBaseUrl(),
     );
   }
 

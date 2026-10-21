@@ -17,6 +17,8 @@ urlencoding = "2"
 httpdate = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 thiserror = "2"
+http = "1"
+http-body-util = "0.1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util"] }

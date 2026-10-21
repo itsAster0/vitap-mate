@@ -4,12 +4,14 @@
 //! Fetches borrow the client immutably, so flutter_rust_bridge takes a read
 //! lock and several fetches can run at once. Login and OTP take `&mut`.
 
+use flutter_rust_bridge::DartFnFuture;
 use vtop_core::client::{GeneralOutingApplication, OutingKind, WeekendOutingApplication};
 use vtop_core::inputs::{
     BiometricDate, ContactNumber, CourseFilePath, CourseId, CourseType, OutingDate, OutingPassId,
     OutingTime, Password, SemesterId, Username,
 };
 
+use crate::api::platform_http::{DartTransport, PlatformHttpRequest, PlatformHttpResponse};
 use crate::api::vtop::{
     types::{
         AcademicCalendarData, AttendanceData, BiometricData, CourseFileInfo, CoursePageClasses,
@@ -28,12 +30,50 @@ pub async fn get_vtop_client(
     persisted_session: Option<PersistedVtopSession>,
     base_url: Option<String>,
 ) -> Result<VtopClient, VtopError> {
+    build_vtop_client(
+        vtop_core::VtopClient::builder(),
+        username,
+        password,
+        persisted_session,
+        base_url,
+    )
+}
+
+/// [`get_vtop_client`], sending every request through `send`: the phone's
+/// HTTP stack, for HTTP/3 to the proxy.
+#[flutter_rust_bridge::frb]
+pub async fn get_vtop_client_via_platform(
+    username: String,
+    password: String,
+    persisted_session: Option<PersistedVtopSession>,
+    base_url: Option<String>,
+    send: impl Fn(PlatformHttpRequest) -> DartFnFuture<PlatformHttpResponse>
+        + Send
+        + Sync
+        + 'static,
+) -> Result<VtopClient, VtopError> {
+    build_vtop_client(
+        vtop_core::VtopClient::builder().transport(DartTransport::new(send)),
+        username,
+        password,
+        persisted_session,
+        base_url,
+    )
+}
+
+fn build_vtop_client(
+    builder: vtop_core::client::VtopClientBuilder,
+    username: String,
+    password: String,
+    persisted_session: Option<PersistedVtopSession>,
+    base_url: Option<String>,
+) -> Result<VtopClient, VtopError> {
     // A base URL other than VTOP's is the server's proxy of it (compressed).
     let mut config = vtop_core::VtopConfig::default();
     if let Some(url) = base_url.filter(|url| !url.trim().is_empty()) {
         config.base_url = url.trim().trim_end_matches('/').to_string();
     }
-    let inner = vtop_core::VtopClient::builder()
+    let inner = builder
         .config(config)
         .with_credentials(Username::parse(&username)?, Password::parse(&password)?)?;
     if let Some(session) = persisted_session {
