@@ -36,9 +36,12 @@ http.Client createAppHttpClient() {
   return IOClient();
 }
 
-/// One client for the app's lifetime, so connections are reused.
-final appHttpClientProvider = Provider<http.Client>((ref) {
-  final client = createAppHttpClient();
-  ref.onDispose(client.close);
-  return client;
-});
+/// One client per isolate, built on first use and never closed, so
+/// connections are reused. Code without a Ref (background isolates, ad hoc
+/// services) uses this too; a Cronet engine per call would be costly.
+final http.Client sharedAppHttpClient = createAppHttpClient();
+
+/// [sharedAppHttpClient], overridable in tests.
+final appHttpClientProvider = Provider<http.Client>(
+  (ref) => sharedAppHttpClient,
+);

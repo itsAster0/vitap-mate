@@ -25,7 +25,7 @@ String? vtopBaseUrlFor({
 Future<String?> currentVtopBaseUrl() async {
   final bool proxy;
   try {
-    proxy = await SharedPreferencesAsync().getBool(vtopProxySettingKey) ?? true;
+    proxy = await SharedPreferencesAsync().getBool(vtopProxySettingKey) ?? false;
   } catch (_) {
     return null;
   }
@@ -38,7 +38,7 @@ Future<String?> currentVtopBaseUrl() async {
 
 final vtopProxyProvider = Provider<bool>(
   (ref) =>
-      ref.watch(settingsProvider).value?.getBool(vtopProxySettingKey) ?? true,
+      ref.watch(settingsProvider).value?.getBool(vtopProxySettingKey) ?? false,
 );
 
 /// Saves the choice and rebuilds the client, so the next request uses it.

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
@@ -13,6 +12,7 @@ import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/utils/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 
 /// The account calls the Server pages make. They need a VTOP session from
 /// the phone (the server checks whose account it is).
@@ -56,16 +56,13 @@ class _BridgeServerAccountApi implements ServerAccountApi {
   Future<T> _withService<T>(
     Future<T> Function(VtopBridgeAccountService service, String cookies) run,
   ) async {
-    final client = http.Client();
-    try {
-      final service = VtopBridgeAccountService(client: client);
-      return await withFreshVtopSession(
-        cookies: _cookieHeader,
-        run: (cookies) => run(service, cookies),
-      );
-    } finally {
-      client.close();
-    }
+    final service = VtopBridgeAccountService(
+      client: _ref.read(appHttpClientProvider),
+    );
+    return withFreshVtopSession(
+      cookies: _cookieHeader,
+      run: (cookies) => run(service, cookies),
+    );
   }
 
   @override

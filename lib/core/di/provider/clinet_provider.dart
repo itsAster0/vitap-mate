@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/core/providers/vtop_proxy.dart';
@@ -20,6 +19,7 @@ import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 part 'clinet_provider.g.dart';
 
 const _auth = SourceLogger('client.auth');
@@ -232,16 +232,13 @@ class VClient extends _$VClient {
 
 Future<void> _reportCredentialsRejected(String? username) async {
   if (username == null || username.trim().isEmpty) return;
-  final client = http.Client();
   try {
     await VtopBridgeAccountService(
-      client: client,
+      client: sharedAppHttpClient,
     ).reportCredentialsRejected(registrationNumber: username);
   } catch (error) {
     _auth.warning(
       'could not tell the server about rejected credentials: $error',
     );
-  } finally {
-    client.close();
   }
 }
