@@ -58,12 +58,23 @@ final class VtopLoginPromptAllowedProvider
 String _$vtopLoginPromptAllowedHash() =>
     r'6bc03c9f869e783d91d2f15c72f9f13820fd0b97';
 
+/// VTOP through the phone's own client (directly, or through the server's
+/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
+/// one re-login and retry.
+
 @ProviderFor(vtopBackend)
 final vtopBackendProvider = VtopBackendProvider._();
+
+/// VTOP through the phone's own client (directly, or through the server's
+/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
+/// one re-login and retry.
 
 final class VtopBackendProvider
     extends $FunctionalProvider<VtopBackend, VtopBackend, VtopBackend>
     with $Provider<VtopBackend> {
+  /// VTOP through the phone's own client (directly, or through the server's
+  /// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
+  /// one re-login and retry.
   VtopBackendProvider._()
     : super(
         from: null,
@@ -97,14 +108,14 @@ final class VtopBackendProvider
   }
 }
 
-String _$vtopBackendHash() => r'dd8143cb5d767b27288bf9b2d8ba97888239342c';
+String _$vtopBackendHash() => r'138fac7c69da05268588215dedb64496adec0095';
 
-/// Logs in on the device; the edge signs in on its own when it fetches.
+/// Logs in on the device.
 
 @ProviderFor(vtopAuthenticator)
 final vtopAuthenticatorProvider = VtopAuthenticatorProvider._();
 
-/// Logs in on the device; the edge signs in on its own when it fetches.
+/// Logs in on the device.
 
 final class VtopAuthenticatorProvider
     extends
@@ -114,7 +125,7 @@ final class VtopAuthenticatorProvider
           VtopAuthenticator
         >
     with $Provider<VtopAuthenticator> {
-  /// Logs in on the device; the edge signs in on its own when it fetches.
+  /// Logs in on the device.
   VtopAuthenticatorProvider._()
     : super(
         from: null,

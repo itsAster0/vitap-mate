@@ -71,6 +71,12 @@ void disCommonToast(BuildContext context, Object e) {
         }
       },
     );
+  } else if (isVtopDown(e)) {
+    _showAppToast(
+      context,
+      title: 'VTOP Is Down',
+      description: vtopErrorMessage(e),
+    );
   } else if (e == VtopError.networkError()) {
     _showAppToast(
       context,
@@ -120,6 +126,12 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       context,
       title: 'Login Failed',
       description: 'The username or password you entered is incorrect.',
+    );
+  } else if (isVtopDown(e)) {
+    _showAppToast(
+      context,
+      title: 'VTOP Is Down',
+      description: vtopErrorMessage(e),
     );
   } else if (e == VtopError.networkError()) {
     _showAppToast(

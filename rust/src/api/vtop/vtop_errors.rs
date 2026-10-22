@@ -17,4 +17,5 @@ pub enum _VtopError {
     CaptchaRequired,
     InvalidResponse,
     OTPRequired(String, u64),
+    VtopUnavailable(String),
 }

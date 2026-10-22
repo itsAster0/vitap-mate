@@ -21,7 +21,7 @@ pub mod transport;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use log::{error, info, warn};
-use reqwest::{Client, Response, Url};
+use reqwest::{Client, Response, StatusCode, Url};
 
 use crate::config::VtopConfig;
 use crate::error::{VtopError, VtopResult};
@@ -257,6 +257,10 @@ impl VtopClient {
     ) -> VtopResult<String> {
         let final_url = response.url().to_string();
         let status = response.status();
+        // VTOP is down or slow: the session is fine.
+        if is_unavailable_status(status) {
+            return Err(status_error(context, status, String::new()));
+        }
 
         if Self::is_login_url(&final_url) {
             self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
@@ -311,16 +315,23 @@ impl VtopClient {
     }
 
     /// Sends a signed-in request built by `build`, retrying once after a
-    /// short pause when VTOP times out, refuses the connection or answers
-    /// with a 5xx. `build` is called again for the retry because multipart
-    /// bodies cannot be cloned.
+    /// short pause when the connection fails or VTOP answers with a 5xx.
+    /// A timeout, or a 504 from the proxy giving up on VTOP, is not
+    /// retried: VTOP is slow, and a second request only adds to its load.
+    /// `build` is called again for the retry because multipart bodies
+    /// cannot be cloned.
     async fn send_authenticated(
         &self,
         context: &str,
         build: impl Fn() -> reqwest::RequestBuilder,
     ) -> VtopResult<String> {
         let response = match build().send_with(self).await {
-            Ok(response) if !response.status().is_server_error() => response,
+            Ok(response)
+                if !response.status().is_server_error()
+                    || response.status() == StatusCode::GATEWAY_TIMEOUT =>
+            {
+                response
+            }
             Ok(response) => {
                 warn!(
                     target: NETWORK,
@@ -331,17 +342,21 @@ impl VtopClient {
                 build()
                     .send_with(self)
                     .await
-                    .map_err(|error| network_error(&format!("{context}.retry"), error))?
+                    .map_err(|error| send_error(&format!("{context}.retry"), error))?
             }
-            Err(error) if error.is_timeout() || error.is_connect() => {
+            Err(error) if error.is_timeout() => {
+                warn!(target: NETWORK, "{context}: {error}");
+                return Err(slow_vtop_error(context));
+            }
+            Err(error) if error.is_connect() => {
                 warn!(target: NETWORK, "{context}: {error}, retrying once");
                 tokio::time::sleep(RETRY_DELAY).await;
                 build()
                     .send_with(self)
                     .await
-                    .map_err(|error| network_error(&format!("{context}.retry"), error))?
+                    .map_err(|error| send_error(&format!("{context}.retry"), error))?
             }
-            Err(error) => return Err(network_error(&format!("{context}.send"), error)),
+            Err(error) => return Err(send_error(&format!("{context}.send"), error)),
         };
         self.read_authenticated_response_text(context, response)
             .await
@@ -401,7 +416,9 @@ impl VtopClient {
             self.config.request_timeout,
         )
         .await?;
-        Ok(transport::to_reqwest_response(transport.send(request).await?)?)
+        Ok(transport::to_reqwest_response(
+            transport.send(request).await?,
+        )?)
     }
 
     // ---- session import / export ----------------------------------------
@@ -577,6 +594,44 @@ fn server_error(context: &str, detail: impl AsRef<str>) -> VtopError {
     let message = format!("{context}: {}", detail.as_ref());
     error!(target: NETWORK, "returning VtopServerError: {message}");
     VtopError::VtopServerError(message)
+}
+
+fn slow_vtop_error(context: &str) -> VtopError {
+    unavailable(context, "VTOP took too long to answer")
+}
+
+fn unavailable(context: &str, reason: &str) -> VtopError {
+    error!(target: NETWORK, "{context}: {reason}");
+    VtopError::VtopUnavailable(reason.to_string())
+}
+
+/// A request that got no answer. A timeout is VTOP being slow; anything
+/// else may be the phone's own connection.
+fn send_error(context: &str, error: SendError) -> VtopError {
+    if error.is_timeout() {
+        warn!(target: NETWORK, "{context}: {error}");
+        return slow_vtop_error(context);
+    }
+    network_error(context, error)
+}
+
+/// Whether `status` says VTOP, or the proxy in front of it, is down or slow
+/// rather than refusing this request.
+fn is_unavailable_status(status: StatusCode) -> bool {
+    matches!(
+        status,
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT
+    )
+}
+
+/// The error for a non-success `status`: VTOP being down or slow when the
+/// status says so, otherwise a server error with `detail`.
+fn status_error(context: &str, status: StatusCode, detail: String) -> VtopError {
+    match status {
+        StatusCode::GATEWAY_TIMEOUT => slow_vtop_error(context),
+        status if is_unavailable_status(status) => unavailable(context, "VTOP is down right now"),
+        _ => server_error(context, detail),
+    }
 }
 
 fn missing_csrf_error(context: &str) -> VtopError {

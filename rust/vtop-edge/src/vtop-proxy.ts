@@ -8,6 +8,11 @@ import { error } from "./common";
 
 export const VTOP_ORIGIN = "https://vtop.vitap.ac.in";
 
+/** How long VTOP gets to start answering. Under the app's own 30 s limit,
+ * so the phone hears "VTOP is slow" from here instead of giving up and
+ * hanging up. */
+export const VTOP_TIMEOUT_MS = 25_000;
+
 /** Headers the phone sends that must NOT reach VTOP: hop-by-hop headers, the
  * ones that would describe the proxy instead of the phone, and the client-IP
  * headers Cloudflare adds (anything `cf-*` is stripped too). Everything else
@@ -54,6 +59,7 @@ function hostOnly(cookie: string): string {
 export async function proxyVtop(
   req: Request,
   fetcher: (req: Request) => Promise<Response> = (r) => fetch(r),
+  timeoutMs = VTOP_TIMEOUT_MS,
 ): Promise<Response> {
   const url = new URL(req.url);
   if (!isVtopPath(url.pathname)) return error(404, "not_found", "No such route.");
@@ -70,14 +76,29 @@ export async function proxyVtop(
     );
   });
   const hasBody = req.method !== "GET" && req.method !== "HEAD";
-  const upstream = await fetcher(
-    new Request(`${VTOP_ORIGIN}${url.pathname}${url.search}`, {
-      method: req.method,
-      headers,
-      body: hasBody ? await req.arrayBuffer() : undefined,
-      redirect: "manual",
-    }),
-  );
+  const body = hasBody ? await req.arrayBuffer() : undefined;
+  // Covers VTOP's headers only; once it answers, the body streams through.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  let upstream: Response;
+  try {
+    upstream = await fetcher(
+      new Request(`${VTOP_ORIGIN}${url.pathname}${url.search}`, {
+        method: req.method,
+        headers,
+        body,
+        redirect: "manual",
+        signal: abort.signal,
+      }),
+    );
+  } catch (e) {
+    if (abort.signal.aborted) return error(504, "vtop_timeout", "VTOP took too long to answer.");
+    // The phone reached us, so this is VTOP being down, not the phone.
+    console.log(`vtop-proxy: VTOP unreachable: ${e}`);
+    return error(502, "vtop_unreachable", "VTOP can't be reached right now.");
+  } finally {
+    clearTimeout(timer);
+  }
 
   const out = new Headers();
   upstream.headers.forEach((value, name) => {

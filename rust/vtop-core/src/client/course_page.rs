@@ -1,7 +1,7 @@
 //! The course page: every class of a course this semester, and each
 //! class's lecture plan with its reference material.
 
-use super::{network_error, server_error, SendWith, VtopClient};
+use super::{network_error, send_error, status_error, SendWith, VtopClient};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{CourseFilePath, SemesterId};
 use crate::parser::course_page;
@@ -144,7 +144,7 @@ impl VtopClient {
             .query(query)
             .send_with(self)
             .await
-            .map_err(|error| network_error(&format!("{context}.send"), error))?;
+            .map_err(|error| send_error(&format!("{context}.send"), error))?;
         let final_url = response.url().to_string();
         if Self::is_login_url(&final_url) {
             self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
@@ -166,8 +166,9 @@ impl VtopClient {
             .await
             .map_err(|error| network_error(&format!("{context}.bytes"), error))?;
         if !status.is_success() {
-            return Err(server_error(
+            return Err(status_error(
                 context,
+                status,
                 format!("VTOP returned HTTP {status}"),
             ));
         }
@@ -249,7 +250,7 @@ impl VtopClient {
             .query(query)
             .send_with(self)
             .await
-            .map_err(|error| network_error(&format!("{context}.send"), error))?;
+            .map_err(|error| send_error(&format!("{context}.send"), error))?;
         let final_url = response.url().to_string();
         if Self::is_login_url(&final_url) {
             self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
@@ -257,8 +258,9 @@ impl VtopClient {
         }
         let status = response.status();
         if !status.is_success() {
-            return Err(server_error(
+            return Err(status_error(
                 context,
+                status,
                 format!("VTOP returned HTTP {status}"),
             ));
         }

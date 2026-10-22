@@ -37,6 +37,8 @@ struct MockVtop {
     not_found: Arc<Mutex<bool>>,
     /// A path that always answers HTTP 503.
     down: Arc<Mutex<Option<&'static str>>>,
+    /// Every request answers HTTP 504, as the edge does when VTOP is slow.
+    gateway_timeout: Arc<Mutex<bool>>,
 }
 
 impl MockVtop {
@@ -101,6 +103,9 @@ impl MockVtop {
                 *failures -= 1;
                 return "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_string();
             }
+        }
+        if *self.gateway_timeout.lock().unwrap() {
+            return "HTTP/1.1 504 Gateway Timeout\r\nContent-Length: 0\r\n\r\n".to_string();
         }
         if *self.down.lock().unwrap() == Some(path) {
             return "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n".to_string();
@@ -352,6 +357,57 @@ async fn a_single_vtop_5xx_is_retried() {
 }
 
 #[tokio::test]
+async fn a_gateway_timeout_is_not_retried_and_keeps_the_session() {
+    let mock = MockVtop::default();
+    let base = mock.start().await;
+    let client = VtopClient::builder()
+        .config(config(base))
+        .with_session(&full_state(None))
+        .unwrap();
+    *mock.gateway_timeout.lock().unwrap() = true;
+
+    let error = client.attendance(&semester()).await.unwrap_err();
+
+    assert!(matches!(error, VtopError::VtopUnavailable(ref m) if m.contains("too long")));
+    assert_eq!(mock.hits("/vtop/processViewStudentAttendance"), 1);
+    assert!(client.is_authenticated());
+}
+
+#[tokio::test]
+async fn a_timeout_is_not_retried() {
+    let transport = Arc::new(TimingOutTransport::default());
+    let client = VtopClient::builder()
+        .config(config("https://vtop.example".into()))
+        .transport(transport.clone())
+        .with_session(&full_state(None))
+        .unwrap();
+
+    let error = client.attendance(&semester()).await.unwrap_err();
+
+    assert!(matches!(error, VtopError::VtopUnavailable(ref m) if m.contains("too long")));
+    assert_eq!(*transport.calls.lock().unwrap(), 1);
+    assert!(client.is_authenticated());
+}
+
+/// A transport whose every request times out.
+#[derive(Debug, Default)]
+struct TimingOutTransport {
+    calls: Mutex<usize>,
+}
+
+impl Transport for TimingOutTransport {
+    fn send(&self, _request: transport::TransportRequest) -> transport::TransportFuture<'_> {
+        *self.calls.lock().unwrap() += 1;
+        Box::pin(async {
+            Err(TransportError {
+                kind: transport::TransportErrorKind::Timeout,
+                message: "timed out".into(),
+            })
+        })
+    }
+}
+
+#[tokio::test]
 async fn persisted_trio_restores_without_validation_and_keeps_login_time() {
     let mock = MockVtop::default();
     let base = mock.start().await;
@@ -530,10 +586,11 @@ async fn verify_session_on_server_error_is_not_expired() {
         .with_session(&cookie_session("JSESSIONID=abc"))
         .unwrap();
 
-    assert!(matches!(
+    // A 503 is VTOP being down, not the session.
+    assert_eq!(
         client.verify_session().await.unwrap_err(),
-        VtopError::VtopServerError(_)
-    ));
+        VtopError::VtopUnavailable("VTOP is down right now".into())
+    );
 }
 
 #[tokio::test]
@@ -668,7 +725,12 @@ async fn a_transport_gets_multipart_bodies_read_out() {
     let form = reqwest::multipart::Form::new().text("field", "value-42");
 
     let _ = client
-        .send_request(client.http.post(format!("{base}/echo-cookie")).multipart(form))
+        .send_request(
+            client
+                .http
+                .post(format!("{base}/echo-cookie"))
+                .multipart(form),
+        )
         .await
         .unwrap();
 

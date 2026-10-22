@@ -3,7 +3,8 @@
 use log::Level;
 
 use super::{
-    missing_csrf_error, network_error, server_error, AuthStage, Credentials, SendWith, VtopClient,
+    missing_csrf_error, network_error, send_error, status_error, AuthStage, Credentials, SendWith,
+    VtopClient,
 };
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::RegistrationNumber;
@@ -134,7 +135,7 @@ impl VtopClient {
             .body(login_data)
             .send_with(self)
             .await
-            .map_err(|error| network_error("perform_login.send", error))?;
+            .map_err(|error| send_error("perform_login.send", error))?;
         let response_url = response.url().to_string();
         let response_text = response
             .text()
@@ -226,11 +227,12 @@ impl VtopClient {
                 .body(body.clone())
                 .send_with(self)
                 .await
-                .map_err(|error| network_error("load_login_page.send", error))?;
+                .map_err(|error| send_error("load_login_page.send", error))?;
             let status = response.status();
             if !status.is_success() {
-                return Err(server_error(
+                return Err(status_error(
                     "load_login_page",
+                    status,
                     format!("VTOP returned HTTP {status} while preparing captcha"),
                 ));
             }
@@ -267,11 +269,12 @@ impl VtopClient {
             .get(&url)
             .send_with(self)
             .await
-            .map_err(|error| network_error("load_initial_page.send", error))?;
+            .map_err(|error| send_error("load_initial_page.send", error))?;
         let status = response.status();
         if !status.is_success() {
-            return Err(server_error(
+            return Err(status_error(
                 "load_initial_page",
+                status,
                 format!("VTOP returned HTTP {status} at {url}"),
             ));
         }
@@ -320,11 +323,15 @@ impl VtopClient {
         let response = request
             .send_with(self)
             .await
-            .map_err(|error| network_error("validate_authenticated_session.send", error))?;
+            .map_err(|error| send_error("validate_authenticated_session.send", error))?;
         let final_url = response.url().to_string();
         let status = response.status();
         if server_error_is_error && status.is_server_error() && !Self::is_login_url(&final_url) {
-            return Err(VtopError::VtopServerError(format!("HTTP {status}")));
+            return Err(status_error(
+                "validate_authenticated_session",
+                status,
+                format!("HTTP {status}"),
+            ));
         }
         if Self::is_login_url(&final_url) || !status.is_success() {
             self.mark_session_expired(

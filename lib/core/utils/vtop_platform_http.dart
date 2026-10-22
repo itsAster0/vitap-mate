@@ -72,10 +72,13 @@ Future<PlatformHttpResponse> sendPlatformHttp(
 ) async {
   final url = Uri.parse(request.url);
   final watch = Stopwatch()..start();
+  // Fires on timeout, so the request is cancelled instead of left running.
+  final abort = Completer<void>();
   try {
-    final outgoing = http.Request(request.method, url)
-      ..followRedirects = false
-      ..bodyBytes = request.body;
+    final outgoing =
+        http.AbortableRequest(request.method, url, abortTrigger: abort.future)
+          ..followRedirects = false
+          ..bodyBytes = request.body;
     for (final (name, value) in request.headers) {
       final previous = outgoing.headers[name];
       outgoing.headers[name] = previous == null ? value : '$previous, $value';
@@ -102,6 +105,7 @@ Future<PlatformHttpResponse> sendPlatformHttp(
       body: response.bodyBytes,
     );
   } on TimeoutException catch (error) {
+    abort.complete();
     _log.warning('platform ${request.method} ${url.path} timed out');
     return _failure(PlatformHttpErrorKind.timeout, request, error);
   } catch (error) {

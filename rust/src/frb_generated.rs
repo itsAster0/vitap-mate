@@ -2809,6 +2809,9 @@ const _: fn() = || {
             let _: String = field0;
             let _: u64 = field1;
         }
+        crate::api::vtop::vtop_errors::VtopError::VtopUnavailable(field0) => {
+            let _: String = field0;
+        }
     }
     {
         let WeekendOutingData = None::<crate::api::vtop::types::WeekendOutingData>.unwrap();
@@ -4452,6 +4455,10 @@ impl SseDecode for crate::api::vtop::vtop_errors::VtopError {
                     var_field0, var_field1,
                 );
             }
+            11 => {
+                let mut var_field0 = <String>::sse_decode(deserializer);
+                return crate::api::vtop::vtop_errors::VtopError::VtopUnavailable(var_field0);
+            }
             _ => {
                 unimplemented!("");
             }
@@ -6045,6 +6052,9 @@ impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::vtop_errors:
                 field1.into_into_dart().into_dart(),
             ]
             .into_dart(),
+            crate::api::vtop::vtop_errors::VtopError::VtopUnavailable(field0) => {
+                [11.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
             _ => {
                 unimplemented!("");
             }
@@ -7195,6 +7205,10 @@ impl SseEncode for crate::api::vtop::vtop_errors::VtopError {
                 <i32>::sse_encode(10, serializer);
                 <String>::sse_encode(field0, serializer);
                 <u64>::sse_encode(field1, serializer);
+            }
+            crate::api::vtop::vtop_errors::VtopError::VtopUnavailable(field0) => {
+                <i32>::sse_encode(11, serializer);
+                <String>::sse_encode(field0, serializer);
             }
             _ => {
                 unimplemented!("");

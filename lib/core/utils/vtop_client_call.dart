@@ -1,14 +1,28 @@
+import 'package:vitapmate/core/utils/edge/edge_events.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 /// A VTOP failure in words for the student: specific about what went wrong
 /// and what to do, never a bare "something went wrong".
+/// Whether [error] means VTOP itself is down or too slow, rather than the
+/// phone being offline. A network error counts while the edge's event
+/// stream is up: the phone is online, so it is VTOP that can't be reached.
+bool isVtopDown(Object error) =>
+    error is VtopError_VtopUnavailable ||
+    (error == const VtopError.networkError() &&
+        EdgeEventChannel.instance.connected.value);
+
 String vtopErrorMessage(Object error) {
   if (error is! VtopError) {
     return 'Something unexpected happened. Please try again.';
   }
   return error.maybeWhen(
-    networkError: () =>
-        "Couldn't reach VTOP. Check your internet connection and try again.",
+    networkError: () => isVtopDown(error)
+        ? "VTOP can't be reached right now, though your internet is working. "
+              'It may be down; try again in a few minutes.'
+        : "Couldn't reach VTOP. Check your internet connection and try again.",
+    vtopUnavailable: (reason) =>
+        '${reason.trim().isEmpty ? 'VTOP is not answering' : reason.trim()}. '
+        "This is on VTOP's side, not your connection; try again in a few minutes.",
     vtopServerError: (message) => message.trim().isEmpty
         ? 'VTOP is not responding properly right now. Try again in a bit.'
         : 'VTOP reported a problem: ${message.trim()}',

@@ -30,6 +30,10 @@ pub enum VtopError {
     /// time (seconds) the challenge was issued.
     #[error("OTP required: {0} at {1}")]
     OTPRequired(String, u64),
+    /// VTOP is down or too slow to answer, as opposed to the phone being
+    /// offline. Carries what happened, worded for the user.
+    #[error("VTOP is unavailable: {0}")]
+    VtopUnavailable(String),
 }
 
 pub type VtopResult<T> = Result<T, VtopError>;

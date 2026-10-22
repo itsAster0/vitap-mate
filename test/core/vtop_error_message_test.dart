@@ -17,6 +17,7 @@ void main() {
           const VtopError.configurationError('bad semester'),
           const VtopError.captchaRequired(),
           const VtopError.invalidResponse(),
+          const VtopError.vtopUnavailable('VTOP is down right now'),
         ])
           e: vtopErrorMessage(e),
       };
@@ -29,6 +30,27 @@ void main() {
         );
       }
     });
+
+    test('VTOP being down is blamed on VTOP, not the connection', () {
+      const error = VtopError.vtopUnavailable('VTOP took too long to answer');
+      final msg = vtopErrorMessage(error);
+      expect(isVtopDown(error), isTrue);
+      expect(msg, startsWith('VTOP took too long to answer.'));
+      expect(msg, contains("VTOP's side, not your connection"));
+      expect(msg.toLowerCase(), isNot(contains('check your internet')));
+    });
+
+    test(
+      'a network error with no sign of being online stays a network error',
+      () {
+        const error = VtopError.networkError();
+        expect(isVtopDown(error), isFalse);
+        expect(
+          vtopErrorMessage(error),
+          contains('Check your internet connection'),
+        );
+      },
+    );
 
     test('a parse failure reads plainly and keeps the detail for context', () {
       final msg = vtopErrorMessage(
