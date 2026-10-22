@@ -61,6 +61,11 @@ class EdgeEventChannel {
   static const _heartbeat = Duration(seconds: 15);
   static const _maxBackoff = Duration(seconds: 30);
 
+  /// How long a stream must stay up before the backoff starts over. A
+  /// stream that opens and drops at once (a flaky network, a server that
+  /// ends it) keeps backing off instead of reconnecting every second.
+  static const _stableAfter = Duration(minutes: 1);
+
   /// Whether a stream is open and beating. While it is, nothing
   /// needs to poll.
   final connected = ValueNotifier<bool>(false);
@@ -74,6 +79,7 @@ class EdgeEventChannel {
   Timer? _retry;
   AppLifecycleListener? _lifecycle;
   DateTime _lastBeat = DateTime.now();
+  DateTime? _openedAt;
   final _data = StringBuffer();
   var _failures = 0;
   var _foreground = true;
@@ -129,8 +135,7 @@ class EdgeEventChannel {
         return;
       }
       _deviceId = device.id;
-      _failures = 0;
-      _lastBeat = DateTime.now();
+      _openedAt = _lastBeat = DateTime.now();
       _data.clear();
       connected.value = true;
       _stream = response.stream
@@ -190,6 +195,11 @@ class EdgeEventChannel {
   void stop() => _close();
 
   void _onDropped() {
+    final openedAt = _openedAt;
+    if (openedAt != null &&
+        DateTime.now().difference(openedAt) >= _stableAfter) {
+      _failures = 0;
+    }
     _close();
     _scheduleRetry();
   }
@@ -202,6 +212,7 @@ class EdgeEventChannel {
     // Cancelling the subscription cancels the request, ending the stream.
     final stream = _stream;
     _stream = null;
+    _openedAt = null;
     connected.value = false;
     if (stream != null) unawaited(stream.cancel().catchError((_) {}));
   }
