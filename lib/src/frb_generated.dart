@@ -3137,6 +3137,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           dco_decode_String(raw[1]),
           dco_decode_u_64(raw[2]),
         );
+      case 11:
+        return VtopError_VtopUnavailable(dco_decode_String(raw[1]));
       default:
         throw Exception("unreachable");
     }
@@ -4723,6 +4725,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         var var_field0 = sse_decode_String(deserializer);
         var var_field1 = sse_decode_u_64(deserializer);
         return VtopError_OTPRequired(var_field0, var_field1);
+      case 11:
+        var var_field0 = sse_decode_String(deserializer);
+        return VtopError_VtopUnavailable(var_field0);
       default:
         throw UnimplementedError('');
     }
@@ -6043,6 +6048,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(10, serializer);
         sse_encode_String(field0, serializer);
         sse_encode_u_64(field1, serializer);
+      case VtopError_VtopUnavailable(field0: final field0):
+        sse_encode_i_32(11, serializer);
+        sse_encode_String(field0, serializer);
     }
   }
 

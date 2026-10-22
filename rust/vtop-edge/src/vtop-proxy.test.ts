@@ -88,4 +88,23 @@ describe("proxyVtop", () => {
     expect(seen[0].headers.get("x-real-ip")).toBeNull();
     expect(seen[0].headers.get("cf-connecting-ip")).toBeNull();
   });
+
+  it("answers 504 when VTOP is too slow, instead of leaving the phone waiting", async () => {
+    const hang = (req: Request) =>
+      new Promise<Response>((_, reject) => {
+        req.signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    const res = await proxyVtop(new Request(`${PROXY}/vtop/content`), hang, 10);
+    expect(res.status).toBe(504);
+    expect(((await res.json()) as { code: string }).code).toBe("vtop_timeout");
+  });
+
+  it("answers 502 when VTOP can't be reached", async () => {
+    const fail = async () => {
+      throw new Error("connection refused");
+    };
+    const res = await proxyVtop(new Request(`${PROXY}/vtop/content`), fail, 1000);
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { code: string }).code).toBe("vtop_unreachable");
+  });
 });

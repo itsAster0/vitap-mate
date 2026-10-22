@@ -3,7 +3,9 @@
 use log::Level;
 use reqwest::multipart;
 
-use super::{missing_csrf_error, network_error, server_error, AuthStage, SendWith, VtopClient};
+use super::{
+    missing_csrf_error, network_error, send_error, status_error, AuthStage, SendWith, VtopClient,
+};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{OtpCode, RegistrationNumber};
 use crate::parser::page;
@@ -86,7 +88,7 @@ impl VtopClient {
             .multipart(form)
             .send_with(self)
             .await
-            .map_err(|error| network_error("submit_security_otp.send", error))?;
+            .map_err(|error| send_error("submit_security_otp.send", error))?;
         let final_url = response.url().to_string();
         let status_code = response.status();
         let response_text = response
@@ -216,7 +218,7 @@ impl VtopClient {
             .header("Accept", "*/*")
             .send_with(self)
             .await
-            .map_err(|error| network_error("follow_security_otp_redirect.send", error))?;
+            .map_err(|error| send_error("follow_security_otp_redirect.send", error))?;
         let final_url = response.url().to_string();
         let status = response.status();
         let text = response
@@ -232,8 +234,9 @@ impl VtopClient {
             return Ok(false);
         }
         if !status.is_success() {
-            return Err(server_error(
+            return Err(status_error(
                 "follow_security_otp_redirect",
+                status,
                 format!("VTOP returned HTTP {status} at {final_url}"),
             ));
         }
@@ -281,7 +284,7 @@ impl VtopClient {
                 .multipart(form)
                 .send_with(self)
                 .await
-                .map_err(|error| network_error("resend_security_otp.send", error))?;
+                .map_err(|error| send_error("resend_security_otp.send", error))?;
 
             let status_code = response.status();
             let response_text = response

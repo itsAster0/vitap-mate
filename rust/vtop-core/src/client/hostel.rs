@@ -7,7 +7,7 @@
 
 use log::warn;
 
-use super::{network_error, server_error, SendWith, VtopClient, NETWORK};
+use super::{network_error, send_error, status_error, SendWith, VtopClient, NETWORK};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{ContactNumber, OutingDate, OutingPassId, OutingTime};
 use crate::parser::hostel;
@@ -226,7 +226,7 @@ impl VtopClient {
             .query(&query)
             .send_with(self)
             .await
-            .map_err(|error| network_error(&format!("{context}.send"), error))?;
+            .map_err(|error| send_error(&format!("{context}.send"), error))?;
 
         let final_url = response.url().to_string();
         if Self::is_login_url(&final_url) {
@@ -239,8 +239,9 @@ impl VtopClient {
             .await
             .map_err(|error| network_error(&format!("{context}.bytes"), error))?;
         if !status.is_success() {
-            return Err(server_error(
+            return Err(status_error(
                 context,
+                status,
                 format!("VTOP returned HTTP {status}"),
             ));
         }
@@ -276,7 +277,7 @@ impl VtopClient {
         let response = request
             .send_with(self)
             .await
-            .map_err(|error| network_error(&format!("{context}.send"), error))?;
+            .map_err(|error| send_error(&format!("{context}.send"), error))?;
         self.read_authenticated_response_text(context, response)
             .await
     }

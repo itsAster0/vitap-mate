@@ -2,11 +2,13 @@ import 'dart:developer' show log;
 
 import 'package:http/http.dart';
 import 'package:vitapmate/core/exceptions.dart';
+import 'package:vitapmate/core/utils/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 enum AppErrorType {
   invalidCredentials,
   network,
+  vtopDown,
   sessionExpired,
   server,
   captcha,
@@ -26,6 +28,10 @@ enum AppErrorType {
       AppErrorType.invalidCredentials,
       'Your VTOP username or password looks incorrect. Check it and try again.',
     );
+  }
+
+  if (isVtopDown(error)) {
+    return (AppErrorType.vtopDown, vtopErrorMessage(error));
   }
 
   if (error == VtopError.networkError() || error is ClientException) {
@@ -107,6 +113,8 @@ extension AppErrorTypeX on AppErrorType {
         return 'Invalid Credentials';
       case AppErrorType.network:
         return 'No Internet';
+      case AppErrorType.vtopDown:
+        return 'VTOP Is Down';
       case AppErrorType.sessionExpired:
         return 'Session Expired';
       case AppErrorType.server:
