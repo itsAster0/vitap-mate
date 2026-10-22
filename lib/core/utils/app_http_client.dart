@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:cronet_http/cronet_http.dart';
@@ -5,8 +6,10 @@ import 'package:cupertino_http/cupertino_http.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:meta/meta.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vitapmate/core/utils/app_urls.dart';
+import 'package:vitapmate/core/utils/cronet_net_log.dart';
 
 /// The HTTP client for the VITAP Mate server: Cronet on Android and
 /// NSURLSession on iOS, both of which speak HTTP/3 (QUIC). On a
@@ -85,7 +88,10 @@ final Future<({CronetEngine engine, http.Client client})> _cronet =
     _buildCronet();
 
 Future<({CronetEngine engine, http.Client client})> _buildCronet() async {
-  final engine = _buildCronetEngine(storagePath: await _claimStorage());
+  final storage = await _claimStorage();
+  final engine = _buildCronetEngine(storagePath: storage);
+  // The main isolate's engine only (the one with storage).
+  if (storage != null) await CronetNetLog.recordLaunch(engine);
   return (engine: engine, client: CronetClient.fromCronetEngine(engine));
 }
 
@@ -101,9 +107,7 @@ Future<({CronetEngine engine, http.Client client})> _buildCronet() async {
 /// claim left by an earlier process is taken over.
 Future<String?> _claimStorage() async {
   try {
-    final root = Directory(
-      '${(await getApplicationSupportDirectory()).path}/cronet',
-    );
+    final root = Directory(await _storageRoot());
     await root.create(recursive: true);
     final owner = File('${root.path}.owner');
     if (await owner.exists()) {
@@ -113,11 +117,51 @@ Future<String?> _claimStorage() async {
     // Exclusive: of two isolates racing here, one wins.
     await owner.create(exclusive: true);
     await owner.writeAsString('$pid');
+    final forget = File('${root.path}.forget-quic');
+    if (await forget.exists()) {
+      await _forgetBrokenQuic(File('${root.path}/prefs/local_prefs.json'));
+      await forget.delete();
+    }
     return root.path;
   } catch (_) {
     // Without it the engine only remembers servers until the app exits.
     return null;
   }
+}
+
+Future<String> _storageRoot() async =>
+    '${(await getApplicationSupportDirectory()).path}/cronet';
+
+/// Has the next launch forget the QUIC failures Cronet saved, before its
+/// engine starts. When QUIC failed for a reason now gone (a VPN dropping
+/// UDP), Cronet keeps to HTTP/2 for minutes to hours, across restarts. Not
+/// done in this run: the live engine holds the failures in memory and would
+/// save them again.
+Future<void> forgetQuicFailuresOnNextLaunch() async {
+  await File('${await _storageRoot()}.forget-quic').create(recursive: true);
+}
+
+Future<void> _forgetBrokenQuic(File prefs) async {
+  if (!await prefs.exists()) return;
+  try {
+    final json = jsonDecode(await prefs.readAsString());
+    if (withoutBrokenAlternativeServices(json)) {
+      await prefs.writeAsString(jsonEncode(json));
+    }
+  } catch (_) {
+    // Unreadable prefs: Cronet starts over without them anyway.
+  }
+}
+
+/// Drops the saved QUIC failures from Cronet's prefs [json] in place,
+/// keeping the rest (which servers speak QUIC, their round-trip times, DNS
+/// answers). Whether there were any.
+@visibleForTesting
+bool withoutBrokenAlternativeServices(Object? json) {
+  if (json case {'net': {'http_server_properties': final Map props}}) {
+    return props.remove('broken_alternative_services') != null;
+  }
+  return false;
 }
 
 /// The engine behind [sharedAppHttpClient] on Android once built, for its

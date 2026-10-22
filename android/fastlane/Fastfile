@@ -3,10 +3,10 @@ update_priority  =4;
 platform :android do
   desc "Deploy a new version to the Internal track only"
   lane :deploy_internal do
-    sh "flutter build appbundle --release --dart-define-from-file=.env.json"
+    sh "flutter build appbundle --release --flavor prod --dart-define-from-file=.env.json"
     upload_to_play_store(
       track: "internal",
-      aab: "../build/app/outputs/bundle/release/app-release.aab",
+      aab: "../build/app/outputs/bundle/prodRelease/app-prod-release.aab",
       skip_upload_changelogs: true,
     skip_upload_metadata: true,
     skip_upload_images: true,
@@ -36,15 +36,15 @@ platform :android do
     in_app_update_priority: update_priority 
     )
 
-    # upload_to_play_store(
-    #   track: "internal",
-    #   track_promote_to:"beta", 
-    #   skip_upload_changelogs: true,
-    # skip_upload_metadata: true,
-    # skip_upload_images: true,
-    # skip_upload_screenshots: true,
-    # in_app_update_priority: update_priority 
-    # )
+    upload_to_play_store(
+      track: "internal",
+      track_promote_to:"beta", 
+      skip_upload_changelogs: true,
+    skip_upload_metadata: true,
+    skip_upload_images: true,
+    skip_upload_screenshots: true,
+    in_app_update_priority: update_priority 
+    )
 
     # upload_to_play_store(
     #   track: "internal",

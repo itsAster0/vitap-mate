@@ -53,6 +53,12 @@ plugins {
 // Firebase is optional. Apply Google Services only when its native config exists.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    // google-services.json has no client for the dev flavor's app ID.
+    tasks.configureEach {
+        if (name.startsWith("processDev") && name.endsWith("GoogleServices")) {
+            enabled = false
+        }
+    }
 }
 
 android {
@@ -95,6 +101,23 @@ dependencies {
         storeFile = file(keystoreProperties["storeFile"] as String)
         storePassword = keystoreProperties["password"] as String
     }
+    }
+
+    // prod is the store app. dev installs beside it, as com.vitap_pal.app.test
+    // ("VM Test"), for trying builds on a phone without replacing the app in
+    // use. dev has no Firebase app, so it runs without push.
+    flavorDimensions += "app"
+    productFlavors {
+        create("prod") {
+            dimension = "app"
+            isDefault = true
+            manifestPlaceholders["appLabel"] = "Vitap Mate"
+        }
+        create("dev") {
+            dimension = "app"
+            applicationIdSuffix = ".test"
+            manifestPlaceholders["appLabel"] = "VM Test"
+        }
     }
 
     buildTypes {
