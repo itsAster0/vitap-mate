@@ -3,6 +3,16 @@ name: Android Build
 on:
   push:
     branches: [main]
+    # Parts of the repo the app is not built from: the edge Worker, the
+    # engine's crates, the browser extension and docs.
+    paths-ignore:
+      - "rust/vtop-edge/**"
+      - "rust/vtop-bridge/**"
+      - "rust/vtop-mcp/**"
+      - "rust/Dockerfile.engine"
+      - "extension/**"
+      - ".github/workflows/extension-build.yml"
+      - "**/*.md"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +41,8 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          # ARM only: x86_64 served just emulators and ChromeOS.
+          targets: aarch64-linux-android,armv7-linux-androideabi
 
       # Cargokit builds the Rust library into the Flutter build directory,
       # not rust/target, so point the cache there.
@@ -95,6 +106,7 @@ jobs:
       - name: Build universal release APK
         run: |
           flutter build apk --release \
+            --target-platform android-arm,android-arm64 \
             --dart-define-from-file=.env.json
           mkdir -p build/artifacts
           cp build/app/outputs/flutter-apk/app-release.apk \
@@ -103,13 +115,12 @@ jobs:
       - name: Build release APKs for each architecture
         run: |
           flutter build apk --release --split-per-abi \
+            --target-platform android-arm,android-arm64 \
             --dart-define-from-file=.env.json
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             build/artifacts/vitapmate-arm64-v8a.apk
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
             build/artifacts/vitapmate-armeabi-v7a.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk \
-            build/artifacts/vitapmate-x86_64.apk
 
       - name: Remove app environment
         if: always()
@@ -136,14 +147,6 @@ jobs:
         with:
           name: vitapmate-armeabi-v7a-apk
           path: build/artifacts/vitapmate-armeabi-v7a.apk
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload x86-64 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitapmate-x86_64-apk
-          path: build/artifacts/vitapmate-x86_64.apk
           if-no-files-found: error
           retention-days: 30
 
