@@ -13,6 +13,7 @@ import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/router/paths.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 import 'package:vitapmate/core/utils/cronet_net_log.dart';
 import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
@@ -80,6 +81,12 @@ class DebugPage extends HookConsumerWidget {
                   subtitle: netLogRecording
                       ? 'Recording: use the app, then tap to save'
                       : 'Why requests use HTTP/2 or HTTP/3',
+                ),
+                tile(
+                  'Forget QUIC Failures',
+                  FLucideIcons.rotateCcw,
+                  () => _forgetQuicFailures(context),
+                  subtitle: 'Try HTTP/3 again from the next launch',
                 ),
               ],
             ),
@@ -166,6 +173,12 @@ class DebugPage extends HookConsumerWidget {
 
 /// Starts Cronet's net log, or stops it and saves the file where the user
 /// picks.
+Future<void> _forgetQuicFailures(BuildContext context) async {
+  await forgetQuicFailuresOnNextLaunch();
+  if (!context.mounted) return;
+  dispToast(context, 'Done', 'Close and reopen the app to try HTTP/3 again.');
+}
+
 Future<void> _toggleNetLog(BuildContext context) async {
   try {
     if (!CronetNetLog.recording.value) {

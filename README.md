@@ -123,11 +123,12 @@ keyAlias=your-key-alias
 password=your-keystore-password
 ```
 
-Then run or build the app:
+Then run or build the app. Android has two flavors: `prod`, the store app, and `dev`, which installs beside it as `com.vitap_pal.app.test` ("VM Test") for trying builds on a phone without replacing the app in use. Android builds must name one; iOS builds take no flavor.
 
 ```bash
-flutter run
-flutter build apk --release
+flutter run --flavor prod
+flutter build apk --release --flavor prod
+flutter build apk --release --flavor dev
 ```
 
 ## Optional build configuration
@@ -146,8 +147,8 @@ Plain builds work without hosted integrations. Pass Dart defines through `.env.j
 ```
 
 ```bash
-flutter run --dart-define-from-file=.env.json
-flutter build apk --release --dart-define-from-file=.env.json
+flutter run --flavor prod --dart-define-from-file=.env.json
+flutter build apk --release --flavor prod --dart-define-from-file=.env.json
 ```
 
 `GOOGLE_OAUTH_CLIENT_ID` must be an Android OAuth client ID ending in `.apps.googleusercontent.com`. Its Android client must use package name `com.vitap_pal.app` and the certificate fingerprints for the signing key. Without this value, Android users can still import a Desktop OAuth JSON file in the Gmail setup screen.

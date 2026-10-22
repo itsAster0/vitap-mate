@@ -13,6 +13,10 @@ import 'package:vitapmate/core/providers/settings.dart';
 
 const vtopProxySettingKey = 'settings_vtop_proxy';
 
+/// The setting before it is chosen. Off, except on test builds made with
+/// `--dart-define=VTOP_PROXY_DEFAULT=true`.
+const _proxyByDefault = bool.fromEnvironment('VTOP_PROXY_DEFAULT');
+
 /// The VTOP origin the phone's client uses: the server's proxy of VTOP,
 /// or null for VTOP itself.
 String? vtopBaseUrlFor({
@@ -25,7 +29,9 @@ String? vtopBaseUrlFor({
 Future<String?> currentVtopBaseUrl() async {
   final bool proxy;
   try {
-    proxy = await SharedPreferencesAsync().getBool(vtopProxySettingKey) ?? false;
+    proxy =
+        await SharedPreferencesAsync().getBool(vtopProxySettingKey) ??
+        _proxyByDefault;
   } catch (_) {
     return null;
   }
@@ -38,7 +44,8 @@ Future<String?> currentVtopBaseUrl() async {
 
 final vtopProxyProvider = Provider<bool>(
   (ref) =>
-      ref.watch(settingsProvider).value?.getBool(vtopProxySettingKey) ?? false,
+      ref.watch(settingsProvider).value?.getBool(vtopProxySettingKey) ??
+      _proxyByDefault,
 );
 
 /// Saves the choice and rebuilds the client, so the next request uses it.

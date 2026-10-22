@@ -1,5 +1,4 @@
 name: Android Build
-
 on:
   push:
     branches: [main]
@@ -14,36 +13,29 @@ on:
       - ".github/workflows/extension-build.yml"
       - "**/*.md"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   build-apk:
     name: Build APK
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
           cache: gradle
-
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           # ARM only: x86_64 served just emulators and ChromeOS.
           targets: aarch64-linux-android,armv7-linux-androideabi
-
       # Cargokit builds the Rust library into the Flutter build directory,
       # not rust/target, so point the cache there.
       - name: Cache Rust build
@@ -52,27 +44,25 @@ jobs:
           workspaces: rust -> ../build/rust_lib_vitapmate/build
           cache-directories: build/rust_lib_vitapmate/build_tool
           cache-on-failure: true
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-
       - name: Install dependencies
         run: flutter pub get
-
-      - name: Configure app environment
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v4
+      - name: Write secrets from 1Password
         env:
-          ENV_JSON: ${{ secrets.ENV_JSON }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
-          if [ -z "$ENV_JSON" ]; then
-            echo "ENV_JSON secret is not configured."
+          if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+            echo "OP_SERVICE_ACCOUNT_TOKEN secret is not configured."
             exit 1
           fi
 
-          printf '%s' "$ENV_JSON" > .env.json
-          # Prints only the names of missing keys, never values.
+          tool/secrets.sh env signing
           missing=$(jq -r '
             . as $env |
             [
@@ -84,48 +74,32 @@ jobs:
             ][] | select(($env[.] // "") == "")
           ' .env.json)
           if [ -n "$missing" ]; then
-            echo "ENV_JSON is missing:"
+            echo ".env.json is missing:"
             echo "$missing"
             exit 1
           fi
-
-      - name: Configure Android signing
-        env:
-          KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEY_STORE }}
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.UPLOAD_RELEASE }}
-        run: |
-          if [ -z "$KEYSTORE_PROPERTIES_BASE64" ] || \
-             [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "KEY_STORE and UPLOAD_RELEASE secrets are not configured."
-            exit 1
-          fi
-
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
-          printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > android/keystore.properties
-
       - name: Build universal release APK
         run: |
-          flutter build apk --release \
+          flutter build apk --release --flavor prod \
             --target-platform android-arm,android-arm64 \
             --dart-define-from-file=.env.json
           mkdir -p build/artifacts
-          cp build/app/outputs/flutter-apk/app-release.apk \
+          cp build/app/outputs/flutter-apk/app-prod-release.apk \
             build/artifacts/vitapmate-universal.apk
-
       - name: Build release APKs for each architecture
         run: |
-          flutter build apk --release --split-per-abi \
+          flutter build apk --release --flavor prod --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --dart-define-from-file=.env.json
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-prod-release.apk \
             build/artifacts/vitapmate-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-prod-release.apk \
             build/artifacts/vitapmate-armeabi-v7a.apk
-
-      - name: Remove app environment
+      - name: Remove secrets
         if: always()
-        run: rm -f .env.json
-
+        run: |
+          rm -f .env.json android/keystore.properties \
+            android/upload-keystore.jks
       - name: Upload universal APK
         uses: actions/upload-artifact@v4
         with:
@@ -133,7 +107,6 @@ jobs:
           path: build/artifacts/vitapmate-universal.apk
           if-no-files-found: error
           retention-days: 30
-
       - name: Upload ARM 64-bit APK
         uses: actions/upload-artifact@v4
         with:
@@ -141,7 +114,6 @@ jobs:
           path: build/artifacts/vitapmate-arm64-v8a.apk
           if-no-files-found: error
           retention-days: 30
-
       - name: Upload ARM 32-bit APK
         uses: actions/upload-artifact@v4
         with:
@@ -149,7 +121,6 @@ jobs:
           path: build/artifacts/vitapmate-armeabi-v7a.apk
           if-no-files-found: error
           retention-days: 30
-
       - name: Publish nightly release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:

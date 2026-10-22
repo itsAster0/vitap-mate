@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:cronet_http/cronet_http.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vitapmate/core/utils/app_http_client.dart';
@@ -19,6 +21,25 @@ class CronetNetLog {
 
   /// Whether a log is being written.
   static final recording = ValueNotifier<bool>(false);
+
+  /// Seconds to log from the moment the engine starts, for problems that
+  /// begin before the Debug page can be reached. Set on test builds only:
+  /// `--dart-define=NETLOG_AT_LAUNCH=90`. The log goes to the app's external
+  /// files directory (readable over adb) as `cronet-netlog-launch.json`.
+  static const _launchSeconds = int.fromEnvironment('NETLOG_AT_LAUNCH');
+
+  /// Starts the launch log on [engine] when [_launchSeconds] is set.
+  static Future<void> recordLaunch(CronetEngine engine) async {
+    if (_launchSeconds <= 0) return;
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return;
+      engine.startNetLogToFile('${dir.path}/cronet-netlog-launch.json', false);
+      Timer(const Duration(seconds: _launchSeconds), engine.stopNetLog);
+    } catch (_) {
+      // A test aid; the app runs the same without it.
+    }
+  }
 
   static Future<File> _file() async =>
       File('${(await getTemporaryDirectory()).path}/cronet-netlog.json');
