@@ -260,10 +260,9 @@ packages:
   cronet_http:
     dependency: "direct main"
     description:
-      name: cronet_http
-      sha256: d8aa6c72b4a3b6c9b299a53f0c4e10cfc87961b2c7496e6c9a7216157f9c529c
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/cronet_http"
+      relative: true
+    source: path
     version: "1.10.0"
   cross_file:
     dependency: transitive
