@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:vitapmate/core/utils/users/saved_credentials.dart';
 import 'package:vitapmate/core/utils/edge/credentials_rejected.dart';
 import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -25,8 +26,12 @@ import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Independent, so start both rather than waiting on one then the other.
-  final (firebaseReady, _) = await (ensureFirebaseReady(), RustLib.init()).wait;
+  // Independent, so start them together rather than one after another.
+  final (firebaseReady, _, _) = await (
+    ensureFirebaseReady(),
+    RustLib.init(),
+    useAppHttpStorage(),
+  ).wait;
   if (firebaseReady) {
     FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
   }
