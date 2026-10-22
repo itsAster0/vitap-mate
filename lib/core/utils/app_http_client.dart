@@ -52,29 +52,6 @@ const _quicNetworkChangeOptions = '''
   "close_sessions_on_ip_change": false
 }}''';
 
-/// Where the main isolate's engine keeps what it learns about servers
-/// (which speak QUIC, how fast they answer, 0-RTT keys), so a cold start
-/// goes straight to HTTP/3 instead of racing TCP. Set by
-/// [useAppHttpStorage] before the first request. Other isolates leave it
-/// null and keep nothing, as Cronet needs one directory per engine. Cronet
-/// keeps no cookies there (integration_test/cronet_cookies_test.dart).
-String? _storagePath;
-
-/// Gives this isolate's engine [_storagePath]. Called once by the app's
-/// entry point, before anything uses [sharedAppHttpClient].
-Future<void> useAppHttpStorage() async {
-  if (!Platform.isAndroid) return;
-  try {
-    final dir = Directory(
-      '${(await getApplicationSupportDirectory()).path}/cronet',
-    );
-    await dir.create(recursive: true);
-    _storagePath = dir.path;
-  } catch (_) {
-    // Without it the engine only remembers servers until the app exits.
-  }
-}
-
 CronetEngine _buildCronetEngine({String? storagePath}) => CronetEngine.build(
   cacheMode: storagePath == null ? CacheMode.disabled : CacheMode.diskNoHttp,
   // Required with a disk mode; no HTTP responses are cached in it.
@@ -102,19 +79,72 @@ CronetEngine _buildCronetEngine({String? storagePath}) => CronetEngine.build(
   ],
 );
 
-/// The Cronet engine behind [sharedAppHttpClient] on Android, null
-/// elsewhere. Kept for its net log (see `cronet_net_log.dart`).
-final CronetEngine? sharedCronetEngine = Platform.isAndroid
-    ? _buildCronetEngine(storagePath: _storagePath)
-    : null;
+/// This isolate's engine and client on Android, built on the first request
+/// rather than at launch.
+final Future<({CronetEngine engine, http.Client client})> _cronet =
+    _buildCronet();
 
-/// One client per isolate, built on first use and never closed, so
+Future<({CronetEngine engine, http.Client client})> _buildCronet() async {
+  final engine = _buildCronetEngine(storagePath: await _claimStorage());
+  return (engine: engine, client: CronetClient.fromCronetEngine(engine));
+}
+
+/// Where the engine keeps what it learns about servers (which speak QUIC,
+/// how fast they answer, DNS answers), so a cold start goes straight to
+/// HTTP/3. Cronet keeps no cookies there
+/// (integration_test/cronet_cookies_test.dart).
+///
+/// Cronet needs one directory per engine, so only one isolate per process
+/// may use it: the first to send a request claims it by writing the process
+/// id into `cronet.owner` beside it. Other isolates (push and background
+/// sync, while the app runs) get null and keep what they learn in memory. A
+/// claim left by an earlier process is taken over.
+Future<String?> _claimStorage() async {
+  try {
+    final root = Directory(
+      '${(await getApplicationSupportDirectory()).path}/cronet',
+    );
+    await root.create(recursive: true);
+    final owner = File('${root.path}.owner');
+    if (await owner.exists()) {
+      if (int.tryParse(await owner.readAsString()) == pid) return null;
+      await owner.delete();
+    }
+    // Exclusive: of two isolates racing here, one wins.
+    await owner.create(exclusive: true);
+    await owner.writeAsString('$pid');
+    return root.path;
+  } catch (_) {
+    // Without it the engine only remembers servers until the app exits.
+    return null;
+  }
+}
+
+/// The engine behind [sharedAppHttpClient] on Android once built, for its
+/// net log (see `cronet_net_log.dart`); null elsewhere.
+Future<CronetEngine?> get sharedCronetEngine async =>
+    Platform.isAndroid ? (await _cronet).engine : null;
+
+/// One client per isolate, set up on its first request and never closed, so
 /// connections are reused. Code without a Ref (background isolates, ad hoc
 /// services) uses this too; a Cronet engine per call would be costly.
-final http.Client sharedAppHttpClient = switch (sharedCronetEngine) {
-  final engine? => CronetClient.fromCronetEngine(engine),
-  null => createAppHttpClient(),
-};
+final http.Client sharedAppHttpClient = Platform.isAndroid
+    ? _DeferredClient(_cronet.then((cronet) => cronet.client))
+    : createAppHttpClient();
+
+/// Sends through the client [_client] completes with.
+class _DeferredClient extends http.BaseClient {
+  _DeferredClient(this._client);
+
+  final Future<http.Client> _client;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      (await _client).send(request);
+
+  @override
+  void close() => _client.then((client) => client.close());
+}
 
 /// [sharedAppHttpClient], overridable in tests.
 final appHttpClientProvider = Provider<http.Client>(

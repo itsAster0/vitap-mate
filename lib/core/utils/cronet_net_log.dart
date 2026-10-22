@@ -15,7 +15,7 @@ class CronetNetLog {
   CronetNetLog._();
 
   /// Whether this platform has a Cronet engine to log.
-  static bool get available => sharedCronetEngine != null;
+  static bool get available => Platform.isAndroid;
 
   /// Whether a log is being written.
   static final recording = ValueNotifier<bool>(false);
@@ -26,7 +26,7 @@ class CronetNetLog {
   /// Starts a new log; it covers every live engine in the app, background
   /// isolates' included.
   static Future<void> start() async {
-    final engine = sharedCronetEngine;
+    final engine = await sharedCronetEngine;
     if (engine == null || recording.value) return;
     final file = await _file();
     if (await file.exists()) await file.delete();
@@ -36,7 +36,7 @@ class CronetNetLog {
 
   /// Stops the log and returns it, or null when there is none.
   static Future<Uint8List?> stop() async {
-    final engine = sharedCronetEngine;
+    final engine = await sharedCronetEngine;
     if (engine == null || !recording.value) return null;
     engine.stopNetLog();
     recording.value = false;
