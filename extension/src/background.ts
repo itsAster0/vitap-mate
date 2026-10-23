@@ -197,13 +197,17 @@ async function getSession(
 
   let outcome = await readSessionOutcome(response);
   const deadline = Date.now() + POLL_TIMEOUT_MS;
+  // Only the first reply names the request; polls answer for it by URL.
+  let requestId = "";
+  if (outcome.kind === "pending") {
+    if (!outcome.requestId) {
+      throw new Error("The sign-in service sent an unexpected reply.");
+    }
+    requestId = outcome.requestId;
+  }
 
   while (outcome.kind === "pending" && Date.now() < deadline) {
     throwIfCancelled(signal);
-    const requestId = outcome.requestId;
-    if (!requestId) {
-      throw new Error("The sign-in service sent an unexpected reply.");
-    }
 
     const phase = outcome.stage === "starting" ? "request" : outcome.stage;
     await report(tabId, progressText(outcome.stage, outcome.serverDueAt), {

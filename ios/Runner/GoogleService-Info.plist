@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyDuQHZzABlOE1DN1qKYC2M7gOy8xydQNcA</string>
+	<string>AIzaSyD8ZRVbFYjPUS54CKrS-S9lqiTkmuPAMqk</string>
 	<key>GCM_SENDER_ID</key>
-	<string>1016469338948</string>
+	<string>436775020888</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.vitapmate.app</string>
 	<key>PROJECT_ID</key>
-	<string>vitapmate</string>
+	<string>vitap-mate-self</string>
 	<key>STORAGE_BUCKET</key>
-	<string>vitapmate.firebasestorage.app</string>
+	<string>vitap-mate-self.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1016469338948:ios:1aaa4fd40ae0652babf511</string>
+	<string>1:436775020888:ios:d9c9b17ed331162a1f5d2d</string>
+	<key>DATABASE_URL</key>
+	<string>https://vitap-mate-self-default-rtdb.asia-southeast1.firebasedatabase.app</string>
 </dict>
 </plist>
