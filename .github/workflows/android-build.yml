@@ -1,4 +1,4 @@
-name: Android Build
+name: App Build
 on:
   push:
     branches: [main]
@@ -30,7 +30,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
+      # Caches ~/.gradle and drops files the build no longer uses before
+      # saving, so the cache does not grow with every dependency bump.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -51,18 +54,17 @@ jobs:
           cache: true
       - name: Install dependencies
         run: flutter pub get
-      - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v4
-      - name: Write secrets from 1Password
+      - name: Configure app environment
         env:
-          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          ENV_JSON: ${{ secrets.ENV_JSON }}
         run: |
-          if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-            echo "OP_SERVICE_ACCOUNT_TOKEN secret is not configured."
+          if [ -z "$ENV_JSON" ]; then
+            echo "ENV_JSON secret is not configured."
             exit 1
           fi
 
-          tool/secrets.sh env signing
+          printf '%s' "$ENV_JSON" > .env.json
+          # Prints only the names of missing keys, never values.
           missing=$(jq -r '
             . as $env |
             [
@@ -74,10 +76,23 @@ jobs:
             ][] | select(($env[.] // "") == "")
           ' .env.json)
           if [ -n "$missing" ]; then
-            echo ".env.json is missing:"
+            echo "ENV_JSON is missing:"
             echo "$missing"
             exit 1
           fi
+      - name: Configure Android signing
+        env:
+          KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEY_STORE }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.UPLOAD_RELEASE }}
+        run: |
+          if [ -z "$KEYSTORE_PROPERTIES_BASE64" ] || \
+             [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "KEY_STORE and UPLOAD_RELEASE secrets are not configured."
+            exit 1
+          fi
+
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > android/keystore.properties
       - name: Build universal release APK
         run: |
           flutter build apk --release --flavor prod \
@@ -121,22 +136,100 @@ jobs:
           path: build/artifacts/vitapmate-armeabi-v7a.apk
           if-no-files-found: error
           retention-days: 30
+  build-ipa:
+    name: Build IPA
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      # On iOS, Cargokit builds the Rust library in the pod's Xcode temp
+      # directory, which a directory cache did not restore usefully.
+      # sccache caches each compiler call instead, wherever Cargo builds.
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Configure app environment
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -z "$ENV_JSON" ]; then
+            echo "ENV_JSON secret is not configured."
+            exit 1
+          fi
+          printf '%s' "$ENV_JSON" > .env.json
+      # Unsigned: AltStore and SideStore sign the app with the user's own
+      # Apple ID when they install it.
+      - name: Build unsigned IPA
+        env:
+          # Xcode passes these on to Cargokit's build phase.
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: sccache
+        run: |
+          # Flutter hides Xcode's errors behind a generic signing message,
+          # so keep the verbose log and print Xcode's own lines on failure.
+          if ! flutter build ios --release --no-codesign -v \
+            --dart-define-from-file=.env.json > ios-build.log 2>&1; then
+            grep -nE "error:|Command .* failed|The following build commands failed|Permission denied" \
+              -A4 ios-build.log | tail -120
+            exit 1
+          fi
+          mkdir -p build/artifacts/Payload
+          cp -R build/ios/iphoneos/Runner.app build/artifacts/Payload/
+          (cd build/artifacts && zip -qry vitapmate.ipa Payload)
+      # Cache hits show whether Cargokit's build went through sccache.
+      - name: Show sccache stats
+        if: always()
+        run: sccache --show-stats
+      - name: Remove secrets
+        if: always()
+        run: rm -f .env.json
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitapmate-ipa
+          path: build/artifacts/vitapmate.ipa
+          if-no-files-found: error
+          retention-days: 30
+  publish-nightly:
+    name: Publish nightly release
+    needs: [build-apk, build-ipa]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: vitapmate-*
+          path: build/artifacts
+          merge-multiple: true
       - name: Publish nightly release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           short_sha="${GITHUB_SHA::7}"
           {
-            echo "Automated build of \`${short_sha}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo "Automated build of \`${short_sha}\` from main on $(date -u '+%Y-%m-%d %H:%M UTC')."
             echo
-            echo "**$(git log -1 --format=%s)**"
+            echo "Latest change: $(git log -1 --format=%s)"
             echo
-            echo "Not a stable release. Most people should use \`vitapmate-universal.apk\`."
+            cat .github/nightly-notes.md
           } > nightly-notes.md
 
           gh release delete nightly --yes --cleanup-tag || true
           gh release create nightly build/artifacts/*.apk \
+            build/artifacts/vitapmate.ipa \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Nightly ${short_sha}" \
