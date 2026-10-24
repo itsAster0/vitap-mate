@@ -117,16 +117,12 @@ class ServerAppsPage extends HookConsumerWidget {
       },
     );
 
-    FTile offlineTile(_Offline mode, IconData icon, String title, String sub) =>
-        FTile(
-          prefix: ServerIconBox(icon: icon, tone: colors.app.accentTone),
-          title: Text(title, maxLines: 2),
-          subtitle: Text(sub, maxLines: 3),
-          suffix: offline == mode
-              ? Icon(FLucideIcons.check, color: colors.app.success.base)
-              : null,
-          onPress: busy.value ? null : () => chooseOffline(mode),
-        );
+    String offlineSubtitle(_Offline mode) => switch (mode) {
+      _Offline.phone => 'Only this phone',
+      _Offline.wait10 => 'Wait 10s, then the server',
+      _Offline.wait20 => 'Wait 20s, then the server',
+      _Offline.server => 'Server signs in right away',
+    };
 
     return ServerSubPage(
       title: 'Connected apps',
@@ -134,62 +130,95 @@ class ServerAppsPage extends HookConsumerWidget {
         const ServerNote(
           'One access key works in the browser extension and in AI agents (MCP). The phone that created a key signs in for it when needed.',
         ),
-        const SectionHeader(title: 'When the phone is offline'),
-        if (status?.credentialsRejectedAt case final rejected?
-            when status?.vaultSavedAt == null ||
-                rejected.isAfter(status!.vaultSavedAt!)) ...[
-          const FAlert(
-            variant: FAlertVariant.destructive,
-            title: Text('VTOP rejected your saved password'),
-            subtitle: Text('Pick a server option again to save a fresh one.'),
-          ),
-          const SizedBox(height: Space.sm),
-        ],
-        FTileGroup(
-          divider: FItemDivider.indented,
-          children: [
-            offlineTile(
-              _Offline.phone,
-              FLucideIcons.smartphone,
-              'Only this phone',
-              'Apps wait for this phone to sign in. Nothing is sealed on the server.',
-            ),
-            offlineTile(
-              _Offline.wait10,
-              FLucideIcons.timer,
-              'Wait 10s, then the server',
-              'Give this phone 10 seconds, then the server signs in.',
-            ),
-            offlineTile(
-              _Offline.wait20,
-              FLucideIcons.timer,
-              'Wait 20s, then the server',
-              'Give this phone 20 seconds, then the server signs in.',
-            ),
-            offlineTile(
-              _Offline.server,
-              FLucideIcons.zap,
-              'Server signs in right away',
-              'Fastest for apps; this phone is not asked first.',
-            ),
-          ],
-        ),
-        const ServerNote(
-          'The server signing in needs your password sealed on it and OTP email forwarding set up.',
-        ),
-        SectionHeader(
-          title: 'Access keys',
-          trailing: Text('${keys.length}/$_maxKeys'),
-        ),
         if (account.isLoading)
-          const Center(child: FCircularProgress.pinwheel())
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: Space.xxl),
+            child: Center(child: FCircularProgress.pinwheel()),
+          )
         else if (account.hasError)
           FAlert(
             variant: FAlertVariant.destructive,
-            title: const Text('Could not load your keys'),
+            title: const Text('Could not load your account'),
             subtitle: Text('${account.error}'),
           )
-        else
+        else ...[
+          if (status?.credentialsRejectedAt case final rejected?
+              when status?.vaultSavedAt == null ||
+                  rejected.isAfter(status!.vaultSavedAt!)) ...[
+            const FAlert(
+              variant: FAlertVariant.destructive,
+              title: Text('VTOP rejected your saved password'),
+              subtitle: Text('Pick a server option again to save a fresh one.'),
+            ),
+            const SizedBox(height: Space.sm),
+          ],
+          FTileGroup(
+            children: [
+              FSelectMenuTile<_Offline>(
+                prefix: ServerIconBox(
+                  icon: FLucideIcons.smartphone,
+                  tone: colors.app.accentTone,
+                ),
+                title: FTappable(
+                  child: const Text('When the phone is offline'),
+                ),
+                subtitle: Text(offlineSubtitle(offline)),
+                selectControl: FMultiValueControl.managedRadio(
+                  initial: offline,
+                  onChange: busy.value
+                      ? null
+                      : (value) {
+                          if (value.isNotEmpty) chooseOffline(value.first);
+                        },
+                ),
+                menu: const [
+                  FSelectTile(
+                    title: Text('Only this phone'),
+                    subtitle: Text(
+                      'Apps wait for this phone to sign in. Nothing is sealed on the server.',
+                      softWrap: true,
+                      maxLines: 3,
+                    ),
+                    value: _Offline.phone,
+                  ),
+                  FSelectTile(
+                    title: Text('Wait 10s, then the server'),
+                    subtitle: Text(
+                      'Give this phone 10 seconds, then the server signs in.',
+                      softWrap: true,
+                      maxLines: 3,
+                    ),
+                    value: _Offline.wait10,
+                  ),
+                  FSelectTile(
+                    title: Text('Wait 20s, then the server'),
+                    subtitle: Text(
+                      'Give this phone 20 seconds, then the server signs in.',
+                      softWrap: true,
+                      maxLines: 3,
+                    ),
+                    value: _Offline.wait20,
+                  ),
+                  FSelectTile(
+                    title: Text('Server signs in right away'),
+                    subtitle: Text(
+                      'Fastest for apps; this phone is not asked first.',
+                      softWrap: true,
+                      maxLines: 3,
+                    ),
+                    value: _Offline.server,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const ServerNote(
+            'The server signing in needs your password sealed on it and OTP email forwarding set up.',
+          ),
+          SectionHeader(
+            title: 'Access keys',
+            trailing: Text('${keys.length}/$_maxKeys'),
+          ),
           FTileGroup(
             divider: FItemDivider.indented,
             children: [
@@ -232,7 +261,8 @@ class ServerAppsPage extends HookConsumerWidget {
               ),
             ],
           ),
-        const ServerNote('Long-press a key to show it again on this phone.'),
+          const ServerNote('Long-press a key to show it again on this phone.'),
+        ],
         const SectionHeader(title: 'Get the apps'),
         FTileGroup(
           children: [

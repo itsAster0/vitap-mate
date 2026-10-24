@@ -97,7 +97,7 @@ jobs:
         run: |
           flutter build apk --release --flavor prod \
             --target-platform android-arm,android-arm64 \
-            --dart-define-from-file=.env.json
+            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }}
           mkdir -p build/artifacts
           cp build/app/outputs/flutter-apk/app-prod-release.apk \
             build/artifacts/vitapmate-universal.apk
@@ -105,7 +105,7 @@ jobs:
         run: |
           flutter build apk --release --flavor prod --split-per-abi \
             --target-platform android-arm,android-arm64 \
-            --dart-define-from-file=.env.json
+            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }}
           cp build/app/outputs/flutter-apk/app-arm64-v8a-prod-release.apk \
             build/artifacts/vitapmate-arm64-v8a.apk
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-prod-release.apk \
@@ -178,7 +178,7 @@ jobs:
           # Flutter hides Xcode's errors behind a generic signing message,
           # so keep the verbose log and print Xcode's own lines on failure.
           if ! flutter build ios --release --no-codesign -v \
-            --dart-define-from-file=.env.json > ios-build.log 2>&1; then
+            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }} > ios-build.log 2>&1; then
             grep -nE "error:|Command .* failed|The following build commands failed|Permission denied" \
               -A4 ios-build.log | tail -120
             exit 1

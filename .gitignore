@@ -55,3 +55,6 @@ keystore.properties
 
 # Wrangler local cache
 .wrangler/
+
+# direnv, per machine
+.envrc

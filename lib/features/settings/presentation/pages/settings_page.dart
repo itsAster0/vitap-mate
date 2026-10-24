@@ -28,6 +28,7 @@ import 'package:vitapmate/features/settings/presentation/providers/semester_id_p
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/services/update_check.dart';
 
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
@@ -93,6 +94,13 @@ class SettingsPage extends HookConsumerWidget {
     final appVersion = packageInfo == null
         ? null
         : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
+    final updateSnapshot = useFuture(
+      useMemoized(checkForAppUpdate, const []),
+    );
+    final update = updateSnapshot.data;
+    // Only a confirmed update is worth a tile; hide it when there is none or
+    // when the check could not tell (offline, GitHub answered oddly, …).
+    final hasUpdate = update?.available == true;
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -445,6 +453,41 @@ class SettingsPage extends HookConsumerWidget {
               ],
             ),
           ),
+          if (hasUpdate && update != null) ...[
+            const SizedBox(height: Space.lg),
+            FTileGroup(
+              children: [
+                FTile(
+                  prefix: _IconTile(
+                    icon: FLucideIcons.download,
+                    tone: colors.app.accentTone,
+                  ),
+                  title: const Text('Update available'),
+                  subtitle: Text(
+                    update.source == UpdateSource.github
+                        ? 'Nightly ${update.latest} is available on GitHub'
+                        : 'An update is available on the Play Store',
+                  ),
+                  suffix: const Icon(FLucideIcons.chevronRight),
+                  onPress: () async {
+                    try {
+                      await installAppUpdate(update);
+                    } catch (error, stackTrace) {
+                      log(
+                        'App update failed',
+                        name: 'settings.update',
+                        error: error,
+                        stackTrace: stackTrace,
+                      );
+                      if (context.mounted) {
+                        disCommonToast(context, error);
+                      }
+                    }
+                  },
+                ),
+              ],
+            ),
+          ],
           if (appVersion != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, bottom: 16),
