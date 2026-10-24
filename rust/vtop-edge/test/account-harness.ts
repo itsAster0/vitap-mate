@@ -1,6 +1,8 @@
 // An `Account` Durable Object over in-memory SQLite, with the engine faked:
 // enough to drive its methods in unit tests.
 
+import { vi } from "vitest";
+
 import { Account, loadAccount, prepareAccountDb, saveAccount } from "../src/account";
 import type { AccountRecord } from "../src/account-state";
 import type { Env } from "../src/common";
@@ -14,16 +16,10 @@ export function accountObject(
 ) {
   const db = memorySql();
   prepareAccountDb(db);
-  const env = {
-    BRIDGE_URL: "container",
-    BRIDGE_SECRET: "s",
-    ...vars,
-    ENGINE: {
-      getByName: () => ({
-        fetch: async (req: Request) => engine(new URL(req.url).pathname, await req.json()),
-      }),
-    },
-  } as unknown as Env;
+  vi.stubGlobal("fetch", async (url: string, init: RequestInit) =>
+    engine(new URL(url).pathname, JSON.parse(init.body as string)),
+  );
+  const env = { ENGINE_URL: "http://engine", BRIDGE_SECRET: "s", ...vars } as unknown as Env;
   const ctx = { storage: { sql: db } } as unknown as DurableObjectState;
   const account = new Account(ctx, env);
   return {

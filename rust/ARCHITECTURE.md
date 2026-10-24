@@ -4,7 +4,7 @@
 rust/                    Cargo workspace; the root package is the app's FFI crate
 ├── src/                 rust_lib_vitapmate: flutter_rust_bridge wrapper (cdylib/staticlib)
 ├── vtop-core/           all VTOP logic, no FRB and no server code
-├── vtop-bridge/         the Engine: axum service over vtop-core, run as a Cloudflare Container
+├── vtop-bridge/         the Engine: axum service over vtop-core, run on Railway
 └── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
 lib/core/vtop_backend/   Dart: VtopBackend interface, local (FRB) and edge (HTTP, NDJSON)
 ```

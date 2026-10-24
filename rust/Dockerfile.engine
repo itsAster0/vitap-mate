@@ -1,11 +1,9 @@
-# The engine (vtop-bridge) for Cloudflare Containers. Built by wrangler from
-# vtop-edge/wrangler.toml with this folder (the Cargo workspace) as context.
+# The engine (vtop-bridge), deployed on Railway (root directory rust,
+# RAILWAY_DOCKERFILE_PATH=Dockerfile.engine) with this folder as context.
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
 COPY . .
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
-    cargo build --locked --profile server --package vtop-bridge --bin vtop-bridge \
+RUN cargo build --locked --profile server --package vtop-bridge --bin vtop-bridge \
     && cp target/server/vtop-bridge /vtop-bridge
 
 FROM debian:bookworm-slim

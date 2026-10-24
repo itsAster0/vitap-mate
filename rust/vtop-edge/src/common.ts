@@ -5,7 +5,6 @@ import { Inflate, strFromU8 } from "fflate";
 import { EDGE_VERSION } from "./version";
 import type { Account } from "./account";
 import type { Device } from "./device";
-import type { Engine } from "./engine";
 import type { FcmToken } from "./fcm";
 import type { Index, Mailbox } from "./store";
 import { DEVICE_SECRET_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
@@ -16,17 +15,14 @@ export interface Env {
   INDEX: DurableObjectNamespace<Index>;
   FCM_TOKEN: DurableObjectNamespace<FcmToken>;
   ACCOUNT: DurableObjectNamespace<Account>;
-  ENGINE: DurableObjectNamespace<Engine>;
   MAIL_DOMAIN: string;
-  BRIDGE_URL: string;
+  ENGINE_URL: string;
   FCM_URL: string;
-  MCP_URL: string;
   PUBLIC_URL: string;
   ALLOWED_ORIGINS: string;
   FALLBACK_FORWARD: string;
   FIREBASE_CREDENTIALS_JSON: string;
   BRIDGE_SECRET: string;
-  VAULT_KEY: string;
 }
 
 /** Unix seconds. */
@@ -86,7 +82,7 @@ export function str(value: unknown): string | undefined {
 }
 
 /** A required `[vars]` entry; every address the edge uses is configured. */
-export function variable(env: Env, name: "MAIL_DOMAIN" | "BRIDGE_URL" | "FCM_URL" | "MCP_URL" | "PUBLIC_URL"): string {
+export function variable(env: Env, name: "MAIL_DOMAIN" | "ENGINE_URL" | "FCM_URL" | "PUBLIC_URL"): string {
   const value = (env[name] ?? "").trim();
   if (!value) throw new Error(`${name} is not configured`);
   return value.replace(/\/+$/, "");
@@ -110,23 +106,14 @@ export function isEngine(req: Request, env: Env): boolean {
 
 // ---- the engine ---------------------------------------------------------------
 
-/** The value of `BRIDGE_URL` / `MCP_URL` that sends calls to the engine's
- * container, through the `Engine` Durable Object (engine.ts). */
-const IN_CONTAINER = "container";
-
-/** Sends a request to the engine: to the container or to the address in
- * `service`. */
-export function engineSend(env: Env, service: "BRIDGE_URL" | "MCP_URL", path: string, init: RequestInit): Promise<Response> {
-  const base = variable(env, service);
-  if (base === IN_CONTAINER) {
-    return env.ENGINE.getByName("engine").fetch(new Request(`http://engine${path}`, init));
-  }
-  return fetch(`${base}${path}`, init);
+/** Sends a request to the engine at `ENGINE_URL`. */
+export function engineSend(env: Env, path: string, init: RequestInit): Promise<Response> {
+  return fetch(`${variable(env, "ENGINE_URL")}${path}`, init);
 }
 
 /** Posts to the engine with the shared secret. */
 export function enginePost(env: Env, path: string, body: unknown): Promise<Response> {
-  return engineSend(env, "BRIDGE_URL", path, {
+  return engineSend(env, path, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${env.BRIDGE_SECRET}` },
     body: JSON.stringify(body),
