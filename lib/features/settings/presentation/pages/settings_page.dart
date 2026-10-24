@@ -94,9 +94,7 @@ class SettingsPage extends HookConsumerWidget {
     final appVersion = packageInfo == null
         ? null
         : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
-    final updateSnapshot = useFuture(
-      useMemoized(checkForAppUpdate, const []),
-    );
+    final updateSnapshot = useFuture(useMemoized(checkForAppUpdate, const []));
     final update = updateSnapshot.data;
     // Only a confirmed update is worth a tile; hide it when there is none or
     // when the check could not tell (offline, GitHub answered oddly, …).

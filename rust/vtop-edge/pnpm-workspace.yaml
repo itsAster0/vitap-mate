@@ -1,3 +1,6 @@
+# One package; pnpm before 10 refuses a workspace file without this.
+packages:
+  - "."
 allowBuilds:
   esbuild: true
   workerd: true

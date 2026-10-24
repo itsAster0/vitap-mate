@@ -13,6 +13,7 @@ import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/icon_box.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/status_card.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/server_sections/vtop_mode_picker.dart';
 
 /// Where the Server page lives; Connected apps' old route goes here too.
 const serverPagePath = '/settings/server';
@@ -57,6 +58,7 @@ class ServerPage extends ConsumerWidget {
     final status = ref.watch(serverStatusProvider).value;
     final url = ref.watch(serverUrlProvider);
     final isDefault = ref.read(serverUrlProvider.notifier).isDefault;
+    final mode = ref.watch(vtopModeProvider);
 
     FTile row(
       String title,
@@ -78,28 +80,14 @@ class ServerPage extends ConsumerWidget {
         const SizedBox(height: Space.md),
         ServerStatusCard(linked: linked),
         const SectionHeader(title: 'VTOP'),
-        FTileGroup(
-          children: [
-            FTile(
-              prefix: ServerIconBox(
-                icon: FLucideIcons.zap,
-                tone: colors.app.success,
-              ),
-              title: const Text('Compress through the server', maxLines: 2),
-              subtitle: const Text(
-                'About 10× less data. The server passes on your sign-in.',
-                maxLines: 2,
-              ),
-              suffix: FSwitch(
-                value: ref.watch(vtopProxyProvider),
-                onChange: (on) => setVtopProxy(ref, on),
-              ),
-            ),
-          ],
-        ),
-        const ServerNote(
-          'The phone signs in and fetches either way; with this on, VTOP\'s pages reach it compressed through the server.',
-        ),
+        const VtopModePicker(),
+        ServerNote(switch (mode) {
+          VtopServerMode.off => 'Nothing about VTOP goes through the server.',
+          VtopServerMode.compress =>
+            'VTOP\'s pages reach the phone compressed through the server.',
+          VtopServerMode.server =>
+            'Your password goes to the server for each sign-in and is not kept; nor is the session. Outing requests and file downloads still go from the phone. If the server is down, the phone fetches itself.',
+        }),
         const SectionHeader(title: 'Apps and phones'),
         FTileGroup(
           divider: FItemDivider.indented,

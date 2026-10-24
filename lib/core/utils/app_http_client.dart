@@ -46,9 +46,10 @@ http.Client createAppHttpClient() {
 /// is merely degraded, and no handshake retry on the other network.
 const _quicNetworkChangeOptions = '''
 {"QUIC": {
+  "idle_connection_timeout_seconds": 60,
   "migrate_sessions_on_network_change_v2": true,
   "migrate_idle_sessions": true,
-  "idle_session_migration_period_seconds": 30,
+  "idle_session_migration_period_seconds": 60,
   "migrate_sessions_early_v2": false,
   "retry_on_alternate_network_before_handshake": false,
   "goaway_sessions_on_ip_change": false,

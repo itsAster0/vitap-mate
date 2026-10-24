@@ -2,6 +2,7 @@
   "name": "vtop-edge",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@12.15.0",
   "scripts": {
     "check": "tsc -p .",
     "test": "vitest run",
