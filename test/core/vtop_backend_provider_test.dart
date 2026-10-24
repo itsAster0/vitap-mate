@@ -18,15 +18,20 @@ void main() {
     return container.read(vtopBackendProvider).name;
   }
 
-  test('VTOP is always read on the phone, linked, proxied or not', () async {
-    expect(await backendName({}), 'local');
+  // The mode is read at each call (ServerVtopBackend), so one backend
+  // serves every setting.
+  test('one backend reads VTOP for every mode', () async {
+    expect(await backendName({}), 'phone or server');
     expect(
       await backendName({
         bridgeLinkedSettingKey: true,
-        vtopProxySettingKey: true,
+        vtopModeSettingKey: 'server',
       }),
-      'local',
+      'phone or server',
     );
-    expect(await backendName({onDeviceModeSettingKey: true}), 'local');
+    expect(
+      await backendName({onDeviceModeSettingKey: true}),
+      'phone or server',
+    );
   });
 }

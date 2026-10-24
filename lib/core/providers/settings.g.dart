@@ -48,7 +48,7 @@ final class SettingsProvider
   }
 }
 
-String _$settingsHash() => r'842da2ac0f25e00733525792b1c44bfa19ff0cb7';
+String _$settingsHash() => r'071b7b344390e33510d2a4ab79245a8b8b5a13ff';
 
 @ProviderFor(classesLeftUntil)
 final classesLeftUntilProvider = ClassesLeftUntilProvider._();

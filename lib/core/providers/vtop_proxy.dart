@@ -1,7 +1,7 @@
-/// The phone's own VTOP requests (sign-in and fetches) through the server:
-/// the same requests, but VTOP's uncompressed pages arrive compressed. The
-/// server sees them, password included, so it is off unless chosen, and
-/// never in on-device mode.
+/// How the phone reaches VTOP ([VtopServerMode]): itself, through the
+/// server's compressing proxy, or with the server signing in and fetching.
+/// The server sees the password in both server modes, so it is off unless
+/// chosen, and never in on-device mode.
 library;
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -11,47 +11,88 @@ import 'package:vitapmate/core/providers/on_device_mode.dart';
 import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 
+enum VtopServerMode {
+  /// The phone signs in and fetches, straight to VTOP.
+  off,
+
+  /// The phone signs in and fetches through the server's `/vtop/` proxy:
+  /// the same requests, but VTOP's pages arrive compressed.
+  compress,
+
+  /// The server signs in with the phone's password (asking the phone for
+  /// the OTP) and fetches; only the parsed page reaches the phone. What
+  /// changes VTOP (outing applies, cancels) and file downloads still go
+  /// from the phone, through the proxy. Nothing is kept on the server.
+  server,
+}
+
+const vtopModeSettingKey = 'settings_vtop_mode';
+
+/// The on/off switch [vtopModeSettingKey] replaced; on reads as
+/// [VtopServerMode.compress].
 const vtopProxySettingKey = 'settings_vtop_proxy';
 
 /// The setting before it is chosen. Off, except on test builds made with
 /// `--dart-define=VTOP_PROXY_DEFAULT=true`.
 const _proxyByDefault = bool.fromEnvironment('VTOP_PROXY_DEFAULT');
 
+/// The saved mode, from the new key or else the old switch.
+VtopServerMode vtopModeFrom({String? saved, bool? oldProxy}) {
+  for (final mode in VtopServerMode.values) {
+    if (mode.name == saved) return mode;
+  }
+  return (oldProxy ?? _proxyByDefault)
+      ? VtopServerMode.compress
+      : VtopServerMode.off;
+}
+
 /// The VTOP origin the phone's client uses: the server's proxy of VTOP,
 /// or null for VTOP itself.
 String? vtopBaseUrlFor({
-  required bool proxy,
+  required VtopServerMode mode,
   required bool onDevice,
   required String server,
-}) => proxy && !onDevice ? server.replaceFirst(RegExp(r'/+$'), '') : null;
+}) => mode != VtopServerMode.off && !onDevice
+    ? server.replaceFirst(RegExp(r'/+$'), '')
+    : null;
 
-/// [vtopBaseUrlFor] from the saved settings, for building a client.
-Future<String?> currentVtopBaseUrl() async {
-  final bool proxy;
+/// The mode in force from the saved settings: [VtopServerMode.off] in
+/// on-device mode. For code without a `ref` (it is read at each call, so
+/// background isolates follow the setting too).
+Future<VtopServerMode> currentVtopMode() async {
   try {
-    proxy =
-        await SharedPreferencesAsync().getBool(vtopProxySettingKey) ??
-        _proxyByDefault;
+    if (await isOnDeviceMode()) return VtopServerMode.off;
+    final prefs = SharedPreferencesAsync();
+    return vtopModeFrom(
+      saved: await prefs.getString(vtopModeSettingKey),
+      oldProxy: await prefs.getBool(vtopProxySettingKey),
+    );
   } catch (_) {
-    return null;
+    return VtopServerMode.off;
   }
-  return vtopBaseUrlFor(
-    proxy: proxy,
-    onDevice: await isOnDeviceMode(),
-    server: await currentServerUrl(),
-  );
 }
 
-final vtopProxyProvider = Provider<bool>(
-  (ref) =>
-      ref.watch(settingsProvider).value?.getBool(vtopProxySettingKey) ??
-      _proxyByDefault,
+/// [vtopBaseUrlFor] from the saved settings, for building a client.
+Future<String?> currentVtopBaseUrl() async => vtopBaseUrlFor(
+  mode: await currentVtopMode(),
+  onDevice: false,
+  server: await currentServerUrl(),
 );
 
+/// The chosen mode, as the Server page shows it.
+final vtopModeProvider = Provider<VtopServerMode>((ref) {
+  final prefs = ref.watch(settingsProvider).value;
+  return vtopModeFrom(
+    saved: prefs?.getString(vtopModeSettingKey),
+    oldProxy: prefs?.getBool(vtopProxySettingKey),
+  );
+});
+
 /// Saves the choice and rebuilds the client, so the next request uses it.
-Future<void> setVtopProxy(WidgetRef ref, bool on) async {
+Future<void> setVtopMode(WidgetRef ref, VtopServerMode mode) async {
   final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(vtopProxySettingKey, on);
+  await prefs.setString(vtopModeSettingKey, mode.name);
+  await prefs.remove(vtopProxySettingKey);
   ref.invalidate(settingsProvider);
   ref.invalidate(vClientProvider);
 }

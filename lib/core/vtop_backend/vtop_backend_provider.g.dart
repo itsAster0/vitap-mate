@@ -59,22 +59,25 @@ String _$vtopLoginPromptAllowedHash() =>
     r'6bc03c9f869e783d91d2f15c72f9f13820fd0b97';
 
 /// VTOP through the phone's own client (directly, or through the server's
-/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
-/// one re-login and retry.
+/// compressing proxy), or read by the server in "Fetch on the server" mode;
+/// see `vtop_proxy.dart`. An expired session triggers one re-login and
+/// retry.
 
 @ProviderFor(vtopBackend)
 final vtopBackendProvider = VtopBackendProvider._();
 
 /// VTOP through the phone's own client (directly, or through the server's
-/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
-/// one re-login and retry.
+/// compressing proxy), or read by the server in "Fetch on the server" mode;
+/// see `vtop_proxy.dart`. An expired session triggers one re-login and
+/// retry.
 
 final class VtopBackendProvider
     extends $FunctionalProvider<VtopBackend, VtopBackend, VtopBackend>
     with $Provider<VtopBackend> {
   /// VTOP through the phone's own client (directly, or through the server's
-  /// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
-  /// one re-login and retry.
+  /// compressing proxy), or read by the server in "Fetch on the server" mode;
+  /// see `vtop_proxy.dart`. An expired session triggers one re-login and
+  /// retry.
   VtopBackendProvider._()
     : super(
         from: null,
@@ -108,14 +111,14 @@ final class VtopBackendProvider
   }
 }
 
-String _$vtopBackendHash() => r'138fac7c69da05268588215dedb64496adec0095';
+String _$vtopBackendHash() => r'ad01e83dad9dae2f19c792758b50a62c6c1b4c20';
 
-/// Logs in on the device.
+/// Logs in on the device, or on the server in "Fetch on the server" mode.
 
 @ProviderFor(vtopAuthenticator)
 final vtopAuthenticatorProvider = VtopAuthenticatorProvider._();
 
-/// Logs in on the device.
+/// Logs in on the device, or on the server in "Fetch on the server" mode.
 
 final class VtopAuthenticatorProvider
     extends
@@ -125,7 +128,7 @@ final class VtopAuthenticatorProvider
           VtopAuthenticator
         >
     with $Provider<VtopAuthenticator> {
-  /// Logs in on the device.
+  /// Logs in on the device, or on the server in "Fetch on the server" mode.
   VtopAuthenticatorProvider._()
     : super(
         from: null,
@@ -160,4 +163,4 @@ final class VtopAuthenticatorProvider
   }
 }
 
-String _$vtopAuthenticatorHash() => r'c937bb644bb340d647d6c7ad4241010639fc8136';
+String _$vtopAuthenticatorHash() => r'f1fd6d1721d01653f3ee624f85e0502a717c05e7';

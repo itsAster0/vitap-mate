@@ -10,7 +10,7 @@ crate-type = ["cdylib", "staticlib"]
 members = ["vtop-shared", "vtop-core", "vtop-bridge", "vtop-mcp"]
 
 [workspace.dependencies]
-reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls-webpki-roots", "http2", "json", "multipart", "cookies", "gzip"] }
+reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls-webpki-roots", "http2", "json", "multipart", "cookies", "gzip", "brotli"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.43.0" }

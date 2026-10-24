@@ -11,6 +11,18 @@ pub const SEAL: &str = "/engine/seal";
 /// Engine: signs in with saved credentials; answers at once and reports
 /// to the edge's [`LOGIN_DONE`] when finished.
 pub const LOGIN: &str = "/engine/login";
+/// Engine: fetches and parses one page on a phone's session ([`PageFetch`]),
+/// answering `{"data": …}`. The edge's `/v1/vtop/fetch` passes it on.
+pub const FETCH: &str = "/engine/fetch";
+/// Engine: signs in with a phone's username and password, keeping nothing.
+/// Answers `{"status": "ok", session}`, or `{"status": "otp_required",
+/// session, message, issuedAt}` with the half-done session for the phone
+/// to send back with the code it asks the student for.
+pub const VTOP_LOGIN: &str = "/engine/vtop-login";
+/// Engine: finishes a [`VTOP_LOGIN`] with the OTP (`{session, otp}`).
+pub const VTOP_LOGIN_OTP: &str = "/engine/vtop-login/otp";
+/// Engine: asks VTOP to mail a new OTP for a pending [`VTOP_LOGIN`].
+pub const VTOP_LOGIN_RESEND: &str = "/engine/vtop-login/resend";
 /// Edge: the outcome of a [`LOGIN`].
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.
@@ -107,6 +119,20 @@ pub struct LoginDone {
     pub account: String,
     pub request_id: String,
     pub outcome: LoginOutcome,
+}
+
+/// One page, named as the app names it, read on the phone's own session.
+/// No `Debug`: it holds cookies.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageFetch {
+    /// `vtop_core::SessionState` as JSON (snake_case fields).
+    pub session: serde_json::Value,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semester: Option<String>,
+    #[serde(default)]
+    pub args: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -154,7 +154,10 @@ class _WeekendApplySheetState extends ConsumerState<_WeekendApplySheet> {
       sending: _sending,
       onSubmit: _review,
       children: [
-        FieldLabel('Day', trailing: Text(weekdayNames(form.weekdays))),
+        FieldLabel(
+          'Day',
+          trailing: Text(weekdayNames(weekendOutingDays(form, DateTime.now()))),
+        ),
         if (_dates.isEmpty)
           const FieldError('VTOP offers no day in the coming week.')
         else

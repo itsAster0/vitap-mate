@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the release config (src/main) plus plain HTTP to the
+     emulator's host (10.0.2.2), for a local edge (`wrangler dev`). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">vitap.ac.in</domain>
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="@raw/vitap_ac_in"/>
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

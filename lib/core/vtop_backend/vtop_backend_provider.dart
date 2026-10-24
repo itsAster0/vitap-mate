@@ -7,10 +7,14 @@ import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
 import 'package:vitapmate/core/vtop_backend/local_vtop_backend.dart';
 import 'package:vitapmate/core/utils/edge/server_status.dart';
 import 'package:vitapmate/core/vtop_backend/relogin_vtop_backend.dart';
+import 'package:vitapmate/core/vtop_backend/server_vtop.dart';
+import 'package:vitapmate/core/utils/app_http_client.dart';
+import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 
 part 'vtop_backend_provider.g.dart';
 
@@ -59,12 +63,18 @@ Future<SessionState?> _deviceSession(Ref ref) async {
 }
 
 /// VTOP through the phone's own client (directly, or through the server's
-/// compressing proxy; see `vtop_proxy.dart`). An expired session triggers
-/// one re-login and retry.
+/// compressing proxy), or read by the server in "Fetch on the server" mode;
+/// see `vtop_proxy.dart`. An expired session triggers one re-login and
+/// retry.
 @Riverpod(keepAlive: true)
 VtopBackend vtopBackend(Ref ref) {
+  Future<VtopClient> client() => ref.read(vClientProvider.future);
   return ReloginVtopBackend(
-    LocalVtopBackend(() => ref.read(vClientProvider.future)),
+    ServerVtopBackend(
+      LocalVtopBackend(client),
+      session: () async => signedInSession(await client()),
+      api: ServerVtopApi(client: sharedAppHttpClient),
+    ),
     relogin: () => ref
         .read(vClientProvider.notifier)
         .ensureLogin(
@@ -84,6 +94,14 @@ VtopBackend vtopBackend(Ref ref) {
   );
 }
 
-/// Logs in on the device.
+/// Logs in on the device, or on the server in "Fetch on the server" mode.
 @Riverpod(keepAlive: true)
-VtopAuthenticator vtopAuthenticator(Ref ref) => const LocalVtopAuthenticator();
+VtopAuthenticator vtopAuthenticator(Ref ref) => ServerVtopAuthenticator(
+  const LocalVtopAuthenticator(),
+  credentials: () async {
+    final user = await ref.read(vtopUserProvider.future);
+    if (user is! StoredVtopUser) return null;
+    return (username: user.username.toUpperCase(), password: user.password);
+  },
+  api: ServerVtopApi(client: sharedAppHttpClient),
+);

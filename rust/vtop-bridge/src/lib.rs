@@ -1,14 +1,18 @@
 //! The engine: all VTOP work for the Cloudflare edge, nothing stored. It
 //! checks whose a session is, seals saved credentials, signs in with them
-//! (the OTP from forwarded mail) and serves the MCP tools. See `engine`.
+//! (the OTP from forwarded mail), fetches pages on a phone's session and
+//! serves the MCP tools. See `engine` and `fetch`.
 
 pub mod config;
 pub mod engine;
 pub mod error;
 pub mod fakes;
+pub mod fetch;
 pub mod login;
+pub mod pages;
 pub mod vault;
 pub mod verify;
+pub mod vtop_login;
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -19,6 +23,7 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use tower_http::compression::CompressionLayer;
 
 use config::Config;
 use engine::EdgeLink;
@@ -38,6 +43,8 @@ pub struct AppState {
     pub verifier: Arc<dyn SessionVerifier>,
     pub forwarded_login: Arc<dyn ForwardedLogin>,
     pub edge: Arc<dyn EdgeLink>,
+    /// The VTOP that phone sign-ins and fetches go to.
+    pub vtop: vtop_core::VtopConfig,
     sealer: Sealer,
 }
 
@@ -48,8 +55,15 @@ impl AppState {
             verifier: parts.verifier,
             forwarded_login: parts.forwarded_login,
             edge: parts.edge,
+            vtop: vtop_core::VtopConfig::default(),
             config,
         }
+    }
+
+    /// Sends phone sign-ins and fetches to another VTOP (a mock, in tests).
+    pub fn with_vtop(mut self, vtop: vtop_core::VtopConfig) -> Self {
+        self.vtop = vtop;
+        self
     }
 
     /// Seals account fields with `VAULT_KEY`.
@@ -65,7 +79,14 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
+        .route(vtop_shared::engine::FETCH, post(fetch::fetch))
+        .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))
+        .route(vtop_shared::engine::VTOP_LOGIN_OTP, post(vtop_login::otp))
+        .route(vtop_shared::engine::VTOP_LOGIN_RESEND, post(vtop_login::resend))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        // Parsed pages are JSON; Brotli (gzip for callers without it) makes
+        // the hop to the edge small.
+        .layer(CompressionLayer::new())
         .layer(middleware::from_fn(access_log))
         .with_state(state)
 }

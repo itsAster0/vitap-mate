@@ -153,6 +153,26 @@ void main() {
       );
     });
 
+    test('offers tomorrow even when VTOP blocks it a day early', () {
+      // On Saturday VTOP's picker leaves only Monday open.
+      final saturday = DateTime(2026, 10, 24, 20, 25);
+      final form = weekendForm().copyWith(weekdays: Uint8List.fromList([1]));
+      expect(weekendOutingDays(form, saturday), [0, 1]);
+      expect(weekendOutingDates(form, saturday), [
+        DateTime(2026, 10, 25),
+        DateTime(2026, 10, 26),
+      ]);
+      // And on Sunday only Sunday.
+      final sunday = DateTime(2026, 10, 25, 9);
+      final sundayForm = weekendForm().copyWith(
+        weekdays: Uint8List.fromList([0]),
+      );
+      expect(weekendOutingDates(sundayForm, sunday), [DateTime(2026, 10, 26)]);
+      // A day outside the usual outing days is not added back.
+      final thursday = DateTime(2026, 10, 22, 9);
+      expect(weekendOutingDays(form, thursday), [1]);
+    });
+
     test('checks day, purpose and contact', () {
       final ok = checkWeekendOuting(
         form: weekendForm(),
