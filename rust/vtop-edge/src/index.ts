@@ -10,6 +10,8 @@
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
 //   see account.ts. The engine does the VTOP work for them.
+// - VTOP for the phone: `/vtop/*` proxies its own requests (vtop-proxy.ts);
+//   `/v1/vtop/*` has the engine sign in and fetch for it (vtop-phone.ts).
 // - `/internal/accounts/*`, `/internal/mail-otp/await`: the engine reports
 //   sign-ins and waits for forwarded OTPs (sealed to its own key).
 //
@@ -23,6 +25,7 @@
 import * as account from "./account";
 import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
+import { PHONE_ROUTES, phoneVtop } from "./vtop-phone";
 import {
   type Env,
   badRequest,
@@ -430,6 +433,7 @@ async function route(req: Request, env: Env): Promise<Response> {
     return Response.json(healthBody(req.cf as { colo?: unknown } | undefined));
   }
   if (isVtopPath(path)) return proxyVtop(req);
+  if (path in PHONE_ROUTES) return phoneVtop(req, env);
   if (method === "GET" && path === "/v1/events") return events(req, env);
   if (method === "POST" && path === "/v1/devices/register") return deviceRegister(req, env);
   if (method === "POST" && path === "/v1/devices/update") return deviceUpdate(req, env);

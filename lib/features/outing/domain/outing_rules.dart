@@ -149,16 +149,32 @@ String? _textError(String value, int maxLength, String missing) {
   return null;
 }
 
+/// The days weekend outings are usually on (0 = Sunday, 1 = Monday).
+const usualWeekendOutingDays = [0, 1];
+
+/// The weekdays a weekend outing can be on (VTOP numbers them like
+/// JavaScript, 0 = Sunday). VTOP's picker also blocks the day before an
+/// outing day, so on Saturday it leaves only Monday; tomorrow is added back
+/// when it is one of [usualWeekendOutingDays].
+List<int> weekendOutingDays(WeekendOutingData form, DateTime now) {
+  final tomorrow = dateOnly(now).add(const Duration(days: 1)).weekday % 7;
+  return {
+    ...form.weekdays,
+    if (usualWeekendOutingDays.contains(tomorrow)) tomorrow,
+  }.toList()..sort();
+}
+
 /// Dates a weekend outing can be applied for: tomorrow up to
-/// `maxDaysAhead`, on the allowed weekdays (VTOP numbers them like
-/// JavaScript, 0 = Sunday). Never today: an outing cannot be applied for on
-/// its own day, though Saturday up to midnight is fine for Sunday. VTOP's
-/// own picker allows today, so this is the app's rule, not parsed.
+/// `maxDaysAhead`, on [weekendOutingDays]. Never today: an outing cannot be
+/// applied for on its own day, though Saturday up to midnight is fine for
+/// Sunday. VTOP's own picker allows today, so this is the app's rule, not
+/// parsed.
 List<DateTime> weekendOutingDates(WeekendOutingData form, DateTime now) {
   final today = dateOnly(now);
+  final weekdays = weekendOutingDays(form, now);
   return [
     for (var i = 1; i <= form.maxDaysAhead; i++)
-      if (form.weekdays.contains(today.add(Duration(days: i)).weekday % 7))
+      if (weekdays.contains(today.add(Duration(days: i)).weekday % 7))
         today.add(Duration(days: i)),
   ];
 }

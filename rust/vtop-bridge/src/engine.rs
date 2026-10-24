@@ -6,7 +6,8 @@
 //! edge to a key made for that one sign-in.
 //!
 //! Routes (`Authorization: Bearer $MAIL_RELAY_SECRET`):
-//! `POST /engine/session`, `/engine/seal`, `/engine/login`, and
+//! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
+//! (in `fetch`), and
 //! `/internal/mail-otp/owner` (whose a session is, as an owner hash).
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -218,7 +219,7 @@ fn accounts_aad(account: &str) -> String {
 }
 
 /// Every route needs the secret shared with the edge.
-fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
+pub(crate) fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let presented = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
@@ -845,5 +846,89 @@ mod tests {
                 .await,
             None
         );
+    }
+
+    // ---- phone sign-in and fetches (`vtop_login`, `fetch`) ----------------
+
+    fn phone_app() -> axum::Router {
+        engine_app(
+            Arc::new(FakeEdge::default()),
+            FakeLogin::answering(Err(LoginError::InvalidCredentials)),
+        )
+        .0
+    }
+
+    fn signed_in() -> Value {
+        json!({ "cookies": "JSESSIONID=1", "csrf_token": "c", "registration_number": REG })
+    }
+
+    #[tokio::test]
+    async fn phone_routes_need_the_engine_secret() {
+        let app = phone_app();
+        for uri in ["/engine/fetch", "/engine/vtop-login", "/engine/vtop-login/otp"] {
+            let (status, body) = post(&app, uri, "wrong", json!({})).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "{uri}");
+            assert_eq!(body["code"], "unauthorized");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_fetch_names_a_known_page_with_its_arguments() {
+        let app = phone_app();
+        let (status, body) = post(
+            &app,
+            "/engine/fetch",
+            RELAY,
+            json!({ "session": signed_in(), "name": "apply_general_outing" }),
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (StatusCode::NOT_FOUND, Some("unknown_page")));
+
+        let (status, body) = post(
+            &app,
+            "/engine/fetch",
+            RELAY,
+            json!({ "session": signed_in(), "name": "grade_details", "semester": "AP2025264" }),
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("bad_arguments")));
+    }
+
+    #[tokio::test]
+    async fn a_fetch_without_cookies_asks_for_a_sign_in() {
+        let (status, body) = post(
+            &phone_app(),
+            "/engine/fetch",
+            RELAY,
+            json!({ "session": { "cookies": " " }, "name": "semesters" }),
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("session_expired")));
+    }
+
+    #[tokio::test]
+    async fn an_otp_needs_a_session_waiting_for_one() {
+        let (status, body) = post(
+            &phone_app(),
+            "/engine/vtop-login/otp",
+            RELAY,
+            json!({ "session": signed_in(), "otp": "123456" }),
+        )
+        .await;
+        assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("no_pending_login")));
+    }
+
+    #[tokio::test]
+    async fn answers_are_brotli_for_callers_that_take_it() {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/engine/fetch")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {RELAY}"))
+            .header("accept-encoding", "br, gzip")
+            .body(Body::from(json!({ "session": signed_in(), "name": "nope" }).to_string()))
+            .unwrap();
+        let response = phone_app().oneshot(request).await.unwrap();
+        assert_eq!(response.headers()["content-encoding"], "br");
     }
 }

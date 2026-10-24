@@ -3,20 +3,38 @@ import 'package:vitapmate/core/providers/vtop_proxy.dart';
 
 void main() {
   test('the phone reaches VTOP through the server only when asked', () {
+    for (final mode in [VtopServerMode.compress, VtopServerMode.server]) {
+      expect(
+        vtopBaseUrlFor(mode: mode, onDevice: false, server: 'https://s/'),
+        'https://s',
+      );
+    }
     expect(
-      vtopBaseUrlFor(proxy: true, onDevice: false, server: 'https://s/'),
-      'https://s',
-    );
-    expect(
-      vtopBaseUrlFor(proxy: false, onDevice: false, server: 'https://s'),
+      vtopBaseUrlFor(
+        mode: VtopServerMode.off,
+        onDevice: false,
+        server: 'https://s',
+      ),
       null,
     );
   });
 
-  test('on-device mode never uses the server, proxy or not', () {
+  test('on-device mode never uses the server, whatever the mode', () {
+    for (final mode in VtopServerMode.values) {
+      expect(
+        vtopBaseUrlFor(mode: mode, onDevice: true, server: 'https://s'),
+        null,
+      );
+    }
+  });
+
+  test('the old proxy switch carries over as Compress', () {
+    expect(vtopModeFrom(oldProxy: true), VtopServerMode.compress);
+    expect(vtopModeFrom(oldProxy: false), VtopServerMode.off);
     expect(
-      vtopBaseUrlFor(proxy: true, onDevice: true, server: 'https://s'),
-      null,
+      vtopModeFrom(saved: 'server', oldProxy: true),
+      VtopServerMode.server,
     );
+    expect(vtopModeFrom(saved: 'nonsense'), VtopServerMode.off);
   });
 }

@@ -235,7 +235,10 @@ class _WeekendTab extends ConsumerWidget {
               open: open && dates.isNotEmpty,
               notice: !open ? form.notice : 'No outing day in the coming week.',
               facts: [
-                ('Outing days', weekdayShortNames(form.weekdays)),
+                (
+                  'Outing days',
+                  weekdayShortNames(weekendOutingDays(form, now)),
+                ),
                 ('Next', dates.isEmpty ? '—' : dayFormat.format(dates.first)),
                 ('Time slots', '${form.timeSlots.length}'),
                 ('Places', '${form.places.length}'),
