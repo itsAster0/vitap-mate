@@ -5,7 +5,7 @@
 //   that install's event log. The edge never keeps anything readable.
 // - `fetch`: app routes for mailboxes (`/v1/mail-otp/*`), installs
 //   (`/v1/devices/*`) and the event channel (`GET /v1/events`: server-sent
-//   events, a WebSocket or a catch-up read). `/mcp` goes on to the engine (`MCP_URL`), which
+//   events, a WebSocket or a catch-up read). `/mcp` goes on to the engine (`ENGINE_URL`), which
 //   serves the MCP tools, so clients only ever talk to this host.
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
@@ -15,8 +15,8 @@
 //
 // State lives in Durable Objects: `Device` (per install), `Mailbox` (per
 // address), `Index` (owner hash → mailbox, key hash → account), `Account`
-// (per student), `FcmToken` (one, caches the OAuth token) and `Engine`
-// (the engine's container), each in its own SQLite tables. Whose VTOP
+// (per student) and `FcmToken` (one, caches the OAuth token), each in its
+// own SQLite tables. Whose VTOP
 // session a request carries is asked of the engine, which holds the key the
 // owner hash is made with.
 
@@ -68,7 +68,6 @@ import {
 
 export { Account } from "./account";
 export { Device } from "./device";
-export { Engine } from "./engine";
 export { FcmToken } from "./fcm";
 export { Index, Mailbox } from "./store";
 
@@ -448,21 +447,14 @@ async function route(req: Request, env: Env): Promise<Response> {
     const response = method === "OPTIONS" ? empty() : await account.handle(req, env, path);
     return withCors(response, origin, env);
   }
-  // Engine-only: reaches the container whatever BRIDGE_URL says, to try it
-  // before switching.
-  if (path.startsWith("/internal/engine/")) {
-    if (!isEngine(req, env)) return error(401, "unauthorized", "The engine secret is required.");
-    const inner = path.slice("/internal/engine".length);
-    return env.ENGINE.getByName("engine").fetch(new Request(`http://engine${inner}`, { method }));
-  }
   if (path.startsWith("/internal/")) return error(404, "not_found", "No such route.");
-  if (path === "/mcp" || path.startsWith("/mcp/")) return passOn(req, env, "MCP_URL");
+  if (path === "/mcp" || path.startsWith("/mcp/")) return passOn(req, env);
   return error(404, "not_found", "No such route.");
 }
 
-/** Hands a request to the service at `[vars].<service>` as it came, with
- * the caller's address for its rate limits. */
-async function passOn(req: Request, env: Env, service: "MCP_URL"): Promise<Response> {
+/** Hands a request to the engine as it came, with the caller's address for
+ * its rate limits. */
+async function passOn(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const headers = new Headers();
   for (const [name, value] of req.headers) {
@@ -477,7 +469,7 @@ async function passOn(req: Request, env: Env, service: "MCP_URL"): Promise<Respo
     const body = await req.arrayBuffer();
     if (body.byteLength > 0) init.body = body;
   }
-  return engineSend(env, service, `${url.pathname}${url.search}`, init);
+  return engineSend(env, `${url.pathname}${url.search}`, init);
 }
 
 /** The catch-all. Throwing makes the sending server retry later. */

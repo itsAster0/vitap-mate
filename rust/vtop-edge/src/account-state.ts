@@ -221,8 +221,8 @@ export function phoneId(deviceId: string): string {
 }
 
 /** One student's account. Secrets are sealed by the engine with
- * `VAULT_KEY`, an edge secret the edge passes to the engine: storage alone
- * does not open them, but whoever controls the Worker can. */
+ * `VAULT_KEY`, the engine's secret: storage alone does not open them, but
+ * whoever controls the engine can. */
 export class AccountRecord {
   settings: AccountSettings = defaultSettings();
   semesterId: string | null = null;

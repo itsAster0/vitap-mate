@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@cloudflare/containers':
-        specifier: 0.3.7
-        version: 0.3.7
       '@noble/ciphers':
         specifier: 2.4.0
         version: 2.4.0
@@ -41,9 +38,6 @@ importers:
         version: 4.147.0(@cloudflare/workers-types@5.20261001.1)
 
 packages:
-
-  '@cloudflare/containers@0.3.7':
-    resolution: {integrity: sha512-DM9dm3FnIBSyiSJ1FLavKwl/lk3oAmTaynCzZQ9pZR0ncRPquSxkxd8Nu2MFILxmDDsPkxKsSNEh9mHHMty4Fw==}
 
   '@cloudflare/kv-asset-handler@0.5.0':
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
@@ -931,8 +925,6 @@ packages:
     resolution: {integrity: sha512-rLfVLB4FgQneDr0dv1oddCVZmKjcJ6yX6mS4pU82Mq/Dt9a3cLZQ62pDBL4AUO+uVrCvtWz3ZFUL2HFAFJ/BXQ==}
 
 snapshots:
-
-  '@cloudflare/containers@0.3.7': {}
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 

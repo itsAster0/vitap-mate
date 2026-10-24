@@ -1,7 +1,8 @@
 # vtop-bridge (the engine)
 
-The VTOP work behind the Cloudflare edge (`vtop-edge`), run in a Cloudflare
-Container by the edge's `Engine` Durable Object. It stores nothing: accounts,
+The VTOP work behind the Cloudflare edge (`vtop-edge`), run on Railway from
+`../Dockerfile.engine` (`RAILWAY_DOCKERFILE_PATH`); the edge reaches it at its
+`ENGINE_URL`. It stores nothing: accounts,
 keys, devices, mailboxes and pending requests live in the edge's Durable
 Objects. The engine only:
 
@@ -21,9 +22,8 @@ never logged.
 Saved credentials and cached sessions are sealed with AES-256-GCM under
 `VAULT_KEY` (see `vault.rs`); the associated data names the account, so a
 sealed value copied into another account does not open. The edge stores
-only the sealed values, but `VAULT_KEY` is an edge secret that the edge
-hands to this container, so whoever controls the Cloudflare account can
-open them. Sealing protects against a leak of stored data, not against the
+only the sealed values, but `VAULT_KEY` is set on the engine's Railway
+service, so whoever controls that service can open them. Sealing protects against a leak of stored data, not against the
 operator.
 
 Credentials are only sent by the phone when the student turns on server
@@ -33,7 +33,7 @@ forgets them from the app.
 
 ## Configuration
 
-Set by the edge when it starts the container (`vtop-edge/src/engine.ts`):
+Set as variables on the Railway service:
 
 | Variable            | Default | Notes                                        |
 | ------------------- | ------- | -------------------------------------------- |
