@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Env } from "./common";
-import { phoneVtop } from "./vtop-phone";
+import { PACKED_PAGE, phoneVtop } from "./vtop-phone";
 
 const EDGE = "https://edge.example";
 const env = { ENGINE_URL: "https://engine.example/", BRIDGE_SECRET: "s3cret" } as Env;
@@ -29,6 +29,16 @@ describe("phoneVtop", () => {
     expect(seen[0].url).toBe("https://engine.example/engine/fetch");
     expect(seen[0].headers.get("authorization")).toBe("Bearer s3cret");
     expect(await seen[0].json()).toEqual(body);
+  });
+
+  it("passes a packed page on byte for byte", async () => {
+    const bytes = new Uint8Array([0x1b, 0x00, 0xff, 0x7f, 0x80]);
+    const { fetcher } = capture(new Response(bytes, { headers: { "content-type": PACKED_PAGE } }));
+    const res = await phoneVtop(post("/v1/vtop/fetch", { name: "marks" }), env, fetcher);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe(PACKED_PAGE);
+    expect(res.headers.get("cache-control")).toContain("no-transform");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
   });
 
   it("maps each sign-in step to its engine route", async () => {

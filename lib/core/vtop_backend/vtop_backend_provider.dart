@@ -73,7 +73,10 @@ VtopBackend vtopBackend(Ref ref) {
     ServerVtopBackend(
       LocalVtopBackend(client),
       session: () async => signedInSession(await client()),
-      api: ServerVtopApi(client: sharedAppHttpClient),
+      api: ServerVtopApi(
+        client: sharedAppHttpClient,
+        pages: rustPageDictionary,
+      ),
     ),
     relogin: () => ref
         .read(vClientProvider.notifier)

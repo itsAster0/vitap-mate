@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1312437741;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1416809860;
 
 // Section: executor
 
@@ -2100,6 +2100,67 @@ fn wire__crate__api__native_logs__native_logs_get_entries_impl(
             transform_result_sse::<_, ()>((move || {
                 let output_ok =
                     Result::<_, ()>::Ok(crate::api::native_logs::native_logs_get_entries())?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__server_page__server_page_dictionary_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "server_page_dictionary",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Result::<_, ()>::Ok(crate::api::server_page::server_page_dictionary())?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__server_page__server_page_unpack_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "server_page_unpack",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_packed = <Vec<u8>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>((move || {
+                let output_ok = crate::api::server_page::server_page_unpack(api_name, api_packed)?;
                 Ok(output_ok)
             })())
         },
@@ -4691,19 +4752,19 @@ fn pde_ffi_dispatcher_primary_impl(
         31 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
         32 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
         34 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        41 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        41 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        43 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        45 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
@@ -4740,12 +4801,16 @@ fn pde_ffi_dispatcher_sync_impl(
         38 => {
             wire__crate__api__native_logs__native_logs_get_entries_impl(ptr, rust_vec_len, data_len)
         }
-        40 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        39 => {
+            wire__crate__api__server_page__server_page_dictionary_impl(ptr, rust_vec_len, data_len)
+        }
+        40 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        42 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+        44 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,

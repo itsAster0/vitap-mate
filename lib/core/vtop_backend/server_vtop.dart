@@ -8,6 +8,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/logging/app_logger.dart';
@@ -17,6 +18,7 @@ import 'package:vitapmate/core/vtop_backend/server_json.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
+import 'package:vitapmate/src/api/server_page.dart' as server_page;
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -78,13 +80,43 @@ class ServerOtpRequired extends ServerLogin {
   final BigInt issuedAt;
 }
 
+/// The content type of a page the engine packed with [PageDictionary].
+const packedPageType = 'application/vnd.vmate.page+br';
+
+/// The page dictionary (`rust/vtop-shared/src/page_dictionary.rs`): the
+/// engine packs a page with it, about 30% smaller than plain Brotli, when
+/// the phone names the same [id].
+class PageDictionary {
+  const PageDictionary({required this.id, required this.unpack});
+
+  /// Which dictionary the phone holds.
+  final String Function() id;
+
+  /// A packed page as its JSON text.
+  final String Function(String name, Uint8List packed) unpack;
+}
+
+/// The app's own dictionary, in Rust.
+final rustPageDictionary = PageDictionary(
+  id: server_page.serverPageDictionary,
+  unpack: (name, packed) =>
+      server_page.serverPageUnpack(name: name, packed: packed),
+);
+
 /// The edge's `/v1/vtop/*` routes.
 class ServerVtopApi {
-  ServerVtopApi({required http.Client client, String? baseUrl})
-    : _client = client,
-      _baseUrl = baseUrl;
+  ServerVtopApi({
+    required http.Client client,
+    String? baseUrl,
+    PageDictionary? pages,
+  }) : _client = client,
+       _baseUrl = baseUrl,
+       _pages = pages;
 
   final http.Client _client;
+
+  /// Pages come as JSON without one.
+  final PageDictionary? _pages;
 
   /// Fixed for tests; otherwise the server URL in use at each call.
   final String? _baseUrl;
@@ -98,13 +130,25 @@ class ServerVtopApi {
     String? semester,
     Map<String, String> args = const {},
   }) async {
-    final body = await _post('/v1/vtop/fetch', {
+    final pages = _pages;
+    final response = await _send('/v1/vtop/fetch', {
       'session': sessionToServerJson(session),
       'name': name,
       'semester': ?semester,
       'args': args,
+      'dictionary': ?pages?.id(),
     });
-    final data = rustJsonToDart(body['data']);
+    final Object? page;
+    if (pages != null && response.headers['content-type'] == packedPageType) {
+      try {
+        page = jsonDecode(pages.unpack(name, response.bodyBytes));
+      } catch (error) {
+        throw ServerVtopUnavailable('the packed page does not unpack: $error');
+      }
+    } else {
+      page = _json(response)['data'];
+    }
+    final data = rustJsonToDart(page);
     if (data is! Map<String, dynamic>) {
       throw const ServerVtopUnavailable('the server sent no page');
     }
@@ -149,7 +193,9 @@ class ServerVtopApi {
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, Object?> body,
-  ) async {
+  ) async => _json(await _send(path, body));
+
+  Future<http.Response> _send(String path, Map<String, Object?> body) async {
     final base = (_baseUrl ?? await currentServerUrl()).replaceFirst(
       RegExp(r'/+$'),
       '',
@@ -171,6 +217,11 @@ class ServerVtopApi {
     } catch (error) {
       throw ServerVtopUnavailable('$error');
     }
+    return response;
+  }
+
+  /// The JSON of a 2xx [response]; a refusal is thrown as [serverError].
+  Map<String, dynamic> _json(http.Response response) {
     Object? decoded;
     try {
       decoded = jsonDecode(response.body);

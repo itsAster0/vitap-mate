@@ -22,6 +22,7 @@ pub use config::VtopConfig;
 pub use error::{VtopError, VtopResult};
 pub use session::SessionState;
 pub use vtop_shared::mail_seal;
+pub use vtop_shared::page_dictionary;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
