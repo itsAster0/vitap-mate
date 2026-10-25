@@ -1,0 +1,798 @@
+{
+  "shapes": {
+    "academic_calendar": {
+      "entries": [
+        {
+          "date": "",
+          "group": "General (Semester)",
+          "kind": "CAT - II",
+          "note": "Exam Days"
+        },
+        {
+          "date": "",
+          "group": "General (Semester)",
+          "kind": "Holiday",
+          "note": ""
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "attendance": {
+      "records": [
+        {
+          "attendance_percentage": "",
+          "attendence_fat_cat": "",
+          "category": "Program Core",
+          "classes_attended": "",
+          "course_code": "",
+          "course_id": "",
+          "course_name": "",
+          "course_type": "ETH",
+          "debar_status": "-",
+          "faculty_detail": "",
+          "serial": "",
+          "total_classes": ""
+        },
+        {
+          "attendance_percentage": "",
+          "attendence_fat_cat": "",
+          "category": "Program Core",
+          "classes_attended": "",
+          "course_code": "",
+          "course_id": "",
+          "course_name": "",
+          "course_type": "ELA",
+          "debar_status": "",
+          "faculty_detail": "",
+          "serial": "",
+          "total_classes": ""
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "biometric": {
+      "records": [
+        {
+          "punch_date": "",
+          "punch_time": "",
+          "serial": "",
+          "venue": ""
+        },
+        {
+          "punch_date": "",
+          "punch_time": "",
+          "serial": "",
+          "venue": ""
+        }
+      ],
+      "requested_date": "",
+      "update_time": 0
+    },
+    "course_page_classes": {
+      "classes": [
+        {
+          "class_group": "General (Semester)",
+          "class_id": "",
+          "course_code": "",
+          "course_title": "",
+          "course_type": "Embedded Theory",
+          "erp_id": "",
+          "faculty": "",
+          "faculty_school": "SCOPE",
+          "slot": ""
+        },
+        {
+          "class_group": "General (Semester)",
+          "class_id": "",
+          "course_code": "",
+          "course_title": "",
+          "course_type": "Embedded Lab",
+          "erp_id": "",
+          "faculty": "",
+          "faculty_school": "SCOPE",
+          "slot": ""
+        }
+      ],
+      "course_id": "",
+      "semester_id": "",
+      "update_time": 0
+    },
+    "course_page_courses": {
+      "courses": [
+        {
+          "code": "",
+          "course_type": "Embedded Theory",
+          "id": "",
+          "title": ""
+        },
+        {
+          "code": "",
+          "course_type": "Theory Only",
+          "id": "",
+          "title": ""
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "course_page_detail": {
+      "all_materials_path": "",
+      "class": {
+        "class_group": "General (Semester)",
+        "class_id": "",
+        "course_code": "",
+        "course_title": "",
+        "course_type": "Embedded Theory",
+        "erp_id": "",
+        "faculty": "",
+        "faculty_school": "SCOPE",
+        "slot": ""
+      },
+      "course_id": "",
+      "general_materials_path": "",
+      "has_course_plan": true,
+      "lectures": [
+        {
+          "date": "",
+          "day": "FRI",
+          "materials": [
+            {
+              "label": "Reference Material I",
+              "path": ""
+            },
+            {
+              "label": "Reference Material II",
+              "path": ""
+            }
+          ],
+          "serial": "",
+          "topic": ""
+        },
+        {
+          "date": "",
+          "day": "MON",
+          "materials": [],
+          "serial": "",
+          "topic": ""
+        }
+      ],
+      "semester_id": "",
+      "syllabus_path": "",
+      "update_time": 0
+    },
+    "exam_schedule": {
+      "exams": [
+        {
+          "exam_type": "CAT1",
+          "records": [
+            {
+              "course_code": "",
+              "course_id": "",
+              "course_name": "",
+              "course_type": "ETH",
+              "exam_date": "",
+              "exam_session": "FN",
+              "exam_time": "",
+              "reporting_time": "",
+              "seat_location": "",
+              "seat_no": "",
+              "serial": "",
+              "slot": "",
+              "venue": ""
+            },
+            {
+              "course_code": "",
+              "course_id": "",
+              "course_name": "",
+              "course_type": "TH",
+              "exam_date": "",
+              "exam_session": "AN",
+              "exam_time": "",
+              "reporting_time": "",
+              "seat_location": "",
+              "seat_no": "",
+              "serial": "",
+              "slot": "B1",
+              "venue": ""
+            }
+          ]
+        },
+        {
+          "exam_type": "FAT",
+          "records": [
+            {
+              "course_code": "",
+              "course_id": "",
+              "course_name": "",
+              "course_type": "ETH",
+              "exam_date": "-",
+              "exam_session": "-",
+              "exam_time": "-",
+              "reporting_time": "-",
+              "seat_location": "-",
+              "seat_no": "-",
+              "serial": "",
+              "slot": "",
+              "venue": "-"
+            }
+          ]
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "full_attendance": {
+      "course_id": "",
+      "course_type": "ETH",
+      "records": [
+        {
+          "date": "",
+          "day_time": "",
+          "remark": "",
+          "serial": "",
+          "slot": "A1",
+          "status": "Present"
+        },
+        {
+          "date": "",
+          "day_time": "",
+          "remark": "",
+          "serial": "",
+          "slot": "A1",
+          "status": "Absent"
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "general_outing": {
+      "in_hours": [
+        0,
+        0
+      ],
+      "max_days_ahead": 0,
+      "max_days_away": 0,
+      "notice": "",
+      "out_hours": [
+        0,
+        0
+      ],
+      "place_max_length": 0,
+      "purpose_max_length": 0,
+      "records": [
+        {
+          "cancel_id": "",
+          "from_date": "",
+          "from_time": "",
+          "pass_id": "",
+          "place": "",
+          "purpose": "",
+          "serial": "",
+          "status": "Waiting for Warden's Approval",
+          "to_date": "",
+          "to_time": ""
+        },
+        {
+          "cancel_id": "",
+          "from_date": "",
+          "from_time": "",
+          "pass_id": "",
+          "place": "",
+          "purpose": "",
+          "serial": "",
+          "status": "Approved",
+          "to_date": "",
+          "to_time": ""
+        }
+      ],
+      "student": {
+        "application_no": "",
+        "gender": "",
+        "hostel_block": "",
+        "name": "",
+        "parent_contact_number": "",
+        "registration_number": "",
+        "room_number": ""
+      },
+      "update_time": 0
+    },
+    "grade_details": {
+      "class_course_type": "",
+      "class_number": "",
+      "course_id": "",
+      "grade_ranges": [
+        {
+          "grade": "S",
+          "range": ""
+        },
+        {
+          "grade": "A",
+          "range": ""
+        }
+      ],
+      "grand_total": "",
+      "marks": [
+        {
+          "mark_title": "",
+          "max_mark": "50",
+          "scored_mark": "",
+          "serial": "",
+          "status": "Present",
+          "weightage": "15",
+          "weightage_mark": ""
+        },
+        {
+          "mark_title": "",
+          "max_mark": "100",
+          "scored_mark": "",
+          "serial": "",
+          "status": "Present",
+          "weightage": "",
+          "weightage_mark": ""
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "grade_history": {
+      "cgpa": {
+        "a_grades": "",
+        "b_grades": "",
+        "c_grades": "",
+        "cgpa": "",
+        "credits_earned": "10",
+        "credits_registered": "10",
+        "d_grades": "",
+        "e_grades": "",
+        "f_grades": "",
+        "n_grades": "",
+        "s_grades": ""
+      },
+      "records": [
+        {
+          "attempts": [
+            {
+              "course_code": "",
+              "course_title": "",
+              "course_type": "",
+              "credits": "",
+              "exam_month": "",
+              "grade": "S",
+              "result_declared": ""
+            }
+          ],
+          "course_code": "",
+          "course_distribution": "",
+          "course_title": "",
+          "course_type": "",
+          "credits": "",
+          "exam_month": "",
+          "grade": "S",
+          "result_declared": "",
+          "serial": ""
+        },
+        {
+          "attempts": [
+            {
+              "course_code": "",
+              "course_title": "",
+              "course_type": "TH",
+              "credits": "",
+              "exam_month": "",
+              "grade": "F",
+              "result_declared": ""
+            },
+            {
+              "course_code": "",
+              "course_title": "",
+              "course_type": "TH",
+              "credits": "",
+              "exam_month": "",
+              "grade": "A",
+              "result_declared": ""
+            }
+          ],
+          "course_code": "",
+          "course_distribution": "",
+          "course_title": "",
+          "course_type": "TH",
+          "credits": "",
+          "exam_month": "",
+          "grade": "A",
+          "result_declared": "",
+          "serial": ""
+        }
+      ],
+      "student": {
+        "campus": "",
+        "edu_status": "",
+        "gender": "",
+        "name": "",
+        "programme_branch": "",
+        "programme_mode": "",
+        "reg_no": "",
+        "school": "SCOPE",
+        "study_system": "",
+        "year_joined": ""
+      },
+      "update_time": 0
+    },
+    "grades": {
+      "courses": [
+        {
+          "course_code": "",
+          "course_id": "",
+          "course_title": "",
+          "course_type": "",
+          "grade": "A",
+          "grading_type": "",
+          "grand_total": "",
+          "serial": ""
+        },
+        {
+          "course_code": "",
+          "course_id": "",
+          "course_title": "",
+          "course_type": "Theory Only",
+          "grade": "B",
+          "grading_type": "",
+          "grand_total": "",
+          "serial": ""
+        }
+      ],
+      "semester_id": "",
+      "semesters": [
+        {
+          "id": "",
+          "name": ""
+        },
+        {
+          "id": "",
+          "name": ""
+        }
+      ],
+      "update_time": 0
+    },
+    "marks": {
+      "records": [
+        {
+          "coursecode": "",
+          "coursetitle": "",
+          "coursetype": "Embedded Theory",
+          "faculity": "",
+          "marks": [
+            {
+              "markstitle": "CAT-1",
+              "maxmarks": "50",
+              "remark": "",
+              "scoredmark": "",
+              "serial": "",
+              "status": "Present",
+              "weightage": "15",
+              "weightagemark": ""
+            },
+            {
+              "markstitle": "Quiz 1",
+              "maxmarks": "10",
+              "remark": "",
+              "scoredmark": "",
+              "serial": "",
+              "status": "Present",
+              "weightage": "10",
+              "weightagemark": ""
+            }
+          ],
+          "serial": "",
+          "slot": ""
+        },
+        {
+          "coursecode": "",
+          "coursetitle": "",
+          "coursetype": "Theory Only",
+          "faculity": "",
+          "marks": [],
+          "serial": "",
+          "slot": "B1"
+        }
+      ],
+      "semester_id": "",
+      "update_time": 0
+    },
+    "semesters": {
+      "semesters": [
+        {
+          "id": "",
+          "name": ""
+        },
+        {
+          "id": "",
+          "name": ""
+        }
+      ],
+      "update_time": 0
+    },
+    "timetable": {
+      "courses": [
+        {
+          "course_code": "",
+          "course_type": "Embedded Theory",
+          "credits": "3.0",
+          "name": ""
+        },
+        {
+          "course_code": "",
+          "course_type": "Embedded Lab",
+          "credits": "1.0",
+          "name": ""
+        }
+      ],
+      "semester_id": "",
+      "slots": [
+        {
+          "block": "",
+          "course_code": "",
+          "course_type": "ETH",
+          "credits": "3.0",
+          "day": "MON",
+          "end_time": "",
+          "faculty": "",
+          "kind": "",
+          "name": "",
+          "room_no": "",
+          "serial": "",
+          "slot": "A1",
+          "start_time": ""
+        },
+        {
+          "block": "",
+          "course_code": "",
+          "course_type": "TH",
+          "credits": "4.0",
+          "day": "MON",
+          "end_time": "",
+          "faculty": "",
+          "kind": "",
+          "name": "",
+          "room_no": "",
+          "serial": "",
+          "slot": "B1",
+          "start_time": ""
+        }
+      ],
+      "update_time": 0
+    },
+    "weekend_outing": {
+      "max_days_ahead": 0,
+      "notice": "",
+      "places": [
+        {
+          "label": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "value": ""
+        }
+      ],
+      "purpose_max_length": 0,
+      "records": [
+        {
+          "cancel_id": "",
+          "date": "",
+          "hostel_block": "",
+          "pass_id": "",
+          "place": "",
+          "purpose": "",
+          "room_number": "",
+          "serial": "",
+          "status": "Waiting for Mentor's Approval",
+          "time_slot": ""
+        }
+      ],
+      "student": {
+        "application_no": "",
+        "gender": "",
+        "hostel_block": "",
+        "name": "",
+        "parent_contact_number": "",
+        "registration_number": "",
+        "room_number": ""
+      },
+      "time_slots": [
+        {
+          "label": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "value": ""
+        }
+      ],
+      "update_time": 0,
+      "weekdays": [
+        0,
+        0
+      ]
+    }
+  },
+  "vocabulary": [
+    "Embedded Theory",
+    "Embedded Lab",
+    "Theory Only",
+    "Lab Only",
+    "Project",
+    "Soft Skill",
+    "Online Course",
+    "ETH",
+    "ELA",
+    "TH",
+    "LO",
+    "EPJ",
+    "SS",
+    "Program Core",
+    "Program Elective",
+    "University Core",
+    "University Elective",
+    "Engineering Science",
+    "Basic Science",
+    "Humanities",
+    "Open Elective",
+    "Present",
+    "Absent",
+    "On Duty",
+    "Not Applicable",
+    "CAT-1",
+    "CAT-2",
+    "CAT1",
+    "CAT2",
+    "FAT",
+    "CAT - I",
+    "CAT - II",
+    "Quiz 1",
+    "Quiz 2",
+    "Assignment",
+    "Digital Assignment",
+    "Lab Assessment",
+    "Final Assessment Test",
+    "Holiday",
+    "Exam Days",
+    "Instructional Day",
+    "No Instructional Day",
+    "General (Semester)",
+    "FN",
+    "AN",
+    "09:30 AM",
+    "11:00 AM",
+    "02:00 PM",
+    "05:00 PM",
+    "AM - ",
+    "PM - ",
+    "Row ",
+    "Dr. ",
+    " - SCOPE",
+    " - SENSE",
+    " - SMEC",
+    " - VISH",
+    "SCOPE",
+    "SENSE",
+    "SMEC",
+    "VSB",
+    "VISH",
+    "CSE",
+    "MAT",
+    "ECE",
+    "PHY",
+    "CHY",
+    "ENG",
+    "STS",
+    "MEC",
+    "HUM",
+    "AB1 ",
+    "AB2 ",
+    "CB ",
+    "ALL",
+    "AB1-",
+    "AB2-",
+    "CB-",
+    "A1",
+    "A2",
+    "B1",
+    "B2",
+    "C1",
+    "C2",
+    "D1",
+    "D2",
+    "E1",
+    "E2",
+    "F1",
+    "F2",
+    "G1",
+    "G2",
+    "TA1",
+    "TA2",
+    "TB1",
+    "TB2",
+    "TC1",
+    "TC2",
+    "TD1",
+    "TD2",
+    "TE1",
+    "TE2",
+    "TF1",
+    "TF2",
+    "TG1",
+    "TG2",
+    "L1",
+    "L2",
+    "L3",
+    "+TA1",
+    "+TB1",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+    "-2026",
+    "-2027",
+    "2026-",
+    "2027-",
+    "MON",
+    "TUE",
+    "WED",
+    "THU",
+    "FRI",
+    "SAT",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Winter Semester",
+    "Fall Semester",
+    "Summer Semester",
+    "AP2026",
+    "AP2027",
+    "S",
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "N",
+    "3.0",
+    "4.0",
+    "1.0",
+    "2.0",
+    "0.0",
+    "50",
+    "100",
+    "10",
+    "15",
+    "20",
+    "30",
+    "%",
+    "-",
+    "Waiting for Warden's Approval",
+    "Waiting for Mentor's Approval",
+    "Waiting for Approval",
+    "Approved",
+    "Rejected",
+    "Cancelled",
+    "Reference Material I",
+    "Reference Material II",
+    "downloadPdf/",
+    "Lecture",
+    "Tutorial"
+  ]
+}

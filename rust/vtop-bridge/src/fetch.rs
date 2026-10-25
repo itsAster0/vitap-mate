@@ -2,21 +2,24 @@
 //! own session, for a phone in "Fetch on the server" mode. The phone signs
 //! in itself; the engine only borrows the session for this request, keeps
 //! nothing, and answers `{"data": …}` (the parsed page, as vtop-core's
-//! serde JSON), Brotli-compressed when the caller accepts it.
+//! serde JSON), Brotli-compressed when the caller accepts it; or, for a
+//! phone holding the same page dictionary, the page packed with it.
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use vtop_core::{SessionState, VtopClient, VtopError};
 use vtop_shared::engine::PageFetch;
+use vtop_shared::page_dictionary;
 
 use crate::engine::require_secret;
 use crate::error::ApiError;
+use crate::page_pack;
 use crate::pages::{self, Args};
 use crate::AppState;
 
@@ -51,6 +54,11 @@ pub async fn fetch(
         .await
         .map_err(|_| ApiError::new(StatusCode::GATEWAY_TIMEOUT, "vtop_timeout", "VTOP took too long to answer."))?
         .map_err(|error| vtop_error(&error))?;
+    if request.dictionary.as_deref() == Some(page_dictionary::id()) {
+        if let Some(packed) = page_pack::pack(def.name, &data) {
+            return Ok(([(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)], packed).into_response());
+        }
+    }
     Ok(Json(serde_json::json!({ "data": data })).into_response())
 }
 

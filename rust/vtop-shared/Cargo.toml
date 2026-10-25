@@ -7,6 +7,7 @@ description = "Formats shared by the app and the engine (the edge Worker keeps a
 [dependencies]
 aes-gcm = "0.10"
 base64 = "0.22.1"
+brotli-decompressor = "5"
 hex = "0.4"
 hkdf = "0.12"
 rand = "0.8"

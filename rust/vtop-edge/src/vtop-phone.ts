@@ -3,7 +3,8 @@
 // the session it hands back, answering with the parsed page only. Nothing
 // is kept here or on the engine; the phone sends its session each time.
 // Answers are JSON, which Cloudflare sends Brotli-compressed to a phone
-// that accepts it (the engine compresses its own hop too).
+// that accepts it (the engine compresses its own hop too), or a page the
+// engine packed with the phone's page dictionary, passed on byte for byte.
 
 import { error, type Env, variable } from "./common";
 
@@ -17,6 +18,10 @@ export const PHONE_ROUTES: Record<string, string> = {
 
 /** Bodies are a session and a page name, or a username and password. */
 const MAX_BODY_BYTES = 64 * 1024;
+
+/** A page packed with the page dictionary (`vtop_shared::page_dictionary`):
+ * Brotli already, which only the phone can unpack. */
+export const PACKED_PAGE = "application/vnd.vmate.page+br";
 
 /** Over the engine's own VTOP limits (25 s a page, 28 s a sign-in), so
  * the phone hears the engine's reason instead of a bare timeout. */
@@ -50,8 +55,17 @@ export async function phoneVtop(
         signal: abort.signal,
       }),
     );
-    // Read here, under the timer: `fetch` has already undone the engine's
-    // Brotli, and Cloudflare compresses again for the phone.
+    // Read here, under the timer.
+    if (answer.headers.get("content-type") === PACKED_PAGE) {
+      const packed = await answer.arrayBuffer();
+      return new Response(packed, {
+        status: answer.status,
+        // no-transform: Cloudflare must not compress it again.
+        headers: { "content-type": PACKED_PAGE, "cache-control": "no-store, no-transform" },
+      });
+    }
+    // `fetch` has already undone the engine's Brotli, and Cloudflare
+    // compresses again for the phone.
     const text = await answer.text();
     return new Response(text, {
       status: answer.status,

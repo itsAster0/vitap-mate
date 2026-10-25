@@ -133,6 +133,10 @@ pub struct PageFetch {
     pub semester: Option<String>,
     #[serde(default)]
     pub args: std::collections::BTreeMap<String, String>,
+    /// The [`crate::page_dictionary::id`] the phone holds: the page comes
+    /// back packed with it when the engine holds the same one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dictionary: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

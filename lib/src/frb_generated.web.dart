@@ -10,6 +10,7 @@ import 'api/email_otp.dart';
 import 'api/mail_otp.dart';
 import 'api/native_logs.dart';
 import 'api/platform_http.dart';
+import 'api/server_page.dart';
 import 'api/simple.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
@@ -262,6 +263,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PerExamScheduleRecord> dco_decode_list_per_exam_schedule_record(
     dynamic raw,
   );
+
+  @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -673,6 +677,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PerExamScheduleRecord> sse_decode_list_per_exam_schedule_record(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -1211,6 +1218,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<PerExamScheduleRecord> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(

@@ -121,10 +121,15 @@ void main() {
       _Phone phone, {
       VtopServerMode mode = VtopServerMode.server,
       SessionState? session = _session,
+      PageDictionary? pages,
     }) => ServerVtopBackend(
       phone,
       session: () async => session,
-      api: ServerVtopApi(client: client, baseUrl: 'https://edge.example/'),
+      api: ServerVtopApi(
+        client: client,
+        baseUrl: 'https://edge.example/',
+        pages: pages,
+      ),
       mode: () async => mode,
     );
 
@@ -150,7 +155,59 @@ void main() {
         'csrf_token': 'c',
         'registration_number': '23BCE7000',
       });
+      expect(body.containsKey('dictionary'), isFalse);
     });
+
+    http.Response packed(List<int> bytes) => http.Response.bytes(
+      bytes,
+      200,
+      headers: {'content-type': packedPageType},
+    );
+
+    test('names its page dictionary and reads a page packed with it', () async {
+      Map<String, dynamic>? body;
+      final client = MockClient((request) async {
+        body = jsonDecode(request.body) as Map<String, dynamic>;
+        return packed([1, 2, 3]);
+      });
+      final pages = PageDictionary(
+        id: () => 'd1',
+        unpack: (name, bytes) {
+          expect(name, 'semesters');
+          expect(bytes, [1, 2, 3]);
+          return jsonEncode(_fixture('semesters'));
+        },
+      );
+      final phone = _Phone('unused');
+      final data = await backend(
+        client,
+        phone,
+        pages: pages,
+      ).fetch(VtopQueries.semesters());
+      expect(body!['dictionary'], 'd1');
+      expect(data.semesters, isNotEmpty);
+      expect(phone.asked, isEmpty);
+    });
+
+    test(
+      'a packed page that does not unpack is fetched on the phone',
+      () async {
+        final client = MockClient((_) async => packed([9]));
+        final pages = PageDictionary(
+          id: () => 'd1',
+          unpack: (_, _) => throw Exception('corrupt'),
+        );
+        final phone = _Phone(
+          SemesterData(semesters: const [], updateTime: BigInt.zero),
+        );
+        await backend(
+          client,
+          phone,
+          pages: pages,
+        ).fetch(VtopQueries.semesters());
+        expect(phone.asked, ['semesters']);
+      },
+    );
 
     test('sends the arguments of a page that takes them', () async {
       Map<String, dynamic>? body;

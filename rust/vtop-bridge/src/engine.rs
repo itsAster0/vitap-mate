@@ -522,6 +522,14 @@ mod tests {
     }
 
     fn engine_app(edge: Arc<FakeEdge>, login: FakeLogin) -> (axum::Router, Arc<AppState>) {
+        engine_app_on(edge, login, vtop_core::VtopConfig::default())
+    }
+
+    fn engine_app_on(
+        edge: Arc<FakeEdge>,
+        login: FakeLogin,
+        vtop: vtop_core::VtopConfig,
+    ) -> (axum::Router, Arc<AppState>) {
         let config = Config::from_lookup(|name| match name {
             "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
             "EDGE_URL" => Some("https://edge.example".into()),
@@ -530,14 +538,17 @@ mod tests {
             _ => None,
         })
         .unwrap();
-        let state = Arc::new(AppState::new(
-            config,
-            Parts {
-                forwarded_login: Arc::new(login),
-                verifier: Arc::new(FakeVerifier),
-                edge,
-            },
-        ));
+        let state = Arc::new(
+            AppState::new(
+                config,
+                Parts {
+                    forwarded_login: Arc::new(login),
+                    verifier: Arc::new(FakeVerifier),
+                    edge,
+                },
+            )
+            .with_vtop(vtop),
+        );
         (crate::router(state.clone()), state)
     }
 
@@ -930,5 +941,68 @@ mod tests {
             .unwrap();
         let response = phone_app().oneshot(request).await.unwrap();
         assert_eq!(response.headers()["content-encoding"], "br");
+    }
+
+    /// A VTOP that answers every request with the semesters fixture.
+    async fn vtop_with_semesters() -> (wiremock::MockServer, axum::Router) {
+        let vtop = wiremock::MockServer::start().await;
+        let html = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../vtop-core/tests/fixtures/semesters.html"),
+        )
+        .unwrap();
+        wiremock::Mock::given(wiremock::matchers::any())
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_string(html))
+            .mount(&vtop)
+            .await;
+        let config = vtop_core::VtopConfig {
+            base_url: vtop.uri(),
+            ..Default::default()
+        };
+        let app = engine_app_on(
+            Arc::new(FakeEdge::default()),
+            FakeLogin::answering(Err(LoginError::InvalidCredentials)),
+            config,
+        )
+        .0;
+        (vtop, app)
+    }
+
+    async fn fetch_semesters(app: &axum::Router, dictionary: Option<&str>) -> axum::response::Response {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/engine/fetch")
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {RELAY}"))
+            .header("accept-encoding", "br, gzip")
+            .body(Body::from(
+                json!({ "session": signed_in(), "name": "semesters", "dictionary": dictionary }).to_string(),
+            ))
+            .unwrap();
+        app.clone().oneshot(request).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_phone_with_the_same_dictionary_gets_the_page_packed() {
+        use vtop_shared::page_dictionary;
+        let (_vtop, app) = vtop_with_semesters().await;
+        let response = fetch_semesters(&app, Some(page_dictionary::id())).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["content-type"], page_dictionary::CONTENT_TYPE);
+        // Packed already: not compressed again on the way.
+        assert!(response.headers().get("content-encoding").is_none());
+        let packed = response.into_body().collect().await.unwrap().to_bytes();
+        let page: Value = serde_json::from_slice(&page_dictionary::unpack("semesters", &packed).unwrap()).unwrap();
+        assert!(!page["semesters"].as_array().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn another_dictionary_gets_plain_json() {
+        let (_vtop, app) = vtop_with_semesters().await;
+        for dictionary in [None, Some("000000000000")] {
+            let response = fetch_semesters(&app, dictionary).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()["content-type"], "application/json");
+            assert_eq!(response.headers()["content-encoding"], "br");
+        }
     }
 }

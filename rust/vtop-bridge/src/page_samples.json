@@ -1,0 +1,161 @@
+{
+  "course_page_classes": {
+    "classes": [
+      {
+        "class_group": "General (Semester)",
+        "class_id": "AP2026271000123",
+        "course_code": "CSE2001",
+        "course_title": "Data Structures",
+        "course_type": "Embedded Theory",
+        "erp_id": "70001",
+        "faculty": "Dr. Test Faculty",
+        "faculty_school": "SCOPE",
+        "slot": "A1+TA1"
+      },
+      {
+        "class_group": "General (Semester)",
+        "class_id": "AP2026271000124",
+        "course_code": "CSE2001",
+        "course_title": "Data Structures",
+        "course_type": "Embedded Lab",
+        "erp_id": "70002",
+        "faculty": "Dr. Other Faculty",
+        "faculty_school": "SCOPE",
+        "slot": "L1+L2"
+      }
+    ],
+    "course_id": "AP2026271CSE2001",
+    "semester_id": "AP2026271",
+    "update_time": 0
+  },
+  "course_page_courses": {
+    "courses": [
+      { "code": "CSE2001", "course_type": "Embedded Theory", "id": "AP2026271CSE2001", "title": "Data Structures" },
+      { "code": "MAT1001", "course_type": "Theory Only", "id": "AP2026271MAT1001", "title": "Calculus-I" }
+    ],
+    "semester_id": "AP2026271",
+    "update_time": 0
+  },
+  "course_page_detail": {
+    "all_materials_path": "downloadPdf/AP2026271/AP2026271000123/all",
+    "class": {
+      "class_group": "General (Semester)",
+      "class_id": "AP2026271000123",
+      "course_code": "CSE2001",
+      "course_title": "Data Structures",
+      "course_type": "Embedded Theory",
+      "erp_id": "70001",
+      "faculty": "Dr. Test Faculty",
+      "faculty_school": "SCOPE",
+      "slot": "A1+TA1"
+    },
+    "course_id": "AP2026271CSE2001",
+    "general_materials_path": "downloadPdf/AP2026271/AP2026271000123/general",
+    "has_course_plan": true,
+    "lectures": [
+      {
+        "date": "17-Jul-2026",
+        "day": "FRI",
+        "materials": [
+          { "label": "Reference Material I", "path": "downloadPdf/AP2026271/AP2026271000123/19/17-07-2026" },
+          { "label": "Reference Material II", "path": "downloadPdf/AP2026271/AP2026271000123/20/17-07-2026" }
+        ],
+        "serial": "1",
+        "topic": "Introduction to Data Structures"
+      },
+      {
+        "date": "20-Jul-2026",
+        "day": "MON",
+        "materials": [],
+        "serial": "2",
+        "topic": "Arrays and Linked Lists"
+      }
+    ],
+    "semester_id": "AP2026271",
+    "syllabus_path": "downloadPdf/AP2026271/AP2026271000123/syllabus",
+    "update_time": 0
+  },
+  "general_outing": {
+    "in_hours": [18, 19, 20],
+    "max_days_ahead": 7,
+    "max_days_away": 3,
+    "notice": "",
+    "out_hours": [9, 10, 11],
+    "place_max_length": 50,
+    "purpose_max_length": 100,
+    "records": [
+      {
+        "cancel_id": "",
+        "from_date": "10-Oct-2026",
+        "from_time": "09:00",
+        "pass_id": "G1001",
+        "place": "Home",
+        "purpose": "Festival",
+        "serial": "1",
+        "status": "Waiting for Warden's Approval",
+        "to_date": "12-Oct-2026",
+        "to_time": "18:00"
+      },
+      {
+        "cancel_id": "",
+        "from_date": "01-Oct-2026",
+        "from_time": "10:00",
+        "pass_id": "G1000",
+        "place": "Guntur",
+        "purpose": "Shopping",
+        "serial": "2",
+        "status": "Approved",
+        "to_date": "01-Oct-2026",
+        "to_time": "19:00"
+      }
+    ],
+    "student": {
+      "application_no": "A1001",
+      "gender": "Male",
+      "hostel_block": "MH-1",
+      "name": "Test Student",
+      "parent_contact_number": "9000000000",
+      "registration_number": "23BCE7000",
+      "room_number": "101"
+    },
+    "update_time": 0
+  },
+  "weekend_outing": {
+    "max_days_ahead": 7,
+    "notice": "",
+    "places": [
+      { "label": "Vijayawada", "value": "Vijayawada" },
+      { "label": "Guntur", "value": "Guntur" }
+    ],
+    "purpose_max_length": 100,
+    "records": [
+      {
+        "cancel_id": "W2000",
+        "date": "17-Oct-2026",
+        "hostel_block": "MH-1",
+        "pass_id": "W1000",
+        "place": "Vijayawada",
+        "purpose": "Shopping",
+        "room_number": "101",
+        "serial": "1",
+        "status": "Waiting for Mentor's Approval",
+        "time_slot": "09:30 AM - 03:30 PM"
+      }
+    ],
+    "student": {
+      "application_no": "A1001",
+      "gender": "Male",
+      "hostel_block": "MH-1",
+      "name": "Test Student",
+      "parent_contact_number": "9000000000",
+      "registration_number": "23BCE7000",
+      "room_number": "101"
+    },
+    "time_slots": [
+      { "label": "09:30 AM - 03:30 PM", "value": "1" },
+      { "label": "10:30 AM - 04:30 PM", "value": "2" }
+    ],
+    "update_time": 0,
+    "weekdays": [6, 0]
+  }
+}
