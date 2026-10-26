@@ -153,8 +153,11 @@ class BridgeKey {
   final String key;
   final String mcpUrl;
 
-  /// The header MCP agents send the key in; the URL never carries it.
+  /// The header MCP agents send the key in.
   String get authHeader => 'Authorization: Bearer $key';
+
+  /// The MCP URL with the key in it, for agents that only take a URL.
+  String get agentUrl => '$mcpUrl/$key';
 
   /// Adds the MCP server to Claude Code with the key in the header.
   String get claudeCodeCommand =>

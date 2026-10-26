@@ -631,18 +631,26 @@ class Segmented<T> extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              AnimatedDefaultTextStyle(
-                                duration: Motion.medium,
-                                style: context.theme.typography.body.sm
-                                    .copyWith(
-                                      fontWeight: segment == value
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                      color: segment == value
-                                          ? colors.foreground
-                                          : colors.mutedForeground,
-                                    ),
-                                child: Text(label, maxLines: 1),
+                              // A label too long for its segment ends
+                              // in an ellipsis instead of overflowing.
+                              Flexible(
+                                child: AnimatedDefaultTextStyle(
+                                  duration: Motion.medium,
+                                  style: context.theme.typography.body.sm
+                                      .copyWith(
+                                        fontWeight: segment == value
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                        color: segment == value
+                                            ? colors.foreground
+                                            : colors.mutedForeground,
+                                      ),
+                                  child: Text(
+                                    label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
                               ),
                               if (counts case final c? when i < c.length) ...[
                                 const SizedBox(width: 6),
