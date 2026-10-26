@@ -26,10 +26,11 @@ pub use vtop_core::types::{
     FullAttendanceData, FullAttendanceRecord, GeneralOutingData, GeneralOutingRecord,
     GradeCourseRecord, GradeDetailMark, GradeDetailsData, GradeHistoryAttempt, GradeHistoryCgpa,
     GradeHistoryData, GradeHistoryRecord, GradeHistoryStudentInfo, GradeRange, GradeViewData,
-    MarksData, MarksRecord, MarksRecordEach, OutingApplyResult, OutingCancelResult, OutingOption,
-    OutingStudent, PerExamScheduleRecord, PersistedCookie, PersistedHeader, PersistedVtopSession,
-    SemesterData, SemesterInfo, TimetableCourse, TimetableData, TimetableSlot, WeekendOutingData,
-    WeekendOutingRecord,
+    MarksData, MarksRecord, MarksRecordEach, MentorData, MentorMessage, OutingApplyResult,
+    OutingCancelResult, OutingOption, OutingStudent, PerExamScheduleRecord, PersistedCookie,
+    PersistedHeader, PersistedVtopSession, ProfileField, ProfileGroup, ProfileSection,
+    SemesterData, SemesterInfo, StudentProfile, TimetableCourse, TimetableData, TimetableSlot,
+    WeekendOutingData, WeekendOutingRecord,
 };
 
 #[frb(mirror(ClassKind), non_opaque)]
@@ -91,6 +92,48 @@ pub struct _BiometricRecord {
 pub struct _BiometricData {
     pub records: Vec<BiometricRecord>,
     pub requested_date: String,
+    pub update_time: u64,
+}
+
+#[frb(mirror(ProfileField), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _ProfileField {
+    pub label: String,
+    pub value: String,
+}
+
+#[frb(mirror(ProfileGroup), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _ProfileGroup {
+    pub title: String,
+    pub fields: Vec<ProfileField>,
+}
+
+#[frb(mirror(ProfileSection), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _ProfileSection {
+    pub title: String,
+    pub groups: Vec<ProfileGroup>,
+}
+
+#[frb(mirror(StudentProfile), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _StudentProfile {
+    pub name: String,
+    pub registration_number: String,
+    pub vit_email: String,
+    pub program: String,
+    pub school: String,
+    pub photo: String,
+    pub sections: Vec<ProfileSection>,
+    pub update_time: u64,
+}
+
+#[frb(mirror(MentorMessage), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _MentorMessage {
+    pub fields: Vec<ProfileField>,
+}
+
+#[frb(mirror(MentorData), dart_metadata=("freezed", "immutable" import "package:meta/meta.dart" as meta),json_serializable)]
+pub struct _MentorData {
+    pub details: Vec<ProfileField>,
+    pub messages: Vec<MentorMessage>,
     pub update_time: u64,
 }
 

@@ -119,6 +119,19 @@ abstract final class VtopQueries {
         vtop_api.fetchBiometricHistory(client: client, date: date),
   );
 
+  static VtopQuery<StudentProfile> profile() => VtopQuery(
+    name: 'profile',
+    fromJson: StudentProfile.fromJson,
+    local: (client) => vtop_api.fetchProfile(client: client),
+  );
+
+  /// The mentor's details and the messages they sent.
+  static VtopQuery<MentorData> mentor() => VtopQuery(
+    name: 'mentor',
+    fromJson: MentorData.fromJson,
+    local: (client) => vtop_api.fetchMentor(client: client),
+  );
+
   // Pages not saved on the phone: fetched in full every time.
 
   static VtopQuery<GeneralOutingData> generalOuting() => VtopQuery(

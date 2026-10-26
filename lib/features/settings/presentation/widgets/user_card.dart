@@ -5,6 +5,7 @@ import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:vitapmate/core/router/paths.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
@@ -72,46 +73,57 @@ class UserCard extends HookConsumerWidget {
           Row(
             spacing: 12,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.app.accentTone.subtle,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  initials.toUpperCase(),
-                  style: typography.body.md.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colors.app.accentTone.onSubtle,
-                  ),
-                ),
-              ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.md.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colors.foreground,
+                child: PressScale(
+                  semanticsLabel: 'Open profile',
+                  onPress: () => GoRouter.of(context).pushNamed(Paths.profile),
+                  child: Row(
+                    spacing: 12,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: colors.app.accentTone.subtle,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          initials.toUpperCase(),
+                          style: typography.body.md.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: colors.app.accentTone.onSubtle,
+                          ),
+                        ),
                       ),
-                    ),
-                    Text(
-                      username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.xs.copyWith(
-                        color: user.isValid
-                            ? colors.mutedForeground
-                            : colors.destructive,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: typography.body.md.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: colors.foreground,
+                              ),
+                            ),
+                            Text(
+                              username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: typography.body.xs.copyWith(
+                                color: user.isValid
+                                    ? colors.mutedForeground
+                                    : colors.destructive,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Semantics(

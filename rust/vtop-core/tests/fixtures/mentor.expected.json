@@ -1,0 +1,42 @@
+{
+  "details": [
+    {
+      "label": "Faculty ID",
+      "value": "10001"
+    },
+    {
+      "label": "Faculty Name",
+      "value": "Faculty Name"
+    },
+    {
+      "label": "Faculty Designation",
+      "value": "Assistant Professor"
+    },
+    {
+      "label": "School",
+      "value": "School of Advanced Sciences"
+    },
+    {
+      "label": "Cabin",
+      "value": "AB1-101"
+    },
+    {
+      "label": "Faculty Department",
+      "value": "Department of Mathematics"
+    },
+    {
+      "label": "Faculty Email",
+      "value": "mentor@vitap.ac.in"
+    },
+    {
+      "label": "Faculty intercom",
+      "value": ""
+    },
+    {
+      "label": "Faculty Mobile Number",
+      "value": "9000000000"
+    }
+  ],
+  "messages": [],
+  "update_time": 0
+}

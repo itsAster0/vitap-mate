@@ -17,8 +17,8 @@ use crate::api::vtop::{
         AcademicCalendarData, AttendanceData, BiometricData, CourseFileInfo, CoursePageClasses,
         CoursePageCourses, CoursePageDetail, ExamScheduleData, FullAttendanceData,
         GeneralOutingData, GradeDetailsData, GradeHistoryData, GradeViewData, MarksData,
-        OutingApplyResult, OutingCancelResult, PersistedVtopSession, SemesterData, SessionState,
-        TimetableData, WeekendOutingData,
+        MentorData, OutingApplyResult, OutingCancelResult, PersistedVtopSession, SemesterData,
+        SessionState, StudentProfile, TimetableData, WeekendOutingData,
     },
     vtop_client::{VtopClient, VtopError},
 };
@@ -47,10 +47,7 @@ pub async fn get_vtop_client_via_platform(
     password: String,
     persisted_session: Option<PersistedVtopSession>,
     base_url: Option<String>,
-    send: impl Fn(PlatformHttpRequest) -> DartFnFuture<PlatformHttpResponse>
-        + Send
-        + Sync
-        + 'static,
+    send: impl Fn(PlatformHttpRequest) -> DartFnFuture<PlatformHttpResponse> + Send + Sync + 'static,
 ) -> Result<VtopClient, VtopError> {
     build_vtop_client(
         vtop_core::VtopClient::builder().transport(DartTransport::new(send)),
@@ -216,6 +213,16 @@ pub async fn fetch_grade_view_details(
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_grade_history(client: &VtopClient) -> Result<GradeHistoryData, VtopError> {
     client.inner.grade_history().await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_profile(client: &VtopClient) -> Result<StudentProfile, VtopError> {
+    client.inner.profile().await
+}
+
+#[flutter_rust_bridge::frb()]
+pub async fn fetch_mentor(client: &VtopClient) -> Result<MentorData, VtopError> {
+    client.inner.mentor().await
 }
 
 #[flutter_rust_bridge::frb()]

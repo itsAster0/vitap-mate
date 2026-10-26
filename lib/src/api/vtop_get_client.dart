@@ -146,6 +146,12 @@ Future<GradeDetailsData> fetchGradeViewDetails({
 Future<GradeHistoryData> fetchGradeHistory({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchGradeHistory(client: client);
 
+Future<StudentProfile> fetchProfile({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchProfile(client: client);
+
+Future<MentorData> fetchMentor({required VtopClient client}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchMentor(client: client);
+
 Future<GeneralOutingData> fetchGeneralOuting({required VtopClient client}) =>
     RustLib.instance.api.crateApiVtopGetClientFetchGeneralOuting(
       client: client,

@@ -15,7 +15,8 @@ use std::path::PathBuf;
 use serde::Serialize;
 use serde_json::Value;
 use vtop_core::parser::{
-    attendance, biometric, calendar, exam_schedule, grade_history, grades, marks, timetable,
+    attendance, biometric, calendar, exam_schedule, grade_history, grades, marks, mentor, profile,
+    timetable,
 };
 
 fn fixture_dir() -> PathBuf {
@@ -209,6 +210,41 @@ fn biometric_fixture() {
 }
 
 #[test]
+fn profile_fixture() {
+    let data = profile::parse_profile(&fixture("profile"));
+    assert_eq!(data.name, "JANE DOE");
+    assert_eq!(data.registration_number, "24ABC0001");
+    assert_eq!(data.vit_email, "jane.24abc0001@vitapstudent.ac.in");
+    assert!(!data.photo.is_empty());
+    let titles: Vec<_> = data.sections.iter().map(|s| s.title.as_str()).collect();
+    assert_eq!(
+        titles,
+        [
+            "PERSONAL INFORMATION",
+            "EDUCATIONAL INFORMATION",
+            "FAMILY INFORMATION",
+            "PROCTOR INFORMATION",
+            "HOSTEL INFORMATION"
+        ]
+    );
+    let personal = &data.sections[0];
+    assert_eq!(personal.groups[1].title, "CURRENT ADDRESS");
+    assert_eq!(personal.groups[2].title, "PERMANENT ADDRESS");
+    assert_eq!(data.sections[2].groups[1].title, "FATHER DETAILS");
+    assert_snapshot("profile", &data);
+}
+
+#[test]
+fn mentor_fixture() {
+    let data = mentor::parse_mentor(&fixture("mentor_details"), &fixture("mentor_messages"));
+    assert_eq!(data.details.len(), 9);
+    assert_eq!(data.details[0].label, "Faculty ID");
+    assert_eq!(data.details[6].value, "mentor@vitap.ac.in");
+    assert!(data.messages.is_empty());
+    assert_snapshot("mentor", &data);
+}
+
+#[test]
 fn calendar_months_fixture() {
     let months = calendar::parse_calendar_months(&fixture("calendar_months"));
     assert_eq!(
@@ -259,6 +295,9 @@ fn parsers_never_panic_on_truncated_pages() {
         "biometric",
         "calendar_months",
         "calendar_month",
+        "profile",
+        "mentor_details",
+        "mentor_messages",
     ];
     for name in names {
         let html = fixture(name);
@@ -279,6 +318,8 @@ fn parsers_never_panic_on_truncated_pages() {
             biometric::parse_biometric(page, "01/01/2026");
             calendar::parse_calendar_months(page);
             calendar::parse_calendar_month(page, "01-OCT-2026");
+            profile::parse_profile(page);
+            mentor::parse_mentor(page, page);
         }
     }
 }

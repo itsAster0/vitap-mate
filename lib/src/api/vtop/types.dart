@@ -542,6 +542,29 @@ sealed class MarksRecordEach with _$MarksRecordEach {
 
 @freezed
 @meta.immutable
+sealed class MentorData with _$MentorData {
+  const factory MentorData({
+    required List<ProfileField> details,
+    required List<MentorMessage> messages,
+    required BigInt updateTime,
+  }) = _MentorData;
+
+  factory MentorData.fromJson(Map<String, dynamic> json) =>
+      _$MentorDataFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class MentorMessage with _$MentorMessage {
+  const factory MentorMessage({required List<ProfileField> fields}) =
+      _MentorMessage;
+
+  factory MentorMessage.fromJson(Map<String, dynamic> json) =>
+      _$MentorMessageFromJson(json);
+}
+
+@freezed
+@meta.immutable
 sealed class OutingApplyResult with _$OutingApplyResult {
   const factory OutingApplyResult({
     required bool applied,
@@ -621,6 +644,40 @@ sealed class PersistedVtopSession with _$PersistedVtopSession {
 
 @freezed
 @meta.immutable
+sealed class ProfileField with _$ProfileField {
+  const factory ProfileField({required String label, required String value}) =
+      _ProfileField;
+
+  factory ProfileField.fromJson(Map<String, dynamic> json) =>
+      _$ProfileFieldFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class ProfileGroup with _$ProfileGroup {
+  const factory ProfileGroup({
+    required String title,
+    required List<ProfileField> fields,
+  }) = _ProfileGroup;
+
+  factory ProfileGroup.fromJson(Map<String, dynamic> json) =>
+      _$ProfileGroupFromJson(json);
+}
+
+@freezed
+@meta.immutable
+sealed class ProfileSection with _$ProfileSection {
+  const factory ProfileSection({
+    required String title,
+    required List<ProfileGroup> groups,
+  }) = _ProfileSection;
+
+  factory ProfileSection.fromJson(Map<String, dynamic> json) =>
+      _$ProfileSectionFromJson(json);
+}
+
+@freezed
+@meta.immutable
 sealed class SemesterData with _$SemesterData {
   const factory SemesterData({
     required List<SemesterInfo> semesters,
@@ -677,6 +734,24 @@ class SessionState {
           registrationNumber == other.registrationNumber &&
           otpIssuedAt == other.otpIssuedAt &&
           loggedInAt == other.loggedInAt;
+}
+
+@freezed
+@meta.immutable
+sealed class StudentProfile with _$StudentProfile {
+  const factory StudentProfile({
+    required String name,
+    required String registrationNumber,
+    required String vitEmail,
+    required String program,
+    required String school,
+    required String photo,
+    required List<ProfileSection> sections,
+    required BigInt updateTime,
+  }) = _StudentProfile;
+
+  factory StudentProfile.fromJson(Map<String, dynamic> json) =>
+      _$StudentProfileFromJson(json);
 }
 
 @freezed

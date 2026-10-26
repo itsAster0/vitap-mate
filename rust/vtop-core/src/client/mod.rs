@@ -16,6 +16,7 @@ mod exams;
 mod hostel;
 mod http;
 mod otp;
+mod profile;
 pub mod transport;
 
 use std::sync::{Arc, Mutex, MutexGuard};

@@ -149,6 +149,8 @@ async fn mcp_tools_list_names_every_tool() {
             "get_grade_history",
             "get_grades",
             "get_marks",
+            "get_mentor",
+            "get_profile",
             "get_semesters",
             "get_session",
             "get_timetable",
@@ -242,7 +244,7 @@ async fn legacy_protocol_clients_work_without_sessions() {
     let body: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(
         body["result"]["tools"].as_array().unwrap().len(),
-        18,
+        20,
         "{body}"
     );
 }

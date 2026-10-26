@@ -9184,6 +9184,544 @@ as String,
 
 
 /// @nodoc
+mixin _$MentorData {
+
+ List<ProfileField> get details; List<MentorMessage> get messages; BigInt get updateTime;
+/// Create a copy of MentorData
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$MentorDataCopyWith<MentorData> get copyWith => _$MentorDataCopyWithImpl<MentorData>(this as MentorData, _$identity);
+
+  /// Serializes this MentorData to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MentorData&&const DeepCollectionEquality().equals(other.details, details)&&const DeepCollectionEquality().equals(other.messages, messages)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(details),const DeepCollectionEquality().hash(messages),updateTime);
+
+@override
+String toString() {
+  return 'MentorData(details: $details, messages: $messages, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $MentorDataCopyWith<$Res>  {
+  factory $MentorDataCopyWith(MentorData value, $Res Function(MentorData) _then) = _$MentorDataCopyWithImpl;
+@useResult
+$Res call({
+ List<ProfileField> details, List<MentorMessage> messages, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class _$MentorDataCopyWithImpl<$Res>
+    implements $MentorDataCopyWith<$Res> {
+  _$MentorDataCopyWithImpl(this._self, this._then);
+
+  final MentorData _self;
+  final $Res Function(MentorData) _then;
+
+/// Create a copy of MentorData
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? details = null,Object? messages = null,Object? updateTime = null,}) {
+  return _then(_self.copyWith(
+details: null == details ? _self.details : details // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,messages: null == messages ? _self.messages : messages // ignore: cast_nullable_to_non_nullable
+as List<MentorMessage>,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [MentorData].
+extension MentorDataPatterns on MentorData {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _MentorData value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _MentorData() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _MentorData value)  $default,){
+final _that = this;
+switch (_that) {
+case _MentorData():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _MentorData value)?  $default,){
+final _that = this;
+switch (_that) {
+case _MentorData() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<ProfileField> details,  List<MentorMessage> messages,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _MentorData() when $default != null:
+return $default(_that.details,_that.messages,_that.updateTime);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<ProfileField> details,  List<MentorMessage> messages,  BigInt updateTime)  $default,) {final _that = this;
+switch (_that) {
+case _MentorData():
+return $default(_that.details,_that.messages,_that.updateTime);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<ProfileField> details,  List<MentorMessage> messages,  BigInt updateTime)?  $default,) {final _that = this;
+switch (_that) {
+case _MentorData() when $default != null:
+return $default(_that.details,_that.messages,_that.updateTime);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _MentorData implements MentorData {
+  const _MentorData({required final  List<ProfileField> details, required final  List<MentorMessage> messages, required this.updateTime}): _details = details,_messages = messages;
+  factory _MentorData.fromJson(Map<String, dynamic> json) => _$MentorDataFromJson(json);
+
+ final  List<ProfileField> _details;
+@override List<ProfileField> get details {
+  if (_details is EqualUnmodifiableListView) return _details;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_details);
+}
+
+ final  List<MentorMessage> _messages;
+@override List<MentorMessage> get messages {
+  if (_messages is EqualUnmodifiableListView) return _messages;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_messages);
+}
+
+@override final  BigInt updateTime;
+
+/// Create a copy of MentorData
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$MentorDataCopyWith<_MentorData> get copyWith => __$MentorDataCopyWithImpl<_MentorData>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$MentorDataToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MentorData&&const DeepCollectionEquality().equals(other._details, _details)&&const DeepCollectionEquality().equals(other._messages, _messages)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_details),const DeepCollectionEquality().hash(_messages),updateTime);
+
+@override
+String toString() {
+  return 'MentorData(details: $details, messages: $messages, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$MentorDataCopyWith<$Res> implements $MentorDataCopyWith<$Res> {
+  factory _$MentorDataCopyWith(_MentorData value, $Res Function(_MentorData) _then) = __$MentorDataCopyWithImpl;
+@override @useResult
+$Res call({
+ List<ProfileField> details, List<MentorMessage> messages, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class __$MentorDataCopyWithImpl<$Res>
+    implements _$MentorDataCopyWith<$Res> {
+  __$MentorDataCopyWithImpl(this._self, this._then);
+
+  final _MentorData _self;
+  final $Res Function(_MentorData) _then;
+
+/// Create a copy of MentorData
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? details = null,Object? messages = null,Object? updateTime = null,}) {
+  return _then(_MentorData(
+details: null == details ? _self._details : details // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,messages: null == messages ? _self._messages : messages // ignore: cast_nullable_to_non_nullable
+as List<MentorMessage>,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$MentorMessage {
+
+ List<ProfileField> get fields;
+/// Create a copy of MentorMessage
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$MentorMessageCopyWith<MentorMessage> get copyWith => _$MentorMessageCopyWithImpl<MentorMessage>(this as MentorMessage, _$identity);
+
+  /// Serializes this MentorMessage to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MentorMessage&&const DeepCollectionEquality().equals(other.fields, fields));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(fields));
+
+@override
+String toString() {
+  return 'MentorMessage(fields: $fields)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $MentorMessageCopyWith<$Res>  {
+  factory $MentorMessageCopyWith(MentorMessage value, $Res Function(MentorMessage) _then) = _$MentorMessageCopyWithImpl;
+@useResult
+$Res call({
+ List<ProfileField> fields
+});
+
+
+
+
+}
+/// @nodoc
+class _$MentorMessageCopyWithImpl<$Res>
+    implements $MentorMessageCopyWith<$Res> {
+  _$MentorMessageCopyWithImpl(this._self, this._then);
+
+  final MentorMessage _self;
+  final $Res Function(MentorMessage) _then;
+
+/// Create a copy of MentorMessage
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? fields = null,}) {
+  return _then(_self.copyWith(
+fields: null == fields ? _self.fields : fields // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [MentorMessage].
+extension MentorMessagePatterns on MentorMessage {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _MentorMessage value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _MentorMessage() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _MentorMessage value)  $default,){
+final _that = this;
+switch (_that) {
+case _MentorMessage():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _MentorMessage value)?  $default,){
+final _that = this;
+switch (_that) {
+case _MentorMessage() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<ProfileField> fields)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _MentorMessage() when $default != null:
+return $default(_that.fields);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<ProfileField> fields)  $default,) {final _that = this;
+switch (_that) {
+case _MentorMessage():
+return $default(_that.fields);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<ProfileField> fields)?  $default,) {final _that = this;
+switch (_that) {
+case _MentorMessage() when $default != null:
+return $default(_that.fields);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _MentorMessage implements MentorMessage {
+  const _MentorMessage({required final  List<ProfileField> fields}): _fields = fields;
+  factory _MentorMessage.fromJson(Map<String, dynamic> json) => _$MentorMessageFromJson(json);
+
+ final  List<ProfileField> _fields;
+@override List<ProfileField> get fields {
+  if (_fields is EqualUnmodifiableListView) return _fields;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_fields);
+}
+
+
+/// Create a copy of MentorMessage
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$MentorMessageCopyWith<_MentorMessage> get copyWith => __$MentorMessageCopyWithImpl<_MentorMessage>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$MentorMessageToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MentorMessage&&const DeepCollectionEquality().equals(other._fields, _fields));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_fields));
+
+@override
+String toString() {
+  return 'MentorMessage(fields: $fields)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$MentorMessageCopyWith<$Res> implements $MentorMessageCopyWith<$Res> {
+  factory _$MentorMessageCopyWith(_MentorMessage value, $Res Function(_MentorMessage) _then) = __$MentorMessageCopyWithImpl;
+@override @useResult
+$Res call({
+ List<ProfileField> fields
+});
+
+
+
+
+}
+/// @nodoc
+class __$MentorMessageCopyWithImpl<$Res>
+    implements _$MentorMessageCopyWith<$Res> {
+  __$MentorMessageCopyWithImpl(this._self, this._then);
+
+  final _MentorMessage _self;
+  final $Res Function(_MentorMessage) _then;
+
+/// Create a copy of MentorMessage
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? fields = null,}) {
+  return _then(_MentorMessage(
+fields: null == fields ? _self._fields : fields // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$OutingApplyResult {
 
  bool get applied; String get message;
@@ -10777,6 +11315,798 @@ as BigInt?,
 
 
 /// @nodoc
+mixin _$ProfileField {
+
+ String get label; String get value;
+/// Create a copy of ProfileField
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProfileFieldCopyWith<ProfileField> get copyWith => _$ProfileFieldCopyWithImpl<ProfileField>(this as ProfileField, _$identity);
+
+  /// Serializes this ProfileField to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileField&&(identical(other.label, label) || other.label == label)&&(identical(other.value, value) || other.value == value));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,label,value);
+
+@override
+String toString() {
+  return 'ProfileField(label: $label, value: $value)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProfileFieldCopyWith<$Res>  {
+  factory $ProfileFieldCopyWith(ProfileField value, $Res Function(ProfileField) _then) = _$ProfileFieldCopyWithImpl;
+@useResult
+$Res call({
+ String label, String value
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProfileFieldCopyWithImpl<$Res>
+    implements $ProfileFieldCopyWith<$Res> {
+  _$ProfileFieldCopyWithImpl(this._self, this._then);
+
+  final ProfileField _self;
+  final $Res Function(ProfileField) _then;
+
+/// Create a copy of ProfileField
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? label = null,Object? value = null,}) {
+  return _then(_self.copyWith(
+label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProfileField].
+extension ProfileFieldPatterns on ProfileField {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProfileField value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProfileField() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProfileField value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileField():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProfileField value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileField() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String label,  String value)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProfileField() when $default != null:
+return $default(_that.label,_that.value);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String label,  String value)  $default,) {final _that = this;
+switch (_that) {
+case _ProfileField():
+return $default(_that.label,_that.value);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String label,  String value)?  $default,) {final _that = this;
+switch (_that) {
+case _ProfileField() when $default != null:
+return $default(_that.label,_that.value);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProfileField implements ProfileField {
+  const _ProfileField({required this.label, required this.value});
+  factory _ProfileField.fromJson(Map<String, dynamic> json) => _$ProfileFieldFromJson(json);
+
+@override final  String label;
+@override final  String value;
+
+/// Create a copy of ProfileField
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProfileFieldCopyWith<_ProfileField> get copyWith => __$ProfileFieldCopyWithImpl<_ProfileField>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProfileFieldToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileField&&(identical(other.label, label) || other.label == label)&&(identical(other.value, value) || other.value == value));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,label,value);
+
+@override
+String toString() {
+  return 'ProfileField(label: $label, value: $value)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProfileFieldCopyWith<$Res> implements $ProfileFieldCopyWith<$Res> {
+  factory _$ProfileFieldCopyWith(_ProfileField value, $Res Function(_ProfileField) _then) = __$ProfileFieldCopyWithImpl;
+@override @useResult
+$Res call({
+ String label, String value
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProfileFieldCopyWithImpl<$Res>
+    implements _$ProfileFieldCopyWith<$Res> {
+  __$ProfileFieldCopyWithImpl(this._self, this._then);
+
+  final _ProfileField _self;
+  final $Res Function(_ProfileField) _then;
+
+/// Create a copy of ProfileField
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? label = null,Object? value = null,}) {
+  return _then(_ProfileField(
+label: null == label ? _self.label : label // ignore: cast_nullable_to_non_nullable
+as String,value: null == value ? _self.value : value // ignore: cast_nullable_to_non_nullable
+as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProfileGroup {
+
+ String get title; List<ProfileField> get fields;
+/// Create a copy of ProfileGroup
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProfileGroupCopyWith<ProfileGroup> get copyWith => _$ProfileGroupCopyWithImpl<ProfileGroup>(this as ProfileGroup, _$identity);
+
+  /// Serializes this ProfileGroup to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileGroup&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.fields, fields));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,title,const DeepCollectionEquality().hash(fields));
+
+@override
+String toString() {
+  return 'ProfileGroup(title: $title, fields: $fields)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProfileGroupCopyWith<$Res>  {
+  factory $ProfileGroupCopyWith(ProfileGroup value, $Res Function(ProfileGroup) _then) = _$ProfileGroupCopyWithImpl;
+@useResult
+$Res call({
+ String title, List<ProfileField> fields
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProfileGroupCopyWithImpl<$Res>
+    implements $ProfileGroupCopyWith<$Res> {
+  _$ProfileGroupCopyWithImpl(this._self, this._then);
+
+  final ProfileGroup _self;
+  final $Res Function(ProfileGroup) _then;
+
+/// Create a copy of ProfileGroup
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? title = null,Object? fields = null,}) {
+  return _then(_self.copyWith(
+title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,fields: null == fields ? _self.fields : fields // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProfileGroup].
+extension ProfileGroupPatterns on ProfileGroup {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProfileGroup value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProfileGroup() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProfileGroup value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileGroup():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProfileGroup value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileGroup() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String title,  List<ProfileField> fields)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProfileGroup() when $default != null:
+return $default(_that.title,_that.fields);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String title,  List<ProfileField> fields)  $default,) {final _that = this;
+switch (_that) {
+case _ProfileGroup():
+return $default(_that.title,_that.fields);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String title,  List<ProfileField> fields)?  $default,) {final _that = this;
+switch (_that) {
+case _ProfileGroup() when $default != null:
+return $default(_that.title,_that.fields);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProfileGroup implements ProfileGroup {
+  const _ProfileGroup({required this.title, required final  List<ProfileField> fields}): _fields = fields;
+  factory _ProfileGroup.fromJson(Map<String, dynamic> json) => _$ProfileGroupFromJson(json);
+
+@override final  String title;
+ final  List<ProfileField> _fields;
+@override List<ProfileField> get fields {
+  if (_fields is EqualUnmodifiableListView) return _fields;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_fields);
+}
+
+
+/// Create a copy of ProfileGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProfileGroupCopyWith<_ProfileGroup> get copyWith => __$ProfileGroupCopyWithImpl<_ProfileGroup>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProfileGroupToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileGroup&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other._fields, _fields));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,title,const DeepCollectionEquality().hash(_fields));
+
+@override
+String toString() {
+  return 'ProfileGroup(title: $title, fields: $fields)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProfileGroupCopyWith<$Res> implements $ProfileGroupCopyWith<$Res> {
+  factory _$ProfileGroupCopyWith(_ProfileGroup value, $Res Function(_ProfileGroup) _then) = __$ProfileGroupCopyWithImpl;
+@override @useResult
+$Res call({
+ String title, List<ProfileField> fields
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProfileGroupCopyWithImpl<$Res>
+    implements _$ProfileGroupCopyWith<$Res> {
+  __$ProfileGroupCopyWithImpl(this._self, this._then);
+
+  final _ProfileGroup _self;
+  final $Res Function(_ProfileGroup) _then;
+
+/// Create a copy of ProfileGroup
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? title = null,Object? fields = null,}) {
+  return _then(_ProfileGroup(
+title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,fields: null == fields ? _self._fields : fields // ignore: cast_nullable_to_non_nullable
+as List<ProfileField>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$ProfileSection {
+
+ String get title; List<ProfileGroup> get groups;
+/// Create a copy of ProfileSection
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$ProfileSectionCopyWith<ProfileSection> get copyWith => _$ProfileSectionCopyWithImpl<ProfileSection>(this as ProfileSection, _$identity);
+
+  /// Serializes this ProfileSection to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileSection&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other.groups, groups));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,title,const DeepCollectionEquality().hash(groups));
+
+@override
+String toString() {
+  return 'ProfileSection(title: $title, groups: $groups)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $ProfileSectionCopyWith<$Res>  {
+  factory $ProfileSectionCopyWith(ProfileSection value, $Res Function(ProfileSection) _then) = _$ProfileSectionCopyWithImpl;
+@useResult
+$Res call({
+ String title, List<ProfileGroup> groups
+});
+
+
+
+
+}
+/// @nodoc
+class _$ProfileSectionCopyWithImpl<$Res>
+    implements $ProfileSectionCopyWith<$Res> {
+  _$ProfileSectionCopyWithImpl(this._self, this._then);
+
+  final ProfileSection _self;
+  final $Res Function(ProfileSection) _then;
+
+/// Create a copy of ProfileSection
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? title = null,Object? groups = null,}) {
+  return _then(_self.copyWith(
+title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,groups: null == groups ? _self.groups : groups // ignore: cast_nullable_to_non_nullable
+as List<ProfileGroup>,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [ProfileSection].
+extension ProfileSectionPatterns on ProfileSection {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _ProfileSection value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _ProfileSection() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _ProfileSection value)  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileSection():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _ProfileSection value)?  $default,){
+final _that = this;
+switch (_that) {
+case _ProfileSection() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String title,  List<ProfileGroup> groups)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _ProfileSection() when $default != null:
+return $default(_that.title,_that.groups);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String title,  List<ProfileGroup> groups)  $default,) {final _that = this;
+switch (_that) {
+case _ProfileSection():
+return $default(_that.title,_that.groups);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String title,  List<ProfileGroup> groups)?  $default,) {final _that = this;
+switch (_that) {
+case _ProfileSection() when $default != null:
+return $default(_that.title,_that.groups);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _ProfileSection implements ProfileSection {
+  const _ProfileSection({required this.title, required final  List<ProfileGroup> groups}): _groups = groups;
+  factory _ProfileSection.fromJson(Map<String, dynamic> json) => _$ProfileSectionFromJson(json);
+
+@override final  String title;
+ final  List<ProfileGroup> _groups;
+@override List<ProfileGroup> get groups {
+  if (_groups is EqualUnmodifiableListView) return _groups;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_groups);
+}
+
+
+/// Create a copy of ProfileSection
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$ProfileSectionCopyWith<_ProfileSection> get copyWith => __$ProfileSectionCopyWithImpl<_ProfileSection>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$ProfileSectionToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileSection&&(identical(other.title, title) || other.title == title)&&const DeepCollectionEquality().equals(other._groups, _groups));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,title,const DeepCollectionEquality().hash(_groups));
+
+@override
+String toString() {
+  return 'ProfileSection(title: $title, groups: $groups)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$ProfileSectionCopyWith<$Res> implements $ProfileSectionCopyWith<$Res> {
+  factory _$ProfileSectionCopyWith(_ProfileSection value, $Res Function(_ProfileSection) _then) = __$ProfileSectionCopyWithImpl;
+@override @useResult
+$Res call({
+ String title, List<ProfileGroup> groups
+});
+
+
+
+
+}
+/// @nodoc
+class __$ProfileSectionCopyWithImpl<$Res>
+    implements _$ProfileSectionCopyWith<$Res> {
+  __$ProfileSectionCopyWithImpl(this._self, this._then);
+
+  final _ProfileSection _self;
+  final $Res Function(_ProfileSection) _then;
+
+/// Create a copy of ProfileSection
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? title = null,Object? groups = null,}) {
+  return _then(_ProfileSection(
+title: null == title ? _self.title : title // ignore: cast_nullable_to_non_nullable
+as String,groups: null == groups ? _self._groups : groups // ignore: cast_nullable_to_non_nullable
+as List<ProfileGroup>,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
 mixin _$SemesterData {
 
  List<SemesterInfo> get semesters; BigInt get updateTime;
@@ -11295,6 +12625,290 @@ class __$SemesterInfoCopyWithImpl<$Res>
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,
+  ));
+}
+
+
+}
+
+
+/// @nodoc
+mixin _$StudentProfile {
+
+ String get name; String get registrationNumber; String get vitEmail; String get program; String get school; String get photo; List<ProfileSection> get sections; BigInt get updateTime;
+/// Create a copy of StudentProfile
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$StudentProfileCopyWith<StudentProfile> get copyWith => _$StudentProfileCopyWithImpl<StudentProfile>(this as StudentProfile, _$identity);
+
+  /// Serializes this StudentProfile to a JSON map.
+  Map<String, dynamic> toJson();
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is StudentProfile&&(identical(other.name, name) || other.name == name)&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.vitEmail, vitEmail) || other.vitEmail == vitEmail)&&(identical(other.program, program) || other.program == program)&&(identical(other.school, school) || other.school == school)&&(identical(other.photo, photo) || other.photo == photo)&&const DeepCollectionEquality().equals(other.sections, sections)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,registrationNumber,vitEmail,program,school,photo,const DeepCollectionEquality().hash(sections),updateTime);
+
+@override
+String toString() {
+  return 'StudentProfile(name: $name, registrationNumber: $registrationNumber, vitEmail: $vitEmail, program: $program, school: $school, photo: $photo, sections: $sections, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $StudentProfileCopyWith<$Res>  {
+  factory $StudentProfileCopyWith(StudentProfile value, $Res Function(StudentProfile) _then) = _$StudentProfileCopyWithImpl;
+@useResult
+$Res call({
+ String name, String registrationNumber, String vitEmail, String program, String school, String photo, List<ProfileSection> sections, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class _$StudentProfileCopyWithImpl<$Res>
+    implements $StudentProfileCopyWith<$Res> {
+  _$StudentProfileCopyWithImpl(this._self, this._then);
+
+  final StudentProfile _self;
+  final $Res Function(StudentProfile) _then;
+
+/// Create a copy of StudentProfile
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? registrationNumber = null,Object? vitEmail = null,Object? program = null,Object? school = null,Object? photo = null,Object? sections = null,Object? updateTime = null,}) {
+  return _then(_self.copyWith(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,registrationNumber: null == registrationNumber ? _self.registrationNumber : registrationNumber // ignore: cast_nullable_to_non_nullable
+as String,vitEmail: null == vitEmail ? _self.vitEmail : vitEmail // ignore: cast_nullable_to_non_nullable
+as String,program: null == program ? _self.program : program // ignore: cast_nullable_to_non_nullable
+as String,school: null == school ? _self.school : school // ignore: cast_nullable_to_non_nullable
+as String,photo: null == photo ? _self.photo : photo // ignore: cast_nullable_to_non_nullable
+as String,sections: null == sections ? _self.sections : sections // ignore: cast_nullable_to_non_nullable
+as List<ProfileSection>,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
+  ));
+}
+
+}
+
+
+/// Adds pattern-matching-related methods to [StudentProfile].
+extension StudentProfilePatterns on StudentProfile {
+/// A variant of `map` that fallback to returning `orElse`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _StudentProfile value)?  $default,{required TResult orElse(),}){
+final _that = this;
+switch (_that) {
+case _StudentProfile() when $default != null:
+return $default(_that);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// Callbacks receives the raw object, upcasted.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case final Subclass2 value:
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _StudentProfile value)  $default,){
+final _that = this;
+switch (_that) {
+case _StudentProfile():
+return $default(_that);}
+}
+/// A variant of `map` that fallback to returning `null`.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case final Subclass value:
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _StudentProfile value)?  $default,){
+final _that = this;
+switch (_that) {
+case _StudentProfile() when $default != null:
+return $default(_that);case _:
+  return null;
+
+}
+}
+/// A variant of `when` that fallback to an `orElse` callback.
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return orElse();
+/// }
+/// ```
+
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String name,  String registrationNumber,  String vitEmail,  String program,  String school,  String photo,  List<ProfileSection> sections,  BigInt updateTime)?  $default,{required TResult orElse(),}) {final _that = this;
+switch (_that) {
+case _StudentProfile() when $default != null:
+return $default(_that.name,_that.registrationNumber,_that.vitEmail,_that.program,_that.school,_that.photo,_that.sections,_that.updateTime);case _:
+  return orElse();
+
+}
+}
+/// A `switch`-like method, using callbacks.
+///
+/// As opposed to `map`, this offers destructuring.
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case Subclass2(:final field2):
+///     return ...;
+/// }
+/// ```
+
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String name,  String registrationNumber,  String vitEmail,  String program,  String school,  String photo,  List<ProfileSection> sections,  BigInt updateTime)  $default,) {final _that = this;
+switch (_that) {
+case _StudentProfile():
+return $default(_that.name,_that.registrationNumber,_that.vitEmail,_that.program,_that.school,_that.photo,_that.sections,_that.updateTime);}
+}
+/// A variant of `when` that fallback to returning `null`
+///
+/// It is equivalent to doing:
+/// ```dart
+/// switch (sealedClass) {
+///   case Subclass(:final field):
+///     return ...;
+///   case _:
+///     return null;
+/// }
+/// ```
+
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String name,  String registrationNumber,  String vitEmail,  String program,  String school,  String photo,  List<ProfileSection> sections,  BigInt updateTime)?  $default,) {final _that = this;
+switch (_that) {
+case _StudentProfile() when $default != null:
+return $default(_that.name,_that.registrationNumber,_that.vitEmail,_that.program,_that.school,_that.photo,_that.sections,_that.updateTime);case _:
+  return null;
+
+}
+}
+
+}
+
+/// @nodoc
+@JsonSerializable()
+
+class _StudentProfile implements StudentProfile {
+  const _StudentProfile({required this.name, required this.registrationNumber, required this.vitEmail, required this.program, required this.school, required this.photo, required final  List<ProfileSection> sections, required this.updateTime}): _sections = sections;
+  factory _StudentProfile.fromJson(Map<String, dynamic> json) => _$StudentProfileFromJson(json);
+
+@override final  String name;
+@override final  String registrationNumber;
+@override final  String vitEmail;
+@override final  String program;
+@override final  String school;
+@override final  String photo;
+ final  List<ProfileSection> _sections;
+@override List<ProfileSection> get sections {
+  if (_sections is EqualUnmodifiableListView) return _sections;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_sections);
+}
+
+@override final  BigInt updateTime;
+
+/// Create a copy of StudentProfile
+/// with the given fields replaced by the non-null parameter values.
+@override @JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+_$StudentProfileCopyWith<_StudentProfile> get copyWith => __$StudentProfileCopyWithImpl<_StudentProfile>(this, _$identity);
+
+@override
+Map<String, dynamic> toJson() {
+  return _$StudentProfileToJson(this, );
+}
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _StudentProfile&&(identical(other.name, name) || other.name == name)&&(identical(other.registrationNumber, registrationNumber) || other.registrationNumber == registrationNumber)&&(identical(other.vitEmail, vitEmail) || other.vitEmail == vitEmail)&&(identical(other.program, program) || other.program == program)&&(identical(other.school, school) || other.school == school)&&(identical(other.photo, photo) || other.photo == photo)&&const DeepCollectionEquality().equals(other._sections, _sections)&&(identical(other.updateTime, updateTime) || other.updateTime == updateTime));
+}
+
+@JsonKey(includeFromJson: false, includeToJson: false)
+@override
+int get hashCode => Object.hash(runtimeType,name,registrationNumber,vitEmail,program,school,photo,const DeepCollectionEquality().hash(_sections),updateTime);
+
+@override
+String toString() {
+  return 'StudentProfile(name: $name, registrationNumber: $registrationNumber, vitEmail: $vitEmail, program: $program, school: $school, photo: $photo, sections: $sections, updateTime: $updateTime)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class _$StudentProfileCopyWith<$Res> implements $StudentProfileCopyWith<$Res> {
+  factory _$StudentProfileCopyWith(_StudentProfile value, $Res Function(_StudentProfile) _then) = __$StudentProfileCopyWithImpl;
+@override @useResult
+$Res call({
+ String name, String registrationNumber, String vitEmail, String program, String school, String photo, List<ProfileSection> sections, BigInt updateTime
+});
+
+
+
+
+}
+/// @nodoc
+class __$StudentProfileCopyWithImpl<$Res>
+    implements _$StudentProfileCopyWith<$Res> {
+  __$StudentProfileCopyWithImpl(this._self, this._then);
+
+  final _StudentProfile _self;
+  final $Res Function(_StudentProfile) _then;
+
+/// Create a copy of StudentProfile
+/// with the given fields replaced by the non-null parameter values.
+@override @pragma('vm:prefer-inline') $Res call({Object? name = null,Object? registrationNumber = null,Object? vitEmail = null,Object? program = null,Object? school = null,Object? photo = null,Object? sections = null,Object? updateTime = null,}) {
+  return _then(_StudentProfile(
+name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
+as String,registrationNumber: null == registrationNumber ? _self.registrationNumber : registrationNumber // ignore: cast_nullable_to_non_nullable
+as String,vitEmail: null == vitEmail ? _self.vitEmail : vitEmail // ignore: cast_nullable_to_non_nullable
+as String,program: null == program ? _self.program : program // ignore: cast_nullable_to_non_nullable
+as String,school: null == school ? _self.school : school // ignore: cast_nullable_to_non_nullable
+as String,photo: null == photo ? _self.photo : photo // ignore: cast_nullable_to_non_nullable
+as String,sections: null == sections ? _self._sections : sections // ignore: cast_nullable_to_non_nullable
+as List<ProfileSection>,updateTime: null == updateTime ? _self.updateTime : updateTime // ignore: cast_nullable_to_non_nullable
+as BigInt,
   ));
 }
 

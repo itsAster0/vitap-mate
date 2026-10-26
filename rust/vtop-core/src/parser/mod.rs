@@ -13,7 +13,9 @@ pub mod grade_history;
 pub mod grades;
 pub mod hostel;
 pub mod marks;
+pub mod mentor;
 pub mod page;
+pub mod profile;
 pub mod timetable;
 
 use std::sync::LazyLock;

@@ -119,13 +119,19 @@ fn pending(state: &AppState, session: &SessionState) -> Result<VtopClient, ApiEr
 async fn timed(sign_in: impl std::future::Future<Output = VtopResult<()>>) -> VtopResult<()> {
     tokio::time::timeout(LOGIN_TIMEOUT, sign_in)
         .await
-        .unwrap_or_else(|_| Err(VtopError::VtopUnavailable("VTOP took too long to sign in.".into())))
+        .unwrap_or_else(|_| {
+            Err(VtopError::VtopUnavailable(
+                "VTOP took too long to sign in.".into(),
+            ))
+        })
 }
 
 /// The session when signed in; the half-done one when VTOP wants the OTP.
 fn outcome(client: &VtopClient, result: VtopResult<()>) -> Result<Response, ApiError> {
     match result {
-        Ok(()) => Ok(Json(json!({ "status": "ok", "session": client.session_state() })).into_response()),
+        Ok(()) => {
+            Ok(Json(json!({ "status": "ok", "session": client.session_state() })).into_response())
+        }
         Err(VtopError::OTPRequired(message, issued_at)) => Ok(Json(json!({
             "status": "otp_required",
             "message": message,
@@ -151,12 +157,16 @@ pub fn login_error(error: &VtopError) -> ApiError {
             "invalid_credentials",
             error.to_string(),
         ),
-        VtopError::AuthenticationFailed(message) => {
-            ApiError::new(StatusCode::UNAUTHORIZED, "authentication_failed", message.clone())
-        }
-        VtopError::CaptchaRequired | VtopError::RegistrationParsingError => {
-            ApiError::new(StatusCode::BAD_GATEWAY, "authentication_failed", error.to_string())
-        }
+        VtopError::AuthenticationFailed(message) => ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "authentication_failed",
+            message.clone(),
+        ),
+        VtopError::CaptchaRequired | VtopError::RegistrationParsingError => ApiError::new(
+            StatusCode::BAD_GATEWAY,
+            "authentication_failed",
+            error.to_string(),
+        ),
         // Inputs a username or password check rejects.
         VtopError::ConfigurationError(message) => {
             ApiError::new(StatusCode::BAD_REQUEST, "bad_arguments", message.clone())
@@ -172,11 +182,17 @@ mod tests {
     #[test]
     fn a_wrong_password_and_a_wrong_otp_are_told_apart() {
         let api = login_error(&VtopError::InvalidCredentials);
-        assert_eq!((api.status, api.code), (StatusCode::UNAUTHORIZED, "invalid_credentials"));
+        assert_eq!(
+            (api.status, api.code),
+            (StatusCode::UNAUTHORIZED, "invalid_credentials")
+        );
         let api = login_error(&VtopError::AuthenticationFailed("Invalid OTP".into()));
         assert_eq!(api.code, "authentication_failed");
         assert_eq!(api.message, "Invalid OTP");
         let api = login_error(&VtopError::NetworkError);
-        assert_eq!((api.status, api.code), (StatusCode::BAD_GATEWAY, "vtop_unavailable"));
+        assert_eq!(
+            (api.status, api.code),
+            (StatusCode::BAD_GATEWAY, "vtop_unavailable")
+        );
     }
 }

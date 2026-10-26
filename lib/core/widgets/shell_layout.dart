@@ -235,6 +235,9 @@ Widget _buildHeader(
       case "biometric-history":
         data = "Biometric History";
         break;
+      case "profile":
+        data = "Profile";
+        break;
       case "course-page":
         data = path.endsWith('/course') ? "Course" : "Course Page";
         break;
