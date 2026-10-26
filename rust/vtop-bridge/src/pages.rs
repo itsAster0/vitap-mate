@@ -11,7 +11,9 @@ use futures::future::BoxFuture;
 use serde::Serialize;
 use serde_json::Value;
 use vtop_core::client::OutingKind;
-use vtop_core::inputs::{BiometricDate, CourseFilePath, CourseId, CourseType, OutingPassId, SemesterId};
+use vtop_core::inputs::{
+    BiometricDate, CourseFilePath, CourseId, CourseType, OutingPassId, SemesterId,
+};
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
 /// A page's arguments, by name.
@@ -89,6 +91,8 @@ call!(grade_history, |c, s, a| c.grade_history().await?);
 call!(biometric, |c, s, a| c
     .biometric_history(&BiometricDate::parse(arg(a, "date"))?)
     .await?);
+call!(profile, |c, s, a| c.profile().await?);
+call!(mentor, |c, s, a| c.mentor().await?);
 call!(general_outing, |c, s, a| c.general_outing().await?);
 call!(weekend_outing, |c, s, a| c.weekend_outing().await?);
 call!(outing_pass, |c, s, a| {
@@ -133,7 +137,11 @@ const fn page(name: &'static str, args: &'static [&'static str], call: PageCall)
 pub static PAGES: &[PageDef] = &[
     page("semesters", &[], semesters),
     page("attendance", &[], attendance),
-    page("full_attendance", &["course_id", "course_type"], full_attendance),
+    page(
+        "full_attendance",
+        &["course_id", "course_type"],
+        full_attendance,
+    ),
     page("timetable", &[], timetable),
     page("marks", &[], marks),
     page("exam_schedule", &[], exam_schedule),
@@ -142,12 +150,18 @@ pub static PAGES: &[PageDef] = &[
     page("grade_details", &["course_id"], grade_details),
     page("grade_history", &[], grade_history),
     page("biometric", &["date"], biometric),
+    page("profile", &[], profile),
+    page("mentor", &[], mentor),
     page("general_outing", &[], general_outing),
     page("weekend_outing", &[], weekend_outing),
     page("outing_pass", &["kind", "pass_id"], outing_pass),
     page("course_page_courses", &[], course_page_courses),
     page("course_page_classes", &["course_id"], course_page_classes),
-    page("course_page_detail", &["erp_id", "class_id"], course_page_detail),
+    page(
+        "course_page_detail",
+        &["erp_id", "class_id"],
+        course_page_detail,
+    ),
     page("course_file_info", &["path"], course_file_info),
     page("course_plan_info", &["class_id"], course_plan_info),
 ];

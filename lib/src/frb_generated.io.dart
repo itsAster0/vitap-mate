@@ -255,6 +255,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<MarksRecordEach> dco_decode_list_marks_record_each(dynamic raw);
 
   @protected
+  List<MentorMessage> dco_decode_list_mentor_message(dynamic raw);
+
+  @protected
   List<OutingOption> dco_decode_list_outing_option(dynamic raw);
 
   @protected
@@ -267,6 +270,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<ProfileField> dco_decode_list_profile_field(dynamic raw);
+
+  @protected
+  List<ProfileGroup> dco_decode_list_profile_group(dynamic raw);
+
+  @protected
+  List<ProfileSection> dco_decode_list_profile_section(dynamic raw);
 
   @protected
   List<(String, String)> dco_decode_list_record_string_string(dynamic raw);
@@ -294,6 +306,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MarksRecordEach dco_decode_marks_record_each(dynamic raw);
+
+  @protected
+  MentorData dco_decode_mentor_data(dynamic raw);
+
+  @protected
+  MentorMessage dco_decode_mentor_message(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -345,6 +363,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformHttpResponse dco_decode_platform_http_response(dynamic raw);
 
   @protected
+  ProfileField dco_decode_profile_field(dynamic raw);
+
+  @protected
+  ProfileGroup dco_decode_profile_group(dynamic raw);
+
+  @protected
+  ProfileSection dco_decode_profile_section(dynamic raw);
+
+  @protected
   (String, String) dco_decode_record_string_string(dynamic raw);
 
   @protected
@@ -355,6 +382,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SessionState dco_decode_session_state(dynamic raw);
+
+  @protected
+  StudentProfile dco_decode_student_profile(dynamic raw);
 
   @protected
   TimetableCourse dco_decode_timetable_course(dynamic raw);
@@ -667,6 +697,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<MentorMessage> sse_decode_list_mentor_message(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<OutingOption> sse_decode_list_outing_option(
     SseDeserializer deserializer,
   );
@@ -681,6 +716,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<ProfileField> sse_decode_list_profile_field(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ProfileGroup> sse_decode_list_profile_group(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ProfileSection> sse_decode_list_profile_section(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<(String, String)> sse_decode_list_record_string_string(
@@ -718,6 +768,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   MarksRecordEach sse_decode_marks_record_each(SseDeserializer deserializer);
+
+  @protected
+  MentorData sse_decode_mentor_data(SseDeserializer deserializer);
+
+  @protected
+  MentorMessage sse_decode_mentor_message(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -787,6 +843,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ProfileField sse_decode_profile_field(SseDeserializer deserializer);
+
+  @protected
+  ProfileGroup sse_decode_profile_group(SseDeserializer deserializer);
+
+  @protected
+  ProfileSection sse_decode_profile_section(SseDeserializer deserializer);
+
+  @protected
   (String, String) sse_decode_record_string_string(
     SseDeserializer deserializer,
   );
@@ -799,6 +864,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   SessionState sse_decode_session_state(SseDeserializer deserializer);
+
+  @protected
+  StudentProfile sse_decode_student_profile(SseDeserializer deserializer);
 
   @protected
   TimetableCourse sse_decode_timetable_course(SseDeserializer deserializer);
@@ -1206,6 +1274,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_mentor_message(
+    List<MentorMessage> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_outing_option(
     List<OutingOption> self,
     SseSerializer serializer,
@@ -1223,6 +1297,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_profile_field(
+    List<ProfileField> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_profile_group(
+    List<ProfileGroup> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_profile_section(
+    List<ProfileSection> self,
     SseSerializer serializer,
   );
 
@@ -1273,6 +1365,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     MarksRecordEach self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_mentor_data(MentorData self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_mentor_message(MentorMessage self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
@@ -1353,6 +1451,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_profile_field(ProfileField self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_profile_group(ProfileGroup self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_profile_section(
+    ProfileSection self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_record_string_string(
     (String, String) self,
     SseSerializer serializer,
@@ -1366,6 +1476,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_session_state(SessionState self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_student_profile(
+    StudentProfile self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_timetable_course(

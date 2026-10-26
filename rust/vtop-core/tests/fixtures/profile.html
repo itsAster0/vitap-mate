@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<style>
+.accordion-button:not(.collapsed) {
+	color: #e6e6e6;
+}
+
+.accordion-button {
+	font-size: 1rem;
+	color: #fffefe;
+	text-align: left;
+}
+
+hr.style14 {
+	border: 0;
+	height: 1px;
+	background-image: -webkit-linear-gradient(left, #f0f0f0, #8c8b8b, #f0f0f0);
+	background-image: -moz-linear-gradient(left, #f0f0f0, #0c0c0c, #f0f0f0);
+	background-image: -ms-linear-gradient(left, #f0f0f0, #8c8b8b, #f0f0f0);
+	background-image: -o-linear-gradient(left, #f0f0f0, #8c8b8b, #f0f0f0);
+}
+</style>
+</head>
+<body oncontextmenu="false">
+
+	<!-- Main content -->
+	<section class="content">
+		<div class="col-md-12">
+			<div class=" row-col-1" align="center" style="margin-top: 30px;">
+				<div class="col-12" align="center">
+					<div class="card border-1 border"
+						style="border-radius: 1em; box-shadow: 2px 2px 8px;">
+						<br />
+						<div class="row">
+							<div class="col-4 mt-4 mb-3 " align="center">
+								<img
+									src="data:null;base64,/9j/4AAQSkZJRgABAQ=="
+									class="img border border-primary" alt="" width="125rem;"
+									height="142rem;"
+									style="object-fit: cover; object-position: center; border-radius: 1rem;" /><br />
+								<p style="text-align: center; font-weight: bold">JANE DOE</p>
+
+							</div>
+							<div class="col-8 mt-3">
+								<div class="row" style="margin-top: 3em;">
+									<div class="col-xs-12 col-sm-6" align="left">
+										<label for="regno" class="col-form-label"
+											style="color: #c7254e; font-weight: bold;"> REGISTER
+											NUMBER:</label> <label for="no" class="col-form-label">24ABC0001</label>
+									</div>
+									<div class="col-xs-12 col-sm-6" align="left">
+										<label for="vitmail" class="col-form-label"
+											style="color: #c7254e; font-weight: bold;"> VIT
+											EMAIL: </label> <label for="vmail" class="col-form-label">jane.24abc0001@vitapstudent.ac.in</label>
+
+									</div>
+								</div>
+								<div class="row">
+									<div class="col-xs-12 col-sm-6" align="left">
+										<label for="branch" class="col-form-label"
+											style="color: #c7254e; font-weight: bold;"> PROGRAM &
+											BRANCH:</label> <label for="branchno" class="col-form-label">BTECH - Computer Science and Engineering</label>
+										<!-- NEW: DYOD OPTED (only if title is present) -->
+										<br />  
+									</div>
+									<div class="col-xs-12 col-sm-6" align="left">
+										<label for="schoolname" class="col-form-label"
+											style="color: #c7254e; font-weight: bold;"> SCHOOL
+											NAME: </label> <label for="schoolno" class="col-form-label">School of Computer Science &amp; Engineering</label>
+									</div>
+								</div>
+							</div>
+							<br />
+
+						</div>
+						<hr class="style14">
+						<div class="card-body">
+							<div class="d-flex align-items-center">
+								<div class="container-fluid bg-gray" id="accordion-style-1">
+									<div class="col-12">
+										<section>
+											<div class="col-12">
+												<div class="accordion" id="accordionExample">
+													<div class="accordion-item">
+														<h2 class="accordion-header" id="headingOne">
+															<button class="accordion-button" type="button"
+																data-bs-toggle="collapse" data-bs-target="#collapseOne"
+																aria-expanded="false" aria-controls="collapseOne"
+																style="background: radial-gradient(circle at 48.7% 44.3%, rgb(30, 144, 231) 0%, rgb(56, 113, 209) 22.9%, rgb(38, 76, 140) 76.7%, rgb(31, 63, 116) 100.2%);">
+																<i class="fa fa-address-book-o"
+																	style="background: #fbc902; padding: 10px 11px; color: black; width: 38px; height: 35px; position: absolute; left: -1px; top: 6px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; display: block;"></i>
+																&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>PERSONAL
+																	INFORMATION</strong>
+															</button>
+														</h2>
+														<div id="collapseOne" class="accordion-collapse collapse"
+															aria-labelledby="headingOne"
+															data-bs-parent="#accordionExample">
+															<div class="accordion-body">
+																<div class="table-responsive">
+																	<table
+																		class="table table-responsive table-borderless border border-primary">
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">APPLICATION
+																				NUMBER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 1</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STUDENT
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 2</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">DATE
+																				OF BIRTH</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 3</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">GENDER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 4</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">NATIVE
+																				LANGUAGE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 5</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">NATIVE
+																				STATE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 6</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">BLOOD
+																				GROUP</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 7</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PHYSICALLY
+																				CHALLENGED</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 8</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">COMMUNITY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 9</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">RELIGION</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 10</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CASTE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 11</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">NATIONALITY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 12</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">HOSTELLER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 13</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">AADHAR
+																				NUMBER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 14</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">MOBILE
+																				NUMBER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 15</td>
+																		</tr>
+																		<tr>
+																			<td colspan="3"
+																				style="background-color: #a5bbff; font-weight: bold; text-align: center">CURRENT
+																				ADDRESS</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STREET
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 16</td>
+																			<td style="background-color: #FAF0DD;" colspan="2"></td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">AREA
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 17</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CITY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 18</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STATE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 19</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">COUNTRY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 20</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PINCODE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 21</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PHONE
+																				NUMBER[LAND LINE]</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2"></td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">EMAIL</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 22</td>
+																		</tr>
+
+																		<tr>
+																			<td colspan="3"
+																				style="background-color: #a5bbff; font-weight: bold; text-align: center">PERMANENT
+																				ADDRESS</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STREET
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 23</td>
+																			<td style="background-color: #FAF0DD;" colspan="2"></td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">AREA
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 24</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CITY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 25</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STATE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 26</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">COUNTRY</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 27</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PINCODE</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 28</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PHONE
+																				NUMBER[LAND LINE]</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2"></td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">EMAIL</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 29</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PARENT
+																				WHATSAPP NUMBER</td>
+																			<td style="background-color: #FAF0DD;"
+																				colspan="2">Value 30</td>
+																		</tr>
+																	</table>
+																</div>
+															</div>
+														</div>
+													</div>
+													<br />
+													<div class="accordion-item">
+														<h2 class="accordion-header" id="headingTwo">
+															<button class="accordion-button" type="button"
+																data-bs-toggle="collapse" data-bs-target="#collapseTwo"
+																aria-expanded="false" aria-controls="collapseTwo"
+																style="background: radial-gradient(circle at 48.7% 44.3%, rgb(30, 144, 231) 0%, rgb(56, 113, 209) 22.9%, rgb(38, 76, 140) 76.7%, rgb(31, 63, 116) 100.2%);">
+																<i class="fa fa-graduation-cap"
+																	style="background: #fbc902; padding: 10px 11px; color: black; width: 38px; height: 35px; position: absolute; left: -1px; top: 6px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; display: block;"></i>
+																&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>EDUCATIONAL
+																	INFORMATION</strong>
+															</button>
+														</h2>
+														<div id="collapseTwo" class="accordion-collapse collapse"
+															aria-labelledby="headingTwo"
+															data-bs-parent="#accordionExample">
+															<div class="accordion-body">
+																<div class=" table-responsive">
+																	<table
+																		class="table table-responsive table-borderless border border-primary">
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">APPLIED
+																				DEGREE</td>
+																			<td style="background-color: #FAF0DD;">Value 31</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">EDUCATIONAL
+																				QUALIFICATION</td>
+																			<td style="background-color: #FAF0DD;">Value 32</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">BRANCH
+																				/ GROUP STUDIED</td>
+																			<td style="background-color: #FAF0DD;">Value 33</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">SCHOOL
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 34</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">MEDIUM
+																				OF STUDY</td>
+																			<td style="background-color: #FAF0DD;">Value 35</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">BOARD
+																				/ UNIVERSITY</td>
+																			<td style="background-color: #FAF0DD;">Value 36</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">REGISTER
+																				NO/ ROLL NO</td>
+																			<td style="background-color: #FAF0DD;">Value 37</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CLASS
+																				OBTAINED</td>
+																			<td style="background-color: #FAF0DD;">Value 38</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">YEAR
+																				OF PASSING/ PASSED</td>
+																			<td style="background-color: #FAF0DD;">Value 39</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">MONTH
+																				OF PASSING/ PASSED</td>
+																			<td style="background-color: #FAF0DD;">Value 40</td>
+																		</tr>
+
+																		<tr>
+																			<td colspan="3"
+																				style="background-color: #a5bbff; font-weight: bold; text-align: center">SCHOOL
+																				/ COLLEGE ADDRESS</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">AREA
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 41</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CITY
+																				/ DISTRICT NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 42</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STATE
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 43</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PINCODE
+																				/ ZIPCODE</td>
+																			<td style="background-color: #FAF0DD;">Value 44</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">PHONE
+																				NUMBER[LAND LINE]</td>
+																			<td style="background-color: #FAF0DD;"></td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">BREAK
+																				IN STUDY</td>
+																			<td style="background-color: #FAF0DD;">Value 45</td>
+																		</tr>
+
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">REASON</td>
+																			<td style="background-color: #FAF0DD;">Value 46</td>
+																		</tr>
+																	</table>
+																</div>
+															</div>
+														</div>
+													</div>
+													<br />
+													<div class="accordion-item">
+														<h2 class="accordion-header" id="headingThree">
+															<button class="accordion-button" type="button"
+																data-bs-toggle="collapse"
+																data-bs-target="#collapseThree" aria-expanded="false"
+																aria-controls="collapseThree"
+																style="background: radial-gradient(circle at 48.7% 44.3%, rgb(30, 144, 231) 0%, rgb(56, 113, 209) 22.9%, rgb(38, 76, 140) 76.7%, rgb(31, 63, 116) 100.2%);">
+																<i class="fa fa-users"
+																	style="background: #fbc902; padding: 10px 11px; color: black; width: 38px; height: 35px; position: absolute; left: -1px; top: 6px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; display: block;"></i>
+																&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>FAMILY
+																	INFORMATION</strong>
+															</button>
+														</h2>
+														<div id="collapseThree"
+															class="accordion-collapse collapse"
+															aria-labelledby="headingThree"
+															data-bs-parent="#accordionExample">
+															<div class="accordion-body">
+																<div class=" table-responsive">
+																	<table
+																		class="table table-responsive table-borderless border border-primary">
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold; width: 30%">NO.OF.BROTHERS</td>
+																			<td style="background-color: #FAF0DD;">Value 47</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">NO.OF.SISTERS</td>
+																			<td style="background-color: #FAF0DD;">Value 48</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">IF
+																				BROTHER/SISTER STUDYING IN VIT</td>
+																			<td style="background-color: #FAF0DD;">Value 49</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STUDYING
+																				DETAILS</td>
+																			<td style="background-color: #FAF0DD;">Value 50</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">IF
+																				BROTHER/SISTER STUDIED IN VIT</td>
+																			<td style="background-color: #FAF0DD;">Value 51</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">STUDIED
+																				DETAILS</td>
+																			<td style="background-color: #FAF0DD;">Value 52</td>
+																		</tr>
+																		
+																		
+																			
+																				<tr>
+																					<td colspan="3"
+																						style="background-color: #a5bbff; font-weight: bold; text-align: center">FATHER
+																						DETAILS</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold; width: 30%">FATHER
+																						NAME</td>
+																					<td style="background-color: #FAF0DD;">Value 53</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">QUALIFICATION</td>
+																					<td style="background-color: #FAF0DD;">Value 54</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">OCCUPATION</td>
+																					<td style="background-color: #FAF0DD;">Value 55</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">ORGANIZATION</td>
+																					<td style="background-color: #FAF0DD;">Value 56</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">EMP.ID(IF
+																						EMPLOYED IN VIT)</td>
+																					<td style="background-color: #FAF0DD;">Value 57</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">MOBILE
+																						NUMBER</td>
+																					<td style="background-color: #FAF0DD;">Value 58</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">EMAIL</td>
+																					<td style="background-color: #FAF0DD;">Value 59</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">ANNUAL
+																						INCOME</td>
+																					<td style="background-color: #FAF0DD;">Value 60</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">OFFICIAL
+																						ADDRESS(AREA NAME)</td>
+																					<td style="background-color: #FAF0DD;">Value 61</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">STATE</td>
+																					<td style="background-color: #FAF0DD;">Value 62</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">CITY/DISTRICT</td>
+																					<td style="background-color: #FAF0DD;">Value 63</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">PINCODE/ZIPCODE</td>
+																					<td style="background-color: #FAF0DD;">Value 64</td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">PHONE
+																						NUMBER[LAND LINE]</td>
+																					<td style="background-color: #FAF0DD;"></td>
+																				</tr>
+																				<tr>
+																					<td
+																						style="background-color: #d4d3d3; font-weight: bold;">DESIGNATION</td>
+																					<td style="background-color: #FAF0DD;">Value 65</td>
+																				</tr>
+																			
+
+																			
+																			
+																			<tr>
+																				<td
+																					style="background-color: #d4d3d3; font-weight: bold;">GUARDIAN
+																					INFO</td>
+																				<td style="background-color: #FAF0DD;">Value 66</td>
+																			</tr>
+																		
+																	</table>
+																	<input type="hidden" name="applno" id="applno"
+																		value="0" /> <input
+																		type="hidden" name="regno" id="regno"
+																		value="0" />
+																</div>
+															</div>
+														</div>
+													</div>
+													<br />
+
+													<div class="accordion-item">
+														<h2 class="accordion-header" id="headingFour">
+															<button class="accordion-button" type="button"
+																data-bs-toggle="collapse" data-bs-target="#collapseFour"
+																aria-expanded="false" aria-controls="collapseFour"
+																style="background: radial-gradient(circle at 48.7% 44.3%, rgb(30, 144, 231) 0%, rgb(56, 113, 209) 22.9%, rgb(38, 76, 140) 76.7%, rgb(31, 63, 116) 100.2%);">
+																<i class="fa fa-user-circle-o"
+																	style="background: #fbc902; padding: 10px 11px; color: black; width: 38px; height: 35px; position: absolute; left: -1px; top: 6px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; display: block;"></i>
+																&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>PROCTOR
+																	INFORMATION</strong>
+															</button>
+														</h2>
+														<div id="collapseFour" class="accordion-collapse collapse"
+															aria-labelledby="headingFour"
+															data-bs-parent="#accordionExample">
+															<div class="accordion-body">
+																<div class=" table-responsive">
+																	<table
+																		class="table table-responsive table-borderless border border-primary">
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				ID</td>
+																			<td style="background-color: #FAF0DD;">Value 67</td>
+																			<td style="background-color: #FAF0DD;" rowspan="4">
+																				<img
+																				src="assets/img/navatar.png"
+																				class="img-rounded" alt="Image Not Available"
+																				width="120" height="130"
+																				style="border: solid 2px #3c8dbc;" />
+																			</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				NAME</td>
+																			<td style="background-color: #FAF0DD;">Value 68</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				DESIGNATION</td>
+																			<td style="background-color: #FAF0DD;">Value 69</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">SCHOOL</td>
+																			<td style="background-color: #FAF0DD;">Value 70</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">CABIN</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 71</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				DEPARTMENT</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 72</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				EMAIL</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 73</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				INTERCOM</td>
+																			<td colspan="2" style="background-color: #FAF0DD;"></td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">FACULTY
+																				MOBILE NUMBER</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 74</td>
+																		</tr>
+																	</table>
+																</div>
+																
+															</div>
+														</div>
+													</div>
+													<br />
+
+													<div class="accordion-item">
+														<h2 class="accordion-header" id="headingFive">
+															<button class="accordion-button" type="button"
+																data-bs-toggle="collapse" data-bs-target="#collapseFive"
+																aria-expanded="false" aria-controls="collapseFive"
+																style="background: radial-gradient(circle at 48.7% 44.3%, rgb(30, 144, 231) 0%, rgb(56, 113, 209) 22.9%, rgb(38, 76, 140) 76.7%, rgb(31, 63, 116) 100.2%);">
+																<i class="fa fa-home"
+																	style="background: #fbc902; padding: 10px 11px; color: black; width: 38px; height: 35px; position: absolute; left: -1px; top: 6px; border-top-right-radius: 7px; border-bottom-right-radius: 7px; display: block;"></i>
+																&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <strong>HOSTEL
+																	INFORMATION</strong>
+															</button>
+														</h2>
+														<div id="collapseFive" class="accordion-collapse collapse"
+															aria-labelledby="headingFive"
+															data-bs-parent="#accordionExample">
+															<div class="accordion-body">
+																<div class="table-responsive">
+																	<table
+																		class="table table-responsive table-borderless border border-primary">
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Application
+																				Number</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 75</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Register
+																				Number</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 76</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Block
+																				Name</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 77</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Room
+																				No.</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 78</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Bed
+																				Type</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 79</td>
+																		</tr>
+																		<tr>
+																			<td
+																				style="background-color: #d4d3d3; font-weight: bold;">Mess
+																				Information</td>
+																			<td colspan="2" style="background-color: #FAF0DD;">Value 80</td>
+																		</tr>
+																	</table>
+																</div>
+
+																<!-- Previous Status 30 Booking -->
+																
+
+																
+															</div>
+														</div>
+													</div>
+													<br />
+												</div>
+											</div>
+										</section>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script>
+			/*<![CDATA[*/
+
+			/*]]>*/
+		</script>
+	</section>
+
+
+</body>
+</html>

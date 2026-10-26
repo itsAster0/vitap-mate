@@ -11,6 +11,7 @@ use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerConfig
 use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler};
 use serde::{Deserialize, Serialize};
 use vtop_core::inputs::{BiometricDate, CourseId, CourseType, SemesterId};
+use vtop_core::types::StudentProfile;
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
 use crate::bridge::SessionSource;
@@ -425,6 +426,58 @@ impl VtopTools {
         })
         .await
     }
+
+    #[tool(
+        description = "The student's VTOP profile: name, register number, VIT email, program and school, then VTOP's sections in its own wording (PERSONAL INFORMATION with current and permanent address, EDUCATIONAL INFORMATION, FAMILY INFORMATION with parent details, PROCTOR INFORMATION, HOSTEL INFORMATION with block, room, bed type and mess). Each section is groups of label/value fields; empty, '-' or 'NA' means not filled in. The photo is left out and the Aadhaar number shows only its last four digits."
+    )]
+    async fn get_profile(
+        &self,
+        Parameters(_): Parameters<NoArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        self.fetch(&parts, |client| async move {
+            client.profile().await.map(for_agent)
+        })
+        .await
+    }
+
+    #[tool(
+        description = "The student's mentor (proctor, also called faculty adviser): faculty id, name, designation, school, department, cabin, email, intercom and mobile as label/value fields; and the messages the mentor sent in the last week (VTOP removes older ones), each as the message table's column/value pairs. An empty messages list means none."
+    )]
+    async fn get_mentor(
+        &self,
+        Parameters(_): Parameters<NoArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        self.fetch(&parts, |client| async move { client.mentor().await })
+            .await
+    }
+}
+
+/// The profile without what an agent does not need: the photo (a large
+/// base64 image) and all but the last four digits of the Aadhaar number.
+fn for_agent(mut profile: StudentProfile) -> StudentProfile {
+    profile.photo.clear();
+    for field in profile
+        .sections
+        .iter_mut()
+        .flat_map(|section| &mut section.groups)
+        .flat_map(|group| &mut group.fields)
+    {
+        let label = field.label.to_ascii_uppercase();
+        if label.contains("AADHAR") || label.contains("AADHAAR") {
+            let digits = field.value.chars().filter(char::is_ascii_digit).count();
+            if digits > 4 {
+                let tail: String = field
+                    .value
+                    .chars()
+                    .skip(field.value.chars().count() - 4)
+                    .collect();
+                field.value = format!("{}{tail}", "X".repeat(digits - 4));
+            }
+        }
+    }
+    profile
 }
 
 #[tool_router(router = more_tools_router)]
@@ -641,6 +694,12 @@ and F=0. A student who fails a course, or misses its FAT without an approved rea
 must re-register it in a later semester; a passed course can also be re-registered to \
 improve the grade. An approved medical or OD absence can get a re-CAT or re-FAT.
 - Faculty names, emails and cabins from VTOP may be shown to the student.
+- The mentor (proctor or faculty adviser) is the student's first contact for \
+attendance, OD, leave and academic problems; get_mentor gives their cabin, email \
+and mobile, and the messages they sent this week. get_profile has the student's \
+own details, addresses, parents, school before VIT and hostel room; share only what \
+the student asks for, and do not repeat personal details (date of birth, family, \
+religion, caste, income) unless asked.
 - Outings: a general outing is a leave; a weekend outing means going out in the \
 morning and returning by night. There is no fixed limit on outings.
 - The biometric log records entries at both classes and the hostel. Hostellers must \

@@ -25,8 +25,8 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
-    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
+    LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault, SessionCheck,
+    SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
 };
 use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
@@ -552,7 +552,6 @@ mod tests {
         (crate::router(state.clone()), state)
     }
 
-
     async fn post(app: &axum::Router, uri: &str, auth: &str, body: Value) -> (StatusCode, Value) {
         let request = Request::builder()
             .method("POST")
@@ -876,7 +875,11 @@ mod tests {
     #[tokio::test]
     async fn phone_routes_need_the_engine_secret() {
         let app = phone_app();
-        for uri in ["/engine/fetch", "/engine/vtop-login", "/engine/vtop-login/otp"] {
+        for uri in [
+            "/engine/fetch",
+            "/engine/vtop-login",
+            "/engine/vtop-login/otp",
+        ] {
             let (status, body) = post(&app, uri, "wrong", json!({})).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED, "{uri}");
             assert_eq!(body["code"], "unauthorized");
@@ -893,7 +896,10 @@ mod tests {
             json!({ "session": signed_in(), "name": "apply_general_outing" }),
         )
         .await;
-        assert_eq!((status, body["code"].as_str()), (StatusCode::NOT_FOUND, Some("unknown_page")));
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::NOT_FOUND, Some("unknown_page"))
+        );
 
         let (status, body) = post(
             &app,
@@ -902,7 +908,10 @@ mod tests {
             json!({ "session": signed_in(), "name": "grade_details", "semester": "AP2025264" }),
         )
         .await;
-        assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("bad_arguments")));
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::BAD_REQUEST, Some("bad_arguments"))
+        );
     }
 
     #[tokio::test]
@@ -914,7 +923,10 @@ mod tests {
             json!({ "session": { "cookies": " " }, "name": "semesters" }),
         )
         .await;
-        assert_eq!((status, body["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("session_expired")));
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::UNAUTHORIZED, Some("session_expired"))
+        );
     }
 
     #[tokio::test]
@@ -926,7 +938,10 @@ mod tests {
             json!({ "session": signed_in(), "otp": "123456" }),
         )
         .await;
-        assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("no_pending_login")));
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (StatusCode::BAD_REQUEST, Some("no_pending_login"))
+        );
     }
 
     #[tokio::test]
@@ -937,7 +952,9 @@ mod tests {
             .header("content-type", "application/json")
             .header("authorization", format!("Bearer {RELAY}"))
             .header("accept-encoding", "br, gzip")
-            .body(Body::from(json!({ "session": signed_in(), "name": "nope" }).to_string()))
+            .body(Body::from(
+                json!({ "session": signed_in(), "name": "nope" }).to_string(),
+            ))
             .unwrap();
         let response = phone_app().oneshot(request).await.unwrap();
         assert_eq!(response.headers()["content-encoding"], "br");
@@ -947,7 +964,8 @@ mod tests {
     async fn vtop_with_semesters() -> (wiremock::MockServer, axum::Router) {
         let vtop = wiremock::MockServer::start().await;
         let html = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../vtop-core/tests/fixtures/semesters.html"),
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../vtop-core/tests/fixtures/semesters.html"),
         )
         .unwrap();
         wiremock::Mock::given(wiremock::matchers::any())
@@ -967,7 +985,10 @@ mod tests {
         (vtop, app)
     }
 
-    async fn fetch_semesters(app: &axum::Router, dictionary: Option<&str>) -> axum::response::Response {
+    async fn fetch_semesters(
+        app: &axum::Router,
+        dictionary: Option<&str>,
+    ) -> axum::response::Response {
         let request = Request::builder()
             .method("POST")
             .uri("/engine/fetch")
@@ -975,7 +996,8 @@ mod tests {
             .header("authorization", format!("Bearer {RELAY}"))
             .header("accept-encoding", "br, gzip")
             .body(Body::from(
-                json!({ "session": signed_in(), "name": "semesters", "dictionary": dictionary }).to_string(),
+                json!({ "session": signed_in(), "name": "semesters", "dictionary": dictionary })
+                    .to_string(),
             ))
             .unwrap();
         app.clone().oneshot(request).await.unwrap()
@@ -987,11 +1009,16 @@ mod tests {
         let (_vtop, app) = vtop_with_semesters().await;
         let response = fetch_semesters(&app, Some(page_dictionary::id())).await;
         assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(response.headers()["content-type"], page_dictionary::CONTENT_TYPE);
+        assert_eq!(
+            response.headers()["content-type"],
+            page_dictionary::CONTENT_TYPE
+        );
         // Packed already: not compressed again on the way.
         assert!(response.headers().get("content-encoding").is_none());
         let packed = response.into_body().collect().await.unwrap().to_bytes();
-        let page: Value = serde_json::from_slice(&page_dictionary::unpack("semesters", &packed).unwrap()).unwrap();
+        let page: Value =
+            serde_json::from_slice(&page_dictionary::unpack("semesters", &packed).unwrap())
+                .unwrap();
         assert!(!page["semesters"].as_array().unwrap().is_empty());
     }
 

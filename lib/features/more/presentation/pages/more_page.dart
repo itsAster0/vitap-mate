@@ -90,6 +90,12 @@ class MorePage extends HookConsumerWidget {
         colors.app.lab,
         [
           _Tool(
+            FLucideIcons.idCard,
+            'Profile',
+            'You & mentor',
+            () => push(Paths.profile),
+          ),
+          _Tool(
             FLucideIcons.scanFace,
             'Biometric',
             'Entry logs',

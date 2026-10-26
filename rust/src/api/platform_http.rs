@@ -48,10 +48,7 @@ pub(crate) struct DartTransport {
 
 impl DartTransport {
     pub(crate) fn new(
-        send: impl Fn(PlatformHttpRequest) -> DartFnFuture<PlatformHttpResponse>
-            + Send
-            + Sync
-            + 'static,
+        send: impl Fn(PlatformHttpRequest) -> DartFnFuture<PlatformHttpResponse> + Send + Sync + 'static,
     ) -> Arc<Self> {
         Arc::new(Self {
             send: Box::new(send),

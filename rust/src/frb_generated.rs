@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1416809860;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1339021109;
 
 // Section: executor
 
@@ -1516,6 +1516,64 @@ fn wire__crate__api__vtop_get_client__fetch_marks_impl(
         },
     )
 }
+fn wire__crate__api__vtop_get_client__fetch_mentor_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "fetch_mentor",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
+                    (move || async move {
+                        let mut api_client_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_client,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_client_guard =
+                                        Some(api_client.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_client_guard = api_client_guard.unwrap();
+                        let output_ok =
+                            crate::api::vtop_get_client::fetch_mentor(&*api_client_guard).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1572,6 +1630,64 @@ fn wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
                             api_pass_id,
                         )
                         .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__vtop_get_client__fetch_profile_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "fetch_profile",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_client = <RustOpaqueMoi<
+                flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
+                    (move || async move {
+                        let mut api_client_guard = None;
+                        let decode_indices_ =
+                            flutter_rust_bridge::for_generated::lockable_compute_decode_order(
+                                vec![flutter_rust_bridge::for_generated::LockableOrderInfo::new(
+                                    &api_client,
+                                    0,
+                                    false,
+                                )],
+                            );
+                        for i in decode_indices_ {
+                            match i {
+                                0 => {
+                                    api_client_guard =
+                                        Some(api_client.lockable_decode_async_ref().await)
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        let api_client_guard = api_client_guard.unwrap();
+                        let output_ok =
+                            crate::api::vtop_get_client::fetch_profile(&*api_client_guard).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2761,6 +2877,16 @@ const _: fn() = || {
         let _: String = MarksRecordEach.remark;
     }
     {
+        let MentorData = None::<crate::api::vtop::types::MentorData>.unwrap();
+        let _: Vec<crate::api::vtop::types::ProfileField> = MentorData.details;
+        let _: Vec<crate::api::vtop::types::MentorMessage> = MentorData.messages;
+        let _: u64 = MentorData.update_time;
+    }
+    {
+        let MentorMessage = None::<crate::api::vtop::types::MentorMessage>.unwrap();
+        let _: Vec<crate::api::vtop::types::ProfileField> = MentorMessage.fields;
+    }
+    {
         let OutingApplyResult = None::<crate::api::vtop::types::OutingApplyResult>.unwrap();
         let _: bool = OutingApplyResult.applied;
         let _: String = OutingApplyResult.message;
@@ -2800,6 +2926,21 @@ const _: fn() = || {
         let _: Option<u64> = PersistedVtopSession.logged_in_at;
     }
     {
+        let ProfileField = None::<crate::api::vtop::types::ProfileField>.unwrap();
+        let _: String = ProfileField.label;
+        let _: String = ProfileField.value;
+    }
+    {
+        let ProfileGroup = None::<crate::api::vtop::types::ProfileGroup>.unwrap();
+        let _: String = ProfileGroup.title;
+        let _: Vec<crate::api::vtop::types::ProfileField> = ProfileGroup.fields;
+    }
+    {
+        let ProfileSection = None::<crate::api::vtop::types::ProfileSection>.unwrap();
+        let _: String = ProfileSection.title;
+        let _: Vec<crate::api::vtop::types::ProfileGroup> = ProfileSection.groups;
+    }
+    {
         let SemesterData = None::<crate::api::vtop::types::SemesterData>.unwrap();
         let _: Vec<crate::api::vtop::types::SemesterInfo> = SemesterData.semesters;
         let _: u64 = SemesterData.update_time;
@@ -2816,6 +2957,17 @@ const _: fn() = || {
         let _: Option<String> = SessionState.registration_number;
         let _: Option<u64> = SessionState.otp_issued_at;
         let _: Option<u64> = SessionState.logged_in_at;
+    }
+    {
+        let StudentProfile = None::<crate::api::vtop::types::StudentProfile>.unwrap();
+        let _: String = StudentProfile.name;
+        let _: String = StudentProfile.registration_number;
+        let _: String = StudentProfile.vit_email;
+        let _: String = StudentProfile.program;
+        let _: String = StudentProfile.school;
+        let _: String = StudentProfile.photo;
+        let _: Vec<crate::api::vtop::types::ProfileSection> = StudentProfile.sections;
+        let _: u64 = StudentProfile.update_time;
     }
     {
         let TimetableCourse = None::<crate::api::vtop::types::TimetableCourse>.unwrap();
@@ -3915,6 +4067,20 @@ impl SseDecode for Vec<crate::api::vtop::types::MarksRecordEach> {
     }
 }
 
+impl SseDecode for Vec<crate::api::vtop::types::MentorMessage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::MentorMessage>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::vtop::types::OutingOption> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -3948,6 +4114,48 @@ impl SseDecode for Vec<u8> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<u8>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::vtop::types::ProfileField> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::ProfileField>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::vtop::types::ProfileGroup> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::ProfileGroup>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::vtop::types::ProfileSection> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::vtop::types::ProfileSection>::sse_decode(
+                deserializer,
+            ));
         }
         return ans_;
     }
@@ -4091,6 +4299,30 @@ impl SseDecode for crate::api::vtop::types::MarksRecordEach {
             weightagemark: var_weightagemark,
             remark: var_remark,
         };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::MentorData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_details =
+            <Vec<crate::api::vtop::types::ProfileField>>::sse_decode(deserializer);
+        let mut var_messages =
+            <Vec<crate::api::vtop::types::MentorMessage>>::sse_decode(deserializer);
+        let mut var_updateTime = <u64>::sse_decode(deserializer);
+        return crate::api::vtop::types::MentorData {
+            details: var_details,
+            messages: var_messages,
+            update_time: var_updateTime,
+        };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::MentorMessage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_fields = <Vec<crate::api::vtop::types::ProfileField>>::sse_decode(deserializer);
+        return crate::api::vtop::types::MentorMessage { fields: var_fields };
     }
 }
 
@@ -4311,6 +4543,42 @@ impl SseDecode for crate::api::platform_http::PlatformHttpResponse {
     }
 }
 
+impl SseDecode for crate::api::vtop::types::ProfileField {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_value = <String>::sse_decode(deserializer);
+        return crate::api::vtop::types::ProfileField {
+            label: var_label,
+            value: var_value,
+        };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::ProfileGroup {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_fields = <Vec<crate::api::vtop::types::ProfileField>>::sse_decode(deserializer);
+        return crate::api::vtop::types::ProfileGroup {
+            title: var_title,
+            fields: var_fields,
+        };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::ProfileSection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_groups = <Vec<crate::api::vtop::types::ProfileGroup>>::sse_decode(deserializer);
+        return crate::api::vtop::types::ProfileSection {
+            title: var_title,
+            groups: var_groups,
+        };
+    }
+}
+
 impl SseDecode for (String, String) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4359,6 +4627,31 @@ impl SseDecode for crate::api::vtop::types::SessionState {
             registration_number: var_registrationNumber,
             otp_issued_at: var_otpIssuedAt,
             logged_in_at: var_loggedInAt,
+        };
+    }
+}
+
+impl SseDecode for crate::api::vtop::types::StudentProfile {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_registrationNumber = <String>::sse_decode(deserializer);
+        let mut var_vitEmail = <String>::sse_decode(deserializer);
+        let mut var_program = <String>::sse_decode(deserializer);
+        let mut var_school = <String>::sse_decode(deserializer);
+        let mut var_photo = <String>::sse_decode(deserializer);
+        let mut var_sections =
+            <Vec<crate::api::vtop::types::ProfileSection>>::sse_decode(deserializer);
+        let mut var_updateTime = <u64>::sse_decode(deserializer);
+        return crate::api::vtop::types::StudentProfile {
+            name: var_name,
+            registration_number: var_registrationNumber,
+            vit_email: var_vitEmail,
+            program: var_program,
+            school: var_school,
+            photo: var_photo,
+            sections: var_sections,
+            update_time: var_updateTime,
         };
     }
 }
@@ -4713,58 +5006,64 @@ fn pde_ffi_dispatcher_primary_impl(
         24 => {
             wire__crate__api__vtop_get_client__fetch_marks_impl(port, ptr, rust_vec_len, data_len)
         }
-        25 => wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
+        25 => {
+            wire__crate__api__vtop_get_client__fetch_mentor_impl(port, ptr, rust_vec_len, data_len)
+        }
+        26 => wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
+        27 => {
+            wire__crate__api__vtop_get_client__fetch_profile_impl(port, ptr, rust_vec_len, data_len)
+        }
+        28 => wire__crate__api__vtop_get_client__fetch_semesters_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
+        29 => wire__crate__api__vtop_get_client__fetch_timetable_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__api__vtop_get_client__fetch_weekend_outing_impl(
+        30 => wire__crate__api__vtop_get_client__fetch_weekend_outing_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
+        31 => wire__crate__api__vtop_get_client__get_vtop_client_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__vtop_get_client__get_vtop_client_via_platform_impl(
+        32 => wire__crate__api__vtop_get_client__get_vtop_client_via_platform_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        33 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        45 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        47 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
@@ -4792,25 +5091,25 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        33 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        35 => {
+        35 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        37 => {
             wire__crate__api__mail_otp__mail_otp_generate_keypair_impl(ptr, rust_vec_len, data_len)
         }
-        36 => wire__crate__api__mail_otp__mail_otp_open_impl(ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
-        38 => {
+        38 => wire__crate__api__mail_otp__mail_otp_open_impl(ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__native_logs__native_logs_clear_impl(ptr, rust_vec_len, data_len),
+        40 => {
             wire__crate__api__native_logs__native_logs_get_entries_impl(ptr, rust_vec_len, data_len)
         }
-        39 => {
+        41 => {
             wire__crate__api__server_page__server_page_dictionary_impl(ptr, rust_vec_len, data_len)
         }
-        40 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        42 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+        46 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,
@@ -5732,6 +6031,45 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Marks
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::MentorData> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.details.into_into_dart().into_dart(),
+            self.0.messages.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::MentorData>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::MentorData>>
+    for crate::api::vtop::types::MentorData
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::MentorData> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::MentorMessage> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.0.fields.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::MentorMessage>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::MentorMessage>>
+    for crate::api::vtop::types::MentorMessage
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::MentorMessage> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::OutingApplyResult> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -5938,6 +6276,69 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::platform_http::PlatformHttpRe
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ProfileField> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.label.into_into_dart().into_dart(),
+            self.0.value.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ProfileField>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ProfileField>>
+    for crate::api::vtop::types::ProfileField
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ProfileField> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ProfileGroup> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.title.into_into_dart().into_dart(),
+            self.0.fields.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ProfileGroup>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ProfileGroup>>
+    for crate::api::vtop::types::ProfileGroup
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ProfileGroup> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ProfileSection> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.title.into_into_dart().into_dart(),
+            self.0.groups.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::ProfileSection>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::ProfileSection>>
+    for crate::api::vtop::types::ProfileSection
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::ProfileSection> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::SemesterData> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -6000,6 +6401,33 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Sessi
     for crate::api::vtop::types::SessionState
 {
     fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::SessionState> {
+        self.into()
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::StudentProfile> {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.0.name.into_into_dart().into_dart(),
+            self.0.registration_number.into_into_dart().into_dart(),
+            self.0.vit_email.into_into_dart().into_dart(),
+            self.0.program.into_into_dart().into_dart(),
+            self.0.school.into_into_dart().into_dart(),
+            self.0.photo.into_into_dart().into_dart(),
+            self.0.sections.into_into_dart().into_dart(),
+            self.0.update_time.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for FrbWrapper<crate::api::vtop::types::StudentProfile>
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::StudentProfile>>
+    for crate::api::vtop::types::StudentProfile
+{
+    fn into_into_dart(self) -> FrbWrapper<crate::api::vtop::types::StudentProfile> {
         self.into()
     }
 }
@@ -6827,6 +7255,16 @@ impl SseEncode for Vec<crate::api::vtop::types::MarksRecordEach> {
     }
 }
 
+impl SseEncode for Vec<crate::api::vtop::types::MentorMessage> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::MentorMessage>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::vtop::types::OutingOption> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -6853,6 +7291,36 @@ impl SseEncode for Vec<u8> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <u8>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::vtop::types::ProfileField> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::ProfileField>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::vtop::types::ProfileGroup> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::ProfileGroup>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::vtop::types::ProfileSection> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::vtop::types::ProfileSection>::sse_encode(item, serializer);
         }
     }
 }
@@ -6948,6 +7416,22 @@ impl SseEncode for crate::api::vtop::types::MarksRecordEach {
         <String>::sse_encode(self.scoredmark, serializer);
         <String>::sse_encode(self.weightagemark, serializer);
         <String>::sse_encode(self.remark, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::MentorData {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::vtop::types::ProfileField>>::sse_encode(self.details, serializer);
+        <Vec<crate::api::vtop::types::MentorMessage>>::sse_encode(self.messages, serializer);
+        <u64>::sse_encode(self.update_time, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::MentorMessage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<crate::api::vtop::types::ProfileField>>::sse_encode(self.fields, serializer);
     }
 }
 
@@ -7111,6 +7595,30 @@ impl SseEncode for crate::api::platform_http::PlatformHttpResponse {
     }
 }
 
+impl SseEncode for crate::api::vtop::types::ProfileField {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.label, serializer);
+        <String>::sse_encode(self.value, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::ProfileGroup {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.title, serializer);
+        <Vec<crate::api::vtop::types::ProfileField>>::sse_encode(self.fields, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::ProfileSection {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.title, serializer);
+        <Vec<crate::api::vtop::types::ProfileGroup>>::sse_encode(self.groups, serializer);
+    }
+}
+
 impl SseEncode for (String, String) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7143,6 +7651,20 @@ impl SseEncode for crate::api::vtop::types::SessionState {
         <Option<String>>::sse_encode(self.registration_number, serializer);
         <Option<u64>>::sse_encode(self.otp_issued_at, serializer);
         <Option<u64>>::sse_encode(self.logged_in_at, serializer);
+    }
+}
+
+impl SseEncode for crate::api::vtop::types::StudentProfile {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <String>::sse_encode(self.registration_number, serializer);
+        <String>::sse_encode(self.vit_email, serializer);
+        <String>::sse_encode(self.program, serializer);
+        <String>::sse_encode(self.school, serializer);
+        <String>::sse_encode(self.photo, serializer);
+        <Vec<crate::api::vtop::types::ProfileSection>>::sse_encode(self.sections, serializer);
+        <u64>::sse_encode(self.update_time, serializer);
     }
 }
 

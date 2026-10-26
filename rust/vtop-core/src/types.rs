@@ -62,6 +62,60 @@ pub struct BiometricData {
     pub update_time: u64,
 }
 
+/// One row of the student profile: VTOP's label and its value, as shown.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProfileField {
+    pub label: String,
+    pub value: String,
+}
+
+/// A run of fields under one sub-heading ("CURRENT ADDRESS", "FATHER
+/// DETAILS"); the first group of a section has an empty title.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProfileGroup {
+    pub title: String,
+    pub fields: Vec<ProfileField>,
+}
+
+/// One of the profile's sections ("PERSONAL INFORMATION", "PROCTOR
+/// INFORMATION", ...), kept in VTOP's order and wording so a field VTOP
+/// adds shows up without a change here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProfileSection {
+    pub title: String,
+    pub groups: Vec<ProfileGroup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StudentProfile {
+    pub name: String,
+    pub registration_number: String,
+    pub vit_email: String,
+    pub program: String,
+    pub school: String,
+    /// The photo as base64 (JPEG), without the `data:` prefix; empty when
+    /// VTOP has none.
+    pub photo: String,
+    pub sections: Vec<ProfileSection>,
+    pub update_time: u64,
+}
+
+/// One message from the mentor: the message table's headings and this
+/// row's cells, in order.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentorMessage {
+    pub fields: Vec<ProfileField>,
+}
+
+/// The mentor (proctor) and the messages they sent, which VTOP drops after
+/// a week.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentorData {
+    pub details: Vec<ProfileField>,
+    pub messages: Vec<MentorMessage>,
+    pub update_time: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimetableSlot {
     pub serial: String,

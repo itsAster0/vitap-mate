@@ -24,6 +24,7 @@ class Paths {
   static final examSchedule = "examSchedule";
   static final academicCalendar = "academicCalendar";
   static final biometricHistory = "biometricHistory";
+  static final profile = "profile";
   static final outing = "outing";
   static final outingPass = "outingPass";
   static final coursePage = "coursePage";

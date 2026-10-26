@@ -1,0 +1,421 @@
+{
+  "name": "JANE DOE",
+  "photo": "/9j/4AAQSkZJRgABAQ==",
+  "program": "BTECH - Computer Science and Engineering",
+  "registration_number": "24ABC0001",
+  "school": "School of Computer Science & Engineering",
+  "sections": [
+    {
+      "groups": [
+        {
+          "fields": [
+            {
+              "label": "APPLICATION NUMBER",
+              "value": "Value 1"
+            },
+            {
+              "label": "STUDENT NAME",
+              "value": "Value 2"
+            },
+            {
+              "label": "DATE OF BIRTH",
+              "value": "Value 3"
+            },
+            {
+              "label": "GENDER",
+              "value": "Value 4"
+            },
+            {
+              "label": "NATIVE LANGUAGE",
+              "value": "Value 5"
+            },
+            {
+              "label": "NATIVE STATE",
+              "value": "Value 6"
+            },
+            {
+              "label": "BLOOD GROUP",
+              "value": "Value 7"
+            },
+            {
+              "label": "PHYSICALLY CHALLENGED",
+              "value": "Value 8"
+            },
+            {
+              "label": "COMMUNITY",
+              "value": "Value 9"
+            },
+            {
+              "label": "RELIGION",
+              "value": "Value 10"
+            },
+            {
+              "label": "CASTE",
+              "value": "Value 11"
+            },
+            {
+              "label": "NATIONALITY",
+              "value": "Value 12"
+            },
+            {
+              "label": "HOSTELLER",
+              "value": "Value 13"
+            },
+            {
+              "label": "AADHAR NUMBER",
+              "value": "Value 14"
+            },
+            {
+              "label": "MOBILE NUMBER",
+              "value": "Value 15"
+            }
+          ],
+          "title": ""
+        },
+        {
+          "fields": [
+            {
+              "label": "STREET NAME",
+              "value": "Value 16"
+            },
+            {
+              "label": "AREA NAME",
+              "value": "Value 17"
+            },
+            {
+              "label": "CITY",
+              "value": "Value 18"
+            },
+            {
+              "label": "STATE",
+              "value": "Value 19"
+            },
+            {
+              "label": "COUNTRY",
+              "value": "Value 20"
+            },
+            {
+              "label": "PINCODE",
+              "value": "Value 21"
+            },
+            {
+              "label": "PHONE NUMBER[LAND LINE]",
+              "value": ""
+            },
+            {
+              "label": "EMAIL",
+              "value": "Value 22"
+            }
+          ],
+          "title": "CURRENT ADDRESS"
+        },
+        {
+          "fields": [
+            {
+              "label": "STREET NAME",
+              "value": "Value 23"
+            },
+            {
+              "label": "AREA NAME",
+              "value": "Value 24"
+            },
+            {
+              "label": "CITY",
+              "value": "Value 25"
+            },
+            {
+              "label": "STATE",
+              "value": "Value 26"
+            },
+            {
+              "label": "COUNTRY",
+              "value": "Value 27"
+            },
+            {
+              "label": "PINCODE",
+              "value": "Value 28"
+            },
+            {
+              "label": "PHONE NUMBER[LAND LINE]",
+              "value": ""
+            },
+            {
+              "label": "EMAIL",
+              "value": "Value 29"
+            },
+            {
+              "label": "PARENT WHATSAPP NUMBER",
+              "value": "Value 30"
+            }
+          ],
+          "title": "PERMANENT ADDRESS"
+        }
+      ],
+      "title": "PERSONAL INFORMATION"
+    },
+    {
+      "groups": [
+        {
+          "fields": [
+            {
+              "label": "APPLIED DEGREE",
+              "value": "Value 31"
+            },
+            {
+              "label": "EDUCATIONAL QUALIFICATION",
+              "value": "Value 32"
+            },
+            {
+              "label": "BRANCH / GROUP STUDIED",
+              "value": "Value 33"
+            },
+            {
+              "label": "SCHOOL NAME",
+              "value": "Value 34"
+            },
+            {
+              "label": "MEDIUM OF STUDY",
+              "value": "Value 35"
+            },
+            {
+              "label": "BOARD / UNIVERSITY",
+              "value": "Value 36"
+            },
+            {
+              "label": "REGISTER NO/ ROLL NO",
+              "value": "Value 37"
+            },
+            {
+              "label": "CLASS OBTAINED",
+              "value": "Value 38"
+            },
+            {
+              "label": "YEAR OF PASSING/ PASSED",
+              "value": "Value 39"
+            },
+            {
+              "label": "MONTH OF PASSING/ PASSED",
+              "value": "Value 40"
+            }
+          ],
+          "title": ""
+        },
+        {
+          "fields": [
+            {
+              "label": "AREA NAME",
+              "value": "Value 41"
+            },
+            {
+              "label": "CITY / DISTRICT NAME",
+              "value": "Value 42"
+            },
+            {
+              "label": "STATE NAME",
+              "value": "Value 43"
+            },
+            {
+              "label": "PINCODE / ZIPCODE",
+              "value": "Value 44"
+            },
+            {
+              "label": "PHONE NUMBER[LAND LINE]",
+              "value": ""
+            },
+            {
+              "label": "BREAK IN STUDY",
+              "value": "Value 45"
+            },
+            {
+              "label": "REASON",
+              "value": "Value 46"
+            }
+          ],
+          "title": "SCHOOL / COLLEGE ADDRESS"
+        }
+      ],
+      "title": "EDUCATIONAL INFORMATION"
+    },
+    {
+      "groups": [
+        {
+          "fields": [
+            {
+              "label": "NO.OF.BROTHERS",
+              "value": "Value 47"
+            },
+            {
+              "label": "NO.OF.SISTERS",
+              "value": "Value 48"
+            },
+            {
+              "label": "IF BROTHER/SISTER STUDYING IN VIT",
+              "value": "Value 49"
+            },
+            {
+              "label": "STUDYING DETAILS",
+              "value": "Value 50"
+            },
+            {
+              "label": "IF BROTHER/SISTER STUDIED IN VIT",
+              "value": "Value 51"
+            },
+            {
+              "label": "STUDIED DETAILS",
+              "value": "Value 52"
+            }
+          ],
+          "title": ""
+        },
+        {
+          "fields": [
+            {
+              "label": "FATHER NAME",
+              "value": "Value 53"
+            },
+            {
+              "label": "QUALIFICATION",
+              "value": "Value 54"
+            },
+            {
+              "label": "OCCUPATION",
+              "value": "Value 55"
+            },
+            {
+              "label": "ORGANIZATION",
+              "value": "Value 56"
+            },
+            {
+              "label": "EMP.ID(IF EMPLOYED IN VIT)",
+              "value": "Value 57"
+            },
+            {
+              "label": "MOBILE NUMBER",
+              "value": "Value 58"
+            },
+            {
+              "label": "EMAIL",
+              "value": "Value 59"
+            },
+            {
+              "label": "ANNUAL INCOME",
+              "value": "Value 60"
+            },
+            {
+              "label": "OFFICIAL ADDRESS(AREA NAME)",
+              "value": "Value 61"
+            },
+            {
+              "label": "STATE",
+              "value": "Value 62"
+            },
+            {
+              "label": "CITY/DISTRICT",
+              "value": "Value 63"
+            },
+            {
+              "label": "PINCODE/ZIPCODE",
+              "value": "Value 64"
+            },
+            {
+              "label": "PHONE NUMBER[LAND LINE]",
+              "value": ""
+            },
+            {
+              "label": "DESIGNATION",
+              "value": "Value 65"
+            },
+            {
+              "label": "GUARDIAN INFO",
+              "value": "Value 66"
+            }
+          ],
+          "title": "FATHER DETAILS"
+        }
+      ],
+      "title": "FAMILY INFORMATION"
+    },
+    {
+      "groups": [
+        {
+          "fields": [
+            {
+              "label": "FACULTY ID",
+              "value": "Value 67"
+            },
+            {
+              "label": "FACULTY NAME",
+              "value": "Value 68"
+            },
+            {
+              "label": "FACULTY DESIGNATION",
+              "value": "Value 69"
+            },
+            {
+              "label": "SCHOOL",
+              "value": "Value 70"
+            },
+            {
+              "label": "CABIN",
+              "value": "Value 71"
+            },
+            {
+              "label": "FACULTY DEPARTMENT",
+              "value": "Value 72"
+            },
+            {
+              "label": "FACULTY EMAIL",
+              "value": "Value 73"
+            },
+            {
+              "label": "FACULTY INTERCOM",
+              "value": ""
+            },
+            {
+              "label": "FACULTY MOBILE NUMBER",
+              "value": "Value 74"
+            }
+          ],
+          "title": ""
+        }
+      ],
+      "title": "PROCTOR INFORMATION"
+    },
+    {
+      "groups": [
+        {
+          "fields": [
+            {
+              "label": "Application Number",
+              "value": "Value 75"
+            },
+            {
+              "label": "Register Number",
+              "value": "Value 76"
+            },
+            {
+              "label": "Block Name",
+              "value": "Value 77"
+            },
+            {
+              "label": "Room No.",
+              "value": "Value 78"
+            },
+            {
+              "label": "Bed Type",
+              "value": "Value 79"
+            },
+            {
+              "label": "Mess Information",
+              "value": "Value 80"
+            }
+          ],
+          "title": ""
+        }
+      ],
+      "title": "HOSTEL INFORMATION"
+    }
+  ],
+  "update_time": 0,
+  "vit_email": "jane.24abc0001@vitapstudent.ac.in"
+}

@@ -39,11 +39,20 @@ pub async fn fetch(
     if session.cookies.trim().is_empty() {
         return Err(expired());
     }
-    let def = pages::find(&request.name)
-        .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "unknown_page", format!("No page named {}.", request.name)))?;
+    let def = pages::find(&request.name).ok_or_else(|| {
+        ApiError::new(
+            StatusCode::NOT_FOUND,
+            "unknown_page",
+            format!("No page named {}.", request.name),
+        )
+    })?;
     let args: Args = request.args;
     if args.len() != def.args.len() || !def.args.iter().all(|name| args.contains_key(*name)) {
-        return Err(bad_arguments(format!("{} takes: {}.", def.name, def.args.join(", "))));
+        return Err(bad_arguments(format!(
+            "{} takes: {}.",
+            def.name,
+            def.args.join(", ")
+        )));
     }
     let client = VtopClient::builder()
         .config(state.vtop.clone())
@@ -52,11 +61,21 @@ pub async fn fetch(
     let semester = request.semester.unwrap_or_default();
     let data = tokio::time::timeout(FETCH_TIMEOUT, (def.call)(&client, &semester, &args))
         .await
-        .map_err(|_| ApiError::new(StatusCode::GATEWAY_TIMEOUT, "vtop_timeout", "VTOP took too long to answer."))?
+        .map_err(|_| {
+            ApiError::new(
+                StatusCode::GATEWAY_TIMEOUT,
+                "vtop_timeout",
+                "VTOP took too long to answer.",
+            )
+        })?
         .map_err(|error| vtop_error(&error))?;
     if request.dictionary.as_deref() == Some(page_dictionary::id()) {
         if let Some(packed) = page_pack::pack(def.name, &data) {
-            return Ok(([(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)], packed).into_response());
+            return Ok((
+                [(header::CONTENT_TYPE, page_dictionary::CONTENT_TYPE)],
+                packed,
+            )
+                .into_response());
         }
     }
     Ok(Json(serde_json::json!({ "data": data })).into_response())
@@ -67,7 +86,11 @@ fn bad_arguments(message: impl Into<String>) -> ApiError {
 }
 
 fn expired() -> ApiError {
-    ApiError::new(StatusCode::UNAUTHORIZED, "session_expired", "Session has expired")
+    ApiError::new(
+        StatusCode::UNAUTHORIZED,
+        "session_expired",
+        "Session has expired",
+    )
 }
 
 /// A vtop-core error as the phone reads it back: `session_expired` makes
@@ -105,15 +128,24 @@ mod tests {
             VtopError::OTPRequired("x".into(), 1),
         ] {
             let api = vtop_error(&error);
-            assert_eq!((api.status, api.code), (StatusCode::UNAUTHORIZED, "session_expired"));
+            assert_eq!(
+                (api.status, api.code),
+                (StatusCode::UNAUTHORIZED, "session_expired")
+            );
         }
     }
 
     #[test]
     fn vtop_being_down_is_a_bad_gateway() {
         let api = vtop_error(&VtopError::VtopUnavailable("slow".into()));
-        assert_eq!((api.status, api.code), (StatusCode::BAD_GATEWAY, "vtop_unavailable"));
+        assert_eq!(
+            (api.status, api.code),
+            (StatusCode::BAD_GATEWAY, "vtop_unavailable")
+        );
         let api = vtop_error(&VtopError::ConfigurationError("bad".into()));
-        assert_eq!((api.status, api.code), (StatusCode::BAD_REQUEST, "bad_arguments"));
+        assert_eq!(
+            (api.status, api.code),
+            (StatusCode::BAD_REQUEST, "bad_arguments")
+        );
     }
 }

@@ -84,13 +84,18 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))
         .route(vtop_shared::engine::VTOP_LOGIN_OTP, post(vtop_login::otp))
-        .route(vtop_shared::engine::VTOP_LOGIN_RESEND, post(vtop_login::resend))
+        .route(
+            vtop_shared::engine::VTOP_LOGIN_RESEND,
+            post(vtop_login::resend),
+        )
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         // Parsed pages are JSON; Brotli (gzip for callers without it) makes
         // the hop to the edge small. Packed pages are Brotli already.
-        .layer(CompressionLayer::new().compress_when(
-            DefaultPredicate::new().and(NotForContentType::const_new(vtop_shared::page_dictionary::CONTENT_TYPE)),
-        ))
+        .layer(
+            CompressionLayer::new().compress_when(DefaultPredicate::new().and(
+                NotForContentType::const_new(vtop_shared::page_dictionary::CONTENT_TYPE),
+            )),
+        )
         .layer(middleware::from_fn(access_log))
         .with_state(state)
 }

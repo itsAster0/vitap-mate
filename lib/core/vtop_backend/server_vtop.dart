@@ -40,6 +40,8 @@ const serverPages = {
   'grade_details',
   'grade_history',
   'biometric',
+  'profile',
+  'mentor',
   'general_outing',
   'weekend_outing',
   'outing_pass',

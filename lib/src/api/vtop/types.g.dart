@@ -681,6 +681,33 @@ Map<String, dynamic> _$MarksRecordEachToJson(_MarksRecordEach instance) =>
       'remark': instance.remark,
     };
 
+_MentorData _$MentorDataFromJson(Map<String, dynamic> json) => _MentorData(
+  details: (json['details'] as List<dynamic>)
+      .map((e) => ProfileField.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  messages: (json['messages'] as List<dynamic>)
+      .map((e) => MentorMessage.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  updateTime: BigInt.parse(json['updateTime'] as String),
+);
+
+Map<String, dynamic> _$MentorDataToJson(_MentorData instance) =>
+    <String, dynamic>{
+      'details': instance.details,
+      'messages': instance.messages,
+      'updateTime': instance.updateTime.toString(),
+    };
+
+_MentorMessage _$MentorMessageFromJson(Map<String, dynamic> json) =>
+    _MentorMessage(
+      fields: (json['fields'] as List<dynamic>)
+          .map((e) => ProfileField.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$MentorMessageToJson(_MentorMessage instance) =>
+    <String, dynamic>{'fields': instance.fields};
+
 _OutingApplyResult _$OutingApplyResultFromJson(Map<String, dynamic> json) =>
     _OutingApplyResult(
       applied: json['applied'] as bool,
@@ -773,6 +800,37 @@ Map<String, dynamic> _$PersistedVtopSessionToJson(
   'loggedInAt': instance.loggedInAt?.toString(),
 };
 
+_ProfileField _$ProfileFieldFromJson(Map<String, dynamic> json) =>
+    _ProfileField(
+      label: json['label'] as String,
+      value: json['value'] as String,
+    );
+
+Map<String, dynamic> _$ProfileFieldToJson(_ProfileField instance) =>
+    <String, dynamic>{'label': instance.label, 'value': instance.value};
+
+_ProfileGroup _$ProfileGroupFromJson(Map<String, dynamic> json) =>
+    _ProfileGroup(
+      title: json['title'] as String,
+      fields: (json['fields'] as List<dynamic>)
+          .map((e) => ProfileField.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$ProfileGroupToJson(_ProfileGroup instance) =>
+    <String, dynamic>{'title': instance.title, 'fields': instance.fields};
+
+_ProfileSection _$ProfileSectionFromJson(Map<String, dynamic> json) =>
+    _ProfileSection(
+      title: json['title'] as String,
+      groups: (json['groups'] as List<dynamic>)
+          .map((e) => ProfileGroup.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$ProfileSectionToJson(_ProfileSection instance) =>
+    <String, dynamic>{'title': instance.title, 'groups': instance.groups};
+
 _SemesterData _$SemesterDataFromJson(Map<String, dynamic> json) =>
     _SemesterData(
       semesters: (json['semesters'] as List<dynamic>)
@@ -792,6 +850,32 @@ _SemesterInfo _$SemesterInfoFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$SemesterInfoToJson(_SemesterInfo instance) =>
     <String, dynamic>{'id': instance.id, 'name': instance.name};
+
+_StudentProfile _$StudentProfileFromJson(Map<String, dynamic> json) =>
+    _StudentProfile(
+      name: json['name'] as String,
+      registrationNumber: json['registrationNumber'] as String,
+      vitEmail: json['vitEmail'] as String,
+      program: json['program'] as String,
+      school: json['school'] as String,
+      photo: json['photo'] as String,
+      sections: (json['sections'] as List<dynamic>)
+          .map((e) => ProfileSection.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      updateTime: BigInt.parse(json['updateTime'] as String),
+    );
+
+Map<String, dynamic> _$StudentProfileToJson(_StudentProfile instance) =>
+    <String, dynamic>{
+      'name': instance.name,
+      'registrationNumber': instance.registrationNumber,
+      'vitEmail': instance.vitEmail,
+      'program': instance.program,
+      'school': instance.school,
+      'photo': instance.photo,
+      'sections': instance.sections,
+      'updateTime': instance.updateTime.toString(),
+    };
 
 _TimetableCourse _$TimetableCourseFromJson(Map<String, dynamic> json) =>
     _TimetableCourse(
