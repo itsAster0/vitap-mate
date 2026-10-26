@@ -131,6 +131,7 @@ void main() {
     expect(key.key, startsWith('vtm_'));
     expect(key.mcpUrl, 'https://mcp.test/mcp');
     expect(key.authHeader, 'Authorization: Bearer ${key.key}');
+    expect(key.agentUrl, 'https://mcp.test/mcp/${key.key}');
     expect(
       key.claudeCodeCommand,
       'claude mcp add --transport http vtop https://mcp.test/mcp '

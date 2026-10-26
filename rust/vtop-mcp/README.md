@@ -14,6 +14,12 @@ URL:    https://vmate-api.aster0.dev/mcp
 Header: Authorization: Bearer vtm_…
 ```
 
+An agent that only takes a URL can carry the key in the path instead:
+
+```
+https://vmate-api.aster0.dev/mcp/vtm_…
+```
+
 For Claude Code:
 
 ```sh
@@ -21,7 +27,8 @@ claude mcp add --transport http vtop https://vmate-api.aster0.dev/mcp \
   --header "Authorization: Bearer vtm_…"
 ```
 
-The key is only read from the header; a key in the URL is not accepted.
+The header wins when both are sent. A URL with the key in it is as secret
+as the key: it can show up in the agent's config and in request logs.
 
 Transport is streamable HTTP, stateless, JSON responses. Keys are checked
 against the edge (`/v1/whoami`, cached 5 minutes). When VTOP rejects a
