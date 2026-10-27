@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
-    "firefox": "web-ext run --source-dir dist"
+    "build:firefox": "vite build --mode firefox",
+    "firefox": "vite build --mode firefox && web-ext run --source-dir dist-firefox"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

@@ -79,15 +79,16 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      # AMO never signs the same version twice, so the Firefox copy gets the
-      # run number as a fourth version part.
+      # Firefox gets its own build (an event page, not a service worker). AMO
+      # never signs the same version twice, so it also gets the run number as
+      # a fourth version part.
       - name: Prepare Firefox build
         run: |
-          rm -rf dist-firefox
-          cp -r dist dist-firefox
-          version=$(jq -r .version dist/manifest.json)
+          pnpm build:firefox
+          version=$(jq -r .version dist-firefox/manifest.json)
           jq --arg v "$version.$GITHUB_RUN_NUMBER" '.version = $v' \
-            dist/manifest.json > dist-firefox/manifest.json
+            dist-firefox/manifest.json > dist-firefox/manifest.tmp
+          mv dist-firefox/manifest.tmp dist-firefox/manifest.json
 
       - name: Lint for Firefox
         run: pnpm exec web-ext lint --source-dir dist-firefox --self-hosted
