@@ -2856,6 +2856,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "url",
  "vtop-core",
  "vtop-mcp",
  "vtop-shared",

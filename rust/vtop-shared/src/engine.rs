@@ -78,6 +78,53 @@ pub struct SealVault {
     pub account: String,
     pub username: String,
     pub password: String,
+    /// Gmail access, so the engine can read the OTP itself when the
+    /// student has no forwarding address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gmail: Option<GmailGrant>,
+}
+
+/// A Gmail refresh token and the OAuth client it was issued to: the app's
+/// own on phones (no secret), the student's own on desktop. Vaults sealed
+/// by the old bridge spell the fields in snake_case.
+/// No `Debug`: it holds the refresh token and maybe a client secret.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GmailGrant {
+    #[serde(alias = "refresh_token")]
+    pub refresh_token: String,
+    #[serde(alias = "client_id")]
+    pub client_id: String,
+    #[serde(
+        default,
+        alias = "client_secret",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub client_secret: Option<String>,
+    /// Trash the OTP email once read; otherwise it is only marked read.
+    #[serde(default, alias = "delete_after_reading")]
+    pub delete_after_reading: bool,
+}
+
+impl GmailGrant {
+    /// The grant with its fields trimmed, or `None` when it cannot be
+    /// used at all.
+    pub fn usable(self) -> Option<Self> {
+        let refresh_token = self.refresh_token.trim().to_string();
+        let client_id = self.client_id.trim().to_string();
+        if refresh_token.is_empty() || client_id.is_empty() {
+            return None;
+        }
+        Some(Self {
+            refresh_token,
+            client_id,
+            client_secret: self
+                .client_secret
+                .map(|secret| secret.trim().to_string())
+                .filter(|secret| !secret.is_empty()),
+            delete_after_reading: self.delete_after_reading,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,8 +154,13 @@ pub enum LoginOutcome {
     InvalidCredentials,
     /// The saved credentials belong to someone else, or no longer open.
     VaultUnusable,
-    /// No forwarding address is set up, so the OTP cannot be read.
+    /// No forwarding address and no Gmail access, so the OTP cannot be
+    /// read.
     ForwardingRequired,
+    /// Google refused the saved Gmail access. `sealed_vault` is the same
+    /// credentials without it, to keep in place of the old ones.
+    #[serde(rename_all = "camelCase")]
+    GmailRevoked { sealed_vault: String },
     /// Anything else; the credentials may still be good.
     Failed { reason: String },
 }
@@ -178,6 +230,46 @@ mod tests {
             serde_json::to_value(LoginOutcome::ForwardingRequired).unwrap(),
             serde_json::json!({"status": "forwarding_required"})
         );
+        assert_eq!(
+            serde_json::to_value(LoginOutcome::GmailRevoked {
+                sealed_vault: "v".into()
+            })
+            .unwrap(),
+            serde_json::json!({"status": "gmail_revoked", "sealedVault": "v"})
+        );
+    }
+
+    #[test]
+    fn gmail_grants_read_both_spellings() {
+        let new: GmailGrant = serde_json::from_value(serde_json::json!(
+            {"refreshToken": "r", "clientId": "c", "clientSecret": "s", "deleteAfterReading": true}
+        ))
+        .unwrap();
+        let old: GmailGrant = serde_json::from_value(serde_json::json!(
+            {"refresh_token": "r", "client_id": "c", "client_secret": "s", "delete_after_reading": true}
+        ))
+        .unwrap();
+        assert!(new == old);
+        let phone: GmailGrant =
+            serde_json::from_value(serde_json::json!({"refreshToken": "r", "clientId": "c"}))
+                .unwrap();
+        assert_eq!(
+            serde_json::to_value(&phone).unwrap(),
+            serde_json::json!({"refreshToken": "r", "clientId": "c", "deleteAfterReading": false})
+        );
+    }
+
+    #[test]
+    fn blank_gmail_grants_are_unusable() {
+        let grant = |token: &str, secret: Option<&str>| GmailGrant {
+            refresh_token: token.into(),
+            client_id: "c".into(),
+            client_secret: secret.map(String::from),
+            delete_after_reading: false,
+        };
+        assert!(grant("r", None).usable().is_some());
+        assert!(grant(" ", None).usable().is_none());
+        assert_eq!(grant("r", Some(" ")).usable().unwrap().client_secret, None);
     }
 
     #[test]

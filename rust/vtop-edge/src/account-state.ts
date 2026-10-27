@@ -233,6 +233,9 @@ export class AccountRecord {
   mailboxId: string | null = null;
   sealedVault: string | null = null;
   vaultSavedAt: number | null = null;
+  /** The saved credentials carry Gmail access, so the server can read the
+   * OTP without a forwarding address. */
+  vaultGmail = false;
   sealedSession: string | null = null;
   sessionSavedAt: number | null = null;
   /** Who made the cached session: `phone` or `server`. */
@@ -282,6 +285,7 @@ export class AccountRecord {
       sessionSource: this.sealedSession !== null ? this.sessionSource : null,
       vaultSavedAt: vault ? this.vaultSavedAt : null,
       vaultExpiresAt: vault && ttl !== null && this.vaultSavedAt !== null ? this.vaultSavedAt + ttl : null,
+      vaultGmail: vault && this.vaultGmail,
       credentialsRejectedAt: this.credentialsRejectedAt,
       forwarding,
       signIns: this.signIns.map((s) => ({ ...s })),
@@ -330,15 +334,26 @@ export class AccountRecord {
     return sourceView(this.sessionSource, this.sessionSavedAt, true);
   }
 
-  saveVault(sealed: string, now: number): void {
+  /** Keeps sealed credentials; `gmail` when they carry Gmail access. */
+  saveVault(sealed: string, now: number, gmail = false): void {
     this.sealedVault = sealed;
     this.vaultSavedAt = now;
+    this.vaultGmail = gmail;
     this.credentialsRejectedAt = null;
+  }
+
+  /** Google refused the saved Gmail access: the same credentials without
+   * it take their place, keeping their age. */
+  dropGmail(sealed: string): void {
+    if (this.sealedVault === null) return;
+    this.sealedVault = sealed;
+    this.vaultGmail = false;
   }
 
   clearVault(): void {
     this.sealedVault = null;
     this.vaultSavedAt = null;
+    this.vaultGmail = false;
   }
 
   rejectCredentials(now: number): void {
@@ -346,10 +361,15 @@ export class AccountRecord {
     this.credentialsRejectedAt = now;
   }
 
-  /** The phone should send credentials with its answer: none are saved, or
-   * saved ones expire (each answer restarts their clock). */
+  /** The phone should send credentials with its answer: none are saved,
+   * saved ones expire (each answer restarts their clock), or the server
+   * has no way to read the OTP with them (Gmail access may come along). */
   wantCredentials(now: number): boolean {
-    return this.usableVault(now) === null || this.settings.vaultTtlSecs !== null;
+    return (
+      this.usableVault(now) === null ||
+      this.settings.vaultTtlSecs !== null ||
+      (!this.vaultGmail && this.mailboxId === null)
+    );
   }
 
   linked(): boolean {
@@ -469,6 +489,7 @@ export class AccountRecord {
       linked: this.linked(),
       savedCredentials: vault !== null,
       vaultSavedAt: vault !== null ? this.vaultSavedAt : null,
+      vaultGmail: vault !== null && this.vaultGmail,
       credentialsRejectedAt: this.credentialsRejectedAt,
       forwarding,
       phoneLinked: this.linked(),

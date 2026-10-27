@@ -77,7 +77,8 @@ session. `/healthz` reports `version` and `colo`.
 - `vtop-core/tests/parsers.rs`: fixture HTML → JSON snapshots, plus truncated
   pages that must not panic. Fixtures are synthetic or redacted.
 - `vtop-core/src/client/tests.rs`: session reuse against an in-process mock VTOP.
-- `vtop-bridge`: the engine routes (session, seal, sign-in with forwarded OTP).
+- `vtop-bridge`: the engine routes (session, seal, sign-in with a forwarded
+  or Gmail OTP).
 - `vtop-edge` (`pnpm test`): accounts, devices, mail OTP, the `/vtop/` proxy.
 - `src/live_bench.rs` (ignored): live timings; `VTOP_DUMP_DIR` saves raw pages.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

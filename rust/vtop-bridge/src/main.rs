@@ -4,6 +4,7 @@ use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 use vtop_bridge::config::Config;
 use vtop_bridge::engine::HttpEdge;
+use vtop_bridge::gmail::{GoogleOAuthRefresher, DEFAULT_TOKEN_URL};
 use vtop_bridge::login::CoreLogin;
 use vtop_bridge::verify::CoreVerifier;
 use vtop_bridge::{router, AppState, Parts};
@@ -53,6 +54,10 @@ async fn main() {
                 config: vtop_core::VtopConfig::default(),
             }),
             edge,
+            gmail: Arc::new(GoogleOAuthRefresher::new(
+                reqwest::Client::new(),
+                DEFAULT_TOKEN_URL.into(),
+            )),
         },
     ));
     tracing::info!("starting vtop-engine on {listen}");

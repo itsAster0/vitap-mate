@@ -6,9 +6,10 @@
 // A session request is answered from the cache (checked with VTOP by the
 // engine), or left pending while the phone that created the key is asked
 // (an event on its install) and/or the engine signs in with saved
-// credentials, the OTP read from the student's forwarded mail. Server
-// sign-in therefore needs email forwarding: credentials are only kept for
-// students who set it up.
+// credentials, the OTP read from the student's forwarded mail or, without
+// a forwarding address, from their Gmail. Server sign-in therefore needs
+// one of the two: credentials are only kept for students with forwarding
+// set up or Gmail access sent along.
 //
 // Routes:
 // - Key holders (`Authorization: Bearer vtm_…`): `GET /v1/whoami`,
@@ -77,6 +78,7 @@ import {
   type LoginStart,
   SEAL,
   SESSION,
+  type GmailGrant,
   type SealVault,
   type SealedVault,
   type SessionCheck,
@@ -244,6 +246,8 @@ function isLoginOutcome(raw: unknown): raw is LoginDone["outcome"] {
       return typeof outcome.cookies === "string" && typeof outcome.sealedSession === "string";
     case "failed":
       return typeof outcome.reason === "string";
+    case "gmail_revoked":
+      return typeof outcome.sealedVault === "string";
     case "invalid_credentials":
     case "vault_unusable":
     case "forwarding_required":
@@ -333,9 +337,17 @@ const EXTRA_SCHEMA = [
   "CREATE TABLE IF NOT EXISTS key_uses (key_hash TEXT NOT NULL, at INTEGER NOT NULL, via TEXT NOT NULL)",
 ];
 
+/** `account` columns added after `SCHEMA`, the same way. */
+const EXTRA_ACCOUNT_COLUMNS = [["vault_gmail", "INTEGER NOT NULL DEFAULT 0"]];
+
+
 export function prepareAccountDb(db: SqlStorage): void {
   sql.prepare(db, SCHEMA);
   for (const statement of EXTRA_SCHEMA) db.exec(statement);
+  const columns = new Set(sql.rows(db, "PRAGMA table_info(account)").map((row) => sql.text(row, "name")));
+  for (const [name, type] of EXTRA_ACCOUNT_COLUMNS) {
+    if (!columns.has(name)) db.exec(`ALTER TABLE account ADD COLUMN ${name} ${type}`);
+  }
 }
 
 type Value = string | number | null;
@@ -350,6 +362,7 @@ function accountColumns(doc: AccountRecord): Array<[string, Value]> {
     ["mailbox_id", doc.mailboxId],
     ["sealed_vault", doc.sealedVault],
     ["vault_saved_at", doc.vaultSavedAt],
+    ["vault_gmail", doc.vaultGmail ? 1 : 0],
     ["sealed_session", doc.sealedSession],
     ["session_saved_at", doc.sessionSavedAt],
     ["session_source", doc.sessionSource],
@@ -377,6 +390,7 @@ function accountFrom(row: sql.Row, keys: KeyRecord[], phones: PhoneRecord[]): Ac
   doc.mailboxId = sql.text(row, "mailbox_id");
   doc.sealedVault = sql.text(row, "sealed_vault");
   doc.vaultSavedAt = sql.int(row, "vault_saved_at");
+  doc.vaultGmail = sql.flag(row, "vault_gmail");
   doc.sealedSession = sql.text(row, "sealed_session");
   doc.sessionSavedAt = sql.int(row, "session_saved_at");
   doc.sessionSource = sql.text(row, "session_source");
@@ -609,11 +623,34 @@ function usableText(raw: unknown): string | null {
   return typeof raw === "string" ? raw.trim() || null : null;
 }
 
-/** `username` and `password` of a body's `credentials`, if it has them. */
-function credentialsOf(raw: unknown): { username: string; password: string } | null {
+interface Credentials {
+  username: string;
+  password: string;
+  gmail: GmailGrant | null;
+}
+
+/** `username`, `password` and any Gmail access of a body's `credentials`,
+ * if it has them. */
+function credentialsOf(raw: unknown): Credentials | null {
   if (raw === null || typeof raw !== "object") return null;
-  const { username, password } = raw as Record<string, unknown>;
-  return { username: str(username) ?? "", password: str(password) ?? "" };
+  const { username, password, gmail } = raw as Record<string, unknown>;
+  return { username: str(username) ?? "", password: str(password) ?? "", gmail: gmailGrantOf(gmail) };
+}
+
+/** Gmail access the phone sent with its credentials, if usable. */
+export function gmailGrantOf(raw: unknown): GmailGrant | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const grant = raw as Record<string, unknown>;
+  const refreshToken = usableText(grant.refreshToken);
+  const clientId = usableText(grant.clientId);
+  if (refreshToken === null || clientId === null) return null;
+  const clientSecret = usableText(grant.clientSecret);
+  return {
+    refreshToken,
+    clientId,
+    ...(clientSecret !== null ? { clientSecret } : {}),
+    deleteAfterReading: grant.deleteAfterReading === true,
+  };
 }
 
 function pending(request: RequestRecord): Response {
@@ -885,12 +922,21 @@ export class Account extends DurableObject<Env> {
         fallback = { reason: "credentials_rejected: VTOP rejected the saved password. Sign in again in VITAP Mate." };
         break;
       case "forwarding_required":
-        // Without forwarding the server cannot sign in, and each try would
-        // mail the student an OTP for nothing.
-        doc.recordSignIn(at, "server", false, "OTP forwarding is not set up");
-        doc.clearVault();
+        // The engine did not ask VTOP (it would have mailed an OTP nobody
+        // reads). The credentials stay: the phone sends them again, with
+        // Gmail access if it has it, until the server can read the OTP.
+        doc.recordSignIn(at, "server", false, "Neither OTP forwarding nor Gmail is set up");
         fallback = {
-          reason: "forwarding_required: Set up OTP email forwarding in VITAP Mate to sign in from the server.",
+          reason:
+            "forwarding_required: Set up OTP email forwarding or connect Gmail in VITAP Mate to sign in from the server.",
+        };
+        break;
+      case "gmail_revoked":
+        console.log("account: Google refused the saved Gmail access; dropping it");
+        doc.recordSignIn(at, "server", false, "Google refused the saved Gmail access");
+        doc.dropGmail(outcome.sealedVault);
+        fallback = {
+          reason: "gmail_revoked: Gmail access was revoked. Connect Gmail again in VITAP Mate to sign in from the server.",
         };
         break;
       case "vault_unusable":
@@ -1028,7 +1074,7 @@ export class Account extends DurableObject<Env> {
     if (credentials) {
       const username = usableText(credentials.username) ?? usableText(answer.username);
       if (username !== null) {
-        await this.keepCredentials(doc, checked.ownerHash ?? "", username, credentials.password, at);
+        await this.keepCredentials(doc, checked.ownerHash ?? "", username, credentials, at);
       }
     }
     this.save(doc);
@@ -1036,17 +1082,18 @@ export class Account extends DurableObject<Env> {
   }
 
   /** Seals and keeps credentials, only for students with forwarding set
-   * up; true when kept. */
+   * up or Gmail access sent along; true when kept. */
   private async keepCredentials(
     doc: AccountRecord,
     ownerHash: string,
     username: string,
-    password: string,
+    credentials: Credentials,
     at: number,
   ): Promise<boolean> {
+    const { password, gmail } = credentials;
     if (!password || !ownerHash) return false;
-    if ((await forwardingMailbox(this.env, ownerHash)) === null) {
-      console.log("account: credentials not kept: no forwarding address");
+    if (gmail === null && (await forwardingMailbox(this.env, ownerHash)) === null) {
+      console.log("account: credentials not kept: no forwarding address or Gmail access");
       return false;
     }
     try {
@@ -1054,8 +1101,9 @@ export class Account extends DurableObject<Env> {
         account: doc.id,
         username,
         password,
+        ...(gmail !== null ? { gmail } : {}),
       } satisfies SealVault);
-      doc.saveVault(sealed.sealedVault, at);
+      doc.saveVault(sealed.sealedVault, at, gmail !== null);
       return true;
     } catch (e) {
       console.log(`account: sealing credentials failed: ${e}`);
@@ -1167,8 +1215,8 @@ export class Account extends DurableObject<Env> {
     let saved = false;
     const credentials = credentialsOf(body.credentials);
     const username = usableText(credentials?.username);
-    if (credentials && forwarding && username !== null) {
-      saved = await this.keepCredentials(doc, checked.ownerHash ?? "", username, credentials.password, at);
+    if (credentials && (forwarding || credentials.gmail !== null) && username !== null) {
+      saved = await this.keepCredentials(doc, checked.ownerHash ?? "", username, credentials, at);
     }
     this.save(doc);
     return Response.json({

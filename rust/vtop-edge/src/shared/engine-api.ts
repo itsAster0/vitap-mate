@@ -43,6 +43,19 @@ export interface SealVault {
   account: string;
   username: string;
   password: string;
+  /** Gmail access, so the engine can read the OTP itself when the student
+   * has no forwarding address. */
+  gmail?: GmailGrant;
+}
+
+/** A Gmail refresh token and the OAuth client it was issued to: the app's
+ * own on phones (no secret), the student's own on desktop. */
+export interface GmailGrant {
+  refreshToken: string;
+  clientId: string;
+  clientSecret?: string;
+  /** Trash the OTP email once read; otherwise it is only marked read. */
+  deleteAfterReading?: boolean;
 }
 
 export interface SealedVault {
@@ -61,8 +74,11 @@ export type LoginOutcome =
   | { status: "invalid_credentials" }
   /** The saved credentials belong to someone else, or no longer open. */
   | { status: "vault_unusable" }
-  /** No forwarding address is set up, so the OTP cannot be read. */
+  /** No forwarding address and no Gmail access, so the OTP cannot be read. */
   | { status: "forwarding_required" }
+  /** Google refused the saved Gmail access; `sealedVault` is the same
+   * credentials without it, to keep in place of the old ones. */
+  | { status: "gmail_revoked"; sealedVault: string }
   /** Anything else; the credentials may still be good. */
   | { status: "failed"; reason: string };
 

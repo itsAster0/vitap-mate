@@ -3,7 +3,9 @@
 //! to seal saved credentials (only the engine has `VAULT_KEY`) and to sign
 //! in with them. A sign-in answers at once and reports to the edge when
 //! done; the OTP comes from the student's forwarded mail, sealed by the
-//! edge to a key made for that one sign-in.
+//! edge to a key made for that one sign-in, or, for students without a
+//! forwarding address, from their Gmail with the access sealed in their
+//! credentials.
 //!
 //! Routes (`Authorization: Bearer $MAIL_RELAY_SECRET`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
@@ -25,14 +27,15 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault, SessionCheck,
-    SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
+    GmailGrant, LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
+    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
 };
 use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
 use vtop_shared::tokens;
 
 use crate::error::ApiError;
+use crate::gmail::{GmailCodes, RefreshError};
 use crate::login::{LoginError, OtpCodes};
 use crate::verify::VerifyError;
 use crate::AppState;
@@ -200,13 +203,16 @@ impl OtpCodes for ForwardedCodes {
     }
 }
 
-/// Saved credentials, sealed to `accounts/<id>`. No `Debug`. Vaults from
-/// the old bridge also carry a Gmail grant, which is ignored.
+/// Saved credentials, sealed to `accounts/<id>`. No `Debug`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Vault {
     /// The VTOP login name; it can change, the registration number cannot.
     pub username: String,
     pub password: String,
+    /// Gmail access, used when the student has no forwarding address.
+    /// Vaults from the old bridge carry one too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gmail: Option<GmailGrant>,
 }
 
 fn bad_request(message: &str) -> ApiError {
@@ -331,6 +337,7 @@ pub async fn seal(
     let vault = Vault {
         username,
         password: body.password,
+        gmail: body.gmail.and_then(GmailGrant::usable),
     };
     let sealed_vault = state
         .accounts_sealer()
@@ -383,12 +390,18 @@ async fn sign_in(
     else {
         return LoginOutcome::VaultUnusable;
     };
+    // Forwarding comes first; Gmail only for students without it.
     let codes = ForwardedCodes::new(edge, owner_hash(&state.config.vault_key, account));
     match codes.register().await {
         Ok(()) => {}
-        // No forwarding address: VTOP is not asked (it would mail an OTP
-        // nobody can read here).
-        Err(EdgeError::NoMailbox) => return LoginOutcome::ForwardingRequired,
+        // No forwarding address: VTOP is not asked unless Gmail can read
+        // the OTP (it would mail one nobody can read here).
+        Err(EdgeError::NoMailbox) => {
+            return match vault.gmail.clone().and_then(GmailGrant::usable) {
+                Some(grant) => sign_in_with_gmail(state, account, vault, grant).await,
+                None => LoginOutcome::ForwardingRequired,
+            }
+        }
         Err(EdgeError::Unavailable(reason)) => {
             tracing::info!("engine: could not register for {account}'s OTP: {reason}");
         }
@@ -402,6 +415,63 @@ async fn sign_in(
             state.config.otp_wait,
         )
         .await;
+    if matches!(result, Err(LoginError::Failed(_))) && codes.no_mailbox.load(Ordering::SeqCst) {
+        return LoginOutcome::ForwardingRequired;
+    }
+    signed_in(state, account, result)
+}
+
+/// Signs in with the OTP read from the student's Gmail. Access Google
+/// refuses is dropped from the credentials; the rest are kept.
+async fn sign_in_with_gmail(
+    state: &AppState,
+    account: &str,
+    vault: Vault,
+    grant: GmailGrant,
+) -> LoginOutcome {
+    let token = match state.gmail.refresh(&grant).await {
+        Ok(token) => token,
+        Err(RefreshError::InvalidGrant) => {
+            tracing::info!("engine: Gmail access of {account} was revoked; dropping it");
+            let vault = Vault {
+                gmail: None,
+                ..vault
+            };
+            return LoginOutcome::GmailRevoked {
+                sealed_vault: state
+                    .accounts_sealer()
+                    .seal_json(&accounts_aad(account), &vault),
+            };
+        }
+        Err(RefreshError::Unavailable(reason)) => {
+            tracing::info!("engine: no Gmail access token for {account} for now: {reason}");
+            return LoginOutcome::Failed {
+                reason: "gmail_unavailable: Gmail could not be reached".into(),
+            };
+        }
+    };
+    let codes = GmailCodes::new(token, grant.delete_after_reading);
+    let result = state
+        .forwarded_login
+        .login(
+            &vault.username,
+            &vault.password,
+            &codes,
+            state.config.otp_wait,
+        )
+        .await;
+    if result.is_ok() {
+        codes.tidy_up().await;
+    }
+    signed_in(state, account, result)
+}
+
+/// What a sign-in with saved credentials ended in.
+fn signed_in(
+    state: &AppState,
+    account: &str,
+    result: Result<SessionState, LoginError>,
+) -> LoginOutcome {
     match result {
         Ok(session) => {
             let owner = session.registration_number.as_deref().map(account_id);
@@ -418,9 +488,6 @@ async fn sign_in(
             }
         }
         Err(LoginError::InvalidCredentials) => LoginOutcome::InvalidCredentials,
-        Err(LoginError::Failed(_)) if codes.no_mailbox.load(Ordering::SeqCst) => {
-            LoginOutcome::ForwardingRequired
-        }
         Err(LoginError::Failed(reason)) => {
             tracing::info!("engine: sign-in of {account} failed for now: {reason}");
             LoginOutcome::Failed { reason }
@@ -475,7 +542,7 @@ pub async fn owner_check(
 mod tests {
     use super::*;
     use crate::config::Config;
-    use crate::fakes::{session as cookies_session, FakeLogin, FakeVerifier};
+    use crate::fakes::{session as cookies_session, FakeLogin, FakeRefresher, FakeVerifier};
     use crate::Parts;
     use axum::body::Body;
     use axum::http::Request;
@@ -530,6 +597,15 @@ mod tests {
         login: FakeLogin,
         vtop: vtop_core::VtopConfig,
     ) -> (axum::Router, Arc<AppState>) {
+        engine_app_with(edge, Arc::new(login), Arc::default(), vtop)
+    }
+
+    fn engine_app_with(
+        edge: Arc<FakeEdge>,
+        login: Arc<FakeLogin>,
+        gmail: Arc<FakeRefresher>,
+        vtop: vtop_core::VtopConfig,
+    ) -> (axum::Router, Arc<AppState>) {
         let config = Config::from_lookup(|name| match name {
             "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
             "EDGE_URL" => Some("https://edge.example".into()),
@@ -542,9 +618,10 @@ mod tests {
             AppState::new(
                 config,
                 Parts {
-                    forwarded_login: Arc::new(login),
+                    forwarded_login: login,
                     verifier: Arc::new(FakeVerifier),
                     edge,
+                    gmail,
                 },
             )
             .with_vtop(vtop),
@@ -821,7 +898,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn old_vaults_with_a_gmail_grant_still_open() {
+    async fn old_vaults_keep_their_gmail_grant() {
         let (_, state) = engine_app(Arc::default(), FakeLogin::default());
         let old = json!({"username": "u", "password": "p",
             "gmail": {"refresh_token": "r", "client_id": "c"}});
@@ -834,6 +911,145 @@ mod tests {
             (vault.username.as_str(), vault.password.as_str()),
             ("u", "p")
         );
+        let grant = vault.gmail.unwrap();
+        assert_eq!(
+            (grant.refresh_token.as_str(), grant.client_id.as_str()),
+            ("r", "c")
+        );
+    }
+
+    async fn gmail_vault(app: &axum::Router, gmail: Value) -> String {
+        let (status, body) = post(
+            app,
+            "/engine/seal",
+            RELAY,
+            json!({"account": REG, "username": "student123", "password": "pw", "gmail": gmail}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        body["sealedVault"].as_str().unwrap().to_string()
+    }
+
+    fn opened(state: &AppState, sealed: &str) -> Vault {
+        state
+            .accounts_sealer()
+            .open_json(&format!("accounts/{REG}"), sealed)
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn gmail_access_is_sealed_with_the_credentials() {
+        let (app, state) = engine_app(Arc::default(), FakeLogin::default());
+        let sealed = gmail_vault(
+            &app,
+            json!({"refreshToken": " r ", "clientId": "c", "clientSecret": "s", "deleteAfterReading": true}),
+        )
+        .await;
+        let grant = opened(&state, &sealed).gmail.unwrap();
+        assert_eq!(grant.refresh_token, "r");
+        assert_eq!(grant.client_secret.as_deref(), Some("s"));
+        assert!(grant.delete_after_reading);
+        // A grant without a token is not kept.
+        let sealed = gmail_vault(&app, json!({"refreshToken": "", "clientId": "c"})).await;
+        assert!(opened(&state, &sealed).gmail.is_none());
+    }
+
+    async fn sign_in_once(
+        edge: Arc<FakeEdge>,
+        login: Arc<FakeLogin>,
+        gmail: Arc<FakeRefresher>,
+        grant: Option<Value>,
+    ) -> (LoginOutcome, Arc<AppState>) {
+        let (app, state) =
+            engine_app_with(edge.clone(), login, gmail, vtop_core::VtopConfig::default());
+        let vault = match grant {
+            Some(grant) => gmail_vault(&app, grant).await,
+            None => sealed_vault(&app, REG).await,
+        };
+        post(
+            &app,
+            "/engine/login",
+            RELAY,
+            json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
+        )
+        .await;
+        (wait_for_done(&edge).await.outcome, state)
+    }
+
+    fn no_mailbox() -> Arc<FakeEdge> {
+        Arc::new(FakeEdge {
+            no_mailbox: true,
+            ..FakeEdge::default()
+        })
+    }
+
+    #[tokio::test]
+    async fn without_forwarding_gmail_reads_the_otp() {
+        let gmail = Arc::new(FakeRefresher::default());
+        let login = Arc::new(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
+        let (outcome, _) = sign_in_once(
+            no_mailbox(),
+            login.clone(),
+            gmail.clone(),
+            Some(json!({"refreshToken": "r", "clientId": "c"})),
+        )
+        .await;
+        assert!(outcome == LoginOutcome::InvalidCredentials);
+        assert_eq!(gmail.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(login.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn forwarding_comes_before_gmail() {
+        let edge = Arc::new(FakeEdge {
+            code: Some("123456"),
+            ..FakeEdge::default()
+        });
+        let gmail = Arc::new(FakeRefresher::default());
+        let (outcome, _) = sign_in_once(
+            edge,
+            Arc::new(FakeLogin::default()),
+            gmail.clone(),
+            Some(json!({"refreshToken": "r", "clientId": "c"})),
+        )
+        .await;
+        assert!(matches!(outcome, LoginOutcome::Ok { .. }));
+        assert_eq!(gmail.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn revoked_gmail_access_is_dropped_and_the_password_kept() {
+        let login = Arc::new(FakeLogin::default());
+        let (outcome, state) = sign_in_once(
+            no_mailbox(),
+            login.clone(),
+            Arc::new(FakeRefresher {
+                revoked: true,
+                ..FakeRefresher::default()
+            }),
+            Some(json!({"refreshToken": "r", "clientId": "c"})),
+        )
+        .await;
+        let LoginOutcome::GmailRevoked { sealed_vault } = outcome else {
+            panic!("not revoked");
+        };
+        let vault = opened(&state, &sealed_vault);
+        assert_eq!(
+            (vault.username.as_str(), vault.password.as_str()),
+            ("student123", "pw")
+        );
+        assert!(vault.gmail.is_none());
+        // VTOP was not asked: it would have mailed an OTP nobody reads.
+        assert_eq!(login.calls(), 0);
+    }
+
+    #[tokio::test]
+    async fn neither_forwarding_nor_gmail_means_no_server_sign_in() {
+        let login = Arc::new(FakeLogin::default());
+        let (outcome, _) =
+            sign_in_once(no_mailbox(), login.clone(), Arc::default(), None).await;
+        assert!(outcome == LoginOutcome::ForwardingRequired);
+        assert_eq!(login.calls(), 0);
     }
 
     #[tokio::test]

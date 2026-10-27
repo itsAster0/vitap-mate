@@ -175,6 +175,21 @@ class GoogleEmailOtpAuthService {
     return session.hasGmailScope && session.refreshToken.isNotEmpty;
   }
 
+  /// Gmail access for the server ([gmailServerGrant]), or null when Gmail
+  /// is not connected.
+  Future<Map<String, dynamic>?> serverGrant({
+    required bool deleteAfterReading,
+  }) async {
+    if (!await isReady()) return null;
+    final session = await loadSession();
+    if (session == null) return null;
+    return gmailServerGrant(
+      session,
+      sharedClientId: googleOauthClientId,
+      deleteAfterReading: deleteAfterReading,
+    );
+  }
+
   Stream<EmailOtpOAuthSession> pollForPersonalSession({
     required String clientId,
     EmailOtpOAuthSession? previousSession,

@@ -9,7 +9,8 @@ Objects. The engine only:
 - checks whose a VTOP session is (`/engine/session`);
 - seals saved credentials for an account (`/engine/seal`);
 - signs in with saved credentials, reading the OTP from the student's
-  forwarded mail (`/engine/login`);
+  forwarded mail or, without a forwarding address, from their Gmail
+  (`/engine/login`);
 - checks a mailbox owner for the edge (`/internal/mail-otp/owner`);
 - serves the MCP tools (`/mcp`, from `vtop-mcp`).
 
@@ -27,9 +28,16 @@ service, so whoever controls that service can open them. Sealing protects agains
 operator.
 
 Credentials are only sent by the phone when the student turns on server
-sign-in and OTP forwarding is set up. They are dropped when VTOP rejects
-them, when the account's `vaultTtlSecs` runs out, or when the student
-forgets them from the app.
+sign-in and the server can read the OTP: OTP forwarding is set up, or
+(without forwarding) Gmail is connected, in which case the phone sends its
+Gmail refresh token and the OAuth client it was issued to (the app's own,
+or the student's own key with its secret) along with them. They are sealed
+together, so the engine needs no Google settings of its own. Forwarding
+comes first; Gmail is only used without a forwarding address. When Google
+refuses the token, only the Gmail access is dropped (`gmail_revoked`); the
+password stays. Credentials are dropped when VTOP rejects them, when the
+account's `vaultTtlSecs` runs out, or when the student forgets them from
+the app.
 
 ## Configuration
 
@@ -40,7 +48,7 @@ Set as variables on the Railway service:
 | `VAULT_KEY`         | —       | required; base64 of 32 bytes                 |
 | `EDGE_URL`          | —       | required; the edge's public URL              |
 | `MAIL_RELAY_SECRET` | —       | required; the edge's `BRIDGE_SECRET`, 32+ characters |
-| `OTP_WAIT_SECS`     | 45      | wait for the forwarded OTP mail on sign-in   |
+| `OTP_WAIT_SECS`     | 45      | wait for the OTP mail (forwarded or Gmail) on sign-in |
 | `PORT`              | 8080    | listens on `[::]`, IPv4 where that fails     |
 
 Do not rotate `VAULT_KEY` casually: sealed credentials become unreadable,

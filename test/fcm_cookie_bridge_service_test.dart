@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 
+import 'package:vitapmate/core/utils/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
 
 void main() {
@@ -127,6 +128,21 @@ void main() {
       );
     });
 
+    test('payload carries Gmail access in place of forwarding', () {
+      const gmail = {'refreshToken': 'r', 'clientId': 'c'};
+      expect(
+        bridgeCredentialsPayload(
+          wantCredentials: true,
+          serverSignIn: true,
+          username: 'student123',
+          password: 'pw',
+          forwarding: false,
+          gmail: gmail,
+        ),
+        {'username': 'student123', 'password': 'pw', 'gmail': gmail},
+      );
+    });
+
     test('payload is username and password only', () {
       expect(
         bridgeCredentialsPayload(
@@ -197,5 +213,87 @@ void main() {
     expect(sent!.containsKey('username'), isFalse);
     expect(sent!.containsKey('fcmToken'), isFalse);
     expect(sent!.containsKey('credentials'), isFalse);
+  });
+
+  group('Gmail access for the server', () {
+    EmailOtpOAuthSession session({
+      EmailOtpAuthSource source = EmailOtpAuthSource.sharedBuiltIn,
+      List<String> scopes = const [
+        'https://www.googleapis.com/auth/gmail.modify',
+      ],
+      String? clientId,
+      String? clientSecret,
+    }) => EmailOtpOAuthSession(
+      email: 'student@vitapstudent.ac.in',
+      accessToken: 'access',
+      refreshToken: ' refresh ',
+      scopes: scopes,
+      accessTokenExpiryEpochMs: 0,
+      authSource: source,
+      oauthClientId: clientId,
+      oauthClientSecret: clientSecret,
+    );
+
+    test('names the app\'s client, without a secret, for shared access', () {
+      expect(
+        gmailServerGrant(
+          session(clientId: 'ignored', clientSecret: 'ignored'),
+          sharedClientId: 'shared.apps.googleusercontent.com',
+          deleteAfterReading: true,
+        ),
+        {
+          'refreshToken': 'refresh',
+          'clientId': 'shared.apps.googleusercontent.com',
+          'deleteAfterReading': true,
+        },
+      );
+    });
+
+    test('names the student\'s own client, with its secret', () {
+      expect(
+        gmailServerGrant(
+          session(
+            source: EmailOtpAuthSource.personalByok,
+            clientId: 'own.apps.googleusercontent.com',
+            clientSecret: 'shh',
+          ),
+          sharedClientId: 'shared.apps.googleusercontent.com',
+          deleteAfterReading: false,
+        ),
+        {
+          'refreshToken': 'refresh',
+          'clientId': 'own.apps.googleusercontent.com',
+          'clientSecret': 'shh',
+          'deleteAfterReading': false,
+        },
+      );
+    });
+
+    test('is null without a client or the Gmail scope', () {
+      expect(
+        gmailServerGrant(
+          session(source: EmailOtpAuthSource.personalByok),
+          sharedClientId: 'shared',
+          deleteAfterReading: true,
+        ),
+        isNull,
+      );
+      expect(
+        gmailServerGrant(
+          session(),
+          sharedClientId: '',
+          deleteAfterReading: true,
+        ),
+        isNull,
+      );
+      expect(
+        gmailServerGrant(
+          session(scopes: const ['email']),
+          sharedClientId: 'shared',
+          deleteAfterReading: true,
+        ),
+        isNull,
+      );
+    });
   });
 }

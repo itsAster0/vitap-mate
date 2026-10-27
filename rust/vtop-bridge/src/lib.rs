@@ -1,6 +1,6 @@
 //! The engine: all VTOP work for the Cloudflare edge, nothing stored. It
 //! checks whose a session is, seals saved credentials, signs in with them
-//! (the OTP from forwarded mail), fetches pages on a phone's session and
+//! (the OTP from forwarded mail, or from Gmail), fetches pages on a phone's session and
 //! serves the MCP tools. See `engine` and `fetch`.
 
 pub mod config;
@@ -8,6 +8,7 @@ pub mod engine;
 pub mod error;
 pub mod fakes;
 pub mod fetch;
+pub mod gmail;
 pub mod login;
 pub mod page_pack;
 pub mod pages;
@@ -29,6 +30,7 @@ use tower_http::compression::CompressionLayer;
 
 use config::Config;
 use engine::EdgeLink;
+use gmail::GmailRefresher;
 use login::ForwardedLogin;
 use vault::Sealer;
 use verify::SessionVerifier;
@@ -38,6 +40,7 @@ pub struct Parts {
     pub forwarded_login: Arc<dyn ForwardedLogin>,
     pub verifier: Arc<dyn SessionVerifier>,
     pub edge: Arc<dyn EdgeLink>,
+    pub gmail: Arc<dyn GmailRefresher>,
 }
 
 pub struct AppState {
@@ -45,6 +48,8 @@ pub struct AppState {
     pub verifier: Arc<dyn SessionVerifier>,
     pub forwarded_login: Arc<dyn ForwardedLogin>,
     pub edge: Arc<dyn EdgeLink>,
+    /// Turns saved Gmail access into access tokens.
+    pub gmail: Arc<dyn GmailRefresher>,
     /// The VTOP that phone sign-ins and fetches go to.
     pub vtop: vtop_core::VtopConfig,
     sealer: Sealer,
@@ -57,6 +62,7 @@ impl AppState {
             verifier: parts.verifier,
             forwarded_login: parts.forwarded_login,
             edge: parts.edge,
+            gmail: parts.gmail,
             vtop: vtop_core::VtopConfig::default(),
             config,
         }

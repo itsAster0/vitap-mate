@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { accountObject } from "../test/account-harness";
 import { AccountRecord, RequestRecord } from "./account-state";
-import { keyVia } from "./account";
+import { gmailGrantOf, keyVia } from "./account";
 import { hash } from "./shared/tokens";
 
 function linked(): AccountRecord {
@@ -31,7 +31,25 @@ describe("sign-in history", () => {
     rig.seed(linked());
     await rig.account.loginDone({ account: "22BCE0001", requestId: "r1", outcome: { status: "forwarding_required" } });
     await rig.account.loginDone({ account: "22BCE0001", requestId: "r2", outcome: { status: "failed", reason: "VTOP down" } });
-    expect(rig.load()!.signIns.map((s) => s.reason)).toEqual(["VTOP down", "OTP forwarding is not set up"]);
+    expect(rig.load()!.signIns.map((s) => s.reason)).toEqual(["VTOP down", "Neither OTP forwarding nor Gmail is set up"]);
+    // The credentials stay for when the server can read the OTP.
+    expect(rig.load()!.sealedVault).toBe("sealed");
+  });
+
+  it("keeps the password when Google refuses the Gmail access", async () => {
+    const rig = accountObject();
+    const doc = linked();
+    doc.saveVault("sealed", doc.vaultSavedAt!, true);
+    rig.seed(doc);
+    await rig.account.loginDone({
+      account: "22BCE0001",
+      requestId: "r1",
+      outcome: { status: "gmail_revoked", sealedVault: "without-gmail" },
+    });
+    const after = rig.load()!;
+    expect(after.sealedVault).toBe("without-gmail");
+    expect(after.vaultGmail).toBe(false);
+    expect(after.signIns[0].reason).toBe("Google refused the saved Gmail access");
   });
 
   it("records a phone's answer as a phone sign-in", async () => {
@@ -103,5 +121,75 @@ describe("rejected password", () => {
     });
     expect(response.status).toBeLessThan(300);
     expect(rig.load()!.credentialsRejectedAt).not.toBeNull();
+  });
+});
+
+describe("Gmail access with credentials", () => {
+  it("is read only when usable", () => {
+    expect(gmailGrantOf({ refreshToken: " r ", clientId: "c" })).toEqual({
+      refreshToken: "r",
+      clientId: "c",
+      deleteAfterReading: false,
+    });
+    expect(gmailGrantOf({ refreshToken: "r", clientId: "c", clientSecret: "s", deleteAfterReading: true })).toEqual({
+      refreshToken: "r",
+      clientId: "c",
+      clientSecret: "s",
+      deleteAfterReading: true,
+    });
+    expect(gmailGrantOf({ refreshToken: "", clientId: "c" })).toBeNull();
+    expect(gmailGrantOf({ refreshToken: "r" })).toBeNull();
+    expect(gmailGrantOf(null)).toBeNull();
+  });
+
+  /** A phone answering a request with credentials, for a student without
+   * a forwarding address. */
+  async function answerWith(credentials: Record<string, unknown>) {
+    const sealed: unknown[] = [];
+    const INDEX = { getByName: () => ({ get: async () => null }) };
+    const rig = accountObject(
+      (path, body) => {
+        if (path === "/engine/seal") {
+          sealed.push(body);
+          return Response.json({ sealedVault: "sealed-new" });
+        }
+        return Response.json({
+          status: "valid",
+          registrationNumber: "22BCE0001",
+          cookies: "A=1",
+          sealedSession: "s",
+          ownerHash: "owner",
+        });
+      },
+      { INDEX },
+    );
+    const doc = linked();
+    doc.clearVault();
+    rig.seed(doc);
+    rig.inner.putRequest(new RequestRecord("req1", "tok", Math.floor(Date.now() / 1000)));
+    const response = await rig.account.answer({
+      requestId: "req1",
+      responseToken: "tok",
+      cookies: [{ name: "JSESSIONID", value: "a", domain: "vtop.vitap.ac.in" }],
+      credentials,
+    });
+    expect(response.status).toBe(200);
+    return { sealed, after: rig.load()! };
+  }
+
+  it("lets the server keep credentials without forwarding", async () => {
+    const gmail = { refreshToken: "r", clientId: "c", clientSecret: "s" };
+    const { sealed, after } = await answerWith({ username: "student", password: "pw", gmail });
+    expect(sealed).toEqual([
+      { account: "22BCE0001", username: "student", password: "pw", gmail: { ...gmail, deleteAfterReading: false } },
+    ]);
+    expect(after.sealedVault).toBe("sealed-new");
+    expect(after.vaultGmail).toBe(true);
+  });
+
+  it("is required when there is no forwarding address", async () => {
+    const { sealed, after } = await answerWith({ username: "student", password: "pw" });
+    expect(sealed).toEqual([]);
+    expect(after.sealedVault).toBeNull();
   });
 });

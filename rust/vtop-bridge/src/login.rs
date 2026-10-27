@@ -1,5 +1,5 @@
 //! Signs in to VTOP with saved credentials, the OTP coming from the
-//! student's forwarded mail.
+//! student's forwarded mail or their Gmail.
 
 use std::time::Duration;
 
@@ -43,7 +43,7 @@ pub fn map_outcome(result: VtopResult<()>) -> Result<(), LoginError> {
         Err(VtopError::InvalidCredentials) => Err(LoginError::InvalidCredentials),
         // No usable code came, so the sign-in is stuck at the OTP.
         Err(VtopError::OTPRequired(..)) => {
-            Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()))
+            Err(LoginError::Failed("otp_not_found: the OTP mail did not arrive".into()))
         }
         Err(error) => Err(LoginError::Failed(error.to_string())),
     }
@@ -93,7 +93,7 @@ mod tests {
         );
         assert_eq!(
             map_outcome(Err(VtopError::OTPRequired("enter OTP".into(), 5))),
-            Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()))
+            Err(LoginError::Failed("otp_not_found: the OTP mail did not arrive".into()))
         );
         assert_eq!(
             map_outcome(Err(VtopError::NetworkError)),

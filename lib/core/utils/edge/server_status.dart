@@ -98,6 +98,7 @@ class ServerStatus {
     this.sessionSource,
     this.vaultSavedAt,
     this.vaultExpiresAt,
+    this.vaultGmail = false,
     this.credentialsRejectedAt,
     this.forwarding,
     this.phones = 0,
@@ -113,6 +114,10 @@ class ServerStatus {
   /// When the sealed password was saved, and when it will be forgotten.
   final DateTime? vaultSavedAt;
   final DateTime? vaultExpiresAt;
+
+  /// The sealed password carries Gmail access, so the server reads the OTP
+  /// from Gmail when there is no forwarding address.
+  final bool vaultGmail;
 
   /// When VTOP last refused the saved password.
   final DateTime? credentialsRejectedAt;
@@ -134,6 +139,7 @@ class ServerStatus {
       sessionSource: json['sessionSource'] as String?,
       vaultSavedAt: _time(json['vaultSavedAt']),
       vaultExpiresAt: _time(json['vaultExpiresAt']),
+      vaultGmail: json['vaultGmail'] == true,
       credentialsRejectedAt: _time(json['credentialsRejectedAt']),
       forwarding: json['forwarding'] as String?,
       phones: json['phones'] is int ? json['phones'] as int : 0,

@@ -145,3 +145,31 @@ class EmailOtpOAuthSession {
     );
   }
 }
+
+/// What the server needs to read VTOP's OTP from Gmail by itself, sealed
+/// with the saved credentials: the refresh token and the OAuth client it
+/// was issued to. That is [sharedClientId] (no secret) for the app's own
+/// sign-in, the student's own client for a personal one. Null when the
+/// session lacks a usable client or token. Never logged.
+Map<String, dynamic>? gmailServerGrant(
+  EmailOtpOAuthSession session, {
+  required String sharedClientId,
+  required bool deleteAfterReading,
+}) {
+  final personal = session.authSource == EmailOtpAuthSource.personalByok;
+  final clientId = (personal ? session.oauthClientId : sharedClientId)?.trim();
+  final refreshToken = session.refreshToken.trim();
+  if (clientId == null ||
+      clientId.isEmpty ||
+      refreshToken.isEmpty ||
+      !session.hasGmailScope) {
+    return null;
+  }
+  final secret = personal ? session.oauthClientSecret?.trim() : null;
+  return {
+    'refreshToken': refreshToken,
+    'clientId': clientId,
+    if (secret != null && secret.isNotEmpty) 'clientSecret': secret,
+    'deleteAfterReading': deleteAfterReading,
+  };
+}

@@ -6,6 +6,7 @@ import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/settings.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
@@ -79,6 +80,12 @@ class _BridgeServerAccountApi implements ServerAccountApi {
       username: user.username,
       password: user.password,
       forwarding: forwarding,
+      gmail: forwarding
+          ? null
+          : await serverGmailGrant(
+              _ref.read(googleEmailOtpAuthServiceProvider),
+              await _ref.read(settingsProvider.future),
+            ),
     );
   }
 
@@ -92,15 +99,15 @@ class _BridgeServerAccountApi implements ServerAccountApi {
     if (withCredentials) {
       credentials = await _credentials();
       if (credentials == null) {
-        throw StateError('Set up OTP email forwarding first.');
+        throw StateError('Set up OTP email forwarding or connect Gmail first.');
       }
     }
     final semid = (await _ref.read(vtopUserProvider.future)).semid;
     final label = await currentDeviceLabel();
     await _withService((s, c) async {
-      // The server keeps credentials only for the owner of a forwarding
-      // address, so tie it to this student first.
-      if (credentials != null) {
+      // Without Gmail access the server keeps credentials only for the
+      // owner of a forwarding address, so tie it to this student first.
+      if (credentials != null && credentials['gmail'] == null) {
         await _ref.read(mailForwardingServiceProvider).claimOwner(cookies: c);
       }
       // Registers this install again if the server lost it.
@@ -229,7 +236,7 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
       await link(withCredentials: true);
       if (!(state.value?.savedCredentials ?? false)) {
         throw StateError(
-          'The server could not keep your password. Check OTP email forwarding and try again.',
+          'The server could not keep your password. Check OTP email forwarding or Gmail and try again.',
         );
       }
     } else {
