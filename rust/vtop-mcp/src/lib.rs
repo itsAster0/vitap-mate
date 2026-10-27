@@ -3,6 +3,8 @@
 
 pub mod bridge;
 pub mod config;
+pub mod outings;
+pub mod prompts;
 pub mod tools;
 
 use std::collections::HashMap;

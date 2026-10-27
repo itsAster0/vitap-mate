@@ -33,7 +33,10 @@ use transport::{Transport, TransportError, TransportErrorKind};
 
 pub use course_page::{CourseFile, CourseFileInfo};
 pub use email_otp::EmailOtpLogin;
-pub use hostel::{GeneralOutingApplication, OutingKind, WeekendOutingApplication};
+pub use hostel::{
+    check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
+    WeekendOutingApplication,
+};
 use reqwest::cookie::CookieStore;
 
 const AUTH: &str = "rust.auth";
