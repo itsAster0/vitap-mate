@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/core/di/provider/clinet_provider.dart';
 import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
 import 'package:vitapmate/core/providers/on_device_mode.dart';
@@ -18,6 +19,7 @@ import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
 import 'package:vitapmate/core/utils/edge/edge_device.dart';
 import 'package:vitapmate/core/utils/edge/credentials_rejected.dart';
 import 'package:vitapmate/core/utils/edge/edge_events.dart';
+import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
@@ -364,8 +366,8 @@ Future<_PreparedCookieBridgePayload> _authenticatedCookieEditorCookies({
 }
 
 /// The credentials to hand the server: only when it asked, the user turned
-/// on offline sign-in, and OTP email forwarding is set up (the server reads
-/// the OTP from forwarded mail).
+/// on offline sign-in, and the server can read the OTP, from forwarded
+/// mail or (with the Gmail access sent along) from Gmail.
 Future<Map<String, dynamic>?> bridgeCredentialsFor(
   ProviderContainer container,
   VtopUserEntity user, {
@@ -385,7 +387,29 @@ Future<Map<String, dynamic>?> bridgeCredentialsFor(
     username: user.username?.trim() ?? '',
     password: user is ConfiguredVtopUser ? user.password : '',
     forwarding: forwarding,
+    gmail: forwarding
+        ? null
+        : await serverGmailGrant(
+            container.read(googleEmailOtpAuthServiceProvider),
+            prefs,
+          ),
   );
+}
+
+/// Gmail access for the server, or null when Gmail is not connected or
+/// cannot be read. Only sent without forwarding, which comes first.
+Future<Map<String, dynamic>?> serverGmailGrant(
+  GoogleEmailOtpAuthService gmail,
+  SharedPreferencesWithCache prefs,
+) async {
+  try {
+    return await gmail.serverGrant(
+      deleteAfterReading:
+          prefs.getBool(emailOtpDeleteAfterReadingSettingKey) ?? true,
+    );
+  } catch (_) {
+    return null;
+  }
 }
 
 /// Logs in headless (no OTP prompt is possible here) and returns the VTOP
@@ -531,24 +555,30 @@ String cookieEditorJsonFromHeader(String cookieHeader) {
 }
 
 /// Credentials the phone may hand the server so it can sign in on its own.
-/// Null unless every required piece is present; secrets are never logged
-/// here.
+/// Null unless every required piece is present, including a way for the
+/// server to read the OTP: [forwarding], or [gmail] access. Secrets are
+/// never logged here.
 Map<String, dynamic>? bridgeCredentialsPayload({
   required bool wantCredentials,
   required bool serverSignIn,
   required String username,
   required String password,
   required bool forwarding,
+  Map<String, dynamic>? gmail,
 }) {
   final trimmedUsername = username.trim();
   if (!wantCredentials ||
       !serverSignIn ||
-      !forwarding ||
+      (!forwarding && gmail == null) ||
       trimmedUsername.isEmpty ||
       password.trim().isEmpty) {
     return null;
   }
-  return {'username': trimmedUsername, 'password': password};
+  return {
+    'username': trimmedUsername,
+    'password': password,
+    ...?(gmail == null ? null : {'gmail': gmail}),
+  };
 }
 
 class CookieCallbackException implements Exception {

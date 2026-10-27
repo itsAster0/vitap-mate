@@ -69,7 +69,7 @@ impl ForwardedLogin for FakeLogin {
                 .await
                 .is_none()
         {
-            return Err(LoginError::Failed("otp_not_found: no forwarded OTP".into()));
+            return Err(LoginError::Failed("otp_not_found: the OTP mail did not arrive".into()));
         }
         let mut results = self.results.lock().unwrap();
         if results.len() > 1 {
@@ -101,5 +101,29 @@ impl crate::verify::SessionVerifier for FakeVerifier {
             .find_map(|part| part.trim().strip_prefix("REG="))
             .map(str::to_uppercase)
             .ok_or(VerifyError::Expired)
+    }
+}
+
+/// Hands out a token for any grant, or refuses them all as revoked.
+#[derive(Default)]
+pub struct FakeRefresher {
+    pub revoked: bool,
+    pub calls: AtomicUsize,
+}
+
+#[async_trait]
+impl crate::gmail::GmailRefresher for FakeRefresher {
+    async fn refresh(
+        &self,
+        _grant: &crate::gmail::GmailGrant,
+    ) -> Result<crate::gmail::FreshToken, crate::gmail::RefreshError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.revoked {
+            return Err(crate::gmail::RefreshError::InvalidGrant);
+        }
+        Ok(crate::gmail::FreshToken {
+            access_token: "access".into(),
+            expires_at: vtop_core::now_unix() + 3600,
+        })
     }
 }

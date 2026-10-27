@@ -249,7 +249,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
             eyebrow: 'OPTION 2 · MOST CONTROL',
             title: 'Your own Google key',
             description:
-                'Make a free Google Cloud key once. Vitap Mate reads the OTP straight from Gmail; nothing passes through our server.',
+                'Make a free Google Cloud key once. Vitap Mate reads the OTP straight from Gmail; nothing passes through our server unless you let it sign in for you.',
             facts: const [
               ('One-time setup', '~10 min'),
               ('Who sees mail', 'Only this phone'),
@@ -257,7 +257,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
             points: const [
               MethodPoint('Can move used OTP mail to Trash'),
               MethodPoint(
-                'Only this phone; server sign-in needs forwarding',
+                'Lets the server sign in for you, if you turn it on: your Gmail access is then sealed on it (forwarding is used instead when set up)',
                 caveat: true,
               ),
               MethodPoint(

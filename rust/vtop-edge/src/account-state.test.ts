@@ -121,6 +121,7 @@ describe("accounts", () => {
     const a = account();
     expect(a.usableVault(NOW)).toBeNull();
     expect(a.wantCredentials(NOW)).toBe(true);
+    a.mailboxId = "m";
     a.saveVault("v", NOW);
     expect(a.usableVault(NOW + 10 * 86_400)).toBe("v");
     expect(a.wantCredentials(NOW)).toBe(false);
@@ -128,6 +129,30 @@ describe("accounts", () => {
     expect(a.wantCredentials(NOW)).toBe(true);
     expect(a.usableVault(NOW + 86_399)).toBe("v");
     expect(a.usableVault(NOW + 86_400)).toBeNull();
+  });
+
+  it("want credentials again while the server cannot read the OTP", () => {
+    const a = account();
+    a.saveVault("v", NOW);
+    // No forwarding address and no Gmail access.
+    expect(a.wantCredentials(NOW)).toBe(true);
+    a.saveVault("v", NOW, true);
+    expect(a.wantCredentials(NOW)).toBe(false);
+    expect(a.view(null, false, NOW).vaultGmail).toBe(true);
+    expect(a.statusView(null).vaultGmail).toBe(true);
+  });
+
+  it("drop only the Gmail access Google refused", () => {
+    const a = account();
+    a.saveVault("v", NOW, true);
+    a.dropGmail("w");
+    expect(a.usableVault(NOW)).toBe("w");
+    expect(a.vaultSavedAt).toBe(NOW);
+    expect(a.vaultGmail).toBe(false);
+    // Nothing to drop it from once the credentials are gone.
+    a.clearVault();
+    a.dropGmail("x");
+    expect(a.sealedVault).toBeNull();
   });
 
   it("drop rejected credentials until new ones come", () => {

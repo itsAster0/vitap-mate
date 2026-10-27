@@ -107,6 +107,14 @@ class ServerDataPage extends HookConsumerWidget {
                 'OTP forwarding address',
                 s.forwarding ?? 'Not set up',
               ),
+              if (s.vaultSavedAt != null && s.vaultGmail)
+                item(
+                  FLucideIcons.inbox,
+                  'Gmail access',
+                  s.forwarding == null
+                      ? 'sealed with the password; the server reads the OTP from Gmail'
+                      : 'sealed with the password; used only without forwarding',
+                ),
               item(FLucideIcons.key, 'Access keys', '${s.keys.length}'),
               item(FLucideIcons.smartphone, 'Linked phones', '${s.phones}'),
             ],

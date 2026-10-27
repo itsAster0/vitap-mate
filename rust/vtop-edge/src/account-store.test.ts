@@ -37,6 +37,24 @@ describe("account storage", () => {
     expect(c.keys[0].uses.map((u) => u.via)).toEqual(["extension", "mcp"]);
   });
 
+  it("adds the Gmail column to accounts stored before it", () => {
+    const db = memorySql();
+    prepareAccountDb(db);
+    saveAccount(db, linked());
+    // As an account stored before the column was added.
+    db.exec("ALTER TABLE account DROP COLUMN vault_gmail");
+    prepareAccountDb(db);
+    const a = loadAccount(db)!;
+    expect(a.sealedVault).toBe("sealed");
+    expect(a.vaultGmail).toBe(false);
+    a.saveVault("sealed", NOW, true);
+    saveAccount(db, a);
+    expect(loadAccount(db)!.vaultGmail).toBe(true);
+    // Preparing again leaves it be.
+    prepareAccountDb(db);
+    expect(loadAccount(db)!.vaultGmail).toBe(true);
+  });
+
   it("a forgotten password stays forgotten after a reload", () => {
     const db = memorySql();
     prepareAccountDb(db);

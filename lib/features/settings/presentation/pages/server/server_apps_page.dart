@@ -114,25 +114,24 @@ class ServerAppsPage extends HookConsumerWidget {
         ? _Offline.wait10
         : _Offline.wait20;
 
-    Future<void> saveOffline(_Offline mode) => run(
-      'Could not change',
-      () async {
-        if (mode == _Offline.phone) {
-          await actions.setServerSignIn(false);
-          return;
-        }
-        // Seal the password first if it is not already (needs OTP forwarding).
-        if (!(account.value?.savedCredentials ?? false)) {
-          await actions.setServerSignIn(true);
-        }
-        await actions.updateSettings(
-          BridgeSettings(
-            alwaysUseVault: mode == _Offline.server,
-            phoneWaitSecs: mode == _Offline.wait10 ? 10 : 20,
-          ),
-        );
-      },
-    );
+    Future<void> saveOffline(_Offline mode) =>
+        run('Could not change', () async {
+          if (mode == _Offline.phone) {
+            await actions.setServerSignIn(false);
+            return;
+          }
+          // Seal the password first if it is not already (needs OTP
+          // forwarding or Gmail).
+          if (!(account.value?.savedCredentials ?? false)) {
+            await actions.setServerSignIn(true);
+          }
+          await actions.updateSettings(
+            BridgeSettings(
+              alwaysUseVault: mode == _Offline.server,
+              phoneWaitSecs: mode == _Offline.wait10 ? 10 : 20,
+            ),
+          );
+        });
 
     Future<void> chooseOffline(_Offline mode) async {
       pendingOffline.value = mode;
@@ -222,7 +221,7 @@ class ServerAppsPage extends HookConsumerWidget {
             ],
           ),
           const ServerNote(
-            'The server signing in needs your password sealed on it and OTP email forwarding set up.',
+            'The server signing in needs your password sealed on it, and OTP email forwarding or Gmail connected. Without forwarding, your Gmail access is sealed with the password so the server can read the OTP.',
           ),
           SectionHeader(
             title: 'Access keys',
