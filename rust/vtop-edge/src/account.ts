@@ -17,7 +17,7 @@
 //   `POST /v1/session/expire`.
 // - The phone's answer to a request: `POST /v1/session/answer?account=`.
 // - The app, with a live VTOP session: `/v1/link`, `/v1/keys`,
-//   `/v1/keys/revoke`, `/v1/account`, `/v1/account/{fcm-token,
+//   `/v1/keys/revoke`, `/v1/keys/outings`, `/v1/account`, `/v1/account/{fcm-token,
 //   forget-credentials,delete,settings,semester,remove-phone}`. And with
 //   only its app secret: `/v1/account/credentials-rejected` (VTOP turned
 //   the password down on the phone, so the server must stop trying it too).
@@ -112,7 +112,9 @@ async function forwardingMailbox(env: Env, ownerHash: string): Promise<string | 
 /** The routes this module answers at the edge. */
 export function handles(path: string): boolean {
   return (
-    ["/v1/whoami", "/v1/session", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/account"].includes(path) ||
+    ["/v1/whoami", "/v1/session", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
+      path,
+    ) ||
     path.startsWith("/v1/session/") ||
     path.startsWith("/v1/account/")
   );
@@ -122,6 +124,7 @@ const APP_OPS: Record<string, AppOp> = {
   "/v1/link": "link",
   "/v1/keys": "create-key",
   "/v1/keys/revoke": "revoke-key",
+  "/v1/keys/outings": "key-outings",
   "/v1/account": "account",
   "/v1/account/fcm-token": "fcm-token",
   "/v1/account/forget-credentials": "forget-credentials",
@@ -264,6 +267,7 @@ type AppOp =
   | "link"
   | "create-key"
   | "revoke-key"
+  | "key-outings"
   | "account"
   | "fcm-token"
   | "forget-credentials"
@@ -339,15 +343,21 @@ const EXTRA_SCHEMA = [
 
 /** `account` columns added after `SCHEMA`, the same way. */
 const EXTRA_ACCOUNT_COLUMNS = [["vault_gmail", "INTEGER NOT NULL DEFAULT 0"]];
+/** `keys` columns added after `SCHEMA`. */
+const EXTRA_KEY_COLUMNS = [["outings", "INTEGER NOT NULL DEFAULT 0"]];
 
+function addColumns(db: SqlStorage, table: string, wanted: string[][]): void {
+  const columns = new Set(sql.rows(db, `PRAGMA table_info(${table})`).map((row) => sql.text(row, "name")));
+  for (const [name, type] of wanted) {
+    if (!columns.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
+  }
+}
 
 export function prepareAccountDb(db: SqlStorage): void {
   sql.prepare(db, SCHEMA);
   for (const statement of EXTRA_SCHEMA) db.exec(statement);
-  const columns = new Set(sql.rows(db, "PRAGMA table_info(account)").map((row) => sql.text(row, "name")));
-  for (const [name, type] of EXTRA_ACCOUNT_COLUMNS) {
-    if (!columns.has(name)) db.exec(`ALTER TABLE account ADD COLUMN ${name} ${type}`);
-  }
+  addColumns(db, "account", EXTRA_ACCOUNT_COLUMNS);
+  addColumns(db, "keys", EXTRA_KEY_COLUMNS);
 }
 
 type Value = string | number | null;
@@ -409,7 +419,15 @@ function keyFrom(row: sql.Row): KeyRecord | null {
   const createdAt = sql.int(row, "created_at");
   const deviceId = sql.text(row, "device_id");
   if (keyHash === null || label === null || createdAt === null || deviceId === null) return null;
-  return { hash: keyHash, label, createdAt, lastUsedAt: sql.int(row, "last_used_at"), deviceId, uses: [] };
+  return {
+    hash: keyHash,
+    label,
+    createdAt,
+    lastUsedAt: sql.int(row, "last_used_at"),
+    deviceId,
+    outings: sql.flag(row, "outings"),
+    uses: [],
+  };
 }
 
 function signInFrom(row: sql.Row): SignInRecord | null {
@@ -513,12 +531,13 @@ function requestFrom(row: sql.Row): RequestRecord | null {
 
 function putKey(db: SqlStorage, key: KeyRecord): void {
   db.exec(
-    "INSERT OR REPLACE INTO keys (hash, label, created_at, last_used_at, device_id) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO keys (hash, label, created_at, last_used_at, device_id, outings) VALUES (?, ?, ?, ?, ?, ?)",
     key.hash,
     key.label,
     key.createdAt,
     key.lastUsedAt,
     key.deviceId,
+    key.outings ? 1 : 0,
   );
 }
 
@@ -597,14 +616,20 @@ function writeChanges(db: SqlStorage, base: AccountRecord, doc: AccountRecord): 
     const was = base.keys.find((k) => k.hash === key.hash);
     if (!was) {
       putKey(db, key);
-    } else if (was.label !== key.label || was.lastUsedAt !== key.lastUsedAt || was.deviceId !== key.deviceId) {
+    } else if (
+      was.label !== key.label ||
+      was.lastUsedAt !== key.lastUsedAt ||
+      was.deviceId !== key.deviceId ||
+      was.outings !== key.outings
+    ) {
       // A key revoked meanwhile stays revoked: only update a row that is
       // still there.
       db.exec(
-        "UPDATE keys SET label = ?, last_used_at = ?, device_id = ? WHERE hash = ?",
+        "UPDATE keys SET label = ?, last_used_at = ?, device_id = ?, outings = ? WHERE hash = ?",
         key.label,
         key.lastUsedAt,
         key.deviceId,
+        key.outings ? 1 : 0,
         key.hash,
       );
     }
@@ -742,6 +767,7 @@ export class Account extends DurableObject<Env> {
       keyLabel: key?.label ?? null,
       keyCreatedAt: key?.createdAt ?? null,
       keyLastUsedAt: key?.lastUsedAt ?? null,
+      keyOutings: key?.outings ?? false,
       semesterId: doc.semesterId,
       settings: doc.settings,
       phoneLinked: doc.linked(),
@@ -1241,12 +1267,21 @@ export class Account extends DurableObject<Env> {
         const key = newKey();
         const keyHash = hash(key);
         // Only this phone is asked for the key's sessions.
-        if (!doc.addKey(keyHash, keyLabel(str(body.label)), doc.phones[me!].deviceId, at)) {
+        const outings = body.outings === true;
+        if (!doc.addKey(keyHash, keyLabel(str(body.label)), doc.phones[me!].deviceId, at, outings)) {
           return error(409, "key_limit", "This account already has the most keys allowed; revoke one first.");
         }
         await keyIndex(this.env, keyHash).put(doc.id);
         this.save(doc);
         return Response.json({ id: keyId(keyHash), key, mcpUrl: mcpUrl(this.env) }, { status: 201 });
+      }
+      case "key-outings": {
+        if (typeof body.outings !== "boolean") return badRequest("outings must be true or false.");
+        if (!doc.setKeyOutings(str(body.id) ?? "", body.outings)) {
+          return error(404, "key_not_found", "No such key on this account.");
+        }
+        this.save(doc);
+        return empty();
       }
       case "revoke-key": {
         const revoked = doc.revokeKey(str(body.id) ?? "");

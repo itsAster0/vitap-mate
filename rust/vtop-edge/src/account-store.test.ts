@@ -55,6 +55,23 @@ describe("account storage", () => {
     expect(loadAccount(db)!.vaultGmail).toBe(true);
   });
 
+  it("keeps a key's outing permission, and adds the column to keys stored before it", () => {
+    const db = memorySql();
+    prepareAccountDb(db);
+    saveAccount(db, linked());
+    db.exec("ALTER TABLE keys DROP COLUMN outings");
+    prepareAccountDb(db);
+    const a = loadAccount(db)!;
+    expect(a.keys[0].outings).toBe(false);
+    a.setKeyOutings("00abcdef", true);
+    saveAccount(db, a);
+    const b = loadAccount(db)!;
+    expect(b.keys[0].outings).toBe(true);
+    b.setKeyOutings("00abcdef", false);
+    saveAccount(db, b);
+    expect(loadAccount(db)!.keys[0].outings).toBe(false);
+  });
+
   it("a forgotten password stays forgotten after a reload", () => {
     const db = memorySql();
     prepareAccountDb(db);

@@ -23,7 +23,8 @@ abstract interface class ServerAccountApi {
   /// Links this phone (its FCM token), with the saved credentials when
   /// [withCredentials].
   Future<void> link({required bool withCredentials});
-  Future<BridgeKey> createKey(String label);
+  Future<BridgeKey> createKey(String label, {bool outings = false});
+  Future<void> setKeyOutings(String id, bool outings);
   Future<void> revokeKey(String id);
   Future<void> removePhone(BridgePhone phone);
   Future<void> forgetCredentials();
@@ -132,8 +133,15 @@ class _BridgeServerAccountApi implements ServerAccountApi {
   }
 
   @override
-  Future<BridgeKey> createKey(String label) =>
-      _withService((s, c) => s.createKey(cookies: c, label: label));
+  Future<BridgeKey> createKey(String label, {bool outings = false}) =>
+      _withService(
+        (s, c) => s.createKey(cookies: c, label: label, outings: outings),
+      );
+
+  @override
+  Future<void> setKeyOutings(String id, bool outings) => _withService(
+    (s, c) => s.setKeyOutings(cookies: c, id: id, outings: outings),
+  );
 
   @override
   Future<void> revokeKey(String id) =>
@@ -206,16 +214,23 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
     await _reload();
   });
 
-  Future<BridgeKey> createKey(String label) => _kept(() async {
-    if (!(state.value?.linkedHere ?? false)) {
-      final prefs = await ref.read(settingsProvider.future);
-      await link(
-        withCredentials: prefs.getBool(bridgeServerSignInSettingKey) ?? false,
-      );
-    }
-    final key = await _api.createKey(label);
+  Future<BridgeKey> createKey(String label, {bool outings = false}) => _kept(
+    () async {
+      if (!(state.value?.linkedHere ?? false)) {
+        final prefs = await ref.read(settingsProvider.future);
+        await link(
+          withCredentials: prefs.getBool(bridgeServerSignInSettingKey) ?? false,
+        );
+      }
+      final key = await _api.createKey(label, outings: outings);
+      await _reload();
+      return key;
+    },
+  );
+
+  Future<void> setKeyOutings(String id, bool outings) => _kept(() async {
+    await _api.setKeyOutings(id, outings);
     await _reload();
-    return key;
   });
 
   Future<void> revokeKey(String id) => _kept(() async {

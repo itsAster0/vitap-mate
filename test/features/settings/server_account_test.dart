@@ -40,10 +40,14 @@ class _Api implements ServerAccountApi {
   }
 
   @override
-  Future<BridgeKey> createKey(String label) async {
-    calls.add('createKey:$label');
+  Future<BridgeKey> createKey(String label, {bool outings = false}) async {
+    calls.add('createKey:$label:$outings');
     return const BridgeKey(id: 'k', key: 'vtm_x', mcpUrl: 'https://e/mcp');
   }
+
+  @override
+  Future<void> setKeyOutings(String id, bool outings) async =>
+      calls.add('outings:$id:$outings');
 
   @override
   Future<void> revokeKey(String id) async => calls.add('revoke:$id');
@@ -143,8 +147,15 @@ void main() {
   test('a key on an unlinked phone links it first', () async {
     final (c, api) = await rig(accountWith(linkedHere: false));
     await controller(c).createKey('laptop');
-    expect(api.calls, ['link:false', 'createKey:laptop']);
+    expect(api.calls, ['link:false', 'createKey:laptop:false']);
     expect(await pref(c, bridgeLinkedSettingKey), isTrue);
+  });
+
+  test('outing permission is sent on create and when changed', () async {
+    final (c, api) = await rig(accountWith());
+    await controller(c).createKey('agent', outings: true);
+    await controller(c).setKeyOutings('k', false);
+    expect(api.calls, ['createKey:agent:true', 'outings:k:false']);
   });
 
   test('removing this phone unlinks it here', () async {

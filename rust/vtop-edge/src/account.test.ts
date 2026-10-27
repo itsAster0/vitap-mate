@@ -11,6 +11,7 @@ describe("account routes", () => {
       "/v1/session/answer",
       "/v1/link",
       "/v1/keys",
+      "/v1/keys/outings",
       "/v1/account",
       "/v1/account/credentials-rejected",
     ]) {

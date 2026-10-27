@@ -11,6 +11,9 @@ import 'package:vitapmate/features/settings/presentation/pages/server/server_app
 import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
 
 class _Api implements ServerAccountApi {
+  bool outings = false;
+  final calls = <String>[];
+
   @override
   Future<BridgeAccount> account() async => BridgeAccount(
     registrationNumber: '22BCE0001',
@@ -25,9 +28,16 @@ class _Api implements ServerAccountApi {
         label: 'laptop',
         createdAt: DateTime.utc(2026),
         lastUsedAt: DateTime.now().toUtc(),
+        outings: outings,
       ),
     ],
   );
+
+  @override
+  Future<void> setKeyOutings(String id, bool outings) async {
+    calls.add('outings:$id:$outings');
+    this.outings = outings;
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -40,13 +50,14 @@ void main() {
     WidgetTester tester,
     Widget page, {
     ServerStatus status = const ServerStatus(),
+    _Api? api,
   }) async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.withData({bridgeLinkedSettingKey: true});
     final container = ProviderContainer(
       retry: (_, _) => null,
       overrides: [
-        serverAccountApiProvider.overrideWithValue(_Api()),
+        serverAccountApiProvider.overrideWithValue(api ?? _Api()),
         serverStatusProvider.overrideWith((ref) async => status),
       ],
     );
@@ -93,5 +104,25 @@ void main() {
       find.textContaining('MCP just now · Extension 3 h ago'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('tapping a key asks, then allows outing applications', (
+    tester,
+  ) async {
+    final api = _Api();
+    await pump(tester, const ServerAppsPage(), api: api);
+    expect(find.textContaining('can apply for outings'), findsNothing);
+
+    await tester.tap(find.text('laptop'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Allow outing applications for "laptop"?'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Allow'));
+    await tester.pumpAndSettle();
+
+    expect(api.calls, ['outings:k1:true']);
+    expect(find.textContaining('can apply for outings'), findsOneWidget);
   });
 }

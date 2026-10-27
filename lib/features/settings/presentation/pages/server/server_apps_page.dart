@@ -7,6 +7,7 @@ import 'package:vitapmate/core/router/paths.dart';
 import 'package:vitapmate/core/utils/edge/server_status.dart';
 import 'package:vitapmate/core/utils/toast/common_toast.dart';
 import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/core/widgets/app_dialog.dart';
 import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
 import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
@@ -36,6 +37,7 @@ class ServerAppsPage extends HookConsumerWidget {
     // What is in flight, so its own row shows it.
     final creating = useState(false);
     final revoking = useState<String?>(null);
+    final changingOutings = useState<String?>(null);
     final pendingOffline = useState<_Offline?>(null);
 
     Future<void> create() async {
@@ -52,12 +54,15 @@ class ServerAppsPage extends HookConsumerWidget {
         return;
       }
       if (!context.mounted) return;
-      final label = await askKeyLabel(context);
-      if (label == null) return;
+      final choice = await askKeyLabel(context);
+      if (choice == null) return;
       creating.value = true;
       try {
         await run('Could not create a key', () async {
-          final key = await actions.createKey(label);
+          final key = await actions.createKey(
+            choice.label,
+            outings: choice.outings,
+          );
           creating.value = false;
           if (context.mounted) await showAccessKey(context, key, fresh: true);
         });
@@ -95,6 +100,29 @@ class ServerAppsPage extends HookConsumerWidget {
         await run('Could not revoke', () => actions.revokeKey(key.id));
       } finally {
         if (context.mounted) revoking.value = null;
+      }
+    }
+
+    Future<void> toggleOutings(BridgeKeyInfo key) async {
+      final on = !key.outings;
+      if (!await confirm(
+        context,
+        title: on
+            ? 'Allow outing applications for "${key.label}"?'
+            : 'Stop outing applications for "${key.label}"?',
+        body: on
+            ? outingPermissionDetail
+            : 'AI agents using this key can still see your outings, but no longer apply for or cancel them.',
+        action: on ? 'Allow' : 'Stop',
+        direction: Axis.horizontal,
+      )) {
+        return;
+      }
+      changingOutings.value = key.id;
+      try {
+        await run('Could not change', () => actions.setKeyOutings(key.id, on));
+      } finally {
+        if (context.mounted) changingOutings.value = null;
       }
     }
 
@@ -240,8 +268,11 @@ class ServerAppsPage extends HookConsumerWidget {
                   subtitle: Text(
                     revoking.value == key.id
                         ? 'Revoking…'
+                        : changingOutings.value == key.id
+                        ? 'Saving…'
                         : [
                             key.id,
+                            if (key.outings) 'can apply for outings',
                             for (final use in usesOf(key.id).take(3))
                               '${_via(use.via)} ${ago(use.at)}',
                             if (usesOf(key.id).isEmpty)
@@ -250,6 +281,7 @@ class ServerAppsPage extends HookConsumerWidget {
                                   : 'used ${ago(key.lastUsedAt!)}',
                           ].join(' · '),
                   ),
+                  onPress: busy.value ? null : () => toggleOutings(key),
                   onLongPress: busy.value ? null : () => showSaved(key),
                   suffix: revoking.value == key.id
                       ? const Padding(
@@ -280,7 +312,9 @@ class ServerAppsPage extends HookConsumerWidget {
               ),
             ],
           ),
-          const ServerNote('Long-press a key to show it again on this phone.'),
+          const ServerNote(
+            'Tap a key to let AI agents apply for outings with it, or stop them. Long-press it to show the key again on this phone.',
+          ),
         ],
         const SectionHeader(title: 'Get the apps'),
         FTileGroup(

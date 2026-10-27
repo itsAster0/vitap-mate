@@ -184,6 +184,19 @@ describe("accounts", () => {
     expect(plan(settings, true)).toEqual({ kind: "phone_first", waitSecs: 20 });
   });
 
+  it("outing actions are off for a new key until turned on", () => {
+    const a = account();
+    a.addPhone(phone("d1", "vta_x"));
+    a.addKey("00abcdefgh", "k", "d1", NOW);
+    a.addKey("01abcdefgh", "k", "d1", NOW, true);
+    expect(a.keys.map((k) => k.outings)).toEqual([false, true]);
+    expect(a.setKeyOutings("00abcdef", true)).toBe(true);
+    expect(a.setKeyOutings("01abcdef", false)).toBe(true);
+    expect(a.keys.map((k) => k.outings)).toEqual([true, false]);
+    expect(a.setKeyOutings("99abcdef", true)).toBe(false);
+    expect(a.view(0, false, NOW).keys.map((k) => k.outings)).toEqual([true, false]);
+  });
+
   it("limit, touch and revoke keys", () => {
     const a = account();
     a.addPhone(phone("d1", "vta_x"));
