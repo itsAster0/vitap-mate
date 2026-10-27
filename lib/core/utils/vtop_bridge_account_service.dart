@@ -172,12 +172,16 @@ class BridgeKeyInfo {
     required this.createdAt,
     required this.lastUsedAt,
     this.phoneId,
+    this.outings = false,
   });
 
   final String id;
   final String label;
   final DateTime createdAt;
   final DateTime? lastUsedAt;
+
+  /// Whether AI agents may apply for and cancel outings with it.
+  final bool outings;
 
   /// The phone that created it ([BridgePhone.id]), the only one asked for
   /// its sessions; null for keys from before, which ask every phone.
@@ -473,11 +477,12 @@ class VtopBridgeAccountService {
   Future<BridgeKey> createKey({
     required String cookies,
     required String label,
+    bool outings = false,
   }) async {
     final body = await _post(
       '/v1/keys',
       cookies: cookies,
-      body: {'label': label},
+      body: {'label': label, 'outings': outings},
     );
     final key = BridgeKey(
       id: '${body['id'] ?? ''}',
@@ -504,6 +509,7 @@ class VtopBridgeAccountService {
                 ? null
                 : _dateTimeFromUnixSeconds(raw['lastUsedAt']),
             phoneId: raw['phoneId'] is String ? raw['phoneId'] as String : null,
+            outings: raw['outings'] == true,
           ),
         );
       }
@@ -548,6 +554,20 @@ class VtopBridgeAccountService {
       credentialsRejectedAt: body['credentialsRejectedAt'] == null
           ? null
           : _dateTimeFromUnixSeconds(body['credentialsRejectedAt']),
+    );
+  }
+
+  /// Lets AI agents using key [id] apply for and cancel outings, or stops
+  /// them.
+  Future<void> setKeyOutings({
+    required String cookies,
+    required String id,
+    required bool outings,
+  }) async {
+    await _post(
+      '/v1/keys/outings',
+      cookies: cookies,
+      body: {'id': id, 'outings': outings},
     );
   }
 

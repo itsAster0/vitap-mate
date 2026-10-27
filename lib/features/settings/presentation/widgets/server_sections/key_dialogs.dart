@@ -52,9 +52,17 @@ useServerAction(BuildContext context, WidgetRef ref) {
   return (busy: busy, run: run);
 }
 
-Future<String?> askKeyLabel(BuildContext context) {
+/// What agents may do with outings, as the switch and dialogs say it.
+const outingPermissionTitle = 'Allow outing applications';
+const outingPermissionDetail =
+    'AI agents using this key can apply for and cancel your outings. They show you each request and need your yes before sending it.';
+
+/// The new key's name, and whether it may act on outings (off unless
+/// switched on here).
+Future<({String label, bool outings})?> askKeyLabel(BuildContext context) {
   final controller = TextEditingController(text: 'My laptop');
-  return showFDialog<String>(
+  final outings = ValueNotifier(false);
+  return showFDialog<({String label, bool outings})>(
     context: context,
     useRootNavigator: true,
     builder: (context, style, animation) => AppDialog(
@@ -70,6 +78,16 @@ Future<String?> askKeyLabel(BuildContext context) {
           FTextField(
             control: FTextFieldControl.managed(controller: controller),
           ),
+          const SizedBox(height: Space.md),
+          ValueListenableBuilder(
+            valueListenable: outings,
+            builder: (context, on, _) => FSwitch(
+              label: const Text(outingPermissionTitle),
+              description: const Text('Off unless you need it.'),
+              value: on,
+              onChange: (value) => outings.value = value,
+            ),
+          ),
         ],
       ),
       actions: [
@@ -81,7 +99,10 @@ Future<String?> askKeyLabel(BuildContext context) {
         FButton(
           onPress: () {
             final label = controller.text.trim();
-            Navigator.of(context).pop(label.isEmpty ? 'Access key' : label);
+            Navigator.of(context).pop((
+              label: label.isEmpty ? 'Access key' : label,
+              outings: outings.value,
+            ));
           },
           child: const Text('Create'),
         ),

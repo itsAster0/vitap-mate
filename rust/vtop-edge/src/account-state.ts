@@ -180,6 +180,9 @@ export interface KeyRecord {
   /** The install of the phone that created it: the only phone its session
    * requests go to. */
   deviceId: string;
+  /** Whether agents may apply for and cancel outings with it. Off until
+   * the student turns it on in the app. */
+  outings: boolean;
   /** Its latest uses, newest first, at most `MAX_KEY_USES`. */
   uses: KeyUse[];
 }
@@ -452,9 +455,18 @@ export class AccountRecord {
   }
 
   /** False when the account has the most keys allowed. */
-  addKey(keyHash: string, label: string, deviceId: string, now: number): boolean {
+  addKey(keyHash: string, label: string, deviceId: string, now: number, outings = false): boolean {
     if (this.keys.length >= MAX_KEYS_PER_ACCOUNT) return false;
-    this.keys.push({ hash: keyHash, label, createdAt: now, lastUsedAt: null, deviceId, uses: [] });
+    this.keys.push({ hash: keyHash, label, createdAt: now, lastUsedAt: null, deviceId, outings, uses: [] });
+    return true;
+  }
+
+  /** Turns outing actions on or off for the key with this short id; false
+   * when there is no such key. */
+  setKeyOutings(id: string, outings: boolean): boolean {
+    const key = this.keys.find((k) => keyId(k.hash) === id.trim());
+    if (!key) return false;
+    key.outings = outings;
     return true;
   }
 
@@ -511,6 +523,7 @@ export class AccountRecord {
             createdAt: key.createdAt,
             lastUsedAt: key.lastUsedAt,
             phoneId: phoneId(key.deviceId),
+            outings: key.outings,
           }))
         : [],
     };
