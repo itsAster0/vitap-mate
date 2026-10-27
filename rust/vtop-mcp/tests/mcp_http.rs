@@ -18,6 +18,7 @@ struct RecordingSource {
     usernames: Mutex<Vec<String>>,
     whoami_calls: Mutex<usize>,
     revoked: Mutex<bool>,
+    outings: Mutex<bool>,
 }
 
 #[async_trait]
@@ -29,6 +30,7 @@ impl SessionSource for RecordingSource {
                 registration_number: "22BCE0001".to_string(),
                 key_label: Some("My laptop".to_string()),
                 semester_id: Some("AP2026272".to_string()),
+                outings: *self.outings.lock().unwrap(),
             }),
         )
     }
@@ -136,11 +138,17 @@ async fn mcp_tools_list_names_every_tool() {
     assert_eq!(
         names,
         [
+            "apply_general_outing",
+            "apply_weekend_outing",
+            "cancel_outing",
             "get_academic_calendar",
             "get_attendance",
             "get_biometric",
+            "get_biometric_range",
             "get_course_classes",
             "get_course_detail",
+            "get_course_file",
+            "get_course_plan",
             "get_courses",
             "get_exam_schedule",
             "get_full_attendance",
@@ -150,6 +158,7 @@ async fn mcp_tools_list_names_every_tool() {
             "get_grades",
             "get_marks",
             "get_mentor",
+            "get_outing_pass",
             "get_profile",
             "get_semesters",
             "get_session",
@@ -244,7 +253,7 @@ async fn legacy_protocol_clients_work_without_sessions() {
     let body: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(
         body["result"]["tools"].as_array().unwrap().len(),
-        20,
+        27,
         "{body}"
     );
 }
@@ -339,6 +348,7 @@ async fn whoami_answers_from_the_bridge_without_a_vtop_session() {
         json!({
             "registrationNumber": "22BCE0001",
             "keyLabel": "My laptop",
+            "outings": false,
             "semesterId": "AP2026272"
         })
     );
@@ -408,4 +418,182 @@ async fn discover_returns_the_instructions() {
     assert_eq!(status, StatusCode::OK, "{body}");
     let instructions = body["result"]["instructions"].as_str().unwrap_or_default();
     assert!(instructions.contains("marked current"), "{body}");
+}
+
+fn general_outing(confirmation: Option<&str>) -> String {
+    let mut arguments = json!({
+        "place": "Vijayawada",
+        "purpose": "home",
+        "out_date": "11-Oct-2026",
+        "out_time": "09:00",
+        "in_date": "12-Oct-2026",
+        "in_time": "18:00",
+    });
+    if let Some(code) = confirmation {
+        arguments["confirmation"] = json!(code);
+    }
+    rpc(
+        "tools/call",
+        json!({ "name": "apply_general_outing", "arguments": arguments }),
+    )
+}
+
+#[tokio::test]
+async fn outing_actions_need_the_students_permission_on_the_key() {
+    let source = Arc::new(RecordingSource::default());
+    for body in [
+        general_outing(None),
+        rpc(
+            "tools/call",
+            json!({ "name": "cancel_outing", "arguments": { "kind": "general", "cancel_id": "L1" } }),
+        ),
+    ] {
+        let (_, body) = call(source.clone(), Some(KEY), body).await;
+        assert_eq!(body["result"]["isError"], true, "{body}");
+        assert!(
+            body["result"]["content"][0]["text"]
+                .as_str()
+                .unwrap()
+                .starts_with("outings_off"),
+            "{body}"
+        );
+    }
+    // Refused before a session is fetched: nothing reached VTOP.
+    assert!(source.usernames.lock().unwrap().is_empty());
+
+    // Reading outings and fetching a pass are not gated.
+    let (_, body) = call(
+        source.clone(),
+        Some(KEY),
+        rpc(
+            "tools/call",
+            json!({ "name": "get_general_outing", "arguments": {} }),
+        ),
+    )
+    .await;
+    assert!(!body["result"]["content"][0]["text"]
+        .as_str()
+        .unwrap()
+        .starts_with("outings_off"));
+
+    // Allowed: the check goes on to VTOP (here, an unreachable phone).
+    *source.outings.lock().unwrap() = true;
+    let (_, body) = call(source.clone(), Some(KEY), general_outing(None)).await;
+    assert!(
+        body["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("phone_unreachable"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn an_outing_is_not_sent_with_a_made_up_confirmation() {
+    let source = Arc::new(RecordingSource::default());
+    *source.outings.lock().unwrap() = true;
+    let (status, body) = call(source.clone(), Some(KEY), general_outing(Some("yes"))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["result"]["isError"], true, "{body}");
+    // Refused before a session is fetched: nothing reached VTOP.
+    assert!(source.usernames.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn outing_tools_say_what_they_change() {
+    let (_, body) = call(
+        Arc::new(RecordingSource::default()),
+        Some(KEY),
+        rpc("tools/list", json!({})),
+    )
+    .await;
+    let tools = body["result"]["tools"].as_array().unwrap();
+    let annotations = |name: &str| {
+        tools
+            .iter()
+            .find(|tool| tool["name"] == name)
+            .map(|tool| tool["annotations"].clone())
+            .unwrap_or_else(|| panic!("no {name} in {body}"))
+    };
+    assert_eq!(annotations("apply_general_outing")["readOnlyHint"], false);
+    assert_eq!(annotations("cancel_outing")["destructiveHint"], true);
+    assert_eq!(annotations("get_outing_pass")["readOnlyHint"], true);
+}
+
+#[tokio::test]
+async fn every_tool_says_whether_it_only_reads() {
+    let (_, body) = call(
+        Arc::new(RecordingSource::default()),
+        Some(KEY),
+        rpc("tools/list", json!({})),
+    )
+    .await;
+    let acting = [
+        "apply_general_outing",
+        "apply_weekend_outing",
+        "cancel_outing",
+        "get_session",
+    ];
+    for tool in body["result"]["tools"].as_array().unwrap() {
+        let name = tool["name"].as_str().unwrap();
+        assert_eq!(
+            tool["annotations"]["readOnlyHint"],
+            !acting.contains(&name),
+            "{name}: {tool}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn prompts_are_listed_and_fill_in_their_arguments() {
+    let source = Arc::new(RecordingSource::default());
+    let (status, body) = call(source.clone(), Some(KEY), rpc("prompts/list", json!({}))).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let mut names: Vec<&str> = body["result"]["prompts"]
+        .as_array()
+        .unwrap_or_else(|| panic!("no prompts in {body}"))
+        .iter()
+        .map(|prompt| prompt["name"].as_str().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "apply-outing",
+            "can-i-skip",
+            "exam-prep",
+            "marks-needed",
+            "weekly-briefing",
+        ]
+    );
+
+    let (_, body) = call(
+        source.clone(),
+        Some(KEY),
+        rpc(
+            "prompts/get",
+            json!({ "name": "can-i-skip", "arguments": { "day": "Friday" } }),
+        ),
+    )
+    .await;
+    let text = body["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .unwrap_or_else(|| panic!("no text in {body}"));
+    assert!(text.starts_with("Can I skip my classes Friday?"), "{text}");
+
+    let (_, body) = call(
+        source.clone(),
+        Some(KEY),
+        rpc(
+            "prompts/get",
+            json!({ "name": "can-i-skip", "arguments": {} }),
+        ),
+    )
+    .await;
+    let text = body["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .unwrap_or_else(|| panic!("no text in {body}"));
+    assert!(text.contains("tomorrow"), "{text}");
+    // Prompts are text only: nothing reached VTOP.
+    assert!(source.usernames.lock().unwrap().is_empty());
 }

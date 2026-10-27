@@ -15,6 +15,8 @@ pub struct Identity {
     pub key_label: Option<String>,
     /// The semester picked in the student's app, once it has sent one.
     pub semester_id: Option<String>,
+    /// Whether the student let this key apply for and cancel outings.
+    pub outings: bool,
 }
 
 /// Where tools get VTOP sessions from. Every call carries the caller's key.
@@ -122,6 +124,7 @@ impl SessionSource for BridgeClient {
                         .get("semesterId")
                         .and_then(Value::as_str)
                         .map(String::from),
+                    outings: body.get("keyOutings").and_then(Value::as_bool) == Some(true),
                 },
             )),
             StatusCode::UNAUTHORIZED => Ok(None),

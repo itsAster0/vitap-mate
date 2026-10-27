@@ -44,6 +44,7 @@ impl SessionSource for FakeSource {
             registration_number: "22BCE0001".into(),
             key_label: None,
             semester_id: None,
+            outings: false,
         }))
     }
 
@@ -219,7 +220,7 @@ async fn whoami_maps_401_to_unknown() {
         .and(path("/v1/whoami"))
         .and(header("authorization", format!("Bearer {KEY}").as_str()))
         .respond_with(ResponseTemplate::new(200).set_body_json(
-            serde_json::json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop", "semesterId": "AP2026272" }),
+            serde_json::json!({ "registrationNumber": "22BCE0001", "keyLabel": "My laptop", "semesterId": "AP2026272", "keyOutings": true }),
         ))
         .mount(&server)
         .await;
@@ -237,6 +238,7 @@ async fn whoami_maps_401_to_unknown() {
             registration_number: "22BCE0001".into(),
             key_label: Some("My laptop".into()),
             semester_id: Some("AP2026272".into()),
+            outings: true,
         })
     );
     assert_eq!(client(&server).whoami("vtm_other").await.unwrap(), None);
@@ -283,6 +285,10 @@ fn instructions_explain_the_tools_to_an_agent() {
         "get_semesters",
         "marked current",
         "get_session",
+        "confirmation code",
+        "never confirm",
+        "get_outing_pass",
+        "get_course_file",
         "newest first",
         "get_courses",
         "get_course_detail",
@@ -394,4 +400,37 @@ async fn bridge_calls_say_they_come_from_mcp() {
         .mount(&server)
         .await;
     client(&server).expire(KEY).await.unwrap();
+}
+
+#[test]
+fn biometric_range_lists_each_day_across_a_month_end() {
+    use vtop_mcp::tools::biometric_days;
+    let days: Vec<String> = biometric_days("30/12/2026", "02/01/2027")
+        .unwrap()
+        .iter()
+        .map(|day| day.as_str().to_string())
+        .collect();
+    assert_eq!(
+        days,
+        ["30/12/2026", "31/12/2026", "01/01/2027", "02/01/2027"]
+    );
+    assert_eq!(biometric_days("29/02/2024", "29/02/2024").unwrap().len(), 1);
+    assert!(biometric_days("02/01/2027", "01/01/2027").is_err());
+    assert!(biometric_days("01/01/2027", "14/01/2027").is_ok());
+    assert!(biometric_days("01/01/2027", "15/01/2027").is_err());
+}
+
+#[test]
+fn a_confirmation_only_fits_the_request_and_key_it_was_given_for() {
+    use vtop_mcp::outings::{check_confirmation, new_confirmation};
+    let fields = ["Vijayawada", "home", "11-Oct-2026", "09:00"];
+    let code = new_confirmation(KEY, "apply_general_outing", &fields);
+    assert!(check_confirmation(&code, KEY, "apply_general_outing", &fields).is_ok());
+    let changed = ["Guntur", "home", "11-Oct-2026", "09:00"];
+    assert!(check_confirmation(&code, KEY, "apply_general_outing", &changed).is_err());
+    assert!(check_confirmation(&code, "vtm_other", "apply_general_outing", &fields).is_err());
+    assert!(check_confirmation(&code, KEY, "cancel_outing", &fields).is_err());
+    assert!(check_confirmation("yes", KEY, "apply_general_outing", &fields).is_err());
+    let lapsed = format!("1-{}", code.split_once('-').unwrap().1);
+    assert!(check_confirmation(&lapsed, KEY, "apply_general_outing", &fields).is_err());
 }

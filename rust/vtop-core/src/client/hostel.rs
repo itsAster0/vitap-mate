@@ -75,10 +75,7 @@ impl VtopClient {
         let Some(student) = form.student.as_ref() else {
             return Ok(form_closed(&form.notice));
         };
-        let place = limited_text(&application.place, "place", form.place_max_length)?;
-        let purpose = limited_text(&application.purpose, "purpose", form.purpose_max_length)?;
-        offered_time(application.out_time, &form.out_hours, "leaving")?;
-        offered_time(application.in_time, &form.in_hours, "return")?;
+        let (place, purpose) = check_general_outing(&form, application)?;
 
         let auth = self.authorize("apply_general_outing").await?;
         let url = self.config.url("/vtop/hostel/saveGeneralOutingForm");
@@ -111,22 +108,7 @@ impl VtopClient {
         let Some(student) = form.student.as_ref() else {
             return Ok(form_closed(&form.notice));
         };
-        let purpose = limited_text(&application.purpose, "purpose", form.purpose_max_length)?;
-        if application.date.day_number() <= today_in_india() {
-            return Err(invalid(
-                "a weekend outing cannot be applied for on its own day",
-            ));
-        }
-        if !form.places.iter().any(|o| o.value == application.place) {
-            return Err(invalid("place is not one VTOP offers"));
-        }
-        if !form
-            .time_slots
-            .iter()
-            .any(|o| o.value == application.time_slot)
-        {
-            return Err(invalid("time slot is not one VTOP offers"));
-        }
+        let purpose = check_weekend_outing(&form, application)?;
 
         let auth = self.authorize("apply_weekend_outing").await?;
         let url = self.config.url("/vtop/hostel/saveOutingForm");
@@ -281,6 +263,45 @@ impl VtopClient {
         self.read_authenticated_response_text(context, response)
             .await
     }
+}
+
+/// The checks [`VtopClient::apply_general_outing`] makes against the form
+/// before sending, so a request can be checked without being sent.
+/// Returns the tidied place and purpose.
+pub fn check_general_outing(
+    form: &GeneralOutingData,
+    application: &GeneralOutingApplication,
+) -> VtopResult<(String, String)> {
+    let place = limited_text(&application.place, "place", form.place_max_length)?;
+    let purpose = limited_text(&application.purpose, "purpose", form.purpose_max_length)?;
+    offered_time(application.out_time, &form.out_hours, "leaving")?;
+    offered_time(application.in_time, &form.in_hours, "return")?;
+    Ok((place, purpose))
+}
+
+/// [`check_general_outing`] for [`VtopClient::apply_weekend_outing`].
+/// Returns the tidied purpose.
+pub fn check_weekend_outing(
+    form: &WeekendOutingData,
+    application: &WeekendOutingApplication,
+) -> VtopResult<String> {
+    let purpose = limited_text(&application.purpose, "purpose", form.purpose_max_length)?;
+    if application.date.day_number() <= today_in_india() {
+        return Err(invalid(
+            "a weekend outing cannot be applied for on its own day",
+        ));
+    }
+    if !form.places.iter().any(|o| o.value == application.place) {
+        return Err(invalid("place is not one VTOP offers"));
+    }
+    if !form
+        .time_slots
+        .iter()
+        .any(|o| o.value == application.time_slot)
+    {
+        return Err(invalid("time slot is not one VTOP offers"));
+    }
+    Ok(purpose)
 }
 
 /// The pre-filled fields VTOP's form posts, plus the empty id of a new

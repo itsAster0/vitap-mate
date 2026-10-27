@@ -4,13 +4,17 @@ use std::future::Future;
 use std::sync::Arc;
 
 use axum::http::request::Parts;
+use rmcp::handler::server::router::prompt::PromptRouter;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::tool::Extension;
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerConfig};
-use rmcp::{schemars, tool, tool_handler, tool_router, ServerHandler};
+use rmcp::model::{
+    CallToolResult, ContentBlock, ResourceContents, ServerCapabilities, ServerConfig,
+};
+use rmcp::{prompt_handler, schemars, tool, tool_handler, tool_router, ServerHandler};
 use serde::{Deserialize, Serialize};
-use vtop_core::inputs::{BiometricDate, CourseId, CourseType, SemesterId};
+use vtop_core::client::CourseFile;
+use vtop_core::inputs::{BiometricDate, CourseFilePath, CourseId, CourseType, SemesterId};
 use vtop_core::types::StudentProfile;
 use vtop_core::{VtopClient, VtopError, VtopResult};
 
@@ -98,6 +102,30 @@ pub struct CourseDetailArgs {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
+pub struct DateRangeArgs {
+    #[schemars(description = "First day, DD/MM/YYYY")]
+    pub from: String,
+    #[schemars(description = "Last day, DD/MM/YYYY; at most 14 days after from")]
+    pub to: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+pub struct CourseFileArgs {
+    #[schemars(
+        description = "A download path from get_course_detail: a lecture material's path, syllabus_path, all_materials_path or general_materials_path"
+    )]
+    pub path: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+pub struct CoursePlanArgs {
+    #[schemars(description = "VTOP semester id (from get_semesters)")]
+    pub semester_id: String,
+    #[schemars(description = "Class id from get_course_classes")]
+    pub class_id: String,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
 pub struct NoArgs {}
 
 /// Course-page ids are plain alphanumerics, as vtop-core requires; checked
@@ -172,37 +200,140 @@ pub fn browser_session(cookie_header: &str) -> serde_json::Value {
     })
 }
 
-fn json_result(value: &impl Serialize) -> CallToolResult {
+pub(crate) fn json_result(value: &impl Serialize) -> CallToolResult {
     match serde_json::to_string(value) {
         Ok(json) => CallToolResult::success(vec![ContentBlock::text(json)]),
         Err(error) => tool_error(format!("could not encode the result: {error}")),
     }
 }
 
-fn tool_error(message: impl Into<String>) -> CallToolResult {
+pub(crate) fn tool_error(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message.into())])
 }
 
-fn input<T>(parsed: VtopResult<T>) -> Result<T, CallToolResult> {
+pub(crate) fn input<T>(parsed: VtopResult<T>) -> Result<T, CallToolResult> {
     parsed.map_err(|error| tool_error(format!("invalid input: {error}")))
+}
+
+/// The most days get_biometric_range fetches, one VTOP request each.
+const MAX_BIOMETRIC_DAYS: i64 = 14;
+
+/// Files larger than this are not sent to the agent: base64 makes them a
+/// third bigger, and few agents read more.
+const MAX_FILE_BYTES: usize = 10 * 1024 * 1024;
+
+/// Days since 1970-01-01 of a valid `DD/MM/YYYY` (Howard Hinnant's
+/// days_from_civil).
+pub(crate) fn day_number(day: i64, month: i64, year: i64) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    era * 146_097 + day_of_era - 719_468
+}
+
+/// (year, month, day) of a day number: civil_from_days.
+pub(crate) fn civil_date(days: i64) -> (i64, i64, i64) {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let day_of_era = z - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let mp = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    (year, month, day)
+}
+
+fn biometric_day(date: &BiometricDate) -> i64 {
+    let mut parts = date
+        .as_str()
+        .split('/')
+        .map(|part| part.parse().unwrap_or(1));
+    let (day, month, year) = (
+        parts.next().unwrap_or(1),
+        parts.next().unwrap_or(1),
+        parts.next().unwrap_or(1970),
+    );
+    day_number(day, month, year)
+}
+
+/// Every day from `from` to `to`, both included; at most
+/// [`MAX_BIOMETRIC_DAYS`].
+pub fn biometric_days(from: &str, to: &str) -> VtopResult<Vec<BiometricDate>> {
+    let (first, last) = (
+        biometric_day(&BiometricDate::parse(from)?),
+        biometric_day(&BiometricDate::parse(to)?),
+    );
+    if last < first {
+        return Err(VtopError::ConfigurationError(
+            "to must not be before from".to_string(),
+        ));
+    }
+    if last - first >= MAX_BIOMETRIC_DAYS {
+        return Err(VtopError::ConfigurationError(format!(
+            "at most {MAX_BIOMETRIC_DAYS} days at a time"
+        )));
+    }
+    (first..=last)
+        .map(|days| {
+            let (year, month, day) = civil_date(days);
+            BiometricDate::parse(&format!("{day:02}/{month:02}/{year:04}"))
+        })
+        .collect()
+}
+
+/// A file as the tool result: what it is, as text, then the file itself
+/// as an embedded resource.
+pub(crate) fn file_result(
+    file_name: &str,
+    content_type: &str,
+    bytes: &[u8],
+    uri: &str,
+) -> CallToolResult {
+    use base64::Engine;
+    if bytes.len() > MAX_FILE_BYTES {
+        return tool_error(format!(
+            "{file_name} is {} MB, too large to hand over (limit {} MB); open it with get_session instead",
+            bytes.len() / (1024 * 1024),
+            MAX_FILE_BYTES / (1024 * 1024),
+        ));
+    }
+    let about = serde_json::json!({
+        "file_name": file_name,
+        "content_type": content_type,
+        "size_bytes": bytes.len(),
+    });
+    let blob = base64::engine::general_purpose::STANDARD.encode(bytes);
+    CallToolResult::success(vec![
+        ContentBlock::text(about.to_string()),
+        ContentBlock::resource(ResourceContents::blob(blob, uri).with_mime_type(content_type)),
+    ])
 }
 
 #[derive(Clone)]
 pub struct VtopTools {
-    source: Arc<dyn SessionSource>,
+    pub(crate) source: Arc<dyn SessionSource>,
     tool_router: ToolRouter<Self>,
+    prompt_router: PromptRouter<Self>,
 }
 
 impl VtopTools {
     pub fn new(source: Arc<dyn SessionSource>) -> Self {
         Self {
             source,
-            tool_router: Self::tool_router() + Self::more_tools_router(),
+            tool_router: Self::tool_router()
+                + Self::more_tools_router()
+                + Self::outing_tools_router(),
+            prompt_router: Self::prompt_router(),
         }
     }
 
     /// Fetches with the caller's session and renders the result as JSON.
-    async fn fetch<T, F, Fut>(&self, parts: &Parts, call: F) -> CallToolResult
+    pub(crate) async fn fetch<T, F, Fut>(&self, parts: &Parts, call: F) -> CallToolResult
     where
         T: Serialize,
         F: Fn(VtopClient) -> Fut,
@@ -219,12 +350,28 @@ impl VtopTools {
             Err(message) => tool_error(message),
         }
     }
+
+    /// [`Self::fetch`] for a download, handed over as an embedded resource.
+    async fn fetch_file<F, Fut>(&self, parts: &Parts, uri: &str, call: F) -> CallToolResult
+    where
+        F: Fn(VtopClient) -> Fut,
+        Fut: Future<Output = VtopResult<CourseFile>>,
+    {
+        let Some(Caller(username)) = parts.extensions.get::<Caller>().cloned() else {
+            return tool_error("no caller on the request");
+        };
+        match with_retry(self.source.as_ref(), &username, call).await {
+            Ok(file) => file_result(&file.file_name, &file.content_type, &file.bytes, uri),
+            Err(message) => tool_error(message),
+        }
+    }
 }
 
 #[tool_router]
 impl VtopTools {
     #[tool(
-        description = "List the student's VTOP semesters (ids and names). The one marked current (also current_semester_id) is the semester picked in the student's app; use it unless they name another. Call this first to get a semester_id."
+        description = "List the student's VTOP semesters (ids and names). The one marked current (also current_semester_id) is the semester picked in the student's app; use it unless they name another. Call this first to get a semester_id.",
+        annotations(read_only_hint = true)
     )]
     async fn get_semesters(
         &self,
@@ -251,7 +398,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Attendance summary for every course in a semester: classes attended, total classes, percentage and debar status (Permitted means allowed into the next exam), with the course_id and course_type that get_full_attendance takes."
+        description = "Attendance summary for every course in a semester: classes attended, total classes, percentage and debar status (Permitted means allowed into the next exam), with the course_id and course_type that get_full_attendance takes.",
+        annotations(read_only_hint = true)
     )]
     async fn get_attendance(
         &self,
@@ -270,7 +418,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Class-by-class attendance for one course: date, slot, day and time, status and remark of each class."
+        description = "Class-by-class attendance for one course: date, slot, day and time, status and remark of each class.",
+        annotations(read_only_hint = true)
     )]
     async fn get_full_attendance(
         &self,
@@ -296,7 +445,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Weekly timetable for a semester: each slot's day, start and end time, course, theory or lab, room, block, faculty and credits, plus the list of registered courses. It is the usual week only; holidays, exam days and other changes are in get_academic_calendar."
+        description = "Weekly timetable for a semester: each slot's day, start and end time, course, theory or lab, room, block, faculty and credits, plus the list of registered courses. It is the usual week only; holidays, exam days and other changes are in get_academic_calendar.",
+        annotations(read_only_hint = true)
     )]
     async fn get_timetable(
         &self,
@@ -315,7 +465,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Marks for every course in a semester: each assessment (CATs, quizzes, assignments, FAT once published) with max marks, weightage, scored mark and weighted mark."
+        description = "Marks for every course in a semester: each assessment (CATs, quizzes, assignments, FAT once published) with max marks, weightage, scored mark and weighted mark.",
+        annotations(read_only_hint = true)
     )]
     async fn get_marks(
         &self,
@@ -334,7 +485,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Exam schedule of a semester, grouped by exam type (CAT-1, CAT-2, FAT): date, session, reporting and exam time, venue and seat for each course. Lab FATs are not listed; get_academic_calendar marks those days."
+        description = "Exam schedule of a semester, grouped by exam type (CAT-1, CAT-2, FAT): date, session, reporting and exam time, venue and seat for each course. Lab FATs are not listed; get_academic_calendar marks those days.",
+        annotations(read_only_hint = true)
     )]
     async fn get_exam_schedule(
         &self,
@@ -353,7 +505,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Final grades for a semester: each course's grand total, grade and grading type (RG relative, AG absolute), with the course_id that get_grade_details takes."
+        description = "Final grades for a semester: each course's grand total, grade and grading type (RG relative, AG absolute), with the course_id that get_grade_details takes.",
+        annotations(read_only_hint = true)
     )]
     async fn get_grades(
         &self,
@@ -372,7 +525,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Mark breakdown behind one course's grade, with the grade ranges (mark cutoffs for each grade) of that class."
+        description = "Mark breakdown behind one course's grade, with the grade ranges (mark cutoffs for each grade) of that class.",
+        annotations(read_only_hint = true)
     )]
     async fn get_grade_details(
         &self,
@@ -397,7 +551,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Full grade history across all semesters: every course with credits, grade, exam month and earlier attempts, plus CGPA, credits registered and earned, and the count of each grade."
+        description = "Full grade history across all semesters: every course with credits, grade, exam month and earlier attempts, plus CGPA, credits registered and earned, and the count of each grade.",
+        annotations(read_only_hint = true)
     )]
     async fn get_grade_history(
         &self,
@@ -409,7 +564,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Biometric punches for one day: time and venue of each entry, at classes and the hostel."
+        description = "Biometric punches for one day: time and venue of each entry, at classes and the hostel.",
+        annotations(read_only_hint = true)
     )]
     async fn get_biometric(
         &self,
@@ -428,7 +584,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "The student's VTOP profile: name, register number, VIT email, program and school, then VTOP's sections in its own wording (PERSONAL INFORMATION with current and permanent address, EDUCATIONAL INFORMATION, FAMILY INFORMATION with parent details, PROCTOR INFORMATION, HOSTEL INFORMATION with block, room, bed type and mess). Each section is groups of label/value fields; empty, '-' or 'NA' means not filled in. The photo is left out and the Aadhaar number shows only its last four digits."
+        description = "The student's VTOP profile: name, register number, VIT email, program and school, then VTOP's sections in its own wording (PERSONAL INFORMATION with current and permanent address, EDUCATIONAL INFORMATION, FAMILY INFORMATION with parent details, PROCTOR INFORMATION, HOSTEL INFORMATION with block, room, bed type and mess). Each section is groups of label/value fields; empty, '-' or 'NA' means not filled in. The photo is left out and the Aadhaar number shows only its last four digits.",
+        annotations(read_only_hint = true)
     )]
     async fn get_profile(
         &self,
@@ -442,7 +599,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "The student's mentor (proctor, also called faculty adviser): faculty id, name, designation, school, department, cabin, email, intercom and mobile as label/value fields; and the messages the mentor sent in the last week (VTOP removes older ones), each as the message table's column/value pairs. An empty messages list means none."
+        description = "The student's mentor (proctor, also called faculty adviser): faculty id, name, designation, school, department, cabin, email, intercom and mobile as label/value fields; and the messages the mentor sent in the last week (VTOP removes older ones), each as the message table's column/value pairs. An empty messages list means none.",
+        annotations(read_only_hint = true)
     )]
     async fn get_mentor(
         &self,
@@ -483,7 +641,8 @@ fn for_agent(mut profile: StudentProfile) -> StudentProfile {
 #[tool_router(router = more_tools_router)]
 impl VtopTools {
     #[tool(
-        description = "Academic calendar of a semester, sorted by date: each entry has date (YYYY-MM-DD), kind (Instructional Day, Holiday, No Instructional Day, CAT - I…), group and note (WorkingDay, LAB FAT, a holiday's name…). A day can have several entries."
+        description = "Academic calendar of a semester, sorted by date: each entry has date (YYYY-MM-DD), kind (Instructional Day, Holiday, No Instructional Day, CAT - I…), group and note (WorkingDay, LAB FAT, a holiday's name…). A day can have several entries.",
+        annotations(read_only_hint = true)
     )]
     async fn get_academic_calendar(
         &self,
@@ -502,7 +661,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Courses on the course page for a semester: id, code, title and type (ETH, ELA…). Use an id with get_course_classes."
+        description = "Courses on the course page for a semester: id, code, title and type (ETH, ELA…). Use an id with get_course_classes.",
+        annotations(read_only_hint = true)
     )]
     async fn get_courses(
         &self,
@@ -521,7 +681,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Classes of one course: class_id, erp_id, slot, faculty and school. Use them with get_course_detail."
+        description = "Classes of one course: class_id, erp_id, slot, faculty and school. Use them with get_course_detail.",
+        annotations(read_only_hint = true)
     )]
     async fn get_course_classes(
         &self,
@@ -546,7 +707,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Course page of one class: the lecture plan (dates, topics and materials per lecture), syllabus and course plan availability."
+        description = "Course page of one class: the lecture plan (dates, topics and materials per lecture), syllabus and course plan availability.",
+        annotations(read_only_hint = true)
     )]
     async fn get_course_detail(
         &self,
@@ -572,7 +734,82 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "General (day) outing: the form state, student info, and current and past outing records."
+        description = "Downloads a file from a class's course page: a lecture's material, the syllabus, or a bundle of all materials. Takes a path from get_course_detail. Returns its name, type and size, then the file itself (usually a PDF, slides or a zip) as an embedded resource. Files over 10 MB are refused.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_course_file(
+        &self,
+        Parameters(args): Parameters<CourseFileArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        let path = match input(CourseFilePath::parse(&args.path)) {
+            Ok(value) => value,
+            Err(error) => return error,
+        };
+        let uri = format!("vtop://course-page/{}", path.as_str());
+        self.fetch_file(&parts, &uri, |client| {
+            let path = path.clone();
+            async move { client.course_page_file(&path).await }
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Downloads a class's course plan, an Excel sheet of what each lecture covers, when get_course_detail says has_course_plan. Returned as an embedded resource.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_course_plan(
+        &self,
+        Parameters(args): Parameters<CoursePlanArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        let parsed = (|| {
+            Ok((
+                SemesterId::parse(&args.semester_id)?,
+                plain_id(&args.class_id, "class id")?,
+            ))
+        })();
+        let (semester, class) = match input(parsed) {
+            Ok(value) => value,
+            Err(error) => return error,
+        };
+        let uri = format!("vtop://course-plan/{}/{class}", semester.as_str());
+        self.fetch_file(&parts, &uri, |client| {
+            let (semester, class) = (semester.clone(), class.clone());
+            async move { client.course_plan(&semester, &class).await }
+        })
+        .await
+    }
+
+    #[tool(
+        description = "Biometric punches for each day from one date to another (at most 14 days), oldest first: each day's date and its entries, as get_biometric gives them.",
+        annotations(read_only_hint = true)
+    )]
+    async fn get_biometric_range(
+        &self,
+        Parameters(args): Parameters<DateRangeArgs>,
+        Extension(parts): Extension<Parts>,
+    ) -> CallToolResult {
+        let days = match input(biometric_days(&args.from, &args.to)) {
+            Ok(value) => value,
+            Err(error) => return error,
+        };
+        self.fetch(&parts, |client| {
+            let days = days.clone();
+            async move {
+                let mut found = Vec::with_capacity(days.len());
+                for date in &days {
+                    found.push(client.biometric_history(date).await?);
+                }
+                Ok(found)
+            }
+        })
+        .await
+    }
+
+    #[tool(
+        description = "General (day) outing: the form state, student info, and current and past outing records.",
+        annotations(read_only_hint = true)
     )]
     async fn get_general_outing(
         &self,
@@ -587,7 +824,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Weekend outing: the form state, student info, and current and past outing records."
+        description = "Weekend outing: the form state, student info, and current and past outing records.",
+        annotations(read_only_hint = true)
     )]
     async fn get_weekend_outing(
         &self,
@@ -602,7 +840,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "A live, signed-in VTOP session for a browser, so you can open VTOP as the student (for pages no other tool covers). Returns `url`, `cookies` (Playwright `context.add_cookies(cookies)` / Puppeteer `page.setCookie(...cookies)` shape) and `cookie_header` (for curl or requests). To use it: add the cookies to the browser context, then open `url`; it lands on the signed-in VTOP home. If VTOP shows its login page, the session expired: call get_session again. This is the student's full account: anything done in the browser acts as them, so do only what they asked, never print or share the cookies, and confirm before submitting any form."
+        description = "A live, signed-in VTOP session for a browser, so you can open VTOP as the student (for pages no other tool covers). Returns `url`, `cookies` (Playwright `context.add_cookies(cookies)` / Puppeteer `page.setCookie(...cookies)` shape) and `cookie_header` (for curl or requests). To use it: add the cookies to the browser context, then open `url`; it lands on the signed-in VTOP home. If VTOP shows its login page, the session expired: call get_session again. This is the student's full account: anything done in the browser acts as them, so do only what they asked, never print or share the cookies, and confirm before submitting any form.",
+        annotations(read_only_hint = false, destructive_hint = false)
     )]
     async fn get_session(
         &self,
@@ -620,7 +859,8 @@ impl VtopTools {
     }
 
     #[tool(
-        description = "Who this access key belongs to: registration number and key label. Does not contact VTOP."
+        description = "Who this access key belongs to: registration number, key label, and outings (whether the student allowed this key to apply for and cancel outings). Does not contact VTOP.",
+        annotations(read_only_hint = true)
     )]
     async fn whoami(
         &self,
@@ -646,7 +886,12 @@ const INSTRUCTIONS: &str = "\
 Access to one VIT-AP student's VTOP data. Every tool is read-only except get_session, \
 which hands over a live login for a browser: use it only for pages the other tools do \
 not cover, act only as the student asked, confirm before submitting anything, and never \
-show the cookies.
+show the cookies; and apply_general_outing, apply_weekend_outing and cancel_outing, \
+which change the student's outing requests. Those take two calls: the first only checks \
+the request and returns it with a confirmation code. Show the student that request and \
+send the code back only after they say yes; never confirm on their behalf. They also need \
+the student's permission on this access key (whoami shows outings); without it they \
+answer outings_off, and the student can turn it on in the app.
 
 - Call get_semesters first and use the semester marked current (current_semester_id) \
 as semester_id unless the student names another. It is the semester picked in the \
@@ -654,7 +899,7 @@ student's app, or else the newest, as VTOP lists them newest first.
 - Ids chain from one tool to the next: get_attendance gives course_id and course_type \
 for get_full_attendance; get_courses gives course_id for get_course_classes, which \
 gives erp_id and class_id for get_course_detail.
-- Dates: get_biometric takes DD/MM/YYYY. VTOP returns them in mixed forms: \
+- Dates: get_biometric and get_biometric_range take DD/MM/YYYY. VTOP returns them in mixed forms: \
 01-Jul-2026 in attendance and exams, 18/07/2026 in biometrics, 2026-10-01 in the \
 academic calendar. Take \"today\" in India time (IST).
 - Attendance is counted per course and type, theory and lab separately; a lab \
@@ -701,7 +946,13 @@ own details, addresses, parents, school before VIT and hostel room; share only w
 the student asks for, and do not repeat personal details (date of birth, family, \
 religion, caste, income) unless asked.
 - Outings: a general outing is a leave; a weekend outing means going out in the \
-morning and returning by night. There is no fixed limit on outings.
+morning and returning by night. There is no fixed limit on outings. Outing dates are \
+DD-Mon-YYYY (11-Oct-2026) and general outing times 24-hour HH:MM. A weekend outing's \
+place and time_slot are option values from get_weekend_outing. Once a request is \
+accepted, its pass_id gives the PDF pass through get_outing_pass.
+- Files: get_course_file takes a path from get_course_detail (a lecture's materials, \
+syllabus_path, all_materials_path) and returns the file as an embedded resource; \
+get_course_plan gives the course plan sheet.
 - The biometric log records entries at both classes and the hostel. Hostellers must \
 be back by 8:30 pm and may leave from 5 am (boys) or 6 am (girls); these times can \
 change.
@@ -722,9 +973,15 @@ phone_timeout means the student should open the VITAP Mate app; rate_limited mea
 wait a minute.";
 
 #[tool_handler(router = self.tool_router)]
+#[prompt_handler(router = self.prompt_router)]
 impl ServerHandler for VtopTools {
     fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
-            .with_instructions(INSTRUCTIONS)
+        ServerConfig::new(
+            ServerCapabilities::builder()
+                .enable_tools()
+                .enable_prompts()
+                .build(),
+        )
+        .with_instructions(INSTRUCTIONS)
     }
 }
