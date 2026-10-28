@@ -13,6 +13,7 @@ import 'package:vitapmate/core/widgets/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/icon_box.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/status_card.dart';
+import 'package:vitapmate/features/settings/presentation/widgets/server_sections/udp_mode_tile.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/vtop_mode_picker.dart';
 
 /// Where the Server page lives; Connected apps' old route goes here too.
@@ -88,6 +89,7 @@ class ServerPage extends ConsumerWidget {
           VtopServerMode.server =>
             'Your password goes to the server for each sign-in and is not kept; nor is the session. Outing requests and file downloads still go from the phone. If the server is down, the phone fetches itself.',
         }),
+        if (mode == VtopServerMode.server) const UdpModeTile(),
         const SectionHeader(title: 'Apps and phones'),
         FTileGroup(
           divider: FItemDivider.indented,

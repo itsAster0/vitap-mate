@@ -7,6 +7,7 @@ import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
 import 'package:vitapmate/core/vtop_backend/local_vtop_backend.dart';
 import 'package:vitapmate/core/utils/edge/server_status.dart';
 import 'package:vitapmate/core/vtop_backend/relogin_vtop_backend.dart';
+import 'package:vitapmate/core/providers/vtop_udp.dart';
 import 'package:vitapmate/core/vtop_backend/server_vtop.dart';
 import 'package:vitapmate/core/utils/app_http_client.dart';
 import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
@@ -76,6 +77,8 @@ VtopBackend vtopBackend(Ref ref) {
       api: ServerVtopApi(
         client: sharedAppHttpClient,
         pages: rustPageDictionary,
+        wire: rustWirePage,
+        useWire: currentVtopUdp,
       ),
     ),
     relogin: () => ref

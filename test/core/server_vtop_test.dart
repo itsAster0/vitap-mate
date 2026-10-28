@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,7 @@ import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
+import 'package:vitapmate/src/api/wire.dart';
 
 const _session = SessionState(
   cookies: 'JSESSIONID=a',
@@ -331,6 +333,120 @@ void main() {
         ).login('23BCE7000', 'pw'),
         throwsA(const VtopError.invalidCredentials()),
       );
+    });
+  });
+
+  group('ServerVtopApi over UDP', () {
+    WirePage page(int status, Object json) => WirePage(
+      status: status,
+      packed: false,
+      body: Uint8List.fromList(utf8.encode(jsonEncode(json))),
+      elapsedMs: 12,
+      handshake: false,
+      wireBytes: 300,
+    );
+
+    /// An edge that answers every fetch with `{"data": {"via": "https"}}`.
+    MockClient https(List<String> asked) => MockClient((request) async {
+      asked.add(request.url.path);
+      return http.Response('{"data":{"via":"https"}}', 200);
+    });
+
+    ServerVtopApi api(
+      List<String> asked,
+      Future<WirePage> Function() wire, {
+      bool on = true,
+    }) => ServerVtopApi(
+      client: https(asked),
+      baseUrl: 'https://edge.example',
+      useWire: () async => on,
+      wire:
+          ({
+            required sessionJson,
+            required name,
+            semester,
+            required args,
+            dictionary,
+          }) {
+            asked.add('udp $name');
+            expect(jsonDecode(sessionJson)['cookies'], 'JSESSIONID=a');
+            return wire();
+          },
+    );
+
+    test('pages come over UDP when the mode is on', () async {
+      final asked = <String>[];
+      final data = await api(
+        asked,
+        () async => page(200, {
+          'data': {'via': 'udp'},
+        }),
+      ).fetch(session: _session, name: 'attendance');
+      expect(data, {'via': 'udp'});
+      expect(asked, ['udp attendance']);
+    });
+
+    test('the mode off leaves UDP alone', () async {
+      final asked = <String>[];
+      final data = await api(
+        asked,
+        () async => fail('no UDP'),
+        on: false,
+      ).fetch(session: _session, name: 'attendance');
+      expect(data, {'via': 'https'});
+      expect(asked, ['/v1/vtop/fetch']);
+    });
+
+    test(
+      'an unreachable gateway falls back to HTTPS and is skipped after',
+      () async {
+        final asked = <String>[];
+        final server = api(
+          asked,
+          () async => throw const WireFetchError.unreachable(),
+        );
+        expect(await server.fetch(session: _session, name: 'marks'), {
+          'via': 'https',
+        });
+        expect(await server.fetch(session: _session, name: 'marks'), {
+          'via': 'https',
+        });
+        expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
+      },
+    );
+
+    test('a page too large for UDP comes over HTTPS', () async {
+      final asked = <String>[];
+      final data = await api(
+        asked,
+        () async => page(413, {'code': 'too_large', 'error': 'too large'}),
+      ).fetch(session: _session, name: 'grade_history');
+      expect(data, {'via': 'https'});
+      expect(asked, ['udp grade_history', '/v1/vtop/fetch']);
+    });
+
+    test('VTOP refusals over UDP are the usual errors', () async {
+      final asked = <String>[];
+      await expectLater(
+        api(
+          asked,
+          () async =>
+              page(401, {'code': 'session_expired', 'error': 'expired'}),
+        ).fetch(session: _session, name: 'attendance'),
+        throwsA(const VtopError.sessionExpired()),
+      );
+    });
+
+    test('a page that stalls is a timeout, not an HTTPS retry', () async {
+      final asked = <String>[];
+      await expectLater(
+        api(
+          asked,
+          () async => throw const WireFetchError.timeout(),
+        ).fetch(session: _session, name: 'attendance'),
+        throwsA(isA<VtopError>()),
+      );
+      expect(asked, ['udp attendance']);
     });
   });
 }

@@ -53,6 +53,7 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         'settings_server_url',
         'settings_vtop_proxy',
         'settings_vtop_mode',
+        'settings_vtop_udp',
         bridgeServerSignInSettingKey,
         vtopRecentPagesSettingKey,
         bridgeLinkedSettingKey,
