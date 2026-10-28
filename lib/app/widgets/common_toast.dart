@@ -7,30 +7,22 @@ import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
-String _authFailedMessage(Object e) {
-  if (e is VtopError) {
-    return e.maybeWhen(
-      authenticationFailed: (message) {
-        final trimmed = message.trim();
-        return trimmed.isNotEmpty
-            ? trimmed
-            : 'We could not complete your sign-in. Please try again.';
-      },
-      otpRequired: (_, _) {
-        return 'We need to verify this sign-in with the OTP sent to your registered email.';
-      },
-      vtopServerError: (message) {
-        final trimmed = message.trim();
-        return trimmed.isNotEmpty
-            ? 'VTOP server error: $trimmed'
-            : 'VTOP is not responding properly right now. Try again in a bit.';
-      },
-      sessionExpired: () => 'Your saved session expired. Please sign in again.',
-      orElse: () => 'We could not complete your sign-in. Please try again.',
-    );
-  }
-  return 'We could not complete your sign-in. Please try again.';
-}
+const _signInFailed = 'We could not complete your sign-in. Please try again.';
+
+String _authFailedMessage(Object e) => switch (e) {
+  VtopError() => e.maybeWhen(
+    authenticationFailed: (message) =>
+        message.trim().isNotEmpty ? message.trim() : _signInFailed,
+    otpRequired: (_, _) =>
+        'We need to verify this sign-in with the OTP sent to your registered email.',
+    vtopServerError: (message) => message.trim().isNotEmpty
+        ? 'VTOP server error: ${message.trim()}'
+        : 'VTOP is not responding properly right now. Try again in a bit.',
+    sessionExpired: () => 'Your saved session expired. Please sign in again.',
+    orElse: () => _signInFailed,
+  ),
+  _ => _signInFailed,
+};
 
 void _showAppToast(
   BuildContext context, {
@@ -55,110 +47,62 @@ void _showAppToast(
   );
 }
 
+const _offline = (
+  'No Internet Connection',
+  "We couldn't reach VTOP. Check your internet connection and try again.",
+);
+
+bool _isSignInError(Object e) =>
+    e is VtopError &&
+    e.maybeWhen(
+      authenticationFailed: (_) => true,
+      otpRequired: (_, _) => true,
+      vtopServerError: (_) => true,
+      sessionExpired: () => true,
+      orElse: () => false,
+    );
+
 void disCommonToast(BuildContext context, Object e) {
   if (!context.mounted) return;
-  if (e == VtopError.invalidCredentials()) {
-    _showAppToast(
-      context,
-      title: 'VTOP Sign-In Failed',
-      description:
-          'VTOP rejected the saved username or password. Check your VTOP account details in Settings.',
-      onDismiss: () {
-        final router = GoRouter.maybeOf(context);
-        if (router != null) {
-          router.goNamed(Paths.settings);
-        }
-      },
-    );
-  } else if (isVtopDown(e)) {
-    _showAppToast(
-      context,
-      title: 'VTOP Is Down',
-      description: vtopErrorMessage(e),
-    );
-  } else if (e == VtopError.networkError()) {
-    _showAppToast(
-      context,
-      title: 'No Internet Connection',
-      description:
-          "We couldn't reach VTOP. Check your internet connection and try again.",
-    );
-  } else if (e is VtopError &&
-      e.maybeWhen(
-        authenticationFailed: (_) => true,
-        otpRequired: (_, _) => true,
-        vtopServerError: (_) => true,
-        sessionExpired: () => true,
-        orElse: () => false,
-      )) {
-    _showAppToast(
-      context,
-      title: 'Sign-In Problem',
-      description: _authFailedMessage(e),
-    );
-  } else if (e is VtopError) {
-    _showAppToast(
-      context,
-      title: 'VTOP Problem',
-      description: vtopErrorMessage(e),
-    );
-  } else {
-    log('Unexpected error in disCommonToast: $e');
-    _showAppToast(
-      context,
-      title: 'Error occurred',
-      description: 'Please try again',
-    );
-  }
+  final invalidCredentials = e == VtopError.invalidCredentials();
+  final (title, description) = switch (e) {
+    _ when invalidCredentials => (
+      'VTOP Sign-In Failed',
+      'VTOP rejected the saved username or password. Check your VTOP account details in Settings.',
+    ),
+    _ when isVtopDown(e) => ('VTOP Is Down', vtopErrorMessage(e)),
+    _ when e == VtopError.networkError() => _offline,
+    _ when _isSignInError(e) => ('Sign-In Problem', _authFailedMessage(e)),
+    VtopError() => ('VTOP Problem', vtopErrorMessage(e)),
+    _ => () {
+      log('Unexpected error in disCommonToast: $e');
+      return ('Error occurred', 'Please try again');
+    }(),
+  };
+  _showAppToast(
+    context,
+    title: title,
+    description: description,
+    onDismiss: invalidCredentials
+        ? () => GoRouter.maybeOf(context)?.goNamed(Paths.settings)
+        : null,
+  );
 }
 
 void disOnbardingCommonToast(BuildContext context, Object e) {
   if (!context.mounted) return;
-  if (e == VtopError.invalidCredentials()) {
-    _showAppToast(
-      context,
-      title: 'Login Failed',
-      description: 'The username or password you entered is incorrect.',
-    );
-  } else if (isVtopDown(e)) {
-    _showAppToast(
-      context,
-      title: 'VTOP Is Down',
-      description: vtopErrorMessage(e),
-    );
-  } else if (e == VtopError.networkError()) {
-    _showAppToast(
-      context,
-      title: 'No Internet Connection',
-      description:
-          "We couldn't reach VTOP. Check your internet connection and try again.",
-    );
-  } else if (e is VtopError &&
-      e.maybeWhen(
-        authenticationFailed: (_) => true,
-        otpRequired: (_, _) => true,
-        vtopServerError: (_) => true,
-        sessionExpired: () => true,
-        orElse: () => false,
-      )) {
-    _showAppToast(
-      context,
-      title: 'Login Problem',
-      description: _authFailedMessage(e),
-    );
-  } else if (e is VtopError) {
-    _showAppToast(
-      context,
-      title: 'Login Problem',
-      description: vtopErrorMessage(e),
-    );
-  } else {
-    _showAppToast(
-      context,
-      title: 'Login Failed',
-      description: 'Authentication failed',
-    );
-  }
+  final (title, description) = switch (e) {
+    _ when e == VtopError.invalidCredentials() => (
+      'Login Failed',
+      'The username or password you entered is incorrect.',
+    ),
+    _ when isVtopDown(e) => ('VTOP Is Down', vtopErrorMessage(e)),
+    _ when e == VtopError.networkError() => _offline,
+    _ when _isSignInError(e) => ('Login Problem', _authFailedMessage(e)),
+    VtopError() => ('Login Problem', vtopErrorMessage(e)),
+    _ => ('Login Failed', 'Authentication failed'),
+  };
+  _showAppToast(context, title: title, description: description);
 }
 
 void dispToast(BuildContext context, String title, String des) {

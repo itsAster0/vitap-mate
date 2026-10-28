@@ -1,26 +1,23 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:forui/forui.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/ui/app_palette.dart';
-part 'theme_provider.g.dart';
 
-@Riverpod(keepAlive: true)
-class ThemeModeController extends _$ThemeModeController {
-  static const String _themeKey = 'theme_mode';
+class ThemeModeController extends Notifier<ThemeMode> {
+  static const _themeKey = 'theme_mode';
 
   @override
   ThemeMode build() {
     _loadThemeMode();
-    return ThemeMode.system;
+    return .system;
   }
 
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final themeIndex = prefs.getInt(_themeKey) ?? 1;
-    state = ThemeMode.values[themeIndex];
+    state = ThemeMode.values[prefs.getInt(_themeKey) ?? 1];
   }
 
   Future<void> setThemeMode(ThemeMode themeMode) async {
@@ -28,34 +25,11 @@ class ThemeModeController extends _$ThemeModeController {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_themeKey, themeMode.index);
   }
-
-  Future<void> toggleTheme() async {
-    final newThemeMode = state == ThemeMode.light
-        ? ThemeMode.dark
-        : ThemeMode.light;
-    await setThemeMode(newThemeMode);
-  }
-
-  bool get isDarkMode => state == ThemeMode.dark;
-  bool get isLightMode => state == ThemeMode.light;
-  bool get isSystemMode => state == ThemeMode.system;
 }
 
-final themeProvider = themeModeControllerProvider;
-
-@riverpod
-FThemeData fTheme(Ref ref) {
-  final themeMode = ref.watch(themeProvider);
-
-  final dark = switch (themeMode) {
-    ThemeMode.dark => true,
-    ThemeMode.light => false,
-    ThemeMode.system =>
-      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-          Brightness.dark,
-  };
-  return dark ? appDarkTheme : appLightTheme;
-}
+final themeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
+  ThemeModeController.new,
+);
 
 // A soft grey page so white cards read as surfaces instead of blending in.
 final appLightTheme = _withPalette(
@@ -71,14 +45,12 @@ FThemeData _withPalette(
   Color? background,
 }) => FThemeData(
   colors: base.colors.copyWith(background: background, extensions: [palette]),
-  typography: _tuned(base.typography),
+  typography: base.typography.copyWith(
+    display: _tracked(base.typography.display),
+    body: _tracked(base.typography.body),
+  ),
   style: base.style,
   touch: true,
-);
-
-FTypography _tuned(FTypography typography) => typography.copyWith(
-  display: _tracked(typography.display),
-  body: _tracked(typography.body),
 );
 
 /// Inter is drawn for small text; at larger sizes it reads loose unless the

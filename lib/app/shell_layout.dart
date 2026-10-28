@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -28,19 +30,12 @@ class ShellLayout extends HookConsumerWidget {
         .watch(vtopUserProvider)
         .maybeWhen(data: (value) => value, orElse: () => null);
     final newSemExist = useMemoized(() {
-      if (sem == null || sems == null) return false;
-      final max = sems.semesters.fold<int>(0, (i, e) {
-        final result =
-            int.tryParse(e.id.toLowerCase().replaceAll("ap", "")) ?? 0;
-        return result > i ? result : i;
-      });
-
-      if (max == 0) return false;
-      if (sem.semid == null) return false;
-
-      final currentSemID =
-          int.tryParse(sem.semid!.toLowerCase().replaceAll("ap", "")) ?? 0;
-      return currentSemID < max;
+      final semid = sem?.semid;
+      if (sems == null || semid == null) return false;
+      int number(String id) =>
+          int.tryParse(id.toLowerCase().replaceAll("ap", "")) ?? 0;
+      final newest = sems.semesters.map((e) => number(e.id)).fold(0, math.max);
+      return newest != 0 && number(semid) < newest;
     }, [sem?.semid, sems?.semesters.length]);
     // Refreshes stale pages after a quick fetch while the app is open.
     ref.watch(staleRefresherProvider);
@@ -54,41 +49,21 @@ class ShellLayout extends HookConsumerWidget {
     final routerDelegate = GoRouter.of(context).routerDelegate;
     useListenable(routerDelegate);
     final configuration = routerDelegate.currentConfiguration;
-    var k = configuration.lastOrNull?.matchedLocation ?? configuration.uri.path;
+    final location =
+        configuration.lastOrNull?.matchedLocation ?? configuration.uri.path;
     final queueStatus = _queueStatusText(runningTasks);
-    final isNestedRoute = k.split('/').length - 1 > 1;
+    final isNestedRoute = location.split('/').length - 1 > 1;
     final headerSubtitle = isNestedRoute
         ? queueStatus
         : queueStatus ?? (newSemExist ? "New semester data available!" : null);
-    final headers = [
-      _buildHeader(context, "Timetable", k, headerSubtitle),
-      _buildHeader(context, "Attendance", k, headerSubtitle),
-      _buildHeader(context, "More", k, headerSubtitle),
-      _buildHeader(
-        context,
-        k.startsWith('/docs/view') ? activeDocumentTitle ?? 'Document' : 'Docs',
-        k,
-        headerSubtitle,
-      ),
-      _buildHeader(context, "Settings", k, headerSubtitle),
-    ];
     final selected = useState(0);
     useEffect(() {
-      if (k.startsWith("/timetable")) {
-        selected.value = 0;
-      } else if (k.startsWith("/attendance")) {
-        selected.value = 1;
-      } else if (k.startsWith("/more")) {
-        selected.value = 2;
-      } else if (k.startsWith("/docs")) {
-        selected.value = 3;
-      } else if (k.startsWith("/student-projects")) {
-        selected.value = 3;
-      } else if (k.startsWith("/settings")) {
-        selected.value = 4;
+      if (_tabs.indexWhere((tab) => tab.prefixes.any(location.startsWith))
+          case final index when index >= 0) {
+        selected.value = index;
       }
       return null;
-    }, [k]);
+    }, [location]);
 
     final tabFade = useAnimationController(
       duration: const Duration(milliseconds: 200),
@@ -119,7 +94,15 @@ class ShellLayout extends HookConsumerWidget {
           BoxDecoration(color: context.theme.colors.background),
         ),
       ),
-      header: headers[selected.value],
+      header: _buildHeader(
+        context,
+        _tabs[selected.value].route == Paths.docs &&
+                location.startsWith('/docs/view')
+            ? activeDocumentTitle ?? 'Document'
+            : _tabs[selected.value].label,
+        location,
+        headerSubtitle,
+      ),
       footer: SafeArea(
         top: false,
         right: false,
@@ -135,56 +118,17 @@ class ShellLayout extends HookConsumerWidget {
           onChange: (index) {
             if (index != selected.value) HapticFeedback.selectionClick();
             selected.value = index;
-            switch (selected.value) {
-              case 0:
-                GoRouter.of(context).goNamed(Paths.timetable);
-                break;
-              case 1:
-                GoRouter.of(context).goNamed(Paths.attendance);
-                break;
-              case 2:
-                GoRouter.of(context).goNamed(Paths.more);
-                break;
-              case 3:
-                GoRouter.of(context).goNamed(Paths.docs);
-                break;
-              // case 4:
-              //   GoRouter.of(context).goNamed(Paths.studentProjects);
-              //   break;
-              case 4:
-                GoRouter.of(context).goNamed(Paths.settings);
-                break;
-            }
+            GoRouter.of(context).goNamed(_tabs[index].route);
           },
           children: [
-            FBottomNavigationBarItem(
-              icon: Icon(FLucideIcons.calendarDays),
-              label: const Text('Timetable'),
-            ),
-            FBottomNavigationBarItem(
-              icon: Icon(FLucideIcons.userCheck),
-              label: const Text('Attendance'),
-            ),
-            FBottomNavigationBarItem(
-              icon: Icon(FLucideIcons.libraryBig),
-              label: const Text('More'),
-            ),
-            FBottomNavigationBarItem(
-              icon: Icon(FLucideIcons.files),
-              label: const Text('Docs'),
-            ),
-            // FBottomNavigationBarItem(
-            //   icon: Icon(FLucideIcons.rocket),
-            //   label: const Text('Projects'),
-            // ),
-            FBottomNavigationBarItem(
-              icon: Icon(FLucideIcons.settings),
-              label: const Text('Settings'),
-            ),
+            for (final tab in _tabs)
+              FBottomNavigationBarItem(
+                icon: Icon(tab.icon),
+                label: Text(tab.label),
+              ),
           ],
         ),
       ),
-
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8.0),
         // The tabs share one navigator shell, so fade the newly shown tab in
@@ -202,67 +146,32 @@ Widget _buildHeader(
   String? subtitle,
 ) {
   if (path.split('/').length - 1 > 1) {
-    switch (path.split("/")[2]) {
-      case "marks":
-        data = "Marks";
-        break;
-      case "grades":
-        data = "Grades";
-        break;
-      case "grade_history":
-        data = "Grade History";
-        break;
-      case "calendar-sync":
-        data = "Calendar Sync";
-        break;
-      case "notification-management":
-        data = "Notifications";
-        break;
-      case "debug":
-        data = switch (path.split('/').last) {
-          'activity' => 'Activity',
-          'diagnostics' => 'Diagnostics',
-          'logs' => 'Logs',
-          _ => 'Debug',
-        };
-        break;
-      case "exam_schedule":
-        data = "Exam Schedule";
-        break;
-      case "academic-calendar":
-        data = "Academic Calendar";
-        break;
-      case "biometric-history":
-        data = "Biometric History";
-        break;
-      case "profile":
-        data = "Profile";
-        break;
-      case "course-page":
-        data = path.endsWith('/course') ? "Course" : "Course Page";
-        break;
-      case "outing":
-        data = path.endsWith('/pass') ? "Outing Pass" : "Outing";
-        break;
-      case "server":
-        data = serverHeaderTitle(path);
-        break;
-      case "gpa_calculator":
-        data = "GPA Planner";
-        break;
-      case "gmail-otp-setup":
-        data = "Email OTP";
-        break;
-      case "gmail-oauth-guide":
-        data = "Your own Google key";
-        break;
-      case "mail-forwarding":
-        data = "Email forwarding";
-        break;
-      case "how-it-works":
-        data = "How It's Calculated";
-        break;
-    }
+    data = switch (path.split('/')[2]) {
+      'marks' => 'Marks',
+      'grades' => 'Grades',
+      'grade_history' => 'Grade History',
+      'calendar-sync' => 'Calendar Sync',
+      'notification-management' => 'Notifications',
+      'debug' => switch (path.split('/').last) {
+        'activity' => 'Activity',
+        'diagnostics' => 'Diagnostics',
+        'logs' => 'Logs',
+        _ => 'Debug',
+      },
+      'exam_schedule' => 'Exam Schedule',
+      'academic-calendar' => 'Academic Calendar',
+      'biometric-history' => 'Biometric History',
+      'profile' => 'Profile',
+      'course-page' => path.endsWith('/course') ? 'Course' : 'Course Page',
+      'outing' => path.endsWith('/pass') ? 'Outing Pass' : 'Outing',
+      'server' => serverHeaderTitle(path),
+      'gpa_calculator' => 'GPA Planner',
+      'gmail-otp-setup' => 'Email OTP',
+      'gmail-oauth-guide' => 'Your own Google key',
+      'mail-forwarding' => 'Email forwarding',
+      'how-it-works' => "How It's Calculated",
+      _ => data,
+    };
 
     return FHeader.nested(
       title: _HeaderTitle(
@@ -344,36 +253,70 @@ class _HeaderTitle extends StatelessWidget {
 
 String? _queueStatusText(List<String> runningTasks) {
   if (runningTasks.isEmpty) return null;
-
-  final visibleTasks = runningTasks.map(_taskLabel).toSet().toList();
-  final firstTask = visibleTasks.first;
+  final visibleTasks = runningTasks.map(_taskLabel).toSet();
   final extraCount = visibleTasks.length - 1;
-
-  if (extraCount <= 0) return firstTask;
-  return '$firstTask + $extraCount more';
+  return extraCount <= 0
+      ? visibleTasks.first
+      : '${visibleTasks.first} + $extraCount more';
 }
+
+/// Queue task id prefixes and what the header says while they run.
+const _taskLabels = [
+  ('vtop_login', 'Logging in to VTOP...'),
+  ('vtop_attendance', 'Fetching attendance...'),
+  ('vtop_fullattendance', 'Fetching attendance details...'),
+  ('vtop_timetable', 'Fetching timetable...'),
+  ('vtop_fetchSchedule', 'Fetching exam schedule...'),
+  ('vtop_marks', 'Fetching marks...'),
+  ('vtop_grades', 'Fetching grades...'),
+  ('vtop_grade_details', 'Fetching grade details...'),
+  ('vtop_grade_history', 'Fetching grade history...'),
+  ('vtop_semids', 'Fetching semesters...'),
+  ('toStorage', 'Saving data...'),
+  ('fromStorage', 'Loading data...'),
+];
 
 String _taskLabel(String id) {
-  if (id.startsWith('vtop_login')) return 'Logging in to VTOP...';
-  if (id.startsWith('vtop_attendance')) return 'Fetching attendance...';
-  if (id.startsWith('vtop_fullattendance')) {
-    return 'Fetching attendance details...';
+  if (id == 'get_semids_storage') return 'Loading data...';
+  for (final (prefix, label) in _taskLabels) {
+    if (id.startsWith(prefix)) return label;
   }
-  if (id.startsWith('vtop_timetable')) return 'Fetching timetable...';
-  if (id.startsWith('vtop_fetchSchedule')) return 'Fetching exam schedule...';
-  if (id.startsWith('vtop_marks')) return 'Fetching marks...';
-  if (id.startsWith('vtop_grades')) return 'Fetching grades...';
-  if (id.startsWith('vtop_grade_details')) return 'Fetching grade details...';
-  if (id.startsWith('vtop_grade_history')) return 'Fetching grade history...';
-  if (id.startsWith('vtop_semids')) return 'Fetching semesters...';
-
-  if (id.startsWith('toStorage')) return 'Saving data...';
-  if (id.startsWith('fromStorage') || id == 'get_semids_storage') {
-    return 'Loading data...';
-  }
-
   return 'Working...';
 }
+
+/// The bottom bar's tabs, in order, with the paths that select each.
+const _tabs = [
+  (
+    label: 'Timetable',
+    icon: FLucideIcons.calendarDays,
+    route: Paths.timetable,
+    prefixes: ['/timetable'],
+  ),
+  (
+    label: 'Attendance',
+    icon: FLucideIcons.userCheck,
+    route: Paths.attendance,
+    prefixes: ['/attendance'],
+  ),
+  (
+    label: 'More',
+    icon: FLucideIcons.libraryBig,
+    route: Paths.more,
+    prefixes: ['/more'],
+  ),
+  (
+    label: 'Docs',
+    icon: FLucideIcons.files,
+    route: Paths.docs,
+    prefixes: ['/docs', '/student-projects'],
+  ),
+  (
+    label: 'Settings',
+    icon: FLucideIcons.settings,
+    route: Paths.settings,
+    prefixes: ['/settings'],
+  ),
+];
 
 /// Opens the page explaining how attendance numbers are worked out.
 class _AttendanceGuideButton extends StatelessWidget {

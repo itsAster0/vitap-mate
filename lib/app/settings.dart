@@ -1,12 +1,12 @@
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hooks_riverpod/misc.dart' show ProviderOrFamily;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vitapmate/platform/notifications/change_alert_notification_service.dart';
 import 'package:vitapmate/platform/notifications/class_reminder_notification_service.dart';
 import 'package:vitapmate/platform/notifications/exam_reminder_notification_service.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
-part 'settings.g.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
@@ -18,10 +18,19 @@ const messTimingsSettingKey = 'settings_mess_timings';
 const showSkipAdviceSettingKey = 'settings_show_skip_advice';
 const byokGuideDoneSettingKey = 'settings_byok_guide_done';
 const forwardingGuideDoneSettingKey = 'settings_forwarding_guide_done';
+const vtopCompactModeSettingKey = 'settings_vtop_compact_mode';
+const vtopDesktopModeSettingKey = 'settings_vtop_desktop_mode';
+const vtopRecentPagesSettingKey = 'settings_vtop_recent_pages';
+const _autoRefreshKey = 'settings_auto_refresh';
+const _classEnabledKey = 'settings_class_notifications_enabled';
+const _classBeforeKey = 'settings_class_notify_before_minutes';
+const _classPauseUntilKey = 'settings_class_pause_until_millis';
+const _examEnabledKey = 'settings_exam_notifications_enabled';
+const _examBeforeKey = 'settings_exam_notify_before_minutes';
+const _changeAlertsKey = 'settings_change_alerts_enabled';
 
-@Riverpod(keepAlive: true)
-Future<SharedPreferencesWithCache> settings(Ref ref) async {
-  return SharedPreferencesWithCache.create(
+final settingsProvider = FutureProvider<SharedPreferencesWithCache>(
+  (ref) => SharedPreferencesWithCache.create(
     cacheOptions: SharedPreferencesWithCacheOptions(
       allowList: {
         classesLeftUntilSettingKey,
@@ -29,23 +38,20 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         showSkipAdviceSettingKey,
         byokGuideDoneSettingKey,
         forwardingGuideDoneSettingKey,
-        "settings_auto_refresh",
+        _autoRefreshKey,
         refreshButtonSettingKey,
         emailOtpDeleteAfterReadingSettingKey,
-        "settings_class_notifications_enabled",
-        "settings_class_notify_before_minutes",
-        "settings_class_pause_until_millis",
-        "settings_exam_notifications_enabled",
-        "settings_exam_notify_before_minutes",
-        "settings_change_alerts_enabled",
-        "settings_change_alerts_attendance",
-        "settings_change_alerts_marks",
-        "settings_change_alerts_timetable",
-        "settings_change_alerts_exam_schedule",
+        _classEnabledKey,
+        _classBeforeKey,
+        _classPauseUntilKey,
+        _examEnabledKey,
+        _examBeforeKey,
+        _changeAlertsKey,
+        for (final type in ChangeAlertTypeSetting.values) type.prefKey,
         vtopSessionReuseTtlSettingKey,
-        "settings_student_projects_pinned_ids",
-        "settings_student_projects_json",
-        "settings_student_projects_rotation_seed",
+        'settings_student_projects_pinned_ids',
+        'settings_student_projects_json',
+        'settings_student_projects_rotation_seed',
         timetableViewModeSettingKey,
         emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
@@ -62,8 +68,52 @@ Future<SharedPreferencesWithCache> settings(Ref ref) async {
         onDeviceModeSettingKey,
       },
     ),
-  );
+  ),
+);
+
+/// Writes [value] under [key], or removes it when null. With [legacy] it
+/// goes to plain SharedPreferences too, which background work reads.
+Future<void> _write(
+  Future<SharedPreferencesWithCache> settings,
+  String key,
+  Object? value, {
+  bool legacy = false,
+}) async {
+  final prefs = await settings;
+  final plain = legacy ? await SharedPreferences.getInstance() : null;
+  switch (value) {
+    case bool value:
+      await prefs.setBool(key, value);
+      await plain?.setBool(key, value);
+    case int value:
+      await prefs.setInt(key, value);
+      await plain?.setInt(key, value);
+    case String value:
+      await prefs.setString(key, value);
+      await plain?.setString(key, value);
+    case null:
+      await prefs.remove(key);
+      await plain?.remove(key);
+  }
 }
+
+/// Saves [value] and refreshes [provider], which reads it.
+Future<void> _set(
+  WidgetRef ref,
+  ProviderOrFamily provider,
+  String key,
+  Object? value, {
+  bool legacy = false,
+  bool whenMounted = false,
+}) async {
+  await _write(ref.read(settingsProvider.future), key, value, legacy: legacy);
+  if (whenMounted && !ref.context.mounted) return;
+  ref.invalidate(provider);
+}
+
+Provider<bool> _boolSetting(String key, bool fallback) => Provider.autoDispose(
+  (ref) => ref.watch(settingsProvider).value?.getBool(key) ?? fallback,
+);
 
 /// How far ahead "classes left" on the attendance cards counts.
 enum ClassesLeftUntil {
@@ -74,422 +124,202 @@ enum ClassesLeftUntil {
   nextExam,
 }
 
-@riverpod
-ClassesLeftUntil classesLeftUntil(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  final stored = prefs?.getString(classesLeftUntilSettingKey);
+final classesLeftUntilProvider = Provider.autoDispose<ClassesLeftUntil>((ref) {
+  final stored = ref
+      .watch(settingsProvider)
+      .value
+      ?.getString(classesLeftUntilSettingKey);
   return ClassesLeftUntil.values.firstWhere(
     (value) => value.name == stored,
     orElse: () => ClassesLeftUntil.nextExam,
   );
-}
+});
 
-Future<void> setClassesLeftUntil(WidgetRef ref, ClassesLeftUntil value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setString(classesLeftUntilSettingKey, value.name);
-  ref.invalidate(classesLeftUntilProvider);
-}
+Future<void> setClassesLeftUntil(WidgetRef ref, ClassesLeftUntil value) =>
+    _set(ref, classesLeftUntilProvider, classesLeftUntilSettingKey, value.name);
 
 /// Shows skip advice ("Can skip 3", "6 to spare", "need 2") in the
 /// timetable and attendance; off by default, when only percentages and
 /// counts show.
-@riverpod
-bool showSkipAdvice(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool(showSkipAdviceSettingKey) ?? false;
-}
+final showSkipAdviceProvider = _boolSetting(showSkipAdviceSettingKey, false);
 
-Future<void> setShowSkipAdvice(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(showSkipAdviceSettingKey, value);
-  ref.invalidate(showSkipAdviceProvider);
-}
+Future<void> setShowSkipAdvice(WidgetRef ref, bool value) =>
+    _set(ref, showSkipAdviceProvider, showSkipAdviceSettingKey, value);
 
 /// The floating refresh button on the screen edge.
-@riverpod
-bool refreshButton(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool(refreshButtonSettingKey) ?? true;
-}
+final refreshButtonProvider = _boolSetting(refreshButtonSettingKey, true);
 
-Future<void> setRefreshButton(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(refreshButtonSettingKey, value);
-  ref.invalidate(refreshButtonProvider);
-}
+Future<void> setRefreshButton(WidgetRef ref, bool value) =>
+    _set(ref, refreshButtonProvider, refreshButtonSettingKey, value);
 
-@riverpod
-bool autoRefresh(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool("settings_auto_refresh") ?? true;
-}
+final autoRefreshProvider = _boolSetting(_autoRefreshKey, true);
 
 Future<bool> isAutoRefreshEnabled(WidgetRef ref) async {
   await ref.read(settingsProvider.future);
   return ref.read(autoRefreshProvider);
 }
 
-Future<void> setautoRefresh(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool("settings_auto_refresh", value);
-  ref.invalidate(autoRefreshProvider);
-}
+Future<void> setautoRefresh(WidgetRef ref, bool value) =>
+    _set(ref, autoRefreshProvider, _autoRefreshKey, value);
 
-@riverpod
-bool emailOtpDeleteAfterReading(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return prefs?.getBool(emailOtpDeleteAfterReadingSettingKey) ?? true;
-}
+final emailOtpDeleteAfterReadingProvider = _boolSetting(
+  emailOtpDeleteAfterReadingSettingKey,
+  true,
+);
 
-Future<void> setEmailOtpDeleteAfterReading(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  await prefs.setBool(emailOtpDeleteAfterReadingSettingKey, value);
-  ref.invalidate(emailOtpDeleteAfterReadingProvider);
-}
+Future<void> setEmailOtpDeleteAfterReading(WidgetRef ref, bool value) => _set(
+  ref,
+  emailOtpDeleteAfterReadingProvider,
+  emailOtpDeleteAfterReadingSettingKey,
+  value,
+);
 
-@riverpod
-Duration vtopSessionReuseTtl(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return vtopSessionReuseTtlFromMinutes(
-    prefs?.getInt(vtopSessionReuseTtlSettingKey),
-  );
-}
+final vtopSessionReuseTtlProvider = Provider.autoDispose<Duration>(
+  (ref) => vtopSessionReuseTtlFromMinutes(
+    ref.watch(settingsProvider).value?.getInt(vtopSessionReuseTtlSettingKey),
+  ),
+);
 
-Future<void> setVtopSessionReuseTtl(WidgetRef ref, Duration value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.setInt(vtopSessionReuseTtlSettingKey, value.inMinutes);
-  await legacyPrefs.setInt(vtopSessionReuseTtlSettingKey, value.inMinutes);
-  ref.invalidate(vtopSessionReuseTtlProvider);
-}
+Future<void> setVtopSessionReuseTtl(WidgetRef ref, Duration value) => _set(
+  ref,
+  vtopSessionReuseTtlProvider,
+  vtopSessionReuseTtlSettingKey,
+  value.inMinutes,
+  legacy: true,
+);
 
-@riverpod
-Set<int> studentProjectPinnedIds(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  final list =
-      prefs?.getStringList("settings_student_projects_pinned_ids") ?? [];
-  return list.map(int.tryParse).whereType<int>().toSet();
-}
-
-@riverpod
-class StudentProjectsPinnedOnlySession
-    extends _$StudentProjectsPinnedOnlySession {
-  @override
-  bool build() => false;
-
-  void setValue(bool value) {
-    state = value;
-  }
-}
-
-@Riverpod(keepAlive: true)
-StudentProjectsSettingsController studentProjectsSettingsController(Ref ref) {
-  return StudentProjectsSettingsController(ref);
-}
-
-class StudentProjectsSettingsController {
-  final Ref ref;
-  StudentProjectsSettingsController(this.ref);
-
-  Future<void> togglePinned(int id) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final current =
-        (prefs.getStringList("settings_student_projects_pinned_ids") ?? [])
-            .map(int.tryParse)
-            .whereType<int>()
-            .toSet();
-    if (current.contains(id)) {
-      current.remove(id);
-    } else {
-      current.add(id);
-    }
-    final sorted = current.toList()..sort();
-    await prefs.setStringList(
-      "settings_student_projects_pinned_ids",
-      sorted.map((e) => "$e").toList(),
-    );
-    ref.invalidate(studentProjectPinnedIdsProvider);
-  }
-}
-
-class ClassReminderSettings {
-  final bool enabled;
-  final int notifyBeforeMinutes;
-  final int? pauseUntilMillis;
-
-  const ClassReminderSettings({
-    required this.enabled,
-    required this.notifyBeforeMinutes,
-    required this.pauseUntilMillis,
-  });
-}
-
-@riverpod
-ClassReminderSettings classReminderSettings(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return ClassReminderSettings(
-    enabled: prefs?.getBool("settings_class_notifications_enabled") ?? false,
-    notifyBeforeMinutes:
-        prefs?.getInt("settings_class_notify_before_minutes") ?? 10,
-    pauseUntilMillis: prefs?.getInt("settings_class_pause_until_millis"),
-  );
-}
+final classReminderSettingsProvider =
+    Provider.autoDispose<
+      ({bool enabled, int notifyBeforeMinutes, int? pauseUntilMillis})
+    >((ref) {
+      final prefs = ref.watch(settingsProvider).value;
+      return (
+        enabled: prefs?.getBool(_classEnabledKey) ?? false,
+        notifyBeforeMinutes: prefs?.getInt(_classBeforeKey) ?? 10,
+        pauseUntilMillis: prefs?.getInt(_classPauseUntilKey),
+      );
+    });
 
 Future<void> setClassReminderEnabled(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.setBool("settings_class_notifications_enabled", value);
-  await legacyPrefs.setBool("settings_class_notifications_enabled", value);
-  if (!value) {
-    await ClassReminderNotificationService.cancelAll();
-  }
+  await _write(
+    ref.read(settingsProvider.future),
+    _classEnabledKey,
+    value,
+    legacy: true,
+  );
+  if (!value) await ClassReminderNotificationService.cancelAll();
   if (!ref.context.mounted) return;
   ref.invalidate(classReminderSettingsProvider);
 }
 
-Future<void> setClassReminderNotifyBeforeMinutes(
-  WidgetRef ref,
-  int value,
-) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.setInt("settings_class_notify_before_minutes", value);
-  await legacyPrefs.setInt("settings_class_notify_before_minutes", value);
-  if (!ref.context.mounted) return;
-  ref.invalidate(classReminderSettingsProvider);
-}
+Future<void> setClassReminderNotifyBeforeMinutes(WidgetRef ref, int value) =>
+    _set(
+      ref,
+      classReminderSettingsProvider,
+      _classBeforeKey,
+      value,
+      legacy: true,
+      whenMounted: true,
+    );
 
 Future<void> pauseClassRemindersForDays(WidgetRef ref, int days) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
   final now = DateTime.now();
   final until = DateTime(now.year, now.month, now.day + days, 23, 59, 59);
-  await prefs.setInt(
-    "settings_class_pause_until_millis",
+  await _write(
+    ref.read(settingsProvider.future),
+    _classPauseUntilKey,
     until.millisecondsSinceEpoch,
-  );
-  await legacyPrefs.setInt(
-    "settings_class_pause_until_millis",
-    until.millisecondsSinceEpoch,
+    legacy: true,
   );
   await ClassReminderNotificationService.cancelAll();
   if (!ref.context.mounted) return;
   ref.invalidate(classReminderSettingsProvider);
 }
 
-Future<void> clearClassReminderPause(WidgetRef ref) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.remove("settings_class_pause_until_millis");
-  await legacyPrefs.remove("settings_class_pause_until_millis");
-  if (!ref.context.mounted) return;
-  ref.invalidate(classReminderSettingsProvider);
-}
+Future<void> clearClassReminderPause(WidgetRef ref) => _set(
+  ref,
+  classReminderSettingsProvider,
+  _classPauseUntilKey,
+  null,
+  legacy: true,
+  whenMounted: true,
+);
 
-@Riverpod(keepAlive: true)
-ClassReminderSettingsController classReminderSettingsController(Ref ref) {
-  return ClassReminderSettingsController(ref);
-}
-
-class ClassReminderSettingsController {
-  final Ref ref;
-  ClassReminderSettingsController(this.ref);
-
-  Future<void> setEnabled(bool value) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.setBool("settings_class_notifications_enabled", value);
-    await legacyPrefs.setBool("settings_class_notifications_enabled", value);
-    if (!value) {
-      await ClassReminderNotificationService.cancelAll();
-    }
-    ref.invalidate(classReminderSettingsProvider);
-  }
-
-  Future<void> setNotifyBeforeMinutes(int value) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.setInt("settings_class_notify_before_minutes", value);
-    await legacyPrefs.setInt("settings_class_notify_before_minutes", value);
-    ref.invalidate(classReminderSettingsProvider);
-  }
-
-  Future<void> pauseForDays(int days) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final until = DateTime(now.year, now.month, now.day + days, 23, 59, 59);
-    await prefs.setInt(
-      "settings_class_pause_until_millis",
-      until.millisecondsSinceEpoch,
-    );
-    await legacyPrefs.setInt(
-      "settings_class_pause_until_millis",
-      until.millisecondsSinceEpoch,
-    );
-    await ClassReminderNotificationService.cancelAll();
-    ref.invalidate(classReminderSettingsProvider);
-  }
-
-  Future<void> clearPause() async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.remove("settings_class_pause_until_millis");
-    await legacyPrefs.remove("settings_class_pause_until_millis");
-    ref.invalidate(classReminderSettingsProvider);
-  }
-}
-
-class ExamReminderSettings {
-  final bool enabled;
-  final int notifyBeforeMinutes;
-
-  const ExamReminderSettings({
-    required this.enabled,
-    required this.notifyBeforeMinutes,
-  });
-}
-
-@riverpod
-ExamReminderSettings examReminderSettings(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return ExamReminderSettings(
-    enabled: prefs?.getBool("settings_exam_notifications_enabled") ?? false,
-    notifyBeforeMinutes:
-        prefs?.getInt("settings_exam_notify_before_minutes") ?? 10,
-  );
-}
+final examReminderSettingsProvider =
+    Provider.autoDispose<({bool enabled, int notifyBeforeMinutes})>((ref) {
+      final prefs = ref.watch(settingsProvider).value;
+      return (
+        enabled: prefs?.getBool(_examEnabledKey) ?? false,
+        notifyBeforeMinutes: prefs?.getInt(_examBeforeKey) ?? 10,
+      );
+    });
 
 Future<void> setExamReminderEnabled(WidgetRef ref, bool value) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.setBool("settings_exam_notifications_enabled", value);
-  await legacyPrefs.setBool("settings_exam_notifications_enabled", value);
-  if (!value) {
-    await ExamReminderNotificationService.cancelAll();
-  }
+  await _write(
+    ref.read(settingsProvider.future),
+    _examEnabledKey,
+    value,
+    legacy: true,
+  );
+  if (!value) await ExamReminderNotificationService.cancelAll();
   if (!ref.context.mounted) return;
   ref.invalidate(examReminderSettingsProvider);
 }
 
-Future<void> setExamReminderNotifyBeforeMinutes(
-  WidgetRef ref,
-  int value,
-) async {
-  final prefs = await ref.read(settingsProvider.future);
-  final legacyPrefs = await SharedPreferences.getInstance();
-  await prefs.setInt("settings_exam_notify_before_minutes", value);
-  await legacyPrefs.setInt("settings_exam_notify_before_minutes", value);
-  if (!ref.context.mounted) return;
-  ref.invalidate(examReminderSettingsProvider);
-}
+Future<void> setExamReminderNotifyBeforeMinutes(WidgetRef ref, int value) =>
+    _set(
+      ref,
+      examReminderSettingsProvider,
+      _examBeforeKey,
+      value,
+      legacy: true,
+      whenMounted: true,
+    );
 
-@Riverpod(keepAlive: true)
-ExamReminderSettingsController examReminderSettingsController(Ref ref) {
-  return ExamReminderSettingsController(ref);
-}
-
-class ExamReminderSettingsController {
-  final Ref ref;
-  ExamReminderSettingsController(this.ref);
-
-  Future<void> setEnabled(bool value) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.setBool("settings_exam_notifications_enabled", value);
-    await legacyPrefs.setBool("settings_exam_notifications_enabled", value);
-    if (!value) {
-      await ExamReminderNotificationService.cancelAll();
-    }
-    ref.invalidate(examReminderSettingsProvider);
-  }
-
-  Future<void> setNotifyBeforeMinutes(int value) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.setInt("settings_exam_notify_before_minutes", value);
-    await legacyPrefs.setInt("settings_exam_notify_before_minutes", value);
-    ref.invalidate(examReminderSettingsProvider);
-  }
-}
-
-enum ChangeAlertTypeSetting { attendance, marks, timetable, examSchedule }
-
-extension ChangeAlertTypeSettingKey on ChangeAlertTypeSetting {
-  String get prefKey => switch (this) {
-    ChangeAlertTypeSetting.attendance => "settings_change_alerts_attendance",
-    ChangeAlertTypeSetting.marks => "settings_change_alerts_marks",
-    ChangeAlertTypeSetting.timetable => "settings_change_alerts_timetable",
-    ChangeAlertTypeSetting.examSchedule =>
-      "settings_change_alerts_exam_schedule",
-  };
-}
+typedef ChangeAlertTypeSetting = ChangeAlertType;
 
 class ChangeAlertsSettings {
+  const ChangeAlertsSettings({required this.enabled, required this.types});
+
   final bool enabled;
-  final bool attendance;
-  final bool marks;
-  final bool timetable;
-  final bool examSchedule;
+  final Set<ChangeAlertTypeSetting> types;
 
-  const ChangeAlertsSettings({
-    required this.enabled,
-    required this.attendance,
-    required this.marks,
-    required this.timetable,
-    required this.examSchedule,
-  });
-
-  bool isEnabled(ChangeAlertTypeSetting type) => switch (type) {
-    ChangeAlertTypeSetting.attendance => attendance,
-    ChangeAlertTypeSetting.marks => marks,
-    ChangeAlertTypeSetting.timetable => timetable,
-    ChangeAlertTypeSetting.examSchedule => examSchedule,
-  };
+  bool isEnabled(ChangeAlertTypeSetting type) => types.contains(type);
 }
 
-@riverpod
-ChangeAlertsSettings changeAlertsSettings(Ref ref) {
-  final prefs = ref.watch(settingsProvider).value;
-  return ChangeAlertsSettings(
-    enabled: prefs?.getBool("settings_change_alerts_enabled") ?? true,
-    attendance: prefs?.getBool("settings_change_alerts_attendance") ?? true,
-    marks: prefs?.getBool("settings_change_alerts_marks") ?? true,
-    timetable: prefs?.getBool("settings_change_alerts_timetable") ?? true,
-    examSchedule:
-        prefs?.getBool("settings_change_alerts_exam_schedule") ?? true,
-  );
-}
+final changeAlertsSettingsProvider = Provider.autoDispose<ChangeAlertsSettings>(
+  (ref) {
+    final prefs = ref.watch(settingsProvider).value;
+    return ChangeAlertsSettings(
+      enabled: prefs?.getBool(_changeAlertsKey) ?? true,
+      types: {
+        for (final type in ChangeAlertTypeSetting.values)
+          if (prefs?.getBool(type.prefKey) ?? true) type,
+      },
+    );
+  },
+);
 
-@Riverpod(keepAlive: true)
-ChangeAlertsSettingsController changeAlertsSettingsController(Ref ref) {
-  return ChangeAlertsSettingsController(ref);
-}
+final changeAlertsSettingsControllerProvider =
+    Provider<ChangeAlertsSettingsController>(
+      ChangeAlertsSettingsController.new,
+    );
 
 class ChangeAlertsSettingsController {
-  final Ref ref;
   ChangeAlertsSettingsController(this.ref);
 
-  Future<void> _write(String key, bool value) async {
-    final prefs = await ref.read(settingsProvider.future);
-    final legacyPrefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-    await legacyPrefs.setBool(key, value);
+  final Ref ref;
+
+  Future<void> _save(String key, bool value) async {
+    await _write(ref.read(settingsProvider.future), key, value, legacy: true);
     ref.invalidate(changeAlertsSettingsProvider);
   }
 
-  Future<void> setEnabled(bool value) async {
-    await _write("settings_change_alerts_enabled", value);
-  }
+  Future<void> setEnabled(bool value) => _save(_changeAlertsKey, value);
 
-  Future<void> setTypeEnabled(ChangeAlertTypeSetting type, bool value) async {
-    await _write(type.prefKey, value);
-  }
+  Future<void> setTypeEnabled(ChangeAlertTypeSetting type, bool value) =>
+      _save(type.prefKey, value);
 }
-
-const vtopCompactModeSettingKey = 'settings_vtop_compact_mode';
-const vtopDesktopModeSettingKey = 'settings_vtop_desktop_mode';
-const vtopRecentPagesSettingKey = 'settings_vtop_recent_pages';
 
 /// Serialize preference writes while updating the visible selection immediately.
 class VtopViewPreference extends Notifier<bool> {

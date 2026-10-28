@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'dart:io';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -21,36 +20,14 @@ class DocsCopyException implements Exception {
   final Object cause;
 }
 
-String formatUnixTimestamp(int timestamp) {
-  final date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
-  final formatter = DateFormat("MMM dd, yyyy hh:mm a");
-  final formatted = formatter.format(date);
-  return formatted.replaceFirstMapped(
-    RegExp(r'^[A-Za-z]{3}'),
-    (match) => match.group(0)!.toUpperCase(),
-  );
-}
+String commonErrorMessage(Object e) => appError(e).$2;
 
-String commonErrorMessage(Object e) {
-  final (type, message) = appError(e);
-  return message;
-}
-
-void myNotificationTapCallback(
-  Task task,
-  NotificationType notificationType,
-) async {
-  if (notificationType == NotificationType.complete) {
-    if (Platform.isAndroid) {
-      await _openAndroidDownloadsFolder();
-      return;
-    }
-
-    final path = await task.filePath();
-    final result = await OpenFile.open(path);
-    if (result.type == ResultType.noAppToOpen) {
-      await OpenFile.open(_androidDir.path);
-    }
+void _onNotificationTap(Task task, NotificationType notificationType) async {
+  if (notificationType != NotificationType.complete) return;
+  if (Platform.isAndroid) return _openAndroidDownloadsFolder();
+  final result = await OpenFile.open(await task.filePath());
+  if (result.type == ResultType.noAppToOpen) {
+    await OpenFile.open(_androidDir.path);
   }
 }
 
@@ -58,12 +35,11 @@ void fileDownloaderConfig() {
   FileDownloader().configureNotification(
     running: TaskNotification('Downloading', 'file: {filename}'),
     complete: TaskNotification('Download finished', 'file: {filename}'),
-
     progressBar: true,
   );
 
   FileDownloader().registerCallbacks(
-    taskNotificationTapCallback: myNotificationTapCallback,
+    taskNotificationTapCallback: _onNotificationTap,
   );
 }
 
@@ -113,7 +89,6 @@ Future<void> downloadFile(
     url: url,
     headers: {"Cookie": cookie},
     retries: 5,
-
     directory: downloadsDir.path,
     filename: fallbackFilename ?? DownloadTask.suggestedFilename,
     baseDirectory: BaseDirectory.root,
@@ -173,18 +148,14 @@ Future<int?> _downloadWithAndroidDownloadManager(
   }
 }
 
-String? _normalizeDownloadFilename(String? filename) {
-  final trimmed = filename?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return null;
-  }
-
-  if (trimmed.toLowerCase().endsWith('.bin')) {
-    return '${trimmed.substring(0, trimmed.length - 4)}.zip';
-  }
-
-  return trimmed;
-}
+/// VTOP serves some zip files as .bin.
+String? _normalizeDownloadFilename(String? filename) =>
+    switch (filename?.trim()) {
+      null || '' => null,
+      final name when name.toLowerCase().endsWith('.bin') =>
+        '${name.substring(0, name.length - 4)}.zip',
+      final name => name,
+    };
 
 Future<void> _openAndroidDownloadsFolder() async {
   try {

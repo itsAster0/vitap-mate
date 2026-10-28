@@ -33,11 +33,10 @@ class ClassReminderNotificationService {
       _tzInitialized = true;
     }
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/launcher_icon',
-    );
     await _notifications.initialize(
-      settings: const InitializationSettings(android: androidSettings),
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+      ),
       onDidReceiveNotificationResponse: (response) {
         handleNotificationResponse(response);
       },
@@ -60,18 +59,14 @@ class ClassReminderNotificationService {
   }
 
   static Future<void> cancelAll() async {
-    final pending = await _notifications.pendingNotificationRequests();
-    for (final request in pending) {
+    for (final request in await _notifications.pendingNotificationRequests()) {
       try {
-        final payload = request.payload;
-        if (payload == null) continue;
-        final parsed = jsonDecode(payload);
-        if (parsed is Map<String, dynamic> && parsed["type"] == _payloadType) {
+        if (jsonDecode(request.payload ?? 'null') case <String, dynamic>{
+          'type': _payloadType,
+        }) {
           await _notifications.cancel(id: request.id);
         }
-      } catch (_) {
-        continue;
-      }
+      } catch (_) {}
     }
   }
 
@@ -95,14 +90,13 @@ class ClassReminderNotificationService {
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return false;
     try {
-      final parsed = jsonDecode(payload);
-      if (parsed is Map<String, dynamic> && parsed["type"] == _payloadType) {
-        return true;
-      }
+      return switch (jsonDecode(payload)) {
+        <String, dynamic>{'type': _payloadType} => true,
+        _ => false,
+      };
     } catch (_) {
       return false;
     }
-    return false;
   }
 
   /// Schedules a reminder before every class. With a [calendar], reminders
@@ -138,14 +132,10 @@ class ClassReminderNotificationService {
     }
 
     for (final slot in data.slots) {
-      if (slot.serial == "-1") {
-        continue;
-      }
-      final weekday = _weekdayFromSlot(slot.day);
+      if (slot.serial == "-1") continue;
+      final weekday = _weekdays[slot.day.trim().toUpperCase()];
       final classTime = _parseTime(slot.startTime);
-      if (weekday == null || classTime == null) {
-        continue;
-      }
+      if (weekday == null || classTime == null) continue;
 
       var nextClass = _nextDateForWeekday(weekday, classTime);
       var remindAt = nextClass.subtract(Duration(minutes: beforeMinutes));
@@ -154,35 +144,45 @@ class ClassReminderNotificationService {
         remindAt = nextClass.subtract(Duration(minutes: beforeMinutes));
       }
 
-      final id =
-          Object.hash(
-            data.semesterId,
-            slot.day,
-            slot.startTime,
-            slot.courseCode,
-            slot.slot,
-          ) &
-          0x7fffffff;
-
-      final payload = jsonEncode({
-        "type": _payloadType,
-        "semesterId": data.semesterId,
-        "courseCode": slot.courseCode,
-        "slot": slot.slot,
-      });
-
-      await _notifications.zonedSchedule(
-        id: id,
-        title: "Class Reminder",
-        body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
-        scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-        notificationDetails: _details,
-        payload: payload,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      await _schedule(
+        data,
+        slot,
+        id: Object.hash(
+          data.semesterId,
+          slot.day,
+          slot.startTime,
+          slot.courseCode,
+          slot.slot,
+        ),
+        at: remindAt,
+        beforeMinutes: beforeMinutes,
+        repeat: DateTimeComponents.dayOfWeekAndTime,
       );
     }
   }
+
+  static Future<void> _schedule(
+    TimetableData data,
+    TimetableSlot slot, {
+    required int id,
+    required DateTime at,
+    required int beforeMinutes,
+    DateTimeComponents? repeat,
+  }) => _notifications.zonedSchedule(
+    id: id & 0x7fffffff,
+    title: "Class Reminder",
+    body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
+    scheduledDate: tz.TZDateTime.from(at, tz.local),
+    notificationDetails: _details,
+    payload: jsonEncode({
+      "type": _payloadType,
+      "semesterId": data.semesterId,
+      "courseCode": slot.courseCode,
+      "slot": slot.slot,
+    }),
+    androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    matchDateTimeComponents: repeat,
+  );
 
   static const _details = NotificationDetails(
     android: AndroidNotificationDetails(
@@ -213,7 +213,7 @@ class ClassReminderNotificationService {
       final day = DateTime(now.year, now.month, now.day + offset);
       for (final slot in data.slots) {
         if (slot.serial == "-1") continue;
-        if (_weekdayFromSlot(slot.day) != day.weekday) continue;
+        if (_weekdays[slot.day.trim().toUpperCase()] != day.weekday) continue;
         if (!calendar.holdsClasses(day, lab: slot.kind == ClassKind.lab)) {
           continue;
         }
@@ -228,28 +228,18 @@ class ClassReminderNotificationService {
         ).subtract(Duration(minutes: beforeMinutes));
         if (!remindAt.isAfter(now)) continue;
 
-        final id =
-            Object.hash(
-              data.semesterId,
-              day.millisecondsSinceEpoch,
-              slot.startTime,
-              slot.courseCode,
-              slot.slot,
-            ) &
-            0x7fffffff;
-        await _notifications.zonedSchedule(
-          id: id,
-          title: "Class Reminder",
-          body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
-          scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-          notificationDetails: _details,
-          payload: jsonEncode({
-            "type": _payloadType,
-            "semesterId": data.semesterId,
-            "courseCode": slot.courseCode,
-            "slot": slot.slot,
-          }),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        await _schedule(
+          data,
+          slot,
+          id: Object.hash(
+            data.semesterId,
+            day.millisecondsSinceEpoch,
+            slot.startTime,
+            slot.courseCode,
+            slot.slot,
+          ),
+          at: remindAt,
+          beforeMinutes: beforeMinutes,
         );
       }
     }
@@ -283,27 +273,26 @@ class ClassReminderNotificationService {
     return candidate;
   }
 
-  static int? _weekdayFromSlot(String day) {
-    const map = {
-      "MON": DateTime.monday,
-      "TUE": DateTime.tuesday,
-      "WED": DateTime.wednesday,
-      "THU": DateTime.thursday,
-      "FRI": DateTime.friday,
-      "SAT": DateTime.saturday,
-      "SUN": DateTime.sunday,
-    };
-    return map[day.trim().toUpperCase()];
-  }
+  static const _weekdays = {
+    "MON": DateTime.monday,
+    "TUE": DateTime.tuesday,
+    "WED": DateTime.wednesday,
+    "THU": DateTime.thursday,
+    "FRI": DateTime.friday,
+    "SAT": DateTime.saturday,
+    "SUN": DateTime.sunday,
+  };
 
-  static (int, int)? _parseTime(String time) {
-    final parts = time.split(":");
-    if (parts.length < 2) return null;
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) return null;
-    return (hour, minute);
-  }
+  static (int, int)? _parseTime(String time) => switch (time.split(":")) {
+    [final hour, final minute, ...] => switch ((
+      int.tryParse(hour),
+      int.tryParse(minute),
+    )) {
+      (final hour?, final minute?) => (hour, minute),
+      _ => null,
+    },
+    _ => null,
+  };
 }
 
 @pragma("vm:entry-point")

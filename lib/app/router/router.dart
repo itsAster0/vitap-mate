@@ -11,7 +11,7 @@ import 'package:vitapmate/features/grades/grades_page.dart';
 import 'package:vitapmate/features/attendance/attendance_page.dart';
 import 'package:vitapmate/features/biometric/biometric_history_page.dart';
 import 'package:vitapmate/features/attendance/attendance_guide_page.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/app/router/slide_fade_page.dart';
@@ -41,14 +41,38 @@ import 'package:vitapmate/features/account/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/features/settings/notification_management_page.dart';
 import 'package:vitapmate/features/developer/logs_page.dart';
 import 'package:vitapmate/app/widgets/server_feature_gate.dart';
-part 'router.g.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
-@Riverpod(keepAlive: true)
-GoRouter router(Ref ref) {
-  return GoRouter(
-    redirect: (context, state) => redirect(context, ref, state),
+/// A route pushed with [SlideFadePage].
+GoRoute _slide(
+  String path,
+  String name,
+  Widget Function(GoRouterState state) page, {
+  List<RouteBase> routes = const [],
+}) => GoRoute(
+  path: path,
+  name: name,
+  pageBuilder: (context, state) =>
+      SlideFadePage<void>(key: state.pageKey, child: page(state)),
+  routes: routes,
+);
+
+StatefulShellBranch _branch(RouteBase route) => StatefulShellBranch(
+  navigatorKey: GlobalKey<NavigatorState>(),
+  routes: [route],
+);
+
+final routerProvider = Provider<GoRouter>(
+  (ref) => GoRouter(
+    redirect: (context, state) async {
+      try {
+        final user = await ref.read(vtopUserProvider.future);
+        return user.username == null ? '/onboarding' : null;
+      } catch (_) {
+        return '/onboarding';
+      }
+    },
     initialLocation: '/timetable',
     navigatorKey: rootNavigatorKey,
     routes: [
@@ -57,418 +81,245 @@ GoRouter router(Ref ref) {
         name: Paths.onbaording,
         builder: (context, state) => OnboardingPage(),
       ),
-      GoRoute(
-        path: '/vtopweb',
-        name: Paths.vtopweb,
-
-        pageBuilder: (context, state) {
-          return SlideFadePage<void>(
-            key: state.pageKey,
-            child: VtopWebview(initialMenuUrl: state.extra as String?),
-          );
-        },
+      _slide(
+        '/vtopweb',
+        Paths.vtopweb,
+        (state) => VtopWebview(initialMenuUrl: state.extra as String?),
       ),
-
       StatefulShellRoute.indexedStack(
-        builder: (context, state, child) {
-          return ShellLayout(child: child);
-        },
+        builder: (context, state, child) => ShellLayout(child: child),
         branches: [
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/timetable',
-                name: Paths.timetable,
-                pageBuilder: (context, state) => SlideFadePage<void>(
-                  key: state.pageKey,
-                  child: TimetablePage(),
+          _branch(
+            _slide(
+              '/timetable',
+              Paths.timetable,
+              (_) => TimetablePage(),
+              routes: [
+                GoRoute(
+                  path: 'details',
+                  builder: (context, state) => Placeholder(),
                 ),
-                routes: [
-                  GoRoute(
-                    path: 'details',
-                    builder: (context, state) => Placeholder(),
-                  ),
-                  GoRoute(
-                    path: 'how-it-works',
-                    name: Paths.timetableAttendanceGuide,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const AttendanceGuidePage(showTimetable: true),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/attendance',
-                name: Paths.attendance,
-
-                pageBuilder: (context, state) => SlideFadePage<void>(
-                  key: state.pageKey,
-                  child: AttendancePage(),
+                _slide(
+                  'how-it-works',
+                  Paths.timetableAttendanceGuide,
+                  (_) => const AttendanceGuidePage(showTimetable: true),
                 ),
-                routes: [
-                  GoRoute(
-                    path: 'how-it-works',
-                    name: Paths.attendanceGuide,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const AttendanceGuidePage(),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/more',
-                name: Paths.more,
-                pageBuilder: (context, state) =>
-                    SlideFadePage<void>(key: state.pageKey, child: MorePage()),
-                routes: [
-                  GoRoute(
-                    path: 'marks',
-                    name: Paths.marks,
-
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: MarksPage(),
-                      );
+          _branch(
+            _slide(
+              '/attendance',
+              Paths.attendance,
+              (_) => AttendancePage(),
+              routes: [
+                _slide(
+                  'how-it-works',
+                  Paths.attendanceGuide,
+                  (_) => const AttendanceGuidePage(),
+                ),
+              ],
+            ),
+          ),
+          _branch(
+            _slide(
+              '/more',
+              Paths.more,
+              (_) => MorePage(),
+              routes: [
+                _slide('marks', Paths.marks, (_) => MarksPage()),
+                _slide('grades', Paths.grades, (_) => GradesPage()),
+                _slide(
+                  'grade_history',
+                  Paths.gradeHistory,
+                  (_) => GradeHistoryPage(),
+                ),
+                _slide(
+                  'exam_schedule',
+                  Paths.examSchedule,
+                  (_) => ExamSchedulePage(),
+                ),
+                _slide(
+                  'academic-calendar',
+                  Paths.academicCalendar,
+                  (_) => const AcademicCalendarPage(),
+                ),
+                _slide(
+                  'biometric-history',
+                  Paths.biometricHistory,
+                  (_) => const BiometricHistoryPage(),
+                ),
+                _slide(
+                  'profile',
+                  Paths.profile,
+                  (state) => ProfilePage(
+                    initialTab: switch (state.extra) {
+                      final ProfileTab tab => tab,
+                      _ => ProfileTab.profile,
                     },
                   ),
-                  GoRoute(
-                    path: 'grades',
-                    name: Paths.grades,
-
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: GradesPage(),
-                      );
+                ),
+                _slide(
+                  'outing',
+                  Paths.outing,
+                  (state) => OutingPage(
+                    initialTab: switch (state.extra) {
+                      final OutingTab tab => tab,
+                      _ => OutingTab.general,
                     },
                   ),
-                  GoRoute(
-                    path: 'grade_history',
-                    name: Paths.gradeHistory,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: GradeHistoryPage(),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'exam_schedule',
-                    name: Paths.examSchedule,
-
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: ExamSchedulePage(),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'academic-calendar',
-                    name: Paths.academicCalendar,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const AcademicCalendarPage(),
+                  routes: [
+                    _slide(
+                      'pass',
+                      Paths.outingPass,
+                      (state) =>
+                          DocumentViewerPage(doc: state.extra as DocWindow),
                     ),
-                  ),
-                  GoRoute(
-                    path: 'biometric-history',
-                    name: Paths.biometricHistory,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const BiometricHistoryPage(),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'profile',
-                    name: Paths.profile,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: ProfilePage(
-                        initialTab: state.extra is ProfileTab
-                            ? state.extra! as ProfileTab
-                            : ProfileTab.profile,
+                  ],
+                ),
+                _slide(
+                  'course-page',
+                  Paths.coursePage,
+                  (_) => const CoursePagePage(),
+                  routes: [
+                    _slide(
+                      'course',
+                      Paths.coursePageCourse,
+                      (state) => CourseViewPage(
+                        course: state.extra as CoursePageCourse,
                       ),
                     ),
+                  ],
+                ),
+                GoRoute(
+                  path: 'connected-apps',
+                  name: Paths.connectedApps,
+                  redirect: (_, _) => serverPagePath,
+                ),
+                _slide(
+                  'gpa_calculator',
+                  Paths.gpaCalculator,
+                  (_) => const GpaCalculatorPage(),
+                ),
+              ],
+            ),
+          ),
+          _branch(
+            _slide(
+              '/docs',
+              Paths.docs,
+              (_) => const DocsPage(),
+              routes: [
+                GoRoute(
+                  path: 'view',
+                  name: Paths.docView,
+                  pageBuilder: (context, state) => CustomTransitionPage<void>(
+                    key: state.pageKey,
+                    child: DocumentViewerPage(doc: state.extra as DocWindow),
+                    transitionsBuilder: (context, animation, secondary, child) {
+                      final curved = CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      );
+                      return FadeTransition(
+                        opacity: curved,
+                        child: ScaleTransition(
+                          scale: Tween<double>(
+                            begin: 0.97,
+                            end: 1,
+                          ).animate(curved),
+                          child: child,
+                        ),
+                      );
+                    },
+                    transitionDuration: const Duration(milliseconds: 220),
                   ),
-                  GoRoute(
-                    path: 'outing',
-                    name: Paths.outing,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: OutingPage(
-                        initialTab: state.extra is OutingTab
-                            ? state.extra! as OutingTab
-                            : OutingTab.general,
-                      ),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'pass',
-                        name: Paths.outingPass,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: DocumentViewerPage(
-                            doc: state.extra as DocWindow,
+                ),
+              ],
+            ),
+          ),
+          _branch(
+            _slide(
+              '/settings',
+              Paths.settings,
+              (_) => SettingsPage(),
+              routes: [
+                _slide(
+                  'server',
+                  Paths.server,
+                  (_) => const ServerPage(),
+                  routes: [
+                    _slide(
+                      'apps',
+                      Paths.serverApps,
+                      (_) => const ServerAppsPage(),
+                      routes: [
+                        _slide(
+                          'chrome-extension',
+                          Paths.chromeExtension,
+                          (_) => const ServerFeatureGate(
+                            feature: 'The browser extension',
+                            child: ChromeExtensionPage(),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'course-page',
-                    name: Paths.coursePage,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const CoursePagePage(),
+                      ],
                     ),
-                    routes: [
-                      GoRoute(
-                        path: 'course',
-                        name: Paths.coursePageCourse,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: CourseViewPage(
-                            course: state.extra as CoursePageCourse,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'connected-apps',
-                    name: Paths.connectedApps,
-                    redirect: (_, _) => serverPagePath,
-                  ),
-                  GoRoute(
-                    path: 'gpa_calculator',
-                    name: Paths.gpaCalculator,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: const GpaCalculatorPage(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/docs',
-                name: Paths.docs,
-                pageBuilder: (context, state) => SlideFadePage<void>(
-                  key: state.pageKey,
-                  child: const DocsPage(),
+                    _slide(
+                      'phones',
+                      Paths.serverPhones,
+                      (_) => const ServerPhonesPage(),
+                    ),
+                    _slide(
+                      'address',
+                      Paths.serverAddress,
+                      (_) => const ServerAddressPage(),
+                    ),
+                    _slide(
+                      'data',
+                      Paths.serverData,
+                      (_) => const ServerDataPage(),
+                    ),
+                  ],
                 ),
-                routes: [
-                  GoRoute(
-                    path: 'view',
-                    name: Paths.docView,
-                    pageBuilder: (context, state) {
-                      return CustomTransitionPage<void>(
-                        key: state.pageKey,
-                        child: DocumentViewerPage(
-                          doc: state.extra as DocWindow,
-                        ),
-                        transitionsBuilder:
-                            (context, animation, secondary, child) {
-                              final curved = CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
-                              );
-                              return FadeTransition(
-                                opacity: curved,
-                                child: ScaleTransition(
-                                  scale: Tween<double>(
-                                    begin: 0.97,
-                                    end: 1,
-                                  ).animate(curved),
-                                  child: child,
-                                ),
-                              );
-                            },
-                        transitionDuration: const Duration(milliseconds: 220),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: GlobalKey<NavigatorState>(),
-            routes: [
-              GoRoute(
-                path: '/settings',
-                name: Paths.settings,
-                pageBuilder: (context, state) => SlideFadePage<void>(
-                  key: state.pageKey,
-                  child: SettingsPage(),
+                _slide(
+                  'debug',
+                  Paths.debug,
+                  (_) => const DebugPage(),
+                  routes: [_slide('logs', Paths.debugLogs, (_) => LogsPage())],
                 ),
-                routes: [
-                  GoRoute(
-                    path: 'server',
-                    name: Paths.server,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const ServerPage(),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'apps',
-                        name: Paths.serverApps,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: const ServerAppsPage(),
-                        ),
-                        routes: [
-                          GoRoute(
-                            path: 'chrome-extension',
-                            name: Paths.chromeExtension,
-                            pageBuilder: (context, state) =>
-                                SlideFadePage<void>(
-                                  key: state.pageKey,
-                                  child: const ServerFeatureGate(
-                                    feature: 'The browser extension',
-                                    child: ChromeExtensionPage(),
-                                  ),
-                                ),
-                          ),
-                        ],
-                      ),
-                      GoRoute(
-                        path: 'phones',
-                        name: Paths.serverPhones,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: const ServerPhonesPage(),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'address',
-                        name: Paths.serverAddress,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: const ServerAddressPage(),
-                        ),
-                      ),
-                      GoRoute(
-                        path: 'data',
-                        name: Paths.serverData,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: const ServerDataPage(),
-                        ),
-                      ),
-                    ],
+                _slide(
+                  'calendar-sync',
+                  Paths.calendarSync,
+                  (_) => CalendarSyncPage(),
+                ),
+                _slide(
+                  'gmail-otp-setup',
+                  Paths.gmailOtpSetup,
+                  (_) => const GmailOtpSetupPage(),
+                ),
+                _slide(
+                  'gmail-oauth-guide',
+                  Paths.gmailOauthGuide,
+                  (_) => const GmailOAuthGuidePage(),
+                ),
+                _slide(
+                  'mail-forwarding',
+                  Paths.mailForwarding,
+                  (_) => const ServerFeatureGate(
+                    feature: 'OTP mail forwarding',
+                    child: MailForwardingPage(),
                   ),
-                  GoRoute(
-                    path: 'debug',
-                    name: Paths.debug,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const DebugPage(),
-                    ),
-                    routes: [
-                      GoRoute(
-                        path: 'logs',
-                        name: Paths.debugLogs,
-                        pageBuilder: (context, state) => SlideFadePage<void>(
-                          key: state.pageKey,
-                          child: LogsPage(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  GoRoute(
-                    path: 'calendar-sync',
-                    name: Paths.calendarSync,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: CalendarSyncPage(),
-                      );
-                    },
-                  ),
-                  GoRoute(
-                    path: 'gmail-otp-setup',
-                    name: Paths.gmailOtpSetup,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const GmailOtpSetupPage(),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'gmail-oauth-guide',
-                    name: Paths.gmailOauthGuide,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const GmailOAuthGuidePage(),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'mail-forwarding',
-                    name: Paths.mailForwarding,
-                    pageBuilder: (context, state) => SlideFadePage<void>(
-                      key: state.pageKey,
-                      child: const ServerFeatureGate(
-                        feature: 'OTP mail forwarding',
-                        child: MailForwardingPage(),
-                      ),
-                    ),
-                  ),
-                  GoRoute(
-                    path: 'notification-management',
-                    name: Paths.notificationManagement,
-                    pageBuilder: (context, state) {
-                      return SlideFadePage<void>(
-                        key: state.pageKey,
-                        child: NotificationManagementPage(),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
+                ),
+                _slide(
+                  'notification-management',
+                  Paths.notificationManagement,
+                  (_) => NotificationManagementPage(),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     ],
-  );
-}
-
-FutureOr<String?> redirect(
-  BuildContext context,
-  Ref ref,
-  GoRouterState state,
-) async {
-  String? k;
-  try {
-    var user = await ref.read(vtopUserProvider.future);
-    if (user.username == null) {
-      return '/onboarding';
-    }
-  } catch (e) {
-    return '/onboarding';
-  }
-  return k;
-}
+  ),
+);

@@ -34,26 +34,19 @@ class VtopOtpOverlay extends HookConsumerWidget {
     useEffect(() => otpController.dispose, [otpController]);
 
     useEffect(() {
-      if (!state.isActive) {
-        otpController.clear();
-      }
+      if (!state.isActive) otpController.clear();
       return null;
     }, [state.isActive]);
 
     useEffect(() {
-      void listener() {
-        otpText.value = otpController.text;
-      }
-
+      void listener() => otpText.value = otpController.text;
       otpController.addListener(listener);
       return () => otpController.removeListener(listener);
     }, [otpController]);
 
-    String formatSeconds(int totalSeconds) {
-      final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
-      final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
-      return '$minutes:$seconds';
-    }
+    String formatSeconds(int total) =>
+        '${(total ~/ 60).toString().padLeft(2, '0')}:'
+        '${(total % 60).toString().padLeft(2, '0')}';
 
     return Stack(
       children: [
@@ -132,10 +125,10 @@ class VtopOtpOverlay extends HookConsumerWidget {
                                     : null,
                                 child: const Text('Try again'),
                               ),
-                            if (state.errorMessage != null &&
-                                state.errorMessage!.trim().isNotEmpty)
+                            if (state.errorMessage case final error?
+                                when error.trim().isNotEmpty)
                               Text(
-                                state.errorMessage!,
+                                error,
                                 style: context.theme.typography.body.sm
                                     .copyWith(
                                       color: context.theme.colors.destructive,

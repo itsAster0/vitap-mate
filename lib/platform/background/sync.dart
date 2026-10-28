@@ -4,7 +4,7 @@ import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart'
+import 'package:hooks_riverpod/misc.dart'
     show ProviderListenable;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
@@ -25,20 +25,19 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 typedef ProviderReader = T Function<T>(ProviderListenable<T> provider);
 
+/// The WorkManager task that runs the periodic background sync.
+const backgroundSyncTask = 'sync_vtop';
+
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputdata) async {
-    switch (task) {
-      case "sync_vtop":
-        await BackgroundNotificationService.initialize();
-        await BackgroundNotificationService.showProgress();
-        final k = await _syncData(task: task);
-        await BackgroundNotificationService.stop(success: k);
-        return true;
-      default:
-        break;
+    if (task == backgroundSyncTask) {
+      await BackgroundNotificationService.initialize();
+      await BackgroundNotificationService.showProgress();
+      final success = await _syncData(task: task);
+      await BackgroundNotificationService.stop(success: success);
     }
-    return Future.value(true);
+    return true;
   });
 }
 
@@ -68,81 +67,50 @@ Future<bool> syncVtopData({
   bool ignoreRecoverableErrors = false,
   Duration maxAge = backgroundSyncMaxAge,
 }) async {
-  bool fresh(BigInt updatedAt) => isVtopDataFresh(updatedAt, maxAge);
+  bool stale(BigInt updatedAt) => force || !isVtopDataFresh(updatedAt, maxAge);
+  Future<bool> retry(Future<void> Function() refresh) => _retryer(
+    refresh,
+    read: read,
+    ignoreRecoverableErrors: ignoreRecoverableErrors,
+  );
   try {
+    // When each run started and ended, kept for debugging.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val_start', DateTime.now().toString());
 
     final user = await read(vtopUserProvider.future);
-    if (!user.isValid || user.semid == null) {
-      return true;
-    }
+    if (!user.isValid || user.semid == null) return true;
     await read(
       vClientProvider.notifier,
     ).ensureLogin(promptForOtp: promptForOtp);
-    final List<Future<bool>> futures = [];
 
     final timetable = await read(timetableProvider.future);
-    final refreshTimetable = force || !fresh(timetable.updateTime);
     final marks = await read(marksProvider.future);
-    final refreshMarks = force || !fresh(marks.updateTime);
     final examSchedule = await read(examScheduleProvider.future);
-    final refreshExamSchedule = force || !fresh(examSchedule.updateTime);
     final semids = await readSavedPage(read, VtopQueries.semesters());
-    final refreshSemesters =
-        force || semids == null || !fresh(semids.updateTime);
+    final futures = [
+      if (stale(timetable.updateTime))
+        retry(() => read(timetableProvider.notifier).refresh()),
+      if (stale(marks.updateTime))
+        retry(() => read(marksProvider.notifier).refresh()),
+      if (stale(examSchedule.updateTime))
+        retry(() => read(examScheduleProvider.notifier).refresh()),
+      if (semids == null || stale(semids.updateTime))
+        retry(() => read(semesterIdProvider.notifier).refresh()),
+    ];
 
-    if (refreshTimetable) {
-      futures.add(
-        _retryer(
-          () => read(timetableProvider.notifier).refresh(),
-          read: read,
-          ignoreRecoverableErrors: ignoreRecoverableErrors,
-        ),
-      );
-    }
-    if (refreshMarks) {
-      futures.add(
-        _retryer(
-          () => read(marksProvider.notifier).refresh(),
-          read: read,
-          ignoreRecoverableErrors: ignoreRecoverableErrors,
-        ),
-      );
-    }
-    if (refreshExamSchedule) {
-      futures.add(
-        _retryer(
-          () => read(examScheduleProvider.notifier).refresh(),
-          read: read,
-          ignoreRecoverableErrors: ignoreRecoverableErrors,
-        ),
-      );
-    }
-    if (refreshSemesters) {
-      futures.add(
-        _retryer(
-          () => read(semesterIdProvider.notifier).refresh(),
-          read: read,
-          ignoreRecoverableErrors: ignoreRecoverableErrors,
-        ),
-      );
-    }
-
-    AttendanceData? previousAttendance;
-    futures.add(
-      _attendanceSync(
-        read,
-        task,
-        force: force,
-        maxAge: maxAge,
-        ignoreRecoverableErrors: ignoreRecoverableErrors,
-      ).then((result) {
-        previousAttendance = result.$2;
-        return result.$1;
-      }),
+    final attendance = _attendanceSync(
+      read,
+      task,
+      force: force,
+      maxAge: maxAge,
+      ignoreRecoverableErrors: ignoreRecoverableErrors,
     );
-    final k = await Future.wait(futures);
+    final results = await Future.wait([
+      ...futures,
+      attendance.then((result) => result.$1),
+    ]);
+    final (_, previousAttendance) = await attendance;
     // Dated class reminders cover two weeks; keep them topped up even when
     // the app isn't opened.
     await rescheduleClassReminders(read);
@@ -155,7 +123,7 @@ Future<bool> syncVtopData({
       previousAttendance: previousAttendance,
     );
     await prefs.setString('${task}_val_end', DateTime.now().toString());
-    return atLeastHalfTrue(k);
+    return _atLeastHalfTrue(results);
   } catch (e) {
     if (ignoreRecoverableErrors) {
       return _shouldIgnoreBackgroundError(e, read);
@@ -171,41 +139,33 @@ const backgroundSyncMaxAge = Duration(minutes: 15);
 bool isVtopDataFresh(BigInt updatedAt, Duration maxAge) {
   final nowUnixSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final minFresh = BigInt.from(nowUnixSeconds - maxAge.inSeconds);
-  return _isFreshSince(updatedAt, minFresh);
-}
-
-bool _isFreshSince(BigInt updatedAt, BigInt minFresh) {
   return updatedAt > BigInt.zero && updatedAt >= minFresh;
 }
 
-bool atLeastHalfTrue(List<bool> k) {
-  if (k.isEmpty) return true;
-  final trueCount = k.where((e) => e).length;
-  return trueCount * 2 >= k.length;
-}
+bool _atLeastHalfTrue(List<bool> results) =>
+    results.where((ok) => ok).length * 2 >= results.length;
 
+const _maxTries = 3;
+
+/// Runs [func] up to [_maxTries] times. In the background, errors that a
+/// later run can recover from count as success once the tries run out.
 Future<bool> _retryer(
   Future<void> Function() func, {
   required ProviderReader read,
   required bool ignoreRecoverableErrors,
 }) async {
-  // ignore: non_constant_identifier_names
-  final int MAX_TRY = 3;
-  int runs = 0;
-  while (runs < MAX_TRY) {
-    runs += 1;
+  for (var run = 1; run <= _maxTries; run++) {
     try {
       await func();
       return true;
     } catch (e) {
       if (ignoreRecoverableErrors) {
-        final shouldIgnore = await _shouldIgnoreBackgroundError(e, read);
-        if (!shouldIgnore) return false;
-        if (runs == MAX_TRY) return true;
-      } else if (runs == MAX_TRY) {
+        if (!await _shouldIgnoreBackgroundError(e, read)) return false;
+        if (run == _maxTries) return true;
+      } else if (run == _maxTries) {
         return false;
       }
-      await Future.delayed(Duration(milliseconds: 400 * (runs + 1)));
+      await Future.delayed(Duration(milliseconds: 400 * (run + 1)));
     }
   }
   return false;
@@ -219,10 +179,7 @@ Future<bool> _shouldIgnoreBackgroundError(
     return read(vtopOtpChallengeProvider.notifier).canAutoFetchFromEmail();
   }
   final (type, _) = appError(error);
-  if (type == AppErrorType.network || type == AppErrorType.sessionExpired) {
-    return true;
-  }
-  return false;
+  return type == AppErrorType.network || type == AppErrorType.sessionExpired;
 }
 
 Future<(bool, AttendanceData?)> _attendanceSync(
@@ -253,7 +210,7 @@ Future<(bool, AttendanceData?)> _attendanceSync(
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('${task}_val', att.toString());
 
-    final k = await Future.wait([
+    final results = await Future.wait([
       for (final i in att.records)
         () async {
           final fullAttendance = await readSavedFullAttendance(
@@ -278,7 +235,7 @@ Future<(bool, AttendanceData?)> _attendanceSync(
           );
         }(),
     ]);
-    return (atLeastHalfTrue(k) && ok, previousAttendance);
+    return (_atLeastHalfTrue(results) && ok, previousAttendance);
   } catch (e) {
     if (ignoreRecoverableErrors) {
       return (await _shouldIgnoreBackgroundError(e, read), null);
@@ -286,8 +243,6 @@ Future<(bool, AttendanceData?)> _attendanceSync(
     rethrow;
   }
 }
-
-const _backgroundSyncTaskName = 'sync_vtop';
 
 Future<void> _runChangeDetection(
   ProviderReader read,
@@ -297,66 +252,47 @@ Future<void> _runChangeDetection(
   ExamScheduleData? previousExamSchedule,
   AttendanceData? previousAttendance,
 }) async {
-  if (task != _backgroundSyncTaskName) return;
+  if (task != backgroundSyncTask) return;
+  Future<void> alert(
+    ChangeAlertType type,
+    String semesterId,
+    DataChangeSummary? summary,
+  ) async {
+    if (summary == null) return;
+    await ChangeAlertNotificationService.showDataChange(
+      type: type,
+      semesterId: semesterId,
+      summary: summary,
+    );
+  }
+
   try {
-    final freshTimetable = await readSavedSemesterPage(
-      read,
-      VtopQueries.timetable,
-    );
-    if (freshTimetable != null && previousTimetable != null) {
-      final summary = compareTimetable(previousTimetable, freshTimetable);
-      if (summary != null) {
-        await ChangeAlertNotificationService.showDataChange(
-          type: ChangeAlertType.timetable,
-          semesterId: freshTimetable.semesterId,
-          summary: summary,
-        );
-      }
-    }
-
-    final freshMarks = await readSavedSemesterPage(read, VtopQueries.marks);
-    if (freshMarks != null && previousMarks != null) {
-      final summary = compareMarks(previousMarks, freshMarks);
-      if (summary != null) {
-        await ChangeAlertNotificationService.showDataChange(
-          type: ChangeAlertType.marks,
-          semesterId: freshMarks.semesterId,
-          summary: summary,
-        );
-      }
-    }
-
-    final freshExamSchedule = await readSavedSemesterPage(
-      read,
-      VtopQueries.examSchedule,
-    );
-    if (freshExamSchedule != null && previousExamSchedule != null) {
-      final summary = compareExamSchedule(
-        previousExamSchedule,
-        freshExamSchedule,
+    if (await readSavedSemesterPage(read, VtopQueries.timetable)
+        case final now?) {
+      await alert(
+        .timetable,
+        now.semesterId,
+        compareTimetable(previousTimetable, now),
       );
-      if (summary != null) {
-        await ChangeAlertNotificationService.showDataChange(
-          type: ChangeAlertType.examSchedule,
-          semesterId: freshExamSchedule.semesterId,
-          summary: summary,
-        );
-      }
     }
-
-    final freshAttendance = await readSavedSemesterPage(
-      read,
-      VtopQueries.attendance,
-    );
-    if (freshAttendance != null && previousAttendance != null) {
-      final summary = compareAttendance(previousAttendance, freshAttendance);
-      if (summary != null) {
-        await ChangeAlertNotificationService.showDataChange(
-          type: ChangeAlertType.attendance,
-          semesterId: freshAttendance.semesterId,
-          summary: summary,
-        );
-      }
+    if (await readSavedSemesterPage(read, VtopQueries.marks) case final now?) {
+      await alert(.marks, now.semesterId, compareMarks(previousMarks, now));
+    }
+    if (await readSavedSemesterPage(read, VtopQueries.examSchedule)
+        case final now?) {
+      await alert(
+        .examSchedule,
+        now.semesterId,
+        compareExamSchedule(previousExamSchedule, now),
+      );
+    }
+    if (await readSavedSemesterPage(read, VtopQueries.attendance)
+        case final now?) {
+      await alert(
+        .attendance,
+        now.semesterId,
+        compareAttendance(previousAttendance, now),
+      );
     }
   } catch (e) {
     AppLogger.instance.warning(
@@ -370,43 +306,33 @@ class BackgroundNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
 
-  static const int _syncId = 9001;
+  static const _syncId = 9001;
   static const _backSyncId = "background_sync_v2";
-  static const _backSyncDoneId = "background_sync_done_v2";
-  static const AndroidNotificationChannel _backgroundSyncChannel =
-      AndroidNotificationChannel(
-        _backSyncId,
-        'Background Sync',
-        description: 'Background data synchronization',
-        importance: Importance.min,
-      );
-  static const AndroidNotificationChannel _backgroundSyncChannelDone =
-      AndroidNotificationChannel(
-        _backSyncDoneId,
-        'Background Sync done',
-        description: 'Background data synchronization done',
-        importance: Importance.min,
-      );
+  static const _backgroundSyncChannel = AndroidNotificationChannel(
+    _backSyncId,
+    'Background Sync',
+    description: 'Background data synchronization',
+    importance: Importance.min,
+  );
+  static const _backgroundSyncChannelDone = AndroidNotificationChannel(
+    "background_sync_done_v2",
+    'Background Sync done',
+    description: 'Background data synchronization done',
+    importance: Importance.min,
+  );
 
   static Future<void> initialize() async {
-    const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('@mipmap/launcher_icon');
-
-    const settings = InitializationSettings(android: androidSettings);
-
-    await _notifications.initialize(settings: settings);
-
-    await _notifications
+    await _notifications.initialize(
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+      ),
+    );
+    final android = _notifications
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_backgroundSyncChannelDone);
-
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(_backgroundSyncChannel);
+        >();
+    await android?.createNotificationChannel(_backgroundSyncChannelDone);
+    await android?.createNotificationChannel(_backgroundSyncChannel);
   }
 
   static Future<void> showProgress() async {
@@ -430,22 +356,7 @@ class BackgroundNotificationService {
     );
   }
 
-  static Future<void> stop({required bool success}) async {
-    await _notifications.cancel(id: _syncId);
-
-    // await _notifications.show(
-    //   _syncId + 1,
-    //   'VITAP Mate',
-    //   success ? 'Background sync completed' : 'Failed to sync some data',
-    //   const NotificationDetails(
-    //     android: AndroidNotificationDetails(
-    //       _backSyncDoneId,
-    //       'Background Sync done',
-    //       importance: Importance.min,
-    //       priority: Priority.min,
-    //       silent: true,
-    //     ),
-    //   ),
-    // );
-  }
+  /// Clears the progress notification; [success] is not shown for now.
+  static Future<void> stop({required bool success}) =>
+      _notifications.cancel(id: _syncId);
 }
