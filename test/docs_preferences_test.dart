@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
-import 'package:vitapmate/features/docs/data/doc_models.dart';
-import 'package:vitapmate/features/docs/data/docs_repository.dart';
-import 'package:vitapmate/features/docs/domain/docs_query.dart';
-import 'package:vitapmate/features/docs/presentation/providers/docs_sort_provider.dart';
+import 'package:vitapmate/features/docs/logic/doc_models.dart';
+import 'package:vitapmate/features/docs/docs_repository.dart';
+import 'package:vitapmate/features/docs/logic/docs_query.dart';
+import 'package:vitapmate/features/docs/docs_sort_provider.dart';
 import 'support/docs_test_storage.dart';
 
 ProviderContainer containerFor(DocsTestStorage storage) => ProviderContainer(

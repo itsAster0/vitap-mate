@@ -3,7 +3,6 @@ import 'dart:developer';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitapmate/vtop/exceptions.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -97,12 +96,6 @@ void disCommonToast(BuildContext context, Object e) {
       title: 'Sign-In Problem',
       description: _authFailedMessage(e),
     );
-  } else if (e is FeatureDisabledException) {
-    _showAppToast(
-      context,
-      title: 'Feature Disabled',
-      description: 'Please try again in a while Or Update the app',
-    );
   } else if (e is VtopError) {
     _showAppToast(
       context,
@@ -152,12 +145,6 @@ void disOnbardingCommonToast(BuildContext context, Object e) {
       context,
       title: 'Login Problem',
       description: _authFailedMessage(e),
-    );
-  } else if (e is FeatureDisabledException) {
-    _showAppToast(
-      context,
-      title: 'Feature Disabled',
-      description: 'Please try again in a while',
     );
   } else if (e is VtopError) {
     _showAppToast(

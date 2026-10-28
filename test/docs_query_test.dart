@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/docs/data/doc_models.dart';
-import 'package:vitapmate/features/docs/domain/docs_query.dart';
+import 'package:vitapmate/features/docs/logic/doc_models.dart';
+import 'package:vitapmate/features/docs/logic/docs_query.dart';
 
 void main() {
   const documents = [

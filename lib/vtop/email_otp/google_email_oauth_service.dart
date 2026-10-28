@@ -16,7 +16,6 @@ import 'package:vitapmate/vtop/email_otp/google_oauth_loopback.dart';
 
 export 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/app/feature_flags.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 
 part 'google_email_oauth_service.g.dart';
@@ -87,8 +86,6 @@ Future<bool> anyEmailOtpReady(Ref ref) async {
 
 @Riverpod(keepAlive: true)
 Future<bool> emailOtpSetupNeeded(Ref ref) async {
-  final flags = await ref.watch(featureFlagsControllerProvider.future);
-  if (!await flags.isEnabled('2fa-email')) return false;
   return !await ref.watch(anyEmailOtpReadyProvider.future);
 }
 

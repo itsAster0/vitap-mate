@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/outing/domain/outing_rules.dart';
+import 'package:vitapmate/features/outing/logic/outing_rules.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// What VTOP's general outing page offered on 2026-10-07.

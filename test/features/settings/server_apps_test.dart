@@ -7,8 +7,8 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/edge/server_status.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/features/settings/presentation/pages/server/server_apps_page.dart';
-import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
+import 'package:vitapmate/features/server/server_apps_page.dart';
+import 'package:vitapmate/features/server/server_account.dart';
 
 class _Api implements ServerAccountApi {
   bool outings = false;

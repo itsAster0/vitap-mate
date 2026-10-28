@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
-import 'package:vitapmate/features/docs/data/doc_models.dart';
-import 'package:vitapmate/features/docs/data/docs_repository.dart';
-import 'package:vitapmate/features/docs/data/download_to_docs.dart';
+import 'package:vitapmate/features/docs/logic/doc_models.dart';
+import 'package:vitapmate/features/docs/docs_repository.dart';
+import 'package:vitapmate/features/docs/download_to_docs.dart';
 
 class _Storage extends JsonFileStorage {
   _Storage(this.root) : super(username: 'docs-test');

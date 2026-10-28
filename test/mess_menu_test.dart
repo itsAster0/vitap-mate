@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/docs/domain/mess_menu.dart';
+import 'package:vitapmate/features/docs/logic/mess_menu.dart';
 
 List<String> row(List<String> cells) => cells;
 

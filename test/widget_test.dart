@@ -15,8 +15,8 @@ import 'package:vitapmate/features/more/chrome_extension_page.dart';
 import 'package:vitapmate/features/more/more_page.dart';
 import 'package:vitapmate/features/gpa/gpa_calculator_page.dart';
 import 'package:vitapmate/features/grade_history/grade_history.dart';
-import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_page.dart';
-import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
+import 'package:vitapmate/features/account/gmail_otp_setup_page.dart';
+import 'package:vitapmate/features/account/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 GoogleEmailOtpAuthService _testOAuthService() {

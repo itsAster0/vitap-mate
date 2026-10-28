@@ -9,9 +9,9 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
-import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_url_section.dart';
+import 'package:vitapmate/features/server/server_page.dart';
+import 'package:vitapmate/features/server/widgets/server_format.dart';
+import 'package:vitapmate/features/server/widgets/server_url_section.dart';
 
 void main() {
   test('the connected-apps route opens the Server page', () {

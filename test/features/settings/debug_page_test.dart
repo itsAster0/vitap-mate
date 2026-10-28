@@ -6,7 +6,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/features/settings/presentation/pages/debug_page.dart';
+import 'package:vitapmate/features/developer/debug_page.dart';
 
 void main() {
   Future<void> pump(WidgetTester tester, {required bool gmailReady}) async {

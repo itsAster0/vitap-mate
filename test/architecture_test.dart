@@ -16,22 +16,16 @@ const _sharedBindings = {
   'src/api/vtop/vtop_errors.dart',
 };
 
-/// Imports of another feature's private files still to untangle.
-const _privateImportsAllowed = {
-  'features/outing/data/outing_service.dart -> features/docs/data/doc_models.dart',
-  'features/outing/data/outing_service.dart -> features/docs/data/download_to_docs.dart',
-  'features/outing/data/outing_service.dart -> features/docs/presentation/providers/docs_provider.dart',
-  'features/settings/presentation/pages/settings_page.dart -> features/docs/presentation/providers/mess_timings_provider.dart',
-  'features/settings/presentation/widgets/mess_timings_sheet.dart -> features/docs/domain/mess_menu.dart',
-  'features/settings/presentation/widgets/mess_timings_sheet.dart -> features/docs/presentation/providers/mess_timings_provider.dart',
-};
+/// Imports of another feature's private files still to untangle (none
+/// left; keep it that way).
+const _privateImportsAllowed = <String>{};
 
 /// Files outside vtop/ that still call the Rust bindings directly.
 const _bindingsAllowed = {
   'features/onboarding/onboarding_page.dart',
-  'features/settings/presentation/email_otp_support.dart',
-  'features/settings/presentation/pages/logs_page.dart',
-  'features/settings/presentation/providers/server_account.dart',
+  'features/account/email_otp_support.dart',
+  'features/developer/logs_page.dart',
+  'features/server/server_account.dart',
   'main.dart',
   'platform/background/stale_refresh.dart',
   'platform/background/sync.dart',

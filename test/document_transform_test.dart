@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
-import 'package:vitapmate/features/docs/domain/document_transform.dart';
+import 'package:vitapmate/features/docs/logic/document_transform.dart';
 
 void main() {
   test('horizontal reset preserves vertical position and zoom', () {

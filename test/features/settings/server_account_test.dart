@@ -4,7 +4,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
+import 'package:vitapmate/features/server/server_account.dart';
 
 BridgeAccount accountWith({
   bool linkedHere = true,

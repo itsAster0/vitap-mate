@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/docs/presentation/widgets/pdf_document_viewport.dart';
+import 'package:vitapmate/features/docs/widgets/pdf_document_viewport.dart';
 
 void main() {
   testWidgets('embedded PDF pinch wins over the surrounding page scroll', (

@@ -7,7 +7,6 @@ import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/app/feature_flags.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
@@ -698,11 +697,8 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     state = state.update(progress: change(progress));
   }
 
-  Future<bool> _gmailReady() async {
-    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
-    return await featureFlags.isEnabled('2fa-email') &&
-        await ref.read(googleEmailOtpAuthServiceProvider).isReady();
-  }
+  Future<bool> _gmailReady() =>
+      ref.read(googleEmailOtpAuthServiceProvider).isReady();
 
   Future<void> _runEmailAutoFetch({required int runId}) async {
     if (_useMailForwarding) return _runMailForwardingAutoFetch(runId: runId);

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/server_sections/key_dialogs.dart';
+import 'package:vitapmate/features/server/widgets/key_dialogs.dart';
 
 const _key = BridgeKey(
   id: 'k1',
