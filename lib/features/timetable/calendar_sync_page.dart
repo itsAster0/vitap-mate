@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/ui/fit_calendar.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:vitapmate/ui/app_card.dart';
@@ -11,8 +12,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/services/google_calendar_sync_service.dart';
+import 'package:vitapmate/features/timetable/google_calendar_sync_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum _DateSelectionTab { start, end }

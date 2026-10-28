@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_projection.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_projection.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

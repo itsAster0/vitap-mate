@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/extention.dart';
@@ -13,9 +14,8 @@ import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
-import 'package:vitapmate/features/attendance/presentation/widgets/attendance_not_posted.dart';
+import 'package:vitapmate/features/attendance/widgets/attendance.dart';
+import 'package:vitapmate/features/attendance/widgets/attendance_not_posted.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class AttendancePage extends HookConsumerWidget {

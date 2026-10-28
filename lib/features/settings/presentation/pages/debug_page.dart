@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:go_router/go_router.dart';
@@ -19,11 +22,8 @@ import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 
 /// Settings → Debug: what testers and developers use to see why data is
 /// wrong, slow or heavy, and to put the app in odd states on purpose.
@@ -310,22 +310,23 @@ Future<void> _dropLatestHistoryEntries(
   WidgetRef ref,
 ) async {
   try {
-    final attendance = await (await ref.read(
-      attendanceRepositoryProvider.future,
-    )).loadCache();
+    final semester = await ref.read(selectedSemesterProvider.future);
+    final attendance = await readSavedPage(
+      ref.read,
+      VtopQueries.attendance(semester),
+    );
     var dropped = 0;
     for (final course in attendance?.records ?? <AttendanceRecord>[]) {
-      final repo = await ref.read(
-        fullAttendanceRepositoryProvider(
-          course.courseType,
-          course.courseId,
-        ).future,
+      final query = VtopQueries.fullAttendance(
+        semester,
+        courseId: course.courseId,
+        courseType: course.courseType,
       );
-      final history = await repo.loadCache();
+      final history = await readSavedPage(ref.read, query);
       if (history == null) continue;
       final trimmed = withoutLatestEntry(history);
       if (trimmed.records.length == history.records.length) continue;
-      await repo.saveCache(trimmed);
+      await writeSavedPage(ref.read, query, trimmed);
       dropped++;
       ref.invalidate(
         cachedFullAttendanceProvider(course.courseType, course.courseId),
@@ -350,10 +351,16 @@ Future<void> _dropLatestHistoryEntries(
 /// VTOP posts any. A refresh restores it.
 Future<void> _clearAttendance(BuildContext context, WidgetRef ref) async {
   try {
-    final repo = await ref.read(attendanceRepositoryProvider.future);
-    final attendance = await repo.loadCache();
+    final query = VtopQueries.attendance(
+      await ref.read(selectedSemesterProvider.future),
+    );
+    final attendance = await readSavedPage(ref.read, query);
     if (attendance != null) {
-      await repo.saveCache(attendance.copyWith(records: const []));
+      await writeSavedPage(
+        ref.read,
+        query,
+        attendance.copyWith(records: const []),
+      );
     }
     ref.invalidate(attendanceProvider);
     if (context.mounted) {

@@ -9,7 +9,7 @@ import 'package:vitapmate/vtop/vtop_controller.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/features/calendar/data/academic_calendar_repository.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';
+import 'package:vitapmate/features/timetable/class_reminder_scheduler.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'academic_calendar_provider.g.dart';

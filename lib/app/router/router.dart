@@ -7,8 +7,8 @@ import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/app/router/slide_fade_page.dart';
 import 'package:vitapmate/features/onboarding/onboarding_page.dart';
 import 'package:vitapmate/app/shell_layout.dart';
-import 'package:vitapmate/features/attendance/presentation/pages/attendance_guide_page.dart';
-import 'package:vitapmate/features/attendance/presentation/pages/attendance_page.dart';
+import 'package:vitapmate/features/attendance/attendance_guide_page.dart';
+import 'package:vitapmate/features/attendance/attendance_page.dart';
 import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
 import 'package:vitapmate/features/docs/presentation/pages/docs_page.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
@@ -38,8 +38,8 @@ import 'package:vitapmate/features/settings/presentation/pages/gmail_otp_setup_p
 import 'package:vitapmate/features/settings/presentation/pages/gmail_oauth_guide_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/notification_management_page.dart';
 import 'package:vitapmate/features/settings/presentation/pages/logs_page.dart';
-import 'package:vitapmate/features/timetable/presentation/pages/timetable_page.dart';
-import 'package:vitapmate/features/timetable/presentation/pages/calendar_sync_page.dart';
+import 'package:vitapmate/features/timetable/timetable_page.dart';
+import 'package:vitapmate/features/timetable/calendar_sync_page.dart';
 import 'package:vitapmate/app/widgets/server_feature_gate.dart';
 part 'router.g.dart';
 

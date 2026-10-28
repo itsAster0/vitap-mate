@@ -14,7 +14,7 @@ import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/more/domain/exam_time.dart';
-import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
+import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';

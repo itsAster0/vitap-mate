@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
+import 'package:vitapmate/features/timetable/logic/timetable_slot_merge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class CalendarInfo {

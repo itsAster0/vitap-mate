@@ -2,23 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
+import 'package:vitapmate/src/api/vtop/types.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/platform/background/sync.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 /// Pages older than this are refetched after a quick fetch in the open app.
@@ -100,16 +100,18 @@ class StaleRefresher {
       }
     }
 
-    final attendanceRepo = await _ref.read(attendanceRepositoryProvider.future);
+    Future<AttendanceData?> savedAttendance() =>
+        readSavedSemesterPage(_ref.read, VtopQueries.attendance);
     await step(
-      (await attendanceRepo.loadCache())?.updateTime,
+      (await savedAttendance())?.updateTime,
       () => _ref.read(attendanceProvider.notifier).updateAttendance(),
     );
     await step(
-      (await (await _ref.read(
-        timetableRepositoryProvider.future,
-      )).loadCache())?.updateTime,
-      () => _ref.read(timetableProvider.notifier).updateTimetable(),
+      (await readSavedSemesterPage(
+        _ref.read,
+        VtopQueries.timetable,
+      ))?.updateTime,
+      () => _ref.read(timetableProvider.notifier).refresh(),
     );
     await step(
       (await (await _ref.read(
@@ -129,14 +131,12 @@ class StaleRefresher {
       )).loadCache())?.updateTime,
       () => _ref.read(semesterIdProvider.notifier).updatesemids(),
     );
-    for (final course in (await attendanceRepo.loadCache())?.records ?? []) {
-      final repo = await _ref.read(
-        fullAttendanceRepositoryProvider(
-          course.courseType,
-          course.courseId,
-        ).future,
+    for (final course in (await savedAttendance())?.records ?? []) {
+      final history = await readSavedFullAttendance(
+        _ref.read,
+        course.courseType,
+        course.courseId,
       );
-      final history = await repo.loadCache();
       // A history matching the summary is complete; skip its request.
       if (!historyNeedsRefresh(course, history)) continue;
       await step(
