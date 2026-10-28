@@ -20,14 +20,9 @@ const _sharedBindings = {
 /// left; keep it that way).
 const _privateImportsAllowed = <String>{};
 
-/// Files outside vtop/ that still call the Rust bindings directly.
-const _bindingsAllowed = {
-  'features/onboarding/onboarding_page.dart',
-  'features/account/email_otp_support.dart',
-  'features/server/server_account.dart',
-  'platform/background/stale_refresh.dart',
-  'platform/fcm_cookie_bridge_service.dart',
-};
+/// Files outside vtop/ that call the Rust bindings directly (none; use
+/// vtop/vtop.dart).
+const _bindingsAllowed = <String>{};
 
 void main() {
   final imports = <String, List<String>>{};

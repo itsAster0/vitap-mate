@@ -7,7 +7,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/observability/log.dart';
@@ -16,7 +16,7 @@ import 'package:vitapmate/platform/background/sync.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/marks/marks.dart';
 import 'package:vitapmate/vtop/semesters.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/vtop/backend/server_vtop.dart';
 
 /// Pages older than this are refetched after a quick fetch in the open app.
 const openAppRefreshMaxAge = Duration(hours: 12);
@@ -168,8 +168,9 @@ class StaleRefresher {
   /// could ask the user for an OTP they did not start.
   Future<bool> _sessionLive() async {
     final client = await _ref.read(vClientProvider.future);
-    if (!await fetchIsAuth(client: client)) return false;
-    final loggedInAt = exportSessionState(client: client).loggedInAt;
+    final session = await signedInSession(client);
+    if (session == null) return false;
+    final loggedInAt = session.loggedInAt;
     if (loggedInAt == null) return true;
     final age = DateTime.now().toUtc().difference(
       DateTime.fromMillisecondsSinceEpoch(

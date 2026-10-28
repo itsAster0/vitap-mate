@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/ui/app_palette.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 
 /// Faculty name on its own line with a person icon; wraps to two lines
 /// instead of being cut off.

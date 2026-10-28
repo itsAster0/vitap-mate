@@ -33,7 +33,7 @@ final class VtopUserProvider
   VtopUser create() => VtopUser();
 }
 
-String _$vtopUserHash() => r'146f60a6b201daabba21fb74cacd333b8aab1306';
+String _$vtopUserHash() => r'c0df8abbe181d355624cb9f9ed4943a2f9e14577';
 
 abstract class _$VtopUser extends $AsyncNotifier<VtopUserEntity> {
   FutureOr<VtopUserEntity> build();

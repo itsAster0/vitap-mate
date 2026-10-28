@@ -5,7 +5,7 @@ abstract final class Paths {
   static const attendanceGuide = "attendanceGuide";
   static const timetableAttendanceGuide = "timetableAttendanceGuide";
   static const more = "more";
-  static const onbaording = "onbaording";
+  static const onboarding = "onboarding";
   static const vtopUserManagement = "vtopUsermanagement";
   static const settings = "settings";
   static const gmailOtpSetup = "gmailOtpSetup";

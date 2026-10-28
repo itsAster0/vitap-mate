@@ -10,7 +10,7 @@ import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -18,7 +18,7 @@ import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
-part 'clinet_provider.g.dart';
+part 'client_provider.g.dart';
 
 const _auth = SourceLogger('client.auth');
 const _session = SourceLogger('client.session');
@@ -60,8 +60,8 @@ class VClient extends _$VClient {
     );
   }
 
-  void replaceVClinet(VtopClient vclinet) {
-    state = AsyncData(vclinet);
+  void replaceVClient(VtopClient vClient) {
+    state = AsyncData(vClient);
   }
 
   Future<void> _persistCurrentSession(
@@ -87,7 +87,7 @@ class VClient extends _$VClient {
   Future<void> _rememberRegistrationNumber(String? number) async {
     final regno = number?.trim();
     if (regno == null || regno.isEmpty) return;
-    final users = ref.read(vtopusersutilsProvider.notifier);
+    final users = ref.read(vtopUsersProvider.notifier);
     final user = await users.vtopUserDefault();
     if (user == null || user.registrationNumber == regno) return;
     await users.vtopUserSave(user.withRegistrationNumber(regno));
@@ -197,7 +197,7 @@ class VClient extends _$VClient {
           '$flowLabel credentials rejected; marking stored user as invalid',
         );
         await ref
-            .read(vtopusersutilsProvider.notifier)
+            .read(vtopUsersProvider.notifier)
             .vtopUserSave(user.rejectCredentials());
         ref.invalidate(vtopUserProvider);
         // The server must not keep trying the same password either.

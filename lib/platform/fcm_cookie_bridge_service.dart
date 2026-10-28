@@ -12,7 +12,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/app/settings.dart';
@@ -26,8 +26,7 @@ import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/firebase_options.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
+import 'package:vitapmate/vtop/vtop.dart';
 import 'package:vitapmate/platform/notifications/class_reminder_notification_service.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 
@@ -426,16 +425,8 @@ Future<String> _headlessVtopCookieHeader(ProviderContainer container) async {
     if (state.otpIssuedAt != null) throw BridgeOtpRequired(state);
     rethrow;
   }
-  if (!await fetchIsAuth(client: client)) {
-    throw StateError('VTOP session is not authenticated after login.');
-  }
-
-  final snapshot = createPersistedVtopSessionSnapshot(client: client);
-  final cookieHeader = snapshot.cookies?.trim() ?? '';
-  if (cookieHeader.isEmpty) {
-    throw StateError('Authenticated VTOP session did not include cookies.');
-  }
-  return cookieHeader;
+  return await signedInCookies(client) ??
+      (throw StateError('VTOP session is not signed in after login.'));
 }
 
 /// Sends the current FCM token to the vtop-bridge account when the user has

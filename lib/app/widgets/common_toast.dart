@@ -88,7 +88,7 @@ void disCommonToast(BuildContext context, Object e) {
   );
 }
 
-void disOnbardingCommonToast(BuildContext context, Object e) {
+void disOnboardingCommonToast(BuildContext context, Object e) {
   if (!context.mounted) return;
   final (title, description) = switch (e) {
     _ when e == VtopError.invalidCredentials() => (

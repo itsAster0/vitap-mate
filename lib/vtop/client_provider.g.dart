@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'clinet_provider.dart';
+part of 'client_provider.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -33,7 +33,7 @@ final class VClientProvider
   VClient create() => VClient();
 }
 
-String _$vClientHash() => r'a924b609a7d51524c805e5c1bcdec83bb46d7976';
+String _$vClientHash() => r'7777028302fe52e9072a786a4f1abcfdb67250e6';
 
 abstract class _$VClient extends $AsyncNotifier<VtopClient> {
   FutureOr<VtopClient> build();

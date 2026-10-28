@@ -41,7 +41,7 @@ final class VtopOtpChallengeProvider
   }
 }
 
-String _$vtopOtpChallengeHash() => r'9265931b1a921498600d0fbb971a34685f1ecd14';
+String _$vtopOtpChallengeHash() => r'2b21c9c94d111b286985d6319028ec0505c9d5db';
 
 abstract class _$VtopOtpChallenge extends $Notifier<VtopOtpChallengeState> {
   VtopOtpChallengeState build();

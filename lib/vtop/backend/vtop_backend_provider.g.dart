@@ -111,7 +111,7 @@ final class VtopBackendProvider
   }
 }
 
-String _$vtopBackendHash() => r'10961994489d8352b29515fa1cc58a0cc7e21e46';
+String _$vtopBackendHash() => r'7c4d0493af048fb47f0400e85709d8149995f41f';
 
 /// Logs in on the device, or on the server in "Fetch on the server" mode.
 

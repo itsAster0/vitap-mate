@@ -4,17 +4,16 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/vtop/vtop.dart';
 import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
 
 late VtopClient _globalClient;
@@ -126,7 +125,7 @@ class Step1 extends HookConsumerWidget {
         _globalClient = client;
         two.value = true;
       } catch (e) {
-        if (context.mounted) disOnbardingCommonToast(context, e);
+        if (context.mounted) disOnboardingCommonToast(context, e);
       } finally {
         isloading.value = false;
       }
@@ -192,7 +191,7 @@ class Step2 extends HookConsumerWidget {
       try {
         data.value = await fetchSemesters(client: _globalClient);
       } catch (e) {
-        if (context.mounted) disOnbardingCommonToast(context, e);
+        if (context.mounted) disOnboardingCommonToast(context, e);
       } finally {
         fetching.value = false;
       }
@@ -239,7 +238,7 @@ class Step2 extends HookConsumerWidget {
                       semesterId: selectedSemesterId.value!,
                     );
                     await ref
-                        .read(vtopusersutilsProvider.notifier)
+                        .read(vtopUsersProvider.notifier)
                         .vtopUserInitialData(user);
                     final snapshot = createPersistedVtopSessionSnapshot(
                       client: _globalClient,

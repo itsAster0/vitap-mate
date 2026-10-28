@@ -1,7 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 
 /// VTOP turned the saved password down: marks the saved user so the app
 /// asks for it again and background refreshes stop. True when it changed
@@ -18,7 +18,7 @@ Future<bool> rejectSavedCredentials({
 
 /// [rejectSavedCredentials] on [container]'s storage, refreshing its user.
 Future<void> rejectSavedCredentialsIn(ProviderContainer container) async {
-  final users = container.read(vtopusersutilsProvider.notifier);
+  final users = container.read(vtopUsersProvider.notifier);
   if (await rejectSavedCredentials(
     load: users.vtopUserDefault,
     save: users.vtopUserSave,

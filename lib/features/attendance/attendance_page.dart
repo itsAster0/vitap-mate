@@ -9,7 +9,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';

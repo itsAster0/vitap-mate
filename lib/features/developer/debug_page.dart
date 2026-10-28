@@ -12,7 +12,7 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/app/router/paths.dart';

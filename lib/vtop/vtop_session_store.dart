@@ -92,6 +92,15 @@ Future<void> clearStoredVtopSession(String username) async {
   await storage.remove(_sessionKey(username));
 }
 
+/// The `Cookie` header of [client]'s session when it is signed in and has
+/// one; null otherwise.
+Future<String?> signedInCookies(VtopClient client) async {
+  if (!await fetchIsAuth(client: client)) return null;
+  final cookies =
+      createPersistedVtopSessionSnapshot(client: client).cookies?.trim() ?? '';
+  return cookies.isEmpty ? null : cookies;
+}
+
 PersistedVtopSession createPersistedVtopSessionSnapshot({
   required VtopClient client,
 }) {

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 
 void main() {
   test('only a refused sign-in drops the saved session', () {
