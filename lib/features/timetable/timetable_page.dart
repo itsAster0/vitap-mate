@@ -14,14 +14,11 @@ import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/app/widgets/email_otp_banner.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/timetable/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/logic/timetable_slot_merge.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 import 'package:vitapmate/ui/extention.dart';
-import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
-import 'package:vitapmate/features/more/domain/exam_time.dart';
-import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
+import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/timetable/widgets/agenda_timetable_view.dart';
 import 'package:vitapmate/features/timetable/widgets/weekly_timetable_view.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -61,7 +58,7 @@ class TimetablePage extends HookConsumerWidget {
                     day.day == now.day;
               });
           if (!examToday) return;
-          await ref.read(examScheduleProvider.notifier).updatexamschedule();
+          await ref.read(examScheduleProvider.notifier).refresh();
         } catch (e, st) {
           log('exam schedule auto refresh failed: $e', stackTrace: st);
         }

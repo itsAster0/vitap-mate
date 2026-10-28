@@ -8,7 +8,6 @@ import 'package:vitapmate/vtop/backend/vtop_query.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
-import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 import '../support/slow_storage.dart';
@@ -19,17 +18,6 @@ FullAttendanceData _history(String courseId) => FullAttendanceData(
   updateTime: BigInt.one,
   courseId: courseId,
   courseType: 'ETH',
-);
-
-GradeDetailsData _details(String courseId) => GradeDetailsData(
-  semesterId: 'S',
-  courseId: courseId,
-  classNumber: '',
-  classCourseType: '',
-  grandTotal: '',
-  marks: const [],
-  gradeRanges: const [],
-  updateTime: BigInt.one,
 );
 
 void main() {
@@ -56,19 +44,6 @@ void main() {
     ]);
     expect((await readSavedPage(pages.read, query('A')))?.courseId, 'A');
     expect((await readSavedPage(pages.read, query('B')))?.courseId, 'B');
-  });
-
-  test('saving two courses\' grade details at once keeps both', () async {
-    final source = GradesDataSource(
-      storage,
-      () => throw UnimplementedError(),
-      queue,
-    );
-    await Future.wait([
-      source.saveGradeDetails(_details('A'), 'S'),
-      source.saveGradeDetails(_details('B'), 'S'),
-    ]);
-    expect((await source.getGradeDetailsMap('S')).keys.toSet(), {'A', 'B'});
   });
 
   group('JsonFileStorage on disk', () {

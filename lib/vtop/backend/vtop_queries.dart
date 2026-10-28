@@ -36,9 +36,7 @@ abstract final class VtopQueries {
   }) => VtopQuery(
     name: 'full_attendance',
     semester: semester,
-    // In this order, so the saved file keeps its name
-    // (full_attendance_<semester>_<type>_<course>).
-    args: {'course_type': courseType, 'course_id': courseId},
+    args: {'course_id': courseId, 'course_type': courseType},
     fromJson: FullAttendanceData.fromJson,
     local: (client) => vtop_api.fetchFullAttendance(
       client: client,
@@ -51,14 +49,7 @@ abstract final class VtopQueries {
   static VtopQuery<TimetableData> timetable(String semester) => VtopQuery(
     name: 'timetable',
     semester: semester,
-    fromJson: (json) {
-      // Timetables saved before courses and credits existed lack them.
-      json.putIfAbsent('courses', () => <dynamic>[]);
-      for (final slot in json['slots'] as List<dynamic>? ?? const []) {
-        if (slot is Map<String, dynamic>) slot.putIfAbsent('credits', () => '');
-      }
-      return TimetableData.fromJson(json);
-    },
+    fromJson: TimetableData.fromJson,
     local: (client) =>
         vtop_api.fetchTimetable(client: client, semesterId: semester),
   );

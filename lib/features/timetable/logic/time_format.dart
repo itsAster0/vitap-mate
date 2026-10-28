@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:vitapmate/ui/extention.dart';
-import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// "14:05" → "2:05 PM", or unchanged when the device uses 24-hour time.

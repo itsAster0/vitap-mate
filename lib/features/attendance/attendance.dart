@@ -5,11 +5,15 @@ import 'dart:developer';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
-import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
+
+export 'package:vitapmate/features/attendance/logic/attendance_history.dart';
+export 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
+export 'package:vitapmate/features/attendance/widgets/attendance.dart';
 
 final attendanceProvider = AsyncNotifierProvider<Attendance, AttendanceData>(
   Attendance.new,
@@ -58,7 +62,9 @@ class Attendance extends VtopPage<AttendanceData> {
 
 typedef AttendanceCourse = ({String courseType, String courseId});
 
-VtopQuery<FullAttendanceData> Function(String) _history(AttendanceCourse course) =>
+VtopQuery<FullAttendanceData> Function(String) _history(
+  AttendanceCourse course,
+) =>
     (semester) => VtopQueries.fullAttendance(
       semester,
       courseId: course.courseId,
@@ -71,9 +77,11 @@ fullAttendanceProvider(String courseType, String courseId) =>
     _fullAttendance((courseType: courseType, courseId: courseId));
 
 final _fullAttendance =
-    AsyncNotifierProvider.family<FullAttendance, FullAttendanceData, AttendanceCourse>(
-      FullAttendance.new,
-    );
+    AsyncNotifierProvider.family<
+      FullAttendance,
+      FullAttendanceData,
+      AttendanceCourse
+    >(FullAttendance.new);
 
 class FullAttendance extends VtopPage<FullAttendanceData> {
   FullAttendance(this.course) : super(_history(course));

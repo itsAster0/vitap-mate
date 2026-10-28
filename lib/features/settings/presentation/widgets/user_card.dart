@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
+import 'package:vitapmate/features/grade_history/grade_history.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/app/router/paths.dart';
@@ -15,7 +15,7 @@ import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/features/settings/presentation/pages/user_management.dart';
-import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/vtop/semesters.dart';
 
 class UserCard extends HookConsumerWidget {
   final VtopUserEntity user;

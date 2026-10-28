@@ -14,13 +14,9 @@ import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
-import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_projection.dart';
-import 'package:vitapmate/features/attendance/widgets/attendance.dart';
 import 'package:vitapmate/features/attendance/widgets/attendance_cal.dart';
-import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 

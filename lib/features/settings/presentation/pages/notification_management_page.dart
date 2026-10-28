@@ -10,7 +10,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
+import 'package:vitapmate/features/exams/exams.dart';
 
 const _classReminderOptions = [5, 10, 15, 30, 60];
 const _examReminderOptions = [10, 15, 30, 60, 120];
@@ -103,9 +103,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                       if (!context.mounted) return;
 
                       if (value) {
-                        await ref
-                            .read(timetableProvider.notifier)
-                            .refresh();
+                        await ref.read(timetableProvider.notifier).refresh();
                       }
                     },
                   ),
@@ -251,9 +249,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                       if (!context.mounted) return;
 
                       if (value) {
-                        await ref
-                            .read(examScheduleProvider.notifier)
-                            .updatexamschedule();
+                        await ref.read(examScheduleProvider.notifier).refresh();
                       }
                     },
                   ),
@@ -295,7 +291,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                           if (ref.read(examReminderSettingsProvider).enabled) {
                             await ref
                                 .read(examScheduleProvider.notifier)
-                                .updatexamschedule();
+                                .refresh();
                           }
                         },
                       ),

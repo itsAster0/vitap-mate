@@ -12,13 +12,10 @@ import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/platform/background/sync.dart';
-import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
-import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
-import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
-import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
+import 'package:vitapmate/features/exams/exams.dart';
+import 'package:vitapmate/features/marks/marks.dart';
+import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 /// Pages older than this are refetched after a quick fetch in the open app.
@@ -114,22 +111,19 @@ class StaleRefresher {
       () => _ref.read(timetableProvider.notifier).refresh(),
     );
     await step(
-      (await (await _ref.read(
-        marksRepositoryProvider.future,
-      )).loadCache())?.updateTime,
-      () => _ref.read(marksProvider.notifier).updatemarks(),
+      (await readSavedSemesterPage(_ref.read, VtopQueries.marks))?.updateTime,
+      () => _ref.read(marksProvider.notifier).refresh(),
     );
     await step(
-      (await (await _ref.read(
-        examScheduleRepositoryProvider.future,
-      )).loadCache())?.updateTime,
-      () => _ref.read(examScheduleProvider.notifier).updatexamschedule(),
+      (await readSavedSemesterPage(
+        _ref.read,
+        VtopQueries.examSchedule,
+      ))?.updateTime,
+      () => _ref.read(examScheduleProvider.notifier).refresh(),
     );
     await step(
-      (await (await _ref.read(
-        semidRepositoryProvider.future,
-      )).loadCache())?.updateTime,
-      () => _ref.read(semesterIdProvider.notifier).updatesemids(),
+      (await readSavedPage(_ref.read, VtopQueries.semesters()))?.updateTime,
+      () => _ref.read(semesterIdProvider.notifier).refresh(),
     );
     for (final course in (await savedAttendance())?.records ?? []) {
       final history = await readSavedFullAttendance(

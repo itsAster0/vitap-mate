@@ -1,7 +1,7 @@
 import 'package:vitapmate/ui/extention.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
-import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
-import 'package:vitapmate/features/timetable/logic/time_format.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 const _slotDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
