@@ -12,10 +12,6 @@ import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/app_urls.dart';
 import 'package:vitapmate/vtop/http/cronet_net_log.dart';
 
-/// The HTTP client for the VITAP Mate server: Cronet on Android and
-/// NSURLSession on iOS, both of which speak HTTP/3 (QUIC). On a
-/// weak network QUIC loses less to dropped packets and survives a switch
-/// between Wi-Fi and mobile data. Elsewhere, dart:io's client.
 /// Which client [createAppHttpClient] makes here, for Diagnostics.
 String appHttpClientName() => Platform.isAndroid
     ? 'Cronet (HTTP/3)'
@@ -23,6 +19,10 @@ String appHttpClientName() => Platform.isAndroid
     ? 'Cupertino'
     : 'Standard';
 
+/// The HTTP client for the VITAP Mate server: Cronet on Android and
+/// NSURLSession on iOS, both of which speak HTTP/3 (QUIC). On a
+/// weak network QUIC loses less to dropped packets and survives a switch
+/// between Wi-Fi and mobile data. Elsewhere, dart:io's client.
 http.Client createAppHttpClient() {
   if (Platform.isAndroid) {
     return CronetClient.fromCronetEngine(

@@ -27,18 +27,12 @@ class ReloginVtopBackend implements VtopBackend {
   final Future<void> Function() _relogin;
   final Future<void> Function()? _onCredentialsRejected;
 
-  /// The backend this one retries for.
-  VtopBackend get inner => _inner;
-
   /// Bumped after every successful re-login.
   int _generation = 0;
   Future<void>? _inFlight;
 
   @override
   String get name => _inner.name;
-
-  /// Runs [fetch], signing in again and retrying once on an expired session.
-  Future<T> retrying<T>(Future<T> Function() fetch) => _guard(fetch);
 
   Future<T> _guard<T>(Future<T> Function() fetch) async {
     try {

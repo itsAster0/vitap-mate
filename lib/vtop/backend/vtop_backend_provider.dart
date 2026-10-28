@@ -12,9 +12,7 @@ import 'package:vitapmate/vtop/backend/server_vtop.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 
 part 'vtop_backend_provider.g.dart';
@@ -49,18 +47,15 @@ Future<EdgeIdentity?> edgeIdentity(Ref ref) async {
 /// The registration number already known, from the saved account or a live
 /// session, trimmed; null when neither has it yet.
 Future<String?> _knownRegistrationNumber(Ref ref) async {
-  final saved = (await ref.read(
-    vtopUserProvider.future,
-  )).registrationNumber?.trim();
-  if (saved != null && saved.isNotEmpty) return saved;
-  final session = (await _deviceSession(ref))?.registrationNumber?.trim();
-  return (session != null && session.isNotEmpty) ? session : null;
-}
-
-Future<SessionState?> _deviceSession(Ref ref) async {
-  final client = await ref.read(vClientProvider.future);
-  if (!await vtop_api.fetchIsAuth(client: client)) return null;
-  return vtop_api.exportSessionState(client: client);
+  final user = await ref.read(vtopUserProvider.future);
+  if (user.registrationNumber?.trim() case final saved? when saved.isNotEmpty) {
+    return saved;
+  }
+  final session = await signedInSession(await ref.read(vClientProvider.future));
+  return switch (session?.registrationNumber?.trim()) {
+    final number? when number.isNotEmpty => number,
+    _ => null,
+  };
 }
 
 /// VTOP through the phone's own client (directly, or through the server's

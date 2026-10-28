@@ -16,33 +16,19 @@ String pageKey(String name, [Map<String, String> args = const {}]) {
   return '$name?${pairs.join('&')}';
 }
 
-/// The name part of a [pageKey].
-String pageName(String key) {
-  final query = key.indexOf('?');
-  return query < 0 ? key : key.substring(0, query);
-}
-
-String _encode(String text) {
-  final out = StringBuffer();
-  for (final byte in _utf8(text)) {
-    final unreserved =
-        (byte >= 0x30 && byte <= 0x39) ||
-        (byte >= 0x41 && byte <= 0x5A) ||
-        (byte >= 0x61 && byte <= 0x7A) ||
-        byte == 0x2D ||
-        byte == 0x2E ||
-        byte == 0x5F ||
-        byte == 0x7E;
-    if (unreserved) {
-      out.writeCharCode(byte);
-    } else {
-      out.write('%${byte.toRadixString(16).toUpperCase().padLeft(2, '0')}');
-    }
-  }
-  return out.toString();
-}
-
-List<int> _utf8(String text) => const Utf8Codec().encode(text);
+String _encode(String text) => [
+  for (final byte in utf8.encode(text))
+    switch (byte) {
+      >= 0x30 && <= 0x39 ||
+      >= 0x41 && <= 0x5A ||
+      >= 0x61 && <= 0x7A ||
+      0x2D ||
+      0x2E ||
+      0x5F ||
+      0x7E => String.fromCharCode(byte),
+      _ => '%${byte.toRadixString(16).toUpperCase().padLeft(2, '0')}',
+    },
+].join();
 
 /// A page to read: named by [key], read on the phone by [local].
 class VtopQuery<T> {

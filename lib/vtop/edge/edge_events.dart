@@ -13,6 +13,8 @@ import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/edge/edge_device.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 
+const _log = SourceLogger('edge.events');
+
 /// One entry of this install's event log on the edge.
 class EdgeEvent {
   const EdgeEvent({required this.seq, required this.kind, required this.data});
@@ -43,8 +45,9 @@ typedef EdgeEventHandler = Future<void> Function(EdgeEvent event);
 /// [sharedAppHttpClient], so it rides the HTTP/3 connection the app's other
 /// calls use, and its heartbeat keeps that connection from going idle. In
 /// the background Android may kill connections, so FCM carries events and
-/// the stream catches up on what it missed when the app comes back. Both paths go through [accept], which
-/// hands each sequence number to the handler once.
+/// the stream catches up on what it missed when the app comes back. Both
+/// paths go through [accept], which hands each sequence number to the
+/// handler once.
 class EdgeEventChannel {
   EdgeEventChannel._();
 
@@ -142,7 +145,8 @@ class EdgeEventChannel {
     try {
       final device = await _devices.load();
       if (device == null) return;
-      final after = await _cursor(device.id);
+      final prefs = await SharedPreferences.getInstance();
+      final after = prefs.getInt(_cursorKey(device.id)) ?? 0;
       final server = await currentServerUrl();
       final url = Uri.parse(server).replace(
         path: '/v1/events',
@@ -180,7 +184,7 @@ class EdgeEventChannel {
           );
       _watchdog = Timer.periodic(_heartbeat, (_) => _checkBeat());
     } catch (error) {
-      Log.info('edge.events', 'Event stream failed: $error');
+      _log.info('Event stream failed: $error');
       _scheduleRetry();
     } finally {
       _connecting = false;
@@ -190,7 +194,7 @@ class EdgeEventChannel {
   void _checkBeat() {
     // Two beats missed: the link is dead even if no one said so.
     if (DateTime.now().difference(_lastBeat) > _heartbeat * 2) {
-      Log.info('edge.events', 'Event stream stopped beating');
+      _log.info('Event stream stopped beating');
       _onDropped();
     }
   }
@@ -213,12 +217,14 @@ class EdgeEventChannel {
 
   void _onFrame(String frame) {
     try {
-      final json = jsonDecode(frame);
-      if (json is! Map<String, dynamic> || json['type'] != 'event') return;
-      final event = json['event'];
-      if (event is! Map<String, dynamic>) return;
-      final parsed = EdgeEvent.fromJson(event);
-      if (parsed != null) unawaited(accept(parsed, advance: true));
+      if (jsonDecode(frame) case {
+        'type': 'event',
+        'event': final Map<String, dynamic> event,
+      }) {
+        if (EdgeEvent.fromJson(event) case final parsed?) {
+          unawaited(accept(parsed, advance: true));
+        }
+      }
     } catch (_) {}
   }
 
@@ -259,11 +265,6 @@ class EdgeEventChannel {
     });
   }
 
-  Future<int> _cursor(String device) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_cursorKey(device)) ?? 0;
-  }
-
   /// Hands [event] to its handler unless this sequence number was handled
   /// already. Stream events arrive in order, so they also [advance] where
   /// the next catch-up starts; a push may skip ahead and does not.
@@ -272,10 +273,10 @@ class EdgeEventChannel {
     final device = _deviceId;
     // Advanced even for a number handled already (it may have come by
     // push first), so catch-ups don't start before it again.
-    if (advance && device != null) {
-      if ((prefs.getInt(_cursorKey(device)) ?? 0) < event.seq) {
-        await prefs.setInt(_cursorKey(device), event.seq);
-      }
+    if (advance &&
+        device != null &&
+        (prefs.getInt(_cursorKey(device)) ?? 0) < event.seq) {
+      await prefs.setInt(_cursorKey(device), event.seq);
     }
     if (!_seen.add(event.seq)) return;
     if (_seen.length > 256) _seen.remove(_seen.reduce(min));
@@ -295,7 +296,7 @@ class EdgeEventChannel {
     try {
       await handler(event);
     } catch (error) {
-      Log.info('edge.events', 'Event ${event.kind} failed: $error');
+      _log.info('Event ${event.kind} failed: $error');
     }
   }
 
