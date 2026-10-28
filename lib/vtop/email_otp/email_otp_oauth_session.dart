@@ -1,11 +1,6 @@
 // What a Gmail OTP connection keeps, and what setting one up reports.
 
 class EmailOtpSetupResult {
-  const EmailOtpSetupResult({
-    required this.success,
-    required this.message,
-    this.email,
-  });
   const EmailOtpSetupResult.ok(this.message, {this.email}) : success = true;
   const EmailOtpSetupResult.failed(this.message, {this.email})
     : success = false;
@@ -62,27 +57,23 @@ class EmailOtpOAuthSession {
   bool get hasGmailScope =>
       scopes.contains('https://www.googleapis.com/auth/gmail.modify');
 
-  bool get isExpired => expiresWithin(const Duration(seconds: 30));
-
   /// True when the access token is expired or will be within [margin].
   bool expiresWithin(Duration margin) {
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     return accessTokenExpiryEpochMs <= now + margin.inMilliseconds;
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'email': email,
-      'accessToken': accessToken,
-      'refreshToken': refreshToken,
-      'scopes': scopes,
-      'accessTokenExpiryEpochMs': accessTokenExpiryEpochMs,
-      'schemaVersion': schemaVersion,
-      'authSource': authSource.name,
-      if (oauthClientId != null) 'oauthClientId': oauthClientId,
-      if (oauthClientSecret != null) 'oauthClientSecret': oauthClientSecret,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'email': email,
+    'accessToken': accessToken,
+    'refreshToken': refreshToken,
+    'scopes': scopes,
+    'accessTokenExpiryEpochMs': accessTokenExpiryEpochMs,
+    'schemaVersion': schemaVersion,
+    'authSource': authSource.name,
+    'oauthClientId': ?oauthClientId,
+    'oauthClientSecret': ?oauthClientSecret,
+  };
 
   static EmailOtpOAuthSession? fromJson(Map<String, dynamic> raw) {
     final email = (raw['email'] as String?)?.trim();
@@ -100,22 +91,20 @@ class EmailOtpOAuthSession {
         scopesRaw is! List<dynamic>) {
       return null;
     }
-    final scopes = scopesRaw.whereType<String>().toList(growable: false);
     final sourceName = raw['authSource'] as String?;
-    final authSource = EmailOtpAuthSource.values.firstWhere(
-      (value) => value.name == sourceName,
-      orElse: () => EmailOtpAuthSource.sharedBuiltIn,
-    );
     return EmailOtpOAuthSession(
       email: email,
       accessToken: accessToken,
       refreshToken: refreshToken,
-      scopes: scopes,
+      scopes: scopesRaw.whereType<String>().toList(growable: false),
       accessTokenExpiryEpochMs: expiry,
-      schemaVersion: raw['schemaVersion'] is int
-          ? raw['schemaVersion'] as int
-          : 1,
-      authSource: authSource,
+      schemaVersion: switch (raw['schemaVersion']) {
+        final int version => version,
+        _ => 1,
+      },
+      authSource:
+          EmailOtpAuthSource.values.asNameMap()[sourceName] ??
+          EmailOtpAuthSource.sharedBuiltIn,
       oauthClientId: (raw['oauthClientId'] as String?)?.trim(),
       oauthClientSecret: (raw['oauthClientSecret'] as String?)?.trim(),
     );
@@ -124,26 +113,19 @@ class EmailOtpOAuthSession {
   EmailOtpOAuthSession copyWith({
     String? accessToken,
     String? refreshToken,
-    List<String>? scopes,
     int? accessTokenExpiryEpochMs,
-    int? schemaVersion,
-    EmailOtpAuthSource? authSource,
-    String? oauthClientId,
-    String? oauthClientSecret,
-  }) {
-    return EmailOtpOAuthSession(
-      email: email,
-      accessToken: accessToken ?? this.accessToken,
-      refreshToken: refreshToken ?? this.refreshToken,
-      scopes: scopes ?? this.scopes,
-      accessTokenExpiryEpochMs:
-          accessTokenExpiryEpochMs ?? this.accessTokenExpiryEpochMs,
-      schemaVersion: schemaVersion ?? this.schemaVersion,
-      authSource: authSource ?? this.authSource,
-      oauthClientId: oauthClientId ?? this.oauthClientId,
-      oauthClientSecret: oauthClientSecret ?? this.oauthClientSecret,
-    );
-  }
+  }) => EmailOtpOAuthSession(
+    email: email,
+    accessToken: accessToken ?? this.accessToken,
+    refreshToken: refreshToken ?? this.refreshToken,
+    scopes: scopes,
+    accessTokenExpiryEpochMs:
+        accessTokenExpiryEpochMs ?? this.accessTokenExpiryEpochMs,
+    schemaVersion: schemaVersion,
+    authSource: authSource,
+    oauthClientId: oauthClientId,
+    oauthClientSecret: oauthClientSecret,
+  );
 }
 
 /// What the server needs to read VTOP's OTP from Gmail by itself, sealed
