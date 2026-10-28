@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -51,7 +50,7 @@ class CourseViewPage extends HookConsumerWidget {
       try {
         await ref.read(coursePageClassesProvider(course.id).future);
       } catch (e) {
-        log('course refresh failed: $e');
+        Log.info('features.course_page', 'course refresh failed: $e');
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -362,7 +361,7 @@ class _LecturePlan extends HookConsumerWidget {
           );
         }
       } catch (e) {
-        log('course file failed: $e');
+        Log.info('features.course_page', 'course file failed: $e');
         if (context.mounted) {
           dispToast(context, "Couldn't get the file", vtopErrorMessage(e));
         }

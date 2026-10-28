@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -27,7 +26,7 @@ class ExamSchedulePage extends HookConsumerWidget {
       try {
         await ref.read(examScheduleProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
+        Log.info('features.exams', "$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -36,7 +35,7 @@ class ExamSchedulePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(examScheduleProvider.notifier).refresh().catchError((e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.info('features.exams', 'auto refresh failed: $e');
         });
       });
       return null;

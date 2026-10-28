@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'package:vitapmate/observability/log.dart';
 import 'package:in_app_update/in_app_update.dart';
 
 class UpdateService {
@@ -16,7 +16,7 @@ class UpdateService {
         }
       }
     } catch (e) {
-      log("Flexible update check failed: $e");
+      Log.info('platform.update', "Flexible update check failed: $e");
     }
   }
 }

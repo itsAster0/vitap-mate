@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -147,9 +146,9 @@ class NotificationManagementPage extends HookConsumerWidget {
                                   .refresh();
                             }
                           } catch (e, st) {
-                            log(
-                              'Error updating class reminder notify before: $e',
-                              stackTrace: st,
+                            Log.warn(
+                              'features.settings',
+                              'Error updating class reminder notify before: $e\n$st',
                             );
                           }
                         },

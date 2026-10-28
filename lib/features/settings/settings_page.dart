@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' show log;
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -64,11 +64,9 @@ class SettingsPage extends HookConsumerWidget {
               "Some VTOP data could not be refreshed. Try again in a bit. ${took()}",
             );
     } catch (error, stackTrace) {
-      log(
-        'Manual VTOP data refresh failed',
-        name: 'settings.vtop_sync',
-        error: error,
-        stackTrace: stackTrace,
+      Log.error(
+        'settings.vtop_sync',
+        'Manual VTOP data refresh failed: $error\n$stackTrace',
       );
       if (context.mounted) disCommonToast(context, error);
     }
@@ -95,11 +93,9 @@ class SettingsPage extends HookConsumerWidget {
         isGmailOtpReady.value = await ref.read(emailOtpReadyProvider.future);
         isEmailOtpReady.value = await ref.read(anyEmailOtpReadyProvider.future);
       } catch (error, stackTrace) {
-        log(
-          'Failed to refresh Email OTP ready state',
-          name: 'settings.email_otp',
-          error: error,
-          stackTrace: stackTrace,
+        Log.error(
+          'settings.email_otp',
+          'Failed to refresh Email OTP ready state: $error\n$stackTrace',
         );
         showEmailOtp.value = false;
         isEmailOtpReady.value = false;
@@ -462,11 +458,9 @@ class SettingsPage extends HookConsumerWidget {
                     try {
                       await installAppUpdate(update);
                     } catch (error, stackTrace) {
-                      log(
-                        'App update failed',
-                        name: 'settings.update',
-                        error: error,
-                        stackTrace: stackTrace,
+                      Log.error(
+                        'settings.update',
+                        'App update failed: $error\n$stackTrace',
                       );
                       if (context.mounted) disCommonToast(context, error);
                     }

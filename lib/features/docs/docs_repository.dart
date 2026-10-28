@@ -1,6 +1,6 @@
-import 'dart:developer';
 import 'dart:io';
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/features/docs/logic/doc_models.dart';
 
@@ -88,7 +88,7 @@ class DocsRepository {
         final dir = await storage.userDir(_fileSubDir, create: false);
         await storage.deleteUserFile('${dir.path}/${target.fileName}');
       } catch (e) {
-        log('docs: failed deleting file: $e');
+        Log.info('features.docs', 'docs: failed deleting file: $e');
       }
     }
     windows.removeWhere((w) => w.id == id);

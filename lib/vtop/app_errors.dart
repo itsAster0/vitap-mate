@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:http/http.dart';
 import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
@@ -94,7 +93,7 @@ enum AppErrorType {
     return (AppErrorType.state, error.message);
   }
 
-  log('Unhandled error: $error');
+  Log.info('vtop', 'Unhandled error: $error');
   return (AppErrorType.unknown, 'Something went wrong. Please try again.');
 }
 

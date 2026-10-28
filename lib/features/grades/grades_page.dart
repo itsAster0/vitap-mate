@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -44,7 +43,7 @@ class GradesPage extends HookConsumerWidget {
         await ref.read(semesterIdProvider.future);
         await ref.read(gradesProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
+        Log.info('features.grades', "$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -56,7 +55,7 @@ class GradesPage extends HookConsumerWidget {
           await ref.read(gradesProvider.future);
           await ref.read(gradesProvider.notifier).refresh();
         } catch (e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.warn('features.grades', 'auto refresh failed: $e\n$st');
         }
       });
       return null;
@@ -100,7 +99,7 @@ class GradesPage extends HookConsumerWidget {
                   try {
                     await ref.read(gradesProvider.notifier).selectSemester(id);
                   } catch (e) {
-                    log("$e");
+                    Log.info('features.grades', "$e");
                   }
                 },
               ),
@@ -223,7 +222,7 @@ class _GradeCard extends HookConsumerWidget {
       try {
         await loadDetails(force: detail != null);
       } catch (e) {
-        log("$e");
+        Log.info('features.grades', "$e");
       }
     }
 
@@ -311,7 +310,7 @@ class _GradeCard extends HookConsumerWidget {
                 try {
                   await loadDetails(force: true);
                 } catch (e) {
-                  log("$e");
+                  Log.info('features.grades', "$e");
                   if (context.mounted) disCommonToast(context, e);
                 }
               },

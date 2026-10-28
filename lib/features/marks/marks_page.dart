@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator, RefreshCallback;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -25,7 +24,7 @@ class MarksPage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(marksProvider.notifier).refresh().catchError((e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.info('features.marks', 'auto refresh failed: $e');
         });
       });
       return null;
@@ -35,7 +34,7 @@ class MarksPage extends HookConsumerWidget {
       try {
         await ref.read(marksProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
+        Log.info('features.marks', "$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }

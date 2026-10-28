@@ -1,16 +1,16 @@
+import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:hooks_riverpod/misc.dart'
-    show ProviderListenable;
+import 'package:hooks_riverpod/misc.dart' show ProviderListenable;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
@@ -19,7 +19,6 @@ import 'package:vitapmate/features/marks/marks.dart';
 import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/platform/notifications/change_alert_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -47,7 +46,7 @@ Future<bool> _syncData({String? task}) async {
     overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
   );
   try {
-    await RustLib.init();
+    await startRustRuntime();
     return await syncVtopData(
       read: container.read,
       task: task,
@@ -295,10 +294,7 @@ Future<void> _runChangeDetection(
       );
     }
   } catch (e) {
-    AppLogger.instance.warning(
-      'background.change_detection',
-      'Change detection failed: $e',
-    );
+    Log.warn('background.change_detection', 'Change detection failed: $e');
   }
 }
 

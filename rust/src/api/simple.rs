@@ -1,8 +1,3 @@
-#[flutter_rust_bridge::frb(sync)]
-pub fn greet(name: String) -> String {
-    format!("Hello, {name}!")
-}
-
 #[flutter_rust_bridge::frb(init)]
 pub fn init_app() {
     // Not setup_default_user_utils: its Trace-level console logger claims

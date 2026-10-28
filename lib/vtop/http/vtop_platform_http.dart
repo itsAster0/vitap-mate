@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:cronet_http/cronet_http.dart';
 import 'package:cupertino_http/cupertino_http.dart';
 import 'package:http/http.dart' as http;
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/src/api/platform_http.dart';
@@ -106,10 +106,10 @@ Future<PlatformHttpResponse> sendPlatformHttp(
     );
   } on TimeoutException catch (error) {
     abort.complete();
-    _log.warning('platform ${request.method} ${url.path} timed out');
+    _log.warn('platform ${request.method} ${url.path} timed out');
     return _failure(PlatformHttpErrorKind.timeout, request, error);
   } catch (error) {
-    _log.warning('platform ${request.method} ${url.path} failed: $error');
+    _log.warn('platform ${request.method} ${url.path} failed: $error');
     // The request may have reached VTOP, so it is not retried.
     return _failure(PlatformHttpErrorKind.other, request, error);
   }

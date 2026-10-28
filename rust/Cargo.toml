@@ -22,6 +22,7 @@ vtop-shared = { path = "vtop-shared" }
 vtop-wire = { path = "vtop-wire" }
 flutter_rust_bridge = "=2.12.0"
 serde = { workspace = true }
+serde_json = { workspace = true }
 log = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 

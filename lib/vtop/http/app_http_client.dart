@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:meta/meta.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/app_urls.dart';
 import 'package:vitapmate/vtop/http/cronet_net_log.dart';
 
@@ -173,9 +174,28 @@ Future<CronetEngine?> get sharedCronetEngine async =>
 /// One client per isolate, set up on its first request and never closed, so
 /// connections are reused. Code without a Ref (background isolates, ad hoc
 /// services) uses this too; a Cronet engine per call would be costly.
-final http.Client sharedAppHttpClient = Platform.isAndroid
-    ? _DeferredClient(_cronet.then((cronet) => cronet.client))
-    : createAppHttpClient();
+final http.Client sharedAppHttpClient = _FlowIdClient(
+  Platform.isAndroid
+      ? _DeferredClient(_cronet.then((cronet) => cronet.client))
+      : createAppHttpClient(),
+);
+
+/// Sends the current [flow] id as `x-request-id`, so the server's log lines
+/// for a request can be found from the phone's.
+class _FlowIdClient extends http.BaseClient {
+  _FlowIdClient(this._inner);
+
+  final http.Client _inner;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    if (currentFlow case final id?) request.headers['x-request-id'] = id;
+    return _inner.send(request);
+  }
+
+  @override
+  void close() => _inner.close();
+}
 
 /// Sends through the client [_client] completes with.
 class _DeferredClient extends http.BaseClient {

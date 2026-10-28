@@ -24,11 +24,8 @@ const _privateImportsAllowed = <String>{};
 const _bindingsAllowed = {
   'features/onboarding/onboarding_page.dart',
   'features/account/email_otp_support.dart',
-  'features/developer/logs_page.dart',
   'features/server/server_account.dart',
-  'main.dart',
   'platform/background/stale_refresh.dart',
-  'platform/background/sync.dart',
   'platform/fcm_cookie_bridge_service.dart',
 };
 

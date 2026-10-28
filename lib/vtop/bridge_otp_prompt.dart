@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' show log;
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
@@ -16,7 +17,6 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
-import 'package:vitapmate/src/frb_generated.dart';
 
 /// When a browser or AI agent asks the phone to sign in and VTOP wants an
 /// OTP that Gmail auto-fetch cannot supply, the half-finished login is
@@ -260,11 +260,7 @@ Future<void> submitPendingBridgeOtp(String otp) async {
     await clearPendingBridgeOtp();
     return;
   }
-  try {
-    await RustLib.init();
-  } catch (_) {
-    // Already initialised in this isolate.
-  }
+  await startRustRuntime();
   final container = ProviderContainer(
     overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
   );
@@ -274,17 +270,15 @@ Future<void> submitPendingBridgeOtp(String otp) async {
     try {
       await vtopClientSubmitSecurityOtp(client: client, otpCode: otp);
     } catch (error) {
-      log('Bridge OTP rejected', name: 'fcm.cookie', error: error);
+      Log.error('fcm.cookie', 'Bridge OTP rejected: $error');
       await showBridgeOtpNotification(problem: 'That OTP did not work');
       return;
     }
     await _answerPending(container, client, pending);
   } catch (error, stackTrace) {
-    log(
-      'Finishing the bridge OTP login failed',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Finishing the bridge OTP login failed: $error\n$stackTrace',
     );
     await showBridgeOtpNotification(problem: 'Sign-in failed, try again');
   } finally {
@@ -314,11 +308,9 @@ Future<void> answerPendingBridgeOtpInApp(ProviderContainer container) async {
         );
     await _answerPending(container, client, pending);
   } catch (error, stackTrace) {
-    log(
-      'Answering the bridge OTP in the app failed',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Answering the bridge OTP in the app failed: $error\n$stackTrace',
     );
   }
 }
@@ -357,5 +349,5 @@ Future<void> _answerPending(
     credentials: credentials,
   );
   await clearPendingBridgeOtp();
-  log('Bridge OTP login completed', name: 'fcm.cookie');
+  Log.info('fcm.cookie', 'Bridge OTP login completed');
 }

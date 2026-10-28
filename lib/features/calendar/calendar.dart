@@ -6,7 +6,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitapmate/features/calendar/logic/semester_calendar.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
@@ -46,7 +46,7 @@ class AcademicCalendar extends VtopPage<AcademicCalendarData> {
     try {
       await refresh();
     } catch (e) {
-      AppLogger.instance.info(
+      Log.info(
         'client.fetch-academic-calendar',
         'background refresh failed: $e',
       );

@@ -1,8 +1,7 @@
 /// Attendance: the per-course summary and each course's class history.
 library;
 
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
@@ -56,7 +55,10 @@ class Attendance extends VtopPage<AttendanceData> {
             )
             .updateAttendance();
       } catch (e, st) {
-        log('history pull failed for ${record.courseCode}: $e', stackTrace: st);
+        Log.warn(
+          'features.attendance',
+          'history pull failed for ${record.courseCode}: $e\n$st',
+        );
       }
     }
   }

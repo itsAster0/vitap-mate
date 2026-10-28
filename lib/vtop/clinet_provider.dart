@@ -5,7 +5,7 @@ import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
@@ -70,7 +70,7 @@ class VClient extends _$VClient {
   }) async {
     final snapshot = createPersistedVtopSessionSnapshot(client: client);
     if (snapshot.cookies?.trim().isEmpty ?? true) {
-      _session.warning(
+      _session.warn(
         '${flowLabel ?? 'session.persist'} skipped because cookie header was empty',
       );
       return;
@@ -135,7 +135,7 @@ class VClient extends _$VClient {
       }
     }
     if (!user.isValid) {
-      _auth.warning(
+      _auth.warn(
         '$flowLabel blocked because stored credentials are marked invalid',
       );
       throw const VtopError.authenticationFailed(
@@ -166,7 +166,7 @@ class VClient extends _$VClient {
                 !await ref
                     .read(vtopOtpChallengeProvider.notifier)
                     .canAutoFetchFromEmail()) {
-              _auth.warning(
+              _auth.warn(
                 '$flowLabel cannot continue because OTP prompt is disabled and email autofetch is unavailable',
               );
               rethrow;
@@ -193,7 +193,7 @@ class VClient extends _$VClient {
     } catch (e) {
       final uname = user.username;
       if (e == VtopError.invalidCredentials()) {
-        _auth.warning(
+        _auth.warn(
           '$flowLabel credentials rejected; marking stored user as invalid',
         );
         await ref
@@ -208,7 +208,7 @@ class VClient extends _$VClient {
           e is VtopError &&
           e is! VtopError_NetworkError) {
         await clearStoredVtopSession(uname);
-        _session.warning(
+        _session.warn(
           '$flowLabel cleared saved session after a terminal authentication failure',
         );
       }
@@ -227,8 +227,6 @@ Future<void> _reportCredentialsRejected(String? username) async {
       client: sharedAppHttpClient,
     ).reportCredentialsRejected(registrationNumber: username);
   } catch (error) {
-    _auth.warning(
-      'could not tell the server about rejected credentials: $error',
-    );
+    _auth.warn('could not tell the server about rejected credentials: $error');
   }
 }

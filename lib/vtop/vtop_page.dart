@@ -12,7 +12,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
@@ -86,10 +86,10 @@ Future<T> loadPage<T>(Ref ref, VtopQuery<T> query) async =>
 /// Fetches [query] from VTOP (one request at a time per page) and saves it.
 Future<T> fetchPage<T>(Ref ref, VtopQuery<T> query) async {
   final key = savedPageKey(query);
-  final data = await AppLogger.instance.trackRequest(
-    source: 'client.${query.name}',
-    action: 'fetch $key',
-    run: () =>
+  final data = await flow(
+    'fetch $key',
+    source: 'vtop.page',
+    () =>
         ref.read(globalAsyncQueueProvider.notifier).run('vtop_$key', () async {
           await ref.read(vClientProvider.notifier).ensureLogin();
           return ref.read(vtopBackendProvider).fetch(query);

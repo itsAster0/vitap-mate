@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -25,7 +24,7 @@ class AcademicCalendarPage extends HookConsumerWidget {
       try {
         await ref.read(academicCalendarProvider.notifier).refresh();
       } catch (e) {
-        log('$e');
+        Log.info('features.calendar', '$e');
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -38,7 +37,8 @@ class AcademicCalendarPage extends HookConsumerWidget {
             .read(academicCalendarProvider.notifier)
             .refresh()
             .catchError(
-              (e, st) => log('auto refresh failed: $e', stackTrace: st),
+              (e, st) =>
+                  Log.info('features.calendar', 'auto refresh failed: $e'),
             );
       });
       return null;

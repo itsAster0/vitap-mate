@@ -1,5 +1,5 @@
 import 'package:vitapmate/features/timetable/timetable.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/platform/notifications/class_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -32,9 +32,6 @@ Future<void> rescheduleClassReminders(
       calendar: calendar,
     );
   } catch (e) {
-    AppLogger.instance.info(
-      'notifications.class_reminders',
-      'reschedule failed: $e',
-    );
+    Log.info('notifications.class_reminders', 'reschedule failed: $e');
   }
 }

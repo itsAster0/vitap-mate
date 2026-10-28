@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -50,10 +49,9 @@ class ChromeExtensionPage extends HookConsumerWidget {
           mode: .externalApplication,
         );
       } catch (error, stackTrace) {
-        log(
-          'Failed to open the extension download',
-          error: error,
-          stackTrace: stackTrace,
+        Log.error(
+          'features.more',
+          'Failed to open the extension download: $error\n$stackTrace',
         );
       } finally {
         opening.value = false;

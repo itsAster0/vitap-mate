@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
@@ -209,10 +209,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
       _error = null;
       _watchSlowLoad();
     });
-    AppLogger.instance.info(
-      'vtop.webview',
-      'reattachedMs=${_opening.elapsedMilliseconds}',
-    );
+    Log.info('vtop.webview', 'reattachedMs=${_opening.elapsedMilliseconds}');
     await _updateStyles();
     if (_valid) await _ready(controller);
   }
@@ -346,7 +343,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
           ])
             '$key=${event[key] is num ? event[key] : 0}',
         ].join(' ');
-        AppLogger.instance.info('vtop.webview', 'resourceTiming $values');
+        Log.info('vtop.webview', 'resourceTiming $values');
     }
   }
 
@@ -661,7 +658,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                 widget.onLoginRedirect();
                 return;
               }
-              AppLogger.instance.info(
+              Log.info(
                 'vtop.webview',
                 'pageLoadMs=${_pageTimer.elapsedMilliseconds}'
                     '${_loggedFirstPage ? '' : ' firstPageReadyMs=${_opening.elapsedMilliseconds}'}',
@@ -694,17 +691,14 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
             // Handling these keeps Android from killing the whole app along
             // with the web page's process.
             onRenderProcessGone: (controller, detail) {
-              AppLogger.instance.warning(
+              Log.warn(
                 'vtop.webview',
                 'renderProcessGone didCrash=${detail.didCrash}',
               );
               if (_valid) widget.onViewLost();
             },
             onWebContentProcessDidTerminate: (_) {
-              AppLogger.instance.warning(
-                'vtop.webview',
-                'webContentProcessTerminated',
-              );
+              Log.warn('vtop.webview', 'webContentProcessTerminated');
               if (_valid) widget.onViewLost();
             },
           ),
