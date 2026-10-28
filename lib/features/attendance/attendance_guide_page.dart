@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:vitapmate/app/router/paths.dart';
+import 'package:vitapmate/features/attendance/widgets/course_card.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
@@ -49,17 +50,17 @@ class AttendanceGuidePage extends HookWidget {
     // Built in full (it is short) so the timetable section can be scrolled
     // to before it is on screen.
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
+      padding: .fromLTRB(
         Space.sm,
         Space.md,
         Space.sm,
         Space.xl + MediaQuery.paddingOf(context).bottom,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const .symmetric(horizontal: 2),
             child: Text(
               'What each number means, where it comes from, and when to '
               'double-check.',
@@ -76,7 +77,7 @@ class AttendanceGuidePage extends HookWidget {
           const _SampleCard(),
           const SizedBox(height: Space.sm + 2),
           const Surface(
-            padding: EdgeInsets.symmetric(horizontal: Space.lg),
+            padding: .symmetric(horizontal: Space.lg),
             child: Column(
               children: [
                 _Term(
@@ -146,38 +147,30 @@ class AttendanceGuidePage extends HookWidget {
 
           SectionHeader(key: timetableKey, title: 'In the timetable'),
           Surface(
-            padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+            padding: const .symmetric(horizontal: Space.lg),
             child: Column(
               children: [
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.percent,
-                    size: 16,
-                    color: colors.mutedForeground,
-                  ),
+                  icon: FLucideIcons.percent,
                   title: 'Beside each class',
                   body:
                       'The same percentage and skip count as the course card. '
                       '"need 2" is "Attend 2"; tap it for the full details.',
                   // Full size below the text, so it never squeezes the title.
                   footer: Container(
-                    padding: const EdgeInsets.symmetric(
+                    padding: const .symmetric(
                       horizontal: Space.sm + 2,
                       vertical: Space.xs + 2,
                     ),
                     decoration: BoxDecoration(
                       color: colors.secondary,
-                      borderRadius: BorderRadius.circular(Radii.sm),
+                      borderRadius: .circular(Radii.sm),
                     ),
                     child: const _SampleGutter(),
                   ),
                 ),
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.calendarDays,
-                    size: 16,
-                    color: colors.mutedForeground,
-                  ),
+                  icon: FLucideIcons.calendarDays,
                   title: 'Week recap',
                   body:
                       'On a day without classes, one dot per class of the '
@@ -198,11 +191,8 @@ class AttendanceGuidePage extends HookWidget {
                   ),
                 ),
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.pencilLine,
-                    size: 16,
-                    color: palette.warning.base,
-                  ),
+                  icon: FLucideIcons.pencilLine,
+                  iconColor: palette.warning.base,
                   title: 'Exams and holidays',
                   body:
                       'Exam times and venues come straight from VTOP\'s exam '
@@ -217,15 +207,12 @@ class AttendanceGuidePage extends HookWidget {
 
           const SectionHeader(title: 'Good to know'),
           Surface(
-            padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+            padding: const .symmetric(horizontal: Space.lg),
             child: Column(
               children: [
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.flaskConical,
-                    size: 16,
-                    color: palette.lab.base,
-                  ),
+                  icon: FLucideIcons.flaskConical,
+                  iconColor: palette.lab.base,
                   title: 'Labs',
                   body:
                       'VTOP counts each two-period session as 2 classes. The '
@@ -234,11 +221,7 @@ class AttendanceGuidePage extends HookWidget {
                       'sessions. Labs stop at the lab FAT.',
                 ),
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.flag,
-                    size: 16,
-                    color: colors.mutedForeground,
-                  ),
+                  icon: FLucideIcons.flag,
                   title: 'Counting to the next exam',
                   body:
                       'Settings → Classes Left can count to the next CAT or FAT '
@@ -246,11 +229,7 @@ class AttendanceGuidePage extends HookWidget {
                       'till CAT-II".',
                 ),
                 _Term(
-                  lead: Icon(
-                    FLucideIcons.slidersHorizontal,
-                    size: 16,
-                    color: colors.mutedForeground,
-                  ),
+                  icon: FLucideIcons.slidersHorizontal,
                   title: 'Planner',
                   body:
                       'Open a course to try a plan: attend or skip a few '
@@ -264,14 +243,9 @@ class AttendanceGuidePage extends HookWidget {
 
           const SectionHeader(title: 'Where it can be off'),
           Surface(
-            padding: const EdgeInsets.fromLTRB(
-              Space.lg,
-              Space.md,
-              Space.lg,
-              Space.md,
-            ),
+            padding: const .fromLTRB(Space.lg, Space.md, Space.lg, Space.md),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 for (final item in const [
                   'Data on your phone older than VTOP: check "Updated" at '
@@ -290,7 +264,7 @@ class AttendanceGuidePage extends HookWidget {
           const SizedBox(height: Space.lg),
           Text(
             'VTOP and your faculty have the final word.',
-            textAlign: TextAlign.center,
+            textAlign: .center,
             style: typography.body.xs.copyWith(color: colors.mutedForeground),
           ),
         ],
@@ -311,23 +285,23 @@ class _BestEffortNote extends StatelessWidget {
     return Surface(
       color: tone.subtle,
       borderColor: tone.base.withValues(alpha: 0.35),
-      padding: const EdgeInsets.all(Space.md + 2),
+      padding: const .all(Space.md + 2),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 2),
+            padding: const .only(top: 2),
             child: Icon(FLucideIcons.triangleAlert, size: 16, color: tone.base),
           ),
           const SizedBox(width: Space.sm + 2),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   'Best effort, not official',
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: tone.onSubtle,
                   ),
                 ),
@@ -362,127 +336,98 @@ class _SampleCard extends StatelessWidget {
     final tone = colors.app.success;
     final muted = typography.body.sm.nums(color: colors.mutedForeground);
     final small = typography.body.xs.nums(color: colors.mutedForeground);
-    final strong = small.copyWith(
-      fontWeight: FontWeight.w600,
-      color: colors.foreground,
-    );
+    final strong = small.copyWith(fontWeight: .w600, color: colors.foreground);
     InlineSpan mark(String n) => WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
+      alignment: .middle,
       child: Padding(
-        padding: const EdgeInsets.only(left: 3, right: 1),
+        padding: const .only(left: 3, right: 1),
         child: _Marker(n, size: 14),
       ),
     );
 
-    return Surface(
-      padding: EdgeInsets.zero,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(Radii.lg - 1),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 4, color: tone.base),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.md + 2,
-                    Space.md + 2,
-                    Space.md + 2,
-                    Space.md,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Example Course',
-                              style: typography.body.md.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: colors.foreground,
-                              ),
-                            ),
-                          ),
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: '92%',
-                                  style: typography.body.lg.copyWith(
-                                    height: 1.2,
-                                    fontWeight: FontWeight.w500,
-                                    color: tone.base,
-                                  ),
-                                ),
-                                mark('1'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Space.md),
-                      SkipMeter(percent: 92, tone: tone),
-                      const SizedBox(height: Space.md),
-                      Row(
-                        children: [
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: '22/24 attended', style: muted),
-                                mark('2'),
-                              ],
-                            ),
-                          ),
-                          const Spacer(),
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Can skip 5',
-                                  style: muted.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                mark('3'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Space.md),
-                      Container(height: 1, color: colors.border),
-                      const SizedBox(height: Space.sm),
-                      Center(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(text: '1+', style: small),
-                              mark('4'),
-                              TextSpan(text: ' 16', style: strong),
-                              TextSpan(text: ' left', style: small),
-                              mark('5'),
-                              TextSpan(text: '  ·  ', style: small),
-                              TextSpan(text: '8', style: strong),
-                              TextSpan(text: ' to spare', style: small),
-                              mark('6'),
-                              TextSpan(text: '  ·  ', style: small),
-                              TextSpan(text: '95%', style: strong),
-                              TextSpan(text: ' max', style: small),
-                              mark('7'),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+    return StripeCard(
+      stripe: tone.base,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Example Course',
+                style: typography.body.md.copyWith(
+                  fontWeight: .w600,
+                  color: colors.foreground,
                 ),
               ),
-            ],
+            ),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '92%',
+                    style: typography.body.lg.copyWith(
+                      height: 1.2,
+                      fontWeight: .w500,
+                      color: tone.base,
+                    ),
+                  ),
+                  mark('1'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        SkipMeter(percent: 92, tone: tone),
+        const SizedBox(height: Space.md),
+        Row(
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: '22/24 attended', style: muted),
+                  mark('2'),
+                ],
+              ),
+            ),
+            const Spacer(),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Can skip 5',
+                    style: muted.copyWith(fontWeight: .w500),
+                  ),
+                  mark('3'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Space.md),
+        Container(height: 1, color: colors.border),
+        const SizedBox(height: Space.sm),
+        Center(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: '1+', style: small),
+                mark('4'),
+                TextSpan(text: ' 16', style: strong),
+                TextSpan(text: ' left', style: small),
+                mark('5'),
+                TextSpan(text: '  ·  ', style: small),
+                TextSpan(text: '8', style: strong),
+                TextSpan(text: ' to spare', style: small),
+                mark('6'),
+                TextSpan(text: '  ·  ', style: small),
+                TextSpan(text: '95%', style: strong),
+                TextSpan(text: ' max', style: small),
+                mark('7'),
+              ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -495,10 +440,10 @@ class _SampleGutter extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = context.theme.colors.app.success;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: .end,
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             ProgressRing(value: 0.84, color: tone.base, size: 11, stroke: 2),
             const SizedBox(width: 4),
@@ -506,7 +451,7 @@ class _SampleGutter extends StatelessWidget {
               '84%',
               style: TextStyle(
                 fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontWeight: .w700,
                 color: tone.onSubtle,
               ),
             ),
@@ -516,7 +461,7 @@ class _SampleGutter extends StatelessWidget {
           'skip 3',
           style: TextStyle(
             fontSize: 10,
-            fontWeight: FontWeight.w500,
+            fontWeight: .w500,
             color: tone.onSubtle.withValues(alpha: 0.8),
           ),
         ),
@@ -538,17 +483,14 @@ class _Marker extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: colors.secondary,
-        shape: BoxShape.circle,
-      ),
+      alignment: .center,
+      decoration: BoxDecoration(color: colors.secondary, shape: .circle),
       child: Text(
         number,
         style: TextStyle(
           fontSize: size * 0.6,
           height: 1,
-          fontWeight: FontWeight.w700,
+          fontWeight: .w700,
           color: colors.mutedForeground,
         ),
       ),
@@ -556,13 +498,14 @@ class _Marker extends StatelessWidget {
   }
 }
 
-/// One term: a marker (or [lead] icon), its name, what it means, and
+/// One term: a marker (or an [icon]), its name, what it means, and
 /// optionally the example's [math], the [variants] it can read as, and a
 /// [footer]. A hairline sits below unless [last].
 class _Term extends StatelessWidget {
   const _Term({
     this.mark,
-    this.lead,
+    this.icon,
+    this.iconColor,
     required this.title,
     required this.body,
     this.math,
@@ -572,7 +515,10 @@ class _Term extends StatelessWidget {
   });
 
   final String? mark;
-  final Widget? lead;
+  final IconData? icon;
+
+  /// [icon]'s colour; muted when null.
+  final Color? iconColor;
   final String title;
   final String body;
   final String? math;
@@ -593,29 +539,35 @@ class _Term extends StatelessWidget {
         border: last ? null : Border(bottom: BorderSide(color: colors.border)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Space.md + 2),
+        padding: const .symmetric(vertical: Space.md + 2),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: .start,
           children: [
             SizedBox(
               width: 40,
               child: Align(
-                alignment: Alignment.topLeft,
+                alignment: .topLeft,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 1),
-                  child: lead ?? _Marker(mark ?? ''),
+                  padding: const .only(top: 1),
+                  child: icon == null
+                      ? _Marker(mark ?? '')
+                      : Icon(
+                          icon,
+                          size: 16,
+                          color: iconColor ?? colors.mutedForeground,
+                        ),
                 ),
               ),
             ),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Text(
                     title,
                     style: typography.body.md.nums(
                       height: 1.3,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: colors.foreground,
                     ),
                   ),
@@ -624,18 +576,18 @@ class _Term extends StatelessWidget {
                   if (math != null) ...[
                     const SizedBox(height: Space.sm),
                     Container(
-                      padding: const EdgeInsets.symmetric(
+                      padding: const .symmetric(
                         horizontal: Space.sm + 2,
                         vertical: Space.xs + 1,
                       ),
                       decoration: BoxDecoration(
                         color: colors.secondary,
-                        borderRadius: BorderRadius.circular(Radii.sm),
+                        borderRadius: .circular(Radii.sm),
                       ),
                       child: Text(
                         math!,
                         style: typography.body.xs.nums(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: .w500,
                           color: colors.foreground,
                         ),
                       ),
@@ -676,17 +628,9 @@ class _DotKey extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: .min,
       children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: fill,
-            shape: BoxShape.circle,
-            border: ring == null ? null : Border.all(color: ring!, width: 1.2),
-          ),
-        ),
+        Dot(size: 7, color: fill, ring: ring),
         const SizedBox(width: 5),
         Text(
           label,
@@ -708,18 +652,14 @@ class _Bullet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Space.xs + 1),
+      padding: const .symmetric(vertical: Space.xs + 1),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           // On the first line's centre, not the item's.
           Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
+            padding: const .only(top: 8),
+            child: Dot(color: color),
           ),
           const SizedBox(width: Space.sm + 2),
           Expanded(

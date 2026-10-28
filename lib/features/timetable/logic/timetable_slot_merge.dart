@@ -1,35 +1,27 @@
+import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
+/// [input] by start time, with back-to-back periods of the same lab joined
+/// into one session ("L1+L2").
 List<TimetableSlot> mergeLabsSloths(List<TimetableSlot> input) {
-  final t = [...input];
-  t.sort((a, b) {
-    final t1 = _parseTime(a.startTime);
-    final t2 = _parseTime(b.startTime);
-    return t1.compareTo(t2);
-  });
-
-  final r = <TimetableSlot>[];
-  for (var i = 0; i < t.length; i++) {
-    final current = t[i];
-    final prev = r.isNotEmpty ? r.last : null;
+  final merged = <TimetableSlot>[];
+  for (final slot in [...input]..sort(byStart)) {
+    final prev = merged.lastOrNull;
     if (prev != null &&
-        current.kind == ClassKind.lab &&
+        slot.kind == ClassKind.lab &&
         prev.kind == ClassKind.lab &&
-        current.courseCode == prev.courseCode) {
-      r[r.length - 1] = prev.copyWith(
-        endTime: current.endTime,
-        slot: "${prev.slot}+${current.slot}",
+        slot.courseCode == prev.courseCode) {
+      merged.last = prev.copyWith(
+        endTime: slot.endTime,
+        slot: '${prev.slot}+${slot.slot}',
       );
     } else {
-      r.add(current);
+      merged.add(slot);
     }
   }
-  return r;
+  return merged;
 }
 
-Duration _parseTime(String t) {
-  final parts = t.split(":");
-  final h = int.parse(parts[0]);
-  final m = parts.length > 1 ? int.parse(parts[1]) : 0;
-  return Duration(hours: h, minutes: m);
-}
+/// Orders slots by start time.
+int byStart(TimetableSlot a, TimetableSlot b) =>
+    minutesOf(a.startTime).compareTo(minutesOf(b.startTime));

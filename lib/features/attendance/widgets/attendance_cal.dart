@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/widgets/course_card.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
 /// "What if" planner: choose how many upcoming classes to attend or skip and
@@ -49,12 +50,10 @@ class AttendancePlanner extends HookWidget {
     }
 
     // Start from the most useful plan: max skips, or the classes needed.
-    void usefulPlan() => current.isSafe
-        ? setPlan(0, current.canSkip)
-        : setPlan(current.mustAttend, 0);
-
     useEffect(() {
-      usefulPlan();
+      current.isSafe
+          ? setPlan(0, current.canSkip)
+          : setPlan(current.mustAttend, 0);
       return null;
     }, [curAttended.value, curTotal.value]);
 
@@ -83,21 +82,14 @@ class AttendancePlanner extends HookWidget {
     ];
 
     return Padding(
-      padding: const EdgeInsets.only(top: Space.lg),
+      padding: const .only(top: Space.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           if (unposted > 0) ...[
             Row(
               children: [
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: colors.mutedForeground,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                Dot(color: colors.mutedForeground),
                 const SizedBox(width: Space.xs + 2),
                 Expanded(
                   child: Text(
@@ -115,7 +107,7 @@ class AttendancePlanner extends HookWidget {
           // Result: now → after the plan.
           Surface(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 Row(
                   children: [
@@ -145,7 +137,7 @@ class AttendancePlanner extends HookWidget {
                   height: 14,
                   child: LayoutBuilder(
                     builder: (context, c) => Stack(
-                      clipBehavior: Clip.none,
+                      clipBehavior: .none,
                       children: [
                         Positioned.fill(
                           child: SkipMeter(
@@ -165,9 +157,9 @@ class AttendancePlanner extends HookWidget {
                             width: 10,
                             height: 10,
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
+                              shape: .circle,
                               color: colors.background,
-                              border: Border.all(
+                              border: .all(
                                 color: colors.mutedForeground,
                                 width: 2,
                               ),
@@ -189,7 +181,7 @@ class AttendancePlanner extends HookWidget {
                         : 'Below 75% — attend ${predicted.mustAttend} more to recover.',
                     key: ValueKey('${predicted.attended}/${predicted.total}'),
                     style: typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: predicted.isSafe && predicted.canSkip > 0
                           ? colors.foreground
                           : tone.onSubtle,
@@ -206,18 +198,18 @@ class AttendancePlanner extends HookWidget {
           const SizedBox(height: Space.md),
           // Presets
           SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection: .horizontal,
             child: Row(
               children: [
                 for (final (label, a, s) in presets)
                   Padding(
-                    padding: const EdgeInsets.only(right: Space.sm),
+                    padding: const .only(right: Space.sm),
                     child: FButton(
                       variant: willAttend.value == a && willSkip.value == s
                           ? FButtonVariant.primary
                           : FButtonVariant.outline,
-                      size: FButtonSizeVariant.sm,
-                      mainAxisSize: MainAxisSize.min,
+                      size: .sm,
+                      mainAxisSize: .min,
                       onPress: () => setPlan(a, s),
                       child: Text(label),
                     ),
@@ -229,7 +221,7 @@ class AttendancePlanner extends HookWidget {
           // Plan
           Surface(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 CountStepper(
                   label: 'Attend',
@@ -254,7 +246,7 @@ class AttendancePlanner extends HookWidget {
           const SizedBox(height: Space.md),
           // Correct current counts
           Surface(
-            padding: EdgeInsets.zero,
+            padding: .zero,
             child: Column(
               children: [
                 PressScale(
@@ -267,7 +259,7 @@ class AttendancePlanner extends HookWidget {
                     editCurrent.value = !editCurrent.value;
                   },
                   child: Padding(
-                    padding: const EdgeInsets.all(Space.lg),
+                    padding: const .all(Space.lg),
                     child: Row(
                       children: [
                         Icon(
@@ -289,7 +281,7 @@ class AttendancePlanner extends HookWidget {
                         Text(
                           editCurrent.value ? 'Reset' : 'Edit',
                           style: typography.body.sm.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.app.accentTone.onSubtle,
                           ),
                         ),
@@ -302,7 +294,7 @@ class AttendancePlanner extends HookWidget {
                   curve: Curves.easeOutCubic,
                   child: editCurrent.value
                       ? Padding(
-                          padding: const EdgeInsets.fromLTRB(
+                          padding: const .fromLTRB(
                             Space.lg,
                             0,
                             Space.lg,
@@ -358,15 +350,13 @@ class _Figure extends StatelessWidget {
   Widget build(BuildContext context) {
     final typography = context.theme.typography;
     return Column(
-      crossAxisAlignment: alignEnd
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
+      crossAxisAlignment: alignEnd ? .end : .start,
       children: [
         Text(
           label,
           style: typography.body.xs.copyWith(
             fontSize: 10,
-            fontWeight: FontWeight.w600,
+            fontWeight: .w600,
             letterSpacing: 0.5,
             color: context.theme.colors.mutedForeground,
           ),
@@ -379,7 +369,7 @@ class _Figure extends StatelessWidget {
             '${v.toStringAsFixed(decimals)}%',
             style: typography.display.xl2.nums(
               height: 1.1,
-              fontWeight: FontWeight.w800,
+              fontWeight: .w800,
               color: color,
             ),
           ),
@@ -409,10 +399,7 @@ class _PlanStrip extends StatelessWidget {
     Widget square(Color color) => Container(
       width: 12,
       height: 12,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(3),
-      ),
+      decoration: BoxDecoration(color: color, borderRadius: .circular(3)),
     );
     return Wrap(
       spacing: 4,

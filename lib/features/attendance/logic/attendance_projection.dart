@@ -4,8 +4,6 @@ import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-const _slotDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
 /// Where a course ends up by the last class of the semester, counting the
 /// classes still to come from the timetable and academic calendar.
 ///
@@ -132,16 +130,15 @@ class AttendanceProjection {
   }) {
     final perDay = <String, List<int>>{};
     for (final slot in timetable.slots) {
-      if (slot.courseCode != code || (slot.kind == ClassKind.lab) != lab) {
-        continue;
+      if (slot.courseCode == code && (slot.kind == ClassKind.lab) == lab) {
+        perDay.putIfAbsent(slot.day, () => []).add(minutesOf(slot.startTime));
       }
-      perDay.putIfAbsent(slot.day, () => []).add(minutesOf(slot.startTime));
     }
 
-    var unposted = 0;
-    var upcoming = 0;
     final last = calendar.lastClassDay(lab: lab);
     if (perDay.isEmpty || last == null) return (unposted: 0, upcoming: 0);
+    var unposted = 0;
+    var upcoming = 0;
     final today = DateTime(now.year, now.month, now.day);
     final lagging = countedThrough != null && countedThrough.isBefore(today);
     final nowMinute = now.hour * 60 + now.minute;
@@ -154,7 +151,7 @@ class AttendanceProjection {
         : today;
     while (!day.isAfter(last) && (until == null || day.isBefore(until))) {
       if (calendar.holdsClasses(day, lab: lab)) {
-        final starts = perDay[_slotDays[day.weekday - 1]] ?? const [];
+        final starts = perDay[slotDays[day.weekday - 1]] ?? const [];
         if (day.isBefore(today)) {
           unposted += starts.length;
         } else if (day == today) {

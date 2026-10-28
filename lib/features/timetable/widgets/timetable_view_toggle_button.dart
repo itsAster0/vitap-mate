@@ -12,11 +12,8 @@ class TimetableViewToggleButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final viewMode = ref.watch(timetableViewModeProvider);
     final (label, icon) = switch (viewMode) {
-      TimetableViewMode.agenda => (
-        'Show weekly timetable',
-        FLucideIcons.columns3,
-      ),
-      TimetableViewMode.weekly => ('Show agenda', FLucideIcons.listTodo),
+      .agenda => ('Show weekly timetable', FLucideIcons.columns3),
+      .weekly => ('Show agenda', FLucideIcons.listTodo),
     };
 
     return FButton.icon(

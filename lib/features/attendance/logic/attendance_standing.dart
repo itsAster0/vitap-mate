@@ -81,12 +81,10 @@ String courseCodeOf(AttendanceRecord record) =>
 AttendanceRecord? attendanceForSlot(
   Iterable<AttendanceRecord> records,
   TimetableSlot slot,
-) {
-  final wantLab = slot.kind == ClassKind.lab;
-  for (final record in records) {
-    if (courseCodeOf(record) == slot.courseCode && record.islab() == wantLab) {
-      return record;
-    }
-  }
-  return null;
-}
+) => records
+    .where(
+      (r) =>
+          courseCodeOf(r) == slot.courseCode &&
+          r.islab() == (slot.kind == ClassKind.lab),
+    )
+    .firstOrNull;

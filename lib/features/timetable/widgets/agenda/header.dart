@@ -32,7 +32,7 @@ class _DateHeading extends StatelessWidget {
     // The Today button sits beside the day name, so the summary below gets the
     // full width instead of ellipsing beside it.
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: .start,
       children: [
         Row(
           children: [
@@ -40,10 +40,10 @@ class _DateHeading extends StatelessWidget {
               child: Text(
                 DateFormat('EEEE').format(date),
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: .ellipsis,
                 style: typography.display.xl2.copyWith(
                   height: 1.05,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: .w800,
                   letterSpacing: -0.5,
                   color: colors.foreground,
                 ),
@@ -54,9 +54,9 @@ class _DateHeading extends StatelessWidget {
               child: isToday
                   ? const SizedBox.shrink()
                   : FButton(
-                      variant: FButtonVariant.outline,
-                      size: FButtonSizeVariant.sm,
-                      mainAxisSize: MainAxisSize.min,
+                      variant: .outline,
+                      size: .sm,
+                      mainAxisSize: .min,
                       prefix: const Icon(FLucideIcons.undo2),
                       onPress: onToday,
                       child: const Text('Today'),
@@ -68,7 +68,7 @@ class _DateHeading extends StatelessWidget {
         Text(
           summary,
           maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          overflow: .ellipsis,
           style: typography.body.sm.nums(color: colors.mutedForeground),
         ),
       ],
@@ -101,8 +101,8 @@ class _DayBar extends StatelessWidget {
           double x(int minute) =>
               ((minute - start) / span).clamp(0.0, 1.0) * c.maxWidth;
           return Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.centerLeft,
+            clipBehavior: .none,
+            alignment: .centerLeft,
             children: [
               // Track for the free time between classes.
               Positioned(
@@ -129,7 +129,7 @@ class _DayBar extends StatelessWidget {
                       width: width,
                       height: 6,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
+                        borderRadius: .circular(3),
                         child: Stack(
                           children: [
                             Positioned.fill(
@@ -159,7 +159,7 @@ class _DayBar extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       color: colors.foreground,
-                      borderRadius: BorderRadius.circular(1),
+                      borderRadius: .circular(1),
                     ),
                   ),
                 ),
@@ -193,123 +193,98 @@ class _WeekStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    return Row(
-      children: [
-        for (var index = 0; index < dates.length; index++)
-          Expanded(
-            child: Builder(
-              builder: (context) {
-                final day = index + 1;
-                final selected = selectedDay.value == day;
-                final isToday = today == day;
-                final count = classCounts[index];
-                // Class-free days recede unless selected or today.
-                final exam = examDays.contains(day);
-                final free = count == 0 && !exam && !selected && !isToday;
-                final fg = selected
-                    ? colors.primaryForeground
-                    : isToday
-                    ? colors.app.accent
-                    : colors.foreground;
-                return PressScale(
-                  scale: 0.94,
-                  semanticsLabel: DateFormat(
-                    'EEEE, d MMMM',
-                  ).format(dates[index]),
-                  onPress: () => selectedDay.value = day,
-                  child: AnimatedContainer(
-                    duration: Motion.medium,
-                    curve: Curves.easeOutCubic,
-                    height: 54,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? colors.primary
-                          : const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(Radii.md),
-                      border: Border.all(
-                        color: selected
-                            ? colors.primary
-                            : isToday
-                            ? colors.app.accent.withValues(alpha: 0.5)
-                            : const Color(0x00000000),
-                      ),
-                    ),
-                    child: AnimatedOpacity(
-                      duration: Motion.medium,
-                      opacity: free ? 0.35 : 1,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            DateFormat(
-                              'EEE',
-                            ).format(dates[index]).toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10,
-                              letterSpacing: 0.6,
-                              fontWeight: FontWeight.w600,
-                              color: selected
-                                  ? colors.primaryForeground.withValues(
-                                      alpha: 0.7,
-                                    )
-                                  : colors.mutedForeground,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${dates[index].day}',
-                            style: numStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: fg,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          // One dot per class (capped), so the week's load
-                          // reads at a glance.
-                          SizedBox(
-                            height: 3,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                for (var i = 0; i < count.clamp(0, 6); i++)
-                                  Container(
-                                    width: 3,
-                                    height: 3,
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: selected
-                                          ? colors.primaryForeground
-                                          : colors.mutedForeground,
-                                    ),
-                                  ),
-                                if (exam)
-                                  Container(
-                                    width: 3,
-                                    height: 3,
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 1,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: colors.app.warning.base,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+    Widget dot(Color color) => Padding(
+      padding: const .symmetric(horizontal: 1),
+      child: Dot(size: 3, color: color),
+    );
+
+    Widget tile(int index, DateTime date) {
+      final day = index + 1;
+      final selected = selectedDay.value == day;
+      final isToday = today == day;
+      final count = classCounts[index];
+      // Class-free days recede unless selected or today.
+      final exam = examDays.contains(day);
+      final free = count == 0 && !exam && !selected && !isToday;
+      return PressScale(
+        scale: 0.94,
+        semanticsLabel: DateFormat('EEEE, d MMMM').format(date),
+        onPress: () => selectedDay.value = day,
+        child: AnimatedContainer(
+          duration: Motion.medium,
+          curve: Curves.easeOutCubic,
+          height: 54,
+          margin: const .symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            color: selected ? colors.primary : const Color(0x00000000),
+            borderRadius: .circular(Radii.md),
+            border: .all(
+              color: selected
+                  ? colors.primary
+                  : isToday
+                  ? colors.app.accent.withValues(alpha: 0.5)
+                  : const Color(0x00000000),
             ),
           ),
+          child: AnimatedOpacity(
+            duration: Motion.medium,
+            opacity: free ? 0.35 : 1,
+            child: Column(
+              mainAxisAlignment: .center,
+              children: [
+                Text(
+                  DateFormat('EEE').format(date).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 0.6,
+                    fontWeight: .w600,
+                    color: selected
+                        ? colors.primaryForeground.withValues(alpha: 0.7)
+                        : colors.mutedForeground,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${date.day}',
+                  style: numStyle(
+                    fontSize: 17,
+                    fontWeight: .w700,
+                    color: selected
+                        ? colors.primaryForeground
+                        : isToday
+                        ? colors.app.accent
+                        : colors.foreground,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                // One dot per class (capped), so the week's load reads at a
+                // glance.
+                SizedBox(
+                  height: 3,
+                  child: Row(
+                    mainAxisSize: .min,
+                    children: [
+                      for (var i = 0; i < count.clamp(0, 6); i++)
+                        dot(
+                          selected
+                              ? colors.primaryForeground
+                              : colors.mutedForeground,
+                        ),
+                      if (exam) dot(colors.app.warning.base),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        for (final (index, date) in dates.indexed)
+          Expanded(child: tile(index, date)),
       ],
     );
   }

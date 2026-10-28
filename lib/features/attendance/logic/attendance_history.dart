@@ -4,13 +4,13 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum ClassStatus { present, onDuty, absent, other }
 
-ClassStatus classStatusOf(String raw) {
-  final s = raw.toLowerCase().replaceAll(' ', '');
-  if (s == 'present') return ClassStatus.present;
-  if (s == 'onduty') return ClassStatus.onDuty;
-  if (s == 'absent') return ClassStatus.absent;
-  return ClassStatus.other;
-}
+ClassStatus classStatusOf(String raw) =>
+    switch (raw.toLowerCase().replaceAll(' ', '')) {
+      'present' => .present,
+      'onduty' => .onDuty,
+      'absent' => .absent,
+      _ => .other,
+    };
 
 /// Parses a history row's "dd-MM-yyyy" date.
 DateTime? parseHistoryDate(String value) {
@@ -24,20 +24,9 @@ DateTime? parseHistoryDate(String value) {
 /// (attended, total) rows in [data]; on duty counts as attended. Labs have
 /// one row per two-period session.
 (int, int) historyCount(FullAttendanceData data) {
-  var attended = 0;
-  var total = 0;
-  for (final r in data.records) {
-    switch (classStatusOf(r.status)) {
-      case ClassStatus.present || ClassStatus.onDuty:
-        attended++;
-        total++;
-      case ClassStatus.absent:
-        total++;
-      case ClassStatus.other:
-        break;
-    }
-  }
-  return (attended, total);
+  final statuses = [for (final r in data.records) classStatusOf(r.status)];
+  final attended = statuses.where((s) => s == .present || s == .onDuty).length;
+  return (attended, attended + statuses.where((s) => s == .absent).length);
 }
 
 /// [data] without its latest row, as if VTOP had not posted that class to

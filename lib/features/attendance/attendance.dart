@@ -14,6 +14,8 @@ import 'package:vitapmate/vtop/vtop_page.dart';
 export 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 export 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 export 'package:vitapmate/features/attendance/widgets/attendance.dart';
+export 'package:vitapmate/features/attendance/widgets/course_card.dart'
+    show Dot;
 
 final attendanceProvider = AsyncNotifierProvider<Attendance, AttendanceData>(
   Attendance.new,
