@@ -16,10 +16,7 @@ enum Grade {
 
   static Grade? tryParse(String raw) {
     final normalized = raw.trim().toUpperCase();
-    for (final grade in values) {
-      if (grade.label == normalized) return grade;
-    }
-    return null;
+    return values.where((grade) => grade.label == normalized).firstOrNull;
   }
 }
 
@@ -80,15 +77,7 @@ class SemesterCourseComponent {
   final Credits credits;
 }
 
-class SemesterCourseCredits {
-  const SemesterCourseCredits({
-    required this.courseCode,
-    required this.credits,
-  });
-
-  final String courseCode;
-  final Credits credits;
-}
+typedef SemesterCourseCredits = ({String courseCode, Credits credits});
 
 /// Combines theory/lab components while ignoring repeated weekly slots.
 List<SemesterCourseCredits> combineSemesterCourseCredits(
@@ -100,8 +89,7 @@ List<SemesterCourseCredits> combineSemesterCourseCredits(
   for (final component in components) {
     final code = component.courseCode.trim().toUpperCase();
     final type = component.courseType.trim().toUpperCase();
-    if (code.isEmpty) continue;
-    if (!seenComponents.add('$code\u0000$type')) continue;
+    if (code.isEmpty || !seenComponents.add('$code\u0000$type')) continue;
     creditsByCourse.update(
       code,
       (credits) => credits + component.credits.value,
@@ -110,26 +98,25 @@ List<SemesterCourseCredits> combineSemesterCourseCredits(
   }
 
   return [
-    for (final entry in creditsByCourse.entries)
-      SemesterCourseCredits(
-        courseCode: entry.key,
-        credits: Credits(entry.value),
-      ),
+    for (final MapEntry(key: code, value: credits) in creditsByCourse.entries)
+      (courseCode: code, credits: Credits(credits)),
   ];
 }
 
-double gradePointFor(Grade grade) => grade.points.toDouble();
+/// Total credits and credit-weighted grade points of [courses].
+(double, double) _sum(Iterable<GpaCourse> courses) {
+  var credits = 0.0;
+  var points = 0.0;
+  for (final course in courses) {
+    credits += course.credits.value;
+    points += course.credits.value * course.grade.points.toDouble();
+  }
+  return (credits, points);
+}
 
 double calculateSemesterGpa(Iterable<GpaCourse> courses) {
-  var totalCredits = 0.0;
-  var weightedPoints = 0.0;
-
-  for (final course in courses) {
-    totalCredits += course.credits.value;
-    weightedPoints += course.credits.value * gradePointFor(course.grade);
-  }
-
-  return totalCredits == 0 ? 0 : weightedPoints / totalCredits;
+  final (credits, points) = _sum(courses);
+  return credits == 0 ? 0 : points / credits;
 }
 
 double calculateProjectedCgpa({
@@ -144,17 +131,9 @@ double calculateProjectedCgpa({
       'must be finite and non-negative',
     );
   }
-  var plannedCredits = 0.0;
-  var plannedPoints = 0.0;
-
-  for (final course in plannedCourses) {
-    plannedCredits += course.credits.value;
-    plannedPoints += course.credits.value * gradePointFor(course.grade);
-  }
-
+  final (plannedCredits, plannedPoints) = _sum(plannedCourses);
   final totalCredits = completedCredits + plannedCredits;
   if (totalCredits == 0) return 0;
-
   return (currentCgpa.value * completedCredits + plannedPoints) / totalCredits;
 }
 

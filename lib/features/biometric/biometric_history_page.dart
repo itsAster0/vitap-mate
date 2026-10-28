@@ -25,22 +25,24 @@ class BiometricHistoryPage extends ConsumerStatefulWidget {
 }
 
 class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
-  late DateTime _selectedDate;
+  var _selectedDate = DateTime.now();
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    _scheduleAutoRefresh();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !await isAutoRefreshEnabled(ref)) return;
+      _load().catchError((e, st) {
+        log('auto refresh failed: $e', stackTrace: st);
+      });
+    });
   }
 
   String _vtopDate(DateTime date) => DateFormat('dd/MM/yyyy').format(date);
 
-  Future<void> _load() async {
-    await ref
-        .read(biometricHistoryProvider(_vtopDate(_selectedDate)).notifier)
-        .refresh();
-  }
+  Future<void> _load() => ref
+      .read(biometricHistoryProvider(_vtopDate(_selectedDate)).notifier)
+      .refresh();
 
   Future<void> _refresh() async {
     try {
@@ -49,15 +51,6 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
       log('$e');
       if (mounted) disCommonToast(context, e);
     }
-  }
-
-  void _scheduleAutoRefresh() {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted || !await isAutoRefreshEnabled(ref)) return;
-      _load().catchError((e, st) {
-        log('auto refresh failed: $e', stackTrace: st);
-      });
-    });
   }
 
   Future<void> _pickDate() async {
@@ -69,7 +62,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
       useSafeArea: true,
       builder: (dialogContext, _, _) => Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+          padding: const .symmetric(horizontal: Space.lg),
           child: FitCalendar(
             boxed: true,
             control: FGridCalendarControl(
@@ -83,16 +76,12 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                 if (date != null) candidate = date;
               },
             ),
-            onDayPress: (date) {
-              Navigator.of(dialogContext).pop(date);
-            },
+            onDayPress: (date) => Navigator.of(dialogContext).pop(date),
           ),
         ),
       ),
     );
-    if (picked == null || picked == _selectedDate) return;
-    setState(() => _selectedDate = picked);
-    if (await isAutoRefreshEnabled(ref)) await _load();
+    if (picked != null && picked != _selectedDate) await _select(picked);
   }
 
   Future<void> _select(DateTime date) async {
@@ -116,38 +105,29 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
         color: colors.foreground,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.lg,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
           children: [
             // Last week as chips, plus a calendar for older dates.
             SizedBox(
               height: 36,
               child: ListView(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: .horizontal,
                 children: [
-                  for (var i = 0; i < 7; i++)
-                    Builder(
-                      builder: (context) {
-                        final date = now.subtract(Duration(days: i));
-                        final selected =
-                            _vtopDate(date) == _vtopDate(_selectedDate);
-                        return Padding(
-                          padding: const EdgeInsets.only(right: Space.sm),
-                          child: _DateChip(
-                            label: i == 0
-                                ? 'Today'
-                                : i == 1
-                                ? 'Yesterday'
-                                : DateFormat('EEE d').format(date),
-                            selected: selected,
-                            onPress: () => _select(date),
-                          ),
-                        );
-                      },
+                  for (final (i, date) in List.generate(
+                    7,
+                    (i) => now.subtract(Duration(days: i)),
+                  ).indexed)
+                    Padding(
+                      padding: const .only(right: Space.sm),
+                      child: _DateChip(
+                        label: switch (i) {
+                          0 => 'Today',
+                          1 => 'Yesterday',
+                          _ => DateFormat('EEE d').format(date),
+                        },
+                        selected: _vtopDate(date) == _vtopDate(_selectedDate),
+                        onPress: () => _select(date),
+                      ),
                     ),
                   _DateChip(
                     label: 'Pick date',
@@ -177,8 +157,8 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                   title: "Couldn't load biometric history",
                   message: commonErrorMessage(error),
                   action: FButton(
-                    variant: FButtonVariant.outline,
-                    mainAxisSize: MainAxisSize.min,
+                    variant: .outline,
+                    mainAxisSize: .min,
                     onPress: _refresh,
                     child: const Text('Try again'),
                   ),
@@ -192,7 +172,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                     );
                   return Column(
                     key: ValueKey('data_${_vtopDate(_selectedDate)}'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: .stretch,
                     children: [
                       if (records.isEmpty)
                         EmptyState(
@@ -213,7 +193,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
                           ),
                         ),
                         Surface(
-                          padding: const EdgeInsets.symmetric(
+                          padding: const .symmetric(
                             horizontal: Space.md + 2,
                             vertical: Space.sm,
                           ),
@@ -244,12 +224,11 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
 
 enum _Kind { entry, exit, other }
 
-_Kind _kindOf(BiometricRecord r) {
-  final venue = r.venue.toUpperCase();
-  if (venue.contains('-OUT-')) return _Kind.exit;
-  if (venue.contains('-IN-')) return _Kind.entry;
-  return _Kind.other;
-}
+_Kind _kindOf(BiometricRecord r) => switch (r.venue.toUpperCase()) {
+  final venue when venue.contains('-OUT-') => .exit,
+  final venue when venue.contains('-IN-') => .entry,
+  _ => .other,
+};
 
 /// "MH2-FACE-IN-5" → "MH2".
 String _placeOf(BiometricRecord r) => r.venue.split('-').first.trim();
@@ -266,12 +245,11 @@ String _hm(String time) {
 }
 
 /// Seconds since midnight, for ordering punches.
-int _secondsOf(String time) {
-  final p = time.trim().split(':').map((e) => int.tryParse(e) ?? 0).toList();
-  return (p.isNotEmpty ? p[0] : 0) * 3600 +
-      (p.length > 1 ? p[1] : 0) * 60 +
-      (p.length > 2 ? p[2] : 0);
-}
+int _secondsOf(String time) => [
+  for (final part in time.trim().split(':')) int.tryParse(part) ?? 0,
+  0,
+  0,
+].take(3).fold(0, (seconds, part) => seconds * 60 + part);
 
 class _Status extends StatelessWidget {
   const _Status({required this.latest, required this.isToday});
@@ -309,7 +287,7 @@ class _Status extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(
               color: tone.base,
-              shape: BoxShape.circle,
+              shape: .circle,
               boxShadow: [
                 BoxShadow(
                   color: tone.base.withValues(alpha: 0.4),
@@ -322,12 +300,12 @@ class _Status extends StatelessWidget {
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   title,
                   style: typography.body.md.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
@@ -370,16 +348,16 @@ class _PunchRow extends StatelessWidget {
 
     return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           SizedBox(
             width: 64,
             child: Padding(
-              padding: const EdgeInsets.only(top: Space.md),
+              padding: const .only(top: Space.md),
               child: Text(
                 _hm(record.punchTime),
                 style: typography.body.sm.nums(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: .w500,
                   color: colors.foreground,
                 ),
               ),
@@ -388,7 +366,7 @@ class _PunchRow extends StatelessWidget {
           SizedBox(
             width: 24,
             child: Stack(
-              alignment: Alignment.topCenter,
+              alignment: .topCenter,
               children: [
                 Positioned(
                   top: isFirst ? 18 : 0,
@@ -401,10 +379,7 @@ class _PunchRow extends StatelessWidget {
                   child: Container(
                     width: 9,
                     height: 9,
-                    decoration: BoxDecoration(
-                      color: tone.base,
-                      shape: BoxShape.circle,
-                    ),
+                    decoration: BoxDecoration(color: tone.base, shape: .circle),
                   ),
                 ),
               ],
@@ -413,9 +388,9 @@ class _PunchRow extends StatelessWidget {
           const SizedBox(width: Space.sm),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: Space.sm + 2),
+              padding: const .symmetric(vertical: Space.sm + 2),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   ToneBadge(label: label, tone: tone, icon: icon),
                   const SizedBox(height: Space.xs),
@@ -458,15 +433,15 @@ class _DateChip extends StatelessWidget {
       onPress: onPress,
       child: AnimatedContainer(
         duration: Motion.medium,
-        padding: const EdgeInsets.symmetric(horizontal: Space.md),
-        alignment: Alignment.center,
+        padding: const .symmetric(horizontal: Space.md),
+        alignment: .center,
         decoration: BoxDecoration(
           color: selected ? colors.primary : colors.card,
-          borderRadius: BorderRadius.circular(Radii.pill),
-          border: Border.all(color: selected ? colors.primary : colors.border),
+          borderRadius: .circular(Radii.pill),
+          border: .all(color: selected ? colors.primary : colors.border),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             if (icon != null) ...[
               Icon(icon, size: 14, color: fg),
@@ -475,7 +450,7 @@ class _DateChip extends StatelessWidget {
             Text(
               label,
               style: context.theme.typography.body.sm.copyWith(
-                fontWeight: FontWeight.w500,
+                fontWeight: .w500,
                 color: fg,
               ),
             ),

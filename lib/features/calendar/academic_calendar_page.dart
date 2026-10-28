@@ -34,12 +34,12 @@ class AcademicCalendarPage extends HookConsumerWidget {
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!context.mounted || !await isAutoRefreshEnabled(ref)) return;
-        ref.read(academicCalendarProvider.notifier).refresh().catchError((
-          e,
-          st,
-        ) {
-          log('auto refresh failed: $e', stackTrace: st);
-        });
+        ref
+            .read(academicCalendarProvider.notifier)
+            .refresh()
+            .catchError(
+              (e, st) => log('auto refresh failed: $e', stackTrace: st),
+            );
       });
       return null;
     }, const []);
@@ -60,8 +60,8 @@ class AcademicCalendarPage extends HookConsumerWidget {
                   title: 'No calendar yet',
                   message: "VTOP hasn't published this semester's calendar.",
                   action: FButton(
-                    variant: FButtonVariant.outline,
-                    mainAxisSize: MainAxisSize.min,
+                    variant: .outline,
+                    mainAxisSize: .min,
                     onPress: refresh,
                     child: const Text('Check again'),
                   ),
@@ -77,15 +77,15 @@ class AcademicCalendarPage extends HookConsumerWidget {
             title: "Couldn't load the calendar",
             message: commonErrorMessage(e),
             action: FButton(
-              variant: FButtonVariant.outline,
-              mainAxisSize: MainAxisSize.min,
+              variant: .outline,
+              mainAxisSize: .min,
               onPress: refresh,
               child: const Text('Try again'),
             ),
           ),
           loading: () => const Padding(
             key: ValueKey('loading'),
-            padding: EdgeInsets.all(Space.sm),
+            padding: .all(Space.sm),
             child: Column(
               children: [
                 Skeleton(height: 20, radius: Radii.sm),
@@ -164,28 +164,18 @@ class _CalendarView extends HookWidget {
       color: colors.foreground,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.lg,
-        ),
+        padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
         children: [
           _Outlook(calendar: semester, now: now),
           const SizedBox(height: Space.md),
           Surface(
-            padding: const EdgeInsets.fromLTRB(
-              Space.sm,
-              Space.sm,
-              Space.sm,
-              Space.md,
-            ),
+            padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.md),
             child: Column(
               children: [
                 Row(
                   children: [
                     FButton.icon(
-                      variant: FButtonVariant.ghost,
+                      variant: .ghost,
                       semanticsLabel: 'Previous month',
                       onPress: page.value > 0
                           ? () => goTo(page.value - 1)
@@ -198,16 +188,16 @@ class _CalendarView extends HookWidget {
                         child: Text(
                           DateFormat('MMMM yyyy').format(month),
                           key: ValueKey(month),
-                          textAlign: TextAlign.center,
+                          textAlign: .center,
                           style: context.theme.typography.body.md.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
                       ),
                     ),
                     FButton.icon(
-                      variant: FButtonVariant.ghost,
+                      variant: .ghost,
                       semanticsLabel: 'Next month',
                       onPress: page.value < months.length - 1
                           ? () => goTo(page.value + 1)
@@ -273,17 +263,14 @@ class _Outlook extends StatelessWidget {
     final base = context.theme.typography.body.sm.nums(
       color: colors.mutedForeground,
     );
-    final strong = base.copyWith(
-      fontWeight: FontWeight.w600,
-      color: colors.foreground,
-    );
+    final strong = base.copyWith(fontWeight: .w600, color: colors.foreground);
     final daysLeft = calendar.instructionalDaysLeft(now);
     final holiday = calendar.nextHoliday(now);
     final name = holiday == null || holiday.name == 'Holiday'
         ? ''
         : ', ${holiday.name}';
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const .symmetric(horizontal: 4),
       child: Text.rich(
         TextSpan(
           children: [
@@ -320,13 +307,13 @@ class _WeekdayHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = context.theme.typography.body.xs.copyWith(
       color: context.theme.colors.mutedForeground,
-      fontWeight: FontWeight.w600,
+      fontWeight: .w600,
     );
     return Row(
       children: [
         for (final day in _weekdays)
           Expanded(
-            child: Text(day, textAlign: TextAlign.center, style: style),
+            child: Text(day, textAlign: .center, style: style),
           ),
       ],
     );
@@ -397,16 +384,16 @@ class _MonthGrid extends StatelessWidget {
       return SizedBox(
         height: _cellHeight,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: .center,
           children: [
             Container(
               width: 30,
               height: 26,
-              alignment: Alignment.center,
+              alignment: .center,
               decoration: isToday
                   ? BoxDecoration(
-                      border: Border.all(color: colors.app.accent, width: 1.5),
-                      borderRadius: BorderRadius.circular(Radii.sm),
+                      border: .all(color: colors.app.accent, width: 1.5),
+                      borderRadius: .circular(Radii.sm),
                     )
                   : null,
               child: Text(
@@ -428,7 +415,7 @@ class _MonthGrid extends StatelessWidget {
                   width: 5,
                   height: 5,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    shape: .circle,
                     color: mark == CalendarMark.noClasses ? null : dot,
                     border: mark == CalendarMark.noClasses
                         ? Border.all(color: dot, width: 1)
@@ -473,13 +460,13 @@ class _Legend extends StatelessWidget {
       final color = _markColor(context, mark)!;
       final hollow = mark == CalendarMark.noClasses;
       return Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: .min,
         children: [
           Container(
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
+              shape: .circle,
               color: hollow ? null : color,
               border: hollow ? Border.all(color: color, width: 1) : null,
             ),
@@ -491,7 +478,7 @@ class _Legend extends StatelessWidget {
     }
 
     return Wrap(
-      alignment: WrapAlignment.center,
+      alignment: .center,
       spacing: Space.md,
       runSpacing: Space.xs,
       children: [
@@ -609,13 +596,12 @@ List<_Event> _semesterEvents(Map<DateTime, List<CalendarEntry>> byDate) {
         continue;
       }
       // The latest row of the same kind, even with a holiday row after it.
-      _Event? previous;
-      for (final e in events.reversed) {
-        if (markOf(e.entry) == mark && titleOf(e.entry) == titleOf(entry)) {
-          previous = e;
-          break;
-        }
-      }
+      final previous = events.reversed
+          .where(
+            (e) =>
+                markOf(e.entry) == mark && titleOf(e.entry) == titleOf(entry),
+          )
+          .firstOrNull;
       if (previous != null && !_classDayBetween(byDate, previous.last, day)) {
         previous.last = day;
       } else {
@@ -649,10 +635,10 @@ class _MonthEvents extends StatelessWidget {
 
     if (shown.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Space.lg),
+        padding: const .symmetric(vertical: Space.lg),
         child: Text(
           'Regular classes all month.',
-          textAlign: TextAlign.center,
+          textAlign: .center,
           style: context.theme.typography.body.sm.copyWith(
             color: context.theme.colors.mutedForeground,
           ),
@@ -661,14 +647,14 @@ class _MonthEvents extends StatelessWidget {
     }
 
     return Surface(
-      padding: EdgeInsets.zero,
+      padding: .zero,
       child: Column(
         children: [
           for (final (i, event) in shown.indexed) ...[
             if (i > 0)
               Container(
                 height: 1,
-                margin: const EdgeInsets.only(left: 64),
+                margin: const .only(left: 64),
                 color: context.theme.colors.border,
               ),
             _EventRow(event: event, month: month, today: today),
@@ -731,12 +717,9 @@ class _EventRow extends StatelessWidget {
     return Opacity(
       opacity: past ? 0.5 : 1,
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.md,
-          vertical: Space.md,
-        ),
+        padding: const .symmetric(horizontal: Space.md, vertical: Space.md),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: .start,
           children: [
             Row(
               children: [
@@ -751,7 +734,7 @@ class _EventRow extends StatelessWidget {
                         ).format(event.first).toUpperCase(),
                         style: typography.body.xs.copyWith(
                           fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: .w600,
                           letterSpacing: 0.4,
                           color: colors.mutedForeground,
                         ),
@@ -760,7 +743,7 @@ class _EventRow extends StatelessWidget {
                         '${event.first.day}',
                         style: typography.body.lg.nums(
                           height: 1.15,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: .w600,
                           color: colors.foreground,
                         ),
                       ),
@@ -770,20 +753,20 @@ class _EventRow extends StatelessWidget {
                 const SizedBox(width: Space.md),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       Text(
                         title,
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: .ellipsis,
                         style: typography.body.sm.copyWith(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: .w500,
                           color: colors.foreground,
                         ),
                       ),
                       if (subtitle.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(top: 2),
+                          padding: const .only(top: 2),
                           child: Text(
                             subtitle,
                             style: typography.body.xs.nums(
@@ -800,12 +783,12 @@ class _EventRow extends StatelessWidget {
             ),
             if (mixed)
               Padding(
-                padding: const EdgeInsets.only(top: Space.sm),
+                padding: const .only(top: Space.sm),
                 child: Column(
                   children: [
                     for (final part in event.parts)
                       Padding(
-                        padding: const EdgeInsets.only(top: Space.xs),
+                        padding: const .only(top: Space.xs),
                         child: _PartCard(part: part),
                       ),
                   ],
@@ -828,19 +811,16 @@ class _PartCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final day = DateFormat('EEE d');
     final days = part.last == part.first
-        ? DateFormat('EEE d').format(part.first)
-        : '${DateFormat('EEE d').format(part.first)} – '
-              '${DateFormat('EEE d').format(part.last)}';
+        ? day.format(part.first)
+        : '${day.format(part.first)} – ${day.format(part.last)}';
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md,
-        vertical: Space.sm,
-      ),
+      padding: const .symmetric(horizontal: Space.md, vertical: Space.sm),
       decoration: BoxDecoration(
         color: colors.secondary,
-        borderRadius: BorderRadius.circular(Radii.sm),
+        borderRadius: .circular(Radii.sm),
       ),
       child: Row(
         children: [
@@ -849,7 +829,7 @@ class _PartCard extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(
               color: _markColor(context, markOf(part.entry)),
-              shape: BoxShape.circle,
+              shape: .circle,
             ),
           ),
           const SizedBox(width: Space.sm),
@@ -858,7 +838,7 @@ class _PartCard extends StatelessWidget {
             child: Text(
               days,
               style: typography.body.xs.nums(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.mutedForeground,
               ),
             ),
@@ -867,7 +847,7 @@ class _PartCard extends StatelessWidget {
             child: Text(
               titleOf(part.entry),
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: typography.body.sm.copyWith(color: colors.foreground),
             ),
           ),

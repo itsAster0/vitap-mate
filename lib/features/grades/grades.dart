@@ -6,35 +6,31 @@ import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class GradesUiState {
+  const GradesUiState(
+    this.gradeView,
+    this.semesters,
+    this.selectedSemesterId,
+    this.detailsByCourseId, [
+    this.loadingDetailsFor = const {},
+  ]);
+
   final GradeViewData gradeView;
   final List<SemesterInfo> semesters;
   final String selectedSemesterId;
   final Map<String, GradeDetailsData> detailsByCourseId;
   final Set<String> loadingDetailsFor;
 
-  const GradesUiState({
-    required this.gradeView,
-    required this.semesters,
-    required this.selectedSemesterId,
-    required this.detailsByCourseId,
-    required this.loadingDetailsFor,
-  });
-
   GradesUiState copyWith({
-    GradeViewData? gradeView,
-    List<SemesterInfo>? semesters,
     String? selectedSemesterId,
     Map<String, GradeDetailsData>? detailsByCourseId,
     Set<String>? loadingDetailsFor,
-  }) {
-    return GradesUiState(
-      gradeView: gradeView ?? this.gradeView,
-      semesters: semesters ?? this.semesters,
-      selectedSemesterId: selectedSemesterId ?? this.selectedSemesterId,
-      detailsByCourseId: detailsByCourseId ?? this.detailsByCourseId,
-      loadingDetailsFor: loadingDetailsFor ?? this.loadingDetailsFor,
-    );
-  }
+  }) => GradesUiState(
+    gradeView,
+    semesters,
+    selectedSemesterId ?? this.selectedSemesterId,
+    detailsByCourseId ?? this.detailsByCourseId,
+    loadingDetailsFor ?? this.loadingDetailsFor,
+  );
 }
 
 final gradesProvider = AsyncNotifierProvider<GradesNotifier, GradesUiState>(
@@ -45,14 +41,12 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   @override
   Future<GradesUiState> build() async {
     final user = await ref.read(vtopUserProvider.future);
-    final semData = await ref.watch(semesterIdProvider.future);
-    final semId = user.semid ?? "";
-    final initial = await _loadSemester(semId, semData.semesters);
+    final sems = (await ref.watch(semesterIdProvider.future)).semesters;
+    final initial = await _loadSemester(user.semid ?? "", sems);
     if (initial.gradeView.courses.isNotEmpty) return initial;
 
     // Grades for the running semester only appear once it ends, so opening
     // the page on it is a dead end. Fall back to the semester before it.
-    final sems = semData.semesters;
     final index = sems.indexWhere((s) => s.id == initial.selectedSemesterId);
     if (index < 0 || index + 1 >= sems.length) return initial;
     try {
@@ -64,29 +58,29 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
   }
 
   Future<void> refresh() async {
-    final current = state.value;
-    final semId = current?.selectedSemesterId;
-    if (semId == null || semId.isEmpty) return;
-
-    final next = await _loadSemester(
-      semId,
-      current!.semesters,
-      forceRemote: true,
-    );
-    state = AsyncData(next);
+    if (state.value case final current?
+        when current.selectedSemesterId.isNotEmpty) {
+      state = AsyncData(
+        await _loadSemester(
+          current.selectedSemesterId,
+          current.semesters,
+          forceRemote: true,
+        ),
+      );
+    }
   }
 
   Future<void> selectSemester(String semId) async {
     final current = state.value;
-    if (current != null && current.selectedSemesterId == semId) return;
+    if (current?.selectedSemesterId == semId) return;
     if (current != null) {
       state = AsyncData(current.copyWith(selectedSemesterId: semId));
     }
-    final fallbackSems =
+    final sems =
         current?.semesters ??
         (await ref.read(semesterIdProvider.future)).semesters;
     try {
-      state = AsyncData(await _loadSemester(semId, fallbackSems));
+      state = AsyncData(await _loadSemester(semId, sems));
     } catch (e, st) {
       state = AsyncError(e, st);
       rethrow;
@@ -101,32 +95,28 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
             current.loadingDetailsFor.contains(courseId))) {
       return;
     }
+    state = AsyncData(
+      current.copyWith(
+        loadingDetailsFor: {...current.loadingDetailsFor, courseId},
+      ),
+    );
 
-    final loadingSet = {...current.loadingDetailsFor, courseId};
-    state = AsyncData(current.copyWith(loadingDetailsFor: loadingSet));
-
+    GradeDetailsData? details;
     try {
       final query = VtopQueries.gradeDetails(
         current.selectedSemesterId,
         courseId: courseId,
       );
-      final details = force
-          ? await fetchPage(ref, query)
-          : await loadPage(ref, query);
+      details = await (force ? fetchPage(ref, query) : loadPage(ref, query));
+    } finally {
+      // Success or failure, the course stops loading.
       final now = state.value ?? current;
-      final nextMap = {...now.detailsByCourseId, courseId: details};
-      final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
       state = AsyncData(
         now.copyWith(
-          detailsByCourseId: nextMap,
-          loadingDetailsFor: nextLoading,
+          detailsByCourseId: {...now.detailsByCourseId, courseId: ?details},
+          loadingDetailsFor: now.loadingDetailsFor.difference({courseId}),
         ),
       );
-    } catch (_) {
-      final now = state.value ?? current;
-      final nextLoading = {...now.loadingDetailsFor}..remove(courseId);
-      state = AsyncData(now.copyWith(loadingDetailsFor: nextLoading));
-      rethrow;
     }
   }
 
@@ -135,31 +125,21 @@ class GradesNotifier extends AsyncNotifier<GradesUiState> {
     List<SemesterInfo> semesters, {
     bool forceRemote = false,
   }) async {
-    var selected = semId;
-    if (selected.isEmpty && semesters.isNotEmpty) {
-      selected = semesters.first.id;
-    } else if (semesters.isNotEmpty &&
-        !semesters.any((s) => s.id == selected)) {
-      selected = semesters.first.id;
-    }
-
+    final selected =
+        semesters.isNotEmpty &&
+            (semId.isEmpty || !semesters.any((s) => s.id == semId))
+        ? semesters.first.id
+        : semId;
     final query = VtopQueries.grades(selected);
-    final view = forceRemote
-        ? await fetchPage(ref, query)
-        : await loadPage(ref, query);
-    final details = <String, GradeDetailsData>{
+    final view = await (forceRemote
+        ? fetchPage(ref, query)
+        : loadPage(ref, query));
+    return GradesUiState(view, semesters, selected, {
       for (final course in view.courses)
         course.courseId: ?await readSavedPage(
           ref.read,
           VtopQueries.gradeDetails(selected, courseId: course.courseId),
         ),
-    };
-    return GradesUiState(
-      gradeView: view,
-      semesters: semesters,
-      selectedSemesterId: selected,
-      detailsByCourseId: details,
-      loadingDetailsFor: const <String>{},
-    );
+    });
   }
 }

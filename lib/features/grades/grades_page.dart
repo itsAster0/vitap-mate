@@ -21,6 +21,10 @@ import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
+/// "4" for whole numbers, else one decimal: "2.5".
+String _fmt(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
 class GradesPage extends HookConsumerWidget {
   const GradesPage({super.key});
 
@@ -30,17 +34,10 @@ class GradesPage extends HookConsumerWidget {
     final semAsync = ref.watch(semesterIdProvider);
     // Stable keys per course so the summary bar can scroll to a card.
     final cardKeys = useMemoized(() => <String, GlobalKey>{});
-    final semData = semAsync.value;
-    final stateValue = state.value;
-    final stateSems = stateValue?.semesters ?? const <SemesterInfo>[];
-    final semesters = stateSems.isNotEmpty
-        ? stateSems
-        : (semData?.semesters ?? const []);
-    final semLoading = semesters.isEmpty && semAsync.isLoading;
-    final semLoadError = semesters.isEmpty && semAsync.hasError;
-    final selectedSemesterId =
-        stateValue?.selectedSemesterId ??
-        (semesters.isNotEmpty ? semesters.first.id : "");
+    final semesters = switch (state.value?.semesters) {
+      final sems? when sems.isNotEmpty => sems,
+      _ => semAsync.value?.semesters ?? const <SemesterInfo>[],
+    };
 
     Future<void> refresh() async {
       try {
@@ -65,9 +62,10 @@ class GradesPage extends HookConsumerWidget {
       return null;
     }, const []);
 
-    final history = ref.watch(gradeHistoryProvider).value;
     final creditsByCode = {
-      for (final r in history?.records ?? const <GradeHistoryRecord>[])
+      for (final r
+          in ref.watch(gradeHistoryProvider).value?.records ??
+              const <GradeHistoryRecord>[])
         r.courseCode.trim().toUpperCase(): double.tryParse(r.credits.trim()),
     };
 
@@ -80,18 +78,13 @@ class GradesPage extends HookConsumerWidget {
         onRefresh: refresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.lg,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
           children: [
-            if (semLoading)
+            if (semesters.isEmpty && semAsync.isLoading)
               const Skeleton(height: 36, radius: Radii.pill)
-            else if (semLoadError)
+            else if (semesters.isEmpty && semAsync.hasError)
               FButton(
-                variant: FButtonVariant.outline,
+                variant: .outline,
                 prefix: const Icon(FLucideIcons.rotateCw),
                 onPress: () => ref.invalidate(semesterIdProvider),
                 child: const Text("Couldn't load semesters. Retry"),
@@ -99,7 +92,10 @@ class GradesPage extends HookConsumerWidget {
             else
               _SemesterChips(
                 semesters: semesters,
-                selectedId: selectedSemesterId,
+                selectedId:
+                    state.value?.selectedSemesterId ??
+                    semesters.firstOrNull?.id ??
+                    "",
                 onSelect: (id) async {
                   try {
                     await ref.read(gradesProvider.notifier).selectSemester(id);
@@ -128,15 +124,13 @@ class GradesPage extends HookConsumerWidget {
                   message: commonErrorMessage(e),
                 ),
                 data: (data) {
+                  int serial(GradeCourseRecord c) =>
+                      int.tryParse(c.serial) ?? 0;
                   final sorted = [...data.gradeView.courses]
-                    ..sort(
-                      (a, b) => (int.tryParse(a.serial) ?? 0).compareTo(
-                        int.tryParse(b.serial) ?? 0,
-                      ),
-                    );
+                    ..sort((a, b) => serial(a).compareTo(serial(b)));
                   return Column(
                     key: ValueKey('data_${data.selectedSemesterId}'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: .stretch,
                     children: [
                       if (sorted.isEmpty)
                         const EmptyState(
@@ -162,7 +156,7 @@ class GradesPage extends HookConsumerWidget {
                         const SizedBox(height: Space.md),
                         for (final (i, c) in sorted.indexed)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: Space.sm),
+                            padding: const .only(bottom: Space.sm),
                             child: EnterFade(
                               index: i,
                               child: KeyedSubtree(
@@ -190,118 +184,74 @@ class GradesPage extends HookConsumerWidget {
   }
 }
 
-class _GradeCard extends ConsumerStatefulWidget {
-  final GradeCourseRecord course;
+class _GradeCard extends HookConsumerWidget {
   const _GradeCard({required this.course});
 
-  @override
-  ConsumerState<_GradeCard> createState() => _GradeCardState();
-}
-
-class _GradeCardState extends ConsumerState<_GradeCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-  bool _expanded = false;
+  final GradeCourseRecord course;
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggle() async {
-    setState(() => _expanded = !_expanded);
-    if (_expanded) {
-      _controller.forward();
-      final s = ref.read(gradesProvider).value;
-      final has =
-          s?.detailsByCourseId.containsKey(widget.course.courseId) ?? false;
-      final loading =
-          s?.loadingDetailsFor.contains(widget.course.courseId) ?? false;
-      final hasMarkerRange =
-          s?.detailsByCourseId[widget.course.courseId]?.gradeRanges.any(
-            (r) => r.range.contains('#'),
-          ) ??
-          false;
-      if (!has && !loading) {
-        try {
-          await ref
-              .read(gradesProvider.notifier)
-              .loadDetails(widget.course.courseId);
-        } catch (e) {
-          log("$e");
-        }
-      } else if (has && hasMarkerRange && !loading) {
-        try {
-          await ref
-              .read(gradesProvider.notifier)
-              .loadDetails(widget.course.courseId, force: true);
-        } catch (e) {
-          log("$e");
-        }
-      }
-    } else {
-      _controller.reverse();
-    }
-  }
-
-  Future<void> _refreshDetails() async {
-    try {
-      await ref
-          .read(gradesProvider.notifier)
-          .loadDetails(widget.course.courseId, force: true);
-    } catch (e) {
-      log("$e");
-      if (mounted) disCommonToast(context, e);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final controller = useAnimationController(
+      duration: const Duration(milliseconds: 250),
+    );
+    final animation = useMemoized(
+      () => CurvedAnimation(parent: controller, curve: Curves.easeInOut),
+    );
+    final expanded = useState(false);
     final state = ref.watch(gradesProvider).value;
-    final detail = state?.detailsByCourseId[widget.course.courseId];
-    final loading =
-        state?.loadingDetailsFor.contains(widget.course.courseId) ?? false;
-    final c = widget.course;
+    final c = course;
+
+    Future<void> loadDetails({bool force = false}) =>
+        ref.read(gradesProvider.notifier).loadDetails(c.courseId, force: force);
+
+    Future<void> toggle() async {
+      expanded.value = !expanded.value;
+      if (!expanded.value) {
+        controller.reverse();
+        return;
+      }
+      controller.forward();
+      final s = ref.read(gradesProvider).value;
+      final detail = s?.detailsByCourseId[c.courseId];
+      final loading = s?.loadingDetailsFor.contains(c.courseId) ?? false;
+      // A "#" in a cut-off means VTOP sent a placeholder: fetch it again.
+      final hasMarkerRange =
+          detail?.gradeRanges.any((r) => r.range.contains('#')) ?? false;
+      if (loading || (detail != null && !hasMarkerRange)) return;
+      try {
+        await loadDetails(force: detail != null);
+      } catch (e) {
+        log("$e");
+      }
+    }
 
     return Surface(
-      padding: EdgeInsets.zero,
+      padding: .zero,
       child: Column(
         children: [
           PressScale(
             scale: 0.99,
             semanticsLabel: '${c.courseTitle}, grade ${c.grade}',
-            onPress: _toggle,
+            onPress: toggle,
             child: Padding(
-              padding: const EdgeInsets.all(Space.md + 2),
+              padding: const .all(Space.md + 2),
               child: Row(
                 children: [
                   GradeBadge(grade: c.grade),
                   const SizedBox(width: Space.md),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: .start,
                       children: [
                         Text(
                           c.courseTitle,
                           maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: .ellipsis,
                           style: typography.body.md.copyWith(
                             height: 1.25,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
@@ -309,7 +259,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                         Text(
                           '${c.courseCode} · ${c.courseType}',
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: .ellipsis,
                           style: typography.body.xs.copyWith(
                             color: colors.mutedForeground,
                           ),
@@ -319,12 +269,12 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                   ),
                   const SizedBox(width: Space.md),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: .end,
                     children: [
                       Text(
                         c.grandTotal,
                         style: typography.body.lg.nums(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: .w500,
                           color: colors.foreground,
                         ),
                       ),
@@ -338,7 +288,7 @@ class _GradeCardState extends ConsumerState<_GradeCard>
                   ),
                   const SizedBox(width: Space.xs),
                   AnimatedRotation(
-                    turns: _expanded ? 0.5 : 0,
+                    turns: expanded.value ? 0.5 : 0,
                     duration: Motion.medium,
                     child: Icon(
                       FLucideIcons.chevronDown,
@@ -351,17 +301,20 @@ class _GradeCardState extends ConsumerState<_GradeCard>
             ),
           ),
           SizeTransition(
-            sizeFactor: _animation,
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: EdgeInsets.zero,
-              child: _GradeDetailsPanel(
-                detail: detail,
-                loading: loading,
-                gradingType: c.gradingType,
-                grade: c.grade,
-                onRefresh: _refreshDetails,
-              ),
+            sizeFactor: animation,
+            alignment: .topCenter,
+            child: _GradeDetailsPanel(
+              course: c,
+              detail: state?.detailsByCourseId[c.courseId],
+              loading: state?.loadingDetailsFor.contains(c.courseId) ?? false,
+              onRefresh: () async {
+                try {
+                  await loadDetails(force: true);
+                } catch (e) {
+                  log("$e");
+                  if (context.mounted) disCommonToast(context, e);
+                }
+              },
             ),
           ),
         ],
@@ -371,26 +324,26 @@ class _GradeCardState extends ConsumerState<_GradeCard>
 }
 
 class _GradeDetailsPanel extends StatelessWidget {
-  final GradeDetailsData? detail;
-  final bool loading;
-  final String gradingType;
-  final String grade;
-  final VoidCallback onRefresh;
   const _GradeDetailsPanel({
+    required this.course,
     required this.detail,
     required this.loading,
-    required this.gradingType,
-    required this.grade,
     required this.onRefresh,
   });
+
+  final GradeCourseRecord course;
+  final GradeDetailsData? detail;
+  final bool loading;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final detail = this.detail;
     if (detail == null) {
       return Padding(
-        padding: const EdgeInsets.all(Space.md),
+        padding: const .all(Space.md),
         child: loading
             ? const Column(
                 children: [
@@ -412,9 +365,9 @@ class _GradeDetailsPanel extends StatelessWidget {
                     ),
                   ),
                   FButton(
-                    variant: FButtonVariant.outline,
-                    size: FButtonSizeVariant.sm,
-                    mainAxisSize: MainAxisSize.min,
+                    variant: .outline,
+                    size: .sm,
+                    mainAxisSize: .min,
                     onPress: onRefresh,
                     child: const Text('Try again'),
                   ),
@@ -424,27 +377,22 @@ class _GradeDetailsPanel extends StatelessWidget {
     }
 
     final ranges = [
-      for (final r in detail!.gradeRanges)
+      for (final r in detail.gradeRanges)
         if (r.range.replaceAll('#', '').trim().isNotEmpty)
           (r.grade.trim().toUpperCase(), _shortRange(r.range)),
     ];
-    final sections = _groupMarksBySection(detail!);
+    final gradingType = course.gradingType.trim();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md + 2,
-        Space.xs,
-        Space.md + 2,
-        Space.md,
-      ),
+      padding: const .fromLTRB(Space.md + 2, Space.xs, Space.md + 2, Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           if (ranges.isNotEmpty) ...[
             _Label(
-              gradingType.trim().isEmpty
+              gradingType.isEmpty
                   ? 'GRADE CUT-OFFS'
-                  : 'GRADE CUT-OFFS · ${gradingType.trim()}',
+                  : 'GRADE CUT-OFFS · $gradingType',
             ),
             const SizedBox(height: Space.sm),
             Wrap(
@@ -455,21 +403,21 @@ class _GradeDetailsPanel extends StatelessWidget {
                   _CutoffChip(
                     grade: g,
                     range: range,
-                    achieved: g == grade.trim().toUpperCase(),
+                    achieved: g == course.grade.trim().toUpperCase(),
                   ),
               ],
             ),
           ],
-          for (final section in sections) ...[
+          for (final section in _sections(detail)) ...[
             const SizedBox(height: Space.lg),
             Row(
               children: [
-                Expanded(child: _Label(section.sectionTitle.toUpperCase())),
+                Expanded(child: _Label(section.title.toUpperCase())),
                 if (section.total.isNotEmpty)
                   Text(
                     '${section.total} weighted',
                     style: typography.body.xs.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: colors.foreground,
                     ),
                   ),
@@ -498,16 +446,14 @@ class _GradeDetailsPanel extends StatelessWidget {
                 ),
               ),
               FButton(
-                variant: FButtonVariant.ghost,
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
+                variant: .ghost,
+                size: .sm,
+                mainAxisSize: .min,
                 onPress: loading ? null : onRefresh,
                 prefix: loading
                     ? const SizedBox.square(
                         dimension: 14,
-                        child: FCircularProgress(
-                          size: FCircularProgressSizeVariant.sm,
-                        ),
+                        child: FCircularProgress(size: .sm),
                       )
                     : const Icon(FLucideIcons.refreshCw),
                 child: const Text('Refresh'),
@@ -522,78 +468,47 @@ class _GradeDetailsPanel extends StatelessWidget {
   /// ">=83 and <88" → "83–88", ">=88" → "≥88", "<50" → "<50".
   static String _shortRange(String raw) {
     final r = raw.replaceAll('#', '').trim();
-    final nums = RegExp(
-      r'\d+(?:\.\d+)?',
-    ).allMatches(r).map((m) => m[0]!).toList();
-    if (nums.length >= 2) return '${nums[0]}–${nums[1]}';
-    if (nums.length == 1) {
-      if (r.startsWith('<')) return '<${nums[0]}';
-      return '≥${nums[0]}';
-    }
-    return r;
+    final nums = [
+      for (final m in RegExp(r'\d+(?:\.\d+)?').allMatches(r)) m[0]!,
+    ];
+    return switch (nums) {
+      [final lo, final hi, ...] => '$lo–$hi',
+      [final n] => r.startsWith('<') ? '<$n' : '≥$n',
+      _ => r,
+    };
   }
 
-  List<_MarkSection> _groupMarksBySection(GradeDetailsData detail) {
-    final classTypes = detail.classCourseType
-        .split('|')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final classNumbers = detail.classNumber
-        .split('|')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final classNumberByType = <String, String>{};
-    for (int i = 0; i < classTypes.length; i++) {
-      classNumberByType[classTypes[i]] = i < classNumbers.length
-          ? classNumbers[i]
-          : "";
-    }
-
+  /// Marks grouped by the section before "•" in their title ("Theory •
+  /// CAT-1"), in first-seen order, each with its weighted total.
+  static List<({String title, String total, List<GradeDetailMark> marks})>
+  _sections(GradeDetailsData detail) {
     final grouped = <String, List<GradeDetailMark>>{};
-    final order = <String>[];
     for (final mark in detail.marks) {
-      String section = detail.classCourseType;
-      String title = mark.markTitle;
-      if (mark.markTitle.contains("•")) {
-        final parts = mark.markTitle.split("•");
-        if (parts.length >= 2) {
-          section = parts.first.trim();
-          title = parts.sublist(1).join("•").trim();
-        }
-      }
-      if (!grouped.containsKey(section)) {
-        order.add(section);
-      }
-      grouped.putIfAbsent(section, () => []);
-      grouped[section]!.add(mark.copyWith(markTitle: title));
+      final parts = mark.markTitle.split("•");
+      final (section, title) = parts.length >= 2
+          ? (parts.first.trim(), parts.skip(1).join("•").trim())
+          : (detail.classCourseType, mark.markTitle);
+      grouped
+          .putIfAbsent(section, () => [])
+          .add(mark.copyWith(markTitle: title));
     }
-
     return [
-      for (final section in order)
-        _MarkSection(
-          sectionTitle: section,
-          classNumber: classNumberByType[section] ?? "",
-          total: _sumWeightageMarks(grouped[section] ?? const []),
-          marks: grouped[section] ?? const [],
-        ),
+      for (final MapEntry(key: title, value: marks) in grouped.entries)
+        (title: title, total: _weightedTotal(marks), marks: marks),
     ];
   }
 
-  String _sumWeightageMarks(List<GradeDetailMark> marks) {
+  static String _weightedTotal(List<GradeDetailMark> marks) {
     final totals = calculateWeightageTotals<GradeDetailMark>(
       marks,
       titleOf: (m) => m.markTitle,
       gainedOf: (m) => m.weightageMark,
       possibleOf: (m) => m.weightage,
     );
-    String fmt(double v) =>
-        v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
     if (totals.gained == 0) return "";
     return totals.possible > 0
-        ? '${fmt(totals.gained)} / ${fmt(totals.possible)}'
-        : fmt(totals.gained);
+        ? '${_fmt(totals.gained)} / ${_fmt(totals.possible)}'
+        : _fmt(totals.gained);
   }
 }
 
@@ -607,7 +522,7 @@ class _Label extends StatelessWidget {
     text,
     style: context.theme.typography.body.xs.copyWith(
       fontSize: 10.5,
-      fontWeight: FontWeight.w600,
+      fontWeight: .w600,
       letterSpacing: 0.5,
       color: context.theme.colors.mutedForeground,
     ),
@@ -630,11 +545,11 @@ class _CutoffChip extends StatelessWidget {
     final colors = context.theme.colors;
     final tone = gradeTone(context, grade);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Space.sm, vertical: 4),
+      padding: const .symmetric(horizontal: Space.sm, vertical: 4),
       decoration: BoxDecoration(
         color: achieved ? tone.subtle : const Color(0x00000000),
-        borderRadius: BorderRadius.circular(Radii.sm),
-        border: Border.all(color: achieved ? tone.base : colors.border),
+        borderRadius: .circular(Radii.sm),
+        border: .all(color: achieved ? tone.base : colors.border),
       ),
       child: Text.rich(
         TextSpan(
@@ -642,7 +557,7 @@ class _CutoffChip extends StatelessWidget {
             TextSpan(
               text: '$grade ',
               style: TextStyle(
-                fontWeight: FontWeight.w700,
+                fontWeight: .w700,
                 color: achieved ? tone.onSubtle : colors.foreground,
               ),
             ),
@@ -679,9 +594,9 @@ class _MarkRow extends StatelessWidget {
         : colors.app.warning;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Space.sm),
+      padding: const .symmetric(vertical: Space.sm),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Row(
             children: [
@@ -689,9 +604,9 @@ class _MarkRow extends StatelessWidget {
                 child: Text(
                   mark.markTitle,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: .w500,
                     color: colors.foreground,
                   ),
                 ),
@@ -707,7 +622,7 @@ class _MarkRow extends StatelessWidget {
                   ],
                 ),
                 style: typography.body.sm.nums(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: .w500,
                   color: colors.foreground,
                 ),
               ),
@@ -736,20 +651,6 @@ class _MarkRow extends StatelessWidget {
   }
 }
 
-class _MarkSection {
-  final String sectionTitle;
-  final String classNumber;
-  final String total;
-  final List<GradeDetailMark> marks;
-
-  const _MarkSection({
-    required this.sectionTitle,
-    required this.classNumber,
-    required this.total,
-    required this.marks,
-  });
-}
-
 class _SemesterChips extends StatelessWidget {
   const _SemesterChips({
     required this.semesters,
@@ -774,26 +675,26 @@ class _SemesterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+      scrollDirection: .horizontal,
       child: Row(
         children: [
           for (final sem in semesters)
             Padding(
-              padding: const EdgeInsets.only(right: Space.sm),
+              padding: const .only(right: Space.sm),
               child: PressScale(
                 scale: 0.95,
                 semanticsLabel: sem.name,
                 onPress: () => onSelect(sem.id),
                 child: AnimatedContainer(
                   duration: Motion.medium,
-                  padding: const EdgeInsets.symmetric(
+                  padding: const .symmetric(
                     horizontal: Space.md,
                     vertical: Space.sm - 1,
                   ),
                   decoration: BoxDecoration(
                     color: sem.id == selectedId ? colors.primary : colors.card,
-                    borderRadius: BorderRadius.circular(Radii.pill),
-                    border: Border.all(
+                    borderRadius: .circular(Radii.pill),
+                    border: .all(
                       color: sem.id == selectedId
                           ? colors.primary
                           : colors.border,
@@ -802,7 +703,7 @@ class _SemesterChips extends StatelessWidget {
                   child: Text(
                     short(sem.name),
                     style: context.theme.typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                       color: sem.id == selectedId
                           ? colors.primaryForeground
                           : colors.foreground,
@@ -836,44 +737,40 @@ class _SemesterSummary extends StatelessWidget {
     final typography = context.theme.typography;
     var credits = 0.0;
     var points = 0.0;
+    final counts = <String, int>{};
     for (final c in courses) {
       final grade = Grade.tryParse(c.grade);
       final cr = creditsByCode[c.courseCode.trim().toUpperCase()];
-      if (grade == null || cr == null || cr <= 0) continue;
-      credits += cr;
-      points += cr * grade.points;
+      if (grade != null && cr != null && cr > 0) {
+        credits += cr;
+        points += cr * grade.points;
+      }
+      final g = c.grade.trim().toUpperCase();
+      if (g.isNotEmpty && g != '-') counts[g] = (counts[g] ?? 0) + 1;
     }
     final gpa = credits > 0 ? points / credits : null;
-    final counts = <String, int>{};
-    for (final c in courses) {
-      final g = c.grade.trim().toUpperCase();
-      if (g.isEmpty || g == '-') continue;
-      counts[g] = (counts[g] ?? 0) + 1;
-    }
     const order = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'N', 'P'];
     int rank(String g) => order.contains(g) ? order.indexOf(g) : order.length;
     final sortedCounts = counts.entries.toList()
       ..sort((a, b) => rank(a.key).compareTo(rank(b.key)));
     final label = typography.body.xs.copyWith(
-      fontWeight: FontWeight.w600,
+      fontWeight: .w600,
       letterSpacing: 0.6,
       color: colors.mutedForeground,
     );
 
     return Surface(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
-          // Line 1: label and credits
           Row(
             children: [
               Expanded(child: Text('SEMESTER GPA', style: label)),
-              if (gpa != null) Text('${_num(credits)} credits', style: label),
+              if (gpa != null) Text('${_fmt(credits)} credits', style: label),
             ],
           ),
-          // Line 2: GPA and course count
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: .end,
             children: [
               Expanded(
                 child: gpa == null
@@ -888,13 +785,13 @@ class _SemesterSummary extends StatelessWidget {
                         decimals: 2,
                         style: typography.display.xl2.copyWith(
                           height: 1.1,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: .w600,
                           color: colors.foreground,
                         ),
                       ),
               ),
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const .only(bottom: 4),
                 child: Text(
                   gpa == null
                       ? 'Needs credits from grade history'
@@ -918,21 +815,21 @@ class _SemesterSummary extends StatelessWidget {
               spacing: Space.md,
               runSpacing: Space.xs,
               children: [
-                for (final e in sortedCounts)
+                for (final MapEntry(key: grade, value: count) in sortedCounts)
                   Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: .min,
                     children: [
                       Container(
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: gradeTone(context, e.key).base,
-                          borderRadius: BorderRadius.circular(2),
+                          color: gradeTone(context, grade).base,
+                          borderRadius: .circular(2),
                         ),
                       ),
                       const SizedBox(width: Space.xs),
                       Text(
-                        '${e.key} ${e.value}',
+                        '$grade $count',
                         style: typography.body.xs.nums(
                           color: colors.mutedForeground,
                         ),
@@ -946,9 +843,6 @@ class _SemesterSummary extends StatelessWidget {
       ),
     );
   }
-
-  static String _num(double v) =>
-      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 }
 
 /// One bar for the semester: a segment per course, as wide as its credits and
@@ -965,45 +859,43 @@ class _CourseBar extends StatelessWidget {
   final ValueChanged<GradeCourseRecord> onCourse;
 
   @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: Motion.slow * 2,
-      curve: Curves.easeOutCubic,
-      builder: (context, t, _) => Row(
-        children: [
-          for (final (i, c) in courses.indexed) ...[
-            if (i > 0) const SizedBox(width: 3),
-            Expanded(
-              // Non-credit courses still get a sliver so they're visible.
-              flex: math.max(
-                5,
-                ((creditsByCode[c.courseCode.trim().toUpperCase()] ?? 0) * 10)
-                    .round(),
-              ),
-              child: PressScale(
-                scale: 0.9,
-                semanticsLabel: '${c.courseTitle}, grade ${c.grade}',
-                onPress: () => onCourse(c),
-                child: Padding(
-                  // Taller hit area than the bar itself.
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Opacity(
-                    opacity: t,
-                    child: Container(
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: gradeTone(context, c.grade.trim()).base,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: Motion.slow * 2,
+    curve: Curves.easeOutCubic,
+    builder: (context, t, _) => Row(
+      children: [
+        for (final (i, c) in courses.indexed) ...[
+          if (i > 0) const SizedBox(width: 3),
+          Expanded(
+            // Non-credit courses still get a sliver so they're visible.
+            flex: math.max(
+              5,
+              ((creditsByCode[c.courseCode.trim().toUpperCase()] ?? 0) * 10)
+                  .round(),
+            ),
+            child: PressScale(
+              scale: 0.9,
+              semanticsLabel: '${c.courseTitle}, grade ${c.grade}',
+              onPress: () => onCourse(c),
+              child: Padding(
+                // Taller hit area than the bar itself.
+                padding: const .symmetric(vertical: 6),
+                child: Opacity(
+                  opacity: t,
+                  child: Container(
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: gradeTone(context, c.grade.trim()).base,
+                      borderRadius: .circular(3),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
+          ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }

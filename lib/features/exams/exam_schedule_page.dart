@@ -80,15 +80,15 @@ class ExamSchedulePage extends HookConsumerWidget {
           title: "Couldn't load exams",
           message: commonErrorMessage(e),
           action: FButton(
-            variant: FButtonVariant.outline,
-            mainAxisSize: MainAxisSize.min,
+            variant: .outline,
+            mainAxisSize: .min,
             onPress: update,
             child: const Text('Try again'),
           ),
         ),
         loading: () => const Padding(
           key: ValueKey('loading'),
-          padding: EdgeInsets.all(Space.sm),
+          padding: .all(Space.sm),
           child: Column(
             children: [
               Skeleton(height: 40, radius: Radii.md),
@@ -118,30 +118,24 @@ class _ExamsView extends HookWidget {
     // Open on the next exam type — one with an upcoming or not-yet-announced
     // date — else the latest with dates.
     int initialIndex() {
-      for (final (i, t) in types.indexed) {
-        if (t.records.any(
+      final next = types.indexWhere(
+        (t) => t.records.any(
           (e) =>
               examDayOf(e) == null || (examStartOf(e)?.isAfter(now) ?? false),
-        )) {
-          return i;
-        }
-      }
-      for (var i = types.length - 1; i >= 0; i--) {
-        if (types[i].records.any((e) => examDayOf(e) != null)) return i;
-      }
-      return 0;
+        ),
+      );
+      if (next >= 0) return next;
+      final latest = types.lastIndexWhere(
+        (t) => t.records.any((e) => examDayOf(e) != null),
+      );
+      return latest >= 0 ? latest : 0;
     }
 
     final selected = useState<int>(useMemoized(initialIndex));
     final index = selected.value.clamp(0, types.length - 1);
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.sm,
-        Space.sm,
-        Space.lg,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (types.length > 1) ...[
@@ -158,10 +152,8 @@ class _ExamsView extends HookWidget {
           duration: Motion.medium,
           switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
           switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
-          layoutBuilder: (current, previous) => Stack(
-            alignment: Alignment.topCenter,
-            children: [...previous, ?current],
-          ),
+          layoutBuilder: (current, previous) =>
+              Stack(alignment: .topCenter, children: [...previous, ?current]),
           child: _Timeline(key: ValueKey(index), exams: types[index].records),
         ),
         DataUpdatedFooter(updateTime: updateTime),
@@ -169,14 +161,12 @@ class _ExamsView extends HookWidget {
     );
   }
 
-  static int _typeRank(String type) {
-    final t = type.toUpperCase().replaceAll(' ', '');
-    if (t.startsWith('CAT')) {
-      return int.tryParse(t.substring(3)) ?? 5;
-    }
-    if (t.contains('FAT')) return 10;
-    return 20;
-  }
+  static int _typeRank(String type) =>
+      switch (type.toUpperCase().replaceAll(' ', '')) {
+        final t when t.startsWith('CAT') => int.tryParse(t.substring(3)) ?? 5,
+        final t when t.contains('FAT') => 10,
+        _ => 20,
+      };
 }
 
 /// Exams grouped by day, with the free days between them called out.
@@ -191,19 +181,16 @@ class _Timeline extends StatelessWidget {
     for (final exam in exams) {
       byDay.putIfAbsent(examDayOf(exam), () => []).add(exam);
     }
+    DateTime startOf(ExamScheduleRecord e) => examStartOf(e) ?? DateTime(9999);
     for (final list in byDay.values) {
-      list.sort(
-        (a, b) => (examStartOf(a) ?? DateTime(9999)).compareTo(
-          examStartOf(b) ?? DateTime(9999),
-        ),
-      );
+      list.sort((a, b) => startOf(a).compareTo(startOf(b)));
     }
     final days = byDay.keys.whereType<DateTime>().toList()..sort();
     final undated = byDay[null] ?? const [];
     var row = 0;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         for (final (i, day) in days.indexed) ...[
           // Past days carry their date inside each compact row, so they get
@@ -216,7 +203,7 @@ class _Timeline extends StatelessWidget {
             const SizedBox(height: Space.md),
           for (final exam in byDay[day]!)
             Padding(
-              padding: const EdgeInsets.only(bottom: Space.sm),
+              padding: const .only(bottom: Space.sm),
               child: EnterFade(
                 index: row++,
                 child: _ExamCard(exam: exam, day: day),
@@ -229,7 +216,7 @@ class _Timeline extends StatelessWidget {
             trailing: Text('${undated.length} courses'),
           ),
           Surface(
-            padding: EdgeInsets.zero,
+            padding: .zero,
             child: Column(
               children: [
                 for (final (i, exam) in undated.indexed) ...[
@@ -256,15 +243,16 @@ class _DayHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final muted = typography.body.xs.copyWith(color: colors.mutedForeground);
     final (label, tone) = _relative(context, day);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, Space.lg, 2, Space.sm),
+      padding: const .fromLTRB(2, Space.lg, 2, Space.sm),
       child: Row(
         children: [
           Text(
             DateFormat('EEE d MMM').format(day).toUpperCase(),
             style: typography.body.sm.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: .w700,
               letterSpacing: 0.4,
               color: colors.foreground,
             ),
@@ -273,37 +261,25 @@ class _DayHeader extends StatelessWidget {
           if (tone != null)
             ToneBadge(label: label, tone: tone)
           else
-            Text(
-              label,
-              style: typography.body.xs.copyWith(color: colors.mutedForeground),
-            ),
+            Text(label, style: muted),
           const Spacer(),
-          if (count > 1)
-            Text(
-              '$count exams',
-              style: typography.body.xs.copyWith(color: colors.mutedForeground),
-            ),
+          if (count > 1) Text('$count exams', style: muted),
         ],
       ),
     );
   }
 }
 
-bool _isPastDay(DateTime day) {
-  final now = DateTime.now();
-  return DateTime(
-    day.year,
-    day.month,
-    day.day,
-  ).isBefore(DateTime(now.year, now.month, now.day));
-}
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+bool _isPastDay(DateTime day) =>
+    _dateOnly(day).isBefore(_dateOnly(DateTime.now()));
 
 /// Day number over a short weekday, for rows that carry their own date.
 class _DateColumn extends StatelessWidget {
-  const _DateColumn({required this.day, this.muted = false});
+  const _DateColumn({required this.day});
 
   final DateTime day;
-  final bool muted;
 
   @override
   Widget build(BuildContext context) {
@@ -317,8 +293,8 @@ class _DateColumn extends StatelessWidget {
             '${day.day}',
             style: typography.body.lg.nums(
               height: 1.1,
-              fontWeight: FontWeight.w700,
-              color: muted ? colors.mutedForeground : colors.foreground,
+              fontWeight: .w700,
+              color: colors.mutedForeground,
             ),
           ),
           Text(
@@ -338,13 +314,12 @@ class _DateColumn extends StatelessWidget {
 /// "done", "TODAY", "TOMORROW", "IN 3 DAYS" – with a tone for upcoming days.
 (String, Tone?) _relative(BuildContext context, DateTime day) {
   final palette = context.theme.colors.app;
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final diff = DateTime(day.year, day.month, day.day).difference(today).inDays;
-  if (diff < 0) return ('done', null);
-  if (diff == 0) return ('TODAY', palette.danger);
-  if (diff == 1) return ('TOMORROW', palette.warning);
-  return ('IN $diff DAYS', palette.accentTone);
+  return switch (_dateOnly(day).difference(_dateOnly(DateTime.now())).inDays) {
+    < 0 => ('done', null),
+    0 => ('TODAY', palette.danger),
+    1 => ('TOMORROW', palette.warning),
+    final diff => ('IN $diff DAYS', palette.accentTone),
+  };
 }
 
 class _GapRow extends StatelessWidget {
@@ -356,13 +331,14 @@ class _GapRow extends StatelessWidget {
   Widget build(BuildContext context) {
     if (days <= 0) return const SizedBox.shrink();
     final colors = context.theme.colors;
+    final line = Expanded(child: Container(height: 1, color: colors.border));
     return Padding(
-      padding: const EdgeInsets.only(top: Space.sm),
+      padding: const .only(top: Space.sm),
       child: Row(
         children: [
-          Expanded(child: Container(height: 1, color: colors.border)),
+          line,
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+            padding: const .symmetric(horizontal: Space.sm),
             child: Row(
               children: [
                 Icon(
@@ -380,7 +356,7 @@ class _GapRow extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(child: Container(height: 1, color: colors.border)),
+          line,
         ],
       ),
     );
@@ -399,9 +375,7 @@ class _ExamCard extends HookWidget {
     final typography = context.theme.typography;
     final start = examStartOf(exam);
     final done = start != null && start.isBefore(DateTime.now());
-    final hasLocation = hasValue(exam.venue) || hasValue(exam.seatLocation);
-    final hasNumberOrReport =
-        hasValue(exam.seatNo) || hasValue(exam.reportingTime);
+    final startClock = formatClock(exam.examTime.split('-').first, context);
     final expanded = useState(false);
     void toggle() => expanded.value = !expanded.value;
 
@@ -411,14 +385,11 @@ class _ExamCard extends HookWidget {
       return Surface(
         onPress: toggle,
         semanticsLabel: '${exam.courseName}, finished, show details',
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.md + 2,
-          vertical: Space.md,
-        ),
+        padding: const .symmetric(horizontal: Space.md + 2, vertical: Space.md),
         child: Row(
           children: [
             _isPastDay(day)
-                ? _DateColumn(day: day, muted: true)
+                ? _DateColumn(day: day)
                 : Icon(
                     FLucideIcons.circleCheck,
                     size: 16,
@@ -427,14 +398,14 @@ class _ExamCard extends HookWidget {
             const SizedBox(width: Space.md),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Text(
                     exam.courseName,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: .ellipsis,
                     style: typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                       color: colors.mutedForeground,
                     ),
                   ),
@@ -450,7 +421,7 @@ class _ExamCard extends HookWidget {
             ),
             const SizedBox(width: Space.md),
             Text(
-              formatClock(exam.examTime.split('-').first, context),
+              startClock,
               style: typography.body.xs.nums(color: colors.mutedForeground),
             ),
           ],
@@ -458,110 +429,100 @@ class _ExamCard extends HookWidget {
       );
     }
 
-    // A finished exam only reaches here when opened, so show it at full
-    // strength.
-    return AnimatedOpacity(
-      duration: Motion.medium,
-      opacity: 1,
-      child: Surface(
-        onPress: done ? toggle : null,
-        padding: const EdgeInsets.all(Space.md + 2),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_isPastDay(day)) ...[
-                        ToneBadge(
-                          label: DateFormat(
-                            'EEE d MMM',
-                          ).format(day).toUpperCase(),
-                          icon: FLucideIcons.calendar,
-                          tone: colors.app.accentTone,
-                        ),
-                        const SizedBox(height: Space.sm),
-                      ],
-                      Text(
-                        exam.courseName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: typography.body.md.copyWith(
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                          color: colors.foreground,
-                        ),
-                      ),
-                      Text(
-                        exam.courseCode,
-                        style: typography.body.xs.copyWith(
-                          color: colors.mutedForeground,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: Space.md),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+    final factRows = [
+      [
+        if (hasValue(exam.venue))
+          _Fact(label: 'VENUE', value: exam.venue.trim()),
+        if (hasValue(exam.seatLocation))
+          _Fact(label: 'SEAT', value: _seatLabel(exam.seatLocation.trim())),
+      ],
+      [
+        if (hasValue(exam.seatNo))
+          _Fact(label: 'SEAT NO.', value: exam.seatNo.trim()),
+        if (hasValue(exam.reportingTime))
+          _Fact(
+            label: 'REPORT',
+            value: formatClock(exam.reportingTime, context),
+          ),
+      ],
+    ].where((facts) => facts.isNotEmpty);
+
+    return Surface(
+      onPress: done ? toggle : null,
+      padding: const .all(Space.md + 2),
+      child: Column(
+        crossAxisAlignment: .start,
+        children: [
+          Row(
+            crossAxisAlignment: .start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: .start,
                   children: [
+                    if (_isPastDay(day)) ...[
+                      ToneBadge(
+                        label: DateFormat(
+                          'EEE d MMM',
+                        ).format(day).toUpperCase(),
+                        icon: FLucideIcons.calendar,
+                        tone: colors.app.accentTone,
+                      ),
+                      const SizedBox(height: Space.sm),
+                    ],
                     Text(
-                      formatClock(exam.examTime.split('-').first, context),
-                      style: typography.body.md.nums(
-                        fontWeight: FontWeight.w500,
+                      exam.courseName,
+                      maxLines: 2,
+                      overflow: .ellipsis,
+                      style: typography.body.md.copyWith(
+                        height: 1.25,
+                        fontWeight: .w600,
                         color: colors.foreground,
                       ),
                     ),
-                    if (exam.examTime.contains('-'))
-                      Text(
-                        'to ${formatClock(exam.examTime.split('-').last, context)}',
-                        style: typography.body.xs.copyWith(
-                          color: colors.mutedForeground,
-                        ),
+                    Text(
+                      exam.courseCode,
+                      style: typography.body.xs.copyWith(
+                        color: colors.mutedForeground,
                       ),
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(width: Space.md),
+              Column(
+                crossAxisAlignment: .end,
+                children: [
+                  Text(
+                    startClock,
+                    style: typography.body.md.nums(
+                      fontWeight: .w500,
+                      color: colors.foreground,
+                    ),
+                  ),
+                  if (exam.examTime.contains('-'))
+                    Text(
+                      'to ${formatClock(exam.examTime.split('-').last, context)}',
+                      style: typography.body.xs.copyWith(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          for (final (i, facts) in factRows.indexed) ...[
+            SizedBox(height: i == 0 ? Space.md : Space.sm),
+            Row(
+              children: [
+                for (final (j, fact) in facts.indexed) ...[
+                  if (j > 0) const SizedBox(width: Space.sm),
+                  fact,
+                ],
               ],
             ),
-            if (hasLocation || hasNumberOrReport) ...[
-              const SizedBox(height: Space.md),
-              if (hasLocation)
-                Row(
-                  children: [
-                    if (hasValue(exam.venue))
-                      _Fact(label: 'VENUE', value: exam.venue.trim()),
-                    if (hasValue(exam.venue) && hasValue(exam.seatLocation))
-                      const SizedBox(width: Space.sm),
-                    if (hasValue(exam.seatLocation))
-                      _Fact(
-                        label: 'SEAT',
-                        value: _seatLabel(exam.seatLocation.trim()),
-                      ),
-                  ],
-                ),
-              if (hasLocation && hasNumberOrReport)
-                const SizedBox(height: Space.sm),
-              if (hasNumberOrReport)
-                Row(
-                  children: [
-                    if (hasValue(exam.seatNo))
-                      _Fact(label: 'SEAT NO.', value: exam.seatNo.trim()),
-                    if (hasValue(exam.seatNo) && hasValue(exam.reportingTime))
-                      const SizedBox(width: Space.sm),
-                    if (hasValue(exam.reportingTime))
-                      _Fact(
-                        label: 'REPORT',
-                        value: formatClock(exam.reportingTime, context),
-                      ),
-                  ],
-                ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -585,13 +546,13 @@ class _Fact extends StatelessWidget {
     final typography = context.theme.typography;
     return Expanded(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           Text(
             label,
             style: typography.body.xs.copyWith(
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: .w600,
               letterSpacing: 0.5,
               color: colors.mutedForeground,
             ),
@@ -600,9 +561,9 @@ class _Fact extends StatelessWidget {
           Text(
             value,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: .ellipsis,
             style: typography.body.sm.nums(
-              fontWeight: FontWeight.w600,
+              fontWeight: .w600,
               color: colors.foreground,
             ),
           ),
@@ -622,17 +583,14 @@ class _CourseLine extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md + 2,
-        vertical: Space.md,
-      ),
+      padding: const .symmetric(horizontal: Space.md + 2, vertical: Space.md),
       child: Row(
         children: [
           Expanded(
             child: Text(
               exam.courseName,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: typography.body.sm.copyWith(color: colors.foreground),
             ),
           ),
