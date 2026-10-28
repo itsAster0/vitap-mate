@@ -42,6 +42,16 @@ String _formatCredits(double credits) => credits == credits.roundToDouble()
 /// Grades offered in the picker (N carries no points and is left out).
 const _pickerGrades = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
 
+/// A small ghost +/- button.
+Widget _stepButton(String label, IconData icon, VoidCallback? onPress) =>
+    FButton.icon(
+      variant: .ghost,
+      size: .sm,
+      semanticsLabel: label,
+      onPress: onPress,
+      child: Icon(icon),
+    );
+
 class GpaCalculatorPage extends HookConsumerWidget {
   const GpaCalculatorPage({super.key});
 
@@ -73,22 +83,9 @@ class GpaCalculatorPage extends HookConsumerWidget {
       return null;
     }, [history.value]);
 
-    void addRow() {
-      rows.value = [...rows.value, _Row(id: nextId.value)];
-      nextId.value++;
-    }
-
-    void updateRow(int id, _Row Function(_Row) transform) {
-      rows.value = [
-        for (final r in rows.value)
-          if (r.id == id) transform(r) else r,
-      ];
-    }
-
-    void removeRow(int id) {
-      if (rows.value.length == 1) return;
-      rows.value = rows.value.where((r) => r.id != id).toList();
-    }
+    void updateRow(int id, _Row Function(_Row) transform) => rows.value = [
+      for (final r in rows.value) r.id == id ? transform(r) : r,
+    ];
 
     void addCurrentSemester() {
       final data = timetable.value;
@@ -168,19 +165,20 @@ class GpaCalculatorPage extends HookConsumerWidget {
         : (targetValue * (earned + sumCredits) - currentCgpa.value * earned) /
               sumCredits;
     final gpaTone = gradeTone(context, _letterFor(semesterGpa));
+    final label = typography.body.xs.copyWith(
+      fontWeight: .w600,
+      letterSpacing: 0.6,
+      color: colors.mutedForeground,
+    );
+    final count = rows.value.length;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.sm,
-        Space.sm,
-        Space.xl,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.xl),
       children: [
         // Summary: semester GPA ring + CGPA now → after.
         Surface(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               Row(
                 children: [
@@ -192,7 +190,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                     child: Text(
                       semesterGpa.toStringAsFixed(2),
                       style: typography.body.lg.nums(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: .w600,
                         color: colors.foreground,
                       ),
                     ),
@@ -200,31 +198,17 @@ class GpaCalculatorPage extends HookConsumerWidget {
                   const SizedBox(width: Space.lg),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: .start,
                       children: [
+                        Text('SEMESTER GPA', style: label),
                         Text(
-                          'SEMESTER GPA',
-                          style: typography.body.xs.copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.6,
-                            color: colors.mutedForeground,
-                          ),
-                        ),
-                        Text(
-                          '${rows.value.length} ${rows.value.length == 1 ? 'course' : 'courses'} · ${_formatCredits(sumCredits)} credits',
+                          '$count ${count == 1 ? 'course' : 'courses'} · ${_formatCredits(sumCredits)} credits',
                           style: typography.body.sm.copyWith(
                             color: colors.foreground,
                           ),
                         ),
                         const SizedBox(height: Space.md),
-                        Text(
-                          'PROJECTED CGPA',
-                          style: typography.body.xs.copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.6,
-                            color: colors.mutedForeground,
-                          ),
-                        ),
+                        Text('PROJECTED CGPA', style: label),
                         if (projected == null)
                           Text(
                             'Add your current CGPA below',
@@ -242,9 +226,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: Space.xs,
-                                ),
+                                padding: const .symmetric(horizontal: Space.xs),
                                 child: Icon(
                                   FLucideIcons.arrowRight,
                                   size: 14,
@@ -258,7 +240,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                                 builder: (context, v, _) => Text(
                                   v.toStringAsFixed(2),
                                   style: typography.body.lg.nums(
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: .w600,
                                     color: colors.foreground,
                                   ),
                                 ),
@@ -305,7 +287,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                     Text(
                       editBase.value ? 'Done' : 'Edit',
                       style: typography.body.xs.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: .w600,
                         color: colors.app.accentTone.onSubtle,
                       ),
                     ),
@@ -317,20 +299,17 @@ class GpaCalculatorPage extends HookConsumerWidget {
                 curve: Curves.easeOutCubic,
                 child: editBase.value || currentCgpa == null
                     ? Padding(
-                        padding: const EdgeInsets.only(top: Space.md),
+                        padding: const .only(top: Space.md),
                         child: Row(
                           children: [
                             Expanded(
                               child: FTextField(
                                 label: const Text('Current CGPA'),
                                 hint: 'e.g. 8.35',
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                control: FTextFieldControl.managed(
-                                  controller: cgpaController,
+                                keyboardType: const .numberWithOptions(
+                                  decimal: true,
                                 ),
+                                control: .managed(controller: cgpaController),
                               ),
                             ),
                             const SizedBox(width: Space.sm + 2),
@@ -338,10 +317,8 @@ class GpaCalculatorPage extends HookConsumerWidget {
                               child: FTextField(
                                 label: const Text('Completed credits'),
                                 hint: 'e.g. 54',
-                                keyboardType: TextInputType.number,
-                                control: FTextFieldControl.managed(
-                                  controller: earnedController,
-                                ),
+                                keyboardType: .number,
+                                control: .managed(controller: earnedController),
                               ),
                             ),
                           ],
@@ -355,56 +332,38 @@ class GpaCalculatorPage extends HookConsumerWidget {
         if (needed != null) ...[
           const SizedBox(height: Space.sm + 2),
           Surface(
-            padding: const EdgeInsets.fromLTRB(
-              Space.lg,
-              Space.sm,
-              Space.sm,
-              Space.md,
-            ),
+            padding: const .fromLTRB(Space.lg, Space.sm, Space.sm, Space.md),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        'TARGET CGPA',
-                        style: typography.body.xs.copyWith(
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.6,
-                          color: colors.mutedForeground,
-                        ),
-                      ),
-                    ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      size: FButtonSizeVariant.sm,
-                      semanticsLabel: 'Lower target',
-                      onPress: targetValue > 5
+                    Expanded(child: Text('TARGET CGPA', style: label)),
+                    _stepButton(
+                      'Lower target',
+                      FLucideIcons.minus,
+                      targetValue > 5
                           ? () => target.value = targetValue - 0.05
                           : null,
-                      child: const Icon(FLucideIcons.minus),
                     ),
                     SizedBox(
                       width: 52,
                       child: Text(
                         targetValue.toStringAsFixed(2),
-                        textAlign: TextAlign.center,
+                        textAlign: .center,
                         style: typography.body.lg.nums(
-                          fontWeight: FontWeight.w600,
+                          fontWeight: .w600,
                           color: colors.foreground,
                         ),
                       ),
                     ),
-                    FButton.icon(
-                      variant: FButtonVariant.ghost,
-                      size: FButtonSizeVariant.sm,
-                      semanticsLabel: 'Raise target',
-                      onPress: targetValue < 9.995
+                    _stepButton(
+                      'Raise target',
+                      FLucideIcons.plus,
+                      targetValue < 9.995
                           ? () =>
                                 target.value = math.min(10, targetValue + 0.05)
                           : null,
-                      child: const Icon(FLucideIcons.plus),
                     ),
                   ],
                 ),
@@ -428,7 +387,7 @@ class GpaCalculatorPage extends HookConsumerWidget {
                             TextSpan(
                               text: needed.toStringAsFixed(2),
                               style: TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: .w700,
                                 color: colors.foreground,
                               ),
                             ),
@@ -444,9 +403,9 @@ class GpaCalculatorPage extends HookConsumerWidget {
         SectionHeader(
           title: 'Courses',
           trailing: FButton(
-            variant: FButtonVariant.ghost,
-            size: FButtonSizeVariant.sm,
-            mainAxisSize: MainAxisSize.min,
+            variant: .ghost,
+            size: .sm,
+            mainAxisSize: .min,
             prefix: const Icon(FLucideIcons.calendarDays),
             onPress: timetable.value == null ? null : addCurrentSemester,
             child: const Text('Current semester'),
@@ -455,31 +414,37 @@ class GpaCalculatorPage extends HookConsumerWidget {
         AnimatedSize(
           duration: Motion.medium,
           curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
+          alignment: .topCenter,
           child: Column(
             children: [
               for (final (i, row) in rows.value.indexed)
                 Padding(
                   key: ValueKey(row.id),
-                  padding: const EdgeInsets.only(bottom: Space.sm),
+                  padding: const .only(bottom: Space.sm),
                   child: _CourseRowCard(
                     index: i,
                     row: row,
-                    canRemove: rows.value.length > 1,
+                    canRemove: count > 1,
                     onCredits: (c) =>
                         updateRow(row.id, (r) => r.copyWith(credits: c)),
                     onGrade: (g) =>
                         updateRow(row.id, (r) => r.copyWith(grade: g)),
-                    onRemove: () => removeRow(row.id),
+                    onRemove: () => rows.value = [
+                      for (final r in rows.value)
+                        if (r.id != row.id) r,
+                    ],
                   ),
                 ),
             ],
           ),
         ),
         FButton(
-          variant: FButtonVariant.outline,
+          variant: .outline,
           prefix: const Icon(FLucideIcons.plus),
-          onPress: addRow,
+          onPress: () {
+            rows.value = [...rows.value, _Row(id: nextId.value)];
+            nextId.value++;
+          },
           child: const Text('Add course'),
         ),
       ],
@@ -487,15 +452,15 @@ class GpaCalculatorPage extends HookConsumerWidget {
   }
 
   /// Nearest letter for a GPA, used only to colour the ring.
-  static String _letterFor(double gpa) {
-    if (gpa >= 9.5) return 'S';
-    if (gpa >= 8.5) return 'A';
-    if (gpa >= 7.5) return 'B';
-    if (gpa >= 6.5) return 'C';
-    if (gpa >= 5.5) return 'D';
-    if (gpa >= 4.5) return 'E';
-    return 'F';
-  }
+  static String _letterFor(double gpa) => switch (gpa) {
+    >= 9.5 => 'S',
+    >= 8.5 => 'A',
+    >= 7.5 => 'B',
+    >= 6.5 => 'C',
+    >= 5.5 => 'D',
+    >= 4.5 => 'E',
+    _ => 'F',
+  };
 }
 
 class _CourseRowCard extends StatelessWidget {
@@ -519,39 +484,33 @@ class _CourseRowCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final title = row.courseName.isNotEmpty
-        ? row.courseName
-        : 'Course ${index + 1}';
 
     return Surface(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md + 2,
-        Space.sm + 2,
-        Space.sm,
-        Space.md,
-      ),
+      padding: const .fromLTRB(Space.md + 2, Space.sm + 2, Space.sm, Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           // Line 1: name (room to wrap) and remove.
           Row(
             children: [
               Expanded(
                 child: Text(
-                  title,
+                  row.courseName.isNotEmpty
+                      ? row.courseName
+                      : 'Course ${index + 1}',
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.sm.copyWith(
                     height: 1.25,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
               ),
               if (canRemove)
                 FButton.icon(
-                  variant: FButtonVariant.ghost,
-                  size: FButtonSizeVariant.sm,
+                  variant: .ghost,
+                  size: .sm,
                   semanticsLabel: 'Remove course',
                   onPress: onRemove,
                   child: Icon(FLucideIcons.x, color: colors.mutedForeground),
@@ -569,38 +528,34 @@ class _CourseRowCard extends StatelessWidget {
                   ),
                 ),
               ),
-              FButton.icon(
-                variant: FButtonVariant.ghost,
-                size: FButtonSizeVariant.sm,
-                semanticsLabel: 'Fewer credits',
-                onPress: row.credits > 0.5
+              _stepButton(
+                'Fewer credits',
+                FLucideIcons.minus,
+                row.credits > 0.5
                     ? () => onCredits((row.credits - 0.5).clamp(0.5, 30))
                     : null,
-                child: const Icon(FLucideIcons.minus),
               ),
               SizedBox(
                 width: 56,
                 child: Text(
                   '${_formatCredits(row.credits)} cr',
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   style: typography.body.sm.nums(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: .w500,
                     color: colors.foreground,
                   ),
                 ),
               ),
-              FButton.icon(
-                variant: FButtonVariant.ghost,
-                size: FButtonSizeVariant.sm,
-                semanticsLabel: 'More credits',
-                onPress: () => onCredits((row.credits + 0.5).clamp(0.5, 30)),
-                child: const Icon(FLucideIcons.plus),
+              _stepButton(
+                'More credits',
+                FLucideIcons.plus,
+                () => onCredits((row.credits + 0.5).clamp(0.5, 30)),
               ),
             ],
           ),
           const SizedBox(height: Space.sm),
           Padding(
-            padding: const EdgeInsets.only(right: Space.xs + 2),
+            padding: const .only(right: Space.xs + 2),
             child: Segmented<String>(
               value: row.grade,
               onChanged: onGrade,

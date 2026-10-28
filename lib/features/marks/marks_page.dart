@@ -59,15 +59,15 @@ class MarksPage extends HookConsumerWidget {
           title: "Couldn't load marks",
           message: commonErrorMessage(e),
           action: FButton(
-            variant: FButtonVariant.outline,
-            mainAxisSize: MainAxisSize.min,
+            variant: .outline,
+            mainAxisSize: .min,
             onPress: update,
             child: const Text('Try again'),
           ),
         ),
         loading: () => const Padding(
           key: ValueKey('loading'),
-          padding: EdgeInsets.all(Space.sm),
+          padding: .all(Space.sm),
           child: Column(
             children: [
               Skeleton(height: 40, radius: Radii.md),
@@ -114,12 +114,7 @@ class _MarksView extends HookWidget {
         backgroundColor: context.theme.colors.background,
         color: context.theme.colors.foreground,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.lg,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             if (records.isNotEmpty) ...[
@@ -140,7 +135,7 @@ class _MarksView extends HookWidget {
               switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
               switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
               layoutBuilder: (current, previous) => Stack(
-                alignment: Alignment.topCenter,
+                alignment: .topCenter,
                 children: [...previous, ?current],
               ),
               child: Column(
@@ -157,14 +152,16 @@ class _MarksView extends HookWidget {
                   else
                     for (final (i, record) in shown.indexed)
                       Padding(
-                        padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                        padding: const .only(bottom: Space.sm + 2),
                         child: EnterFade(
                           index: i,
                           child: MarksCard(
                             key: ValueKey(
                               '${record.coursecode}_${record.slot}',
                             ),
-                            record: record.copyWith(marks: sortedMarks(record)),
+                            record: record.copyWith(
+                              marks: _bySerial(record.marks),
+                            ),
                           ),
                         ),
                       ),
@@ -179,11 +176,7 @@ class _MarksView extends HookWidget {
   }
 }
 
-List<MarksRecordEach> sortedMarks(MarksRecord record) {
-  final cloned = [...record.marks];
-  cloned.sort(
-    (a, b) =>
-        (int.tryParse(a.serial) ?? 0).compareTo(int.tryParse(b.serial) ?? 0),
-  );
-  return cloned;
+List<MarksRecordEach> _bySerial(List<MarksRecordEach> marks) {
+  int serial(MarksRecordEach m) => int.tryParse(m.serial) ?? 0;
+  return [...marks]..sort((a, b) => serial(a).compareTo(serial(b)));
 }

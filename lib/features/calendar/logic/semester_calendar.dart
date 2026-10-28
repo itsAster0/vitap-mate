@@ -40,12 +40,13 @@ class SemesterCalendar {
       final date = DateTime.tryParse(entry.date);
       if (date == null) continue;
       final day = _dateOnly(date);
+      final mark = markOf(entry);
       final existing = dayEntries[day];
-      if (existing == null || markOf(entry).index < markOf(existing).index) {
+      if (existing == null || mark.index < markOf(existing).index) {
         dayEntries[day] = entry;
       }
       final kind = entry.kind.toLowerCase();
-      if (markOf(entry) == CalendarMark.exam) {
+      if (mark == CalendarMark.exam) {
         final start = examStarts[entry.kind];
         if (start == null || day.isBefore(start)) examStarts[entry.kind] = day;
       }
@@ -67,7 +68,7 @@ class SemesterCalendar {
       dayEntries: dayEntries,
       exams: [
         for (final MapEntry(key: kind, value: start) in examStarts.entries)
-          (start: start, name: _shortExamName(kind)),
+          (start: start, name: examName(kind)),
       ]..sort((a, b) => a.start.compareTo(b.start)),
     );
   }
@@ -84,29 +85,16 @@ class SemesterCalendar {
   /// class days remain.
   ({DateTime start, String name})? nextExam(DateTime now) {
     final today = _dateOnly(now);
-    DateTime? nextClassDay;
-    for (final day in _instructionalDays) {
-      if (day.isBefore(today)) continue;
-      if (nextClassDay == null || day.isBefore(nextClassDay)) {
-        nextClassDay = day;
-      }
-    }
-    if (nextClassDay == null) return null;
-    for (final exam in _exams) {
-      if (exam.start.isAfter(nextClassDay)) return exam;
-    }
-    return null;
+    final upcoming = _instructionalDays.where((d) => !d.isBefore(today));
+    if (upcoming.isEmpty) return null;
+    final nextClassDay = upcoming.reduce((a, b) => a.isBefore(b) ? a : b);
+    return _exams.where((e) => e.start.isAfter(nextClassDay)).firstOrNull;
   }
 
   /// The first exam starting after today, whether or not classes come
   /// before it.
-  ({DateTime start, String name})? upcomingExam(DateTime now) {
-    final today = _dateOnly(now);
-    for (final exam in _exams) {
-      if (exam.start.isAfter(today)) return exam;
-    }
-    return null;
-  }
+  ({DateTime start, String name})? upcomingExam(DateTime now) =>
+      _exams.where((e) => e.start.isAfter(_dateOnly(now))).firstOrNull;
 
   /// The most notable entry of each dated day.
   final Map<DateTime, CalendarEntry> _dayEntries;
@@ -155,13 +143,8 @@ class SemesterCalendar {
   }
 
   /// The next weekday holiday from today on (Sundays are always off).
-  ({DateTime date, String name})? nextHoliday(DateTime now) {
-    final today = _dateOnly(now);
-    for (final holiday in _holidays) {
-      if (!holiday.date.isBefore(today)) return holiday;
-    }
-    return null;
-  }
+  ({DateTime date, String name})? nextHoliday(DateTime now) =>
+      _holidays.where((h) => !h.date.isBefore(_dateOnly(now))).firstOrNull;
 
   /// The semester's first class day, or null for an empty calendar.
   DateTime? get firstClassDay => _instructionalDays.isEmpty
@@ -169,20 +152,12 @@ class SemesterCalendar {
       : _instructionalDays.reduce((a, b) => a.isBefore(b) ? a : b);
 
   /// The last day with classes of this kind, or null for an empty calendar.
-  DateTime? lastClassDay({required bool lab}) {
-    DateTime? last;
-    for (final day in _instructionalDays) {
-      if (!holdsClasses(day, lab: lab)) continue;
-      if (last == null || day.isAfter(last)) last = day;
-    }
-    return last;
-  }
+  DateTime? lastClassDay({required bool lab}) => _instructionalDays
+      .where((day) => holdsClasses(day, lab: lab))
+      .fold<DateTime?>(null, (a, b) => a == null || b.isAfter(a) ? b : a);
 }
 
 DateTime _dateOnly(DateTime date) => DateTime(date.year, date.month, date.day);
-
-/// "CAT - II" → "CAT-II", "Final Assessment Test" → "FAT".
-String _shortExamName(String kind) => examName(kind);
 
 /// One name for an exam wherever it comes from: the calendar's "CAT - II"
 /// or "Final Assessment Test", or the exam schedule's "CAT2" or "FAT", all
@@ -233,7 +208,7 @@ String titleOf(CalendarEntry entry) {
   final note = entry.note.trim();
   return switch (markOf(entry)) {
     CalendarMark.holiday => note.isEmpty ? 'Holiday' : note,
-    CalendarMark.exam => _shortExamName(entry.kind),
+    CalendarMark.exam => examName(entry.kind),
     CalendarMark.labFat => 'Lab FAT',
     CalendarMark.noClasses =>
       note.isEmpty || note.toLowerCase() == 'no instructional day'

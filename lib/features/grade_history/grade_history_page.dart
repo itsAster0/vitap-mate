@@ -34,7 +34,7 @@ Map<String, List<GradeHistoryRecord>> _bySession(
 
 /// Credit-weighted GPA of [records]; pass/fail and N grades carry no points
 /// and are left out. Null when nothing counts.
-double? _sessionGpa(List<GradeHistoryRecord> records) {
+double? _sessionGpa(Iterable<GradeHistoryRecord> records) {
   var points = 0.0;
   var credits = 0.0;
   for (final r in records) {
@@ -47,12 +47,11 @@ double? _sessionGpa(List<GradeHistoryRecord> records) {
   return credits == 0 ? null : points / credits;
 }
 
-/// "Jan-2025" → "Jan 25", for chart labels.
-String _shortSession(String month) {
-  final parts = month.trim().split('-');
-  if (parts.length != 2 || parts[1].length != 4) return month;
-  return "${parts[0]} '${parts[1].substring(2)}";
-}
+/// "Jan-2025" → "Jan '25", for chart labels.
+String _shortSession(String month) => switch (month.trim().split('-')) {
+  [final m, final year] when year.length == 4 => "$m '${year.substring(2)}",
+  _ => month,
+};
 
 /// "Jan-2025" → "Jan 2025".
 String _sessionLabel(String month) => month.replaceAll('-', ' ').trim();
@@ -90,7 +89,7 @@ class GradeHistoryPage extends HookConsumerWidget {
         skipLoadingOnReload: true,
         loading: () => const Padding(
           key: ValueKey('loading'),
-          padding: EdgeInsets.all(Space.sm),
+          padding: .all(Space.sm),
           child: Column(
             children: [
               Skeleton(height: 150, radius: Radii.lg),
@@ -105,8 +104,8 @@ class GradeHistoryPage extends HookConsumerWidget {
           title: "Couldn't load grade history",
           message: commonErrorMessage(e),
           action: FButton(
-            variant: FButtonVariant.outline,
-            mainAxisSize: MainAxisSize.min,
+            variant: .outline,
+            mainAxisSize: .min,
             onPress: reload,
             child: const Text('Try again'),
           ),
@@ -151,12 +150,7 @@ class _HistoryView extends HookWidget {
               .toList();
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.sm,
-        Space.sm,
-        Space.lg,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         _CgpaHero(history: history),
@@ -166,7 +160,7 @@ class _HistoryView extends HookWidget {
             trailing: Text('${shown.length} of ${history.records.length}'),
           ),
           SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection: .horizontal,
             child: Row(
               children: [
                 _FilterChip(
@@ -193,10 +187,8 @@ class _HistoryView extends HookWidget {
           duration: Motion.medium,
           switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
           switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
-          layoutBuilder: (current, previous) => Stack(
-            alignment: Alignment.topCenter,
-            children: [...previous, ?current],
-          ),
+          layoutBuilder: (current, previous) =>
+              Stack(alignment: .topCenter, children: [...previous, ?current]),
           child: Column(
             key: ValueKey(filter.value),
             children: [
@@ -211,23 +203,19 @@ class _HistoryView extends HookWidget {
                     title: entry.key.isEmpty
                         ? 'Other'
                         : _sessionLabel(entry.key),
-                    trailing: Builder(
-                      builder: (context) {
-                        // GPA of the whole session, not just filtered rows.
-                        final gpa = _sessionGpa(
-                          history.records
-                              .where((r) => r.examMonth.trim() == entry.key)
-                              .toList(),
-                        );
-                        return Text(
-                          gpa == null ? '' : 'GPA ${gpa.toStringAsFixed(2)}',
-                        );
-                      },
-                    ),
+                    // GPA of the whole session, not just filtered rows.
+                    trailing: Text(switch (_sessionGpa(
+                      history.records.where(
+                        (r) => r.examMonth.trim() == entry.key,
+                      ),
+                    )) {
+                      final gpa? => 'GPA ${gpa.toStringAsFixed(2)}',
+                      null => '',
+                    }),
                   ),
                   for (final (i, r) in entry.value.indexed)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm),
+                      padding: const .only(bottom: Space.sm),
                       child: EnterFade(
                         index: i,
                         child: _CourseCard(record: r),
@@ -275,7 +263,7 @@ class _CgpaHero extends StatelessWidget {
 
     return Surface(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Text(
             [
@@ -283,20 +271,20 @@ class _CgpaHero extends StatelessWidget {
               history.student.regNo.trim(),
             ].where((p) => p.isNotEmpty).join(' · '),
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: .ellipsis,
             style: typography.body.xs.copyWith(color: colors.mutedForeground),
           ),
           const SizedBox(height: Space.md),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: .end,
             children: [
               Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Text(
                     'CGPA',
                     style: typography.body.xs.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       letterSpacing: 0.6,
                       color: colors.mutedForeground,
                     ),
@@ -308,7 +296,7 @@ class _CgpaHero extends StatelessWidget {
                           decimals: 2,
                           style: typography.display.xl3.copyWith(
                             height: 1.1,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             letterSpacing: -0.5,
                             color: colors.foreground,
                           ),
@@ -324,7 +312,7 @@ class _CgpaHero extends StatelessWidget {
           if (total > 0) ...[
             const SizedBox(height: Space.lg),
             ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.pill),
+              borderRadius: .circular(Radii.pill),
               child: SizedBox(
                 height: 10,
                 child: Row(
@@ -333,7 +321,7 @@ class _CgpaHero extends StatelessWidget {
                       Expanded(
                         flex: e.value,
                         child: Container(
-                          margin: const EdgeInsets.only(right: 2),
+                          margin: const .only(right: 2),
                           color: gradeTone(context, e.key).base,
                         ),
                       ),
@@ -348,14 +336,14 @@ class _CgpaHero extends StatelessWidget {
               children: [
                 for (final e in counts.entries)
                   Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: .min,
                     children: [
                       Container(
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
                           color: gradeTone(context, e.key).base,
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: .circular(2),
                         ),
                       ),
                       const SizedBox(width: Space.xs),
@@ -376,7 +364,7 @@ class _CgpaHero extends StatelessWidget {
               'GPA BY SEMESTER',
               style: typography.body.xs.copyWith(
                 fontSize: 10,
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 letterSpacing: 0.5,
                 color: colors.mutedForeground,
               ),
@@ -417,7 +405,7 @@ class _GpaTrend extends StatelessWidget {
                 18 + chartHeight * (1 - (points[i].$2 - lo) / (hi - lo)),
               );
               return Stack(
-                clipBehavior: Clip.none,
+                clipBehavior: .none,
                 children: [
                   Positioned.fill(
                     child: CustomPaint(
@@ -435,10 +423,10 @@ class _GpaTrend extends StatelessWidget {
                       width: 48,
                       child: Text(
                         points[i].$2.toStringAsFixed(2),
-                        textAlign: TextAlign.center,
+                        textAlign: .center,
                         style: typography.body.xs.nums(
                           fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: .w600,
                           color: colors.foreground,
                         ),
                       ),
@@ -455,7 +443,7 @@ class _GpaTrend extends StatelessWidget {
               Expanded(
                 child: Text(
                   p.$1,
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   maxLines: 1,
                   style: typography.body.xs.copyWith(
                     fontSize: 10,
@@ -485,11 +473,7 @@ class _TrendPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final p in points.skip(1)) {
-      path.lineTo(p.dx, p.dy);
-    }
-    canvas.drawPath(path, line);
+    canvas.drawPath(Path()..addPolygon(points, false), line);
     for (final p in points) {
       canvas.drawCircle(p, 4.5, Paint()..color = hole);
       canvas.drawCircle(p, 3.5, Paint()..color = color);
@@ -513,13 +497,13 @@ class _Stat extends StatelessWidget {
     final typography = context.theme.typography;
     final number = double.tryParse(value.trim());
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: .end,
       children: [
         Text(
           label,
           style: typography.body.xs.copyWith(
             fontSize: 10,
-            fontWeight: FontWeight.w600,
+            fontWeight: .w600,
             letterSpacing: 0.5,
             color: colors.mutedForeground,
           ),
@@ -531,7 +515,7 @@ class _Stat extends StatelessWidget {
               ? number.toStringAsFixed(0)
               : number.toString(),
           style: typography.body.lg.nums(
-            fontWeight: FontWeight.w500,
+            fontWeight: .w500,
             color: colors.foreground,
           ),
         ),
@@ -560,26 +544,24 @@ class _FilterChip extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.only(right: Space.sm),
+      padding: const .only(right: Space.sm),
       child: PressScale(
         scale: 0.95,
         semanticsLabel: 'Show grade $label',
         onPress: onPress,
         child: AnimatedContainer(
           duration: Motion.medium,
-          padding: const EdgeInsets.symmetric(
+          padding: const .symmetric(
             horizontal: Space.md,
             vertical: Space.sm - 1,
           ),
           decoration: BoxDecoration(
             color: selected ? colors.primary : colors.card,
-            borderRadius: BorderRadius.circular(Radii.pill),
-            border: Border.all(
-              color: selected ? colors.primary : colors.border,
-            ),
+            borderRadius: .circular(Radii.pill),
+            border: .all(color: selected ? colors.primary : colors.border),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: .min,
             children: [
               if (tone != null) ...[
                 Container(
@@ -587,7 +569,7 @@ class _FilterChip extends StatelessWidget {
                   height: 8,
                   decoration: BoxDecoration(
                     color: tone!.base,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: .circular(2),
                   ),
                 ),
                 const SizedBox(width: Space.xs + 2),
@@ -595,7 +577,7 @@ class _FilterChip extends StatelessWidget {
               Text(
                 count == null ? label : '$label  $count',
                 style: typography.body.sm.copyWith(
-                  fontWeight: FontWeight.w500,
+                  fontWeight: .w500,
                   color: selected
                       ? colors.primaryForeground
                       : colors.foreground,
@@ -625,7 +607,7 @@ class _CourseCard extends HookWidget {
         .toList();
 
     return Surface(
-      padding: EdgeInsets.zero,
+      padding: .zero,
       child: Column(
         children: [
           PressScale(
@@ -633,22 +615,22 @@ class _CourseCard extends HookWidget {
             semanticsLabel: '${record.courseTitle}, grade ${record.grade}',
             onPress: () => expanded.value = !expanded.value,
             child: Padding(
-              padding: const EdgeInsets.all(Space.md + 2),
+              padding: const .all(Space.md + 2),
               child: Row(
                 children: [
                   GradeBadge(grade: record.grade),
                   const SizedBox(width: Space.md),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: .start,
                       children: [
                         Text(
                           record.courseTitle,
                           maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: .ellipsis,
                           style: typography.body.md.copyWith(
                             height: 1.25,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
@@ -668,7 +650,7 @@ class _CourseCard extends HookWidget {
                   if (credits != null) ...[
                     const SizedBox(width: Space.md),
                     Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: .end,
                       children: [
                         Text(
                           credits == credits.roundToDouble()
@@ -676,7 +658,7 @@ class _CourseCard extends HookWidget {
                               : '$credits',
                           style: typography.body.lg.nums(
                             height: 1.1,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
@@ -711,13 +693,13 @@ class _CourseCard extends HookWidget {
           AnimatedSize(
             duration: Motion.medium,
             curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
+            alignment: .topCenter,
             child: expanded.value && components.isNotEmpty
                 ? Column(
                     children: [
                       Container(height: 1, color: colors.border),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(
+                        padding: const .fromLTRB(
                           Space.md + 2,
                           Space.sm,
                           Space.md + 2,
@@ -727,9 +709,7 @@ class _CourseCard extends HookWidget {
                           children: [
                             for (final a in components)
                               Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: Space.xs,
-                                ),
+                                padding: const .symmetric(vertical: Space.xs),
                                 child: Row(
                                   children: [
                                     Expanded(

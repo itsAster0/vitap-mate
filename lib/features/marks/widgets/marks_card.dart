@@ -38,9 +38,9 @@ class MarksCard extends HookWidget {
     final hasMarks = totals.possible > 0;
 
     return Surface(
-      padding: EdgeInsets.zero,
+      padding: .zero,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           PressScale(
             scale: 0.99,
@@ -48,24 +48,24 @@ class MarksCard extends HookWidget {
                 '${record.coursetitle}, ${totals.gained.toStringAsFixed(1)} of ${totals.possible.toStringAsFixed(0)}',
             onPress: () => expanded.value = !expanded.value,
             child: Padding(
-              padding: const EdgeInsets.all(Space.md + 2),
+              padding: const .all(Space.md + 2),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: .start,
                           children: [
                             Text(
                               record.coursetitle,
                               maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.md.copyWith(
                                 height: 1.25,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.foreground,
                               ),
                             ),
@@ -91,7 +91,7 @@ class MarksCard extends HookWidget {
                       ),
                       const SizedBox(width: Space.md),
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: .end,
                         children: [
                           Text.rich(
                             TextSpan(
@@ -110,14 +110,14 @@ class MarksCard extends HookWidget {
                             ),
                             style: typography.body.lg.nums(
                               height: 1.2,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: .w500,
                             ),
                           ),
                           if (hasMarks)
                             Text(
                               '${totals.percentage.toStringAsFixed(0)}%',
                               style: typography.body.xs.copyWith(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: .w500,
                                 color: tone.base,
                               ),
                             ),
@@ -166,7 +166,7 @@ class MarksCard extends HookWidget {
           AnimatedSize(
             duration: Motion.medium,
             curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
+            alignment: .topCenter,
             child: expanded.value
                 ? Column(
                     children: [
@@ -175,9 +175,7 @@ class MarksCard extends HookWidget {
                         if (i > 0)
                           Container(
                             height: 1,
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: Space.md + 2,
-                            ),
+                            margin: const .symmetric(horizontal: Space.md + 2),
                             color: colors.border.withValues(alpha: 0.6),
                           ),
                         _AssessmentRow(mark: mark),
@@ -205,12 +203,13 @@ class _WeightBar extends StatelessWidget {
     final colors = context.theme.colors;
     final parts = [
       for (final m in marks)
-        (
-          weight: double.tryParse(m.weightage.trim()) ?? 0,
-          gained: double.tryParse(m.weightagemark.trim()) ?? 0,
-          absent: m.status.trim().toLowerCase() == 'absent',
-        ),
-    ].where((p) => p.weight > 0).toList();
+        if (_fillOf(m) case final fill?)
+          (
+            weight: _num(m.weightage),
+            fill: fill,
+            tone: _segmentTone(context, m, fill * 100),
+          ),
+    ];
     final assessed = parts.fold<double>(0, (sum, p) => sum + p.weight);
     final remaining = math.max(0.0, 100 - assessed);
 
@@ -219,31 +218,23 @@ class _WeightBar extends StatelessWidget {
       duration: Motion.slow * 2,
       curve: Curves.easeOutCubic,
       builder: (context, t, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(Radii.pill),
+        borderRadius: .circular(Radii.pill),
         child: SizedBox(
           height: 8,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               for (final (i, p) in parts.indexed) ...[
                 if (i > 0) const SizedBox(width: 2),
                 Expanded(
                   flex: (p.weight * 10).round(),
-                  child: Builder(
-                    builder: (context) {
-                      final fill = (p.gained / p.weight).clamp(0.0, 1.0);
-                      final tone = p.absent
-                          ? colors.app.danger
-                          : scoreTone(context, fill * 100);
-                      return ColoredBox(
-                        color: tone.base.withValues(alpha: 0.25),
-                        child: FractionallySizedBox(
-                          alignment: Alignment.centerLeft,
-                          widthFactor: fill * t,
-                          child: ColoredBox(color: tone.base),
-                        ),
-                      );
-                    },
+                  child: ColoredBox(
+                    color: p.tone.base.withValues(alpha: 0.25),
+                    child: FractionallySizedBox(
+                      alignment: .centerLeft,
+                      widthFactor: p.fill * t,
+                      child: ColoredBox(color: p.tone.base),
+                    ),
                   ),
                 ),
               ],
@@ -271,28 +262,20 @@ class _AssessmentRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final scored = double.tryParse(mark.scoredmark.trim()) ?? 0;
-    final max = double.tryParse(mark.maxmarks.trim()) ?? 0;
-    final percent = max > 0 ? scored / max * 100 : 0.0;
-    final absent = mark.status.trim().toLowerCase() == 'absent';
-    final tone = absent ? colors.app.danger : scoreTone(context, percent);
-    // Same colour rule as this assessment's segment in the card's bar.
-    final weight = double.tryParse(mark.weightage.trim()) ?? 0;
-    final gained = double.tryParse(mark.weightagemark.trim()) ?? 0;
-    final segmentTone = absent
-        ? colors.app.danger
-        : scoreTone(
-            context,
-            weight > 0 ? (gained / weight).clamp(0.0, 1.0) * 100 : percent,
-          );
+    final max = _num(mark.maxmarks);
+    final percent = max > 0 ? _num(mark.scoredmark) / max * 100 : 0.0;
+    final absent = _isAbsent(mark);
+    final tone = _segmentTone(context, mark, percent);
+    // Same colour as this assessment's segment in the card's bar.
+    final segmentTone = switch (_fillOf(mark)) {
+      final fill? => _segmentTone(context, mark, fill * 100),
+      null => tone,
+    };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md + 2,
-        vertical: Space.md,
-      ),
+      padding: const .symmetric(horizontal: Space.md + 2, vertical: Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Row(
             children: [
@@ -301,7 +284,7 @@ class _AssessmentRow extends StatelessWidget {
                 height: 10,
                 decoration: BoxDecoration(
                   color: segmentTone.base,
-                  borderRadius: BorderRadius.circular(2.5),
+                  borderRadius: .circular(2.5),
                 ),
               ),
               const SizedBox(width: Space.sm),
@@ -309,9 +292,9 @@ class _AssessmentRow extends StatelessWidget {
                 child: Text(
                   mark.markstitle,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
@@ -325,7 +308,7 @@ class _AssessmentRow extends StatelessWidget {
                   children: [
                     TextSpan(
                       text: mark.scoredmark,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(fontWeight: .w700),
                     ),
                     TextSpan(
                       text: ' / ${mark.maxmarks}',
@@ -370,3 +353,20 @@ class _AssessmentRow extends StatelessWidget {
 String _fmt(double value) => value == value.roundToDouble()
     ? value.toStringAsFixed(0)
     : value.toStringAsFixed(1);
+
+double _num(String raw) => double.tryParse(raw.trim()) ?? 0;
+
+bool _isAbsent(MarksRecordEach m) => m.status.trim().toLowerCase() == 'absent';
+
+/// Share of the assessment's weight scored (0 to 1), or null when it has no
+/// weight.
+double? _fillOf(MarksRecordEach m) {
+  final weight = _num(m.weightage);
+  return weight > 0 ? (_num(m.weightagemark) / weight).clamp(0.0, 1.0) : null;
+}
+
+/// Red when absent, else [scoreTone] of [percent].
+Tone _segmentTone(BuildContext context, MarksRecordEach m, double percent) =>
+    _isAbsent(m)
+    ? context.theme.colors.app.danger
+    : scoreTone(context, percent);
