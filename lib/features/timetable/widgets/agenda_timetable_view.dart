@@ -9,11 +9,10 @@ import 'package:intl/intl.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
-import 'package:vitapmate/features/more/domain/exam_time.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
+import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/timetable/logic/time_format.dart';
-import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'agenda/sections.dart';

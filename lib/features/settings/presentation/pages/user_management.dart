@@ -16,8 +16,8 @@ import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
+import 'package:vitapmate/features/exams/exams.dart';
+import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/user_card.dart';
 import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
 
@@ -30,7 +30,7 @@ class UserBox extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         try {
-          await ref.read(semesterIdProvider.notifier).updatesemids();
+          await ref.read(semesterIdProvider.notifier).refresh();
           ref.invalidate(semesterIdProvider);
         } catch (e, st) {
           log('auto refresh failed: $e', stackTrace: st);
@@ -117,7 +117,7 @@ class SemesterDialog extends HookConsumerWidget {
 
       isRefreshing.value = true;
       try {
-        await ref.read(semesterIdProvider.notifier).updatesemids();
+        await ref.read(semesterIdProvider.notifier).refresh();
         ref.invalidate(semesterIdProvider);
       } catch (e) {
         if (context.mounted) {
@@ -156,7 +156,7 @@ class SemesterDialog extends HookConsumerWidget {
 
         final examNotifSetting = ref.read(examReminderSettingsProvider);
         if (examNotifSetting.enabled) {
-          await ref.read(examScheduleProvider.notifier).updatexamschedule();
+          await ref.read(examScheduleProvider.notifier).refresh();
         }
 
         if (context.mounted) {

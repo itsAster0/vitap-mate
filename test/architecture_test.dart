@@ -1,5 +1,6 @@
 // Import rules for lib/ (see docs/plans/flutter-refactor.md):
-// - a feature never imports another feature;
+// - a feature imports another feature only through its public file,
+//   features/<name>/<name>.dart, never its pages, widgets or logic;
 // - ui/ imports only ui/ and the generated data types;
 // - only vtop/ touches the generated Rust bindings beyond the data types.
 //
@@ -15,24 +16,14 @@ const _sharedBindings = {
   'src/api/vtop/vtop_errors.dart',
 };
 
-/// "feature -> feature" pairs still to untangle.
-const _crossFeatureAllowed = {
-  'attendance -> calendar',
-  'attendance -> timetable',
-  'calendar -> timetable',
-  'course_page -> timetable',
-  'more -> calendar',
-  'more -> settings',
-  'more -> timetable',
-  'outing -> docs',
-  'settings -> attendance',
-  'settings -> calendar',
-  'settings -> docs',
-  'settings -> more',
-  'settings -> timetable',
-  'timetable -> attendance',
-  'timetable -> calendar',
-  'timetable -> more',
+/// Imports of another feature's private files still to untangle.
+const _privateImportsAllowed = {
+  'features/outing/data/outing_service.dart -> features/docs/data/doc_models.dart',
+  'features/outing/data/outing_service.dart -> features/docs/data/download_to_docs.dart',
+  'features/outing/data/outing_service.dart -> features/docs/presentation/providers/docs_provider.dart',
+  'features/settings/presentation/pages/settings_page.dart -> features/docs/presentation/providers/mess_timings_provider.dart',
+  'features/settings/presentation/widgets/mess_timings_sheet.dart -> features/docs/domain/mess_menu.dart',
+  'features/settings/presentation/widgets/mess_timings_sheet.dart -> features/docs/presentation/providers/mess_timings_provider.dart',
 };
 
 /// Files outside vtop/ that still call the Rust bindings directly.
@@ -65,22 +56,23 @@ void main() {
             .toList();
   }
 
-  test('features do not import each other', () {
-    final pairs = <String>{
+  test('features import each other only through public files', () {
+    final private = <String>{
       for (final MapEntry(key: path, value: deps) in imports.entries)
         if (path.startsWith('features/'))
           for (final dep in deps)
-            if (dep.startsWith('features/') &&
-                dep.split('/')[1] != path.split('/')[1])
-              '${path.split('/')[1]} -> ${dep.split('/')[1]}',
+            if (dep.split('/') case ['features', final other, ...]
+                when other != path.split('/')[1] &&
+                    dep != 'features/$other/$other.dart')
+              '$path -> $dep',
     };
     expect(
-      pairs.difference(_crossFeatureAllowed),
+      private.difference(_privateImportsAllowed),
       isEmpty,
-      reason: 'new cross-feature imports',
+      reason: 'import the feature\'s public file instead',
     );
     expect(
-      _crossFeatureAllowed.difference(pairs),
+      _privateImportsAllowed.difference(private),
       isEmpty,
       reason: 'untangled: remove from the allowlist',
     );

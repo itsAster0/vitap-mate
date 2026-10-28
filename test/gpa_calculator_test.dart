@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
+import 'package:vitapmate/features/gpa/gpa.dart';
 
 void main() {
   group('GPA calculator', () {

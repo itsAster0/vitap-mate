@@ -14,7 +14,6 @@ import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/widgets/attendance.dart';
 import 'package:vitapmate/features/attendance/widgets/attendance_not_posted.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

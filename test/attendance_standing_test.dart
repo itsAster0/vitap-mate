@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 
 void main() {
   test('safe course reports how many classes can be skipped', () {

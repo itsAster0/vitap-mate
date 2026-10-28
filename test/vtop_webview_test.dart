@@ -10,10 +10,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
-import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_cookie_service.dart';
-import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_loading.dart';
-import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_recovery.dart';
-import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_scripts.dart';
+import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_cookie_service.dart';
+import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_loading.dart';
+import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_recovery.dart';
+import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_scripts.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 // Mutable storage test double.

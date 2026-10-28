@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/more/domain/exam_time.dart';
+import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 ExamScheduleRecord _exam(String date, String time) => ExamScheduleRecord(

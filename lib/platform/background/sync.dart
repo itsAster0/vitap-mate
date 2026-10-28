@@ -15,14 +15,10 @@ import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/app/feature_flags.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
-import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
-import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
-import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
-import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
-import 'package:vitapmate/features/timetable/class_reminder_scheduler.dart';
+import 'package:vitapmate/features/exams/exams.dart';
+import 'package:vitapmate/features/marks/marks.dart';
+import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/platform/notifications/change_alert_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/frb_generated.dart';
@@ -98,15 +94,11 @@ Future<bool> syncVtopData({
 
     final timetable = await read(timetableProvider.future);
     final refreshTimetable = force || !fresh(timetable.updateTime);
-    final marks = await (await read(marksRepositoryProvider.future)).load();
+    final marks = await read(marksProvider.future);
     final refreshMarks = force || !fresh(marks.updateTime);
-    final examSchedule = await (await read(
-      examScheduleRepositoryProvider.future,
-    )).load();
+    final examSchedule = await read(examScheduleProvider.future);
     final refreshExamSchedule = force || !fresh(examSchedule.updateTime);
-    final semids = await (await read(
-      semidRepositoryProvider.future,
-    )).loadCache();
+    final semids = await readSavedPage(read, VtopQueries.semesters());
     final refreshSemesters =
         force || semids == null || !fresh(semids.updateTime);
 
@@ -122,7 +114,7 @@ Future<bool> syncVtopData({
     if (refreshMarks) {
       futures.add(
         _retryer(
-          () => read(marksProvider.notifier).updatemarks(),
+          () => read(marksProvider.notifier).refresh(),
           read: read,
           ignoreRecoverableErrors: ignoreRecoverableErrors,
         ),
@@ -131,7 +123,7 @@ Future<bool> syncVtopData({
     if (refreshExamSchedule) {
       futures.add(
         _retryer(
-          () => read(examScheduleProvider.notifier).updatexamschedule(),
+          () => read(examScheduleProvider.notifier).refresh(),
           read: read,
           ignoreRecoverableErrors: ignoreRecoverableErrors,
         ),
@@ -140,7 +132,7 @@ Future<bool> syncVtopData({
     if (refreshSemesters) {
       futures.add(
         _retryer(
-          () => read(semesterIdProvider.notifier).updatesemids(),
+          () => read(semesterIdProvider.notifier).refresh(),
           read: read,
           ignoreRecoverableErrors: ignoreRecoverableErrors,
         ),
@@ -338,8 +330,7 @@ Future<void> _runChangeDetection(
       }
     }
 
-    final marksRepo = await read(marksRepositoryProvider.future);
-    final freshMarks = await marksRepo.loadCache();
+    final freshMarks = await readSavedSemesterPage(read, VtopQueries.marks);
     if (freshMarks != null && previousMarks != null) {
       final summary = compareMarks(previousMarks, freshMarks);
       if (summary != null) {
@@ -351,8 +342,10 @@ Future<void> _runChangeDetection(
       }
     }
 
-    final examScheduleRepo = await read(examScheduleRepositoryProvider.future);
-    final freshExamSchedule = await examScheduleRepo.loadCache();
+    final freshExamSchedule = await readSavedSemesterPage(
+      read,
+      VtopQueries.examSchedule,
+    );
     if (freshExamSchedule != null && previousExamSchedule != null) {
       final summary = compareExamSchedule(
         previousExamSchedule,

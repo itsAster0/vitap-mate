@@ -23,7 +23,6 @@ import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 
 /// Settings → Debug: what testers and developers use to see why data is
 /// wrong, slow or heavy, and to put the app in odd states on purpose.
