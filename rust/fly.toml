@@ -1,0 +1,70 @@
+# The node: the engine (vtop-bridge, with the MCP at /mcp) and UDP mode's
+# gateway, in one process on Fly, at vmate-node.aster0.dev (a DNS-only
+# record in Cloudflare: its proxy carries no UDP). The Cloudflare edge's
+# ENGINE_URL points here; the gateway asks the engine for pages over
+# loopback. Deploy from this directory:
+#   flyctl deploy --ha=false
+# Secrets (flyctl secrets set):
+#   VAULT_KEY          the engine's vault key (as on Railway)
+#   MAIL_RELAY_SECRET  the engine's relay secret, the same one the edge holds
+#                      as BRIDGE_SECRET
+#   GATEWAY_KEY        the Noise private key (`vtop-gateway keygen`; its
+#                      public half is the app's VTOP_UDP_KEY)
+# UDP on Fly needs a dedicated IPv4 (`flyctl ips allocate-v4`; shared IPv4
+# carries no UDP) and the sockets bound to fly-global-services.
+app = "vitapmate-node"
+# Chennai, next to VIT-AP and VTOP. Fly no longer provisions new machines
+# in maa, so the running machine is in sin; a new one (scaling, a
+# recreate) needs a region that is open, e.g. sin.
+primary_region = "maa"
+
+[build]
+  dockerfile = "Dockerfile.engine"
+
+[env]
+  EDGE_URL = "https://vmate-api.aster0.dev"
+  PORT = "8080"
+  RUST_LOG = "warn,vtop_bridge=info,vtop_gateway=info"
+  BIND = "fly-global-services"
+  PORTS = "3478,51820,443"
+
+# The engine, over HTTPS on vmate-node.aster0.dev (and
+# vitapmate-node.fly.dev). It always runs: the UDP side cannot wake a
+# stopped machine.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[services]]
+  internal_port = 3478
+  protocol = "udp"
+  [[services.ports]]
+    port = 3478
+
+[[services]]
+  internal_port = 51820
+  protocol = "udp"
+  [[services.ports]]
+    port = 51820
+
+[[services]]
+  internal_port = 443
+  protocol = "udp"
+  [[services.ports]]
+    port = 443
+
+# The smallest machine: one shared CPU, 256 MB. The engine peaks around
+# 25 MB; its CAPTCHA model is a 250 KB weights file.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

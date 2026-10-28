@@ -1,0 +1,13 @@
+# The UDP gateway alone (vtop-gateway), for running it next to an engine
+# elsewhere. On Fly the engine runs the gateway itself: see fly.toml.
+FROM rust:1.98-slim-bookworm AS build
+WORKDIR /src
+COPY . .
+RUN cargo build --locked --profile server --package vtop-gateway --bin vtop-gateway \
+    && cp target/server/vtop-gateway /vtop-gateway
+
+FROM debian:bookworm-slim
+# TLS uses rustls with built-in roots: no system certificates needed.
+COPY --from=build /vtop-gateway /usr/local/bin/vtop-gateway
+ENV RUST_LOG=info
+CMD ["vtop-gateway"]

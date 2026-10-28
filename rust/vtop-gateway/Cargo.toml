@@ -1,0 +1,18 @@
+[package]
+name = "vtop-gateway"
+version = "0.1.0"
+edition = "2021"
+description = "The UDP gateway for the app's experimental UDP mode: vtop-wire on the phone side, the engine's /engine/fetch over HTTPS on the other. Runs on Fly (Railway takes no UDP)."
+
+[dependencies]
+vtop-wire = { path = "../vtop-wire" }
+vtop-shared = { path = "../vtop-shared" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+
+[dev-dependencies]
+wiremock = "0.6"
