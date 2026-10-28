@@ -34,6 +34,7 @@ Future<void> main() async {
 
   fileDownloaderConfig();
   EdgeEventChannel.instance
+    ..alwaysOn = edgeStreamAlwaysOn
     ..on(mailOtpMessageType, handleMailOtpEvent)
     ..on(vtopCookieRequestType, handleVtopCookieRequestEvent)
     ..on(credentialsRejectedType, handleCredentialsRejectedEvent)

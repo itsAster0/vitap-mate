@@ -138,6 +138,19 @@ Future<void> _syncFcmTokens() async {
   }
 }
 
+/// Whether the edge event stream should stay open while the app is in
+/// front: for a linked account (connected apps ask for cookies through it),
+/// or where there is no FCM to carry events. See [EdgeEventChannel.alwaysOn].
+Future<bool> edgeStreamAlwaysOn() async {
+  if (Firebase.apps.isEmpty) return true;
+  try {
+    return await SharedPreferencesAsync().getBool(bridgeLinkedSettingKey) ??
+        false;
+  } catch (_) {
+    return true;
+  }
+}
+
 /// On-device mode turned on: closes the event stream and drops this
 /// install's push token, so the server can no longer reach the phone.
 Future<void> pauseServerFeatures() async {

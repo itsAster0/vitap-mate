@@ -37,8 +37,9 @@ class EdgeEvent {
 
 typedef EdgeEventHandler = Future<void> Function(EdgeEvent event);
 
-/// The live link to the edge. While the app is in front a server-sent
-/// event stream is open and events arrive on it at once. It is read on
+/// The live link to the edge. While the app is in front and something
+/// needs events at once (see [alwaysOn] and [hold]) a server-sent event
+/// stream is open and events arrive on it as they happen. It is read on
 /// [sharedAppHttpClient], so it rides the HTTP/3 connection the app's other
 /// calls use, and its heartbeat keeps that connection from going idle. In
 /// the background Android may kill connections, so FCM carries events and
@@ -85,6 +86,35 @@ class EdgeEventChannel {
   var _foreground = true;
   var _connecting = false;
 
+  /// Whether the stream stays open in front with no one [hold]ing it. Set
+  /// at launch: on for a linked account (the extension and agents ask for
+  /// cookies through it) and where FCM is missing. Otherwise the stream
+  /// opens only while held, and FCM carries the rest; that saves a TLS
+  /// handshake and a held-open connection on every launch, which on a slow
+  /// network is most of what the launch refresh has to share the link with.
+  Future<bool> Function() alwaysOn = () async => true;
+  var _holds = 0;
+
+  /// Keeps the stream open until the returned function is called, e.g.
+  /// while a sign-in waits for its forwarded OTP.
+  VoidCallback hold() {
+    _holds++;
+    unawaited(connect());
+    var released = false;
+    return () {
+      if (released) return;
+      released = true;
+      _holds--;
+      if (_holds == 0) unawaited(_closeIfUnwanted());
+    };
+  }
+
+  Future<bool> _wanted() async => _holds > 0 || await alwaysOn();
+
+  Future<void> _closeIfUnwanted() async {
+    if (!await _wanted()) _close();
+  }
+
   void on(String kind, EdgeEventHandler handler) => _handlers[kind] = handler;
 
   /// Connects now and follows the app between front and back.
@@ -107,6 +137,7 @@ class EdgeEventChannel {
   Future<void> connect() async {
     if (!_foreground || _stream != null || _connecting) return;
     if (await isOnDeviceMode()) return;
+    if (!await _wanted()) return;
     _connecting = true;
     try {
       final device = await _devices.load();
