@@ -8,11 +8,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
-import 'package:vitapmate/features/attendance/presentation/pages/attendance_guide_page.dart';
+import 'package:vitapmate/features/attendance/attendance_guide_page.dart';
 import 'package:vitapmate/platform/background/stale_refresh.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/timetable_view_toggle_button.dart';
+import 'package:vitapmate/features/timetable/widgets/timetable_view_toggle_button.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
 
 class ShellLayout extends HookConsumerWidget {

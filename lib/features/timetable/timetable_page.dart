@@ -5,6 +5,8 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
@@ -12,19 +14,16 @@ import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
 import 'package:vitapmate/app/widgets/email_otp_banner.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/utils/timetable_slot_merge.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
+import 'package:vitapmate/features/timetable/timetable_view_mode_provider.dart';
+import 'package:vitapmate/features/timetable/logic/timetable_slot_merge.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 import 'package:vitapmate/ui/extention.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/more/domain/exam_time.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/agenda_timetable_view.dart';
-import 'package:vitapmate/features/timetable/presentation/widgets/weekly_timetable_view.dart';
+import 'package:vitapmate/features/timetable/widgets/agenda_timetable_view.dart';
+import 'package:vitapmate/features/timetable/widgets/weekly_timetable_view.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class TimetablePage extends HookConsumerWidget {
@@ -42,7 +41,7 @@ class TimetablePage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         try {
-          await ref.read(timetableProvider.notifier).updateTimetable();
+          await ref.read(timetableProvider.notifier).refresh();
         } catch (e, st) {
           log('auto refresh failed: $e', stackTrace: st);
         }
@@ -92,7 +91,7 @@ class TimetablePage extends HookConsumerWidget {
 
     Future<void> update() async {
       try {
-        await ref.read(timetableProvider.notifier).updateTimetable();
+        await ref.read(timetableProvider.notifier).refresh();
       } catch (e) {
         log("$e");
         if (context.mounted) disCommonToast(context, e);

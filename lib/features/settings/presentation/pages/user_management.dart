@@ -3,6 +3,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -18,7 +19,6 @@ import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/user_card.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
 
 class UserBox extends HookConsumerWidget {
@@ -151,7 +151,7 @@ class SemesterDialog extends HookConsumerWidget {
 
         final notifSetting = ref.read(classReminderSettingsProvider);
         if (notifSetting.enabled) {
-          await ref.read(timetableProvider.notifier).updateTimetable();
+          await ref.read(timetableProvider.notifier).refresh();
         }
 
         final examNotifSetting = ref.read(examReminderSettingsProvider);

@@ -1,3 +1,7 @@
+import 'package:vitapmate/features/timetable/timetable.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
+import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart'
@@ -11,19 +15,14 @@ import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/app/feature_flags.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
-import 'package:vitapmate/features/attendance/presentation/providers/state/attendance_repository.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/more/presentation/providers/marks_provider.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/features/settings/presentation/providers/state/semester_id.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
+import 'package:vitapmate/features/timetable/class_reminder_scheduler.dart';
 import 'package:vitapmate/platform/notifications/change_alert_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/frb_generated.dart';
@@ -97,9 +96,7 @@ Future<bool> syncVtopData({
     ).ensureLogin(promptForOtp: promptForOtp);
     final List<Future<bool>> futures = [];
 
-    final timetable = await (await read(
-      timetableRepositoryProvider.future,
-    )).load();
+    final timetable = await read(timetableProvider.future);
     final refreshTimetable = force || !fresh(timetable.updateTime);
     final marks = await (await read(marksRepositoryProvider.future)).load();
     final refreshMarks = force || !fresh(marks.updateTime);
@@ -116,7 +113,7 @@ Future<bool> syncVtopData({
     if (refreshTimetable) {
       futures.add(
         _retryer(
-          () => read(timetableProvider.notifier).updateTimetable(),
+          () => read(timetableProvider.notifier).refresh(),
           read: read,
           ignoreRecoverableErrors: ignoreRecoverableErrors,
         ),
@@ -258,8 +255,7 @@ Future<(bool, AttendanceData?)> _attendanceSync(
 }) async {
   bool fresh(BigInt updatedAt) => isVtopDataFresh(updatedAt, maxAge);
   try {
-    final attendanceRepo = await read(attendanceRepositoryProvider.future);
-    var att = await attendanceRepo.load();
+    var att = await read(attendanceProvider.future);
     final previousAttendance = att;
     var ok = true;
     if (force || !fresh(att.updateTime)) {
@@ -281,10 +277,11 @@ Future<(bool, AttendanceData?)> _attendanceSync(
     final k = await Future.wait([
       for (final i in att.records)
         () async {
-          final fullAttendanceRepo = await read(
-            fullAttendanceRepositoryProvider(i.courseType, i.courseId).future,
+          final fullAttendance = await readSavedFullAttendance(
+            read,
+            i.courseType,
+            i.courseId,
           );
-          final fullAttendance = await fullAttendanceRepo.loadCache();
           // One VTOP request per course: skip those just fetched or already
           // matching the summary.
           if (!force &&
@@ -326,8 +323,10 @@ Future<void> _runChangeDetection(
     final featureFlags = await read(featureFlagsControllerProvider.future);
     if (!await featureFlags.isEnabled('change-alerts')) return;
 
-    final timetableRepo = await read(timetableRepositoryProvider.future);
-    final freshTimetable = await timetableRepo.loadCache();
+    final freshTimetable = await readSavedSemesterPage(
+      read,
+      VtopQueries.timetable,
+    );
     if (freshTimetable != null && previousTimetable != null) {
       final summary = compareTimetable(previousTimetable, freshTimetable);
       if (summary != null) {
@@ -368,8 +367,10 @@ Future<void> _runChangeDetection(
       }
     }
 
-    final attendanceRepo = await read(attendanceRepositoryProvider.future);
-    final freshAttendance = await attendanceRepo.loadCache();
+    final freshAttendance = await readSavedSemesterPage(
+      read,
+      VtopQueries.attendance,
+    );
     if (freshAttendance != null && previousAttendance != null) {
       final summary = compareAttendance(previousAttendance, freshAttendance);
       if (summary != null) {

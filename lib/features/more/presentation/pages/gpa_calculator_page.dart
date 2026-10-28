@@ -4,11 +4,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/more/domain/gpa_calculator.dart';
 import 'package:vitapmate/features/more/presentation/providers/grade_history_provider.dart';
 import 'package:vitapmate/features/more/presentation/widgets/grade_badge.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
 class _Row {

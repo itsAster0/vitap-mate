@@ -7,9 +7,9 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
-import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
-import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
+import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
+import 'package:vitapmate/features/attendance/widgets/attendance.dart';
+import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 

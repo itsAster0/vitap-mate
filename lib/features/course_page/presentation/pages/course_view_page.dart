@@ -6,13 +6,13 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/course_page/data/course_page_service.dart';
 import 'package:vitapmate/features/course_page/domain/course_page_logic.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 

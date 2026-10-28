@@ -2,9 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_query.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
-import 'package:vitapmate/features/attendance/data/datasources/data_source.dart';
 import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -41,18 +44,18 @@ void main() {
   tearDown(() => container.dispose());
 
   test('saving two courses\' history at once keeps both', () async {
-    final source = AttendanceDataSource(
-      storage,
-      () => throw UnimplementedError(),
-      queue,
+    final pages = ProviderContainer(
+      overrides: [jsonFileStorageProvider.overrideWith((ref) async => storage)],
     );
+    addTearDown(pages.dispose);
+    VtopQuery<FullAttendanceData> query(String course) =>
+        VtopQueries.fullAttendance('S', courseId: course, courseType: 'ETH');
     await Future.wait([
-      source.saveFullAttendance(_history('A'), 'S', 'ETH', 'A'),
-      source.saveFullAttendance(_history('B'), 'S', 'ETH', 'B'),
+      writeSavedPage(pages.read, query('A'), _history('A')),
+      writeSavedPage(pages.read, query('B'), _history('B')),
     ]);
-    // A course that was never saved reads back with an empty semester.
-    expect((await source.getFullAttendance('S', 'A', 'ETH')).semesterId, 'S');
-    expect((await source.getFullAttendance('S', 'B', 'ETH')).semesterId, 'S');
+    expect((await readSavedPage(pages.read, query('A')))?.courseId, 'A');
+    expect((await readSavedPage(pages.read, query('B')))?.courseId, 'B');
   });
 
   test('saving two courses\' grade details at once keeps both', () async {

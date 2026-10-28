@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_view_mode_provider.dart';
+import 'package:vitapmate/features/timetable/timetable_view_mode_provider.dart';
 
 /// Header button that flips between the agenda and the weekly grid. The icon
 /// shows the view you'll switch to.

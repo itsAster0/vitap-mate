@@ -4,13 +4,13 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
+import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
-import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 
 const _classReminderOptions = [5, 10, 15, 30, 60];
 const _examReminderOptions = [10, 15, 30, 60, 120];
@@ -105,7 +105,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                       if (value) {
                         await ref
                             .read(timetableProvider.notifier)
-                            .updateTimetable();
+                            .refresh();
                       }
                     },
                   ),
@@ -151,7 +151,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                                 .enabled) {
                               await ref
                                   .read(timetableProvider.notifier)
-                                  .updateTimetable();
+                                  .refresh();
                             }
                           } catch (e, st) {
                             log(
@@ -206,7 +206,7 @@ class NotificationManagementPage extends HookConsumerWidget {
                                   .enabled) {
                                 await ref
                                     .read(timetableProvider.notifier)
-                                    .updateTimetable();
+                                    .refresh();
                               }
                             },
                           ),
