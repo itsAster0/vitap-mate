@@ -11,20 +11,16 @@ class TimetableViewModeController extends Notifier<TimetableViewMode> {
         .value
         ?.getString(timetableViewModeSettingKey);
     // Anything else, including the removed "daily" view, opens the agenda.
-    return TimetableViewMode.values.firstWhere(
-      (mode) => mode.name == savedMode,
-      orElse: () => TimetableViewMode.agenda,
-    );
+    return TimetableViewMode.values.asNameMap()[savedMode] ?? .agenda;
   }
 
   Future<void> showNext() async {
-    final nextMode = switch (state) {
-      TimetableViewMode.agenda => TimetableViewMode.weekly,
-      TimetableViewMode.weekly => TimetableViewMode.agenda,
+    state = switch (state) {
+      .agenda => .weekly,
+      .weekly => .agenda,
     };
-    state = nextMode;
     final prefs = await ref.read(settingsProvider.future);
-    await prefs.setString(timetableViewModeSettingKey, nextMode.name);
+    await prefs.setString(timetableViewModeSettingKey, state.name);
   }
 }
 

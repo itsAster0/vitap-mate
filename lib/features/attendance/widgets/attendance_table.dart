@@ -70,6 +70,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
     final history = dataAsync.value;
     final sync = history == null ? null : HistorySync.of(record, history);
     final count = (standing.attended, standing.total);
+    final attendedLine = '${count.$1} of ${count.$2} attended';
     final hideSkips = !ref.watch(showSkipAdviceProvider);
     // Classes held since VTOP's last posted day, known only when the
     // history agrees with the summary (in sessions for labs).
@@ -86,6 +87,11 @@ class AttendanceDetailSheet extends HookConsumerWidget {
           );
     final unposted =
         (record.islab() ? classes?.inSessions(record) : classes)?.unposted ?? 0;
+    final strongMd = typography.body.md.copyWith(
+      fontWeight: .w600,
+      color: colors.foreground,
+    );
+    final mutedXs = typography.body.xs.copyWith(color: colors.mutedForeground);
 
     return ScreenRefresh(
       onRefresh: refresh,
@@ -93,17 +99,15 @@ class AttendanceDetailSheet extends HookConsumerWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.background,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(Radii.lg + 4),
-          ),
+          borderRadius: const .vertical(top: .circular(Radii.lg + 4)),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             const SheetHandle(),
             Expanded(
               child: ListView(
-                padding: EdgeInsets.fromLTRB(
+                padding: .fromLTRB(
                   Space.lg,
                   Space.sm,
                   Space.lg,
@@ -111,18 +115,18 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                 ),
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: .start,
                           children: [
                             Text(
                               name.trim().isEmpty
                                   ? record.courseName
                                   : name.trim(),
                               style: typography.body.xl.copyWith(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: .w700,
                                 height: 1.2,
                                 color: colors.foreground,
                               ),
@@ -132,12 +136,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                               children: [
                                 CourseKindBadge(isLab: record.islab()),
                                 const SizedBox(width: Space.sm),
-                                Text(
-                                  code.trim(),
-                                  style: typography.body.xs.copyWith(
-                                    color: colors.mutedForeground,
-                                  ),
-                                ),
+                                Text(code.trim(), style: mutedXs),
                               ],
                             ),
                             if (record.facultyDetail.trim().isNotEmpty) ...[
@@ -153,13 +152,11 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                         ),
                       ),
                       FButton.icon(
-                        variant: FButtonVariant.ghost,
+                        variant: .ghost,
                         semanticsLabel: 'Refresh attendance',
                         onPress: refreshing.value ? null : refresh,
                         child: refreshing.value
-                            ? const FCircularProgress(
-                                size: FCircularProgressSizeVariant.sm,
-                              )
+                            ? const FCircularProgress(size: .sm)
                             : const Icon(FLucideIcons.refreshCw),
                       ),
                     ],
@@ -167,17 +164,17 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                   const SizedBox(height: Space.lg),
                   Surface(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                          crossAxisAlignment: .end,
                           children: [
                             CountUp(
                               value: standing.displayPercent,
                               suffix: '%',
                               style: typography.display.xl2.copyWith(
                                 height: 1,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 letterSpacing: -0.5,
                                 color: tone.base,
                               ),
@@ -185,58 +182,30 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                             const SizedBox(width: Space.md),
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.only(bottom: 3),
+                                padding: const .only(bottom: 3),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: .start,
                                   children: [
                                     if (hideSkips)
-                                      Text(
-                                        '${count.$1} of ${count.$2} attended',
-                                        style: typography.body.md.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.foreground,
-                                        ),
-                                      )
+                                      Text(attendedLine, style: strongMd)
                                     else ...[
-                                      Text(
-                                        standing.advice,
-                                        style: typography.body.md.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: colors.foreground,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${count.$1} of ${count.$2} attended',
-                                        style: typography.body.xs.copyWith(
-                                          color: colors.mutedForeground,
-                                        ),
-                                      ),
+                                      Text(standing.advice, style: strongMd),
+                                      Text(attendedLine, style: mutedXs),
                                     ],
                                     // VTOP updates the history separately;
                                     // flag when it disagrees.
                                     if (sync != null && !sync.inSync)
                                       Row(
                                         children: [
-                                          Container(
-                                            width: 5,
-                                            height: 5,
-                                            decoration: BoxDecoration(
-                                              color: colors.app.warning.base,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
+                                          Dot(color: colors.app.warning.base),
                                           const SizedBox(width: Space.xs + 2),
                                           Expanded(
                                             child: Text(
                                               'History shows ${sync.attended} '
                                               'of ${sync.total} · pull to sync',
                                               maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: typography.body.xs
-                                                  .copyWith(
-                                                    color:
-                                                        colors.mutedForeground,
-                                                  ),
+                                              overflow: .ellipsis,
+                                              style: mutedXs,
                                             ),
                                           ),
                                         ],
@@ -254,10 +223,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                           alignment: const Alignment(0.5, 0),
                           child: Text(
                             '75% required',
-                            style: typography.body.xs.copyWith(
-                              fontSize: 10,
-                              color: colors.mutedForeground,
-                            ),
+                            style: mutedXs.copyWith(fontSize: 10),
                           ),
                         ),
                       ],
@@ -299,13 +265,13 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                       curve: Curves.easeIn,
                     ),
                     layoutBuilder: (current, previous) => Stack(
-                      alignment: Alignment.topCenter,
+                      alignment: .topCenter,
                       children: [...previous, ?current],
                     ),
                     child: KeyedSubtree(
                       key: ValueKey(tab.value),
                       child: switch (tab.value) {
-                        _Tab.history => dataAsync.when(
+                        .history => dataAsync.when(
                           skipLoadingOnRefresh: true,
                           data: (data) => _History(data: data),
                           error: (e, _) => EmptyState(
@@ -314,14 +280,14 @@ class AttendanceDetailSheet extends HookConsumerWidget {
                             message: commonErrorMessage(e),
                           ),
                           loading: () => const Padding(
-                            padding: EdgeInsets.only(top: Space.lg),
+                            padding: .only(top: Space.lg),
                             child: SkeletonList(count: 4, height: 72),
                           ),
                         ),
                         // Plans from the summary counts, which match VTOP
                         // (in sessions for labs). Keyed so it resets when
                         // a refresh changes them.
-                        _Tab.planner => AttendancePlanner(
+                        .planner => AttendancePlanner(
                           key: ValueKey(count),
                           attended: count.$1,
                           reported: standing.reported,
@@ -341,6 +307,21 @@ class AttendanceDetailSheet extends HookConsumerWidget {
   }
 }
 
+/// [status]'s colours: green, accent, red, or muted for anything else.
+Tone _toneOf(BuildContext context, ClassStatus status) {
+  final colors = context.theme.colors;
+  return switch (status) {
+    .present => colors.app.success,
+    .onDuty => colors.app.accentTone,
+    .absent => colors.app.danger,
+    .other => Tone(
+      base: colors.mutedForeground,
+      subtle: colors.secondary,
+      onSubtle: colors.mutedForeground,
+    ),
+  };
+}
+
 /// How the classes split (present / on duty / absent) as one bar, then a
 /// month calendar with each class day marked by its status.
 class _Insights extends StatelessWidget {
@@ -353,26 +334,22 @@ class _Insights extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final palette = colors.app;
+    // Oldest first.
     final statuses = [
       for (final r in data.records.reversed) classStatusOf(r.status),
     ];
     if (statuses.isEmpty) return const SizedBox.shrink();
     int count(ClassStatus s) => statuses.where((x) => x == s).length;
-    final present = count(ClassStatus.present);
-    final onDuty = count(ClassStatus.onDuty);
-    final absent = count(ClassStatus.absent);
+    final present = count(.present);
+    final onDuty = count(.onDuty);
+    final absent = count(.absent);
 
     // Streak of attended (present or on duty) classes ending at the latest.
-    var streak = 0;
-    for (final s in statuses.reversed) {
-      if (s == ClassStatus.present || s == ClassStatus.onDuty) {
-        streak++;
-      } else {
-        break;
-      }
-    }
+    final streak = statuses.reversed
+        .takeWhile((s) => s == .present || s == .onDuty)
+        .length;
     final lastMissed = data.records
-        .where((r) => classStatusOf(r.status) == ClassStatus.absent)
+        .where((r) => classStatusOf(r.status) == .absent)
         .map((r) => parseHistoryDate(r.date))
         .whereType<DateTime>()
         .firstOrNull;
@@ -383,13 +360,14 @@ class _Insights extends StatelessWidget {
       else
         'never missed',
     ].join(' · ');
+    final muted = typography.body.sm.copyWith(color: colors.mutedForeground);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Surface(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               _SplitBar(
                 parts: [
@@ -410,16 +388,12 @@ class _Insights extends StatelessWidget {
                           _countSpan(onDuty, 'on duty', palette.accentTone),
                         ],
                       ),
-                      style: typography.body.sm.copyWith(
-                        color: colors.mutedForeground,
-                      ),
+                      style: muted,
                     ),
                   ),
                   Text.rich(
                     _countSpan(absent, 'absent', palette.danger),
-                    style: typography.body.sm.copyWith(
-                      color: colors.mutedForeground,
-                    ),
+                    style: muted,
                   ),
                 ],
               ),
@@ -443,7 +417,7 @@ class _Insights extends StatelessWidget {
     children: [
       TextSpan(
         text: '$value',
-        style: numStyle(fontWeight: FontWeight.w700, color: tone.onSubtle),
+        style: numStyle(fontWeight: .w700, color: tone.onSubtle),
       ),
       TextSpan(text: ' $label'),
     ],
@@ -464,16 +438,16 @@ class _SplitBar extends StatelessWidget {
       duration: Motion.slow * 2,
       curve: Curves.easeOutCubic,
       builder: (context, t, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(Radii.pill),
+        borderRadius: .circular(Radii.pill),
         child: SizedBox(
           height: 10,
           child: Align(
-            alignment: Alignment.centerLeft,
+            alignment: .centerLeft,
             child: FractionallySizedBox(
               widthFactor: t,
               heightFactor: 1,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   for (final (i, (value, color)) in shown.indexed) ...[
                     if (i > 0) const SizedBox(width: 2),
@@ -504,14 +478,13 @@ class _MonthCalendar extends HookWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final palette = colors.app;
 
     // Worst status per day: absent > on duty > present.
     int rank(ClassStatus s) => switch (s) {
-      ClassStatus.absent => 3,
-      ClassStatus.onDuty => 2,
-      ClassStatus.present => 1,
-      ClassStatus.other => 0,
+      .absent => 3,
+      .onDuty => 2,
+      .present => 1,
+      .other => 0,
     };
     final byDay = <DateTime, ClassStatus>{};
     for (final r in records) {
@@ -534,35 +507,54 @@ class _MonthCalendar extends HookWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
-    Tone toneOf(ClassStatus s) => switch (s) {
-      ClassStatus.present => palette.success,
-      ClassStatus.onDuty => palette.accentTone,
-      ClassStatus.absent => palette.danger,
-      ClassStatus.other => Tone(
-        base: colors.mutedForeground,
-        subtle: colors.secondary,
-        onSubtle: colors.mutedForeground,
-      ),
-    };
-
     Widget arrow(IconData icon, bool enabled, int delta, String label) =>
         FButton.icon(
-          variant: FButtonVariant.ghost,
-          size: FButtonSizeVariant.sm,
+          variant: .ghost,
+          size: .sm,
           semanticsLabel: label,
           onPress: enabled ? () => index.value = i + delta : null,
           child: Icon(icon),
         );
 
+    Widget day(int day) {
+      if (day < 1 || day > daysInMonth) return const SizedBox(height: 36);
+      final date = DateTime(month.year, month.month, day);
+      final tone = switch (byDay[date]) {
+        final status? => _toneOf(context, status),
+        null => null,
+      };
+      return SizedBox(
+        height: 36,
+        child: Center(
+          child: Container(
+            width: 30,
+            height: 30,
+            alignment: .center,
+            decoration: BoxDecoration(
+              shape: .circle,
+              color: tone?.subtle,
+              border: tone != null
+                  ? .all(color: tone.base, width: 1.5)
+                  : date == today
+                  ? .all(color: colors.border)
+                  : null,
+            ),
+            child: Text(
+              '$day',
+              style: typography.body.xs.nums(
+                fontWeight: tone != null ? .w700 : .w400,
+                color: tone?.onSubtle ?? colors.mutedForeground,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Surface(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md,
-        Space.sm,
-        Space.md,
-        Space.md,
-      ),
+      padding: const .fromLTRB(Space.md, Space.sm, Space.md, Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Row(
             children: [
@@ -570,7 +562,7 @@ class _MonthCalendar extends HookWidget {
                 child: Text(
                   DateFormat('MMMM y').format(month),
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
@@ -594,7 +586,7 @@ class _MonthCalendar extends HookWidget {
                       d,
                       style: typography.body.xs.copyWith(
                         fontSize: 10,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: .w600,
                         color: colors.mutedForeground,
                       ),
                     ),
@@ -612,58 +604,7 @@ class _MonthCalendar extends HookWidget {
                   Row(
                     children: [
                       for (var col = 0; col < 7; col++)
-                        Expanded(
-                          child: Builder(
-                            builder: (context) {
-                              final day = week * 7 + col - leading + 1;
-                              if (day < 1 || day > daysInMonth) {
-                                return const SizedBox(height: 36);
-                              }
-                              final date = DateTime(
-                                month.year,
-                                month.month,
-                                day,
-                              );
-                              final status = byDay[date];
-                              final tone = status == null
-                                  ? null
-                                  : toneOf(status);
-                              return SizedBox(
-                                height: 36,
-                                child: Center(
-                                  child: Container(
-                                    width: 30,
-                                    height: 30,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: tone?.subtle,
-                                      border: tone != null
-                                          ? Border.all(
-                                              color: tone.base,
-                                              width: 1.5,
-                                            )
-                                          : date == today
-                                          ? Border.all(color: colors.border)
-                                          : null,
-                                    ),
-                                    child: Text(
-                                      '$day',
-                                      style: typography.body.xs.nums(
-                                        fontWeight: tone != null
-                                            ? FontWeight.w700
-                                            : FontWeight.w400,
-                                        color:
-                                            tone?.onSubtle ??
-                                            colors.mutedForeground,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                        Expanded(child: day(week * 7 + col - leading + 1)),
                     ],
                   ),
               ],
@@ -698,24 +639,21 @@ class _History extends StatelessWidget {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
-        for (final entry in groups.entries) ...[
-          SectionHeader(
-            title: entry.key,
-            trailing: Text(_monthSummary(entry.value)),
-          ),
+        for (final MapEntry(key: month, value: records) in groups.entries) ...[
+          SectionHeader(title: month, trailing: Text(_monthSummary(records))),
           Surface(
-            padding: EdgeInsets.zero,
+            padding: .zero,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(Radii.lg - 1),
+              borderRadius: .circular(Radii.lg - 1),
               child: Column(
                 children: [
-                  for (final (i, record) in entry.value.indexed) ...[
+                  for (final (i, record) in records.indexed) ...[
                     if (i > 0)
                       Container(
                         height: 1,
-                        margin: const EdgeInsets.only(left: 60),
+                        margin: const .only(left: 60),
                         color: context.theme.colors.border,
                       ),
                     _HistoryRow(record: record),
@@ -731,12 +669,12 @@ class _History extends StatelessWidget {
   }
 
   String _monthSummary(List<FullAttendanceRecord> records) {
-    final missed = records.where(
-      (r) => classStatusOf(r.status) == ClassStatus.absent,
-    );
-    return missed.isEmpty
+    final missed = records
+        .where((r) => classStatusOf(r.status) == .absent)
+        .length;
+    return missed == 0
         ? '${records.length} classes'
-        : '${missed.length} missed of ${records.length}';
+        : '$missed missed of ${records.length}';
   }
 }
 
@@ -749,23 +687,16 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final palette = colors.app;
     final date = parseHistoryDate(record.date);
     final status = classStatusOf(record.status);
-    final (tone, label) = switch (status) {
-      ClassStatus.present => (palette.success, 'Present'),
-      ClassStatus.onDuty => (palette.accentTone, 'On duty'),
-      ClassStatus.absent => (palette.danger, 'Absent'),
-      ClassStatus.other => (
-        Tone(
-          base: colors.mutedForeground,
-          subtle: colors.secondary,
-          onSubtle: colors.mutedForeground,
-        ),
-        record.status,
-      ),
+    final tone = _toneOf(context, status);
+    final label = switch (status) {
+      .present => 'Present',
+      .onDuty => 'On duty',
+      .absent => 'Absent',
+      .other => record.status,
     };
-    final absent = status == ClassStatus.absent;
+    final absent = status == .absent;
     // "WED / 15:00-15:50" → "3:00 – 3:50 PM"
     final time = record.dayTime
         .split('/')
@@ -776,10 +707,7 @@ class _HistoryRow extends StatelessWidget {
 
     return Container(
       color: absent ? tone.subtle.withValues(alpha: 0.6) : null,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md,
-        vertical: Space.md - 2,
-      ),
+      padding: const .symmetric(horizontal: Space.md, vertical: Space.md - 2),
       child: Row(
         children: [
           SizedBox(
@@ -790,7 +718,7 @@ class _HistoryRow extends StatelessWidget {
                   date == null ? '–' : DateFormat('d').format(date),
                   style: typography.body.lg.nums(
                     height: 1.1,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: .w700,
                     color: colors.foreground,
                   ),
                 ),
@@ -810,23 +738,16 @@ class _HistoryRow extends StatelessWidget {
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: tone.base,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    Dot(size: 8, color: tone.base),
                     const SizedBox(width: Space.sm),
                     Text(
                       label,
                       style: typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: .w600,
                         color: absent ? tone.onSubtle : colors.foreground,
                       ),
                     ),
@@ -841,7 +762,7 @@ class _HistoryRow extends StatelessWidget {
                   Text(
                     record.remark.trim(),
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: .ellipsis,
                     style: typography.body.xs.copyWith(
                       color: absent ? tone.onSubtle : colors.mutedForeground,
                     ),

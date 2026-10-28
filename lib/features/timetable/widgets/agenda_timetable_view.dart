@@ -74,13 +74,14 @@ class AgendaTimetableView extends HookWidget {
     }, const []);
 
     final weekDates = _weekDates(now.value);
-    List<TimetableSlot> daySlots(int weekday) =>
-        classesOnDate(slotsForDay(weekday), weekDates[weekday - 1], calendar);
+    List<TimetableSlot> slotsOn(DateTime date) =>
+        classesOnDate(slotsForDay(date.weekday), date, calendar);
     // The day's regular schedule is always listed; [slots] are the classes
     // that actually meet, which drive the hero card, day bar and statuses.
     final schedule = slotsForDay(selectedDay.value);
-    final slots = daySlots(selectedDay.value);
     final selectedDate = weekDates[selectedDay.value - 1];
+    final slots = slotsOn(selectedDate);
+    final nextDay = _nextClassDay(selectedDate);
     // What the calendar says about the day: a holiday or exam that cancels
     // it, or a note (Lab FAT, an event) on a day that still has classes.
     final dayEntry = calendar?.entryOn(selectedDate);
@@ -105,17 +106,17 @@ class AgendaTimetableView extends HookWidget {
     final minuteNow = _timeOfDay(now.value);
 
     final current = isToday
-        ? _firstWhereOrNull(
-            slots,
-            (s) =>
-                minutesOf(s.startTime) <= minuteNow &&
-                minutesOf(s.endTime) > minuteNow,
-          )
+        ? slots
+              .where(
+                (s) =>
+                    minutesOf(s.startTime) <= minuteNow &&
+                    minutesOf(s.endTime) > minuteNow,
+              )
+              .firstOrNull
         : null;
-    final next = _firstWhereOrNull(
-      slots,
-      (s) => !isToday || minutesOf(s.startTime) > minuteNow,
-    );
+    final next = slots
+        .where((s) => !isToday || minutesOf(s.startTime) > minuteNow)
+        .firstOrNull;
     final remaining = isToday
         ? slots.where((s) => minutesOf(s.endTime) > minuteNow).length
         : slots.length;
@@ -131,14 +132,36 @@ class AgendaTimetableView extends HookWidget {
         ? realGaps.reduce((a, b) => a > b ? a : b)
         : null;
 
+    Widget classRow(int i) {
+      final slot = schedule[i];
+      // Called off by the calendar (a holiday, or a lab after the LAB FAT):
+      // shown dimmed, with no live state.
+      final off = !slots.contains(slot);
+      final live = isToday && !off;
+      return EnterFade(
+        index: i,
+        child: Opacity(
+          opacity: off ? 0.45 : 1,
+          child: _ClassRow(
+            slot: slot,
+            status: _statusFor(slot, current, next, minuteNow, live),
+            record: attendanceForSlot(attendance, slot),
+            minuteNow: live ? minuteNow : null,
+            isFirst: i == 0,
+            isLast: i == schedule.length - 1,
+          ),
+        ),
+      );
+    }
+
     // Previous day index tells the switcher which way to slide.
     final previousDay = usePrevious(selectedDay.value) ?? selectedDay.value;
     final forward = selectedDay.value >= previousDay;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.sm, Space.sm, Space.sm, 0),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           _DateHeading(
             date: selectedDate,
@@ -156,7 +179,7 @@ class AgendaTimetableView extends HookWidget {
             dates: weekDates,
             today: now.value.weekday,
             selectedDay: selectedDay,
-            classCounts: [for (var d = 1; d <= 7; d++) daySlots(d).length],
+            classCounts: [for (final d in weekDates) slotsOn(d).length],
             examDays: {
               for (final p in exams)
                 for (final (i, date) in weekDates.indexed)
@@ -185,12 +208,12 @@ class AgendaTimetableView extends HookWidget {
               );
             },
             layoutBuilder: (currentChild, previous) => Stack(
-              alignment: Alignment.topCenter,
+              alignment: .topCenter,
               children: [...previous, ?currentChild],
             ),
             child: Column(
               key: ValueKey(selectedDay.value),
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 _FocusPanel(
                   current: current,
@@ -223,10 +246,10 @@ class AgendaTimetableView extends HookWidget {
                       selectedDate.day + 1,
                     ),
                     now: now.value,
-                    before: _nextClassDay(selectedDate)?.date,
+                    before: nextDay?.date,
                   ).firstOrNull,
                   upcomingDay: slots.isEmpty || (isToday && next == null)
-                      ? _nextClassDay(selectedDate)
+                      ? nextDay
                       : null,
                 ),
                 // A day without classes: fill it with what comes next.
@@ -234,12 +257,8 @@ class AgendaTimetableView extends HookWidget {
                   _ComingUp(
                     from: selectedDate,
                     now: now.value,
-                    nextDay: _nextClassDay(selectedDate),
-                    slotsOn: (date) => classesOnDate(
-                      slotsForDay(date.weekday),
-                      date,
-                      calendar,
-                    ),
+                    nextDay: nextDay,
+                    slotsOn: slotsOn,
                     exams: exams,
                     attendance: attendance,
                     calendar: calendar,
@@ -258,18 +277,15 @@ class AgendaTimetableView extends HookWidget {
                             : DateTime(d.year, d.month, d.day - 7),
                     ],
                     now: now.value,
-                    classesOn: (date) => classesOnDate(
-                      slotsForDay(date.weekday),
-                      date,
-                      calendar,
-                    ),
+                    classesOn: slotsOn,
                     history: history,
                   ),
                 // Sundays look ahead at exams and holidays.
-                if (selectedDate.weekday == DateTime.sunday && calendar != null)
+                if (calendar case final calendar?
+                    when selectedDate.weekday == DateTime.sunday)
                   _Lookahead(
                     from: selectedDate,
-                    calendar: calendar!,
+                    calendar: calendar,
                     papers: exams,
                     // Exams whose papers "Coming up" already lists.
                     hide: {
@@ -278,7 +294,7 @@ class AgendaTimetableView extends HookWidget {
                           exams,
                           from: selectedDate,
                           now: now.value,
-                          before: _nextClassDay(selectedDate)?.date,
+                          before: nextDay?.date,
                         ))
                           p.name,
                     },
@@ -310,34 +326,7 @@ class AgendaTimetableView extends HookWidget {
                         isLongest: gaps[i - 1] == longestGap,
                       ),
                     ),
-                  Builder(
-                    builder: (context) {
-                      // Called off by the calendar (a holiday, or a lab
-                      // after the LAB FAT): shown dimmed, with no live state.
-                      final off = !slots.contains(schedule[i]);
-                      final live = isToday && !off;
-                      return EnterFade(
-                        index: i,
-                        child: Opacity(
-                          opacity: off ? 0.45 : 1,
-                          child: _ClassRow(
-                            slot: schedule[i],
-                            status: _statusFor(
-                              schedule[i],
-                              current,
-                              next,
-                              minuteNow,
-                              live,
-                            ),
-                            record: attendanceForSlot(attendance, schedule[i]),
-                            minuteNow: live ? minuteNow : null,
-                            isFirst: i == 0,
-                            isLast: i == schedule.length - 1,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                  classRow(i),
                 ],
               ],
             ),
@@ -375,12 +364,9 @@ AgendaClassStatus _statusFor(
   return AgendaClassStatus.upcoming;
 }
 
-T? _firstWhereOrNull<T>(Iterable<T> items, bool Function(T) test) {
-  for (final item in items) {
-    if (test(item)) return item;
-  }
-  return null;
-}
+/// Whole days from [from] to [date].
+int _inDays(DateTime date, DateTime from) =>
+    DateTime(date.year, date.month, date.day).difference(from).inDays;
 
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
@@ -403,11 +389,7 @@ List<ExamPaper> _papersBetween(
 /// "Tomorrow", a weekday name within the coming week, else "Tue 6 Oct".
 String _dayLabel(DateTime date, DateTime now) {
   final today = DateTime(now.year, now.month, now.day);
-  final days = DateTime(
-    date.year,
-    date.month,
-    date.day,
-  ).difference(today).inDays;
+  final days = _inDays(date, today);
   if (days == 1) return 'Tomorrow';
   if (days > 1 && days < 7) return DateFormat('EEEE').format(date);
   return DateFormat('EEE d MMM').format(date);

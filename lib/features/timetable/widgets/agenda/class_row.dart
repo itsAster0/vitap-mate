@@ -50,27 +50,27 @@ class _ClassRow extends HookWidget {
       opacity: done ? 0.55 : 1,
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             SizedBox(
               width: 62,
               child: Padding(
-                padding: const EdgeInsets.only(top: 14),
+                padding: const .only(top: 14),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: .end,
                   children: [
                     FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.topRight,
+                      fit: .scaleDown,
+                      alignment: .topRight,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                        crossAxisAlignment: .end,
                         children: [
                           Text(
                             to12H(slot.startTime, context),
                             maxLines: 1,
                             softWrap: false,
                             style: typography.body.xs.nums(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: .w600,
                               color: live
                                   ? colors.app.accent
                                   : colors.foreground,
@@ -90,15 +90,15 @@ class _ClassRow extends HookWidget {
                     // Time status sits with the times: countdown, left, or done.
                     const SizedBox(height: Space.sm),
                     FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.topRight,
+                      fit: .scaleDown,
+                      alignment: .topRight,
                       child: Text(
                         timeHint,
                         maxLines: 1,
                         softWrap: false,
                         style: typography.body.xs.nums(
                           fontSize: 11,
-                          fontWeight: done ? FontWeight.w500 : FontWeight.w600,
+                          fontWeight: done ? .w500 : .w600,
                           color: live || status == AgendaClassStatus.next
                               ? colors.app.accentTone.onSubtle
                               : colors.mutedForeground,
@@ -116,12 +116,12 @@ class _ClassRow extends HookWidget {
             _Rail(status: status, isFirst: isFirst, isLast: isLast),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: Space.xs),
+                padding: const .symmetric(vertical: Space.xs),
                 child: Surface(
                   onPress: () => expanded.value = !expanded.value,
                   semanticsLabel:
                       '${slot.name}, ${expanded.value ? 'collapse' : 'show details'}',
-                  padding: const EdgeInsets.fromLTRB(
+                  padding: const .fromLTRB(
                     Space.md + 2,
                     Space.md,
                     Space.md,
@@ -132,20 +132,20 @@ class _ClassRow extends HookWidget {
                       : null,
                   color: live ? colors.app.accentTone.subtle : null,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       // Line 1: name + status
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: .start,
                         children: [
                           Expanded(
                             child: Text(
                               slot.name,
                               maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.md.copyWith(
                                 height: 1.25,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.foreground,
                               ),
                             ),
@@ -168,7 +168,7 @@ class _ClassRow extends HookWidget {
                             child: Text(
                               '${slot.block} · Room ${slot.roomNo}',
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.xs.copyWith(
                                 color: colors.mutedForeground,
                               ),
@@ -195,7 +195,7 @@ class _ClassRow extends HookWidget {
                             child: Text(
                               slot.courseCode,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.xs.copyWith(
                                 color: colors.mutedForeground,
                               ),
@@ -206,12 +206,12 @@ class _ClassRow extends HookWidget {
                       AnimatedSize(
                         duration: Motion.medium,
                         curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
+                        alignment: .topCenter,
                         child: expanded.value
                             ? Padding(
-                                padding: const EdgeInsets.only(top: Space.md),
+                                padding: const .only(top: Space.md),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: .start,
                                   children: [
                                     Container(height: 1, color: colors.border),
                                     const SizedBox(height: Space.md),
@@ -273,20 +273,19 @@ class _Rail extends StatelessWidget {
     final colors = context.theme.colors;
     final accent = colors.app.accent;
     final dot = switch (status) {
-      AgendaClassStatus.current => accent,
-      AgendaClassStatus.completed => colors.mutedForeground,
+      .current => accent,
+      .completed => colors.mutedForeground,
       _ => colors.background,
     };
     final ring = switch (status) {
-      AgendaClassStatus.current => accent,
-      AgendaClassStatus.next => accent,
-      AgendaClassStatus.completed => colors.mutedForeground,
-      AgendaClassStatus.upcoming => colors.border,
+      .current || .next => accent,
+      .completed => colors.mutedForeground,
+      .upcoming => colors.border,
     };
     return SizedBox(
       width: 28,
       child: Stack(
-        alignment: Alignment.topCenter,
+        alignment: .topCenter,
         children: [
           Positioned(
             top: isFirst ? 18 : 0,
@@ -302,8 +301,8 @@ class _Rail extends StatelessWidget {
               height: 11,
               decoration: BoxDecoration(
                 color: dot,
-                shape: BoxShape.circle,
-                border: Border.all(color: ring, width: 2),
+                shape: .circle,
+                border: .all(color: ring, width: 2),
                 boxShadow: status == AgendaClassStatus.current
                     ? [
                         BoxShadow(
@@ -335,12 +334,11 @@ class _Attendance extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hideSkips = !ref.watch(showSkipAdviceProvider);
     final standing = AttendanceStanding.sessions(record);
-    final palette = context.theme.colors.app;
-    final tone = !standing.isSafe
-        ? palette.danger
-        : standing.canSkip == 0
-        ? palette.warning
-        : palette.success;
+    final tone = attendanceTone(
+      context,
+      safe: standing.isSafe,
+      atEdge: standing.canSkip == 0,
+    );
     final hint = !standing.isSafe
         ? 'need ${standing.mustAttend}'
         : standing.canSkip == 0
@@ -350,7 +348,7 @@ class _Attendance extends ConsumerWidget {
     TextStyle style(double size, FontWeight weight, Color color) =>
         numStyle(fontSize: size, fontWeight: weight, color: color);
     final ring = Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: .min,
       children: [
         ProgressRing(
           value: standing.displayPercent / 100,
@@ -362,8 +360,8 @@ class _Attendance extends ConsumerWidget {
         Text(
           stacked || hideSkips ? percent : '$percent · $hint',
           style: stacked
-              ? style(12, FontWeight.w700, tone.onSubtle)
-              : style(11.5, FontWeight.w600, tone.onSubtle),
+              ? style(12, .w700, tone.onSubtle)
+              : style(11.5, .w600, tone.onSubtle),
         ),
       ],
     );
@@ -373,10 +371,10 @@ class _Attendance extends ConsumerWidget {
       child: !stacked
           ? ring
           : FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.topRight,
+              fit: .scaleDown,
+              alignment: .topRight,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: .end,
                 children: [
                   ring,
                   if (!hideSkips) ...[
@@ -385,7 +383,7 @@ class _Attendance extends ConsumerWidget {
                       hint,
                       style: style(
                         10.5,
-                        FontWeight.w500,
+                        .w500,
                         tone.onSubtle.withValues(alpha: 0.8),
                       ),
                     ),
@@ -414,7 +412,7 @@ class _MetaLine extends StatelessWidget {
           child: Text(
             text,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow: .ellipsis,
             style: context.theme.typography.body.sm.copyWith(
               color: colors.mutedForeground,
             ),
@@ -438,7 +436,7 @@ class _IconTile extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         color: tone.subtle,
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: .circular(Radii.md),
       ),
       child: Icon(icon, size: 20, color: tone.base),
     );
@@ -485,11 +483,11 @@ class _BreakRow extends StatelessWidget {
             width: 62,
             child: isLongest && !isNow
                 ? Align(
-                    alignment: Alignment.centerRight,
+                    alignment: .centerRight,
                     child: Padding(
-                      padding: const EdgeInsets.only(left: Space.xs),
+                      padding: const .only(left: Space.xs),
                       child: FittedBox(
-                        fit: BoxFit.scaleDown,
+                        fit: .scaleDown,
                         child: ToneBadge.neutral(context, 'LONGEST'),
                       ),
                     ),
@@ -514,7 +512,7 @@ class _BreakRow extends StatelessWidget {
                   TextSpan(
                     text: 'Free until $until',
                     style: TextStyle(
-                      fontWeight: isNow ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: isNow ? .w600 : .w500,
                       color: isNow ? color : colors.foreground,
                     ),
                   ),
@@ -522,7 +520,7 @@ class _BreakRow extends StatelessWidget {
                 ],
               ),
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: context.theme.typography.body.xs.nums(color: color),
             ),
           ),

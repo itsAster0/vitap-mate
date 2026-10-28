@@ -3,9 +3,12 @@ import 'package:vitapmate/ui/extention.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
+/// VTOP's day names, Monday first: `slotDays[date.weekday - 1]`.
+const slotDays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
 /// "14:05" → "2:05 PM", or unchanged when the device uses 24-hour time.
 String to12H(String time, BuildContext context) {
-  if (MediaQuery.of(context).alwaysUse24HourFormat) return time;
+  if (MediaQuery.alwaysUse24HourFormatOf(context)) return time;
   final parts = time.split(':');
   final hour24 = int.parse(parts[0]);
   final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
@@ -53,13 +56,11 @@ String facultyName(String value) {
 /// shows the coming week, since the current one is over.
 List<DateTime> getCurrentWeekDates() {
   final now = DateTime.now();
-  final referenceDate = now.weekday == DateTime.sunday
+  final reference = now.weekday == DateTime.sunday
       ? now.add(const Duration(days: 1))
       : now;
-  final startOfWeek = referenceDate.subtract(
-    Duration(days: referenceDate.weekday - 1),
-  );
-  return List.generate(7, (index) => startOfWeek.add(Duration(days: index)));
+  final monday = reference.subtract(Duration(days: reference.weekday - 1));
+  return List.generate(7, (i) => monday.add(Duration(days: i)));
 }
 
 /// [slots] (one weekday's classes) that actually meet on [date] per the
@@ -69,10 +70,8 @@ List<TimetableSlot> classesOnDate(
   List<TimetableSlot> slots,
   DateTime date,
   SemesterCalendar? calendar,
-) {
-  if (calendar == null) return slots;
-  return [
-    for (final slot in slots)
-      if (calendar.classesOn(date, lab: slot.kind == ClassKind.lab)) slot,
-  ];
-}
+) => [
+  for (final slot in slots)
+    if (calendar?.classesOn(date, lab: slot.kind == ClassKind.lab) ?? true)
+      slot,
+];

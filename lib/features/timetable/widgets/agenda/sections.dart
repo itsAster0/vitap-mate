@@ -41,7 +41,7 @@ class _ComingUp extends StatelessWidget {
 
     if (papers.isNotEmpty) {
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           SectionHeader(
             title: 'Coming up',
@@ -51,7 +51,7 @@ class _ComingUp extends StatelessWidget {
           ),
           Surface(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 for (final (i, p) in papers.take(_maxPapers).indexed) ...[
                   if (i > 0) const SizedBox(height: Space.md),
@@ -80,7 +80,7 @@ class _ComingUp extends StatelessWidget {
     final typography = context.theme.typography;
     final corner = _corner();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         SectionHeader(
           title: 'Coming up',
@@ -88,7 +88,7 @@ class _ComingUp extends StatelessWidget {
         ),
         Surface(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               Text(
                 '${_dayLabel(nextDate, now)}  ·  ${slots.length} '
@@ -96,9 +96,9 @@ class _ComingUp extends StatelessWidget {
                 '${to12H(slots.first.startTime, context)} – '
                 '${to12H(slots.last.endTime, context)}',
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: .ellipsis,
                 style: typography.body.sm.nums(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   color: colors.foreground,
                 ),
               ),
@@ -107,7 +107,7 @@ class _ComingUp extends StatelessWidget {
               const SizedBox(height: Space.sm),
               for (final slot in slots)
                 Padding(
-                  padding: const EdgeInsets.only(top: Space.sm),
+                  padding: const .only(top: Space.sm),
                   child: Row(
                     children: [
                       SizedBox(
@@ -136,7 +136,7 @@ class _ComingUp extends StatelessWidget {
                             ],
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: .ellipsis,
                           style: typography.body.sm.copyWith(
                             color: colors.foreground,
                           ),
@@ -162,10 +162,7 @@ class _ComingUp extends StatelessWidget {
     final calendar = this.calendar;
     if (calendar == null) return null;
     final today = DateTime(now.year, now.month, now.day);
-    String inDays(DateTime date) {
-      final days = date.difference(today).inDays;
-      return days == 1 ? 'tomorrow' : 'in $days days';
-    }
+    String inDays(DateTime date) => _inDaysLabel(date.difference(today).inDays);
 
     final exam = calendar.upcomingExam(now);
     if (exam != null && exam.start.difference(today).inDays <= _soon) {
@@ -307,18 +304,11 @@ class _WeekRecap extends StatelessWidget {
       ClassStatus.absent => palette.danger.base,
       ClassStatus.other => colors.mutedForeground,
     };
-    Widget dot({Color? fill, Color? ring}) => Container(
-      width: 6,
-      height: 6,
-      decoration: BoxDecoration(
-        color: fill,
-        shape: BoxShape.circle,
-        border: ring == null ? null : Border.all(color: ring, width: 1.2),
-      ),
-    );
+    Widget dot({Color? fill, Color? ring}) =>
+        Dot(size: 6, color: fill, ring: ring);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         SectionHeader(
           title: thisWeek ? 'This week' : 'Last week',
@@ -330,10 +320,10 @@ class _WeekRecap extends StatelessWidget {
         ),
         Surface(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   // Only days that had classes; holidays, no-instructional
                   // days and Sundays are left out.
@@ -351,14 +341,14 @@ class _WeekRecap extends StatelessWidget {
                               DateFormat('EEEEE').format(day.date),
                               style: typography.body.xs.copyWith(
                                 fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.mutedForeground,
                               ),
                             ),
                             Text(
                               '${day.date.day}',
                               style: typography.body.sm.nums(
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.foreground,
                               ),
                             ),
@@ -367,7 +357,7 @@ class _WeekRecap extends StatelessWidget {
                             Wrap(
                               spacing: 3,
                               runSpacing: 3,
-                              alignment: WrapAlignment.center,
+                              alignment: .center,
                               children: [
                                 for (final s in day.statuses)
                                   dot(fill: colorOf(s)),
@@ -405,14 +395,14 @@ class _WeekRecap extends StatelessWidget {
                                 TextSpan(
                                   text: '${summary[col].$1}',
                                   style: TextStyle(
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: .w700,
                                     color: summary[col].$3,
                                   ),
                                 ),
                                 TextSpan(text: ' ${summary[col].$2}'),
                               ],
                             ),
-                            textAlign: TextAlign.center,
+                            textAlign: .center,
                             style: typography.body.sm.nums(
                               color: colors.mutedForeground,
                             ),
@@ -533,13 +523,10 @@ class _Lookahead extends StatelessWidget {
     }
     events.sort((a, b) => a.start.compareTo(b.start));
 
-    String inDays(DateTime date) {
-      final days = date.difference(from).inDays;
-      return days == 1 ? 'tomorrow' : 'in $days days';
-    }
+    String inDays(DateTime date) => _inDaysLabel(date.difference(from).inDays);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         SectionHeader(
           title: 'Next two weeks',
@@ -559,75 +546,22 @@ class _Lookahead extends StatelessWidget {
                   ),
                 )
               : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: .stretch,
                   children: [
                     for (final (i, e) in events.indexed) ...[
                       if (i > 0) const SizedBox(height: Space.md),
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: Space.xs,
-                            ),
-                            decoration: BoxDecoration(
-                              color: e.tone.subtle,
-                              borderRadius: BorderRadius.circular(Radii.md),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  DateFormat(
-                                    'EEE',
-                                  ).format(e.start).toUpperCase(),
-                                  style: typography.body.xs.copyWith(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: e.tone.onSubtle,
-                                  ),
-                                ),
-                                Text(
-                                  '${e.start.day}',
-                                  style: typography.body.md.nums(
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w700,
-                                    color: e.tone.onSubtle,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: Space.md),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  e.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: typography.body.sm.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.foreground,
-                                  ),
-                                ),
-                                Text(
-                                  [
-                                    if (e.last case final last?)
-                                      'Till ${DateFormat('EEE d MMM').format(last)}',
-                                    e.detail,
-                                    inDays(e.start),
-                                  ].join('  ·  '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: typography.body.xs.copyWith(
-                                    color: colors.mutedForeground,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      _DatedRow(
+                        date: e.start,
+                        fill: e.tone.subtle,
+                        weekday: e.tone.onSubtle,
+                        number: e.tone.onSubtle,
+                        title: e.title,
+                        detail: [
+                          if (e.last case final last?)
+                            'Till ${DateFormat('EEE d MMM').format(last)}',
+                          e.detail,
+                          inDays(e.start),
+                        ].join('  ·  '),
                       ),
                     ],
                   ],
@@ -649,7 +583,6 @@ class _PaperRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    final typography = context.theme.typography;
     final today = DateTime(now.year, now.month, now.day);
     final isToday = DateTime(start.year, start.month, start.day) == today;
     final details = [
@@ -658,35 +591,75 @@ class _PaperRow extends StatelessWidget {
       if (hasValue(exam.venue)) exam.venue.trim(),
       if (hasValue(exam.seatNo)) 'Seat ${exam.seatNo.trim()}',
     ].join('  ·  ');
+    final tint = isToday ? colors.app.warning.onSubtle : null;
+    return _DatedRow(
+      date: start,
+      fill: isToday ? colors.app.warning.subtle : colors.secondary,
+      weekday: tint ?? colors.mutedForeground,
+      number: tint ?? colors.foreground,
+      title: exam.courseName.trim(),
+      detail: details.isEmpty ? null : details,
+      tabular: true,
+    );
+  }
+}
+
+/// "tomorrow" or "in 5 days".
+String _inDaysLabel(int days) => days == 1 ? 'tomorrow' : 'in $days days';
+
+/// A day tile (weekday over its number) beside a title and a detail line.
+class _DatedRow extends StatelessWidget {
+  const _DatedRow({
+    required this.date,
+    required this.fill,
+    required this.weekday,
+    required this.number,
+    required this.title,
+    required this.detail,
+    this.tabular = false,
+  });
+
+  final DateTime date;
+  final Color fill;
+
+  /// Colours of the tile's weekday and day number.
+  final Color weekday;
+  final Color number;
+  final String title;
+  final String? detail;
+
+  /// Tabular figures in [detail].
+  final bool tabular;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
     return Row(
       children: [
         Container(
           width: 44,
-          padding: const EdgeInsets.symmetric(vertical: Space.xs),
+          padding: const .symmetric(vertical: Space.xs),
           decoration: BoxDecoration(
-            color: isToday ? colors.app.warning.subtle : colors.secondary,
-            borderRadius: BorderRadius.circular(Radii.md),
+            color: fill,
+            borderRadius: .circular(Radii.md),
           ),
           child: Column(
             children: [
               Text(
-                DateFormat('EEE').format(start).toUpperCase(),
+                DateFormat('EEE').format(date).toUpperCase(),
                 style: typography.body.xs.copyWith(
                   fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: isToday
-                      ? colors.app.warning.onSubtle
-                      : colors.mutedForeground,
+                  fontWeight: .w600,
+                  color: weekday,
                 ),
               ),
               Text(
-                '${start.day}',
+                '${date.day}',
                 style: typography.body.md.nums(
                   height: 1.1,
-                  fontWeight: FontWeight.w700,
-                  color: isToday
-                      ? colors.app.warning.onSubtle
-                      : colors.foreground,
+                  fontWeight: .w700,
+                  color: number,
                 ),
               ),
             ],
@@ -695,23 +668,27 @@ class _PaperRow extends StatelessWidget {
         const SizedBox(width: Space.md),
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: .start,
             children: [
               Text(
-                exam.courseName.trim(),
+                title,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: .ellipsis,
                 style: typography.body.sm.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   color: colors.foreground,
                 ),
               ),
-              if (details.isNotEmpty)
+              if (detail case final detail?)
                 Text(
-                  details,
+                  detail,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: typography.body.xs.nums(color: colors.mutedForeground),
+                  overflow: .ellipsis,
+                  style: tabular
+                      ? typography.body.xs.nums(color: colors.mutedForeground)
+                      : typography.body.xs.copyWith(
+                          color: colors.mutedForeground,
+                        ),
                 ),
             ],
           ),

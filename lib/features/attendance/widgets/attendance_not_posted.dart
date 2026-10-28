@@ -8,6 +8,7 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/widgets/attendance.dart';
+import 'package:vitapmate/features/attendance/widgets/course_card.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
@@ -38,20 +39,21 @@ class AttendanceNotPosted extends ConsumerWidget {
     final courses = <(String, bool), String>{};
     for (final lab in [false, true]) {
       for (final slot in timetable.slots) {
-        if ((slot.kind == ClassKind.lab) != lab) continue;
-        courses.putIfAbsent((slot.courseCode, lab), () => slot.name);
+        if ((slot.kind == ClassKind.lab) == lab) {
+          courses.putIfAbsent((slot.courseCode, lab), () => slot.name);
+        }
       }
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         _Banner(calendar: calendar, now: now, courses: courses.length),
         const SizedBox(height: Space.md),
         for (final (i, MapEntry(key: (code, lab), value: name))
             in courses.entries.indexed)
           Padding(
-            padding: const EdgeInsets.only(bottom: Space.sm + 2),
+            padding: const .only(bottom: Space.sm + 2),
             child: EnterFade(
               index: i,
               child: _CourseBudget(
@@ -114,12 +116,12 @@ class _Banner extends StatelessWidget {
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   'Attendance not posted yet',
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
@@ -165,113 +167,67 @@ class _CourseBudget extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
-    final base = typography.body.xs.nums(color: colors.mutedForeground);
-    final strong = base.copyWith(
-      fontWeight: FontWeight.w600,
-      color: colors.foreground,
-    );
     // Same strict 75% as the attendance cards, from a clean start.
     final canMiss = AttendanceProjection(
       standing: const AttendanceStanding(attended: 0, total: 0),
       left: left,
     ).canMiss;
-    final parts = <(String?, String)>[
-      if (left == 0)
-        (
-          null,
-          examName == null
-              ? 'No classes left this semester'
-              : 'No classes before $examName',
-        )
-      else ...[
-        (
-          '${lab ? (left / 2).ceil() : left}',
-          '${lab ? ' sessions' : ''} left'
-              '${examName == null ? '' : ' till $examName'}',
-        ),
-        // Whole sessions only: missing one costs two classes.
-        if (!hideSkips) ('${lab ? canMiss ~/ 2 : canMiss}', ' can miss'),
-      ],
-    ];
 
-    return Surface(
-      padding: EdgeInsets.zero,
+    return StripeCard(
+      stripe: colors.border,
       semanticsLabel:
           '$name, ${lab ? 'lab' : 'theory'}, attendance not posted yet',
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(Radii.lg - 1),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 4, color: colors.border),
+      children: [
+        Text(
+          name,
+          maxLines: 2,
+          overflow: .ellipsis,
+          style: typography.body.md.copyWith(
+            height: 1.25,
+            fontWeight: .w600,
+            color: colors.foreground,
+          ),
+        ),
+        const SizedBox(height: Space.xs + 2),
+        Row(
+          children: [
+            CourseKindBadge(isLab: lab),
+            if (next != null) ...[
+              const SizedBox(width: Space.sm),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    Space.md + 2,
-                    Space.md + 2,
-                    Space.md + 2,
-                    Space.md,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: typography.body.md.copyWith(
-                          height: 1.25,
-                          fontWeight: FontWeight.w600,
-                          color: colors.foreground,
-                        ),
-                      ),
-                      const SizedBox(height: Space.xs + 2),
-                      Row(
-                        children: [
-                          CourseKindBadge(isLab: lab),
-                          if (next != null) ...[
-                            const SizedBox(width: Space.sm),
-                            Expanded(
-                              child: Text(
-                                'Next: $next',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: base,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: Space.md),
-                      Container(height: 1, color: colors.border),
-                      const SizedBox(height: Space.sm),
-                      Center(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              for (final (i, (value, label))
-                                  in parts.indexed) ...[
-                                if (i > 0) TextSpan(text: '  ·  ', style: base),
-                                if (value != null)
-                                  TextSpan(text: value, style: strong),
-                                TextSpan(text: label, style: base),
-                              ],
-                            ],
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
+                child: Text(
+                  'Next: $next',
+                  maxLines: 1,
+                  overflow: .ellipsis,
+                  style: typography.body.xs.nums(color: colors.mutedForeground),
                 ),
               ),
             ],
-          ),
+          ],
         ),
-      ),
+        const SizedBox(height: Space.md),
+        OutlookLine([
+          if (left == 0)
+            (
+              null,
+              null,
+              examName == null
+                  ? 'No classes left this semester'
+                  : 'No classes before $examName',
+            )
+          else ...[
+            (
+              null,
+              '${lab ? (left / 2).ceil() : left}',
+              '${lab ? ' sessions' : ''} left'
+                  '${examName == null ? '' : ' till $examName'}',
+            ),
+            // Whole sessions only: missing one costs two classes.
+            if (!hideSkips)
+              (null, '${lab ? canMiss ~/ 2 : canMiss}', ' can miss'),
+          ],
+        ]),
+      ],
     );
   }
 }

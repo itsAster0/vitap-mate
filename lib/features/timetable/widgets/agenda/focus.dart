@@ -43,6 +43,7 @@ class _FocusPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
+    final (current, next) = (this.current, this.next);
 
     // Day is over, or there's nothing today: point at the next class day.
     if (current == null && next == null) {
@@ -87,15 +88,34 @@ class _FocusPanel extends StatelessWidget {
         CalendarMark() => 'NO CLASSES',
         null => null,
       };
+      List<Widget> nextLines(String when, String what) => [
+        const SizedBox(height: Space.xs),
+        Text(
+          when,
+          maxLines: 1,
+          overflow: .ellipsis,
+          style: typography.body.sm.nums(
+            fontWeight: .w500,
+            color: colors.foreground,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          what,
+          maxLines: 1,
+          overflow: .ellipsis,
+          style: typography.body.xs.copyWith(color: colors.mutedForeground),
+        ),
+      ];
       return Surface(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: .start,
           children: [
             _IconTile(icon: icon, tone: tone),
             const SizedBox(width: Space.md),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   if (eyebrow != null) ...[
                     ToneBadge(label: eyebrow, tone: tone),
@@ -104,60 +124,29 @@ class _FocusPanel extends StatelessWidget {
                   Text(
                     title,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: .ellipsis,
                     style: typography.body.md.copyWith(
                       height: 1.25,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: .w700,
                       color: colors.foreground,
                     ),
                   ),
-                  if (nextPaper case final paper?) ...[
-                    const SizedBox(height: Space.xs),
+                  if (nextPaper case final paper?)
                     // An exam comes before any class: "Next: CAT-II ·
                     // Tomorrow 2:00 PM".
-                    Text(
+                    ...nextLines(
                       'Next: ${paper.name} · ${_dayLabel(paper.start, now)} '
                       '${formatClock(paper.exam.examTime.split('-').first, context)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.sm.nums(
-                        fontWeight: FontWeight.w500,
-                        color: colors.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
                       paper.exam.courseName.trim(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.xs.copyWith(
-                        color: colors.mutedForeground,
-                      ),
-                    ),
-                  ] else if (upcoming != null) ...[
-                    const SizedBox(height: Space.xs),
+                    )
+                  else if (upcoming != null)
                     // When: "Back Tue 6 Oct · 11:01 AM" / "Tomorrow · 8:00 AM".
-                    Text(
+                    ...nextLines(
                       '${off != null || exam != null || unlisted ? 'Back ' : ''}'
                       '${_dayLabel(upcoming.date, now)} · '
                       '${to12H(upcoming.first.startTime, context)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.sm.nums(
-                        fontWeight: FontWeight.w500,
-                        color: colors.foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
                       upcoming.first.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: typography.body.xs.copyWith(
-                        color: colors.mutedForeground,
-                      ),
                     ),
-                  ],
                 ],
               ),
             ),
@@ -167,50 +156,48 @@ class _FocusPanel extends StatelessWidget {
     }
 
     return Surface(
-      padding: EdgeInsets.zero,
+      padding: .zero,
       borderColor: current != null
           ? colors.app.accent.withValues(alpha: 0.45)
           : null,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           if (current != null)
             _FocusClass(
-              slot: current!,
+              slot: current,
               badge: ToneBadge(
                 label: 'NOW',
                 tone: colors.app.accentTone,
                 solid: true,
               ),
               countdown: _Countdown(
-                target: _at(now, current!.endTime),
+                target: _at(now, current.endTime),
                 prefix: 'Ends in',
               ),
               progress:
-                  (_timeOfDay(now) - minutesOf(current!.startTime)) /
-                  (minutesOf(current!.endTime) - minutesOf(current!.startTime)),
-              record: attendanceForSlot(attendance, current!),
-              large: true,
+                  (_timeOfDay(now) - minutesOf(current.startTime)) /
+                  (minutesOf(current.endTime) - minutesOf(current.startTime)),
+              record: attendanceForSlot(attendance, current),
             ),
           if (current != null && next != null) ...[
             Container(height: 1, color: colors.border),
-            _NextStrip(slot: next!, now: now),
+            _NextStrip(slot: next, now: now),
           ],
           if (current == null && next != null)
             _FocusClass(
-              slot: next!,
+              slot: next,
               badge: ToneBadge(
                 label: isToday ? 'NEXT' : 'FIRST CLASS',
                 tone: colors.app.accentTone,
               ),
               countdown: isToday
                   ? _Countdown(
-                      target: _at(now, next!.startTime),
+                      target: _at(now, next.startTime),
                       prefix: 'Starts in',
                     )
                   : null,
-              record: attendanceForSlot(attendance, next!),
-              large: true,
+              record: attendanceForSlot(attendance, next),
             ),
         ],
       ),
@@ -225,7 +212,6 @@ class _FocusClass extends StatelessWidget {
     required this.record,
     this.countdown,
     this.progress,
-    this.large = false,
   });
 
   final TimetableSlot slot;
@@ -233,29 +219,30 @@ class _FocusClass extends StatelessWidget {
   final Widget? countdown;
   final double? progress;
   final AttendanceRecord? record;
-  final bool large;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.all(Space.lg),
+      padding: const .all(Space.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           Row(
             children: [
               badge,
               const SizedBox(width: Space.sm),
-              if (countdown != null) Expanded(child: countdown!),
-              if (countdown == null) const Spacer(),
+              if (countdown case final countdown?)
+                Expanded(child: countdown)
+              else
+                const Spacer(),
               Text(
                 '${to12H(slot.startTime, context)} – ${to12H(slot.endTime, context)}',
                 // A notch under the countdown so both fit on one line.
                 style: typography.body.xs.nums(
                   fontSize: (typography.body.xs.fontSize ?? 12) - 2,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   color: colors.mutedForeground,
                 ),
               ),
@@ -265,10 +252,10 @@ class _FocusClass extends StatelessWidget {
           Text(
             slot.name,
             maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+            overflow: .ellipsis,
             style: typography.body.xl.copyWith(
               height: 1.2,
-              fontWeight: FontWeight.w700,
+              fontWeight: .w700,
               letterSpacing: -0.2,
               color: colors.foreground,
             ),
@@ -277,11 +264,11 @@ class _FocusClass extends StatelessWidget {
           // Details on the left, the room as a big tile on the right — it's
           // what you look for on the way to class.
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: .end,
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: .start,
                   children: [
                     if (slot.faculty.trim().isNotEmpty) ...[
                       _MetaLine(
@@ -298,7 +285,7 @@ class _FocusClass extends StatelessWidget {
                           child: Text(
                             slot.courseCode,
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            overflow: .ellipsis,
                             style: typography.body.xs.copyWith(
                               color: colors.mutedForeground,
                             ),
@@ -341,14 +328,11 @@ class _RoomTile extends StatelessWidget {
       excludeSemantics: true,
       child: Container(
         width: 88,
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.sm,
-          vertical: Space.sm + 2,
-        ),
+        padding: const .symmetric(horizontal: Space.sm, vertical: Space.sm + 2),
         decoration: BoxDecoration(
           color: colors.secondary,
-          borderRadius: BorderRadius.circular(Radii.md),
-          border: Border.all(color: colors.border),
+          borderRadius: .circular(Radii.md),
+          border: .all(color: colors.border),
         ),
         child: Column(
           children: [
@@ -357,19 +341,19 @@ class _RoomTile extends StatelessWidget {
               style: TextStyle(
                 fontSize: 9,
                 letterSpacing: 0.8,
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.mutedForeground,
               ),
             ),
             FittedBox(
-              fit: BoxFit.scaleDown,
+              fit: .scaleDown,
               child: Text(
                 slot.roomNo,
                 maxLines: 1,
                 style: numStyle(
                   fontSize: 26,
                   height: 1.15,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: .w800,
                   letterSpacing: -0.5,
                   color: colors.foreground,
                 ),
@@ -378,10 +362,10 @@ class _RoomTile extends StatelessWidget {
             Text(
               slot.block,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: TextStyle(
                 fontSize: 10.5,
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.mutedForeground,
               ),
             ),
@@ -405,18 +389,13 @@ class _NextStrip extends StatelessWidget {
     final typography = context.theme.typography;
     final gap = minutesOf(slot.startTime) - _timeOfDay(now);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Space.lg,
-        Space.md,
-        Space.lg,
-        Space.md,
-      ),
+      padding: const .fromLTRB(Space.lg, Space.md, Space.lg, Space.md),
       child: Row(
         children: [
           Text(
             'NEXT',
             style: typography.body.xs.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: .w700,
               letterSpacing: 0.6,
               color: colors.app.accentTone.onSubtle,
             ),
@@ -424,21 +403,21 @@ class _NextStrip extends StatelessWidget {
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   slot.name,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
                 Text(
                   '${to12H(slot.startTime, context)} · Room ${slot.roomNo}',
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.xs.copyWith(
                     color: colors.mutedForeground,
                   ),
@@ -450,7 +429,7 @@ class _NextStrip extends StatelessWidget {
           Text(
             gap <= 0 ? 'now' : 'in ${formatMinutes(gap)}',
             style: typography.body.xs.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: .w600,
               color: colors.mutedForeground,
             ),
           ),
@@ -497,14 +476,14 @@ class _Countdown extends HookWidget {
               TextSpan(
                 text: value,
                 style: TextStyle(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: .w700,
                   color: context.theme.colors.foreground,
                 ),
               ),
             ],
           ),
           maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          overflow: .ellipsis,
           style: context.theme.typography.body.xs.nums(
             color: context.theme.colors.mutedForeground,
           ),

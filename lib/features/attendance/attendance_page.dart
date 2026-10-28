@@ -26,7 +26,7 @@ class AttendancePage extends HookConsumerWidget {
       try {
         await ref.read(attendanceProvider.notifier).updateAttendance();
       } catch (e) {
-        log("$e");
+        log('$e');
         if (context.mounted) disCommonToast(context, e);
         return;
       }
@@ -70,15 +70,15 @@ class AttendancePage extends HookConsumerWidget {
             title: "Couldn't load attendance",
             message: commonErrorMessage(e),
             action: FButton(
-              variant: FButtonVariant.outline,
-              mainAxisSize: MainAxisSize.min,
+              variant: .outline,
+              mainAxisSize: .min,
               onPress: update,
               child: const Text('Try again'),
             ),
           ),
           loading: () => const Padding(
             key: ValueKey('loading'),
-            padding: EdgeInsets.all(Space.sm),
+            padding: .all(Space.sm),
             child: Column(
               children: [
                 Skeleton(height: 40, radius: Radii.md),
@@ -123,12 +123,7 @@ class _AttendanceView extends HookWidget {
       backgroundColor: context.theme.colors.background,
       color: context.theme.colors.foreground,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          Space.sm,
-          Space.sm,
-          Space.sm,
-          Space.lg,
-        ),
+        padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           if (records.isNotEmpty) ...[
@@ -148,10 +143,8 @@ class _AttendanceView extends HookWidget {
             duration: Motion.medium,
             switchInCurve: const Interval(0.3, 1, curve: Curves.easeOut),
             switchOutCurve: const Interval(0.7, 1, curve: Curves.easeIn),
-            layoutBuilder: (current, previous) => Stack(
-              alignment: Alignment.topCenter,
-              children: [...previous, ?current],
-            ),
+            layoutBuilder: (current, previous) =>
+                Stack(alignment: .topCenter, children: [...previous, ?current]),
             child: Column(
               key: ValueKey(filter.value),
               children: [
@@ -173,7 +166,7 @@ class _AttendanceView extends HookWidget {
                 else
                   for (final (i, record) in shown.indexed)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                      padding: const .only(bottom: Space.sm + 2),
                       child: EnterFade(
                         index: i,
                         child: AttendanceCard(

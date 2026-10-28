@@ -26,7 +26,6 @@ class WeeklyTimetableView extends HookWidget {
   final List<TimetableSlot> Function(int day) slotsForDay;
   final List<AttendanceRecord> attendance;
 
-  static const _dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
   static const _gutter = 30.0;
   static const _headerHeight = 52.0;
   static const _hourHeight = 58.0;
@@ -70,9 +69,9 @@ class WeeklyTimetableView extends HookWidget {
     double yOf(int minute) => (minute - start) / 60 * _hourHeight;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, 0),
+      padding: const .fromLTRB(Space.sm, Space.md, Space.sm, 0),
       child: Surface(
-        padding: const EdgeInsets.fromLTRB(0, 0, Space.xs, Space.sm),
+        padding: const .fromLTRB(0, 0, Space.xs, Space.sm),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final dayWidth = (constraints.maxWidth - _gutter) / days.length;
@@ -90,7 +89,7 @@ class WeeklyTimetableView extends HookWidget {
                         SizedBox(
                           width: dayWidth,
                           child: _DayHeader(
-                            name: _dayNames[day - 1],
+                            name: slotDays[day - 1],
                             date: dates[day - 1],
                             isToday: day == today,
                             count: daySlots[day]!.length,
@@ -102,7 +101,7 @@ class WeeklyTimetableView extends HookWidget {
                 SizedBox(
                   height: gridHeight + 8,
                   child: Stack(
-                    clipBehavior: Clip.none,
+                    clipBehavior: .none,
                     children: [
                       // Today's column tint
                       if (todayIndex >= 0)
@@ -116,7 +115,7 @@ class WeeklyTimetableView extends HookWidget {
                               color: colors.app.accentTone.subtle.withValues(
                                 alpha: 0.45,
                               ),
-                              borderRadius: BorderRadius.circular(Radii.sm),
+                              borderRadius: .circular(Radii.sm),
                             ),
                           ),
                         ),
@@ -137,11 +136,11 @@ class WeeklyTimetableView extends HookWidget {
                           top: yOf(m) - 6,
                           child: Text(
                             _hourLabel(m),
-                            textAlign: TextAlign.right,
+                            textAlign: .right,
                             style: numStyle(
                               fontSize: 10,
                               height: 1,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: .w500,
                               color: colors.mutedForeground,
                             ),
                           ),
@@ -170,10 +169,14 @@ class WeeklyTimetableView extends HookWidget {
                                   day == today &&
                                   minutesOf(slot.startTime) <= minuteNow &&
                                   minutesOf(slot.endTime) > minuteNow,
-                              onPress: () => _showClass(
-                                context,
-                                slot,
-                                attendanceForSlot(attendance, slot),
+                              onPress: () => showFSheet(
+                                context: context,
+                                side: .btt,
+                                useRootNavigator: true,
+                                builder: (context) => _ClassSheet(
+                                  slot: slot,
+                                  record: attendanceForSlot(attendance, slot),
+                                ),
                               ),
                             ),
                           ),
@@ -196,14 +199,7 @@ class WeeklyTimetableView extends HookWidget {
                           child: IgnorePointer(
                             child: Row(
                               children: [
-                                Container(
-                                  width: 7,
-                                  height: 7,
-                                  decoration: BoxDecoration(
-                                    color: colors.app.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
+                                Dot(size: 7, color: colors.app.accent),
                                 Expanded(
                                   child: Container(
                                     height: 2,
@@ -255,20 +251,20 @@ class _DayHeader extends StatelessWidget {
       child: Center(
         child: Container(
           width: 40,
-          padding: const EdgeInsets.symmetric(vertical: 5),
+          padding: const .symmetric(vertical: 5),
           decoration: BoxDecoration(
             color: isToday ? colors.primary : null,
-            borderRadius: BorderRadius.circular(Radii.md),
+            borderRadius: .circular(Radii.md),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: .min,
             children: [
               Text(
                 name,
                 style: TextStyle(
                   fontSize: 9.5,
                   letterSpacing: 0.6,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   color: isToday
                       ? colors.primaryForeground.withValues(alpha: 0.7)
                       : colors.mutedForeground,
@@ -280,7 +276,7 @@ class _DayHeader extends StatelessWidget {
                 style: numStyle(
                   fontSize: 15,
                   height: 1.2,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: .w700,
                   color: isToday ? colors.primaryForeground : colors.foreground,
                 ),
               ),
@@ -320,29 +316,29 @@ class _Block extends StatelessWidget {
         duration: Motion.medium,
         opacity: past ? 0.45 : 1,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(5, 4, 3, 3),
+          padding: const .fromLTRB(5, 4, 3, 3),
           decoration: BoxDecoration(
             // Opaque so grid lines don't show through.
             color: Color.alphaBlend(tone.subtle, colors.card),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: .circular(6),
             border: live
                 ? Border.all(color: tone.base, width: 1.5)
                 : Border(left: BorderSide(color: tone.base, width: 2.5)),
           ),
           child: LayoutBuilder(
             builder: (context, c) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
+                  fit: .scaleDown,
+                  alignment: .centerLeft,
                   child: Text(
                     slot.courseCode,
                     maxLines: 1,
                     style: numStyle(
                       fontSize: 10,
                       height: 1.15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: .w700,
                       color: colors.foreground,
                     ),
                   ),
@@ -351,11 +347,11 @@ class _Block extends StatelessWidget {
                   Text(
                     slot.roomNo,
                     maxLines: 1,
-                    overflow: TextOverflow.clip,
+                    overflow: .clip,
                     style: numStyle(
                       fontSize: 9.5,
                       height: 1.2,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                       color: tone.onSubtle,
                     ),
                   ),
@@ -372,19 +368,6 @@ class _Block extends StatelessWidget {
   }
 }
 
-void _showClass(
-  BuildContext context,
-  TimetableSlot slot,
-  AttendanceRecord? record,
-) {
-  showFSheet(
-    context: context,
-    side: FLayout.btt,
-    useRootNavigator: true,
-    builder: (context) => _ClassSheet(slot: slot, record: record),
-  );
-}
-
 class _ClassSheet extends ConsumerWidget {
   const _ClassSheet({required this.slot, required this.record});
 
@@ -398,20 +381,21 @@ class _ClassSheet extends ConsumerWidget {
     final hideSkips = !ref.watch(showSkipAdviceProvider);
     final minutes = minutesOf(slot.endTime) - minutesOf(slot.startTime);
     // Advice in sessions for labs; the x/y line below stays VTOP's own.
+    final record = this.record;
     final standing = record == null
         ? null
-        : AttendanceStanding.sessions(record!);
-    final summary = record == null ? null : AttendanceStanding.of(record!);
+        : AttendanceStanding.sessions(record);
+    final summary = record == null ? null : AttendanceStanding.of(record);
     final tone = standing == null
         ? null
-        : !standing.isSafe
-        ? colors.app.danger
-        : standing.canSkip == 0
-        ? colors.app.warning
-        : colors.app.success;
+        : attendanceTone(
+            context,
+            safe: standing.isSafe,
+            atEdge: standing.canSkip == 0,
+          );
 
     Widget line(IconData icon, String text) => Padding(
-      padding: const EdgeInsets.only(top: Space.sm),
+      padding: const .only(top: Space.sm),
       child: Row(
         children: [
           Icon(icon, size: 15, color: colors.mutedForeground),
@@ -429,27 +413,25 @@ class _ClassSheet extends ConsumerWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(Radii.lg + 4),
-        ),
+        borderRadius: const .vertical(top: Radius.circular(Radii.lg + 4)),
       ),
       child: Padding(
-        padding: EdgeInsets.fromLTRB(
+        padding: .fromLTRB(
           Space.lg,
           0,
           Space.lg,
           Space.xl + MediaQuery.paddingOf(context).bottom,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: .min,
+          crossAxisAlignment: .start,
           children: [
             const SheetHandle(),
             const SizedBox(height: Space.sm),
             Text(
               slot.name,
               style: typography.body.xl.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 height: 1.2,
                 color: colors.foreground,
               ),
@@ -478,7 +460,7 @@ class _ClassSheet extends ConsumerWidget {
             if (standing != null && tone != null) ...[
               const SizedBox(height: Space.lg),
               Surface(
-                padding: const EdgeInsets.all(Space.md),
+                padding: const .all(Space.md),
                 onPress: () {
                   Navigator.of(context).pop();
                   showAttendanceDetails(context, record!);
@@ -496,7 +478,7 @@ class _ClassSheet extends ConsumerWidget {
                         '${standing.displayPercent.round()}',
                         style: numStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: .w700,
                           color: tone.onSubtle,
                         ),
                       ),
@@ -504,13 +486,13 @@ class _ClassSheet extends ConsumerWidget {
                     const SizedBox(width: Space.md),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: .start,
                         children: [
                           if (!hideSkips)
                             Text(
                               standing.advice,
                               style: typography.body.sm.copyWith(
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.foreground,
                               ),
                             ),
@@ -518,7 +500,7 @@ class _ClassSheet extends ConsumerWidget {
                             '${summary!.attended} of ${summary.total} attended',
                             style: hideSkips
                                 ? typography.body.sm.copyWith(
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: .w600,
                                     color: colors.foreground,
                                   )
                                 : typography.body.xs.copyWith(

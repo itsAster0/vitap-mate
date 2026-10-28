@@ -28,9 +28,15 @@ class TimetablePage extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selectedDay = useState<int>(DateTime.now().weekday);
+    final selectedDay = useState(DateTime.now().weekday);
     final timetableData = ref.watch(timetableProvider);
-    final classDays = getDayList(timetableData.value);
+    // ISO weekdays with classes, in order.
+    final classDays = [
+      ...{
+        for (final s in timetableData.value?.slots ?? const <TimetableSlot>[])
+          slotDays.indexOf(s.day) + 1,
+      },
+    ]..sort();
     final attendance = ref.watch(attendanceProvider).value?.records ?? const [];
     final viewMode = ref.watch(timetableViewModeProvider);
     final dragStartX = useState<double?>(null);
@@ -50,20 +56,21 @@ class TimetablePage extends HookConsumerWidget {
           final examToday =
               [
                 for (final type in schedule?.exams ?? const []) ...type.records,
-              ].any((exam) {
-                final day = examDayOf(exam);
-                return day != null &&
+              ].any(
+                (exam) => switch (examDayOf(exam)) {
+                  final day? =>
                     day.year == now.year &&
-                    day.month == now.month &&
-                    day.day == now.day;
-              });
+                        day.month == now.month &&
+                        day.day == now.day,
+                  null => false,
+                },
+              );
           if (!examToday) return;
           await ref.read(examScheduleProvider.notifier).refresh();
         } catch (e, st) {
           log('exam schedule auto refresh failed: $e', stackTrace: st);
         }
       });
-
       return null;
     }, const []);
     final calendar = ref.watch(semesterCalendarProvider);
@@ -90,12 +97,12 @@ class TimetablePage extends HookConsumerWidget {
       try {
         await ref.read(timetableProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
+        log('$e');
         if (context.mounted) disCommonToast(context, e);
       }
     }
 
-    final isAgenda = viewMode == TimetableViewMode.agenda;
+    final isAgenda = viewMode == .agenda;
 
     return ScreenRefresh(
       onRefresh: update,
@@ -115,16 +122,16 @@ class TimetablePage extends HookConsumerWidget {
                 : null,
             onHorizontalDragUpdate: isAgenda
                 ? (details) {
-                    final days = classDays;
-                    if (days.isEmpty) return;
-                    final currentX = details.globalPosition.dx;
-                    final deltaX = currentX - (dragStartX.value ?? currentX);
-                    if (deltaX > 80 && days.first < selectedDay.value) {
+                    if (classDays.isEmpty) return;
+                    final x = details.globalPosition.dx;
+                    final deltaX = x - (dragStartX.value ?? x);
+                    if (deltaX > 80 && classDays.first < selectedDay.value) {
                       selectedDay.value -= 1;
-                      dragStartX.value = currentX;
-                    } else if (deltaX < -80 && days.last > selectedDay.value) {
+                      dragStartX.value = x;
+                    } else if (deltaX < -80 &&
+                        classDays.last > selectedDay.value) {
                       selectedDay.value += 1;
-                      dragStartX.value = currentX;
+                      dragStartX.value = x;
                     }
                   }
                 : null,
@@ -133,46 +140,40 @@ class TimetablePage extends HookConsumerWidget {
                 : null,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height * 0.8,
+                minHeight: MediaQuery.sizeOf(context).height * 0.8,
               ),
               child: AnimatedSwitcher(
                 duration: Motion.medium,
                 // Keep content pinned to the top even when a day is short.
                 layoutBuilder: (current, previous) => Stack(
-                  alignment: Alignment.topCenter,
+                  alignment: .topCenter,
                   children: [...previous, ?current],
                 ),
                 child: timetableData.when(
                   skipLoadingOnRefresh: true,
                   skipLoadingOnReload: true,
                   data: (data) {
-                    final days = classDays;
-
-                    List<TimetableSlot> slotsForDay(int day) {
-                      final slots = mergeLabsSloths(getDaySlotList(data, day));
-                      slots.sort(
-                        (a, b) => _parseTime(
-                          a.startTime,
-                        ).compareTo(_parseTime(b.startTime)),
-                      );
-                      return slots;
-                    }
+                    List<TimetableSlot> slotsForDay(int day) =>
+                        mergeLabsSloths([
+                          for (final slot in data.slots)
+                            if (slot.day == slotDays[day - 1]) slot,
+                        ]);
 
                     return Column(
                       key: const ValueKey('data'),
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: .stretch,
                       children: [
                         const EmailOtpBanner(),
-                        if (viewMode == TimetableViewMode.weekly)
+                        if (viewMode == .weekly)
                           WeeklyTimetableView(
-                            days: days,
+                            days: classDays,
                             slotsForDay: slotsForDay,
                             attendance: attendance,
                           )
                         else
                           AgendaTimetableView(
                             selectedDay: selectedDay,
-                            classDays: days.toSet(),
+                            classDays: classDays.toSet(),
                             slotsForDay: slotsForDay,
                             attendance: attendance,
                             calendar: calendar,
@@ -183,14 +184,14 @@ class TimetablePage extends HookConsumerWidget {
                       ],
                     );
                   },
-                  error: (e, stackTrace) => EmptyState(
+                  error: (e, _) => EmptyState(
                     key: const ValueKey('error'),
                     icon: FLucideIcons.cloudAlert,
                     title: "Couldn't load your timetable",
                     message: commonErrorMessage(e),
                     action: FButton(
-                      variant: FButtonVariant.outline,
-                      mainAxisSize: MainAxisSize.min,
+                      variant: .outline,
+                      mainAxisSize: .min,
                       onPress: update,
                       child: const Text('Try again'),
                     ),
@@ -211,72 +212,21 @@ class _TimetableSkeleton extends StatelessWidget {
   const _TimetableSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(Space.sm, Space.md, Space.sm, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Skeleton(width: 150, height: 30),
-          SizedBox(height: Space.sm),
-          Skeleton(width: 220, height: 12),
-          SizedBox(height: Space.lg),
-          Skeleton(height: 64, radius: Radii.md),
-          SizedBox(height: Space.lg),
-          Skeleton(height: 150, radius: Radii.lg),
-          SizedBox(height: Space.xl),
-          SkeletonList(count: 3),
-        ],
-      ),
-    );
-  }
-}
-
-List<int> getDayList(TimetableData? data) {
-  if (data == null) return [];
-  Map<String, int> map = {
-    "MON": 1,
-    "TUE": 2,
-    "WED": 3,
-    "THU": 4,
-    "FRI": 5,
-    "SAT": 6,
-    "SUN": 7,
-  };
-  Set found = {};
-  for (final i in data.slots) {
-    if (!found.contains(i.day)) {
-      found.add(i.day);
-    }
-  }
-  var out = found.map((k) => map[k]!).toList();
-  out.sort();
-  return out;
-}
-
-List<TimetableSlot> getDaySlotList(TimetableData data, int i) {
-  Map<int, String> map = {
-    1: "MON",
-    2: "TUE",
-    3: "WED",
-    4: "THU",
-    5: "FRI",
-    6: "SAT",
-    7: "SUN",
-  };
-  String day = map[i]!;
-  List<TimetableSlot> slots = [];
-  for (final slot in data.slots) {
-    if (slot.day == day) {
-      slots.add(slot);
-    }
-  }
-  return slots;
-}
-
-Duration _parseTime(String t) {
-  final parts = t.split(":");
-  final h = int.parse(parts[0]);
-  final m = parts.length > 1 ? int.parse(parts[1]) : 0;
-  return Duration(hours: h, minutes: m);
+  Widget build(BuildContext context) => const Padding(
+    padding: .fromLTRB(Space.sm, Space.md, Space.sm, 0),
+    child: Column(
+      crossAxisAlignment: .start,
+      children: [
+        Skeleton(width: 150, height: 30),
+        SizedBox(height: Space.sm),
+        Skeleton(width: 220, height: 12),
+        SizedBox(height: Space.lg),
+        Skeleton(height: 64, radius: Radii.md),
+        SizedBox(height: Space.lg),
+        Skeleton(height: 150, radius: Radii.lg),
+        SizedBox(height: Space.xl),
+        SkeletonList(count: 3),
+      ],
+    ),
+  );
 }

@@ -4,37 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:vitapmate/features/timetable/logic/timetable_slot_merge.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
-class CalendarInfo {
-  final String id;
-  final String name;
-  final String accountName;
+typedef CalendarInfo = ({String id, String name, String accountName});
 
-  const CalendarInfo({
-    required this.id,
-    required this.name,
-    required this.accountName,
-  });
+CalendarInfo _calendarInfo(Map<Object?, Object?> map) => (
+  id: (map['id'] ?? '').toString(),
+  name: (map['name'] ?? '').toString(),
+  accountName: (map['accountName'] ?? '').toString(),
+);
 
-  factory CalendarInfo.fromMap(Map<Object?, Object?> map) {
-    return CalendarInfo(
-      id: (map["id"] ?? "").toString(),
-      name: (map["name"] ?? "").toString(),
-      accountName: (map["accountName"] ?? "").toString(),
-    );
-  }
-}
-
-class CalendarSyncResult {
-  final int created;
-  final String? calendarName;
-  final int version;
-
-  const CalendarSyncResult({
-    required this.created,
-    required this.version,
-    this.calendarName,
-  });
-}
+typedef CalendarSyncResult = ({int created, int version, String? calendarName});
 
 class CalendarSyncService {
   static const MethodChannel _channel = MethodChannel(
@@ -55,13 +33,15 @@ class CalendarSyncService {
     if (!Platform.isAndroid) {
       throw Exception("Calendar sync is currently Android-only.");
     }
-    final rawSlots = timetable.slots
-        .where((slot) => slot.serial != "-1")
-        .toList();
-    final preparedSlots = _mergeLabsByDay(rawSlots);
-    final slots = preparedSlots
-        .map(
-          (slot) => {
+    // Labs are merged per day, in the order days first appear.
+    final byDay = <String, List<TimetableSlot>>{};
+    for (final slot in timetable.slots) {
+      if (slot.serial != '-1') byDay.putIfAbsent(slot.day, () => []).add(slot);
+    }
+    final slots = [
+      for (final day in byDay.values)
+        for (final slot in mergeLabsSloths(day))
+          {
             "serial": slot.serial,
             "day": slot.day,
             "slot": slot.slot,
@@ -74,8 +54,7 @@ class CalendarSyncService {
             "name": slot.name,
             "faculty": slot.faculty,
           },
-        )
-        .toList();
+    ];
 
     final raw = await _channel.invokeMethod<dynamic>("syncTimetableRecurring", {
       "calendarId": calendarId,
@@ -89,14 +68,13 @@ class CalendarSyncService {
       "slots": slots,
     });
 
-    if (raw is Map<Object?, Object?>) {
-      return CalendarSyncResult(
-        created: (raw["created"] as num?)?.toInt() ?? 0,
-        version: (raw["version"] as num?)?.toInt() ?? 1,
-        calendarName: raw["calendarName"]?.toString(),
-      );
-    }
-    return const CalendarSyncResult(created: 0, version: 1);
+    return raw is Map<Object?, Object?>
+        ? (
+            created: (raw["created"] as num?)?.toInt() ?? 0,
+            version: (raw["version"] as num?)?.toInt() ?? 1,
+            calendarName: raw["calendarName"]?.toString(),
+          )
+        : (created: 0, version: 1, calendarName: null);
   }
 
   static Future<(int deleted, String? calendarName)> clearAllSyncedEvents({
@@ -109,13 +87,12 @@ class CalendarSyncService {
       "calendarId": calendarId,
       "semesterId": semesterId,
     });
-    if (raw is Map<Object?, Object?>) {
-      return (
-        (raw["deleted"] as num?)?.toInt() ?? 0,
-        raw["calendarName"]?.toString(),
-      );
-    }
-    return (0, null);
+    return raw is Map<Object?, Object?>
+        ? (
+            (raw["deleted"] as num?)?.toInt() ?? 0,
+            raw["calendarName"]?.toString(),
+          )
+        : (0, null);
   }
 
   static Future<List<CalendarInfo>> getWritableCalendars() async {
@@ -123,24 +100,9 @@ class CalendarSyncService {
     final raw = await _channel.invokeMethod<List<dynamic>>(
       "getWritableCalendars",
     );
-    if (raw == null) return const [];
-    return raw
-        .whereType<Map<Object?, Object?>>()
-        .map(CalendarInfo.fromMap)
-        .where((c) => c.id.trim().isNotEmpty)
-        .toList();
-  }
-
-  static List<TimetableSlot> _mergeLabsByDay(List<TimetableSlot> slots) {
-    final grouped = <String, List<TimetableSlot>>{};
-    for (final slot in slots) {
-      grouped.putIfAbsent(slot.day, () => []).add(slot);
-    }
-
-    final out = <TimetableSlot>[];
-    for (final daySlots in grouped.values) {
-      out.addAll(mergeLabsSloths(daySlots));
-    }
-    return out;
+    return [
+      for (final map in [...?raw?.whereType<Map<Object?, Object?>>()])
+        if (_calendarInfo(map) case final c when c.id.trim().isNotEmpty) c,
+    ];
   }
 }
