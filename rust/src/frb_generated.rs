@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1339021109;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 502930840;
 
 // Section: executor
 
@@ -2568,6 +2568,102 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
         },
     )
 }
+fn wire__crate__api__wire__wire_bench_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "wire_bench",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_config = <crate::api::wire::WireConfig>::sse_decode(&mut deserializer);
+            let api_size = <u32>::sse_decode(&mut deserializer);
+            let api_new_session = <bool>::sse_decode(&mut deserializer);
+            let api_timeout_ms = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::wire::WireFetchError>(
+                    (move || async move {
+                        let output_ok = crate::api::wire::wire_bench(
+                            api_config,
+                            api_size,
+                            api_new_session,
+                            api_timeout_ms,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__wire__wire_fetch_page_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "wire_fetch_page",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_config = <crate::api::wire::WireConfig>::sse_decode(&mut deserializer);
+            let api_session_json = <String>::sse_decode(&mut deserializer);
+            let api_name = <String>::sse_decode(&mut deserializer);
+            let api_semester = <Option<String>>::sse_decode(&mut deserializer);
+            let api_args = <Vec<(String, String)>>::sse_decode(&mut deserializer);
+            let api_dictionary = <Option<String>>::sse_decode(&mut deserializer);
+            let api_timeout_ms = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, crate::api::wire::WireFetchError>(
+                    (move || async move {
+                        let output_ok = crate::api::wire::wire_fetch_page(
+                            api_config,
+                            api_session_json,
+                            api_name,
+                            api_semester,
+                            api_args,
+                            api_dictionary,
+                            api_timeout_ms,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 
 // Section: static_checks
 
@@ -4107,6 +4203,18 @@ impl SseDecode for Vec<crate::api::vtop::types::PerExamScheduleRecord> {
     }
 }
 
+impl SseDecode for Vec<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<u16>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4877,6 +4985,92 @@ impl SseDecode for crate::api::vtop::types::WeekendOutingRecord {
     }
 }
 
+impl SseDecode for crate::api::wire::WireBench {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_elapsedMs = <u32>::sse_decode(deserializer);
+        let mut var_bytesUp = <u32>::sse_decode(deserializer);
+        let mut var_bytesDown = <u32>::sse_decode(deserializer);
+        let mut var_retries = <u32>::sse_decode(deserializer);
+        let mut var_handshake = <bool>::sse_decode(deserializer);
+        let mut var_rate = <u32>::sse_decode(deserializer);
+        let mut var_rttMs = <u32>::sse_decode(deserializer);
+        let mut var_lossPct = <u32>::sse_decode(deserializer);
+        return crate::api::wire::WireBench {
+            elapsed_ms: var_elapsedMs,
+            bytes_up: var_bytesUp,
+            bytes_down: var_bytesDown,
+            retries: var_retries,
+            handshake: var_handshake,
+            rate: var_rate,
+            rtt_ms: var_rttMs,
+            loss_pct: var_lossPct,
+        };
+    }
+}
+
+impl SseDecode for crate::api::wire::WireConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_host = <String>::sse_decode(deserializer);
+        let mut var_ports = <Vec<u16>>::sse_decode(deserializer);
+        let mut var_serverKey = <String>::sse_decode(deserializer);
+        let mut var_stateDir = <String>::sse_decode(deserializer);
+        return crate::api::wire::WireConfig {
+            host: var_host,
+            ports: var_ports,
+            server_key: var_serverKey,
+            state_dir: var_stateDir,
+        };
+    }
+}
+
+impl SseDecode for crate::api::wire::WireFetchError {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut tag_ = <i32>::sse_decode(deserializer);
+        match tag_ {
+            0 => {
+                return crate::api::wire::WireFetchError::Unreachable;
+            }
+            1 => {
+                return crate::api::wire::WireFetchError::Timeout;
+            }
+            2 => {
+                let mut var_field0 = <String>::sse_decode(deserializer);
+                return crate::api::wire::WireFetchError::Unsupported(var_field0);
+            }
+            3 => {
+                let mut var_field0 = <String>::sse_decode(deserializer);
+                return crate::api::wire::WireFetchError::Failed(var_field0);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseDecode for crate::api::wire::WirePage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_status = <u16>::sse_decode(deserializer);
+        let mut var_packed = <bool>::sse_decode(deserializer);
+        let mut var_body = <Vec<u8>>::sse_decode(deserializer);
+        let mut var_elapsedMs = <u32>::sse_decode(deserializer);
+        let mut var_handshake = <bool>::sse_decode(deserializer);
+        let mut var_wireBytes = <u32>::sse_decode(deserializer);
+        return crate::api::wire::WirePage {
+            status: var_status,
+            packed: var_packed,
+            body: var_body,
+            elapsed_ms: var_elapsedMs,
+            handshake: var_handshake,
+            wire_bytes: var_wireBytes,
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -5069,6 +5263,8 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
+        48 => wire__crate__api__wire__wire_bench_impl(port, ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -6622,6 +6818,99 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Weeke
         self.into()
     }
 }
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::wire::WireBench {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.elapsed_ms.into_into_dart().into_dart(),
+            self.bytes_up.into_into_dart().into_dart(),
+            self.bytes_down.into_into_dart().into_dart(),
+            self.retries.into_into_dart().into_dart(),
+            self.handshake.into_into_dart().into_dart(),
+            self.rate.into_into_dart().into_dart(),
+            self.rtt_ms.into_into_dart().into_dart(),
+            self.loss_pct.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::wire::WireBench {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WireBench>
+    for crate::api::wire::WireBench
+{
+    fn into_into_dart(self) -> crate::api::wire::WireBench {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::wire::WireConfig {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.host.into_into_dart().into_dart(),
+            self.ports.into_into_dart().into_dart(),
+            self.server_key.into_into_dart().into_dart(),
+            self.state_dir.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::wire::WireConfig {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WireConfig>
+    for crate::api::wire::WireConfig
+{
+    fn into_into_dart(self) -> crate::api::wire::WireConfig {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::wire::WireFetchError {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            crate::api::wire::WireFetchError::Unreachable => [0.into_dart()].into_dart(),
+            crate::api::wire::WireFetchError::Timeout => [1.into_dart()].into_dart(),
+            crate::api::wire::WireFetchError::Unsupported(field0) => {
+                [2.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+            crate::api::wire::WireFetchError::Failed(field0) => {
+                [3.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::wire::WireFetchError
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WireFetchError>
+    for crate::api::wire::WireFetchError
+{
+    fn into_into_dart(self) -> crate::api::wire::WireFetchError {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::wire::WirePage {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.status.into_into_dart().into_dart(),
+            self.packed.into_into_dart().into_dart(),
+            self.body.into_into_dart().into_dart(),
+            self.elapsed_ms.into_into_dart().into_dart(),
+            self.handshake.into_into_dart().into_dart(),
+            self.wire_bytes.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::wire::WirePage {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WirePage> for crate::api::wire::WirePage {
+    fn into_into_dart(self) -> crate::api::wire::WirePage {
+        self
+    }
+}
 
 impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -7285,6 +7574,16 @@ impl SseEncode for Vec<crate::api::vtop::types::PerExamScheduleRecord> {
     }
 }
 
+impl SseEncode for Vec<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <u16>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7832,6 +8131,67 @@ impl SseEncode for crate::api::vtop::types::WeekendOutingRecord {
         <String>::sse_encode(self.status, serializer);
         <String>::sse_encode(self.pass_id, serializer);
         <String>::sse_encode(self.cancel_id, serializer);
+    }
+}
+
+impl SseEncode for crate::api::wire::WireBench {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u32>::sse_encode(self.elapsed_ms, serializer);
+        <u32>::sse_encode(self.bytes_up, serializer);
+        <u32>::sse_encode(self.bytes_down, serializer);
+        <u32>::sse_encode(self.retries, serializer);
+        <bool>::sse_encode(self.handshake, serializer);
+        <u32>::sse_encode(self.rate, serializer);
+        <u32>::sse_encode(self.rtt_ms, serializer);
+        <u32>::sse_encode(self.loss_pct, serializer);
+    }
+}
+
+impl SseEncode for crate::api::wire::WireConfig {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.host, serializer);
+        <Vec<u16>>::sse_encode(self.ports, serializer);
+        <String>::sse_encode(self.server_key, serializer);
+        <String>::sse_encode(self.state_dir, serializer);
+    }
+}
+
+impl SseEncode for crate::api::wire::WireFetchError {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        match self {
+            crate::api::wire::WireFetchError::Unreachable => {
+                <i32>::sse_encode(0, serializer);
+            }
+            crate::api::wire::WireFetchError::Timeout => {
+                <i32>::sse_encode(1, serializer);
+            }
+            crate::api::wire::WireFetchError::Unsupported(field0) => {
+                <i32>::sse_encode(2, serializer);
+                <String>::sse_encode(field0, serializer);
+            }
+            crate::api::wire::WireFetchError::Failed(field0) => {
+                <i32>::sse_encode(3, serializer);
+                <String>::sse_encode(field0, serializer);
+            }
+            _ => {
+                unimplemented!("");
+            }
+        }
+    }
+}
+
+impl SseEncode for crate::api::wire::WirePage {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u16>::sse_encode(self.status, serializer);
+        <bool>::sse_encode(self.packed, serializer);
+        <Vec<u8>>::sse_encode(self.body, serializer);
+        <u32>::sse_encode(self.elapsed_ms, serializer);
+        <bool>::sse_encode(self.handshake, serializer);
+        <u32>::sse_encode(self.wire_bytes, serializer);
     }
 }
 

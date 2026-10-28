@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:vitapmate/core/logging/app_logger.dart';
 import 'package:vitapmate/core/providers/server_url.dart';
 import 'package:vitapmate/core/providers/vtop_proxy.dart';
+import 'package:vitapmate/core/providers/vtop_udp.dart';
 import 'package:vitapmate/core/vtop_backend/server_json.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
 import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
@@ -23,6 +24,7 @@ import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
+import 'package:vitapmate/src/api/wire.dart';
 
 const _log = SourceLogger('vtop.server');
 
@@ -105,15 +107,49 @@ final rustPageDictionary = PageDictionary(
       server_page.serverPageUnpack(name: name, packed: packed),
 );
 
-/// The edge's `/v1/vtop/*` routes.
+/// One page over the experimental UDP transport (`rust/src/api/wire.rs`).
+typedef WirePageFetch =
+    Future<WirePage> Function({
+      required String sessionJson,
+      required String name,
+      String? semester,
+      required Map<String, String> args,
+      String? dictionary,
+    });
+
+/// [WirePageFetch] through Rust, to the build's gateway (`vtop_udp.dart`).
+Future<WirePage> rustWirePage({
+  required String sessionJson,
+  required String name,
+  String? semester,
+  required Map<String, String> args,
+  String? dictionary,
+}) async => wireFetchPage(
+  config: await udpWireConfig(),
+  sessionJson: sessionJson,
+  name: name,
+  semester: semester,
+  args: [for (final e in args.entries) (e.key, e.value)],
+  dictionary: dictionary,
+  timeoutMs: ServerVtopApi.wireTimeout.inMilliseconds,
+);
+
+Future<bool> _never() async => false;
+
+/// The edge's `/v1/vtop/*` routes; page fetches over the UDP gateway
+/// instead when [useWire] says so (see `vtop_udp.dart`).
 class ServerVtopApi {
   ServerVtopApi({
     required http.Client client,
     String? baseUrl,
     PageDictionary? pages,
+    WirePageFetch? wire,
+    Future<bool> Function() useWire = _never,
   }) : _client = client,
        _baseUrl = baseUrl,
-       _pages = pages;
+       _pages = pages,
+       _wire = wire,
+       _useWire = useWire;
 
   final http.Client _client;
 
@@ -126,6 +162,16 @@ class ServerVtopApi {
   /// Over the edge's own 32 s, which is over the engine's VTOP limits.
   static const timeout = Duration(seconds: 35);
 
+  /// A page over UDP at 1 kbit/s can take this long.
+  static const wireTimeout = Duration(seconds: 45);
+
+  /// After the gateway does not answer, pages use HTTPS for this long.
+  static const wireRetryAfter = Duration(minutes: 10);
+
+  final WirePageFetch? _wire;
+  final Future<bool> Function() _useWire;
+  DateTime? _wireOffUntil;
+
   Future<Map<String, dynamic>> fetch({
     required SessionState session,
     required String name,
@@ -133,13 +179,15 @@ class ServerVtopApi {
     Map<String, String> args = const {},
   }) async {
     final pages = _pages;
-    final response = await _send('/v1/vtop/fetch', {
-      'session': sessionToServerJson(session),
-      'name': name,
-      'semester': ?semester,
-      'args': args,
-      'dictionary': ?pages?.id(),
-    });
+    final response =
+        await _sendWire(session, name, semester, args, pages?.id()) ??
+        await _send('/v1/vtop/fetch', {
+          'session': sessionToServerJson(session),
+          'name': name,
+          'semester': ?semester,
+          'args': args,
+          'dictionary': ?pages?.id(),
+        });
     final Object? page;
     if (pages != null && response.headers['content-type'] == packedPageType) {
       try {
@@ -196,6 +244,63 @@ class ServerVtopApi {
     String path,
     Map<String, Object?> body,
   ) async => _json(await _send(path, body));
+
+  /// The page over UDP, shaped as the edge's answer; null to use HTTPS:
+  /// the mode is off, the gateway did not answer lately, or the page does
+  /// not suit UDP. A page that started arriving but did not finish is a
+  /// timeout, as over HTTPS (another try over HTTPS would only be slower).
+  Future<http.Response?> _sendWire(
+    SessionState session,
+    String name,
+    String? semester,
+    Map<String, String> args,
+    String? dictionary,
+  ) async {
+    final wire = _wire;
+    if (wire == null || !await _useWire()) return null;
+    final off = _wireOffUntil;
+    if (off != null && DateTime.now().isBefore(off)) return null;
+    final WirePage page;
+    try {
+      page = await wire(
+        sessionJson: jsonEncode(sessionToServerJson(session)),
+        name: name,
+        semester: semester,
+        args: args,
+        dictionary: dictionary,
+      );
+    } on WireFetchError catch (error) {
+      switch (error) {
+        case WireFetchError_Timeout():
+          throw const VtopError.vtopUnavailable(
+            'The server took too long to answer.',
+          );
+        case WireFetchError_Unreachable():
+          _wireOffUntil = DateTime.now().add(wireRetryAfter);
+          _log.warning('$name: the UDP gateway did not answer; using HTTPS');
+        case WireFetchError_Unsupported(:final field0) ||
+            WireFetchError_Failed(:final field0):
+          _log.warning('$name over UDP: $field0; using HTTPS');
+      }
+      return null;
+    } catch (error) {
+      _log.warning('$name over UDP: $error; using HTTPS');
+      return null;
+    }
+    _log.info(
+      '$name over UDP: ${page.status} in ${page.elapsedMs} ms, '
+      '${page.wireBytes} B${page.handshake ? ', new session' : ''}',
+    );
+    // Too large for UDP: the gateway said so without sending the page.
+    if (page.status == 413) return null;
+    return http.Response.bytes(
+      page.body,
+      page.status,
+      headers: {
+        'content-type': page.packed ? packedPageType : 'application/json',
+      },
+    );
+  }
 
   Future<http.Response> _send(String path, Map<String, Object?> body) async {
     final base = (_baseUrl ?? await currentServerUrl()).replaceFirst(

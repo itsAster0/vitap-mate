@@ -16,6 +16,7 @@ import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
 import 'api/vtop/vtop_errors.dart';
 import 'api/vtop_get_client.dart';
+import 'api/wire.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -112,6 +113,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  WireConfig dco_decode_box_autoadd_wire_config(dynamic raw);
 
   @protected
   CalendarEntry dco_decode_calendar_entry(dynamic raw);
@@ -266,6 +270,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<PerExamScheduleRecord> dco_decode_list_per_exam_schedule_record(
     dynamic raw,
   );
+
+  @protected
+  Uint16List dco_decode_list_prim_u_16_strict(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -425,6 +432,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeekendOutingRecord dco_decode_weekend_outing_record(dynamic raw);
 
   @protected
+  WireBench dco_decode_wire_bench(dynamic raw);
+
+  @protected
+  WireConfig dco_decode_wire_config(dynamic raw);
+
+  @protected
+  WireFetchError dco_decode_wire_fetch_error(dynamic raw);
+
+  @protected
+  WirePage dco_decode_wire_page(dynamic raw);
+
+  @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
@@ -504,6 +523,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  WireConfig sse_decode_box_autoadd_wire_config(SseDeserializer deserializer);
 
   @protected
   CalendarEntry sse_decode_calendar_entry(SseDeserializer deserializer);
@@ -714,6 +736,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Uint16List sse_decode_list_prim_u_16_strict(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
@@ -911,6 +936,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  WireBench sse_decode_wire_bench(SseDeserializer deserializer);
+
+  @protected
+  WireConfig sse_decode_wire_config(SseDeserializer deserializer);
+
+  @protected
+  WireFetchError sse_decode_wire_fetch_error(SseDeserializer deserializer);
+
+  @protected
+  WirePage sse_decode_wire_page(SseDeserializer deserializer);
+
+  @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
     SseSerializer serializer,
@@ -1019,6 +1056,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_wire_config(
+    WireConfig self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_calendar_entry(CalendarEntry self, SseSerializer serializer);
@@ -1294,6 +1337,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_u_16_strict(
+    Uint16List self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
@@ -1529,6 +1578,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     WeekendOutingRecord self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_wire_bench(WireBench self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_wire_config(WireConfig self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_wire_fetch_error(
+    WireFetchError self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_wire_page(WirePage self, SseSerializer serializer);
 }
 
 // Section: wire_class
