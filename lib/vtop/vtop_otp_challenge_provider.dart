@@ -1,19 +1,28 @@
-import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'dart:async';
+
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/src/api/vtop/vtop_client.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 
 part 'vtop_otp_challenge_provider.g.dart';
 
 const _otpChallengeTimeout = Duration(minutes: 3);
+
+/// The prompt's message when VTOP has just asked for an OTP.
+const defaultOtpMessage =
+    'Additional verification required. OTP sent to your registered email.';
+
+const _tryingEmail = 'Trying to get OTP from email...';
+const _expiredMessage =
+    'OTP expired. Tap resend to get a new OTP and continue verification.';
 
 /// Shown after VTOP rejects a fetched OTP, often one from an earlier sign-in.
 const keepTryingMessage =
@@ -85,37 +94,43 @@ class OtpFetchProgress {
   /// The last check failed; checking goes on.
   final String? problem;
 
-  OtpFetchProgress checked({String? problem}) => OtpFetchProgress(
-    source: source,
+  OtpFetchProgress checked({String? problem}) => _with(
     requestedAt: requestedAt,
-    account: account,
     checks: checks + 1,
     lastCheckAt: DateTime.now().toUtc(),
-    gmailFallbackAvailable: gmailFallbackAvailable,
     gmailFallback: gmailFallback,
-    deleteAfterReading: deleteAfterReading,
     problem: problem,
   );
 
-  OtpFetchProgress withGmailFallback() => OtpFetchProgress(
+  OtpFetchProgress withGmailFallback() => _with(
+    requestedAt: requestedAt,
+    checks: checks,
+    lastCheckAt: lastCheckAt,
+    gmailFallback: true,
+    problem: problem,
+  );
+
+  /// The same source, from a new request: counts start again.
+  OtpFetchProgress restarted(DateTime requestedAt) =>
+      _with(requestedAt: requestedAt);
+
+  /// The same source and account with these counts.
+  OtpFetchProgress _with({
+    required DateTime requestedAt,
+    int checks = 0,
+    DateTime? lastCheckAt,
+    bool gmailFallback = false,
+    String? problem,
+  }) => OtpFetchProgress(
     source: source,
     requestedAt: requestedAt,
     account: account,
     checks: checks,
     lastCheckAt: lastCheckAt,
     gmailFallbackAvailable: gmailFallbackAvailable,
-    gmailFallback: true,
+    gmailFallback: gmailFallback,
     deleteAfterReading: deleteAfterReading,
     problem: problem,
-  );
-
-  /// The same source, from a new request: counts start again.
-  OtpFetchProgress restarted(DateTime requestedAt) => OtpFetchProgress(
-    source: source,
-    requestedAt: requestedAt,
-    account: account,
-    gmailFallbackAvailable: gmailFallbackAvailable,
-    deleteAfterReading: deleteAfterReading,
   );
 }
 
@@ -161,20 +176,17 @@ sealed class VtopOtpChallengeState {
   }
 
   bool get isActive => this is ActiveOtpChallenge;
-  bool get isMinimized =>
-      this is ActiveOtpChallenge &&
-      (this as ActiveOtpChallenge).presentation ==
-          OtpChallengePresentation.minimized;
-  bool get isSubmitting =>
-      this is ActiveOtpChallenge &&
-      (this as ActiveOtpChallenge).activity == OtpChallengeActivity.submitting;
-  bool get isResending =>
-      this is ActiveOtpChallenge &&
-      (this as ActiveOtpChallenge).activity == OtpChallengeActivity.resending;
-  bool get isAutoFetchingEmail =>
-      this is ActiveOtpChallenge &&
-      (this as ActiveOtpChallenge).activity ==
-          OtpChallengeActivity.fetchingEmail;
+  bool get isMinimized => switch (this) {
+    ActiveOtpChallenge(presentation: .minimized) => true,
+    _ => false,
+  };
+  bool get isSubmitting => _activity == .submitting;
+  bool get isResending => _activity == .resending;
+  bool get isAutoFetchingEmail => _activity == .fetchingEmail;
+  OtpChallengeActivity? get _activity => switch (this) {
+    ActiveOtpChallenge(:final activity) => activity,
+    IdleOtpChallenge() => null,
+  };
   bool get canRetryEmailAutoFetch;
   int get remainingSeconds;
   String get message;
@@ -194,22 +206,24 @@ sealed class VtopOtpChallengeState {
     bool clearAutoFetchMessage = false,
     bool clearError = false,
   }) {
-    final current = this;
-    if (current is! ActiveOtpChallenge) {
-      throw StateError('An idle OTP challenge cannot be updated.');
-    }
+    final current = switch (this) {
+      ActiveOtpChallenge active => active,
+      IdleOtpChallenge() => throw StateError(
+        'An idle OTP challenge cannot be updated.',
+      ),
+    };
     return VtopOtpChallengeState.active(
       activity: activity ?? current.activity,
       presentation: presentation ?? current.presentation,
       canRetryEmailAutoFetch:
           canRetryEmailAutoFetch ?? current.canRetryEmailAutoFetch,
-      remainingSeconds: remainingSeconds ?? this.remainingSeconds,
-      message: message ?? this.message,
+      remainingSeconds: remainingSeconds ?? current.remainingSeconds,
+      message: message ?? current.message,
       autoFetchMessage: clearAutoFetchMessage
           ? null
-          : (autoFetchMessage ?? this.autoFetchMessage),
-      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      progress: progress ?? this.progress,
+          : (autoFetchMessage ?? current.autoFetchMessage),
+      errorMessage: clearError ? null : (errorMessage ?? current.errorMessage),
+      progress: progress ?? current.progress,
     );
   }
 }
@@ -293,67 +307,54 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
   Future<void> requestOtp({
     required VtopClient client,
-    String message =
-        'Additional verification required. OTP sent to your registered email.',
+    String message = defaultOtpMessage,
     DateTime? otpRequiredAt,
     String? logContext,
   }) async {
     _client = client;
     _otpRequiredAt = otpRequiredAt?.toUtc() ?? DateTime.now().toUtc();
     _logContext = logContext ?? 'otp.flow#${++_challengeCounter}';
-    final canAutoFetchFromEmail = await _canAutoFetchFromEmail();
-    _emailAutoFetchAvailable = canAutoFetchFromEmail;
+    final autoFetch = _emailAutoFetchAvailable = await canAutoFetchFromEmail();
     final progress = await _progressFor(
-      canAutoFetchFromEmail: canAutoFetchFromEmail,
+      canAutoFetchFromEmail: autoFetch,
       requestedAt: _otpRequiredAt!,
     );
-    if (state.isActive && _completer != null && !_completer!.isCompleted) {
+    final activity = autoFetch
+        ? OtpChallengeActivity.fetchingEmail
+        : OtpChallengeActivity.waiting;
+    final autoFetchMessage = autoFetch ? _tryingEmail : null;
+    if (_completer case final completer?
+        when state.isActive && !completer.isCompleted) {
       _info('challenge already active; refreshing prompt state');
       state = state.update(
-        presentation: OtpChallengePresentation.expanded,
+        presentation: .expanded,
         message: message,
-        activity: canAutoFetchFromEmail
-            ? OtpChallengeActivity.fetchingEmail
-            : OtpChallengeActivity.waiting,
+        activity: activity,
         canRetryEmailAutoFetch: false,
-        autoFetchMessage: canAutoFetchFromEmail
-            ? 'Trying to get OTP from email...'
-            : null,
-        clearAutoFetchMessage: !canAutoFetchFromEmail,
+        autoFetchMessage: autoFetchMessage,
+        clearAutoFetchMessage: !autoFetch,
         progress: progress,
         clearError: true,
       );
-      return _completer!.future;
+      return completer.future;
     }
 
-    _completer = Completer<void>();
+    final completer = _completer = Completer<void>();
     _rejectedCodes.clear();
     _autoResends = 0;
-    _info('challenge started (emailAutofetch=$canAutoFetchFromEmail)');
+    _info('challenge started (emailAutofetch=$autoFetch)');
     state = VtopOtpChallengeState.active(
-      presentation: canAutoFetchFromEmail
-          ? OtpChallengePresentation.minimized
-          : OtpChallengePresentation.expanded,
-      activity: canAutoFetchFromEmail
-          ? OtpChallengeActivity.fetchingEmail
-          : OtpChallengeActivity.waiting,
-      canRetryEmailAutoFetch: false,
+      presentation: autoFetch ? .minimized : .expanded,
+      activity: activity,
       remainingSeconds: _otpChallengeTimeout.inSeconds,
       message: message,
-      autoFetchMessage: canAutoFetchFromEmail
-          ? 'Trying to get OTP from email...'
-          : null,
+      autoFetchMessage: autoFetchMessage,
       progress: progress,
     );
     _startTicker();
-    if (canAutoFetchFromEmail) {
-      final runId = ++_autoFetchRunId;
-      unawaited(_runEmailAutoFetch(runId: runId));
-    }
-    return _completer!.future;
+    if (autoFetch) _startAutoFetch();
+    return completer.future;
   }
-
-  Future<bool> canAutoFetchFromEmail() => _canAutoFetchFromEmail();
 
   void retryEmailAutoFetch() {
     if (!state.isActive ||
@@ -372,21 +373,20 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       canRetryEmailAutoFetch: false,
       message:
           'Trying to get OTP from email again. You can still enter it manually.',
-      autoFetchMessage: 'Trying to get OTP from email...',
+      autoFetchMessage: _tryingEmail,
       clearError: true,
     );
-    final runId = ++_autoFetchRunId;
-    unawaited(_runEmailAutoFetch(runId: runId));
+    _startAutoFetch();
   }
 
   void minimize() {
     if (!state.isActive) return;
-    state = state.update(presentation: OtpChallengePresentation.minimized);
+    state = state.update(presentation: .minimized);
   }
 
   void reopen() {
     if (!state.isActive) return;
-    state = state.update(presentation: OtpChallengePresentation.expanded);
+    state = state.update(presentation: .expanded);
   }
 
   void cancel() {
@@ -401,10 +401,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     final sanitizedOtp = otp.replaceAll(RegExp(r'\D'), '');
     if (sanitizedOtp.length != 6) {
       _warn('rejected OTP submit because the code was not 6 digits');
-      state = state.update(
-        errorMessage: 'Please enter a valid 6-digit OTP.',
-        clearError: false,
-      );
+      state = state.update(errorMessage: 'Please enter a valid 6-digit OTP.');
       return;
     }
 
@@ -423,8 +420,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       _finishSuccess();
     } catch (error) {
       final message = _authMessage(error);
-      final rejection = _rejectionOf(error, message);
-      if (rejection != null) {
+      if (_rejectionOf(error, message) case final rejection?) {
         _warn('OTP rejected (${rejection.name})');
         _onRejected(sanitizedOtp, rejection, message);
         return;
@@ -441,15 +437,14 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     if (rejection == _Rejection.expired) {
       _ticker?.cancel();
       state = state.update(
-        activity: OtpChallengeActivity.waiting,
-        presentation: OtpChallengePresentation.expanded,
+        activity: .waiting,
+        presentation: .expanded,
         remainingSeconds: 0,
-        message:
-            'OTP expired. Tap resend to get a new OTP and continue verification.',
+        message: _expiredMessage,
         errorMessage: message,
         clearAutoFetchMessage: true,
       );
-      if (_emailAutoFetchAvailable && _autoResends < _maxAutoResends) {
+      if (_canAutoResend) {
         _autoResends++;
         unawaited(
           resendOtp(
@@ -464,19 +459,18 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         _rejectedCodes.length < _maxRejectedCodes &&
         state.remainingSeconds > 0) {
       state = state.update(
-        activity: OtpChallengeActivity.fetchingEmail,
-        presentation: OtpChallengePresentation.expanded,
+        activity: .fetchingEmail,
+        presentation: .expanded,
         message: keepTryingMessage,
         autoFetchMessage: 'Waiting for a newer OTP…',
         errorMessage: message,
       );
-      final runId = ++_autoFetchRunId;
-      unawaited(_runEmailAutoFetch(runId: runId));
+      _startAutoFetch();
       return;
     }
     state = state.update(
-      activity: OtpChallengeActivity.waiting,
-      presentation: OtpChallengePresentation.expanded,
+      activity: .waiting,
+      presentation: .expanded,
       canRetryEmailAutoFetch:
           _emailAutoFetchAvailable && state.remainingSeconds > 0,
       errorMessage: message,
@@ -493,7 +487,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
 
     state = state.update(
-      activity: OtpChallengeActivity.resending,
+      activity: .resending,
       canRetryEmailAutoFetch: false,
       clearAutoFetchMessage: true,
       clearError: true,
@@ -510,23 +504,17 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
             : OtpChallengeActivity.waiting,
         remainingSeconds: _otpChallengeTimeout.inSeconds,
         message: message,
-        autoFetchMessage: _emailAutoFetchAvailable
-            ? 'Trying to get OTP from email...'
-            : null,
+        autoFetchMessage: _emailAutoFetchAvailable ? _tryingEmail : null,
         progress: state.progress?.restarted(requestedAt),
         clearError: true,
       );
       _startTicker();
-      if (state.isAutoFetchingEmail) {
-        final runId = ++_autoFetchRunId;
-        unawaited(_runEmailAutoFetch(runId: runId));
-      }
+      if (state.isAutoFetchingEmail) _startAutoFetch();
     } catch (error) {
       _error('resend failed: $error');
       state = state.update(
-        activity: OtpChallengeActivity.waiting,
+        activity: .waiting,
         errorMessage: _authMessage(error),
-        clearError: false,
       );
     }
   }
@@ -538,13 +526,10 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
       final next = state.remainingSeconds - 1;
       if (next <= 0) {
         _ticker?.cancel();
-        if (_emailAutoFetchAvailable &&
-            _autoResends < _maxAutoResends &&
-            !state.isSubmitting &&
-            !state.isResending) {
+        if (_canAutoResend && !state.isSubmitting && !state.isResending) {
           _autoResends++;
           state = state.update(
-            activity: OtpChallengeActivity.waiting,
+            activity: .waiting,
             remainingSeconds: 0,
             clearAutoFetchMessage: true,
           );
@@ -558,15 +543,13 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         }
         final autoFetchPending = state.isAutoFetchingEmail;
         state = state.update(
-          activity: OtpChallengeActivity.waiting,
+          activity: .waiting,
           remainingSeconds: 0,
-          message:
-              'OTP expired. Tap resend to get a new OTP and continue verification.',
+          message: _expiredMessage,
           errorMessage: autoFetchPending
               ? null
               : 'OTP expired. Please resend OTP.',
           clearAutoFetchMessage: true,
-          clearError: false,
         );
         return;
       }
@@ -574,51 +557,25 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     });
   }
 
-  /// VTOP turned the code down: [_Rejection.expired] when it says so,
-  /// otherwise [_Rejection.invalid] whatever the wording. Other errors end
-  /// the challenge.
-  _Rejection? _rejectionOf(Object error, String message) {
-    final rejected =
-        error is VtopError &&
-        error.maybeWhen(authenticationFailed: (_) => true, orElse: () => false);
-    if (!rejected) return null;
-    return message.toLowerCase().contains('expire')
-        ? _Rejection.expired
-        : _Rejection.invalid;
-  }
+  bool get _canAutoResend =>
+      _emailAutoFetchAvailable && _autoResends < _maxAutoResends;
 
-  String _authMessage(Object error) {
-    if (error is VtopError) {
-      return error.maybeWhen(
-        authenticationFailed: (message) {
-          final trimmed = message.trim();
-          return trimmed.isEmpty ? 'Authentication failed' : trimmed;
-        },
-        orElse: () => 'Authentication failed',
-      );
-    }
-    return 'Authentication failed';
-  }
+  void _startAutoFetch() =>
+      unawaited(_runEmailAutoFetch(runId: ++_autoFetchRunId));
 
   void _finishSuccess() {
-    final completer = _completer;
     _info('challenge completed');
-    _reset();
-    if (completer != null && !completer.isCompleted) {
-      completer.complete();
-    }
+    _reset()?.complete();
   }
 
   void _finishWithError(Object error) {
-    final completer = _completer;
     _warn('challenge finished with error: $error');
-    _reset();
-    if (completer != null && !completer.isCompleted) {
-      completer.completeError(error);
-    }
+    _reset()?.completeError(error);
   }
 
-  void _reset() {
+  /// Back to idle; returns the challenge's completer if it is still open.
+  Completer<void>? _reset() {
+    final completer = _completer;
     _autoFetchRunId++;
     _ticker?.cancel();
     _ticker = null;
@@ -630,11 +587,12 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     _autoResends = 0;
     _completer = null;
     state = const VtopOtpChallengeState.idle();
+    return completer != null && !completer.isCompleted ? completer : null;
   }
 
   /// Forwarded mail comes first (pushed, so it's fastest); Gmail (own key
   /// or shared access) is the second choice.
-  Future<bool> _canAutoFetchFromEmail() async {
+  Future<bool> canAutoFetchFromEmail() async {
     try {
       _useMailForwarding =
           !await isOnDeviceMode() &&
@@ -647,7 +605,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
   }
 
-  /// What the prompt shows for the source [_canAutoFetchFromEmail] chose.
+  /// What the prompt shows for the source [canAutoFetchFromEmail] chose.
   Future<OtpFetchProgress> _progressFor({
     required bool canAutoFetchFromEmail,
     required DateTime requestedAt,
@@ -747,9 +705,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
         Zone.current.handleUncaughtError(error, stackTrace);
         if (!_shouldContinueAutoFetch(runId)) return null;
         state = state.update(
-          activity: OtpChallengeActivity.waiting,
+          activity: .waiting,
           canRetryEmailAutoFetch: true,
-          presentation: OtpChallengePresentation.expanded,
+          presentation: .expanded,
           clearAutoFetchMessage: true,
           message:
               'Could not read OTP from email. Enter OTP manually to continue.',
@@ -839,11 +797,24 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     await submitOtp(code);
   }
 
-  bool _shouldContinueAutoFetch(int runId) {
-    return runId == _autoFetchRunId &&
-        state.isActive &&
-        state.isAutoFetchingEmail &&
-        state.remainingSeconds > 0 &&
-        _client != null;
-  }
+  bool _shouldContinueAutoFetch(int runId) =>
+      runId == _autoFetchRunId &&
+      state.isAutoFetchingEmail &&
+      state.remainingSeconds > 0 &&
+      _client != null;
 }
+
+/// VTOP turned the code down: [_Rejection.expired] when it says so,
+/// otherwise [_Rejection.invalid] whatever the wording. Other errors end
+/// the challenge.
+_Rejection? _rejectionOf(Object error, String message) => switch (error) {
+  VtopError_AuthenticationFailed() =>
+    message.toLowerCase().contains('expire') ? .expired : .invalid,
+  _ => null,
+};
+
+String _authMessage(Object error) => switch (error) {
+  VtopError_AuthenticationFailed(:final field0) when field0.trim().isNotEmpty =>
+    field0.trim(),
+  _ => 'Authentication failed',
+};

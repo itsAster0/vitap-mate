@@ -1,7 +1,9 @@
 import 'dart:async';
-import 'package:vitapmate/observability/log.dart';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/entity/global_async_queue_entity.dart';
+
 part 'global_async_queue_provider.g.dart';
 
 abstract class AsyncQueue {
@@ -19,10 +21,9 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   /// is live and the network is good, so stale pages can be refreshed.
   Stream<void> get quickFetches => _quickFetches.stream;
   static const quickFetchLimit = Duration(seconds: 2);
+
   @override
-  GlobalAsyncQueueEntity build() {
-    return const GlobalAsyncQueueEntity();
-  }
+  GlobalAsyncQueueEntity build() => const GlobalAsyncQueueEntity();
 
   @override
   Future<T> run<T>(String id, Future<T> Function() task) async {
@@ -33,20 +34,18 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
     }
     final completer = Completer<T>();
     final future = completer.future;
-    final before = {...current, id: future};
-    state = state.copyWith(running: before);
-    _taskEvents.add(before.keys.toSet());
+    final running = {...current, id: future};
+    state = state.copyWith(running: running);
+    _taskEvents.add(running.keys.toSet());
 
     unawaited(() async {
       try {
-        if (id.startsWith("vtop")) {
-          final mainFutures = current.entries
-              .where(
-                (entry) =>
-                    entry.key.startsWith('vtop_login') && entry.key != id,
-              )
-              .map((entry) => entry.value)
-              .toList();
+        if (id.startsWith('vtop')) {
+          // Every VTOP call waits for a sign-in already under way.
+          final mainFutures = [
+            for (final MapEntry(:key, :value) in current.entries)
+              if (key.startsWith('vtop_login') && key != id) value,
+          ];
           if (mainFutures.isNotEmpty) {
             Log.info('vtop', "waiting for the on start run code ");
             await Future.wait(mainFutures);
@@ -63,8 +62,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
       } catch (e, st) {
         completer.completeError(e, st);
       } finally {
-        final before1 = state.running;
-        final after = {...before1}..remove(id);
+        final after = {...state.running}..remove(id);
         state = state.copyWith(running: after);
         _taskEvents.add(after.keys.toSet());
         Log.info('vtop', "$state");

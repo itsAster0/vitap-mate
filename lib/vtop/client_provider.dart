@@ -1,23 +1,24 @@
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/vtop/global_async_queue_provider.dart';
-import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
-import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
-import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
-import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/vtop/users/vtop_users.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
+import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/vtop/vtop_session_store.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
+
 part 'client_provider.g.dart';
 
 const _auth = SourceLogger('client.auth');
@@ -34,7 +35,7 @@ class VClient extends _$VClient {
       throw StateError('A configured VTOP account is required.');
     }
     final uname = user.username.toUpperCase();
-    final StoredVtopSession? storedSession = await loadStoredVtopSession(uname);
+    final storedSession = await loadStoredVtopSession(uname);
     PersistedVtopSession? persistedSession;
     if (storedSession != null) {
       _session.info(
@@ -60,25 +61,21 @@ class VClient extends _$VClient {
     );
   }
 
-  void replaceVClient(VtopClient vClient) {
-    state = AsyncData(vClient);
-  }
-
   Future<void> _persistCurrentSession(
-    VtopClient client, {
-    String? flowLabel,
-  }) async {
+    VtopClient client,
+    String flowLabel,
+  ) async {
     final snapshot = createPersistedVtopSessionSnapshot(client: client);
     if (snapshot.cookies?.trim().isEmpty ?? true) {
       _session.warn(
-        '${flowLabel ?? 'session.persist'} skipped because cookie header was empty',
+        '$flowLabel session.persist skipped because cookie header was empty',
       );
       return;
     }
     await saveStoredVtopSession(snapshot);
     await _rememberRegistrationNumber(snapshot.registrationNumber);
     _session.info(
-      '${flowLabel ?? 'session.persist'} saved snapshot for ${snapshot.username} (cookieHeaderLength=${snapshot.cookies?.length ?? 0})',
+      '$flowLabel session.persist saved snapshot for ${snapshot.username} (cookieHeaderLength=${snapshot.cookies?.length ?? 0})',
     );
   }
 
@@ -103,10 +100,7 @@ class VClient extends _$VClient {
     final loggedInAt = exportSessionState(client: client).loggedInAt;
     if (loggedInAt == null) return true;
     final age = DateTime.now().toUtc().difference(
-      DateTime.fromMillisecondsSinceEpoch(
-        loggedInAt.toInt() * 1000,
-        isUtc: true,
-      ),
+      utcFromUnixSeconds(loggedInAt),
     );
     final ttl = ref.read(vtopSessionReuseTtlProvider);
     if (age <= ttl) return true;
@@ -120,19 +114,13 @@ class VClient extends _$VClient {
     bool force = false,
     bool promptForOtp = true,
   }) async {
-    VtopClient client = await future;
-    VtopUserEntity user = await ref.watch(vtopUserProvider.future);
-    final flowId = ++_loginFlowCounter;
-    final flowLabel = 'auth.flow#$flowId';
-    if (!force) {
-      if (await _canReuseSession(client, flowLabel)) {
-        _auth.info('$flowLabel reused an authenticated in-memory session');
-        await _persistCurrentSession(
-          client,
-          flowLabel: '$flowLabel session.persist',
-        );
-        return client;
-      }
+    final client = await future;
+    final user = await ref.watch(vtopUserProvider.future);
+    final flowLabel = 'auth.flow#${++_loginFlowCounter}';
+    if (!force && await _canReuseSession(client, flowLabel)) {
+      _auth.info('$flowLabel reused an authenticated in-memory session');
+      await _persistCurrentSession(client, flowLabel);
+      return client;
     }
     if (!user.isValid) {
       _auth.warn(
@@ -148,7 +136,7 @@ class VClient extends _$VClient {
 
     try {
       await ref.read(globalAsyncQueueProvider.notifier).run(
-        "vtop_login_${user.username}",
+        'vtop_login_${user.username}',
         () async {
           _auth.info('$flowLabel entered serialized login queue');
           if (!force && await _canReuseSession(client, flowLabel)) {
@@ -175,8 +163,6 @@ class VClient extends _$VClient {
                 .read(vtopOtpChallengeProvider.notifier)
                 .requestOtp(
                   client: client,
-                  message:
-                      'Additional verification required. OTP sent to your registered email.',
                   otpRequiredAt: securityOtpRequiredAt(e),
                   logContext: flowLabel,
                 );
@@ -184,10 +170,7 @@ class VClient extends _$VClient {
           }
         },
       );
-      await _persistCurrentSession(
-        client,
-        flowLabel: '$flowLabel session.persist',
-      );
+      await _persistCurrentSession(client, flowLabel);
       _auth.info('$flowLabel finished successfully');
       return client;
     } catch (e) {
@@ -207,9 +190,7 @@ class VClient extends _$VClient {
         await clearStoredVtopSession(uname);
         _session.warn('$flowLabel cleared saved session: VTOP refused it');
       }
-
       _auth.error('$flowLabel failed: $e');
-
       rethrow;
     }
   }

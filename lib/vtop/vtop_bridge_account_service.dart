@@ -4,8 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/edge/edge_device.dart';
+import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 
 const bridgeLinkedSettingKey = 'settings_bridge_linked';
@@ -341,6 +341,11 @@ DateTime _dateTimeFromUnixSeconds(Object? value) {
   return DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true);
 }
 
+DateTime? _optionalDateTime(Object? value) =>
+    value == null ? null : _dateTimeFromUnixSeconds(value);
+
+String? _stringOrNull(Object? value) => value is String ? value : null;
+
 /// Talks to the vtop-bridge account API. Every call is authenticated with the
 /// device's live VTOP cookies; secrets are never logged here.
 class VtopBridgeAccountService {
@@ -379,6 +384,15 @@ class VtopBridgeAccountService {
     }
   }
 
+  Future<http.Response> _send(String path, Map<String, dynamic> body) async =>
+      _client
+          .post(
+            Uri.parse('${await _base()}$path'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+
   Future<Map<String, dynamic>> _post(
     String path, {
     required String cookies,
@@ -386,17 +400,11 @@ class VtopBridgeAccountService {
   }) async {
     await _ensureServerAllowed();
     final secret = await _secrets.read();
-    final response = await _client
-        .post(
-          Uri.parse('${await _base()}$path'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'session': {'cookies': cookies},
-            ...?(secret == null ? null : {'appSecret': secret}),
-            ...?body,
-          }),
-        )
-        .timeout(_timeout);
+    final response = await _send(path, {
+      'session': {'cookies': cookies},
+      'appSecret': ?secret,
+      ...?body,
+    });
 
     Map<String, dynamic> decoded;
     try {
@@ -434,12 +442,13 @@ class VtopBridgeAccountService {
       body: {
         'fcmToken': fcmToken,
         // Session requests then arrive as events of this install.
-        ...?(device == null
-            ? null
-            : {'deviceId': device.id, 'deviceSecret': device.secret}),
-        ...?(semesterId == null ? null : {'semesterId': semesterId}),
-        ...?(credentials == null ? null : {'credentials': credentials}),
-        ...?(label == null ? null : {'label': label}),
+        if (device != null) ...{
+          'deviceId': device.id,
+          'deviceSecret': device.secret,
+        },
+        'semesterId': ?semesterId,
+        'credentials': ?credentials,
+        'label': ?label,
       },
     );
     final secret = body['appSecret'];
@@ -455,16 +464,10 @@ class VtopBridgeAccountService {
     if (await isOnDeviceMode()) return;
     final secret = await _secrets.read();
     if (secret == null || registrationNumber.trim().isEmpty) return;
-    final response = await _client
-        .post(
-          Uri.parse('${await _base()}/v1/account/credentials-rejected'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'registrationNumber': registrationNumber.trim(),
-            'appSecret': secret,
-          }),
-        )
-        .timeout(_timeout);
+    final response = await _send('/v1/account/credentials-rejected', {
+      'registrationNumber': registrationNumber.trim(),
+      'appSecret': secret,
+    });
     if (response.statusCode >= 300) {
       throw BridgeAccountException(
         code: 'http_${response.statusCode}',
@@ -495,45 +498,37 @@ class VtopBridgeAccountService {
 
   Future<BridgeAccount> account({required String cookies}) async {
     final body = await _post('/v1/account', cookies: cookies);
-    final keys = <BridgeKeyInfo>[];
-    final rawKeys = body['keys'];
-    if (rawKeys is List) {
-      for (final raw in rawKeys) {
-        if (raw is! Map) continue;
-        keys.add(
-          BridgeKeyInfo(
-            id: '${raw['id'] ?? ''}',
-            label: '${raw['label'] ?? ''}',
-            createdAt: _dateTimeFromUnixSeconds(raw['createdAt']),
-            lastUsedAt: raw['lastUsedAt'] == null
-                ? null
-                : _dateTimeFromUnixSeconds(raw['lastUsedAt']),
-            phoneId: raw['phoneId'] is String ? raw['phoneId'] as String : null,
-            outings: raw['outings'] == true,
-          ),
-        );
-      }
-    }
+    final keys = [
+      if (body['keys'] case List rawKeys)
+        for (final raw in rawKeys)
+          if (raw is Map)
+            BridgeKeyInfo(
+              id: '${raw['id'] ?? ''}',
+              label: '${raw['label'] ?? ''}',
+              createdAt: _dateTimeFromUnixSeconds(raw['createdAt']),
+              lastUsedAt: _optionalDateTime(raw['lastUsedAt']),
+              phoneId: _stringOrNull(raw['phoneId']),
+              outings: raw['outings'] == true,
+            ),
+    ];
     if (body['thisPhone'] == true) {
       await _keys.retainOnly({for (final key in keys) key.id});
     }
-    final phones = <BridgePhone>[];
-    final rawPhones = body['phones'];
-    if (rawPhones is List) {
-      for (final raw in rawPhones) {
-        if (raw is! Map) continue;
-        final label = raw['label'];
-        phones.add(
-          BridgePhone(
-            id: '${raw['id'] ?? ''}',
-            label: label is String && label.isNotEmpty ? label : null,
-            addedAt: _dateTimeFromUnixSeconds(raw['addedAt']),
-            seenAt: _dateTimeFromUnixSeconds(raw['seenAt']),
-            thisPhone: raw['thisPhone'] == true,
-          ),
-        );
-      }
-    }
+    final phones = [
+      if (body['phones'] case List rawPhones)
+        for (final raw in rawPhones)
+          if (raw is Map)
+            BridgePhone(
+              id: '${raw['id'] ?? ''}',
+              label: switch (raw['label']) {
+                String label when label.isNotEmpty => label,
+                _ => null,
+              },
+              addedAt: _dateTimeFromUnixSeconds(raw['addedAt']),
+              seenAt: _dateTimeFromUnixSeconds(raw['seenAt']),
+              thisPhone: raw['thisPhone'] == true,
+            ),
+    ];
     final phoneCount = body['phoneCount'];
     return BridgeAccount(
       registrationNumber: '${body['registrationNumber'] ?? ''}',
@@ -545,15 +540,9 @@ class VtopBridgeAccountService {
       phones: phones,
       phoneCount: phoneCount is int ? phoneCount : phones.length,
       settings: BridgeSettings.fromJson(body['settings']),
-      semesterId: body['semesterId'] is String
-          ? body['semesterId'] as String
-          : null,
-      vaultSavedAt: body['vaultSavedAt'] == null
-          ? null
-          : _dateTimeFromUnixSeconds(body['vaultSavedAt']),
-      credentialsRejectedAt: body['credentialsRejectedAt'] == null
-          ? null
-          : _dateTimeFromUnixSeconds(body['credentialsRejectedAt']),
+      semesterId: _stringOrNull(body['semesterId']),
+      vaultSavedAt: _optionalDateTime(body['vaultSavedAt']),
+      credentialsRejectedAt: _optionalDateTime(body['credentialsRejectedAt']),
     );
   }
 
@@ -563,13 +552,11 @@ class VtopBridgeAccountService {
     required String cookies,
     required String id,
     required bool outings,
-  }) async {
-    await _post(
-      '/v1/keys/outings',
-      cookies: cookies,
-      body: {'id': id, 'outings': outings},
-    );
-  }
+  }) => _post(
+    '/v1/keys/outings',
+    cookies: cookies,
+    body: {'id': id, 'outings': outings},
+  );
 
   Future<void> revokeKey({required String cookies, required String id}) async {
     await _post('/v1/keys/revoke', cookies: cookies, body: {'id': id});
@@ -582,44 +569,38 @@ class VtopBridgeAccountService {
     required String cookies,
     required String fcmToken,
     EdgeDevice? device,
-  }) async {
-    await _post(
-      '/v1/account/fcm-token',
-      cookies: cookies,
-      body: {
-        'fcmToken': fcmToken,
-        ...?(device == null
-            ? null
-            : {'deviceId': device.id, 'deviceSecret': device.secret}),
+  }) => _post(
+    '/v1/account/fcm-token',
+    cookies: cookies,
+    body: {
+      'fcmToken': fcmToken,
+      if (device != null) ...{
+        'deviceId': device.id,
+        'deviceSecret': device.secret,
       },
-    );
-  }
+    },
+  );
 
-  Future<void> forgetCredentials({required String cookies}) async {
-    await _post('/v1/account/forget-credentials', cookies: cookies);
-  }
+  Future<void> forgetCredentials({required String cookies}) =>
+      _post('/v1/account/forget-credentials', cookies: cookies);
 
   Future<void> updateSettings({
     required String cookies,
     required BridgeSettings settings,
-  }) async {
-    await _post(
-      '/v1/account/settings',
-      cookies: cookies,
-      body: {'settings': settings.toJson()},
-    );
-  }
+  }) => _post(
+    '/v1/account/settings',
+    cookies: cookies,
+    body: {'settings': settings.toJson()},
+  );
 
   Future<void> updateSemester({
     required String cookies,
     required String semesterId,
-  }) async {
-    await _post(
-      '/v1/account/semester',
-      cookies: cookies,
-      body: {'semesterId': semesterId},
-    );
-  }
+  }) => _post(
+    '/v1/account/semester',
+    cookies: cookies,
+    body: {'semesterId': semesterId},
+  );
 
   /// Unlinks a phone; it is no longer asked for sessions. Unlinking this
   /// one also forgets its app secret.
