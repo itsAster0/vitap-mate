@@ -808,6 +808,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
     }
 
     final subscription = mailOtpEvents.listen(take);
+    // The mail arrives at once over the event stream, which is otherwise
+    // closed for an install that is not linked.
+    final releaseStream = EdgeEventChannel.instance.hold();
     final lifecycle = AppLifecycleListener(onResume: () => unawaited(pull()));
     final poll = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!EdgeEventChannel.instance.connected.value) unawaited(pull());
@@ -833,6 +836,7 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
 
     final code = await found.future;
     unawaited(subscription.cancel());
+    releaseStream();
     lifecycle.dispose();
     watch.cancel();
     gmailFallback.cancel();
