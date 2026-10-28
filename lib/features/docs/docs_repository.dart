@@ -25,11 +25,10 @@ class DocsRepository {
         .toList();
   }
 
-  Future<void> _writeAll(List<DocWindow> windows) async {
-    await storage.writeJson(_registryKey, {
-      'windows': windows.map((w) => w.toJson()).toList(),
-    });
-  }
+  Future<void> _writeAll(List<DocWindow> windows) => storage.writeJson(
+    _registryKey,
+    {'windows': windows.map((w) => w.toJson()).toList()},
+  );
 
   Future<DocWindow> importFile({
     required String sourcePath,
@@ -37,10 +36,9 @@ class DocsRepository {
     String? id,
   }) async {
     final windows = await list();
-    if (id != null) {
-      for (final existing in windows) {
-        if (existing.id == id) return existing;
-      }
+    if (windows.where((w) => id != null && w.id == id).firstOrNull
+        case final existing?) {
+      return existing;
     }
     final ext = sourcePath.split('.').last.toLowerCase();
     final importId =
@@ -66,21 +64,20 @@ class DocsRepository {
     return doc;
   }
 
-  Future<void> setMessMenu(String id, bool value) async {
+  /// Replaces the document [id] with [change] of it, if it is there.
+  Future<void> _update(String id, DocWindow Function(DocWindow) change) async {
     final windows = await list();
     final idx = windows.indexWhere((w) => w.id == id);
     if (idx == -1) return;
-    windows[idx] = windows[idx].copyWith(asMessMenu: value);
+    windows[idx] = change(windows[idx]);
     await _writeAll(windows);
   }
 
-  Future<void> rename(String id, String name) async {
-    final windows = await list();
-    final idx = windows.indexWhere((w) => w.id == id);
-    if (idx == -1) return;
-    windows[idx] = windows[idx].copyWith(name: name.trim());
-    await _writeAll(windows);
-  }
+  Future<void> setMessMenu(String id, bool value) =>
+      _update(id, (w) => w.copyWith(asMessMenu: value));
+
+  Future<void> rename(String id, String name) =>
+      _update(id, (w) => w.copyWith(name: name.trim()));
 
   Future<void> remove(String id) async {
     final windows = await list();
@@ -104,35 +101,18 @@ class DocsRepository {
     required double offsetX,
     required double offsetY,
     double scrollOffset = 0.0,
-  }) async {
-    final windows = await list();
-    final idx = windows.indexWhere((w) => w.id == id);
-    if (idx == -1) return;
-    final w = windows[idx];
-    windows[idx] = DocWindow(
-      id: w.id,
-      name: w.name,
-      kind: w.kind,
-      fileName: w.fileName,
-      isPreset: w.isPreset,
-      asMessMenu: w.asMessMenu,
-      addedAt: w.addedAt,
-      lastOpenedAt: w.lastOpenedAt,
+  }) => _update(
+    id,
+    (w) => w.copyWith(
       scale: scale,
       offsetX: offsetX,
       offsetY: offsetY,
       scrollOffset: scrollOffset,
-    );
-    await _writeAll(windows);
-  }
+    ),
+  );
 
-  Future<void> touchLastOpened(String id, {required int openedAt}) async {
-    final windows = await list();
-    final idx = windows.indexWhere((w) => w.id == id);
-    if (idx == -1) return;
-    windows[idx] = windows[idx].copyWith(lastOpenedAt: openedAt);
-    await _writeAll(windows);
-  }
+  Future<void> touchLastOpened(String id, {required int openedAt}) =>
+      _update(id, (w) => w.copyWith(lastOpenedAt: openedAt));
 
   Future<String?> storedFilePathOf(DocWindow window) async {
     if (window.fileName == null) return null;

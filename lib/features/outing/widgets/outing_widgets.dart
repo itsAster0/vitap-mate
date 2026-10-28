@@ -10,10 +10,10 @@ import 'package:vitapmate/ui/text_nums.dart';
 Tone statusTone(BuildContext context, OutingStatus status) {
   final colors = context.theme.colors;
   return switch (status) {
-    OutingStatus.approved => colors.app.success,
-    OutingStatus.pending => colors.app.warning,
-    OutingStatus.rejected => colors.app.danger,
-    OutingStatus.other => Tone(
+    .approved => colors.app.success,
+    .pending => colors.app.warning,
+    .rejected => colors.app.danger,
+    .other => Tone(
       base: colors.mutedForeground,
       subtle: colors.secondary,
       onSubtle: colors.mutedForeground,
@@ -22,10 +22,10 @@ Tone statusTone(BuildContext context, OutingStatus status) {
 }
 
 String statusLabel(OutingStatus status, String raw) => switch (status) {
-  OutingStatus.approved => 'APPROVED',
-  OutingStatus.pending => 'PENDING',
-  OutingStatus.rejected => 'REJECTED',
-  OutingStatus.other => raw.toUpperCase(),
+  .approved => 'APPROVED',
+  .pending => 'PENDING',
+  .rejected => 'REJECTED',
+  .other => raw.toUpperCase(),
 };
 
 /// Small caption above a group of fields.
@@ -39,14 +39,14 @@ class FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     return Padding(
-      padding: const EdgeInsets.only(bottom: Space.sm - 2, left: 2),
+      padding: const .only(bottom: Space.sm - 2, left: 2),
       child: Row(
         children: [
           Expanded(
             child: Text(
               text,
               style: context.theme.typography.body.sm.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.foreground,
               ),
             ),
@@ -71,39 +71,37 @@ class FieldError extends StatelessWidget {
   final String? message;
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: Motion.fast,
-      alignment: Alignment.topLeft,
-      child: message == null
-          ? const SizedBox(width: double.infinity)
-          : Padding(
-              padding: const EdgeInsets.only(top: Space.xs + 2, left: 2),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      FLucideIcons.circleAlert,
-                      size: 12,
+  Widget build(BuildContext context) => AnimatedSize(
+    duration: Motion.fast,
+    alignment: .topLeft,
+    child: message == null
+        ? const SizedBox(width: double.infinity)
+        : Padding(
+            padding: const .only(top: Space.xs + 2, left: 2),
+            child: Row(
+              crossAxisAlignment: .start,
+              children: [
+                Padding(
+                  padding: const .only(top: 2),
+                  child: Icon(
+                    FLucideIcons.circleAlert,
+                    size: 12,
+                    color: context.theme.colors.app.danger.base,
+                  ),
+                ),
+                const SizedBox(width: Space.xs + 2),
+                Expanded(
+                  child: Text(
+                    message!,
+                    style: context.theme.typography.body.xs.copyWith(
                       color: context.theme.colors.app.danger.base,
                     ),
                   ),
-                  const SizedBox(width: Space.xs + 2),
-                  Expanded(
-                    child: Text(
-                      message!,
-                      style: context.theme.typography.body.xs.copyWith(
-                        color: context.theme.colors.app.danger.base,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-    );
-  }
+          ),
+  );
 }
 
 /// A selectable pill, like the biometric date chips.
@@ -131,23 +129,20 @@ class ChoicePill extends StatelessWidget {
       onPress: onPress,
       child: AnimatedContainer(
         duration: Motion.medium,
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.md,
-          vertical: Space.sm,
-        ),
+        padding: const .symmetric(horizontal: Space.md, vertical: Space.sm),
         decoration: BoxDecoration(
           color: selected ? colors.primary : colors.card,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
           border: Border.all(color: selected ? colors.primary : colors.border),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             if (caption != null)
               Text(
                 caption!,
                 style: context.theme.typography.body.xs.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   letterSpacing: 0.3,
                   color: selected
                       ? colors.primaryForeground.withValues(alpha: 0.75)
@@ -155,12 +150,12 @@ class ChoicePill extends StatelessWidget {
                 ),
               ),
             FittedBox(
-              fit: BoxFit.scaleDown,
+              fit: .scaleDown,
               child: Text(
                 label,
                 maxLines: 1,
                 style: context.theme.typography.body.sm.nums(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   color: fg,
                 ),
               ),
@@ -199,10 +194,10 @@ class PickerField extends StatelessWidget {
       child: AnimatedContainer(
         duration: Motion.fast,
         height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: Space.md),
+        padding: const .symmetric(horizontal: Space.md),
         decoration: BoxDecoration(
           color: colors.card,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
           border: Border.all(
             color: error ? colors.app.danger.base : colors.border,
           ),
@@ -215,9 +210,9 @@ class PickerField extends StatelessWidget {
               child: Text(
                 text ?? placeholder,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: .ellipsis,
                 style: context.theme.typography.body.sm.nums(
-                  fontWeight: text == null ? FontWeight.w400 : FontWeight.w500,
+                  fontWeight: text == null ? .w400 : .w500,
                   color: text == null
                       ? colors.mutedForeground
                       : colors.foreground,
@@ -266,15 +261,12 @@ Future<DateTime?> pickOutingDate(
               ? last
               : today,
         ),
-        selectionControl: FDateSelectionControl.liftedSingle(
-          value: initial,
-          onChange: (_) {},
-        ),
+        selectionControl: .liftedSingle(value: initial, onChange: (_) {}),
         onDayPress: (date) => Navigator.of(dialogContext).pop(date),
       ),
       actions: [
         FButton(
-          variant: FButtonVariant.outline,
+          variant: .outline,
           onPress: () => Navigator.of(dialogContext).pop(),
           child: const Text('Cancel'),
         ),
@@ -298,14 +290,14 @@ Future<FTime?> pickOutingTime(
     useRootNavigator: true,
     builder: (dialogContext, _, animation) => AppDialog(
       animation: animation,
-      direction: Axis.horizontal,
+      direction: .horizontal,
       title: Text(title),
       body: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: .min,
         children: [
           if (hint != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: Space.sm),
+              padding: const .only(bottom: Space.sm),
               child: Text(
                 hint,
                 style: dialogContext.theme.typography.body.xs.copyWith(
@@ -318,7 +310,7 @@ Future<FTime?> pickOutingTime(
             child: FTimePicker(
               hour24: false,
               minuteInterval: 5,
-              control: FTimePickerControl.managed(
+              control: .managed(
                 initial: initial,
                 onChange: (value) => picked = value,
               ),
@@ -328,7 +320,7 @@ Future<FTime?> pickOutingTime(
       ),
       actions: [
         FButton(
-          variant: FButtonVariant.outline,
+          variant: .outline,
           onPress: () => Navigator.of(dialogContext).pop(),
           child: const Text('Cancel'),
         ),
@@ -365,19 +357,18 @@ class OutingRulesPanel extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final rows = [
-      for (var i = 0; i < facts.length; i += 2)
-        facts.sublist(i, i + 2 > facts.length ? facts.length : i + 2),
+      for (var i = 0; i < facts.length; i += 2) facts.skip(i).take(2).toList(),
     ];
     return Surface(
-      padding: const EdgeInsets.all(Space.md + 2),
+      padding: const .all(Space.md + 2),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           if (!open) ...[
             Text(
               'Applications are closed',
               style: typography.body.sm.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: .w700,
                 color: colors.foreground,
               ),
             ),
@@ -395,14 +386,14 @@ class OutingRulesPanel extends StatelessWidget {
           for (final (i, row) in rows.indexed) ...[
             if (i > 0) const SizedBox(height: Space.md),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 for (final (j, (label, value)) in row.indexed)
                   Expanded(
                     child: Padding(
-                      padding: EdgeInsets.only(left: j == 0 ? 0 : Space.md),
+                      padding: .only(left: j == 0 ? 0 : Space.md),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: .start,
                         children: [
                           Text(
                             label,
@@ -414,7 +405,7 @@ class OutingRulesPanel extends StatelessWidget {
                           Text(
                             value,
                             style: typography.body.sm.nums(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: .w600,
                               color: colors.foreground,
                             ),
                           ),
@@ -476,30 +467,25 @@ class OutingRequestCard extends StatelessWidget {
     final kind = outingStatus(status);
     final tone = statusTone(context, kind);
     // VTOP's own words, e.g. "Waiting for Approval".
-    final waitingOn = kind == OutingStatus.pending ? status.trim() : null;
+    final waitingOn = kind == .pending ? status.trim() : null;
     final typography = context.theme.typography;
     return Surface(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md + 2,
-        Space.md,
-        Space.md,
-        Space.md,
-      ),
+      padding: const .fromLTRB(Space.md + 2, Space.md, Space.md, Space.md),
       borderColor: highlight != null ? colors.app.accentTone.base : null,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           // The place gets the whole first line; delete sits at its end.
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: .start,
             children: [
               Expanded(
                 child: Text(
                   place,
                   maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.md.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: .w700,
                     color: colors.foreground,
                   ),
                 ),
@@ -508,15 +494,15 @@ class OutingRequestCard extends StatelessWidget {
                 const SizedBox(width: Space.sm),
                 cancelLoading
                     ? const Padding(
-                        padding: EdgeInsets.all(Space.sm),
+                        padding: .all(Space.sm),
                         child: SizedBox.square(
                           dimension: 14,
                           child: FCircularProgress(),
                         ),
                       )
                     : FButton.icon(
-                        variant: FButtonVariant.ghost,
-                        size: FButtonSizeVariant.sm,
+                        variant: .ghost,
+                        size: .sm,
                         semanticsLabel: 'Cancel request',
                         onPress: onCancel,
                         child: Icon(
@@ -532,7 +518,7 @@ class OutingRequestCard extends StatelessWidget {
             Text(
               purpose,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: typography.body.sm.copyWith(color: colors.mutedForeground),
             ),
           ],
@@ -559,7 +545,7 @@ class OutingRequestCard extends StatelessWidget {
                   child: Text(
                     text,
                     style: typography.body.xs.nums(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                       color: colors.secondaryForeground,
                     ),
                   ),
@@ -574,14 +560,14 @@ class OutingRequestCard extends StatelessWidget {
                 child: Wrap(
                   spacing: Space.xs,
                   runSpacing: Space.xs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                  crossAxisAlignment: .center,
                   children: [
                     ToneBadge(label: statusLabel(kind, status), tone: tone),
                     if (highlight != null)
                       ToneBadge(label: highlight!, tone: colors.app.accentTone),
                     if (waitingOn != null && waitingOn.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(left: 2),
+                        padding: const .only(left: 2),
                         child: Text(
                           waitingOn,
                           style: typography.body.xs.copyWith(
@@ -597,8 +583,8 @@ class OutingRequestCard extends StatelessWidget {
                 SizedBox(
                   width: 64,
                   child: FButton(
-                    variant: FButtonVariant.outline,
-                    size: FButtonSizeVariant.sm,
+                    variant: .outline,
+                    size: .sm,
                     onPress: passLoading ? null : onPass,
                     child: passLoading
                         ? const SizedBox.square(

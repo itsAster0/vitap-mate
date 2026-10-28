@@ -27,13 +27,10 @@ DayMinutes dayMinutes(int hour, int minute) => hour * 60 + minute;
 
 /// The earliest and latest times a general outing form offers for [hours]:
 /// whole hours from the list, the last one only at :00.
-({DayMinutes earliest, DayMinutes latest})? offeredWindow(List<int> hours) {
-  if (hours.isEmpty) return null;
-  return (
-    earliest: dayMinutes(hours.first, 0),
-    latest: dayMinutes(hours.last, 0),
-  );
-}
+({DayMinutes earliest, DayMinutes latest})? offeredWindow(List<int> hours) =>
+    hours.isEmpty
+    ? null
+    : (earliest: dayMinutes(hours.first, 0), latest: dayMinutes(hours.last, 0));
 
 bool isOfferedTime(List<int> hours, int hour, int minute) {
   if (hours.isEmpty) return true;
@@ -142,8 +139,11 @@ GeneralOutingCheck checkGeneralOuting({
   );
 }
 
+/// Collapses runs of whitespace, as VTOP's own form effectively does.
+String tidyText(String value) => value.trim().split(RegExp(r'\s+')).join(' ');
+
 String? _textError(String value, int maxLength, String missing) {
-  final tidy = value.trim().split(RegExp(r'\s+')).join(' ');
+  final tidy = tidyText(value);
   if (tidy.isEmpty) return missing;
   if (tidy.length > maxLength) return 'At most $maxLength characters';
   return null;
@@ -180,7 +180,13 @@ List<DateTime> weekendOutingDates(WeekendOutingData form, DateTime now) {
 }
 
 /// "Sundays and Mondays" for the allowed weekdays.
-String weekdayNames(List<int> weekdays) {
+String weekdayNames(List<int> weekdays) => _listDays(weekdays, 'and');
+
+/// "Sun & Mon" for the allowed weekdays.
+String weekdayShortNames(List<int> weekdays) =>
+    _listDays(weekdays, '&', short: true);
+
+String _listDays(List<int> weekdays, String and, {bool short = false}) {
   const names = [
     'Sundays',
     'Mondays',
@@ -192,21 +198,10 @@ String weekdayNames(List<int> weekdays) {
   ];
   final listed = [
     for (final day in weekdays)
-      if (day < 7) names[day],
+      if (day < 7) short ? names[day].substring(0, 3) : names[day],
   ];
   if (listed.length <= 1) return listed.join();
-  return '${listed.sublist(0, listed.length - 1).join(', ')} and ${listed.last}';
-}
-
-/// "Sun & Mon" for the allowed weekdays.
-String weekdayShortNames(List<int> weekdays) {
-  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  final listed = [
-    for (final day in weekdays)
-      if (day < 7) names[day],
-  ];
-  if (listed.length <= 1) return listed.join();
-  return '${listed.sublist(0, listed.length - 1).join(', ')} & ${listed.last}';
+  return '${listed.sublist(0, listed.length - 1).join(', ')} $and ${listed.last}';
 }
 
 class WeekendOutingCheck {
@@ -229,11 +224,11 @@ WeekendOutingCheck checkWeekendOuting({
   final digits = contact.trim();
   return WeekendOutingCheck(
     purpose: _textError(purpose, form.purposeMaxLength, "Add why you're going"),
-    date: date == null
-        ? 'Pick a day'
-        : weekendOutingDates(form, now).contains(dateOnly(date))
-        ? null
-        : 'Not a day VTOP offers',
+    date: switch (date) {
+      null => 'Pick a day',
+      _ when weekendOutingDates(form, now).contains(dateOnly(date)) => null,
+      _ => 'Not a day VTOP offers',
+    },
     contact: RegExp(r'^\d{10}$').hasMatch(digits)
         ? null
         : 'A 10-digit mobile number',
@@ -242,21 +237,20 @@ WeekendOutingCheck checkWeekendOuting({
 
 enum OutingStatus { pending, approved, rejected, other }
 
-OutingStatus outingStatus(String status) {
-  final text = status.toLowerCase();
-  if (text.contains('accepted') || text.contains('approved')) {
-    return OutingStatus.approved;
-  }
-  if (text.contains('waiting') || text.contains('pending')) {
-    return OutingStatus.pending;
-  }
-  if (text.contains('reject') ||
-      text.contains('declin') ||
-      text.contains('cancel')) {
-    return OutingStatus.rejected;
-  }
-  return OutingStatus.other;
-}
+OutingStatus outingStatus(String status) => switch (status.toLowerCase()) {
+  final t when t.contains('accepted') || t.contains('approved') => .approved,
+  final t when t.contains('waiting') || t.contains('pending') => .pending,
+  final t
+      when t.contains('reject') ||
+          t.contains('declin') ||
+          t.contains('cancel') =>
+    .rejected,
+  _ => .other,
+};
+
+/// The 24-hour hour of a `9:30 PM` match: groups hour, minute, AM/PM.
+int _hour24(RegExpMatch m) =>
+    int.parse(m[1]!) % 12 + (m[3]!.toUpperCase() == 'PM' ? 12 : 0);
 
 /// Parses VTOP's `YYYY-MM-DD` with an optional `hh:mm AM` time.
 DateTime? parseOutingMoment(String date, [String time = '']) {
@@ -267,9 +261,13 @@ DateTime? parseOutingMoment(String date, [String time = '']) {
     caseSensitive: false,
   ).firstMatch(time.trim());
   if (match == null) return dateOnly(day);
-  var hour = int.parse(match[1]!) % 12;
-  if (match[3]!.toUpperCase() == 'PM') hour += 12;
-  return DateTime(day.year, day.month, day.day, hour, int.parse(match[2]!));
+  return DateTime(
+    day.year,
+    day.month,
+    day.day,
+    _hour24(match),
+    int.parse(match[2]!),
+  );
 }
 
 /// The leaving and return of a weekend slot like `9:30 AM- 3:30PM`.
@@ -279,21 +277,15 @@ DateTime? parseOutingMoment(String date, [String time = '']) {
     caseSensitive: false,
   ).allMatches(slot).toList();
   if (times.length != 2) return null;
-  DayMinutes read(RegExpMatch m) {
-    var hour = int.parse(m[1]!) % 12;
-    if (m[3]!.toUpperCase() == 'PM') hour += 12;
-    return dayMinutes(hour, int.parse(m[2]!));
-  }
-
+  DayMinutes read(RegExpMatch m) => dayMinutes(_hour24(m), int.parse(m[2]!));
   return (start: read(times[0]), end: read(times[1]));
 }
 
 /// `9:30 AM – 3:30 PM` for VTOP's `9:30 AM- 3:30PM`.
-String slotLabel(String slot) {
-  final times = parseTimeSlot(slot);
-  if (times == null) return slot;
-  return '${clockLabel(times.start)} – ${clockLabel(times.end)}';
-}
+String slotLabel(String slot) => switch (parseTimeSlot(slot)) {
+  final t? => '${clockLabel(t.start)} – ${clockLabel(t.end)}',
+  null => slot,
+};
 
 /// How long a general outing lasts, for its card: calendar days for a trip
 /// across days ("4 days"), hours for one inside a day ("8 h 30 min"). Null

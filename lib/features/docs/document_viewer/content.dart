@@ -20,36 +20,30 @@ class _SingleContent extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final body = useFuture(
-      useMemoized(() async {
-        final repo = await ref.read(docsRepositoryProvider.future);
-        return repo.storedFilePathOf(doc);
-      }, [doc.fileName]),
-    );
+    final body = _useStoredPath(ref, doc);
 
     final path = body.data;
     final textBody = useFuture(
       useMemoized(() async {
-        if (path == null || doc.kind == DocKind.image) return null;
+        if (path == null || doc.kind == .image) return null;
         return File(path).readAsString();
       }, [path, doc.kind]),
     );
 
     if (body.connectionState != ConnectionState.done ||
-        (doc.kind != DocKind.image &&
+        (doc.kind != .image &&
             textBody.connectionState != ConnectionState.done)) {
       return const Spinner();
     }
-    if (path == null) {
-      return Center(
-        child: Text(
-          'File missing.',
-          style: TextStyle(color: context.theme.colors.mutedForeground),
-        ),
-      );
-    }
+    if (path == null) return const _Notice('File missing.');
     final fullText = textBody.data ?? '';
     final needle = searchQuery.trim().toLowerCase();
+    final textStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 13,
+      height: 1.45,
+      color: darkMode ? context.theme.colors.primary : const Color(0xFF212121),
+    );
     final visibleText = needle.isEmpty
         ? fullText
         : fullText
@@ -64,26 +58,23 @@ class _SingleContent extends HookConsumerWidget {
       minScale: 0.5,
       maxScale: 8,
       panEnabled: true,
-      clipBehavior: Clip.none,
+      clipBehavior: .none,
       onInteractionEnd: (_) => persist(),
       child: Center(
-        child: doc.kind == DocKind.image
+        child: doc.kind == .image
             ? ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 1200 * dpr * 0.5),
-                child: Image.file(
-                  File(path),
-                  filterQuality: FilterQuality.medium,
-                ),
+                child: Image.file(File(path), filterQuality: .medium),
               )
             : Container(
                 width: 900,
-                margin: const EdgeInsets.all(24),
-                padding: const EdgeInsets.all(20),
+                margin: const .all(24),
+                padding: const .all(20),
                 decoration: BoxDecoration(
                   color: darkMode
                       ? context.theme.colors.primaryForeground
                       : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: .circular(12),
                   boxShadow: const [
                     BoxShadow(color: Color(0x1A000000), blurRadius: 12),
                   ],
@@ -97,23 +88,9 @@ class _SingleContent extends HookConsumerWidget {
                       searchQuery,
                       context.theme.colors.primary.withValues(alpha: 0.24),
                     ),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 13,
-                      height: 1.45,
-                      color: darkMode
-                          ? context.theme.colors.primary
-                          : const Color(0xFF212121),
-                    ),
+                    style: textStyle,
                   ),
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    height: 1.45,
-                    color: darkMode
-                        ? context.theme.colors.primary
-                        : const Color(0xFF212121),
-                  ),
+                  style: textStyle,
                 ),
               ),
       ),
@@ -141,10 +118,7 @@ List<InlineSpan> _searchSpans(String text, String query, Color highlightColor) {
     spans.add(
       TextSpan(
         text: text.substring(match, end),
-        style: TextStyle(
-          backgroundColor: highlightColor,
-          fontWeight: FontWeight.w800,
-        ),
+        style: TextStyle(backgroundColor: highlightColor, fontWeight: .w800),
       ),
     );
     start = end;
@@ -189,28 +163,28 @@ class _SpreadsheetBody extends HookConsumerWidget {
     if (sheets.hasError) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const .all(24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: .min,
             children: [
               Text(
                 'Couldn\u2019t read this file.\n'
                 'If it\u2019s a legacy .xls, save it as .xlsx and re-add it.',
-                textAlign: TextAlign.center,
+                textAlign: .center,
                 style: TextStyle(
                   color: context.theme.colors.mutedForeground,
                   height: 1.5,
                 ),
               ),
               const SizedBox(height: 8),
-              Text('${sheets.error}', textAlign: TextAlign.center),
+              Text('${sheets.error}', textAlign: .center),
               const SizedBox(height: 12),
               FTappable(
                 onPress: () => attempt.value++,
                 child: Text(
                   'Retry',
                   style: TextStyle(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: .w700,
                     color: context.theme.colors.primary,
                   ),
                 ),
@@ -221,39 +195,34 @@ class _SpreadsheetBody extends HookConsumerWidget {
       );
     }
     if (data == null || data.isEmpty) {
-      return Center(
-        child: Text(
-          'This spreadsheet has no readable sheets.',
-          style: TextStyle(color: context.theme.colors.mutedForeground),
-        ),
-      );
+      return const _Notice('This spreadsheet has no readable sheets.');
     }
 
     final names = data.keys.toList();
     final safeIndex = selectedSheet.value.clamp(0, names.length - 1);
     final rows = data[names[safeIndex]] ?? const [];
     final inner = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: .min,
+      crossAxisAlignment: .start,
       children: [
         if (names.length > 1)
           Padding(
-            padding: const EdgeInsets.only(left: 24, bottom: 10),
+            padding: const .only(left: 24, bottom: 10),
             child: SizedBox(
               width: 640,
               child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: .horizontal,
                 child: Row(
                   children: [
-                    for (var i = 0; i < names.length; i++)
+                    for (final (i, name) in names.indexed)
                       Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: const .only(right: 8),
                         child: FTappable(
                           onPress: () => selectedSheet.value = i,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(
+                            padding: const .symmetric(
                               horizontal: 12,
                               vertical: 7,
                             ),
@@ -261,7 +230,7 @@ class _SpreadsheetBody extends HookConsumerWidget {
                               color: i == safeIndex
                                   ? context.theme.colors.primary
                                   : context.theme.colors.background,
-                              borderRadius: BorderRadius.circular(999),
+                              borderRadius: .circular(999),
                               border: Border.all(
                                 color: i == safeIndex
                                     ? context.theme.colors.primary
@@ -269,10 +238,10 @@ class _SpreadsheetBody extends HookConsumerWidget {
                               ),
                             ),
                             child: Text(
-                              names[i],
+                              name,
                               style: TextStyle(
                                 fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: i == safeIndex
                                     ? context.theme.colors.primaryForeground
                                     : context.theme.colors.mutedForeground,
@@ -298,7 +267,7 @@ class _SpreadsheetBody extends HookConsumerWidget {
         maxScale: 6,
         panEnabled: true,
         constrained: false,
-        clipBehavior: Clip.none,
+        clipBehavior: .none,
         onInteractionEnd: (_) => persist(),
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -337,23 +306,21 @@ class _SheetTable extends StatelessWidget {
     return label;
   }
 
-  Widget _axisCell(BuildContext context, String label) {
-    return Container(
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-      color: context.theme.colors.primary.withValues(alpha: 0.09),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w800,
-          color: context.theme.colors.mutedForeground,
-        ),
+  Widget _axisCell(BuildContext context, String label) => Container(
+    alignment: .center,
+    padding: const .symmetric(horizontal: 6, vertical: 7),
+    color: context.theme.colors.primary.withValues(alpha: 0.09),
+    child: Text(
+      label,
+      maxLines: 1,
+      overflow: .ellipsis,
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: .w800,
+        color: context.theme.colors.mutedForeground,
       ),
-    );
-  }
+    ),
+  );
 
   Widget _dataCell(BuildContext context, String value, {required bool header}) {
     final query = searchQuery.trim();
@@ -363,15 +330,15 @@ class _SheetTable extends StatelessWidget {
       color: match
           ? context.theme.colors.primary.withValues(alpha: 0.24)
           : null,
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+      padding: const .symmetric(horizontal: 9, vertical: 7),
       child: Text(
         value,
         maxLines: 3,
-        overflow: TextOverflow.ellipsis,
+        overflow: .ellipsis,
         style: TextStyle(
           fontSize: 12.5,
           height: 1.25,
-          fontWeight: match || header ? FontWeight.w700 : FontWeight.w500,
+          fontWeight: match || header ? .w700 : .w500,
           color: header
               ? context.theme.colors.primary
               : darkMode
@@ -385,39 +352,35 @@ class _SheetTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final query = searchQuery.trim().toLowerCase();
-    final sourceRows = rows.take(_maxRows).toList();
-    final visibleRows = <({int index, List<String> cells})>[
-      for (var i = 0; i < sourceRows.length; i++)
+    final visibleRows = [
+      for (final (i, row) in rows.take(_maxRows).indexed)
         if (query.isEmpty ||
-            sourceRows[i].any((cell) => cell.toLowerCase().contains(query)))
-          (index: i, cells: sourceRows[i]),
+            row.any((cell) => cell.toLowerCase().contains(query)))
+          (index: i, cells: row),
     ];
-    var colCount = 0;
-    for (final r in visibleRows) {
-      colCount = colCount < r.cells.length ? r.cells.length : colCount;
-    }
-    colCount = colCount.clamp(1, _maxCols);
-
-    final widths = List<double>.filled(colCount, 72);
-    for (var c = 0; c < colCount; c++) {
-      var maxLen = 0;
-      for (final r in visibleRows) {
-        if (c < r.cells.length && r.cells[c].length > maxLen) {
-          maxLen = r.cells[c].length;
-        }
-      }
-      widths[c] = (maxLen * 7.5 + 20).clamp(56.0, 170.0);
+    int longest(Iterable<int> lengths) =>
+        lengths.fold(0, (a, b) => a > b ? a : b);
+    final colCount = longest(
+      visibleRows.map((r) => r.cells.length),
+    ).clamp(1, _maxCols);
+    // Each column as wide as its longest cell, within bounds.
+    double width(int c) {
+      final cells = [
+        for (final r in visibleRows)
+          if (c < r.cells.length) r.cells[c].length,
+      ];
+      return (longest(cells) * 7.5 + 20).clamp(56.0, 170.0);
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const .symmetric(horizontal: 24),
       child: Material(
         color: darkMode ? context.theme.colors.primaryForeground : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: .circular(12),
         elevation: darkMode ? 0 : 2,
         shadowColor: const Color(0x22000000),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: .circular(12),
           child: Table(
             border: TableBorder.all(
               color: context.theme.colors.border,
@@ -427,7 +390,7 @@ class _SheetTable extends StatelessWidget {
             columnWidths: {
               0: const FixedColumnWidth(44),
               for (var c = 0; c < colCount; c++)
-                c + 1: FixedColumnWidth(widths[c]),
+                c + 1: FixedColumnWidth(width(c)),
             },
             children: [
               TableRow(
@@ -444,24 +407,22 @@ class _SheetTable extends StatelessWidget {
                     _dataCell(context, 'No matches found.', header: false),
                   ],
                 ),
-              for (var r = 0; r < visibleRows.length; r++)
+              for (final (:index, :cells) in visibleRows)
                 TableRow(
                   decoration: BoxDecoration(
-                    color: visibleRows[r].index == 0
+                    color: index == 0
                         ? context.theme.colors.primary.withValues(alpha: 0.12)
-                        : visibleRows[r].index.isOdd && !darkMode
+                        : index.isOdd && !darkMode
                         ? const Color(0xFFFAFAFA)
                         : null,
                   ),
                   children: [
-                    _axisCell(context, '${visibleRows[r].index + 1}'),
+                    _axisCell(context, '${index + 1}'),
                     for (var c = 0; c < colCount; c++)
                       _dataCell(
                         context,
-                        c < visibleRows[r].cells.length
-                            ? visibleRows[r].cells[c]
-                            : '',
-                        header: visibleRows[r].index == 0,
+                        c < cells.length ? cells[c] : '',
+                        header: index == 0,
                       ),
                   ],
                 ),

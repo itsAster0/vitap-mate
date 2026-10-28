@@ -6,12 +6,11 @@ import 'package:spreadsheet_decoder/spreadsheet_decoder.dart';
 /// a merged range) are ''.
 Map<String, List<List<String>>> decodeSpreadsheetTables(Uint8List bytes) {
   final decoder = SpreadsheetDecoder.decodeBytes(bytes);
-  final out = <String, List<List<String>>>{};
-  decoder.tables.forEach((name, table) {
-    out[name] = [
-      for (final row in table.rows)
-        [for (final cell in row) cell?.toString() ?? ''],
-    ];
-  });
-  return out;
+  return {
+    for (final MapEntry(key: name, value: table) in decoder.tables.entries)
+      name: [
+        for (final row in table.rows)
+          [for (final cell in row) cell?.toString() ?? ''],
+      ],
+  };
 }

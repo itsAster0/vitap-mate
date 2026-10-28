@@ -49,7 +49,7 @@ class MessMenuView extends HookConsumerWidget {
               'Long-press it in Docs and choose "Show as spreadsheet" to see '
               'the file as it is.',
           action: FButton(
-            variant: FButtonVariant.outline,
+            variant: .outline,
             onPress: () => attempt.value++,
             child: const Text('Try again'),
           ),
@@ -133,14 +133,12 @@ class _UpNext extends HookWidget {
     }
     final today = day.day == now.day;
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(Space.md + 2),
+      padding: const .all(Space.md + 2),
       child: _MealCard(
         meal: meal,
         items: sheet.itemsFor(day.day, meal),
         window: windows[meal]!,
-        status: today && minute >= windows[meal]!.start
-            ? _MealStatus.now
-            : _MealStatus.next,
+        status: today && minute >= windows[meal]!.start ? .now : .next,
         when: today ? null : 'Tomorrow',
         framed: false,
       ),
@@ -192,15 +190,14 @@ class _MessMenuBody extends HookWidget {
     final typography = context.theme.typography;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(Space.md, Space.sm, Space.md, 96),
+      padding: const .fromLTRB(Space.md, Space.sm, Space.md, 96),
       children: [
         if (menu.sheets.length > 1) ...[
           Segmented<int>(
             value: sheetIndex.value,
             onChanged: selectSheet,
             segments: [
-              for (var i = 0; i < menu.sheets.length; i++)
-                (i, menu.sheets[i].name),
+              for (final (i, sheet) in menu.sheets.indexed) (i, sheet.name),
             ],
           ),
           const SizedBox(height: Space.md),
@@ -208,13 +205,13 @@ class _MessMenuBody extends HookWidget {
         _WeekStrip(first: first, last: last, today: today, selected: selected),
         const SizedBox(height: Space.md),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const .symmetric(horizontal: 2),
           child: Text(
             isToday
                 ? 'Today · ${DateFormat('EEEE, d MMMM').format(day)}'
                 : DateFormat('EEEE, d MMMM').format(day),
             style: typography.body.sm.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: .w600,
               color: colors.mutedForeground,
             ),
           ),
@@ -231,15 +228,13 @@ class _MessMenuBody extends HookWidget {
               meal: meal,
               items: sheet.itemsFor(day.day, meal),
               window: windows[meal]!,
-              status: focus == null
-                  ? (isToday ? _MealStatus.past : _MealStatus.normal)
-                  : meal == focus
-                  ? (minute >= windows[meal]!.start
-                        ? _MealStatus.now
-                        : _MealStatus.next)
-                  : meal.index < focus.index
-                  ? _MealStatus.past
-                  : _MealStatus.normal,
+              status: switch (focus) {
+                null => isToday ? .past : .normal,
+                _ when meal == focus =>
+                  minute >= windows[meal]!.start ? .now : .next,
+                _ when meal.index < focus.index => .past,
+                _ => .normal,
+              },
             ),
             const SizedBox(height: Space.sm + 2),
           ],
@@ -261,18 +256,13 @@ class _MessMenuBody extends HookWidget {
           ),
           if (showRules.value)
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.sm,
-                Space.sm,
-                Space.sm,
-                0,
-              ),
+              padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, 0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   for (final (i, rule) in sheet.instructions.indexed)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: Space.sm),
+                      padding: const .only(bottom: Space.sm),
                       child: Text(
                         '${i + 1}. $rule',
                         style: typography.body.xs.copyWith(
@@ -358,12 +348,12 @@ class _WeekStrip extends StatelessWidget {
                     duration: Motion.medium,
                     curve: Curves.easeOutCubic,
                     height: 54,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    margin: const .symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? colors.primary
                           : const Color(0x00000000),
-                      borderRadius: BorderRadius.circular(Radii.md),
+                      borderRadius: .circular(Radii.md),
                       border: Border.all(
                         color: isSelected
                             ? colors.primary
@@ -375,14 +365,14 @@ class _WeekStrip extends StatelessWidget {
                     child: Opacity(
                       opacity: outside ? 0.25 : 1,
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: .center,
                         children: [
                           Text(
                             DateFormat('EEE').format(date).toUpperCase(),
                             style: TextStyle(
                               fontSize: 10,
                               letterSpacing: 0.6,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: .w600,
                               color: isSelected
                                   ? colors.primaryForeground.withValues(
                                       alpha: 0.7,
@@ -395,7 +385,7 @@ class _WeekStrip extends StatelessWidget {
                             '${date.day}',
                             style: numStyle(
                               fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: .w700,
                               color: isSelected
                                   ? colors.primaryForeground
                                   : isToday
@@ -445,17 +435,17 @@ class _MealCard extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     final range = mealWindowLabel(window);
-    final live = status == _MealStatus.now || status == _MealStatus.next;
+    final live = status == .now || status == .next;
 
     final body = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: .start,
       children: [
         Row(
           children: [
             Text(
               [?when, meal.label].join(' · ').toUpperCase(),
               style: typography.body.xs.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: .w700,
                 letterSpacing: 0.8,
                 color: live
                     ? colors.app.accentTone.onSubtle
@@ -467,13 +457,13 @@ class _MealCard extends StatelessWidget {
               child: Text(
                 range,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                overflow: .ellipsis,
                 style: typography.body.xs.nums(color: colors.mutedForeground),
               ),
             ),
-            if (status == _MealStatus.now)
+            if (status == .now)
               ToneBadge(label: 'NOW', tone: colors.app.accentTone, solid: true)
-            else if (status == _MealStatus.next)
+            else if (status == .next)
               ToneBadge(label: 'NEXT', tone: colors.app.accentTone),
           ],
         ),
@@ -494,9 +484,9 @@ class _MealCard extends StatelessWidget {
     if (!framed) return body;
     return AnimatedOpacity(
       duration: Motion.medium,
-      opacity: status == _MealStatus.past ? 0.5 : 1,
+      opacity: status == .past ? 0.5 : 1,
       child: Surface(
-        padding: const EdgeInsets.all(Space.md + 2),
+        padding: const .all(Space.md + 2),
         borderColor: live ? colors.app.accent.withValues(alpha: 0.45) : null,
         child: body,
       ),
@@ -514,22 +504,19 @@ class _ItemPill extends StatelessWidget {
     final colors = context.theme.colors;
     final danger = colors.app.danger;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const .symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: item.nonVeg ? danger.subtle : colors.secondary,
-        borderRadius: BorderRadius.circular(Radii.sm + 2),
+        borderRadius: .circular(Radii.sm + 2),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: .min,
         children: [
           if (item.nonVeg) ...[
             Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: danger.base,
-              ),
+              decoration: BoxDecoration(shape: .circle, color: danger.base),
             ),
             const SizedBox(width: 6),
           ],
@@ -537,7 +524,7 @@ class _ItemPill extends StatelessWidget {
             child: Text(
               item.name,
               style: context.theme.typography.body.xs.copyWith(
-                fontWeight: FontWeight.w500,
+                fontWeight: .w500,
                 color: item.nonVeg ? danger.onSubtle : colors.foreground,
               ),
             ),

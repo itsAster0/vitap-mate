@@ -70,7 +70,7 @@ class CourseViewPage extends HookConsumerWidget {
         child: classes.when(
           skipLoadingOnRefresh: true,
           loading: () => ListView(
-            padding: const EdgeInsets.all(Space.sm),
+            padding: const .all(Space.sm),
             children: const [SkeletonList(count: 5, height: 80)],
           ),
           error: (error, _) => ListView(
@@ -80,8 +80,8 @@ class CourseViewPage extends HookConsumerWidget {
                 title: "Couldn't load this course",
                 message: vtopErrorMessage(error),
                 action: FButton(
-                  variant: FButtonVariant.outline,
-                  mainAxisSize: MainAxisSize.min,
+                  variant: .outline,
+                  mainAxisSize: .min,
                   prefix: const Icon(FLucideIcons.rotateCw),
                   onPress: () =>
                       ref.invalidate(coursePageClassesProvider(course.id)),
@@ -116,7 +116,7 @@ Future<CoursePageClass?> _showSections(
   CoursePageClass? selected,
 ) => showFSheet<CoursePageClass>(
   context: context,
-  side: FLayout.btt,
+  side: .btt,
   // Over the bottom navigation bar, so the keyboard inset is counted once.
   useRootNavigator: true,
   mainAxisMaxRatio: 0.8,
@@ -125,20 +125,20 @@ Future<CoursePageClass?> _showSections(
     return Container(
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: const .vertical(top: Radius.circular(10)),
       ),
       child: SafeArea(
         top: false,
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 12),
+          padding: const .fromLTRB(Space.lg, Space.md, Space.lg, 12),
           children: [
             const SheetHandle(),
             const SizedBox(height: Space.md),
             Text(
               'Sections',
               style: context.theme.typography.body.lg.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: .w700,
                 color: colors.foreground,
               ),
             ),
@@ -151,7 +151,7 @@ Future<CoursePageClass?> _showSections(
             const SizedBox(height: Space.md),
             for (final c in classes)
               Padding(
-                padding: const EdgeInsets.only(bottom: Space.sm),
+                padding: const .only(bottom: Space.sm),
                 child: _SectionTile(
                   section: c,
                   isMine: c.classId == mine?.classId,
@@ -192,18 +192,16 @@ class _SectionPicker extends StatelessWidget {
     }
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.sm,
-        Space.sm,
-        Space.xl,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.xl),
       children: [
-        _CourseTitle(course: course),
+        Padding(
+          padding: const .fromLTRB(2, Space.xs, 2, 0),
+          child: _CourseTitle(course: course, large: true),
+        ),
         const SectionHeader(title: 'Pick your section'),
         for (final (i, c) in classes.indexed)
           Padding(
-            padding: const EdgeInsets.only(bottom: Space.sm),
+            padding: const .only(bottom: Space.sm),
             child: EnterFade(
               index: i,
               child: _SectionTile(
@@ -219,36 +217,36 @@ class _SectionPicker extends StatelessWidget {
   }
 }
 
+/// The course code and part over its title ([large] above the section list).
 class _CourseTitle extends StatelessWidget {
-  const _CourseTitle({required this.course});
+  const _CourseTitle({required this.course, this.large = false});
 
   final CoursePageCourse course;
+  final bool large;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, Space.xs, 2, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${course.code} · ${courseTypeLabel(course.courseType)}',
-            style: context.theme.typography.body.xs.copyWith(
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-              color: colors.mutedForeground,
-            ),
+    final body = context.theme.typography.body;
+    return Column(
+      crossAxisAlignment: .start,
+      children: [
+        Text(
+          '${course.code} · ${courseTypeLabel(course.courseType)}',
+          style: body.xs.copyWith(
+            fontWeight: .w600,
+            letterSpacing: 0.3,
+            color: colors.mutedForeground,
           ),
-          Text(
-            course.title,
-            style: context.theme.typography.body.xl.copyWith(
-              fontWeight: FontWeight.w700,
-              color: colors.foreground,
-            ),
+        ),
+        Text(
+          course.title,
+          style: (large ? body.xl : body.lg).copyWith(
+            fontWeight: .w700,
+            color: colors.foreground,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -272,15 +270,12 @@ class _SectionTile extends StatelessWidget {
     return Surface(
       onPress: onPress,
       borderColor: selected ? colors.app.accentTone.base : null,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md + 2,
-        vertical: Space.md,
-      ),
+      padding: const .symmetric(horizontal: Space.md + 2, vertical: Space.md),
       child: Row(
         children: [
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Row(
                   children: [
@@ -288,9 +283,9 @@ class _SectionTile extends StatelessWidget {
                       child: Text(
                         section.faculty,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: .ellipsis,
                         style: context.theme.typography.body.sm.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: .w700,
                           color: colors.foreground,
                         ),
                       ),
@@ -353,11 +348,19 @@ class _LecturePlan extends HookConsumerWidget {
     // Paths (or action ids) being fetched, for per-item spinners.
     final busy = useState<Set<String>>({});
 
-    Future<void> run(String key, Future<void> Function() action) async {
+    /// Hands a file to the system downloader, with a spinner on [key].
+    Future<void> download(String key, Future<void> Function() start) async {
       if (busy.value.contains(key)) return;
       busy.value = {...busy.value, key};
       try {
-        await action();
+        await start();
+        if (context.mounted) {
+          dispToast(
+            context,
+            'Downloading',
+            'Saving to Downloads. Tap the notification to open it.',
+          );
+        }
       } catch (e) {
         log('course file failed: $e');
         if (context.mounted) {
@@ -368,40 +371,16 @@ class _LecturePlan extends HookConsumerWidget {
       }
     }
 
-    Future<void> download(Future<void> Function() start) async {
-      await start();
-      if (!context.mounted) return;
-      dispToast(
-        context,
-        'Downloading',
-        'Saving to Downloads. Tap the notification to open it.',
-      );
-    }
-
     final service = ref.read(coursePageServiceProvider);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     final header = Surface(
-      padding: const EdgeInsets.all(Space.md + 2),
+      padding: const .all(Space.md + 2),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
-          Text(
-            '${course.code} · ${courseTypeLabel(course.courseType)}',
-            style: context.theme.typography.body.xs.copyWith(
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-              color: colors.mutedForeground,
-            ),
-          ),
-          Text(
-            course.title,
-            style: context.theme.typography.body.lg.copyWith(
-              fontWeight: FontWeight.w700,
-              color: colors.foreground,
-            ),
-          ),
+          _CourseTitle(course: course),
           const SizedBox(height: Space.sm),
           Row(
             children: [
@@ -414,7 +393,7 @@ class _LecturePlan extends HookConsumerWidget {
                     if (section.facultySchool.isNotEmpty) section.facultySchool,
                   ].join(' · '),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: context.theme.typography.body.sm.copyWith(
                     color: colors.secondaryForeground,
                   ),
@@ -448,8 +427,8 @@ class _LecturePlan extends HookConsumerWidget {
           if (onSwitch != null) ...[
             const SizedBox(height: Space.md),
             FButton(
-              variant: FButtonVariant.outline,
-              size: FButtonSizeVariant.sm,
+              variant: .outline,
+              size: .sm,
               onPress: onSwitch,
               prefix: const Icon(FLucideIcons.arrowLeftRight),
               child: Text('See all $sectionCount sections'),
@@ -462,7 +441,7 @@ class _LecturePlan extends HookConsumerWidget {
     return detail.when(
       skipLoadingOnRefresh: true,
       loading: () => ListView(
-        padding: const EdgeInsets.all(Space.sm),
+        padding: const .all(Space.sm),
         children: [
           header,
           const SizedBox(height: Space.lg),
@@ -470,7 +449,7 @@ class _LecturePlan extends HookConsumerWidget {
         ],
       ),
       error: (error, _) => ListView(
-        padding: const EdgeInsets.all(Space.sm),
+        padding: const .all(Space.sm),
         children: [
           header,
           EmptyState(
@@ -478,8 +457,8 @@ class _LecturePlan extends HookConsumerWidget {
             title: "Couldn't load the lecture plan",
             message: vtopErrorMessage(error),
             action: FButton(
-              variant: FButtonVariant.outline,
-              mainAxisSize: MainAxisSize.min,
+              variant: .outline,
+              mainAxisSize: .min,
               prefix: const Icon(FLucideIcons.rotateCw),
               onPress: () => ref.invalidate(
                 coursePageDetailProvider((section.erpId, section.classId)),
@@ -493,14 +472,9 @@ class _LecturePlan extends HookConsumerWidget {
         final lectures = detail.lectures
             .where((l) => !withMaterialOnly.value || l.materials.isNotEmpty)
             .toList();
-        final upcoming = lectures.where((l) {
-          final date = lectureDate(l);
-          return date != null && !date.isBefore(today);
-        }).toList();
-        final covered = lectures.reversed.where((l) {
-          final date = lectureDate(l);
-          return date == null || date.isBefore(today);
-        }).toList();
+        bool ahead(CourseLecture l) => lectureDate(l)?.isBefore(today) == false;
+        final upcoming = lectures.where(ahead).toList();
+        final covered = lectures.reversed.where((l) => !ahead(l)).toList();
         final withMaterial = detail.lectures
             .where((l) => l.materials.isNotEmpty)
             .length;
@@ -513,20 +487,13 @@ class _LecturePlan extends HookConsumerWidget {
               planned: planned,
               isNext: identical(lecture, upcoming.firstOrNull),
               busy: busy.value,
-              onMaterial: (material) => run(
-                material.path,
-                () => download(() => service.file(material.path)),
-              ),
+              onMaterial: (material) =>
+                  download(material.path, () => service.file(material.path)),
             );
 
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.xl,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.xl),
           children: [
             header,
             const SizedBox(height: Space.md),
@@ -534,53 +501,44 @@ class _LecturePlan extends HookConsumerWidget {
               spacing: Space.sm,
               runSpacing: Space.sm,
               children: [
-                if (detail.syllabusPath.isNotEmpty)
-                  _ActionChip(
-                    icon: FLucideIcons.fileText,
-                    label: 'Syllabus',
-                    busy: busy.value.contains('syllabus'),
-                    onPress: () => run(
+                for (final (key, icon, label, start) in [
+                  if (detail.syllabusPath.isNotEmpty)
+                    (
                       'syllabus',
-                      () => download(() => service.file(detail.syllabusPath)),
+                      FLucideIcons.fileText,
+                      'Syllabus',
+                      () => service.file(detail.syllabusPath),
                     ),
-                  ),
-                if (detail.hasCoursePlan)
-                  _ActionChip(
-                    icon: FLucideIcons.sheet,
-                    label: 'Course plan',
-                    busy: busy.value.contains('plan'),
-                    onPress: () => run(
+                  if (detail.hasCoursePlan)
+                    (
                       'plan',
-                      () => download(
-                        () => service.coursePlan(
-                          semesterId: detail.semesterId,
-                          classId: section.classId,
-                        ),
+                      FLucideIcons.sheet,
+                      'Course plan',
+                      () => service.coursePlan(
+                        semesterId: detail.semesterId,
+                        classId: section.classId,
                       ),
                     ),
-                  ),
-                if (detail.generalMaterialsPath.isNotEmpty)
-                  _ActionChip(
-                    icon: FLucideIcons.folderArchive,
-                    label: 'General material',
-                    busy: busy.value.contains('general'),
-                    onPress: () => run(
+                  if (detail.generalMaterialsPath.isNotEmpty)
+                    (
                       'general',
-                      () => download(
-                        () => service.file(detail.generalMaterialsPath),
-                      ),
+                      FLucideIcons.folderArchive,
+                      'General material',
+                      () => service.file(detail.generalMaterialsPath),
                     ),
-                  ),
-                if (detail.allMaterialsPath.isNotEmpty)
-                  _ActionChip(
-                    icon: FLucideIcons.download,
-                    label: 'All material (zip)',
-                    busy: busy.value.contains('all'),
-                    onPress: () => run(
+                  if (detail.allMaterialsPath.isNotEmpty)
+                    (
                       'all',
-                      () =>
-                          download(() => service.file(detail.allMaterialsPath)),
+                      FLucideIcons.download,
+                      'All material (zip)',
+                      () => service.file(detail.allMaterialsPath),
                     ),
+                ])
+                  _ActionChip(
+                    icon: icon,
+                    label: label,
+                    busy: busy.value.contains(key),
+                    onPress: () => download(key, start),
                   ),
               ],
             ),
@@ -607,13 +565,13 @@ class _LecturePlan extends HookConsumerWidget {
               ),
               for (final lecture in shownUpcoming)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: Space.sm),
+                  padding: const .only(bottom: Space.sm),
                   child: lectureTile(lecture, planned: true),
                 ),
               if (upcoming.length > _upcomingShown)
                 FButton(
-                  variant: FButtonVariant.ghost,
-                  size: FButtonSizeVariant.sm,
+                  variant: .ghost,
+                  size: .sm,
                   onPress: () => showAllUpcoming.value = !showAllUpcoming.value,
                   child: Text(
                     showAllUpcoming.value
@@ -629,7 +587,7 @@ class _LecturePlan extends HookConsumerWidget {
               ),
               for (final (i, lecture) in covered.indexed)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: Space.sm),
+                  padding: const .only(bottom: Space.sm),
                   child: EnterFade(
                     index: i.clamp(0, 8),
                     child: lectureTile(lecture, planned: false),
@@ -664,14 +622,14 @@ class _ActionChip extends StatelessWidget {
       onPress: busy ? () {} : onPress,
       semanticsLabel: label,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: 8),
+        padding: const .symmetric(horizontal: Space.md, vertical: 8),
         decoration: BoxDecoration(
           color: colors.card,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
           border: Border.all(color: colors.border),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             busy
                 ? const SizedBox.square(
@@ -683,7 +641,7 @@ class _ActionChip extends StatelessWidget {
             Text(
               label,
               style: context.theme.typography.body.xs.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.foreground,
               ),
             ),
@@ -716,14 +674,14 @@ class _LectureTile extends StatelessWidget {
     final faded = planned && !isNext;
     return Surface(
       borderColor: isNext ? colors.app.accentTone.base : null,
-      padding: const EdgeInsets.fromLTRB(
+      padding: const .fromLTRB(
         Space.sm + 2,
         Space.sm + 2,
         Space.md,
         Space.sm + 2,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           SizedBox(
             width: 44,
@@ -732,7 +690,7 @@ class _LectureTile extends StatelessWidget {
                 Text(
                   date == null ? '—' : '${date.day}',
                   style: context.theme.typography.body.lg.nums(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: .w700,
                     height: 1.1,
                     color: faded ? colors.mutedForeground : colors.foreground,
                   ),
@@ -742,7 +700,7 @@ class _LectureTile extends StatelessWidget {
                       ? lecture.day
                       : DateFormat('MMM', 'en_US').format(date).toUpperCase(),
                   style: context.theme.typography.body.xs.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     letterSpacing: 0.4,
                     color: colors.mutedForeground,
                   ),
@@ -753,7 +711,7 @@ class _LectureTile extends StatelessWidget {
           const SizedBox(width: Space.sm),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Row(
                   children: [
@@ -779,7 +737,7 @@ class _LectureTile extends StatelessWidget {
                 Text(
                   lecture.topic.isEmpty ? 'No topic given' : lecture.topic,
                   style: context.theme.typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: faded ? colors.mutedForeground : colors.foreground,
                   ),
                 ),
@@ -826,16 +784,13 @@ class _MaterialChip extends StatelessWidget {
       onPress: busy ? () {} : onPress,
       semanticsLabel: label,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.sm + 2,
-          vertical: 5,
-        ),
+        padding: const .symmetric(horizontal: Space.sm + 2, vertical: 5),
         decoration: BoxDecoration(
           color: tone.subtle,
-          borderRadius: BorderRadius.circular(Radii.pill),
+          borderRadius: .circular(Radii.pill),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisSize: .min,
           children: [
             busy
                 ? const SizedBox.square(
@@ -847,7 +802,7 @@ class _MaterialChip extends StatelessWidget {
             Text(
               label,
               style: context.theme.typography.body.xs.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: tone.onSubtle,
               ),
             ),

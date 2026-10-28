@@ -76,22 +76,20 @@ class _PdfDocumentViewportState extends State<PdfDocumentViewport> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return InteractiveViewer(
-      transformationController: widget.transform,
-      boundaryMargin: const EdgeInsets.all(double.infinity),
-      minScale: 0.5,
-      maxScale: 6,
-      onInteractionEnd: (_) => widget.onInteractionEnd(),
-      child: ListView.builder(
-        controller: widget.scroll,
-        // A nested drag recognizer can win before the second finger lands,
-        // preventing InteractiveViewer from ever receiving the pinch.
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        itemCount: widget.pageCount,
-        itemBuilder: widget.pageBuilder,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => InteractiveViewer(
+    transformationController: widget.transform,
+    boundaryMargin: const EdgeInsets.all(double.infinity),
+    minScale: 0.5,
+    maxScale: 6,
+    onInteractionEnd: (_) => widget.onInteractionEnd(),
+    child: ListView.builder(
+      controller: widget.scroll,
+      // A nested drag recognizer can win before the second finger lands,
+      // preventing InteractiveViewer from ever receiving the pinch.
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const .symmetric(horizontal: 14, vertical: 16),
+      itemCount: widget.pageCount,
+      itemBuilder: widget.pageBuilder,
+    ),
+  );
 }

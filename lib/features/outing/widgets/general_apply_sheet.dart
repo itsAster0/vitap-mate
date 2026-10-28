@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -18,7 +17,7 @@ Future<OutingApplyResult?> showGeneralApplySheet(
   GeneralOutingData form,
 ) => showFSheet<OutingApplyResult>(
   context: context,
-  side: FLayout.btt,
+  side: .btt,
   // Over the bottom navigation bar, so the keyboard inset is counted once.
   useRootNavigator: true,
   mainAxisMaxRatio: 0.92,
@@ -239,9 +238,10 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
   Widget build(BuildContext context) {
     final check = _check;
     final now = DateTime.now();
-    final outWindow = offeredWindow(form.outHours);
-    final inWindow = offeredWindow(form.inHours);
     String? shown(String? error) => _showErrors ? error : null;
+    Text? hours(({int earliest, int latest})? window) => window == null
+        ? null
+        : Text('${clockLabel(window.earliest)} – ${clockLabel(window.latest)}');
 
     return ApplySheetFrame(
       title: 'General outing',
@@ -255,18 +255,18 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
       children: [
         KeepVisibleOnFocus(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               FieldLabel(
                 'Place of visit',
                 trailing: Text('${_place.text.length}/${form.placeMaxLength}'),
               ),
               FTextField(
-                control: FTextFieldControl.managed(controller: _place),
+                control: .managed(controller: _place),
                 hint: 'Where are you going?',
                 maxLength: form.placeMaxLength,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
+                textCapitalization: .words,
+                textInputAction: .next,
                 counterBuilder: (_, _, _, _) => null,
               ),
               FieldError(shown(check.place)),
@@ -276,7 +276,7 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
         const SizedBox(height: Space.md),
         KeepVisibleOnFocus(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               FieldLabel(
                 'Purpose',
@@ -285,11 +285,11 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
                 ),
               ),
               FTextField(
-                control: FTextFieldControl.managed(controller: _purpose),
+                control: .managed(controller: _purpose),
                 hint: 'Why are you going?',
                 maxLength: form.purposeMaxLength,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.done,
+                textCapitalization: .sentences,
+                textInputAction: .done,
                 counterBuilder: (_, _, _, _) => null,
               ),
               FieldError(shown(check.purpose)),
@@ -297,15 +297,7 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
           ),
         ),
         const SizedBox(height: Space.md),
-        FieldLabel(
-          'Leaving',
-          trailing: outWindow == null
-              ? null
-              : Text(
-                  '${clockLabel(outWindow.earliest)} – '
-                  '${clockLabel(outWindow.latest)}',
-                ),
-        ),
+        FieldLabel('Leaving', trailing: hours(offeredWindow(form.outHours))),
         _MomentRow(
           moment: _leaving,
           now: now,
@@ -316,15 +308,7 @@ class _GeneralApplySheetState extends ConsumerState<_GeneralApplySheet> {
         // Timing problems show at once: they come from the pickers, not typing.
         FieldError(check.leaving),
         const SizedBox(height: Space.md),
-        FieldLabel(
-          'Back by',
-          trailing: inWindow == null
-              ? null
-              : Text(
-                  '${clockLabel(inWindow.earliest)} – '
-                  '${clockLabel(inWindow.latest)}',
-                ),
-        ),
+        FieldLabel('Back by', trailing: hours(offeredWindow(form.inHours))),
         _MomentRow(
           moment: _returning,
           now: now,
@@ -363,31 +347,29 @@ class _MomentRow extends StatelessWidget {
   final VoidCallback onTime;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: PickerField(
-            icon: FLucideIcons.calendar,
-            text: shortDate(moment, now),
-            placeholder: 'Date',
-            error: error,
-            onPress: onDate,
-          ),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        flex: 3,
+        child: PickerField(
+          icon: FLucideIcons.calendar,
+          text: shortDate(moment, now),
+          placeholder: 'Date',
+          error: error,
+          onPress: onDate,
         ),
-        const SizedBox(width: Space.sm),
-        Expanded(
-          flex: 2,
-          child: PickerField(
-            icon: FLucideIcons.clock,
-            text: clockLabel(dayMinutes(moment.hour, moment.minute)),
-            placeholder: 'Time',
-            error: error,
-            onPress: onTime,
-          ),
+      ),
+      const SizedBox(width: Space.sm),
+      Expanded(
+        flex: 2,
+        child: PickerField(
+          icon: FLucideIcons.clock,
+          text: clockLabel(dayMinutes(moment.hour, moment.minute)),
+          placeholder: 'Time',
+          error: error,
+          onPress: onTime,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 }

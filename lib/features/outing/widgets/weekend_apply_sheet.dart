@@ -20,7 +20,7 @@ Future<OutingApplyResult?> showWeekendApplySheet(
   WeekendOutingData form,
 ) => showFSheet<OutingApplyResult>(
   context: context,
-  side: FLayout.btt,
+  side: .btt,
   // Over the bottom navigation bar, so the keyboard inset is counted once.
   useRootNavigator: true,
   mainAxisMaxRatio: 0.92,
@@ -187,7 +187,7 @@ class _WeekendApplySheetState extends ConsumerState<_WeekendApplySheet> {
           mainAxisSpacing: Space.sm,
           crossAxisSpacing: Space.sm,
           mainAxisExtent: 44,
-          padding: EdgeInsets.zero,
+          padding: .zero,
           children: [
             for (final slot in form.timeSlots)
               ChoicePill(
@@ -214,7 +214,7 @@ class _WeekendApplySheetState extends ConsumerState<_WeekendApplySheet> {
         const SizedBox(height: Space.md),
         KeepVisibleOnFocus(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               FieldLabel(
                 'Purpose',
@@ -223,11 +223,11 @@ class _WeekendApplySheetState extends ConsumerState<_WeekendApplySheet> {
                 ),
               ),
               FTextField(
-                control: FTextFieldControl.managed(controller: _purpose),
+                control: .managed(controller: _purpose),
                 hint: 'Why are you going?',
                 maxLength: form.purposeMaxLength,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
+                textCapitalization: .sentences,
+                textInputAction: .next,
                 counterBuilder: (_, _, _, _) => null,
               ),
               FieldError(shown(check.purpose)),
@@ -237,14 +237,14 @@ class _WeekendApplySheetState extends ConsumerState<_WeekendApplySheet> {
         const SizedBox(height: Space.md),
         KeepVisibleOnFocus(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               const FieldLabel('Your contact number'),
               FTextField(
-                control: FTextFieldControl.managed(controller: _contact),
+                control: .managed(controller: _contact),
                 hint: '10-digit mobile',
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.done,
+                keyboardType: .phone,
+                textInputAction: .done,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(10),

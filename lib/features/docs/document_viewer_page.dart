@@ -33,11 +33,11 @@ class DocumentViewerPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // "System" follows the phone's setting, not just an explicit Dark.
-    final themeMode = ref.watch(themeProvider);
-    final darkMode =
-        themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+    final darkMode = switch (ref.watch(themeProvider)) {
+      .dark => true,
+      .system => MediaQuery.platformBrightnessOf(context) == .dark,
+      .light => false,
+    };
     final activeTitle = ref.read(activeDocumentTitleProvider.notifier);
     final registry = ref.read(docsRegistryProvider.notifier);
 
@@ -53,35 +53,14 @@ class DocumentViewerPage extends HookConsumerWidget {
     }, [doc.id, doc.name, embedded]);
 
     final transform = useMemoized(() {
-      final m = Matrix4(
-        doc.scale,
-        0,
-        0,
-        0,
-        0,
-        doc.scale,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        doc.offsetX,
-        doc.offsetY,
-        0,
-        1,
-      );
+      final m = Matrix4.diagonal3Values(doc.scale, doc.scale, 1)
+        ..setTranslationRaw(doc.offsetX, doc.offsetY, 0);
       // A stale PDF offset can leave every page out of view; see recenterPdf.
-      return TransformationController(
-        doc.kind == DocKind.pdf ? recenterPdf(m) : m,
-      );
+      return TransformationController(doc.kind == .pdf ? recenterPdf(m) : m);
     }, [doc.id]);
     useEffect(() => transform.dispose, [transform]);
 
-    if (!doc.hasFile) {
-      return _EmptyPrompt(doc: doc, darkMode: darkMode);
-    }
-
+    if (!doc.hasFile) return _EmptyPrompt(doc: doc);
     return _DocSurface(
       doc: doc,
       darkMode: darkMode,
@@ -91,51 +70,48 @@ class DocumentViewerPage extends HookConsumerWidget {
   }
 }
 
-class _EmptyPrompt extends HookConsumerWidget {
+class _EmptyPrompt extends StatelessWidget {
   final DocWindow doc;
-  final bool darkMode;
-  const _EmptyPrompt({required this.doc, required this.darkMode});
+  const _EmptyPrompt({required this.doc});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: context.theme.colors.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              FLucideIcons.utensils,
-              size: 40,
-              color: context.theme.colors.primary,
-            ),
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisAlignment: .center,
+      children: [
+        Container(
+          padding: const .all(24),
+          decoration: BoxDecoration(
+            color: context.theme.colors.primary.withValues(alpha: 0.1),
+            shape: .circle,
           ),
-          const SizedBox(height: 16),
-          Text(
-            doc.name,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: context.theme.colors.primary,
-            ),
+          child: Icon(
+            FLucideIcons.utensils,
+            size: 40,
+            color: context.theme.colors.primary,
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Text(
-              'This document has no file. Delete it and import the file again.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.theme.colors.mutedForeground),
-            ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          doc.name,
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: .w700,
+            color: context.theme.colors.primary,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const .symmetric(horizontal: 40),
+          child: Text(
+            'This document has no file. Delete it and import the file again.',
+            textAlign: .center,
+            style: TextStyle(color: context.theme.colors.mutedForeground),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _DocSurface extends HookConsumerWidget {
@@ -167,10 +143,9 @@ class _DocSurface extends HookConsumerWidget {
           ({double scale, double offsetX, double offsetY, double scrollOffset})?
         >(null);
     final registry = ref.read(docsRegistryProvider.notifier);
-    final messMenu = doc.kind == DocKind.spreadsheet && doc.asMessMenu;
+    final messMenu = doc.kind == .spreadsheet && doc.asMessMenu;
     final searchable =
-        (doc.kind == DocKind.spreadsheet && !messMenu) ||
-        doc.kind == DocKind.text;
+        (doc.kind == .spreadsheet && !messMenu) || doc.kind == .text;
 
     useEffect(() {
       if (embedded) return null;
@@ -224,59 +199,38 @@ class _DocSurface extends HookConsumerWidget {
       saveTimer.value = Timer(const Duration(milliseconds: 500), flushSave);
     }
 
-    useEffect(() {
-      return flushSave;
-    }, []);
+    useEffect(() => flushSave, []);
 
-    Widget content;
-    switch (doc.kind) {
-      case DocKind.pdf:
-        content = _PdfContent(
-          doc: doc,
-          dpr: dpr,
-          darkMode: darkMode,
-          transform: transform,
-          persist: persist,
-        );
-        break;
-      case DocKind.image:
-        content = _SingleContent(
-          doc: doc,
-          darkMode: darkMode,
-          dpr: dpr,
-          transform: transform,
-          persist: persist,
-          searchQuery: searchQuery.value,
-        );
-        break;
-      case DocKind.spreadsheet when doc.asMessMenu:
-        content = MessMenuView(doc: doc, compact: embedded);
-        break;
-      case DocKind.spreadsheet:
-        content = _SpreadsheetBody(
-          doc: doc,
-          darkMode: darkMode,
-          transform: transform,
-          persist: persist,
-          searchQuery: searchQuery.value,
-        );
-        break;
-      case DocKind.text:
-      case DocKind.none:
-        content = _SingleContent(
-          doc: doc,
-          darkMode: darkMode,
-          dpr: dpr,
-          transform: transform,
-          persist: persist,
-          searchQuery: searchQuery.value,
-        );
-        break;
-      case DocKind.file:
-        content = const Center(
-          child: Text('Open this file from Docs with another app.'),
-        );
-    }
+    final content = switch (doc.kind) {
+      .pdf => _PdfContent(
+        doc: doc,
+        dpr: dpr,
+        transform: transform,
+        persist: persist,
+      ),
+      .spreadsheet when doc.asMessMenu => MessMenuView(
+        doc: doc,
+        compact: embedded,
+      ),
+      .spreadsheet => _SpreadsheetBody(
+        doc: doc,
+        darkMode: darkMode,
+        transform: transform,
+        persist: persist,
+        searchQuery: searchQuery.value,
+      ),
+      .image || .text || .none => _SingleContent(
+        doc: doc,
+        darkMode: darkMode,
+        dpr: dpr,
+        transform: transform,
+        persist: persist,
+        searchQuery: searchQuery.value,
+      ),
+      .file => const Center(
+        child: Text('Open this file from Docs with another app.'),
+      ),
+    };
 
     return Stack(
       children: [
@@ -321,13 +275,10 @@ class _DocSurface extends HookConsumerWidget {
             child: IgnorePointer(
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
+                  padding: const .symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: context.theme.colors.primary,
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: .circular(999),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x33000000),
@@ -341,7 +292,7 @@ class _DocSurface extends HookConsumerWidget {
                     style: TextStyle(
                       color: context.theme.colors.primaryForeground,
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: .w700,
                     ),
                   ),
                 ),
@@ -355,13 +306,13 @@ class _DocSurface extends HookConsumerWidget {
             bottom: 12,
             child: FTappable(
               onPress: () {
-                transform.value = doc.kind == DocKind.pdf
+                transform.value = doc.kind == .pdf
                     ? recenterPdf(transform.value)
                     : resetHorizontalOffset(transform.value);
                 persist();
               },
               child: Container(
-                padding: const EdgeInsets.all(10),
+                padding: const .all(10),
                 decoration: _controlDecoration(
                   context,
                   darkMode
@@ -400,7 +351,6 @@ class _ViewerSearch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surface = context.theme.colors.background;
     if (!open) {
       return FTappable(
         onPress: onOpen,
@@ -417,7 +367,7 @@ class _ViewerSearch extends StatelessWidget {
     return Container(
       width: (MediaQuery.sizeOf(context).width - 40).clamp(180.0, 340.0),
       height: 44,
-      decoration: _controlDecoration(context, surface),
+      decoration: _controlDecoration(context, context.theme.colors.background),
       child: Row(
         children: [
           const SizedBox(width: 11),
@@ -440,7 +390,7 @@ class _ViewerSearch extends StatelessWidget {
                 hintText: 'Search document',
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: .zero,
               ),
             ),
           ),
@@ -459,7 +409,7 @@ class _ViewerSearch extends StatelessWidget {
 BoxDecoration _controlDecoration(BuildContext context, Color color) =>
     BoxDecoration(
       color: color,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: .circular(12),
       border: Border.all(color: context.theme.colors.border),
       boxShadow: const [
         BoxShadow(
@@ -476,13 +426,35 @@ class _ViewerControlSurface extends StatelessWidget {
   const _ViewerControlSurface({required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      alignment: Alignment.center,
-      decoration: _controlDecoration(context, context.theme.colors.background),
-      child: child,
+  Widget build(BuildContext context) => Container(
+    width: 44,
+    height: 44,
+    alignment: .center,
+    decoration: _controlDecoration(context, context.theme.colors.background),
+    child: child,
+  );
+}
+
+/// Where [doc]'s file is stored, or null when it is missing.
+AsyncSnapshot<String?> _useStoredPath(WidgetRef ref, DocWindow doc) =>
+    useFuture(
+      useMemoized(() async {
+        final repo = await ref.read(docsRepositoryProvider.future);
+        return repo.storedFilePathOf(doc);
+      }, [doc.fileName]),
     );
-  }
+
+/// A short grey message in the middle of the viewer.
+class _Notice extends StatelessWidget {
+  final String text;
+
+  const _Notice(this.text);
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(
+      text,
+      style: TextStyle(color: context.theme.colors.mutedForeground),
+    ),
+  );
 }

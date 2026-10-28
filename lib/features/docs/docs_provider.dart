@@ -13,26 +13,7 @@ import 'package:vitapmate/features/docs/logic/mess_menu.dart';
 Future<String?> pickDocPath() async {
   final file = await FilePicker.pickFile(
     type: FileType.custom,
-    allowedExtensions: [
-      'pdf',
-      'png',
-      'jpg',
-      'jpeg',
-      'webp',
-      'gif',
-      'bmp',
-      'xlsx',
-      'xlsm',
-      'xls',
-      'ods',
-      'xml',
-      'html',
-      'htm',
-      'txt',
-      'json',
-      'md',
-      'csv',
-    ],
+    allowedExtensions: [for (final e in docExtensions.values) ...e],
   );
   return file?.path;
 }
@@ -104,15 +85,20 @@ class DocsRegistryNotifier extends AsyncNotifier<List<DocWindow>> {
   }
 
   Future<void> rename(String id, String name) async {
-    final repo = await _repo();
-    await repo.rename(id, name);
+    await (await _repo()).rename(id, name);
     ref.invalidateSelf();
   }
 
   Future<void> remove(String id) async {
-    final repo = await _repo();
-    await repo.remove(id);
+    await (await _repo()).remove(id);
     ref.invalidateSelf();
+  }
+
+  /// Shows [change] on [id] at once, without reloading the list.
+  void _patch(String id, DocWindow Function(DocWindow) change) {
+    if (state.value case final windows?) {
+      state = AsyncData([for (final w in windows) w.id == id ? change(w) : w]);
+    }
   }
 
   Future<void> saveScrollState(
@@ -122,44 +108,27 @@ class DocsRegistryNotifier extends AsyncNotifier<List<DocWindow>> {
     required double offsetY,
     double scrollOffset = 0.0,
   }) async {
-    final repo = await _repo();
-    await repo.saveScrollState(
+    await (await _repo()).saveScrollState(
       id,
       scale: scale,
       offsetX: offsetX,
       offsetY: offsetY,
       scrollOffset: scrollOffset,
     );
-    final windows = state.value;
-    if (windows != null) {
-      state = AsyncData([
-        for (final window in windows)
-          if (window.id == id)
-            window.copyWith(
-              scale: scale,
-              offsetX: offsetX,
-              offsetY: offsetY,
-              scrollOffset: scrollOffset,
-            )
-          else
-            window,
-      ]);
-    }
+    _patch(
+      id,
+      (w) => w.copyWith(
+        scale: scale,
+        offsetX: offsetX,
+        offsetY: offsetY,
+        scrollOffset: scrollOffset,
+      ),
+    );
   }
 
   Future<void> touchLastOpened(String id) async {
     final openedAt = DateTime.now().millisecondsSinceEpoch;
-    final windows = state.value;
-    if (windows != null) {
-      state = AsyncData([
-        for (final window in windows)
-          if (window.id == id)
-            window.copyWith(lastOpenedAt: openedAt)
-          else
-            window,
-      ]);
-    }
-    final repo = await _repo();
-    await repo.touchLastOpened(id, openedAt: openedAt);
+    _patch(id, (w) => w.copyWith(lastOpenedAt: openedAt));
+    await (await _repo()).touchLastOpened(id, openedAt: openedAt);
   }
 }

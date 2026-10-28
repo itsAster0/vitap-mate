@@ -10,10 +10,10 @@ enum Meal { breakfast, lunch, snacks, dinner }
 
 extension MealLabel on Meal {
   String get label => switch (this) {
-    Meal.breakfast => 'Breakfast',
-    Meal.lunch => 'Lunch',
-    Meal.snacks => 'Snacks',
-    Meal.dinner => 'Dinner',
+    .breakfast => 'Breakfast',
+    .lunch => 'Lunch',
+    .snacks => 'Snacks',
+    .dinner => 'Dinner',
   };
 }
 
@@ -101,11 +101,10 @@ final _dayCell = RegExp(
 /// Parses decoded sheets (name → rows of cell text). Sheets that don't look
 /// like a mess menu are skipped; throws when none do.
 MessMenu parseMessMenu(Map<String, List<List<String>>> tables) {
-  final sheets = <MessSheet>[];
-  tables.forEach((name, rows) {
-    final sheet = _parseSheet(name, rows);
-    if (sheet != null) sheets.add(sheet);
-  });
+  final sheets = [
+    for (final MapEntry(key: name, value: rows) in tables.entries)
+      ?_parseSheet(name, rows),
+  ];
   if (sheets.isEmpty) {
     throw const MessMenuFormatException(
       "This spreadsheet doesn't look like a mess menu.",
@@ -165,8 +164,7 @@ MessSheet? _parseSheet(String name, List<List<String>> rows) {
       continue;
     }
     for (final cell in row) {
-      final match = _dayCell.firstMatch(cell.trim());
-      if (match != null) {
+      if (_dayCell.firstMatch(cell.trim()) case final match?) {
         current = [
           for (final d in RegExp(r'\d{1,2}').allMatches(match.group(2)!))
             int.parse(d.group(0)!),
@@ -249,10 +247,10 @@ typedef MealWindows = Map<Meal, MealWindow>;
 /// VIT-AP mess serving hours, in minutes since midnight; editable in
 /// Settings.
 const defaultMealWindows = <Meal, MealWindow>{
-  Meal.breakfast: (start: 7 * 60 + 15, end: 9 * 60),
-  Meal.lunch: (start: 12 * 60 + 30, end: 14 * 60),
-  Meal.snacks: (start: 16 * 60 + 30, end: 18 * 60 + 15),
-  Meal.dinner: (start: 19 * 60 + 15, end: 21 * 60),
+  .breakfast: (start: 7 * 60 + 15, end: 9 * 60),
+  .lunch: (start: 12 * 60 + 30, end: 14 * 60),
+  .snacks: (start: 16 * 60 + 30, end: 18 * 60 + 15),
+  .dinner: (start: 19 * 60 + 15, end: 21 * 60),
 };
 
 /// "435-540,750-840,990-1095,1155-1260", breakfast to dinner.
@@ -266,14 +264,14 @@ MealWindows decodeMealWindows(String? raw) {
   final parts = raw?.split(',') ?? const <String>[];
   return {
     for (final meal in Meal.values)
-      meal: () {
-        if (meal.index >= parts.length) return defaultMealWindows[meal]!;
-        final bounds = parts[meal.index].split('-').map(int.tryParse).toList();
-        if (bounds.length != 2 || bounds.contains(null)) {
-          return defaultMealWindows[meal]!;
-        }
-        return (start: bounds[0]!, end: bounds[1]!);
-      }(),
+      meal: switch (parts
+          .elementAtOrNull(meal.index)
+          ?.split('-')
+          .map(int.tryParse)
+          .toList()) {
+        [final start?, final end?] => (start: start, end: end),
+        _ => defaultMealWindows[meal]!,
+      },
   };
 }
 
@@ -283,9 +281,8 @@ String mealWindowLabel(MealWindow window) {
     pattern,
   ).format(DateTime(2000, 1, 1, minutes ~/ 60, minutes % 60));
   final samePeriod = (window.start < 12 * 60) == (window.end < 12 * 60);
-  return samePeriod
-      ? '${clock(window.start, 'h:mm')}–${clock(window.end, 'h:mm a')}'
-      : '${clock(window.start, 'h:mm a')}–${clock(window.end, 'h:mm a')}';
+  return '${clock(window.start, samePeriod ? 'h:mm' : 'h:mm a')}–'
+      '${clock(window.end, 'h:mm a')}';
 }
 
 /// The meal being served at [minute] of the day, else the next one; null

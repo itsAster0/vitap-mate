@@ -33,9 +33,10 @@ class OutingPage extends HookConsumerWidget {
     final colors = context.theme.colors;
 
     Future<void> refresh() async {
-      final provider = tab.value == OutingTab.general
-          ? generalOutingProvider
-          : weekendOutingProvider;
+      final provider = switch (tab.value) {
+        .general => generalOutingProvider,
+        .weekend => weekendOutingProvider,
+      };
       ref.invalidate(provider);
       try {
         await ref.read(provider.future);
@@ -53,12 +54,7 @@ class OutingPage extends HookConsumerWidget {
         color: colors.foreground,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.xl,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.xl),
           children: [
             Segmented<OutingTab>(
               segments: const [
@@ -71,9 +67,10 @@ class OutingPage extends HookConsumerWidget {
             const SizedBox(height: Space.md),
             AnimatedSwitcher(
               duration: Motion.medium,
-              child: tab.value == OutingTab.general
-                  ? const _GeneralTab(key: ValueKey('general'))
-                  : const _WeekendTab(key: ValueKey('weekend')),
+              child: switch (tab.value) {
+                .general => const _GeneralTab(key: ValueKey('general')),
+                .weekend => const _WeekendTab(key: ValueKey('weekend')),
+              },
             ),
           ],
         ),
@@ -104,7 +101,7 @@ class _GeneralTab extends ConsumerWidget {
             ),
           );
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             OutingRulesPanel(
               open: form.student != null,
@@ -152,33 +149,30 @@ class _GeneralRequest extends StatelessWidget {
   Widget build(BuildContext context) {
     final start = parseOutingMoment(record.fromDate, record.fromTime);
     final end = parseOutingMoment(record.toDate, record.toTime);
-    final endOfDay = end == null
-        ? null
-        : record.toTime.isEmpty
-        ? end.add(const Duration(hours: 23, minutes: 59))
-        : end;
-    final kind = outingStatus(record.status);
     return _PassCard(
       weekend: false,
       passId: record.passId,
-      passName: record.passId,
       cancelId: record.cancelId,
       place: record.place,
       purpose: record.purpose,
       status: record.status,
-      when: _generalWhen(start, end, record),
-      highlight:
-          start != null && endOfDay != null && kind != OutingStatus.rejected
-          ? upcomingLabel(start, endOfDay, now)
-          : null,
+      when: _when(start, end),
+      highlight: switch ((start, end)) {
+        (final start?, final end?)
+            when outingStatus(record.status) != .rejected =>
+          upcomingLabel(
+            start,
+            record.toTime.isEmpty
+                ? end.add(const Duration(hours: 23, minutes: 59))
+                : end,
+            now,
+          ),
+        _ => null,
+      },
     );
   }
 
-  List<(String?, String)> _generalWhen(
-    DateTime? start,
-    DateTime? end,
-    GeneralOutingRecord record,
-  ) {
+  List<(String?, String)> _when(DateTime? start, DateTime? end) {
     if (start == null || end == null) {
       return [
         ('Out', '${record.fromDate} ${record.fromTime}'),
@@ -229,7 +223,7 @@ class _WeekendTab extends ConsumerWidget {
           );
         final dayFormat = DateFormat('EEE d MMM', 'en_US');
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             OutingRulesPanel(
               open: open && dates.isNotEmpty,
@@ -274,21 +268,9 @@ class _WeekendRequest extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final day = parseOutingMoment(record.date);
-    final slot = parseTimeSlot(record.timeSlot);
-    String? highlight;
-    if (day != null &&
-        slot != null &&
-        outingStatus(record.status) != OutingStatus.rejected) {
-      highlight = upcomingLabel(
-        day.add(Duration(minutes: slot.start)),
-        day.add(Duration(minutes: slot.end)),
-        now,
-      );
-    }
     return _PassCard(
       weekend: true,
       passId: record.passId,
-      passName: record.passId,
       cancelId: record.cancelId,
       place: record.place,
       purpose: record.purpose,
@@ -302,7 +284,16 @@ class _WeekendRequest extends StatelessWidget {
           ].join(' · '),
         ),
       ],
-      highlight: highlight,
+      highlight: switch ((day, parseTimeSlot(record.timeSlot))) {
+        (final day?, final slot?)
+            when outingStatus(record.status) != .rejected =>
+          upcomingLabel(
+            day.add(Duration(minutes: slot.start)),
+            day.add(Duration(minutes: slot.end)),
+            now,
+          ),
+        _ => null,
+      },
     );
   }
 }
@@ -312,7 +303,6 @@ class _PassCard extends HookConsumerWidget {
   const _PassCard({
     required this.weekend,
     required this.passId,
-    required this.passName,
     required this.cancelId,
     required this.place,
     required this.purpose,
@@ -323,7 +313,6 @@ class _PassCard extends HookConsumerWidget {
 
   final bool weekend;
   final String passId;
-  final String passName;
   final String cancelId;
   final String place;
   final String purpose;
@@ -376,7 +365,7 @@ class _PassCard extends HookConsumerWidget {
       try {
         final doc = await ref
             .read(outingServiceProvider)
-            .pass(weekend: weekend, passId: passId, name: passName);
+            .pass(weekend: weekend, passId: passId, name: passId);
         if (context.mounted) {
           GoRouter.of(context).pushNamed(Paths.outingPass, extra: doc);
         }
@@ -411,26 +400,24 @@ class _RequestList extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SectionHeader(title: 'Your requests', trailing: Text('$count')),
-        if (children.isEmpty)
-          const EmptyState(
-            icon: FLucideIcons.doorOpen,
-            title: 'No requests yet',
-            message: 'Requests you send show here with their status.',
-          )
-        else
-          for (final (i, child) in children.indexed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: Space.sm),
-              child: EnterFade(index: i, child: child),
-            ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: .stretch,
+    children: [
+      SectionHeader(title: 'Your requests', trailing: Text('$count')),
+      if (children.isEmpty)
+        const EmptyState(
+          icon: FLucideIcons.doorOpen,
+          title: 'No requests yet',
+          message: 'Requests you send show here with their status.',
+        )
+      else
+        for (final (i, child) in children.indexed)
+          Padding(
+            padding: const .only(bottom: Space.sm),
+            child: EnterFade(index: i, child: child),
+          ),
+    ],
+  );
 }
 
 class _Loading extends StatelessWidget {
@@ -457,10 +444,10 @@ class _LoadError extends StatelessWidget {
     title: "Couldn't load outings",
     message: 'VTOP did not answer. Check your connection and retry.',
     action: FButton(
-      variant: FButtonVariant.outline,
+      variant: .outline,
       prefix: const Icon(FLucideIcons.rotateCw),
       onPress: onRetry,
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: .min,
       child: const Text('Retry'),
     ),
   );

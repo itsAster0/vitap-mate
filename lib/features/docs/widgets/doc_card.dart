@@ -18,14 +18,14 @@ DocKindVisual visualFor(BuildContext context, DocWindow doc) {
     return DocKindVisual(palette.warning, FLucideIcons.utensils);
   }
   return switch (doc.kind) {
-    DocKind.pdf => DocKindVisual(palette.danger, FLucideIcons.fileText),
-    DocKind.image => DocKindVisual(palette.accentTone, FLucideIcons.image),
-    DocKind.spreadsheet => DocKindVisual(
+    .pdf => DocKindVisual(palette.danger, FLucideIcons.fileText),
+    .image => DocKindVisual(palette.accentTone, FLucideIcons.image),
+    .spreadsheet => DocKindVisual(
       palette.success,
       FLucideIcons.fileSpreadsheet,
     ),
-    DocKind.text => DocKindVisual(palette.lab, FLucideIcons.fileCode2),
-    DocKind.file => DocKindVisual(
+    .text => DocKindVisual(palette.lab, FLucideIcons.fileCode2),
+    .file => DocKindVisual(
       Tone(
         base: colors.mutedForeground,
         subtle: colors.secondary,
@@ -33,26 +33,18 @@ DocKindVisual visualFor(BuildContext context, DocWindow doc) {
       ),
       FLucideIcons.file,
     ),
-    DocKind.none => DocKindVisual(palette.warning, FLucideIcons.utensils),
+    .none => DocKindVisual(palette.warning, FLucideIcons.utensils),
   };
 }
 
-String kindLabel(DocKind kind) {
-  switch (kind) {
-    case DocKind.pdf:
-      return 'PDF';
-    case DocKind.image:
-      return 'IMAGE';
-    case DocKind.spreadsheet:
-      return 'SHEET';
-    case DocKind.text:
-      return 'TEXT';
-    case DocKind.file:
-      return 'FILE';
-    case DocKind.none:
-      return 'MENU';
-  }
-}
+String kindLabel(DocKind kind) => switch (kind) {
+  .pdf => 'PDF',
+  .image => 'IMAGE',
+  .spreadsheet => 'SHEET',
+  .text => 'TEXT',
+  .file => 'FILE',
+  .none => 'MENU',
+};
 
 String lastOpenedLabel(int? ms) {
   if (ms == null || ms == 0) return 'never opened';
@@ -98,9 +90,9 @@ class DocCard extends StatelessWidget {
         child: child,
       ),
       child: Surface(
-        padding: const EdgeInsets.all(Space.md + 2),
+        padding: const .all(Space.md + 2),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: .start,
           children: [
             Row(
               children: [
@@ -109,7 +101,7 @@ class DocCard extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(
                     color: visual.tone.subtle,
-                    borderRadius: BorderRadius.circular(Radii.sm + 2),
+                    borderRadius: .circular(Radii.sm + 2),
                   ),
                   child: Icon(visual.icon, size: 18, color: visual.tone.base),
                 ),
@@ -124,10 +116,10 @@ class DocCard extends StatelessWidget {
             Text(
               doc.name,
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: typography.body.sm.copyWith(
                 height: 1.25,
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: colors.foreground,
               ),
             ),
@@ -137,7 +129,7 @@ class DocCard extends StatelessWidget {
                   ? lastOpenedLabel(doc.lastOpenedAt)
                   : 'Tap to add a file',
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: .ellipsis,
               style: typography.body.xs.copyWith(color: colors.mutedForeground),
             ),
           ],
@@ -146,30 +138,32 @@ class DocCard extends StatelessWidget {
     );
   }
 
-  void _showActions(BuildContext context) {
-    showFSheet(
-      context: context,
-      side: FLayout.btt,
-      builder: (context) => Container(
+  void _showActions(BuildContext context) => showFSheet(
+    context: context,
+    side: .btt,
+    builder: (context) {
+      /// Closes the sheet, then runs [action].
+      VoidCallback then(VoidCallback action) => () {
+        Navigator.of(context).pop();
+        action();
+      };
+      return Container(
         decoration: BoxDecoration(
           color: context.theme.colors.background,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+          borderRadius: const .vertical(top: Radius.circular(10)),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+            padding: const .fromLTRB(12, 16, 12, 12),
             child: FTileGroup(
-              divider: FItemDivider.indented,
+              divider: .indented,
               children: [
                 FTile(
                   prefix: const Icon(FLucideIcons.pencilLine),
                   title: const Text('Rename'),
-                  onPress: () {
-                    Navigator.of(context).pop();
-                    onRename();
-                  },
+                  onPress: then(onRename),
                 ),
-                if (doc.kind == DocKind.spreadsheet)
+                if (doc.kind == .spreadsheet)
                   FTile(
                     prefix: Icon(
                       doc.asMessMenu
@@ -182,24 +176,18 @@ class DocCard extends StatelessWidget {
                           : 'Show as mess menu',
                     ),
                     subtitle: const Text("The file itself isn't changed"),
-                    onPress: () {
-                      Navigator.of(context).pop();
-                      onToggleMessMenu();
-                    },
+                    onPress: then(onToggleMessMenu),
                   ),
                 FTile(
                   prefix: const Icon(FLucideIcons.trash2),
                   title: const Text('Delete'),
-                  onPress: () {
-                    Navigator.of(context).pop();
-                    onDelete();
-                  },
+                  onPress: then(onDelete),
                 ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 }

@@ -33,8 +33,8 @@ class ProfilePage extends HookConsumerWidget {
     Future<void> refresh() async {
       try {
         await switch (tab.value) {
-          ProfileTab.profile => ref.read(profileProvider.notifier).refresh(),
-          ProfileTab.mentor => ref.read(mentorProvider.notifier).refresh(),
+          .profile => ref.read(profileProvider.notifier).refresh(),
+          .mentor => ref.read(mentorProvider.notifier).refresh(),
         };
       } catch (e) {
         log('$e');
@@ -65,12 +65,7 @@ class ProfilePage extends HookConsumerWidget {
         backgroundColor: colors.background,
         color: colors.foreground,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.lg,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             Segmented<ProfileTab>(
@@ -85,12 +80,10 @@ class ProfilePage extends HookConsumerWidget {
             AnimatedSwitcher(
               duration: Motion.medium,
               child: switch (tab.value) {
-                ProfileTab.profile => const _ProfileTab(
+                .profile => const _ProfileTab(
                   key: ValueKey(ProfileTab.profile),
                 ),
-                ProfileTab.mentor => const _MentorTab(
-                  key: ValueKey(ProfileTab.mentor),
-                ),
+                .mentor => const _MentorTab(key: ValueKey(ProfileTab.mentor)),
               },
             ),
           ],
@@ -101,7 +94,7 @@ class ProfilePage extends HookConsumerWidget {
 }
 
 /// Loading, error and data states shared by both tabs.
-class _Loaded<T> extends ConsumerWidget {
+class _Loaded<T> extends StatelessWidget {
   const _Loaded({
     required this.value,
     required this.what,
@@ -115,37 +108,35 @@ class _Loaded<T> extends ConsumerWidget {
   final Widget Function(T data) builder;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return value.when(
-      skipLoadingOnRefresh: true,
-      skipLoadingOnReload: true,
-      loading: () => const Column(
-        children: [
-          Skeleton(height: 150, radius: Radii.lg),
-          SizedBox(height: Space.lg),
-          SkeletonList(count: 4, height: 72),
-        ],
+  Widget build(BuildContext context) => value.when(
+    skipLoadingOnRefresh: true,
+    skipLoadingOnReload: true,
+    loading: () => const Column(
+      children: [
+        Skeleton(height: 150, radius: Radii.lg),
+        SizedBox(height: Space.lg),
+        SkeletonList(count: 4, height: 72),
+      ],
+    ),
+    error: (e, _) => EmptyState(
+      icon: FLucideIcons.cloudAlert,
+      title: "Couldn't load $what",
+      message: commonErrorMessage(e),
+      action: FButton(
+        variant: .outline,
+        mainAxisSize: .min,
+        onPress: () async {
+          try {
+            await onRetry();
+          } catch (e) {
+            if (context.mounted) disCommonToast(context, e);
+          }
+        },
+        child: const Text('Try again'),
       ),
-      error: (e, _) => EmptyState(
-        icon: FLucideIcons.cloudAlert,
-        title: "Couldn't load $what",
-        message: commonErrorMessage(e),
-        action: FButton(
-          variant: FButtonVariant.outline,
-          mainAxisSize: MainAxisSize.min,
-          onPress: () async {
-            try {
-              await onRetry();
-            } catch (e) {
-              if (context.mounted) disCommonToast(context, e);
-            }
-          },
-          child: const Text('Try again'),
-        ),
-      ),
-      data: builder,
-    );
-  }
+    ),
+    data: builder,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -158,11 +149,12 @@ class _Loaded<T> extends ConsumerWidget {
 /// sends is lost.
 class _ProfileLayout {
   _ProfileLayout(StudentProfile profile) {
+    var personal = const <ProfileGroup>[];
     for (final section in profile.sections) {
       final title = section.title.toUpperCase();
       if (title.contains('PROCTOR')) continue; // On the Mentor tab.
       if (title.contains('HOSTEL')) {
-        hostel = _fields(section.groups);
+        hostel = section.groups;
         continue;
       }
       final rest = <ProfileGroup>[];
@@ -177,19 +169,19 @@ class _ProfileLayout {
         }
       }
       if (title.contains('PERSONAL')) personal = rest;
-      details.add((
-        section.title,
-        [
-          for (final group in rest)
-            ProfileGroup(
-              title: group.title,
-              fields: [
-                for (final field in group.fields)
-                  if (!_shownAbove(field.label)) field,
-              ],
-            ),
-        ],
-      ));
+      final groups = [
+        for (final group in rest)
+          ProfileGroup(
+            title: group.title,
+            fields: [
+              for (final field in group.fields)
+                if (!_shownAbove(field.label)) field,
+            ],
+          ),
+      ];
+      if (groups.any((g) => g.fields.any((f) => _shown(f.value)))) {
+        details.add((section.title, groups));
+      }
     }
     contacts = [
       if (_shown(profile.vitEmail)) ('VIT email', profile.vitEmail),
@@ -206,13 +198,13 @@ class _ProfileLayout {
     }
   }
 
-  List<ProfileField> hostel = const [];
-  List<ProfileGroup> personal = const [];
+  List<ProfileGroup> hostel = const [];
   final addresses = <ProfileGroup>[];
   final parents = <ProfileGroup>[];
   late final List<(String, String)> contacts;
 
-  /// Section title and its groups, without what the cards show.
+  /// Section title and its groups, without what the cards show; sections
+  /// with nothing left are dropped.
   final details = <(String, List<ProfileGroup>)>[];
 
   /// The name is in the header and the contacts are in their own card.
@@ -227,65 +219,73 @@ class _ProfileTab extends ConsumerWidget {
   const _ProfileTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return _Loaded(
-      value: ref.watch(profileProvider),
-      what: 'your profile',
-      onRetry: () => ref.read(profileProvider.notifier).refresh(),
-      builder: (profile) {
-        final layout = _ProfileLayout(profile);
-        final details = [
-          for (final (title, groups) in layout.details)
-            if (groups.any((g) => g.fields.any((f) => _shown(f.value))))
-              (title, groups),
-        ];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _ProfileHero(profile: profile),
-            if (_HostelCard.hasRoom(layout.hostel)) ...[
-              const SizedBox(height: Space.md),
-              _HostelCard(fields: layout.hostel),
+  Widget build(BuildContext context, WidgetRef ref) => _Loaded(
+    value: ref.watch(profileProvider),
+    what: 'your profile',
+    onRetry: () => ref.read(profileProvider.notifier).refresh(),
+    builder: (profile) {
+      final layout = _ProfileLayout(profile);
+      return Column(
+        crossAxisAlignment: .stretch,
+        children: [
+          _ProfileHero(profile: profile),
+          if (_value(layout.hostel, 'ROOM NO.') != null) ...[
+            const SizedBox(height: Space.md),
+            _HostelCard(groups: layout.hostel),
+          ],
+          if (layout.contacts.isNotEmpty) ...[
+            const SectionHeader(title: 'Contact'),
+            Surface(
+              padding: const .symmetric(
+                horizontal: Space.lg,
+                vertical: Space.sm,
+              ),
+              child: Column(
+                children: [
+                  for (final (label, value) in layout.contacts)
+                    _ContactRow(label, value),
+                ],
+              ),
+            ),
+          ],
+          if (layout.addresses.isNotEmpty) ...[
+            const SectionHeader(title: 'Addresses'),
+            _AddressCard(groups: layout.addresses),
+          ],
+          if (layout.parents.isNotEmpty) ...[
+            const SectionHeader(title: 'Parents'),
+            for (final group in layout.parents) ...[
+              _ParentCard(group: group),
+              const SizedBox(height: Space.sm),
             ],
-            if (layout.contacts.isNotEmpty) ...[
-              const SectionHeader(title: 'Contact'),
+          ],
+          if (layout.details.isNotEmpty) ...[
+            const SectionHeader(title: 'More details'),
+            for (final (title, groups) in layout.details) ...[
+              // Closed at first, with how many fields it holds.
               Surface(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Space.lg,
-                  vertical: Space.sm,
-                ),
-                child: Column(
-                  children: [
-                    for (final (label, value) in layout.contacts)
-                      _ContactRow.of(label, value),
-                  ],
+                padding: const .symmetric(horizontal: Space.lg),
+                child: _Expandable(
+                  label: _detailsTitle(title),
+                  count: groups
+                      .expand((g) => g.fields)
+                      .where((f) => _shown(f.value))
+                      .length,
+                  header: true,
+                  child: Padding(
+                    padding: const .only(bottom: Space.sm),
+                    child: _Fields(groups: groups),
+                  ),
                 ),
               ),
+              const SizedBox(height: Space.sm),
             ],
-            if (layout.addresses.isNotEmpty) ...[
-              const SectionHeader(title: 'Addresses'),
-              _AddressCard(groups: layout.addresses),
-            ],
-            if (layout.parents.isNotEmpty) ...[
-              const SectionHeader(title: 'Parents'),
-              for (final group in layout.parents) ...[
-                _ParentCard(group: group),
-                const SizedBox(height: Space.sm),
-              ],
-            ],
-            if (details.isNotEmpty) ...[
-              const SectionHeader(title: 'More details'),
-              for (final (title, groups) in details) ...[
-                _Collapsible(title: _detailsTitle(title), groups: groups),
-                const SizedBox(height: Space.sm),
-              ],
-            ],
-            DataUpdatedFooter(updateTime: profile.updateTime.toInt()),
           ],
-        );
-      },
-    );
-  }
+          DataUpdatedFooter(updateTime: profile.updateTime.toInt()),
+        ],
+      );
+    },
+  );
 }
 
 class _ProfileHero extends HookWidget {
@@ -306,17 +306,17 @@ class _ProfileHero extends HookWidget {
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(Radii.md),
+            borderRadius: .circular(Radii.md),
             child: Container(
               width: 76,
               height: 92,
               color: colors.app.accentTone.subtle,
-              alignment: Alignment.center,
+              alignment: .center,
               child: photo == null
                   ? Text(
                       _initials(name),
                       style: typography.body.xl.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: .w700,
                         color: colors.app.accentTone.onSubtle,
                       ),
                     )
@@ -324,7 +324,7 @@ class _ProfileHero extends HookWidget {
                       photo,
                       width: 76,
                       height: 92,
-                      fit: BoxFit.cover,
+                      fit: .cover,
                       gaplessPlayback: true,
                       errorBuilder: (_, _, _) => Icon(
                         FLucideIcons.user,
@@ -336,12 +336,12 @@ class _ProfileHero extends HookWidget {
           const SizedBox(width: Space.md),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   name,
                   style: typography.body.lg.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: .w700,
                     color: colors.foreground,
                     height: 1.2,
                   ),
@@ -361,16 +361,10 @@ class _ProfileHero extends HookWidget {
                     profile.program,
                     style: typography.body.sm.copyWith(
                       color: colors.foreground,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                     ),
                   ),
-                if (_shown(profile.school))
-                  Text(
-                    profile.school,
-                    style: typography.body.xs.copyWith(
-                      color: colors.mutedForeground,
-                    ),
-                  ),
+                if (_shown(profile.school)) _Small(profile.school),
               ],
             ),
           ),
@@ -382,65 +376,30 @@ class _ProfileHero extends HookWidget {
 
 /// Block and room up front, bed and mess underneath.
 class _HostelCard extends StatelessWidget {
-  const _HostelCard({required this.fields});
+  const _HostelCard({required this.groups});
 
-  final List<ProfileField> fields;
-
-  static bool hasRoom(List<ProfileField> fields) =>
-      _value([ProfileGroup(title: '', fields: fields)], 'ROOM NO.') != null;
+  final List<ProfileGroup> groups;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.theme.colors;
-    final typography = context.theme.typography;
-    final group = [ProfileGroup(title: '', fields: fields)];
     // "MH-2 (MH-2) (MH-2 - Block )" → "MH-2".
-    final block = _value(group, 'BLOCK NAME')?.split('(').first.trim();
-    final room = _value(group, 'ROOM NO.');
-    final bed = _value(group, 'BED TYPE');
+    final block = _value(groups, 'BLOCK NAME')?.split('(').first.trim();
+    final room = _value(groups, 'ROOM NO.');
+    final bed = _value(groups, 'BED TYPE');
     // "Non-Veg Mess Fee - " → "Non-Veg Mess".
     final mess = _value(
-      group,
+      groups,
       'MESS INFORMATION',
     )?.replaceAll(RegExp(r'\s*Fee[\s-]*$', caseSensitive: false), '');
-    final tone = colors.app.lab;
+    final shownMess = mess != null && _shown(mess) ? mess : null;
     return Surface(
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: tone.subtle,
-              borderRadius: BorderRadius.circular(Radii.md),
-            ),
-            child: Icon(FLucideIcons.bedDouble, size: 20, color: tone.onSubtle),
-          ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  [?block, if (room != null) 'Room $room'].join(' · '),
-                  style: typography.body.md.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colors.foreground,
-                  ),
-                ),
-                if (bed != null || (mess != null && _shown(mess)))
-                  Text(
-                    [
-                      if (bed != null) _bedType(bed),
-                      if (mess != null && _shown(mess)) mess,
-                    ].join(' · '),
-                    style: typography.body.xs.copyWith(
-                      color: colors.mutedForeground,
-                    ),
-                  ),
-              ],
-            ),
-          ),
+      child: _Headline(
+        tone: context.theme.colors.app.lab,
+        icon: FLucideIcons.bedDouble,
+        title: [?block, if (room != null) 'Room $room'].join(' · '),
+        lines: [
+          if (bed != null || shownMess != null)
+            [if (bed != null) _bedType(bed), ?shownMess].join(' · '),
         ],
       ),
     );
@@ -463,24 +422,21 @@ class _AddressCard extends StatelessWidget {
           (_niceCase(group.title.replaceAll(RegExp(r'\s*ADDRESS$'), '')), text),
     ];
     return Surface(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.lg,
-        vertical: Space.sm,
-      ),
+      padding: const .symmetric(horizontal: Space.lg, vertical: Space.sm),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           for (final (i, (title, text)) in addresses.indexed) ...[
             if (i > 0) Container(height: 1, color: colors.border),
             _Copyable(
               value: text,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: Space.sm + 2),
+                padding: const .symmetric(vertical: Space.sm + 2),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: .start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(top: 2),
+                      padding: const .only(top: 2),
                       child: Icon(
                         i == 0 ? FLucideIcons.mapPin : FLucideIcons.house,
                         size: 16,
@@ -490,14 +446,9 @@ class _AddressCard extends StatelessWidget {
                     const SizedBox(width: Space.sm + 2),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: .start,
                         children: [
-                          Text(
-                            title,
-                            style: typography.body.xs.copyWith(
-                              color: colors.mutedForeground,
-                            ),
-                          ),
+                          _Small(title),
                           const SizedBox(height: 2),
                           Text(
                             text,
@@ -556,8 +507,6 @@ class _ParentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.theme.colors;
-    final typography = context.theme.typography;
     final groups = [group];
     final relation = _niceCase(
       group.title.replaceAll(RegExp(r'\s*DETAILS$'), ''),
@@ -576,93 +525,21 @@ class _ParentCard extends StatelessWidget {
     ];
     return Surface(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: colors.app.warning.subtle,
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  _initials(_niceCase(name ?? relation)),
-                  style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colors.app.warning.onSubtle,
-                  ),
-                ),
-              ),
-              const SizedBox(width: Space.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name == null ? relation : _niceCase(name),
-                      style: typography.body.md.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colors.foreground,
-                      ),
-                    ),
-                    Text(
-                      [
-                        relation,
-                        if (occupation != null) _niceCase(occupation),
-                      ].join(' · '),
-                      style: typography.body.xs.copyWith(
-                        color: colors.mutedForeground,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          _Headline(
+            tone: context.theme.colors.app.warning,
+            initials: _initials(_niceCase(name ?? relation)),
+            title: name == null ? relation : _niceCase(name),
+            lines: [
+              [
+                relation,
+                if (occupation != null) _niceCase(occupation),
+              ].join(' · '),
             ],
           ),
-          if (mobile != null || email != null) ...[
-            const SizedBox(height: Space.sm),
-            if (mobile != null) _ContactRow.of('Mobile', mobile),
-            if (email != null) _ContactRow.of('Email', email),
-          ],
-          if (rest.any((f) => _shown(f.value)))
-            _Expandable(
-              label: 'More',
-              child: _Fields(
-                groups: [ProfileGroup(title: '', fields: rest)],
-              ),
-            ),
+          ..._contactsAndMore(Space.sm, mobile, email, rest),
         ],
-      ),
-    );
-  }
-}
-
-/// A section that starts closed, with how many fields it holds.
-class _Collapsible extends StatelessWidget {
-  const _Collapsible({required this.title, required this.groups});
-
-  final String title;
-  final List<ProfileGroup> groups;
-
-  @override
-  Widget build(BuildContext context) {
-    final count = groups.fold(
-      0,
-      (n, g) => n + g.fields.where((f) => _shown(f.value)).length,
-    );
-    return Surface(
-      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-      child: _Expandable(
-        label: title,
-        count: count,
-        header: true,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: Space.sm),
-          child: _Fields(groups: groups),
-        ),
       ),
     );
   }
@@ -690,7 +567,7 @@ class _Expandable extends HookWidget {
     final typography = context.theme.typography;
     final open = useState(false);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         FTappable(
           semanticsLabel: label,
@@ -699,7 +576,7 @@ class _Expandable extends HookWidget {
             open.value = !open.value;
           },
           child: Padding(
-            padding: EdgeInsets.symmetric(vertical: header ? Space.md : 6),
+            padding: .symmetric(vertical: header ? Space.md : 6),
             child: Row(
               children: [
                 Expanded(
@@ -707,22 +584,16 @@ class _Expandable extends HookWidget {
                     label,
                     style: header
                         ? typography.body.md.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           )
                         : typography.body.xs.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.app.accentTone.base,
                           ),
                   ),
                 ),
-                if (count != null && !open.value)
-                  Text(
-                    '$count',
-                    style: typography.body.xs.copyWith(
-                      color: colors.mutedForeground,
-                    ),
-                  ),
+                if (count != null && !open.value) _Small('$count'),
                 const SizedBox(width: Space.sm),
                 AnimatedRotation(
                   turns: open.value ? 0.5 : 0,
@@ -740,7 +611,7 @@ class _Expandable extends HookWidget {
         AnimatedSize(
           duration: Motion.medium,
           curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
+          alignment: .topCenter,
           child: open.value ? child : const SizedBox(width: double.infinity),
         ),
       ],
@@ -763,16 +634,16 @@ class _Fields extends StatelessWidget {
         if (group.fields.any((f) => _shown(f.value))) group,
     ];
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         for (final (i, group) in shown.indexed) ...[
           if (group.title.isNotEmpty)
             Padding(
-              padding: EdgeInsets.only(top: i == 0 ? 0 : Space.md, bottom: 2),
+              padding: .only(top: i == 0 ? 0 : Space.md, bottom: 2),
               child: Text(
                 group.title.toUpperCase(),
                 style: typography.body.xs.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: .w700,
                   letterSpacing: 0.6,
                   color: colors.app.accentTone.base,
                 ),
@@ -812,9 +683,9 @@ class _FieldRow extends HookWidget {
         children: [
           if (secret)
             WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
+              alignment: .middle,
               child: Padding(
-                padding: const EdgeInsets.only(left: 6),
+                padding: const .only(left: 6),
                 child: Icon(
                   revealed.value ? FLucideIcons.eyeOff : FLucideIcons.eye,
                   size: 14,
@@ -826,7 +697,7 @@ class _FieldRow extends HookWidget {
       ),
       style: typography.body.sm.copyWith(
         color: colors.foreground,
-        fontWeight: FontWeight.w500,
+        fontWeight: .w500,
       ),
     );
     final stacked = value.length > 22;
@@ -835,14 +706,14 @@ class _FieldRow extends HookWidget {
       value: field.value,
       onTap: secret ? () => revealed.value = !revealed.value : null,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const .symmetric(vertical: 7),
         child: stacked
             ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [labelText, const SizedBox(height: 2), valueText],
               )
             : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Expanded(child: labelText),
                   const SizedBox(width: Space.md),
@@ -870,15 +741,11 @@ class _MentorTab extends ConsumerWidget {
       what: 'your mentor',
       onRetry: () => ref.read(mentorProvider.notifier).refresh(),
       builder: (mentor) {
-        String? detail(String label) {
-          for (final field in mentor.details) {
-            if (field.label.toLowerCase().contains(label) &&
-                _shown(field.value)) {
-              return field.value;
-            }
-          }
-          return null;
-        }
+        String? detail(String label) => mentor.details
+            .where((f) => f.label.toLowerCase().contains(label))
+            .where((f) => _shown(f.value))
+            .firstOrNull
+            ?.value;
 
         final name = detail('name');
         final email = detail('email');
@@ -934,7 +801,7 @@ class _MentorTab extends ConsumerWidget {
         ];
 
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             // New messages matter more than details that rarely change.
             if (mentor.messages.isNotEmpty) ...messages,
@@ -948,56 +815,14 @@ class _MentorTab extends ConsumerWidget {
                 const SectionHeader(title: 'Mentor'),
               Surface(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: .stretch,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: colors.app.lab.subtle,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            _initials(name),
-                            style: typography.body.md.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: colors.app.lab.onSubtle,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: Space.md),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: typography.body.md.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: colors.foreground,
-                                ),
-                              ),
-                              if (detail('designation') case final d?)
-                                Text(
-                                  d,
-                                  style: typography.body.xs.copyWith(
-                                    color: colors.mutedForeground,
-                                  ),
-                                ),
-                              if (department != null)
-                                Text(
-                                  department,
-                                  style: typography.body.xs.copyWith(
-                                    color: colors.mutedForeground,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    _Headline(
+                      tone: colors.app.lab,
+                      initials: _initials(name),
+                      large: true,
+                      title: name,
+                      lines: [?detail('designation'), ?department],
                     ),
                     if (cabin != null) ...[
                       const SizedBox(height: Space.md),
@@ -1015,25 +840,14 @@ class _MentorTab extends ConsumerWidget {
                               'Cabin $cabin',
                               style: typography.body.sm.copyWith(
                                 color: colors.foreground,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: .w500,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ],
-                    if (email != null || mobile != null) ...[
-                      const SizedBox(height: Space.xs),
-                      if (mobile != null) _ContactRow.of('Mobile', mobile),
-                      if (email != null) _ContactRow.of('Email', email),
-                    ],
-                    if (rest.any((f) => _shown(f.value)))
-                      _Expandable(
-                        label: 'More',
-                        child: _Fields(
-                          groups: [ProfileGroup(title: '', fields: rest)],
-                        ),
-                      ),
+                    ..._contactsAndMore(Space.xs, mobile, email, rest),
                   ],
                 ),
               ),
@@ -1077,7 +891,7 @@ class _MessageCard extends StatelessWidget {
       child: _Copyable(
         value: body.value,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             Text(
               body.value,
@@ -1090,11 +904,8 @@ class _MessageCard extends StatelessWidget {
                 runSpacing: 4,
                 children: [
                   for (final f in meta)
-                    Text(
+                    _Small(
                       f.label.isEmpty ? f.value : '${f.label}: ${f.value}',
-                      style: typography.body.xs.copyWith(
-                        color: colors.mutedForeground,
-                      ),
                     ),
                 ],
               ),
@@ -1113,77 +924,51 @@ class _MessageCard extends StatelessWidget {
 /// A phone number or email with what it is; a tap calls, mails or opens
 /// WhatsApp, a long-press copies it.
 class _ContactRow extends StatelessWidget {
-  const _ContactRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.uri,
-  });
+  const _ContactRow(this.label, this.value);
 
-  factory _ContactRow.of(String label, String value) {
-    final digits = value.replaceAll(RegExp(r'\D'), '');
-    if (value.contains('@')) {
-      return _ContactRow(
-        icon: FLucideIcons.mail,
-        label: label,
-        value: value,
-        uri: Uri(scheme: 'mailto', path: value),
-      );
-    }
-    if (label.toLowerCase().contains('whatsapp')) {
-      return _ContactRow(
-        icon: FLucideIcons.messageCircle,
-        label: label,
-        value: value,
-        // wa.me takes the number with its country code.
-        uri: Uri.https('wa.me', digits.length == 10 ? '91$digits' : digits),
-      );
-    }
-    return _ContactRow(
-      icon: FLucideIcons.phone,
-      label: label,
-      value: value,
-      uri: Uri(scheme: 'tel', path: digits),
-    );
-  }
-
-  final IconData icon;
   final String label;
   final String value;
-  final Uri uri;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    final (icon, uri) = switch (value) {
+      _ when value.contains('@') => (
+        FLucideIcons.mail,
+        Uri(scheme: 'mailto', path: value),
+      ),
+      _ when label.toLowerCase().contains('whatsapp') => (
+        FLucideIcons.messageCircle,
+        // wa.me takes the number with its country code.
+        Uri.https('wa.me', digits.length == 10 ? '91$digits' : digits),
+      ),
+      _ => (FLucideIcons.phone, Uri(scheme: 'tel', path: digits)),
+    };
     return _Copyable(
       value: value,
-      onTap: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+      onTap: () => launchUrl(uri, mode: .externalApplication),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const .symmetric(vertical: 7),
         child: Row(
           children: [
             Icon(icon, size: 16, color: colors.app.accentTone.base),
             const SizedBox(width: Space.sm + 2),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Text(
                     value,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    overflow: .ellipsis,
                     style: typography.body.sm.copyWith(
                       color: colors.foreground,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: .w500,
                     ),
                   ),
-                  Text(
-                    label,
-                    style: typography.body.xs.copyWith(
-                      color: colors.mutedForeground,
-                    ),
-                  ),
+                  _Small(label),
                 ],
               ),
             ),
@@ -1199,6 +984,107 @@ class _ContactRow extends StatelessWidget {
   }
 }
 
+/// A rounded square in [tone] with [icon], or a circle with [initials]
+/// ([large] for the mentor), then [title] in bold and smaller [lines].
+class _Headline extends StatelessWidget {
+  const _Headline({
+    required this.tone,
+    required this.title,
+    required this.lines,
+    this.icon,
+    this.initials,
+    this.large = false,
+  });
+
+  final Tone tone;
+  final String title;
+  final List<String> lines;
+  final IconData? icon;
+  final String? initials;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final body = context.theme.typography.body;
+    return Row(
+      children: [
+        Container(
+          width: large ? 52 : 44,
+          height: large ? 52 : 44,
+          alignment: .center,
+          decoration: BoxDecoration(
+            color: tone.subtle,
+            shape: icon == null ? .circle : .rectangle,
+            borderRadius: icon == null ? null : .circular(Radii.md),
+          ),
+          child: icon != null
+              ? Icon(icon, size: 20, color: tone.onSubtle)
+              : Text(
+                  initials!,
+                  style: (large ? body.md : body.sm).copyWith(
+                    fontWeight: .w700,
+                    color: tone.onSubtle,
+                  ),
+                ),
+        ),
+        const SizedBox(width: Space.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: .start,
+            children: [
+              Text(
+                title,
+                style: body.md.copyWith(
+                  fontWeight: .w700,
+                  color: colors.foreground,
+                ),
+              ),
+              for (final line in lines) _Small(line),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mobile and email rows after [gap], then the other fields behind "More".
+List<Widget> _contactsAndMore(
+  double gap,
+  String? mobile,
+  String? email,
+  List<ProfileField> rest,
+) => [
+  if (mobile != null || email != null) ...[
+    SizedBox(height: gap),
+    if (mobile != null) _ContactRow('Mobile', mobile),
+    if (email != null) _ContactRow('Email', email),
+  ],
+  if (rest.any((f) => _shown(f.value)))
+    _Expandable(
+      label: 'More',
+      child: _Fields(
+        groups: [ProfileGroup(title: '', fields: rest)],
+      ),
+    ),
+];
+
+/// Small grey text: a caption, count or detail.
+class _Small extends StatelessWidget {
+  const _Small(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: context.theme.typography.body.xs.copyWith(
+      color: context.theme.colors.mutedForeground,
+    ),
+  );
+}
+
 /// Long-press copies [value]; [onTap], if given, runs on a tap.
 class _Copyable extends StatelessWidget {
   const _Copyable({required this.value, required this.child, this.onTap});
@@ -1208,18 +1094,16 @@ class _Copyable extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      onLongPress: () async {
-        HapticFeedback.mediumImpact();
-        await Clipboard.setData(ClipboardData(text: value));
-        if (context.mounted) dispToast(context, 'Copied', value);
-      },
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: .opaque,
+    onTap: onTap,
+    onLongPress: () async {
+      HapticFeedback.mediumImpact();
+      await Clipboard.setData(ClipboardData(text: value));
+      if (context.mounted) dispToast(context, 'Copied', value);
+    },
+    child: child,
+  );
 }
 
 Uint8List? _decodePhoto(String photo) {
@@ -1249,13 +1133,8 @@ String? _value(List<ProfileGroup> groups, String label) {
   return null;
 }
 
-List<ProfileField> _fields(List<ProfileGroup> groups) => [
-  for (final group in groups) ...group.fields,
-];
-
 bool _isSecret(String label) =>
-    label.toUpperCase().contains('AADHAR') ||
-    label.toUpperCase().contains('AADHAAR');
+    label.toUpperCase().contains(RegExp('AADHAA?R'));
 
 bool _isSerial(String label) {
   final l = label.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
@@ -1304,19 +1183,7 @@ const _minorWords = {'and', 'of', 'the', 'for', 'to', 'in', 'at', 'on', 'by'};
 
 /// Short words that are words, not abbreviations, so they are not kept
 /// upper case.
-const _shortWords = {
-  'YES',
-  'NO',
-  'MR',
-  'MRS',
-  'DR',
-  'ST',
-  'RD',
-  'OPP',
-  'BED',
-  ..._minor,
-};
-const _minor = {'AND', 'OF', 'THE', 'FOR', 'TO', 'IN', 'AT', 'ON', 'BY'};
+const _shortWords = {'YES', 'NO', 'MR', 'MRS', 'DR', 'ST', 'RD', 'OPP', 'BED'};
 
 /// An all-caps (or all-lowercase) value in title case: "ANDHRA PRADESH" →
 /// "Andhra Pradesh". Emails and mixed-case values are left as they are;
@@ -1341,6 +1208,7 @@ String _word(String w, {required bool first, required bool allCaps}) {
       letters.isNotEmpty &&
       letters.length <= 3 &&
       !_shortWords.contains(letters) &&
+      !_minorWords.contains(letters.toLowerCase()) &&
       !RegExp(r'\d').hasMatch(w)) {
     return upper;
   }
