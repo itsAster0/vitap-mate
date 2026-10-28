@@ -14,7 +14,7 @@ class ServerIconBox extends StatelessWidget {
     height: 30,
     decoration: BoxDecoration(
       color: tone.subtle,
-      borderRadius: BorderRadius.circular(Radii.sm + 1),
+      borderRadius: .circular(Radii.sm + 1),
     ),
     child: Icon(icon, size: 16, color: tone.onSubtle),
   );

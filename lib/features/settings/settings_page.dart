@@ -32,15 +32,6 @@ import 'package:vitapmate/platform/update/update_check.dart';
 class SettingsPage extends HookConsumerWidget {
   const SettingsPage({super.key});
 
-  void _invalidateVtopDataProviders(WidgetRef ref) {
-    ref.invalidate(attendanceProvider);
-    ref.invalidate(examScheduleProvider);
-    ref.invalidate(academicCalendarProvider);
-    ref.invalidate(marksProvider);
-    ref.invalidate(semesterIdProvider);
-    ref.invalidate(timetableProvider);
-  }
-
   Future<void> _refreshAllVtopData(BuildContext context, WidgetRef ref) async {
     final stopwatch = Stopwatch()..start();
     String took() =>
@@ -53,17 +44,25 @@ class SettingsPage extends HookConsumerWidget {
         promptForOtp: true,
         ignoreRecoverableErrors: false,
       );
-      _invalidateVtopDataProviders(ref);
+      ref
+        ..invalidate(attendanceProvider)
+        ..invalidate(examScheduleProvider)
+        ..invalidate(academicCalendarProvider)
+        ..invalidate(marksProvider)
+        ..invalidate(semesterIdProvider)
+        ..invalidate(timetableProvider);
       if (!context.mounted) return;
-      if (success) {
-        dispToast(context, "Updated", "All VTOP data is up to date. ${took()}");
-      } else {
-        dispToast(
-          context,
-          "Partially Updated",
-          "Some VTOP data could not be refreshed. Try again in a bit. ${took()}",
-        );
-      }
+      success
+          ? dispToast(
+              context,
+              "Updated",
+              "All VTOP data is up to date. ${took()}",
+            )
+          : dispToast(
+              context,
+              "Partially Updated",
+              "Some VTOP data could not be refreshed. Try again in a bit. ${took()}",
+            );
     } catch (error, stackTrace) {
       log(
         'Manual VTOP data refresh failed',
@@ -71,9 +70,7 @@ class SettingsPage extends HookConsumerWidget {
         error: error,
         stackTrace: stackTrace,
       );
-      if (context.mounted) {
-        disCommonToast(context, error);
-      }
+      if (context.mounted) disCommonToast(context, error);
     }
   }
 
@@ -82,22 +79,12 @@ class SettingsPage extends HookConsumerWidget {
     final showDebugFeatures = useState(false);
     final isEmailOtpReady = useState<bool?>(null);
     final isGmailOtpReady = useState(false);
-    final isEmailOtpBusy = useState(false);
-    final isEmailOtpTestBusy = useState(false);
     final showEmailOtp = useState(false);
     final isVtopSyncing = useState(false);
-    final packageInfoSnapshot = useFuture(
+    final packageInfo = useFuture(
       useMemoized(PackageInfo.fromPlatform, const []),
-    );
-    final packageInfo = packageInfoSnapshot.data;
-    final appVersion = packageInfo == null
-        ? null
-        : 'Version ${packageInfo.version} (${packageInfo.buildNumber})';
-    final updateSnapshot = useFuture(useMemoized(checkForAppUpdate, const []));
-    final update = updateSnapshot.data;
-    // Only a confirmed update is worth a tile; hide it when there is none or
-    // when the check could not tell (offline, GitHub answered oddly, …).
-    final hasUpdate = update?.available == true;
+    ).data;
+    final update = useFuture(useMemoized(checkForAppUpdate, const [])).data;
 
     Future<void> refreshEmailOtpReady() async {
       try {
@@ -123,19 +110,8 @@ class SettingsPage extends HookConsumerWidget {
       unawaited(refreshEmailOtpReady());
       return null;
     }, const []);
-    final backgroundSync = [
-      FSelectTile(title: Text("Disable"), value: Duration(hours: 0)),
-      FSelectTile(title: Text("3 hours"), value: Duration(hours: 3)),
-      FSelectTile(title: Text("6 hours"), value: Duration(hours: 6)),
-      FSelectTile(title: Text("12 hours"), value: Duration(hours: 12)),
-      FSelectTile(title: Text("24 hours"), value: Duration(hours: 24)),
-    ];
-    final initialValSync =
-        ref.watch(backgroundSyncProvider).value?.freq ?? Duration(seconds: 0);
-    final backgroundSyncLabel = initialValSync == Duration.zero
-        ? 'Disabled'
-        : 'Every ${initialValSync.inHours} hours';
-    final initialVtopSessionReuseTtl = ref.watch(vtopSessionReuseTtlProvider);
+    final syncFreq =
+        ref.watch(backgroundSyncProvider).value?.freq ?? Duration.zero;
     final classesLeftUntil = ref.watch(classesLeftUntilProvider);
 
     final colors = context.theme.colors;
@@ -145,19 +121,14 @@ class SettingsPage extends HookConsumerWidget {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.sm,
-        Space.sm,
-        Space.lg,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           const UserBox(),
           SectionHeader(title: 'VTOP'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               FTile(
                 prefix: _IconTile(
@@ -192,18 +163,16 @@ class SettingsPage extends HookConsumerWidget {
                           style: TextStyle(color: colors.app.success.onSubtle),
                         )
                       : const Text('Auto-fill the VTOP sign-in OTP'),
-                  suffix: isEmailOtpBusy.value
-                      ? const FCircularProgress.pinwheel()
-                      : isEmailOtpReady.value == true
+                  suffix: isEmailOtpReady.value == true
                       ? const Icon(FLucideIcons.chevronRight)
                       : FButton(
-                          variant: FButtonVariant.outline,
-                          size: FButtonSizeVariant.sm,
-                          mainAxisSize: MainAxisSize.min,
+                          variant: .outline,
+                          size: .sm,
+                          mainAxisSize: .min,
                           onPress: openGmailSetup,
                           child: const Text('Set up'),
                         ),
-                  onPress: isEmailOtpBusy.value ? null : openGmailSetup,
+                  onPress: openGmailSetup,
                 ),
                 if (isGmailOtpReady.value)
                   FTile(
@@ -217,9 +186,8 @@ class SettingsPage extends HookConsumerWidget {
                     ),
                     suffix: FSwitch(
                       value: ref.watch(emailOtpDeleteAfterReadingProvider),
-                      onChange: (value) {
-                        setEmailOtpDeleteAfterReading(ref, value);
-                      },
+                      onChange: (value) =>
+                          setEmailOtpDeleteAfterReading(ref, value),
                     ),
                   ),
               ],
@@ -227,7 +195,7 @@ class SettingsPage extends HookConsumerWidget {
           ),
           SectionHeader(title: 'Privacy'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               FTile(
                 prefix: _IconTile(
@@ -249,7 +217,7 @@ class SettingsPage extends HookConsumerWidget {
                 title: const Text('Server'),
                 subtitle: const Text('VTOP data, sign-in and connected apps'),
                 suffix: const Icon(FLucideIcons.chevronRight),
-                onPress: () => GoRouter.of(context).pushNamed(Paths.server),
+                onPress: () => context.pushNamed(Paths.server),
               ),
             ],
           ),
@@ -264,7 +232,7 @@ class SettingsPage extends HookConsumerWidget {
           ),
           const SizedBox(height: Space.sm + 2),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               FSelectMenuTile(
                 prefix: _IconTile(
@@ -315,7 +283,7 @@ class SettingsPage extends HookConsumerWidget {
                 subtitle: Text(
                   messTimingsSummary(ref.watch(messTimingsProvider)),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                 ),
                 suffix: Icon(FLucideIcons.chevronRight),
                 onPress: () => showMessTimingsSheet(context),
@@ -336,7 +304,7 @@ class SettingsPage extends HookConsumerWidget {
           ),
           SectionHeader(title: 'Sync'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               FTile(
                 prefix: _IconTile(
@@ -346,9 +314,7 @@ class SettingsPage extends HookConsumerWidget {
                 title: const Text('Auto Refresh'),
                 suffix: FSwitch(
                   value: ref.watch(autoRefreshProvider),
-                  onChange: (value) {
-                    setautoRefresh(ref, value);
-                  },
+                  onChange: (value) => setautoRefresh(ref, value),
                 ),
               ),
               FSelectMenuTile(
@@ -357,19 +323,28 @@ class SettingsPage extends HookConsumerWidget {
                   tone: colors.app.success,
                 ),
                 title: FTappable(child: Text('Background Sync')),
-                subtitle: Text(backgroundSyncLabel),
+                subtitle: Text(
+                  syncFreq == Duration.zero
+                      ? 'Disabled'
+                      : 'Every ${syncFreq.inHours} hours',
+                ),
                 selectControl: FMultiValueControl.managedRadio(
-                  initial: initialValSync,
+                  initial: syncFreq,
                   onChange: (value) {
-                    final selected = value.isEmpty ? null : value.first;
-                    if (selected != null) {
+                    if (value.isNotEmpty) {
                       ref
                           .read(backgroundSyncProvider.notifier)
-                          .updateFreq(selected);
+                          .updateFreq(value.first);
                     }
                   },
                 ),
-                menu: backgroundSync,
+                menu: [
+                  for (final hours in const [0, 3, 6, 12, 24])
+                    FSelectTile(
+                      title: Text(hours == 0 ? "Disable" : "$hours hours"),
+                      value: Duration(hours: hours),
+                    ),
+                ],
               ),
               FTile(
                 prefix: _IconTile(
@@ -379,9 +354,7 @@ class SettingsPage extends HookConsumerWidget {
                 title: const Text('Calendar Sync'),
                 subtitle: const Text('Add your classes to the phone calendar'),
                 suffix: Icon(FLucideIcons.chevronRight),
-                onPress: () {
-                  GoRouter.of(context).pushNamed(Paths.calendarSync);
-                },
+                onPress: () => context.pushNamed(Paths.calendarSync),
               ),
               FTile(
                 prefix: _IconTile(
@@ -391,9 +364,7 @@ class SettingsPage extends HookConsumerWidget {
                 title: const Text('Notifications'),
                 subtitle: const Text('Manage class and exam reminders'),
                 suffix: Icon(FLucideIcons.chevronRight),
-                onPress: () {
-                  GoRouter.of(context).pushNamed(Paths.notificationManagement);
-                },
+                onPress: () => context.pushNamed(Paths.notificationManagement),
               ),
             ],
           ),
@@ -405,46 +376,73 @@ class SettingsPage extends HookConsumerWidget {
                   title: const Text('Debug'),
                   subtitle: const Text('Activity, diagnostics, logs and tools'),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => GoRouter.of(context).pushNamed(Paths.debug),
+                  onPress: () => context.pushNamed(Paths.debug),
                 ),
               ],
             ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            padding: const .fromLTRB(24, 16, 24, 0),
             child: Text(
               'Classes left and skip counts are a best-effort estimate from '
               'the VTOP academic calendar and your timetable. Holidays '
               'announced later, cancelled or extra classes can change them.',
-              textAlign: TextAlign.center,
+              textAlign: .center,
               style: context.theme.typography.body.xs.copyWith(
                 color: context.theme.colors.mutedForeground,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const .only(top: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: .center,
               children: [
-                _FooterLink(
-                  icon: Icons.code,
-                  label: 'Source',
-                  url: "https://github.com/itsKryxen/vitap-mate",
-                ),
-                _FooterLink(
-                  icon: FLucideIcons.contact,
-                  label: 'Developer',
-                  url: "https://bio.link/synaptic",
-                ),
-                _FooterLink(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'Instagram',
-                  url: "https://www.instagram.com/itsKryxen",
-                ),
+                for (final (icon, label, url) in const [
+                  (
+                    Icons.code,
+                    'Source',
+                    'https://github.com/itsKryxen/vitap-mate',
+                  ),
+                  (
+                    FLucideIcons.contact,
+                    'Developer',
+                    'https://bio.link/synaptic',
+                  ),
+                  (
+                    Icons.camera_alt_outlined,
+                    'Instagram',
+                    'https://www.instagram.com/itsKryxen',
+                  ),
+                ])
+                  Semantics(
+                    link: true,
+                    label: label,
+                    child: FTappable(
+                      onPress: () => launchUrl(Uri.parse(url)),
+                      child: Padding(
+                        padding: const .symmetric(horizontal: 18, vertical: 10),
+                        child: Column(
+                          mainAxisSize: .min,
+                          children: [
+                            Icon(icon, size: 20, color: colors.mutedForeground),
+                            const SizedBox(height: 4),
+                            Text(
+                              label,
+                              style: context.theme.typography.body.xs.copyWith(
+                                color: colors.mutedForeground,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
-          if (hasUpdate && update != null) ...[
+          // Only a confirmed update is worth a tile; hide it when there is none or
+          // when the check could not tell (offline, GitHub answered oddly, …).
+          if (update != null && update.available == true) ...[
             const SizedBox(height: Space.lg),
             FTileGroup(
               children: [
@@ -470,65 +468,25 @@ class SettingsPage extends HookConsumerWidget {
                         error: error,
                         stackTrace: stackTrace,
                       );
-                      if (context.mounted) {
-                        disCommonToast(context, error);
-                      }
+                      if (context.mounted) disCommonToast(context, error);
                     }
                   },
                 ),
               ],
             ),
           ],
-          if (appVersion != null)
+          if (packageInfo != null)
             Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 16),
+              padding: const .only(top: 4, bottom: 16),
               child: Text(
-                appVersion,
-                textAlign: TextAlign.center,
+                'Version ${packageInfo.version} (${packageInfo.buildNumber})',
+                textAlign: .center,
                 style: context.theme.typography.body.sm.copyWith(
                   color: context.theme.colors.mutedForeground,
                 ),
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _FooterLink extends StatelessWidget {
-  const _FooterLink({
-    required this.icon,
-    required this.label,
-    required this.url,
-  });
-
-  final IconData icon;
-  final String label;
-  final String url;
-
-  @override
-  Widget build(BuildContext context) {
-    final muted = context.theme.colors.mutedForeground;
-    return Semantics(
-      link: true,
-      label: label,
-      child: FTappable(
-        onPress: () => launchUrl(Uri.parse(url)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 20, color: muted),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: context.theme.typography.body.xs.copyWith(color: muted),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -547,7 +505,7 @@ class _IconTile extends StatelessWidget {
     height: 30,
     decoration: BoxDecoration(
       color: tone.subtle,
-      borderRadius: BorderRadius.circular(Radii.sm + 1),
+      borderRadius: .circular(Radii.sm + 1),
     ),
     child: Icon(icon, size: 16, color: tone.onSubtle),
   );
@@ -582,14 +540,9 @@ class _AppearancePicker extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Surface(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md,
-        Space.md,
-        Space.md,
-        Space.md,
-      ),
+      padding: const .all(Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           GestureDetector(
             onLongPress: onLongPress,
@@ -600,7 +553,7 @@ class _AppearancePicker extends StatelessWidget {
                 Text(
                   'Appearance',
                   style: typography.body.md.copyWith(
-                    fontWeight: FontWeight.w500,
+                    fontWeight: .w500,
                     color: colors.foreground,
                   ),
                 ),
@@ -626,9 +579,9 @@ class _AppearancePicker extends StatelessWidget {
                         AnimatedContainer(
                           duration: Motion.medium,
                           height: 64,
-                          padding: const EdgeInsets.all(2),
+                          padding: const .all(2),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(Radii.md),
+                            borderRadius: .circular(Radii.md),
                             border: Border.all(
                               color: value == mode
                                   ? colors.app.accent
@@ -637,14 +590,14 @@ class _AppearancePicker extends StatelessWidget {
                             ),
                           ),
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(Radii.md - 3),
+                            borderRadius: .circular(Radii.md - 3),
                             child: switch (mode) {
                               ThemeMode.light => const _MiniApp(
                                 palette: _light,
                               ),
                               ThemeMode.dark => const _MiniApp(palette: _dark),
                               ThemeMode.system => const Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment: .stretch,
                                 children: [
                                   Expanded(child: _MiniApp(palette: _light)),
                                   Expanded(child: _MiniApp(palette: _dark)),
@@ -657,9 +610,7 @@ class _AppearancePicker extends StatelessWidget {
                         Text(
                           label,
                           style: typography.body.xs.copyWith(
-                            fontWeight: value == mode
-                                ? FontWeight.w600
-                                : FontWeight.w500,
+                            fontWeight: value == mode ? .w600 : .w500,
                             color: value == mode
                                 ? colors.foreground
                                 : colors.mutedForeground,
@@ -690,15 +641,12 @@ class _MiniApp extends StatelessWidget {
     return ColoredBox(
       color: bg,
       child: Padding(
-        padding: const EdgeInsets.all(6),
+        padding: const .all(6),
         child: Container(
-          decoration: BoxDecoration(
-            color: card,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(color: card, borderRadius: .circular(4)),
+          padding: const .all(5),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: .start,
             children: [
               FractionallySizedBox(
                 widthFactor: 0.7,
@@ -706,7 +654,7 @@ class _MiniApp extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     color: line,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: .circular(2),
                   ),
                 ),
               ),
@@ -717,7 +665,7 @@ class _MiniApp extends StatelessWidget {
                   height: 4,
                   decoration: BoxDecoration(
                     color: line.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: .circular(2),
                   ),
                 ),
               ),
@@ -736,10 +684,7 @@ Future<void> _setOnDeviceMode(
   WidgetRef ref,
   bool value,
 ) async {
-  if (!value) {
-    await setOnDeviceMode(ref, false);
-    return;
-  }
+  if (!value) return setOnDeviceMode(ref, false);
   final prefs = await ref.read(settingsProvider.future);
   final linked = prefs.getBool(bridgeLinkedSettingKey) ?? false;
   if (!context.mounted) return;

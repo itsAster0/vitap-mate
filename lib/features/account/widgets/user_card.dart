@@ -38,25 +38,19 @@ class UserCard extends HookConsumerWidget {
         false;
     final username = user.username?.trim().toUpperCase() ?? '';
     final semesterId = user.semid?.trim();
-    final semesters =
-        ref.watch(semesterIdProvider).value?.semesters ?? const [];
-    String? semesterName;
-    for (final semester in semesters) {
-      if (semester.id.trim() == semesterId) {
-        semesterName = semester.name.trim();
-        break;
-      }
-    }
-
-    final studentName = ref
-        .watch(gradeHistoryProvider)
+    final semesterName = ref
+        .watch(semesterIdProvider)
         .value
-        ?.student
-        .name
+        ?.semesters
+        .where((semester) => semester.id.trim() == semesterId)
+        .firstOrNull
+        ?.name
         .trim();
-    final displayName = (studentName?.isNotEmpty ?? false)
-        ? _titleCase(studentName!)
-        : username;
+    final studentName =
+        ref.watch(gradeHistoryProvider).value?.student.name.trim() ?? '';
+    final displayName = studentName.isEmpty
+        ? username
+        : _titleCase(studentName);
     final initials = displayName
         .split(RegExp(r'\s+'))
         .where((p) => p.isNotEmpty)
@@ -76,43 +70,43 @@ class UserCard extends HookConsumerWidget {
               Expanded(
                 child: PressScale(
                   semanticsLabel: 'Open profile',
-                  onPress: () => GoRouter.of(context).pushNamed(Paths.profile),
+                  onPress: () => context.pushNamed(Paths.profile),
                   child: Row(
                     spacing: 12,
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        alignment: Alignment.center,
+                        alignment: .center,
                         decoration: BoxDecoration(
                           color: colors.app.accentTone.subtle,
-                          shape: BoxShape.circle,
+                          shape: .circle,
                         ),
                         child: Text(
                           initials.toUpperCase(),
                           style: typography.body.md.copyWith(
-                            fontWeight: FontWeight.w700,
+                            fontWeight: .w700,
                             color: colors.app.accentTone.onSubtle,
                           ),
                         ),
                       ),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: .start,
                           children: [
                             Text(
                               displayName,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.md.copyWith(
-                                fontWeight: FontWeight.w600,
+                                fontWeight: .w600,
                                 color: colors.foreground,
                               ),
                             ),
                             Text(
                               username,
                               maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              overflow: .ellipsis,
                               style: typography.body.xs.copyWith(
                                 color: user.isValid
                                     ? colors.mutedForeground
@@ -130,7 +124,7 @@ class UserCard extends HookConsumerWidget {
                 label: 'Sign out',
                 button: true,
                 child: FButton.icon(
-                  variant: FButtonVariant.ghost,
+                  variant: .ghost,
                   onPress: () => _confirmSignOut(context, ref),
                   child: Icon(
                     FLucideIcons.logOut,
@@ -140,13 +134,12 @@ class UserCard extends HookConsumerWidget {
               ),
             ],
           ),
-          if (!user.isValid) ...[
+          if (!user.isValid)
             const FAlert(
-              variant: FAlertVariant.destructive,
+              variant: .destructive,
               title: Text('Credentials need attention'),
               subtitle: Text('Update your VTOP password to continue.'),
             ),
-          ],
           // Which semester the app shows, as a field you can tap to change.
           PressScale(
             scale: 0.98,
@@ -156,13 +149,13 @@ class UserCard extends HookConsumerWidget {
               builder: (_) => SemesterDialog(user: user, outerContext: context),
             ),
             child: Container(
-              padding: const EdgeInsets.symmetric(
+              padding: const .symmetric(
                 horizontal: Space.md,
                 vertical: Space.sm + 2,
               ),
               decoration: BoxDecoration(
                 color: colors.secondary,
-                borderRadius: BorderRadius.circular(Radii.md),
+                borderRadius: .circular(Radii.md),
                 border: Border.all(color: colors.border),
               ),
               child: Row(
@@ -172,7 +165,7 @@ class UserCard extends HookConsumerWidget {
                     height: 32,
                     decoration: BoxDecoration(
                       color: colors.app.accentTone.subtle,
-                      borderRadius: BorderRadius.circular(Radii.sm + 2),
+                      borderRadius: .circular(Radii.sm + 2),
                     ),
                     child: Icon(
                       FLucideIcons.calendarRange,
@@ -183,13 +176,13 @@ class UserCard extends HookConsumerWidget {
                   const SizedBox(width: Space.md),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: .start,
                       children: [
                         Text(
                           'SEMESTER',
                           style: typography.body.xs.copyWith(
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             letterSpacing: 0.6,
                             color: colors.mutedForeground,
                           ),
@@ -199,9 +192,9 @@ class UserCard extends HookConsumerWidget {
                               ? 'Choose semester'
                               : semesterName,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: .ellipsis,
                           style: typography.body.md.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
@@ -221,21 +214,20 @@ class UserCard extends HookConsumerWidget {
             spacing: 6,
             children: [
               Expanded(child: UserPassChange(user: user)),
-              if (hasEnrolledBiometrics) ...[
+              if (hasEnrolledBiometrics)
                 Tooltip(
                   message: 'View saved password',
                   child: Semantics(
                     label: 'View saved password',
                     button: true,
                     child: FButton.icon(
-                      variant: FButtonVariant.outline,
-                      size: FButtonSizeVariant.sm,
+                      variant: .outline,
+                      size: .sm,
                       onPress: () => _showPassword(context),
                       child: const Icon(FLucideIcons.eye),
                     ),
                   ),
                 ),
-              ],
             ],
           ),
         ],
@@ -286,45 +278,45 @@ class UserCard extends HookConsumerWidget {
     }
   }
 
-  void _confirmSignOut(BuildContext context, WidgetRef ref) {
-    showAdaptiveDialog(
-      context: context,
-      builder: (dialogContext) => AppDialog(
-        title: const Text('Sign out?'),
-        body: const Text('You will be signed out and returned to onboarding.'),
-        actions: [
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+  void _confirmSignOut(BuildContext context, WidgetRef ref) =>
+      showAdaptiveDialog(
+        context: context,
+        builder: (dialogContext) => AppDialog(
+          title: const Text('Sign out?'),
+          body: const Text(
+            'You will be signed out and returned to onboarding.',
           ),
-          FButton(
-            variant: FButtonVariant.destructive,
-            onPress: () async {
-              try {
-                final username = user.username;
-                if (username != null && username.isNotEmpty) {
-                  await clearStoredVtopSession(username);
-                  await ref
-                      .read(vtopusersutilsProvider.notifier)
-                      .vtopUserDelete(username);
+          actions: [
+            FButton(
+              variant: .outline,
+              onPress: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FButton(
+              variant: .destructive,
+              onPress: () async {
+                try {
+                  final username = user.username;
+                  if (username != null && username.isNotEmpty) {
+                    await clearStoredVtopSession(username);
+                    await ref
+                        .read(vtopusersutilsProvider.notifier)
+                        .vtopUserDelete(username);
+                  }
+                  ref
+                    ..invalidate(vtopUserProvider)
+                    ..invalidate(vClientProvider);
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+                  if (context.mounted) context.go('/onboarding');
+                } catch (error) {
+                  if (context.mounted) disCommonToast(context, error);
                 }
-                ref.invalidate(vtopUserProvider);
-                ref.invalidate(vClientProvider);
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                }
-                if (context.mounted) context.go('/onboarding');
-              } catch (error) {
-                if (context.mounted) disCommonToast(context, error);
-              }
-            },
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
-    );
-  }
+              },
+              child: const Text('Sign out'),
+            ),
+          ],
+        ),
+      );
 }
 
 /// "JANE MARY DOE" → "Jane Mary Doe".

@@ -47,13 +47,13 @@ class ServerPhonesPage extends HookConsumerWidget {
           const Center(child: FCircularProgress.pinwheel())
         else if (account.hasError)
           FAlert(
-            variant: FAlertVariant.destructive,
+            variant: .destructive,
             title: const Text('Could not load your phones'),
             subtitle: Text('${account.error}'),
           )
         else
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               for (final phone in current?.phones ?? const <BridgePhone>[])
                 FTile(
@@ -70,7 +70,7 @@ class ServerPhonesPage extends HookConsumerWidget {
                         : 'seen ${ago(phone.seenAt)}',
                   ),
                   suffix: FButton.icon(
-                    variant: FButtonVariant.ghost,
+                    variant: .ghost,
                     onPress: busy.value ? null : () => remove(phone),
                     child: const Icon(FLucideIcons.unlink),
                   ),

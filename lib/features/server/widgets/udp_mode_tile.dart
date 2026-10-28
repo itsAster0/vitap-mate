@@ -16,7 +16,7 @@ class UdpModeTile extends ConsumerWidget {
     if (!udpModeAvailable) return const SizedBox.shrink();
     final on = ref.watch(vtopUdpProvider);
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         FTileGroup(
           children: [

@@ -208,6 +208,12 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
     state = AsyncData(await _api.account());
   }
 
+  /// Runs one server [call], then reloads the account.
+  Future<void> _apply(Future<void> Function() call) => _kept(() async {
+    await call();
+    await _reload();
+  });
+
   Future<void> link({required bool withCredentials}) => _kept(() async {
     await _api.link(withCredentials: withCredentials);
     await _setPref(bridgeLinkedSettingKey, true);
@@ -228,15 +234,10 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
     },
   );
 
-  Future<void> setKeyOutings(String id, bool outings) => _kept(() async {
-    await _api.setKeyOutings(id, outings);
-    await _reload();
-  });
+  Future<void> setKeyOutings(String id, bool outings) =>
+      _apply(() => _api.setKeyOutings(id, outings));
 
-  Future<void> revokeKey(String id) => _kept(() async {
-    await _api.revokeKey(id);
-    await _reload();
-  });
+  Future<void> revokeKey(String id) => _apply(() => _api.revokeKey(id));
 
   Future<void> removePhone(BridgePhone phone) => _kept(() async {
     await _api.removePhone(phone);
@@ -261,10 +262,8 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
     await _setPref(bridgeServerSignInSettingKey, on);
   });
 
-  Future<void> updateSettings(BridgeSettings settings) => _kept(() async {
-    await _api.updateSettings(settings);
-    await _reload();
-  });
+  Future<void> updateSettings(BridgeSettings settings) =>
+      _apply(() => _api.updateSettings(settings));
 
   Future<void> deleteData() => _kept(() async {
     await _api.deleteAccount();

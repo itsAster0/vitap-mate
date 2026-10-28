@@ -53,13 +53,13 @@ class DebugPage extends HookConsumerWidget {
     );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.xxl),
+      padding: const .fromLTRB(Space.md, 0, Space.md, Space.xxl),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           const SectionHeader(title: 'What happened'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               tile(
                 'Logs',
@@ -92,7 +92,7 @@ class DebugPage extends HookConsumerWidget {
           ],
           const SectionHeader(title: 'Session'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               tile(
                 'VTOP Session Reuse',
@@ -121,7 +121,7 @@ class DebugPage extends HookConsumerWidget {
           ),
           const SectionHeader(title: 'Saved data'),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               tile(
                 'Drop Latest History Entry',
@@ -170,14 +170,15 @@ class DebugPage extends HookConsumerWidget {
   }
 }
 
-/// Starts Cronet's net log, or stops it and saves the file where the user
-/// picks.
 Future<void> _forgetQuicFailures(BuildContext context) async {
   await forgetQuicFailuresOnNextLaunch();
-  if (!context.mounted) return;
-  dispToast(context, 'Done', 'Close and reopen the app to try HTTP/3 again.');
+  if (context.mounted) {
+    dispToast(context, 'Done', 'Close and reopen the app to try HTTP/3 again.');
+  }
 }
 
+/// Starts Cronet's net log, or stops it and saves the file where the user
+/// picks.
 Future<void> _toggleNetLog(BuildContext context) async {
   try {
     if (!CronetNetLog.recording.value) {
@@ -422,70 +423,68 @@ Future<void> _openVtopSessionReuseTtlDialog(
   await showAdaptiveDialog<void>(
     context: context,
     barrierDismissible: true,
-    builder: (dialogContext) {
-      return HookBuilder(
-        builder: (dialogContext) {
-          final controller = useTextEditingController(
-            text: currentTtl.inMinutes.toString(),
-          );
-          final errorText = useState<String?>(null);
+    builder: (_) => HookBuilder(
+      builder: (dialogContext) {
+        final controller = useTextEditingController(
+          text: currentTtl.inMinutes.toString(),
+        );
+        final errorText = useState<String?>(null);
 
-          return AppDialog(
-            title: const Text('VTOP Session Reuse'),
-            body: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Enter how long saved cookies can be reused.'),
+        return AppDialog(
+          title: const Text('VTOP Session Reuse'),
+          body: Column(
+            mainAxisSize: .min,
+            crossAxisAlignment: .start,
+            children: [
+              const Text('Enter how long saved cookies can be reused.'),
+              const SizedBox(height: 8),
+              FTextField(
+                control: FTextFieldControl.managed(controller: controller),
+                keyboardType: .number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
+              if (errorText.value case final error?) ...[
                 const SizedBox(height: 8),
-                FTextField(
-                  control: FTextFieldControl.managed(controller: controller),
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                ),
-                if (errorText.value != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    errorText.value!,
-                    style: dialogContext.theme.typography.body.sm.copyWith(
-                      color: dialogContext.theme.colors.destructive,
-                    ),
+                Text(
+                  error,
+                  style: dialogContext.theme.typography.body.sm.copyWith(
+                    color: dialogContext.theme.colors.destructive,
                   ),
-                ],
+                ),
               ],
-            ),
-            actions: [
-              FButton(
-                variant: FButtonVariant.outline,
-                onPress: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Cancel'),
-              ),
-              FButton(
-                onPress: () async {
-                  final minutes = int.tryParse(controller.text.trim());
-                  if (minutes == null || minutes <= 0) {
-                    errorText.value = 'Enter minutes greater than 0.';
-                    return;
-                  }
-
-                  await setVtopSessionReuseTtl(ref, Duration(minutes: minutes));
-                  if (!dialogContext.mounted) return;
-                  Navigator.of(dialogContext).pop();
-                  if (context.mounted) {
-                    dispToast(
-                      context,
-                      'Saved',
-                      'VTOP sessions will be reused for $minutes minutes.',
-                    );
-                  }
-                },
-                child: const Text('Save'),
-              ),
             ],
-          );
-        },
-      );
-    },
+          ),
+          actions: [
+            FButton(
+              variant: .outline,
+              onPress: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FButton(
+              onPress: () async {
+                final minutes = int.tryParse(controller.text.trim());
+                if (minutes == null || minutes <= 0) {
+                  errorText.value = 'Enter minutes greater than 0.';
+                  return;
+                }
+
+                await setVtopSessionReuseTtl(ref, Duration(minutes: minutes));
+                if (!dialogContext.mounted) return;
+                Navigator.of(dialogContext).pop();
+                if (context.mounted) {
+                  dispToast(
+                    context,
+                    'Saved',
+                    'VTOP sessions will be reused for $minutes minutes.',
+                  );
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    ),
   );
 }
 
@@ -500,44 +499,30 @@ Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
 
     await showAdaptiveDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        if (latest == null) {
-          return AppDialog(
-            title: const Text('Latest OTP Email'),
-            body: const Text('No emails from info1@vitap.ac.in were found.'),
-            actions: [
-              FButton(
-                onPress: () => Navigator.of(dialogContext).pop(),
-                child: const Text('Close'),
+      builder: (dialogContext) => AppDialog(
+        title: const Text('Latest OTP Email'),
+        body: latest == null
+            ? const Text('No emails from info1@vitap.ac.in were found.')
+            : Column(
+                mainAxisSize: .min,
+                crossAxisAlignment: .start,
+                children: [
+                  Text('Subject: ${latest.subject}'),
+                  const SizedBox(height: 6),
+                  Text('Received: ${latest.receivedAt.toLocal()}'),
+                  const SizedBox(height: 6),
+                  Text('OTP: ${latest.otp ?? 'Not found'}'),
+                  const SizedBox(height: 12),
+                  Text(latest.snippet),
+                ],
               ),
-            ],
-          );
-        }
-
-        final localTime = latest.receivedAt.toLocal().toString();
-        return AppDialog(
-          title: const Text('Latest OTP Email'),
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Subject: ${latest.subject}'),
-              const SizedBox(height: 6),
-              Text('Received: $localTime'),
-              const SizedBox(height: 6),
-              Text('OTP: ${latest.otp ?? 'Not found'}'),
-              const SizedBox(height: 12),
-              Text(latest.snippet),
-            ],
+        actions: [
+          FButton(
+            onPress: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Close'),
           ),
-          actions: [
-            FButton(
-              onPress: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     );
   } catch (error, stackTrace) {
     log(
@@ -546,8 +531,6 @@ Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
       error: error,
       stackTrace: stackTrace,
     );
-    if (context.mounted) {
-      dispToast(context, "Test Failed", "$error");
-    }
+    if (context.mounted) dispToast(context, "Test Failed", "$error");
   }
 }

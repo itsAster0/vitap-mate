@@ -29,8 +29,8 @@ class ServerUrlSection extends HookConsumerWidget {
       useMemoized(() => probeServer(url, client), [url]),
     );
     final colors = context.theme.colors;
-    final status = switch (reachable) {
-      AsyncSnapshot(connectionState: ConnectionState.waiting) => (
+    final (statusText, statusColor) = switch (reachable) {
+      AsyncSnapshot(connectionState: .waiting) => (
         'Checking…',
         colors.mutedForeground,
       ),
@@ -39,15 +39,16 @@ class ServerUrlSection extends HookConsumerWidget {
     };
 
     Future<void> confirmSwitch(String? next) async {
-      final ok = await confirm(
+      if (!await confirm(
         context,
         title: 'Switch servers?',
         body:
             'This phone leaves ${Uri.parse(url).host}: its link, access keys and OTP forwarding address stay there. It registers with ${Uri.parse(next ?? defaultServerUrl).host} instead; link it and set up forwarding again there.',
         action: 'Switch',
-        direction: Axis.horizontal,
-      );
-      if (!ok) return;
+        direction: .horizontal,
+      )) {
+        return;
+      }
       try {
         await switchServer(ref, next);
       } catch (error) {
@@ -66,17 +67,19 @@ class ServerUrlSection extends HookConsumerWidget {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         SectionHeader(
           title: 'Server',
           trailing: Text(
-            status.$1,
-            style: context.theme.typography.body.xs.copyWith(color: status.$2),
+            statusText,
+            style: context.theme.typography.body.xs.copyWith(
+              color: statusColor,
+            ),
           ),
         ),
         FTileGroup(
-          divider: FItemDivider.indented,
+          divider: .indented,
           children: [
             FTile(
               prefix: ServerIconBox(
@@ -84,9 +87,7 @@ class ServerUrlSection extends HookConsumerWidget {
                 tone: colors.app.accentTone,
               ),
               title: Text(url),
-              subtitle: isDefault
-                  ? const Text('Default')
-                  : const Text('Set on this phone'),
+              subtitle: Text(isDefault ? 'Default' : 'Set on this phone'),
               suffix: const Icon(FLucideIcons.pencil),
               onPress: edit,
             ),
@@ -136,30 +137,30 @@ class _UrlDialog extends HookWidget {
       checking.value = false;
       if (!ok) {
         error.value = serverUnreachableError;
-        return;
+      } else if (context.mounted) {
+        Navigator.of(context).pop(normalized);
       }
-      if (context.mounted) Navigator.of(context).pop(normalized);
     }
 
     return AppDialog(
       animation: animation,
-      direction: Axis.horizontal,
+      direction: .horizontal,
       title: const Text('Server URL'),
       body: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: .min,
+        crossAxisAlignment: .stretch,
         children: [
           const Text('The VITAP Mate server this phone uses.'),
           const SizedBox(height: Space.sm),
           FTextField(
             control: FTextFieldControl.managed(controller: controller),
-            keyboardType: TextInputType.url,
+            keyboardType: .url,
             autocorrect: false,
           ),
-          if (error.value != null) ...[
+          if (error.value case final message?) ...[
             const SizedBox(height: Space.xs),
             Text(
-              error.value!,
+              message,
               style: TextStyle(color: context.theme.colors.destructive),
             ),
           ],
@@ -167,7 +168,7 @@ class _UrlDialog extends HookWidget {
       ),
       actions: [
         FButton(
-          variant: FButtonVariant.outline,
+          variant: .outline,
           onPress: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),

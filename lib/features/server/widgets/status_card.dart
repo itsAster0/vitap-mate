@@ -14,11 +14,11 @@ enum CardState { checking, connected, slow, unreachable, notLinked }
 /// What the status card shows, from what is known so far.
 CardState statusCardState({required bool linked, ServerHealth? health}) =>
     switch (health) {
-      _ when !linked => CardState.notLinked,
-      null => CardState.checking,
-      ServerHealth(ok: false) => CardState.unreachable,
-      ServerHealth(:final rttMs) when rttMs > 1000 => CardState.slow,
-      _ => CardState.connected,
+      _ when !linked => .notLinked,
+      null => .checking,
+      ServerHealth(ok: false) => .unreachable,
+      ServerHealth(:final rttMs) when rttMs > 1000 => .slow,
+      _ => .connected,
     };
 
 class ServerStatusCard extends HookConsumerWidget {
@@ -38,11 +38,11 @@ class ServerStatusCard extends HookConsumerWidget {
     final url = ref.watch(serverUrlProvider);
 
     final (label, tone) = switch (state) {
-      CardState.checking => ('Checking…', colors.mutedForeground),
-      CardState.connected => ('Connected', colors.app.success.base),
-      CardState.slow => ('Slow', colors.app.warning.base),
-      CardState.unreachable => ('Unreachable', colors.app.danger.base),
-      CardState.notLinked => ('Not linked', colors.app.warning.base),
+      .checking => ('Checking…', colors.mutedForeground),
+      .connected => ('Connected', colors.app.success.base),
+      .slow => ('Slow', colors.app.warning.base),
+      .unreachable => ('Unreachable', colors.app.danger.base),
+      .notLinked => ('Not linked', colors.app.warning.base),
     };
     final muted = typography.body.sm.copyWith(color: colors.mutedForeground);
 
@@ -61,20 +61,20 @@ class ServerStatusCard extends HookConsumerWidget {
     }
 
     final lines = <String>[
-      if (state case CardState.connected || CardState.slow)
+      if (state case .connected || .slow)
         [
           '${health!.rttMs} ms',
           ?health.colo,
           if (health.version case final v?) 'v$v',
         ].join(' · '),
-      if (state == CardState.unreachable)
+      if (state == .unreachable)
         'Connected apps and compressing VTOP wait until it is back.',
-      if (state == CardState.notLinked)
+      if (state == .notLinked)
         'Link this phone for connected apps and OTP forwarding.',
     ];
 
     final Widget? action = switch (state) {
-      CardState.notLinked => FButton(
+      .notLinked => FButton(
         onPress: busy.value
             ? null
             : () => run(
@@ -87,48 +87,38 @@ class ServerStatusCard extends HookConsumerWidget {
       _ => null,
     };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: Space.xs,
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: .stretch,
+        spacing: Space.xs,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: tone,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: Space.sm),
-                  Text(
-                    label,
-                    style: typography.body.md.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: Space.sm),
-                  Expanded(
-                    child: Text(
-                      Uri.tryParse(url)?.host ?? url,
-                      style: muted,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                    ),
-                  ),
-                ],
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(color: tone, shape: .circle),
               ),
-              for (final line in lines) Text(line, style: muted),
-              if (action != null) ...[const SizedBox(height: Space.xs), action],
+              const SizedBox(width: Space.sm),
+              Text(
+                label,
+                style: typography.body.md.copyWith(fontWeight: .w600),
+              ),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: Text(
+                  Uri.tryParse(url)?.host ?? url,
+                  style: muted,
+                  overflow: .ellipsis,
+                  textAlign: .end,
+                ),
+              ),
             ],
           ),
-        ),
-      ],
+          for (final line in lines) Text(line, style: muted),
+          if (action != null) ...[const SizedBox(height: Space.xs), action],
+        ],
+      ),
     );
   }
 }

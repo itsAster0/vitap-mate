@@ -22,18 +22,11 @@ List<int> _optionsWith(List<int> presets, int saved) =>
 
 String _minutesLabel(int m) => m >= 60 ? '${m ~/ 60}h' : '${m}m';
 
-IconData _changeAlertIcon(ChangeAlertTypeSetting type) => switch (type) {
-  ChangeAlertTypeSetting.attendance => FLucideIcons.circlePercent,
-  ChangeAlertTypeSetting.marks => FLucideIcons.clipboardList,
-  ChangeAlertTypeSetting.timetable => FLucideIcons.calendarClock,
-  ChangeAlertTypeSetting.examSchedule => FLucideIcons.bookOpen,
-};
-
-String _changeAlertLabel(ChangeAlertTypeSetting type) => switch (type) {
-  ChangeAlertTypeSetting.attendance => "Attendance Drops",
-  ChangeAlertTypeSetting.marks => "New Marks",
-  ChangeAlertTypeSetting.timetable => "Timetable Changes",
-  ChangeAlertTypeSetting.examSchedule => "Exam Schedule Updates",
+(IconData, String) _changeAlert(ChangeAlertTypeSetting type) => switch (type) {
+  .attendance => (FLucideIcons.circlePercent, "Attendance Drops"),
+  .marks => (FLucideIcons.clipboardList, "New Marks"),
+  .timetable => (FLucideIcons.calendarClock, "Timetable Changes"),
+  .examSchedule => (FLucideIcons.bookOpen, "Exam Schedule Updates"),
 };
 
 class NotificationManagementPage extends HookConsumerWidget {
@@ -45,6 +38,7 @@ class NotificationManagementPage extends HookConsumerWidget {
     final classReminderSettings = ref.watch(classReminderSettingsProvider);
     final examReminderSettings = ref.watch(examReminderSettingsProvider);
     final changeAlertsSettings = ref.watch(changeAlertsSettingsProvider);
+    final alerts = ref.read(changeAlertsSettingsControllerProvider);
     final classNotifyMinutes = useState(
       classReminderSettings.notifyBeforeMinutes,
     );
@@ -60,14 +54,31 @@ class NotificationManagementPage extends HookConsumerWidget {
       return null;
     }, [examReminderSettings.notifyBeforeMinutes]);
 
+    /// Turning reminders on asks for notification permission first; refused,
+    /// they stay off.
+    Future<void> setReminders(
+      bool value,
+      Future<void> Function(WidgetRef ref, bool value) save,
+      Future<void> Function() refresh,
+    ) async {
+      if (value) {
+        final granted = await Permission.notification.request().isGranted;
+        if (!context.mounted) return;
+        if (!granted) return save(ref, false);
+      }
+      await save(ref, value);
+      if (!context.mounted) return;
+      if (value) await refresh();
+    }
+
     return Container(
       color: context.theme.colors.background,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
+        padding: const .all(8),
         child: Column(
           children: [
             FTileGroup(
-              divider: FItemDivider.indented,
+              divider: .indented,
               label: const Text("Notification Management"),
               children: [
                 FTile(
@@ -84,36 +95,20 @@ class NotificationManagementPage extends HookConsumerWidget {
                 FTile(
                   prefix: Icon(FLucideIcons.bell),
                   title: const Text("Class Reminders"),
-
                   suffix: FSwitch(
                     value: classReminderSettings.enabled,
-                    onChange: (value) async {
-                      if (value) {
-                        final granted = await Permission.notification
-                            .request()
-                            .isGranted;
-                        if (!context.mounted) return;
-                        if (!granted) {
-                          await setClassReminderEnabled(ref, false);
-                          return;
-                        }
-                      }
-
-                      await setClassReminderEnabled(ref, value);
-                      if (!context.mounted) return;
-
-                      if (value) {
-                        await ref.read(timetableProvider.notifier).refresh();
-                      }
-                    },
+                    onChange: (value) => setReminders(
+                      value,
+                      setClassReminderEnabled,
+                      () => ref.read(timetableProvider.notifier).refresh(),
+                    ),
                   ),
                 ),
-
                 FTile(
                   prefix: Icon(FLucideIcons.calendarDays),
                   title: const Text("Notify Before"),
                   details: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       const SizedBox(height: 8),
                       Text(
@@ -165,100 +160,79 @@ class NotificationManagementPage extends HookConsumerWidget {
                 FTile(
                   prefix: Icon(FLucideIcons.userCheck),
                   title: const Text("Pause Class Reminders"),
-
                   suffix: Icon(FLucideIcons.chevronRight),
-                  onPress: () {
-                    showFDialog(
-                      context: context,
-                      // Above the tab shell, so the keyboard inset is counted once.
-                      useRootNavigator: true,
-                      builder: (context, style, animation) => AppDialog(
-                        animation: animation,
-                        direction: Axis.horizontal,
-                        title: const Text("Pause class reminders"),
-                        body: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Enter number of days to pause class notifications.",
-                            ),
-                            const SizedBox(height: 8),
-                            FTextField(
-                              control: FTextFieldControl.managed(
-                                controller: pauseDaysController,
-                              ),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          FButton(
-                            variant: FButtonVariant.outline,
-                            child: const Text("Clear Pause"),
-                            onPress: () async {
-                              await clearClassReminderPause(ref);
-                              if (!context.mounted) return;
-                              if (context.mounted) Navigator.of(context).pop();
-                              if (ref
-                                  .read(classReminderSettingsProvider)
-                                  .enabled) {
-                                await ref
-                                    .read(timetableProvider.notifier)
-                                    .refresh();
-                              }
-                            },
+                  onPress: () => showFDialog(
+                    context: context,
+                    // Above the tab shell, so the keyboard inset is counted once.
+                    useRootNavigator: true,
+                    builder: (context, style, animation) => AppDialog(
+                      animation: animation,
+                      direction: .horizontal,
+                      title: const Text("Pause class reminders"),
+                      body: Column(
+                        mainAxisSize: .min,
+                        crossAxisAlignment: .start,
+                        children: [
+                          const Text(
+                            "Enter number of days to pause class notifications.",
                           ),
-                          FButton(
-                            child: const Text("Pause"),
-                            onPress: () async {
-                              final days =
-                                  int.tryParse(
-                                    pauseDaysController.text.trim(),
-                                  ) ??
-                                  0;
-                              if (days <= 0) return;
-                              await pauseClassRemindersForDays(ref, days);
-                              if (!context.mounted) return;
-                              if (context.mounted) Navigator.of(context).pop();
-                            },
+                          const SizedBox(height: 8),
+                          FTextField(
+                            control: FTextFieldControl.managed(
+                              controller: pauseDaysController,
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                      actions: [
+                        FButton(
+                          variant: .outline,
+                          child: const Text("Clear Pause"),
+                          onPress: () async {
+                            await clearClassReminderPause(ref);
+                            if (!context.mounted) return;
+                            Navigator.of(context).pop();
+                            if (ref
+                                .read(classReminderSettingsProvider)
+                                .enabled) {
+                              await ref
+                                  .read(timetableProvider.notifier)
+                                  .refresh();
+                            }
+                          },
+                        ),
+                        FButton(
+                          child: const Text("Pause"),
+                          onPress: () async {
+                            final days =
+                                int.tryParse(pauseDaysController.text.trim()) ??
+                                0;
+                            if (days <= 0) return;
+                            await pauseClassRemindersForDays(ref, days);
+                            if (context.mounted) Navigator.of(context).pop();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 FTile(
                   prefix: Icon(FLucideIcons.bell),
                   title: const Text("Exam Reminders"),
-
                   suffix: FSwitch(
                     value: examReminderSettings.enabled,
-                    onChange: (value) async {
-                      if (value) {
-                        final granted = await Permission.notification
-                            .request()
-                            .isGranted;
-                        if (!context.mounted) return;
-                        if (!granted) {
-                          await setExamReminderEnabled(ref, false);
-                          return;
-                        }
-                      }
-
-                      await setExamReminderEnabled(ref, value);
-                      if (!context.mounted) return;
-
-                      if (value) {
-                        await ref.read(examScheduleProvider.notifier).refresh();
-                      }
-                    },
+                    onChange: (value) => setReminders(
+                      value,
+                      setExamReminderEnabled,
+                      () => ref.read(examScheduleProvider.notifier).refresh(),
+                    ),
                   ),
                 ),
                 FTile(
                   prefix: Icon(FLucideIcons.calendarDays),
                   title: const Text("Exam Notify Before"),
                   details: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       const SizedBox(height: 8),
                       Text(
@@ -301,55 +275,47 @@ class NotificationManagementPage extends HookConsumerWidget {
               ],
             ),
             const SizedBox(height: 16),
-            _buildChangeAlertsTileGroup(context, ref, changeAlertsSettings),
+            FTileGroup(
+              divider: .indented,
+              label: const Text("VTOP Change Alerts"),
+              children: [
+                FTile(
+                  prefix: Icon(FLucideIcons.radar),
+                  title: const Text("Change Alerts"),
+                  subtitle: const Text(
+                    "Notify when your data changes after a background sync",
+                  ),
+                  suffix: FSwitch(
+                    value: changeAlertsSettings.enabled,
+                    onChange: (value) async {
+                      if (value) {
+                        final granted = await Permission.notification
+                            .request()
+                            .isGranted;
+                        if (!granted) return;
+                      }
+                      await alerts.setEnabled(value);
+                    },
+                  ),
+                ),
+                for (final type in ChangeAlertTypeSetting.values)
+                  if (_changeAlert(type) case (final icon, final label))
+                    FTile(
+                      prefix: Icon(icon),
+                      title: Text(label),
+                      suffix: FSwitch(
+                        value: changeAlertsSettings.isEnabled(type),
+                        onChange: (value) async {
+                          if (!changeAlertsSettings.enabled) return;
+                          await alerts.setTypeEnabled(type, value);
+                        },
+                      ),
+                    ),
+              ],
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildChangeAlertsTileGroup(
-    BuildContext context,
-    WidgetRef ref,
-    ChangeAlertsSettings settings,
-  ) {
-    final controller = ref.read(changeAlertsSettingsControllerProvider);
-    return FTileGroup(
-      divider: FItemDivider.indented,
-      label: const Text("VTOP Change Alerts"),
-      children: [
-        FTile(
-          prefix: Icon(FLucideIcons.radar),
-          title: const Text("Change Alerts"),
-          subtitle: const Text(
-            "Notify when your data changes after a background sync",
-          ),
-          suffix: FSwitch(
-            value: settings.enabled,
-            onChange: (value) async {
-              if (value) {
-                final granted = await Permission.notification
-                    .request()
-                    .isGranted;
-                if (!granted) return;
-              }
-              await controller.setEnabled(value);
-            },
-          ),
-        ),
-        for (final type in ChangeAlertTypeSetting.values)
-          FTile(
-            prefix: Icon(_changeAlertIcon(type)),
-            title: Text(_changeAlertLabel(type)),
-            suffix: FSwitch(
-              value: settings.isEnabled(type),
-              onChange: (value) async {
-                if (!settings.enabled) return;
-                await controller.setTypeEnabled(type, value);
-              },
-            ),
-          ),
-      ],
     );
   }
 }

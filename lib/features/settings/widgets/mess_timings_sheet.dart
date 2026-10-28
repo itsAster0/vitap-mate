@@ -9,19 +9,16 @@ import 'package:vitapmate/features/docs/docs.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
 /// Start of each meal, breakfast to dinner: "7:15 · 12:30 · 4:30 · 7:15".
-String messTimingsSummary(MealWindows windows) {
-  String start(Meal meal) =>
-      mealWindowLabel(windows[meal]!).split('–').first.split(' ').first;
-  return [for (final meal in Meal.values) start(meal)].join(' · ');
-}
+String messTimingsSummary(MealWindows windows) => [
+  for (final meal in Meal.values)
+    mealWindowLabel(windows[meal]!).split('–').first.split(' ').first,
+].join(' · ');
 
-void showMessTimingsSheet(BuildContext context) {
-  showFSheet(
-    context: context,
-    side: FLayout.btt,
-    builder: (context) => const _MessTimingsSheet(),
-  );
-}
+void showMessTimingsSheet(BuildContext context) => showFSheet(
+  context: context,
+  side: .btt,
+  builder: (context) => const _MessTimingsSheet(),
+);
 
 class _MessTimingsSheet extends ConsumerWidget {
   const _MessTimingsSheet();
@@ -38,35 +35,35 @@ class _MessTimingsSheet extends ConsumerWidget {
         start: start == null ? current.start : start.hour * 60 + start.minute,
         end: end == null ? current.end : end.hour * 60 + end.minute,
       );
-      if (next.end <= next.start) {
+      if (next.end > next.start) {
+        setMessTimings(ref, {...windows, meal: next});
+      } else {
         dispToast(
           context,
           'Check the times',
           '${meal.label} has to end after it starts.',
         );
-        return;
       }
-      setMessTimings(ref, {...windows, meal: next});
     }
 
     return Container(
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: const .vertical(top: Radius.circular(10)),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 12),
+          padding: const .fromLTRB(Space.lg, Space.md, Space.lg, 12),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: .min,
+            crossAxisAlignment: .stretch,
             children: [
               const SheetHandle(),
               const SizedBox(height: Space.md),
               Text(
                 'Mess Timings',
                 style: typography.body.lg.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: .w700,
                   color: colors.foreground,
                 ),
               ),
@@ -80,14 +77,14 @@ class _MessTimingsSheet extends ConsumerWidget {
               const SizedBox(height: Space.lg),
               for (final meal in Meal.values)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: Space.sm + 2),
+                  padding: const .only(bottom: Space.sm + 2),
                   child: Row(
                     children: [
                       Expanded(
                         child: Text(
                           meal.label,
                           style: typography.body.sm.copyWith(
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: colors.foreground,
                           ),
                         ),
@@ -98,9 +95,7 @@ class _MessTimingsSheet extends ConsumerWidget {
                         onPicked: (t) => update(meal, start: t),
                       ),
                       Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: Space.sm,
-                        ),
+                        padding: const .symmetric(horizontal: Space.sm),
                         child: Text(
                           '–',
                           style: typography.body.sm.copyWith(
@@ -118,7 +113,7 @@ class _MessTimingsSheet extends ConsumerWidget {
                 ),
               const SizedBox(height: Space.sm),
               FButton(
-                variant: FButtonVariant.outline,
+                variant: .outline,
                 onPress: () => resetMessTimings(ref),
                 child: const Text('Reset to VIT-AP timings'),
               ),
@@ -158,7 +153,7 @@ class _TimeButton extends StatelessWidget {
         useRootNavigator: true,
         builder: (context, style, animation) => AppDialog(
           animation: animation,
-          direction: Axis.horizontal,
+          direction: .horizontal,
           title: Text(title),
           body: SizedBox(
             height: 180,
@@ -173,7 +168,7 @@ class _TimeButton extends StatelessWidget {
           ),
           actions: [
             FButton(
-              variant: FButtonVariant.outline,
+              variant: .outline,
               onPress: () => Navigator.of(context).pop(),
               child: const Text('Cancel'),
             ),
@@ -195,16 +190,16 @@ class _TimeButton extends StatelessWidget {
       child: Container(
         width: 104,
         height: 40,
-        alignment: Alignment.center,
+        alignment: .center,
         decoration: BoxDecoration(
           color: colors.card,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
           border: Border.all(color: colors.border),
         ),
         child: Text(
           label,
           style: context.theme.typography.body.sm.nums(
-            fontWeight: FontWeight.w500,
+            fontWeight: .w500,
             color: colors.foreground,
           ),
         ),

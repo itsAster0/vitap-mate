@@ -326,23 +326,27 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
       _document = id;
     }
     if (!_valid) return;
-    if (event['type'] == 'activity') {
-      final requests = (event['active'] as num?)?.toInt() ?? 0;
-      final changed = (requests > 0) != (_requests > 0);
-      _requests = requests;
-      // Only whether VTOP is busy is shown, not how many requests are open.
-      if (changed) setState(_watchSlowLoad);
-    } else if (event['type'] == 'ready') {
-      await _ready(controller);
-    } else if (event['type'] == 'timing') {
-      // Log aggregate numbers only, never URLs, resource names or response bodies.
-      final values = [
-        'duration',
-        'resources',
-        'transferBytes',
-        'zeroTransfer',
-      ].map((key) => '$key=${event[key] is num ? event[key] : 0}').join(' ');
-      AppLogger.instance.info('vtop.webview', 'resourceTiming $values');
+    switch (event['type']) {
+      case 'activity':
+        final requests = (event['active'] as num?)?.toInt() ?? 0;
+        final changed = (requests > 0) != (_requests > 0);
+        _requests = requests;
+        // Only whether VTOP is busy is shown, not how many requests are open.
+        if (changed) setState(_watchSlowLoad);
+      case 'ready':
+        await _ready(controller);
+      case 'timing':
+        // Log aggregate numbers only, never URLs, resource names or response bodies.
+        final values = [
+          for (final key in [
+            'duration',
+            'resources',
+            'transferBytes',
+            'zeroTransfer',
+          ])
+            '$key=${event[key] is num ? event[key] : 0}',
+        ].join(' ');
+        AppLogger.instance.info('vtop.webview', 'resourceTiming $values');
     }
   }
 
@@ -466,7 +470,7 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
     return SafeArea(
       top: false,
       child: Stack(
-        fit: StackFit.expand,
+        fit: .expand,
         children: [
           InAppWebView(
             keepAlive: vtopWebviewStore.keepAlive,
@@ -526,10 +530,11 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                     _menuRequest = null;
                     _watchSlowLoad();
                   });
-                  if (args[1] == true) widget.onMenuOpened();
-                  if (args[1] != true) {
-                    _fail('This VTOP menu is unavailable. Try opening Home.');
-                  }
+                  args[1] == true
+                      ? widget.onMenuOpened()
+                      : _fail(
+                          'This VTOP menu is unavailable. Try opening Home.',
+                        );
                 },
               );
               // Handlers are re-registered above because a reattached view
@@ -735,22 +740,22 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
                 decoration: BoxDecoration(
                   color: colors.background,
                   border: Border.all(color: colors.border),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: .circular(8),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const .all(16),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize: .min,
                     children: [
                       Text(
                         _error ??
                             'VTOP is taking longer than usual. You can keep waiting.',
                         style: context.theme.typography.body.sm,
-                        textAlign: TextAlign.center,
+                        textAlign: .center,
                       ),
                       const SizedBox(height: 12),
                       FButton(
-                        variant: FButtonVariant.outline,
+                        variant: .outline,
                         onPress: _home,
                         child: const Text('Open Home'),
                       ),

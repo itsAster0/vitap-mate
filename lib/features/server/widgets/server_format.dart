@@ -11,12 +11,6 @@ String ago(DateTime time, {DateTime? now}) {
   return '${elapsed.inDays} d ago';
 }
 
-String seconds(int ms) => '${(ms / 1000).toStringAsFixed(1)} s';
-
-String kilobytes(int bytes) => bytes < 1024
-    ? '$bytes B'
-    : '${(bytes / 1024).toStringAsFixed(bytes < 10240 ? 1 : 0)} KB';
-
 /// The shell header's title for a path under `/settings/server`.
 String serverHeaderTitle(String path) => switch (path.split('/').last) {
   'apps' => 'Connected apps',
@@ -37,11 +31,8 @@ class ServerSubPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(Space.md, 0, Space.md, Space.xxl),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: children,
-    ),
+    padding: const .fromLTRB(Space.md, 0, Space.md, Space.xxl),
+    child: Column(crossAxisAlignment: .stretch, children: children),
   );
 }
 
@@ -53,7 +44,7 @@ class ServerNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, Space.sm, 4, 0),
+    padding: const .fromLTRB(4, Space.sm, 4, 0),
     child: Text(
       text,
       style: context.theme.typography.body.sm.copyWith(

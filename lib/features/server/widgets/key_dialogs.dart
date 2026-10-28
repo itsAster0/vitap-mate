@@ -25,7 +25,7 @@ Future<bool> confirmAction(
   body: body,
   action: action,
   destructive: true,
-  direction: Axis.horizontal,
+  direction: .horizontal,
 );
 
 /// A busy flag, and [run] for one server action at a time: the status is
@@ -67,11 +67,11 @@ Future<({String label, bool outings})?> askKeyLabel(BuildContext context) {
     useRootNavigator: true,
     builder: (context, style, animation) => AppDialog(
       animation: animation,
-      direction: Axis.horizontal,
+      direction: .horizontal,
       title: const Text('Name this key'),
       body: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: .min,
+        crossAxisAlignment: .stretch,
         children: [
           const Text('So you can tell your keys apart later.'),
           const SizedBox(height: Space.sm),
@@ -92,7 +92,7 @@ Future<({String label, bool outings})?> askKeyLabel(BuildContext context) {
       ),
       actions: [
         FButton(
-          variant: FButtonVariant.outline,
+          variant: .outline,
           onPress: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
@@ -138,39 +138,25 @@ Future<void> showAccessKey(
   BuildContext context,
   BridgeKey key, {
   required bool fresh,
-}) {
-  return showFSheet<void>(
-    context: context,
-    side: FLayout.btt,
-    mainAxisMaxRatio: _sheetRatio,
-    builder: (context) => _KeySheet(bridgeKey: key, fresh: fresh),
-  );
-}
-
-const _sheetRatio = 3 / 4;
-
-class _KeySheet extends StatelessWidget {
-  const _KeySheet({required this.bridgeKey, required this.fresh});
-
-  final BridgeKey bridgeKey;
-  final bool fresh;
-
-  @override
-  Widget build(BuildContext context) {
+}) => showFSheet<void>(
+  context: context,
+  side: .btt,
+  mainAxisMaxRatio: _sheetRatio,
+  builder: (context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Container(
       height: MediaQuery.sizeOf(context).height * _sheetRatio,
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: const .vertical(top: Radius.circular(10)),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, 12),
+          padding: const .fromLTRB(Space.lg, Space.md, Space.lg, 12),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               const SheetHandle(),
               const SizedBox(height: Space.md),
@@ -180,7 +166,7 @@ class _KeySheet extends StatelessWidget {
                     child: Text(
                       fresh ? 'Your key is ready' : 'Access key',
                       style: typography.body.lg.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: .w700,
                         color: colors.foreground,
                       ),
                     ),
@@ -197,9 +183,9 @@ class _KeySheet extends StatelessWidget {
               Expanded(
                 child: SingleChildScrollView(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: .stretch,
                     children: [
-                      _KeyGuide(bridgeKey: bridgeKey, fresh: fresh),
+                      _KeyGuide(bridgeKey: key, fresh: fresh),
                       const SizedBox(height: Space.lg),
                       FButton(
                         onPress: () => Navigator.of(context).pop(),
@@ -214,8 +200,10 @@ class _KeySheet extends StatelessWidget {
         ),
       ),
     );
-  }
-}
+  },
+);
+
+const _sheetRatio = 3 / 4;
 
 class _KeyGuide extends HookWidget {
   const _KeyGuide({required this.bridgeKey, required this.fresh});
@@ -232,8 +220,8 @@ class _KeyGuide extends HookWidget {
     final muted = typography.body.sm.copyWith(color: colors.mutedForeground);
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: .min,
+      crossAxisAlignment: .stretch,
       children: [
         _CopyBlock(label: 'Access key', value: bridgeKey.key, primary: true),
         const SizedBox(height: Space.sm),
@@ -246,7 +234,7 @@ class _KeyGuide extends HookWidget {
         const SizedBox(height: Space.lg),
         Text(
           'Where will you use it?',
-          style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
+          style: typography.body.sm.copyWith(fontWeight: .w600),
         ),
         const SizedBox(height: Space.sm),
         Segmented<_Target>(
@@ -261,92 +249,85 @@ class _KeyGuide extends HookWidget {
         AnimatedSize(
           duration: Motion.medium,
           curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
+          alignment: .topCenter,
           child: switch (target.value) {
             _Target.extension => const _Steps([
               'Copy the key above.',
               'Open the VITAP Mate extension and paste it in.',
             ]),
-            _Target.agent => _AgentGuide(
-              bridgeKey: bridgeKey,
-              setup: setup.value,
-              onSetup: (value) => setup.value = value,
+            _Target.agent => Column(
+              mainAxisSize: .min,
+              crossAxisAlignment: .stretch,
+              children: [
+                for (final (option, title, detail) in const [
+                  (
+                    _AgentSetup.claudeCode,
+                    'Claude Code',
+                    'One command in a terminal',
+                  ),
+                  (
+                    _AgentSetup.header,
+                    'Other agents',
+                    'A server URL and a header',
+                  ),
+                  (
+                    _AgentSetup.urlOnly,
+                    'URL only',
+                    'For agents that only take a link',
+                  ),
+                ])
+                  _Option(
+                    title: title,
+                    detail: detail,
+                    selected: setup.value == option,
+                    onPress: () => setup.value = option,
+                  ),
+                const SizedBox(height: Space.md),
+                ...switch (setup.value) {
+                  _AgentSetup.claudeCode => [
+                    const _Steps([
+                      'Run this in a terminal. It adds VTOP as a tool.',
+                    ]),
+                    const SizedBox(height: Space.sm),
+                    _CopyBlock(
+                      label: 'Command',
+                      value: bridgeKey.claudeCodeCommand,
+                      wrap: true,
+                    ),
+                  ],
+                  _AgentSetup.header => [
+                    const _Steps([
+                      'Add a remote MCP server with this URL.',
+                      'Add this header to it.',
+                    ]),
+                    const SizedBox(height: Space.sm),
+                    _CopyBlock(label: 'MCP URL', value: bridgeKey.mcpUrl),
+                    const SizedBox(height: Space.sm),
+                    _CopyBlock(label: 'Header', value: bridgeKey.authHeader),
+                  ],
+                  _AgentSetup.urlOnly => [
+                    const _Steps([
+                      'For an agent that only asks for a URL: add this as its MCP server.',
+                    ]),
+                    const SizedBox(height: Space.sm),
+                    _CopyBlock(
+                      label: 'MCP URL with the key',
+                      value: bridgeKey.agentUrl,
+                    ),
+                    const SizedBox(height: Space.sm),
+                    GuideCallout(
+                      icon: FLucideIcons.triangleAlert,
+                      tone: context.theme.colors.app.warning,
+                      child: const Text(
+                        'The key is part of this link, so keep the link as secret as the key. Pick Other agents instead when yours takes a header.',
+                      ),
+                    ),
+                  ],
+                },
+              ],
             ),
           },
         ),
-      ],
-    );
-  }
-}
-
-class _AgentGuide extends StatelessWidget {
-  const _AgentGuide({
-    required this.bridgeKey,
-    required this.setup,
-    required this.onSetup,
-  });
-
-  final BridgeKey bridgeKey;
-  final _AgentSetup setup;
-  final ValueChanged<_AgentSetup> onSetup;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final (option, title, detail) in const [
-          (_AgentSetup.claudeCode, 'Claude Code', 'One command in a terminal'),
-          (_AgentSetup.header, 'Other agents', 'A server URL and a header'),
-          (_AgentSetup.urlOnly, 'URL only', 'For agents that only take a link'),
-        ])
-          _Option(
-            title: title,
-            detail: detail,
-            selected: setup == option,
-            onPress: () => onSetup(option),
-          ),
-        const SizedBox(height: Space.md),
-        ...switch (setup) {
-          _AgentSetup.claudeCode => [
-            const _Steps(['Run this in a terminal. It adds VTOP as a tool.']),
-            const SizedBox(height: Space.sm),
-            _CopyBlock(
-              label: 'Command',
-              value: bridgeKey.claudeCodeCommand,
-              wrap: true,
-            ),
-          ],
-          _AgentSetup.header => [
-            const _Steps([
-              'Add a remote MCP server with this URL.',
-              'Add this header to it.',
-            ]),
-            const SizedBox(height: Space.sm),
-            _CopyBlock(label: 'MCP URL', value: bridgeKey.mcpUrl),
-            const SizedBox(height: Space.sm),
-            _CopyBlock(label: 'Header', value: bridgeKey.authHeader),
-          ],
-          _AgentSetup.urlOnly => [
-            const _Steps([
-              'For an agent that only asks for a URL: add this as its MCP server.',
-            ]),
-            const SizedBox(height: Space.sm),
-            _CopyBlock(
-              label: 'MCP URL with the key',
-              value: bridgeKey.agentUrl,
-            ),
-            const SizedBox(height: Space.sm),
-            GuideCallout(
-              icon: FLucideIcons.triangleAlert,
-              tone: context.theme.colors.app.warning,
-              child: const Text(
-                'The key is part of this link, so keep the link as secret as the key. Pick Other agents instead when yours takes a header.',
-              ),
-            ),
-          ],
-        },
       ],
     );
   }
@@ -371,7 +352,7 @@ class _Option extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.only(bottom: Space.xs),
+      padding: const .only(bottom: Space.xs),
       child: FTappable(
         selected: selected,
         semanticsLabel: '$title: $detail',
@@ -381,13 +362,10 @@ class _Option extends StatelessWidget {
         },
         child: AnimatedContainer(
           duration: Motion.fast,
-          padding: const EdgeInsets.symmetric(
-            horizontal: Space.md,
-            vertical: Space.sm,
-          ),
+          padding: const .symmetric(horizontal: Space.md, vertical: Space.sm),
           decoration: BoxDecoration(
             color: selected ? colors.background : colors.secondary,
-            borderRadius: BorderRadius.circular(Radii.sm + 2),
+            borderRadius: .circular(Radii.sm + 2),
             border: Border.all(
               color: selected ? colors.foreground : colors.border,
             ),
@@ -396,13 +374,11 @@ class _Option extends StatelessWidget {
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: .start,
                   children: [
                     Text(
                       title,
-                      style: typography.body.sm.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: typography.body.sm.copyWith(fontWeight: .w600),
                     ),
                     Text(
                       detail,
@@ -437,12 +413,12 @@ class _Steps extends StatelessWidget {
     final colors = context.theme.colors;
     final style = context.theme.typography.body.sm;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       spacing: Space.xs,
       children: [
         for (final (i, step) in steps.indexed)
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: .start,
             children: [
               if (steps.length > 1)
                 SizedBox(
@@ -481,10 +457,10 @@ class _CopyBlock extends HookWidget {
     final copied = useState(false);
     useEffect(() {
       if (!copied.value) return null;
-      final timer = Timer(const Duration(milliseconds: 1600), () {
-        copied.value = false;
-      });
-      return timer.cancel;
+      return Timer(
+        const Duration(milliseconds: 1600),
+        () => copied.value = false,
+      ).cancel;
     }, [copied.value]);
 
     final colors = context.theme.colors;
@@ -503,15 +479,10 @@ class _CopyBlock extends HookWidget {
       onPress: copy,
       child: AnimatedContainer(
         duration: Motion.fast,
-        padding: const EdgeInsets.fromLTRB(
-          Space.md,
-          Space.sm,
-          Space.sm,
-          Space.sm,
-        ),
+        padding: const .fromLTRB(Space.md, Space.sm, Space.sm, Space.sm),
         decoration: BoxDecoration(
           color: primary ? tone.subtle : colors.secondary,
-          borderRadius: BorderRadius.circular(Radii.sm + 2),
+          borderRadius: .circular(Radii.sm + 2),
           border: Border.all(
             color: copied.value ? app.success.base : colors.border,
           ),
@@ -520,7 +491,7 @@ class _CopyBlock extends HookWidget {
           children: [
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Text(
                     label,
@@ -532,10 +503,10 @@ class _CopyBlock extends HookWidget {
                   Text(
                     value,
                     maxLines: wrap ? null : 1,
-                    overflow: wrap ? null : TextOverflow.ellipsis,
+                    overflow: wrap ? null : .ellipsis,
                     style: typography.body.sm.copyWith(
                       fontFamily: 'monospace',
-                      fontWeight: primary ? FontWeight.w600 : null,
+                      fontWeight: primary ? .w600 : null,
                       color: primary ? tone.onSubtle : colors.foreground,
                     ),
                   ),
@@ -547,7 +518,7 @@ class _CopyBlock extends HookWidget {
               duration: Motion.fast,
               child: Row(
                 key: ValueKey(copied.value),
-                mainAxisSize: MainAxisSize.min,
+                mainAxisSize: .min,
                 children: [
                   Icon(
                     copied.value ? FLucideIcons.check : FLucideIcons.copy,
@@ -560,7 +531,7 @@ class _CopyBlock extends HookWidget {
                   Text(
                     copied.value ? 'Copied' : 'Copy',
                     style: typography.body.xs.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: copied.value
                           ? app.success.base
                           : colors.mutedForeground,

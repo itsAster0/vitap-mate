@@ -103,8 +103,9 @@ class MailForwardingPage extends HookConsumerWidget {
     Future<void> reload() async {
       forwarding.value = await service.load();
       loaded.value = true;
-      ref.invalidate(mailForwardingProvider);
-      ref.invalidate(anyEmailOtpReadyProvider);
+      ref
+        ..invalidate(mailForwardingProvider)
+        ..invalidate(anyEmailOtpReadyProvider);
       unawaited(loadDevices());
     }
 
@@ -160,9 +161,9 @@ class MailForwardingPage extends HookConsumerWidget {
         if (!error.addressExists) return;
         try {
           await service.remove();
-          final found = await reclaimAddress(signIn: false);
-          if (found == null) await reload();
-          if (found != null && context.mounted) {
+          if (await reclaimAddress(signIn: false) == null) {
+            await reload();
+          } else if (context.mounted) {
             dispToast(
               context,
               'You already have an address',
@@ -315,18 +316,18 @@ class MailForwardingPage extends HookConsumerWidget {
           ),
           actions: [
             FButton(
-              variant: FButtonVariant.outline,
+              variant: .outline,
               onPress: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
             if (others > 0)
               FButton(
-                variant: FButtonVariant.outline,
+                variant: .outline,
                 onPress: () => Navigator.of(dialogContext).pop(false),
                 child: const Text('Remove from this device'),
               ),
             FButton(
-              variant: FButtonVariant.destructive,
+              variant: .destructive,
               onPress: () => Navigator.of(dialogContext).pop(true),
               child: Text(others == 0 ? 'Remove' : 'Delete everywhere'),
             ),
@@ -347,9 +348,7 @@ class MailForwardingPage extends HookConsumerWidget {
       }
     }
 
-    if (!loaded.value) {
-      return const Center(child: FCircularProgress());
-    }
+    if (!loaded.value) return const Center(child: FCircularProgress());
 
     final privacy = GuideCallout(
       icon: FLucideIcons.lock,
@@ -362,14 +361,9 @@ class MailForwardingPage extends HookConsumerWidget {
     final address = forwarding.value;
     if (address == null) {
       return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          Space.page,
-          Space.sm,
-          Space.page,
-          Space.xl,
-        ),
+        padding: const .fromLTRB(Space.page, Space.sm, Space.page, Space.xl),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             Text(
               'Option 1 · about 2 minutes, once. Gmail forwards VTOP’s OTP mail to a private address, and the code reaches this phone in seconds.',
@@ -388,7 +382,7 @@ class MailForwardingPage extends HookConsumerWidget {
               ),
             ])
               Padding(
-                padding: const EdgeInsets.only(bottom: Space.md),
+                padding: const .only(bottom: Space.md),
                 child: Row(
                   children: [
                     Container(
@@ -396,7 +390,7 @@ class MailForwardingPage extends HookConsumerWidget {
                       height: 32,
                       decoration: BoxDecoration(
                         color: app.lab.subtle,
-                        borderRadius: BorderRadius.circular(Radii.sm),
+                        borderRadius: .circular(Radii.sm),
                       ),
                       child: Icon(icon, size: 16, color: app.lab.onSubtle),
                     ),
@@ -419,15 +413,13 @@ class MailForwardingPage extends HookConsumerWidget {
             FButton(
               onPress: busy.value ? null : create,
               prefix: busy.value
-                  ? const FCircularProgress(
-                      size: FCircularProgressSizeVariant.sm,
-                    )
+                  ? const FCircularProgress(size: .sm)
                   : const Icon(FLucideIcons.plus),
               child: const Text('Create my address'),
             ),
             const SizedBox(height: Space.sm),
             FButton(
-              variant: FButtonVariant.ghost,
+              variant: .ghost,
               onPress: busy.value ? null : recover,
               child: const Text('I already have an address'),
             ),
@@ -440,7 +432,7 @@ class MailForwardingPage extends HookConsumerWidget {
     final confirmationBox = confirm == null
         ? Row(
             children: [
-              const FCircularProgress(size: FCircularProgressSizeVariant.xs),
+              const FCircularProgress(size: .xs),
               const SizedBox(width: Space.sm),
               Expanded(
                 child: Text(
@@ -451,16 +443,16 @@ class MailForwardingPage extends HookConsumerWidget {
                 ),
               ),
               FButton(
-                variant: FButtonVariant.ghost,
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
+                variant: .ghost,
+                size: .sm,
+                mainAxisSize: .min,
                 onPress: checking.value ? null : () => checkNow(),
                 child: const Text('Check now'),
               ),
             ],
           )
         : Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               GuideCallout(
                 icon: FLucideIcons.mailCheck,
@@ -511,7 +503,7 @@ class MailForwardingPage extends HookConsumerWidget {
         warning:
             'Leave “Disable forwarding” selected. The filter in step 3 forwards only VTOP mail.',
         doneWhen: 'Gmail says it sent a confirmation code.',
-        link: const GuideLink(_gmailForwardingUrl),
+        link: _gmailForwardingUrl,
       ),
       GuideStepTile(
         number: 2,
@@ -543,19 +535,14 @@ class MailForwardingPage extends HookConsumerWidget {
         ],
         extra: const CopyValue(label: 'From', value: _vtopSender),
         doneWhen: 'the filter shows in Filters and Blocked Addresses.',
-        link: const GuideLink(_gmailFiltersUrl),
+        link: _gmailFiltersUrl,
       ),
     ];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.page,
-        Space.sm,
-        Space.page,
-        Space.xl,
-      ),
+      padding: const .fromLTRB(Space.page, Space.sm, Space.page, Space.xl),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           CopyValue(label: 'Your address', value: address.address),
           const SizedBox(height: Space.sm),
@@ -565,7 +552,7 @@ class MailForwardingPage extends HookConsumerWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  shape: .circle,
                   color: statusOk ? app.success.base : app.warning.base,
                 ),
               ),
@@ -607,7 +594,7 @@ class MailForwardingPage extends HookConsumerWidget {
           privacy,
           const SizedBox(height: Space.lg),
           FButton(
-            variant: FButtonVariant.outline,
+            variant: .outline,
             onPress: busy.value ? null : remove,
             prefix: Icon(FLucideIcons.trash2, color: app.danger.base),
             child: Text(
@@ -634,13 +621,13 @@ class _DeviceList extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Text(
           devices.length == 1
               ? 'OTPs go to this device'
               : 'OTPs go to ${devices.length} devices',
-          style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
+          style: typography.body.sm.copyWith(fontWeight: .w600),
         ),
         const SizedBox(height: Space.xs),
         Text(

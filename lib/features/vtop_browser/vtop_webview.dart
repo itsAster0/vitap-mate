@@ -16,7 +16,6 @@ import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
-import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_actions.dart';
 import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_body.dart';
 import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_cookie_service.dart';
 import 'package:vitapmate/features/vtop_browser/vtop_webview/vtop_webview_loading.dart';
@@ -129,10 +128,7 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
 
   Future<void> _loginRedirect() async {
     if (_recovering || _promptOpen || !mounted) return;
-    if (_recovery.beginAutomaticAttempt()) {
-      await _forceLogin();
-      return;
-    }
+    if (_recovery.beginAutomaticAttempt()) return _forceLogin();
     _promptOpen = true;
     try {
       final retry = await confirm(
@@ -219,7 +215,7 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
   Future<void> _back(bool ready) async {
     final handled =
         ready && (await _bodyKey.currentState?.handleBack() ?? false);
-    if (!handled && mounted) GoRouter.of(context).pop();
+    if (!handled && mounted) context.pop();
   }
 
   @override
@@ -274,43 +270,90 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
       child: FScaffold(
         childPad: false,
         header: FHeader.nested(
-          title: Text(
-            _page?.title ?? 'VTOP',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          prefixes: [
-            FHeaderAction.back(onPress: () => GoRouter.of(context).pop()),
-          ],
-          suffixes: ready
-              ? [
-                  VtopWebviewSearchAction(onPress: _search),
-                  VtopWebviewActionsMenu(
-                    isDarkMode: _dark!,
-                    isCompactMode: compact,
-                    isDesktopMode: desktop,
-                    onSearch: _search,
-                    onHome: () => _bodyKey.currentState?.openHome(),
-                    onToggleDarkMode: () => setState(() => _dark = !_dark!),
-                    onToggleCompactMode: () => _savePreference(
-                      ref.read(vtopCompactModeProvider.notifier),
-                      !compact,
-                    ),
-                    onToggleDesktopMode: () => _savePreference(
-                      ref.read(vtopDesktopModeProvider.notifier),
-                      !desktop,
-                    ),
-                    onForceLogin: _forceLogin,
+          title: Text(_page?.title ?? 'VTOP', maxLines: 1, overflow: .ellipsis),
+          prefixes: [FHeaderAction.back(onPress: () => context.pop())],
+          suffixes: [
+            if (ready) ...[
+              FHeaderAction(
+                icon: const Icon(FLucideIcons.search),
+                semanticsLabel: 'Search VTOP pages',
+                onPress: _search,
+              ),
+              FPopoverMenu(
+                autofocus: true,
+                menuAnchor: .topRight,
+                childAnchor: .bottomRight,
+                menu: [
+                  FItemGroup(
+                    children: [
+                      FItem(
+                        prefix: const Icon(FLucideIcons.search),
+                        title: const Text('Search pages'),
+                        onPress: _search,
+                      ),
+                      FItem(
+                        prefix: const Icon(FLucideIcons.house),
+                        title: const Text('VTOP Home'),
+                        onPress: () => _bodyKey.currentState?.openHome(),
+                      ),
+                    ],
                   ),
-                ]
-              : [],
+                  FItemGroup(
+                    children: [
+                      for (final (value, label, onPress) in [
+                        (
+                          _dark!,
+                          'Dark Pages',
+                          () => setState(() => _dark = !_dark!),
+                        ),
+                        (
+                          compact,
+                          'Compact View',
+                          () => _savePreference(
+                            ref.read(vtopCompactModeProvider.notifier),
+                            !compact,
+                          ),
+                        ),
+                        (
+                          desktop,
+                          'Desktop Mode',
+                          () => _savePreference(
+                            ref.read(vtopDesktopModeProvider.notifier),
+                            !desktop,
+                          ),
+                        ),
+                      ])
+                        FItem(
+                          prefix: FCheckbox(value: value),
+                          title: Text(label),
+                          onPress: onPress,
+                        ),
+                    ],
+                  ),
+                  FItemGroup(
+                    children: [
+                      FItem(
+                        prefix: const Icon(FLucideIcons.logIn),
+                        title: const Text('Force Login'),
+                        onPress: _forceLogin,
+                      ),
+                    ],
+                  ),
+                ],
+                builder: (_, controller, _) => FHeaderAction(
+                  icon: const Icon(FLucideIcons.ellipsis),
+                  onPress: controller.toggle,
+                ),
+              ),
+            ],
+          ],
         ),
         // The web view starts while login is prepared, so its engine start-up
         // overlaps the network work; the loading screen covers it until then.
         child: username == null
             ? loading
             : Stack(
-                fit: StackFit.expand,
+                fit: .expand,
                 children: [
                   VtopWebviewBody(
                     key: _bodyKey,
