@@ -7,7 +7,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/edge/server_status.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/features/settings/presentation/pages/server/server_data_page.dart';
+import 'package:vitapmate/features/server/server_data_page.dart';
 
 void main() {
   testWidgets('lists what the server keeps, and what it never does', (

@@ -5,11 +5,9 @@ import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/vtop/exceptions.dart';
 import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
-import 'package:vitapmate/app/feature_flags.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
@@ -143,13 +141,6 @@ class VClient extends _$VClient {
       throw const VtopError.authenticationFailed(
         'Your saved VTOP credentials need attention. Check them in Settings.',
       );
-    }
-    final featureFlags = await ref.read(featureFlagsControllerProvider.future);
-    if (!await featureFlags.isEnabled("try-login")) {
-      _auth.warning(
-        '$flowLabel blocked because try-login feature flag is disabled',
-      );
-      throw FeatureDisabledException("Login is Disabled");
     }
     _auth.info(
       '$flowLabel started (force=$force, promptForOtp=$promptForOtp, user=${user.username?.toUpperCase() ?? '<unknown>'})',

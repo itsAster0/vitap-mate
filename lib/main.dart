@@ -14,7 +14,7 @@ import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
-import 'package:vitapmate/features/docs/data/download_to_docs.dart';
+import 'package:vitapmate/features/docs/download_to_docs.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/vtop_otp_overlay.dart';
 import 'package:vitapmate/platform/background/controller.dart';

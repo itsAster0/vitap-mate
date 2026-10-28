@@ -12,8 +12,8 @@ import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/platform/background/stale_refresh.dart';
 import 'package:vitapmate/vtop/semesters.dart';
-import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/server_sections/server_format.dart';
+import 'package:vitapmate/features/docs/docs_provider.dart';
+import 'package:vitapmate/features/server/widgets/server_format.dart';
 
 class ShellLayout extends HookConsumerWidget {
   final Widget child;

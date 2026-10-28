@@ -11,8 +11,8 @@ import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/edge/server_status.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
-import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
-import 'package:vitapmate/features/settings/presentation/widgets/server_sections/status_card.dart';
+import 'package:vitapmate/features/server/server_page.dart';
+import 'package:vitapmate/features/server/widgets/status_card.dart';
 
 const healthy = ServerHealth(
   ok: true,

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/course_page/domain/course_page_logic.dart';
+import 'package:vitapmate/features/course_page/logic/course_page_logic.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 CoursePageClass section(String faculty, String slot, {String id = 'c'}) =>

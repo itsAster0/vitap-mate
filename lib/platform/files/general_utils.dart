@@ -10,8 +10,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
-import 'package:vitapmate/features/docs/data/docs_repository.dart';
-import 'package:vitapmate/features/docs/data/download_to_docs.dart';
+import 'package:vitapmate/features/docs/docs_repository.dart';
+import 'package:vitapmate/features/docs/download_to_docs.dart';
 
 final _androidDir = Directory('/storage/emulated/0/Download');
 const _downloadManagerChannel = MethodChannel('vitapmate/download_manager');

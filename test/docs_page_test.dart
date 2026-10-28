@@ -6,13 +6,13 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/app/theme_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
-import 'package:vitapmate/features/docs/data/doc_models.dart';
-import 'package:vitapmate/features/docs/data/docs_repository.dart';
-import 'package:vitapmate/features/docs/presentation/pages/docs_page.dart';
-import 'package:vitapmate/features/docs/presentation/pages/document_viewer_page.dart';
-import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
-import 'package:vitapmate/features/docs/presentation/providers/docs_sort_provider.dart';
-import 'package:vitapmate/features/docs/presentation/widgets/doc_card.dart';
+import 'package:vitapmate/features/docs/logic/doc_models.dart';
+import 'package:vitapmate/features/docs/docs_repository.dart';
+import 'package:vitapmate/features/docs/docs_page.dart';
+import 'package:vitapmate/features/docs/document_viewer_page.dart';
+import 'package:vitapmate/features/docs/docs_provider.dart';
+import 'package:vitapmate/features/docs/docs_sort_provider.dart';
+import 'package:vitapmate/features/docs/widgets/doc_card.dart';
 import 'support/docs_test_storage.dart';
 
 class _Theme extends ThemeModeController {

@@ -4,7 +4,7 @@ import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
-import 'package:vitapmate/features/course_page/data/course_page_service.dart';
+import 'package:vitapmate/features/course_page/course_page_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 import '../../support/recording_backend.dart';

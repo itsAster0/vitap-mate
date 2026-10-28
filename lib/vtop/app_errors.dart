@@ -1,7 +1,6 @@
 import 'dart:developer' show log;
 
 import 'package:http/http.dart';
-import 'package:vitapmate/vtop/exceptions.dart';
 import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
@@ -17,7 +16,6 @@ enum AppErrorType {
   format,
   state,
   discontinued,
-  featureDisabled,
   reauthRequired,
   unknown,
 }
@@ -96,12 +94,6 @@ enum AppErrorType {
     return (AppErrorType.state, error.message);
   }
 
-  if (error is FeatureDisabledException) {
-    return (
-      AppErrorType.featureDisabled,
-      'This feature is currently disabled. Please try again later.',
-    );
-  }
   log('Unhandled error: $error');
   return (AppErrorType.unknown, 'Something went wrong. Please try again.');
 }
@@ -131,8 +123,6 @@ extension AppErrorTypeX on AppErrorType {
         return 'State Error';
       case AppErrorType.discontinued:
         return 'Feature Discontinued';
-      case AppErrorType.featureDisabled:
-        return 'Feature Disabled';
       case AppErrorType.reauthRequired:
         return 'Re-authentication Required';
       case AppErrorType.unknown:

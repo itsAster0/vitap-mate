@@ -10,11 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/vtop/exceptions.dart';
 import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
-import 'package:vitapmate/app/feature_flags.dart';
 import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/marks/marks.dart';
@@ -54,7 +52,6 @@ Future<bool> _syncData({String? task}) async {
     return await syncVtopData(
       read: container.read,
       task: task,
-      respectBackgroundFeatureFlag: true,
       promptForOtp: false,
       ignoreRecoverableErrors: true,
     );
@@ -67,7 +64,6 @@ Future<bool> syncVtopData({
   required ProviderReader read,
   String? task,
   bool force = false,
-  bool respectBackgroundFeatureFlag = false,
   bool promptForOtp = true,
   bool ignoreRecoverableErrors = false,
   Duration maxAge = backgroundSyncMaxAge,
@@ -80,12 +76,6 @@ Future<bool> syncVtopData({
     final user = await read(vtopUserProvider.future);
     if (!user.isValid || user.semid == null) {
       return true;
-    }
-    if (respectBackgroundFeatureFlag) {
-      final featureFlags = await read(featureFlagsControllerProvider.future);
-      if (!await featureFlags.isEnabled("background-sync")) {
-        return true;
-      }
     }
     await read(
       vClientProvider.notifier,
@@ -208,9 +198,6 @@ Future<bool> _retryer(
       await func();
       return true;
     } catch (e) {
-      if (e is FeatureDisabledException) {
-        return true;
-      }
       if (ignoreRecoverableErrors) {
         final shouldIgnore = await _shouldIgnoreBackgroundError(e, read);
         if (!shouldIgnore) return false;
@@ -312,9 +299,6 @@ Future<void> _runChangeDetection(
 }) async {
   if (task != _backgroundSyncTaskName) return;
   try {
-    final featureFlags = await read(featureFlagsControllerProvider.future);
-    if (!await featureFlags.isEnabled('change-alerts')) return;
-
     final freshTimetable = await readSavedSemesterPage(
       read,
       VtopQueries.timetable,
