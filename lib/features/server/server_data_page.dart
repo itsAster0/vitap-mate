@@ -75,13 +75,13 @@ class ServerDataPage extends HookConsumerWidget {
           const Center(child: FCircularProgress.pinwheel())
         else if (status.hasError)
           FAlert(
-            variant: FAlertVariant.destructive,
+            variant: .destructive,
             title: const Text('Could not reach the server'),
             subtitle: Text('${status.error}'),
           )
         else if (s != null)
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               item(
                 FLucideIcons.cookie,
@@ -122,7 +122,7 @@ class ServerDataPage extends HookConsumerWidget {
         const ServerNote(neverKeptText),
         const SectionHeader(title: 'Manage'),
         FTileGroup(
-          divider: FItemDivider.indented,
+          divider: .indented,
           children: [
             FTile(
               prefix: ServerIconBox(

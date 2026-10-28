@@ -94,9 +94,9 @@ class ExpandablePicker<T> extends HookWidget {
     return AnimatedSize(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
-      alignment: Alignment.topCenter,
+      alignment: .topCenter,
       child: FTileGroup(
-        divider: FItemDivider.indented,
+        divider: .indented,
         children: [
           header,
           if (isOpen)

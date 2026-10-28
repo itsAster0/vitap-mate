@@ -8,18 +8,10 @@ import 'package:vitapmate/ui/text_nums.dart';
 
 /// Opens [url] outside the app; toasts when nothing can open it.
 Future<void> openExternalLink(BuildContext context, String url) async {
-  final opened = await launchUrl(
-    Uri.parse(url),
-    mode: LaunchMode.externalApplication,
-  );
+  final opened = await launchUrl(Uri.parse(url), mode: .externalApplication);
   if (!opened && context.mounted) {
     dispToast(context, 'Could not open link', 'Try again in your browser.');
   }
-}
-
-Future<void> copyText(BuildContext context, String text, String what) async {
-  await Clipboard.setData(ClipboardData(text: text));
-  if (context.mounted) dispToast(context, 'Copied', what);
 }
 
 /// A tinted note: a tip, a warning or a privacy line.
@@ -39,16 +31,16 @@ class GuideCallout extends StatelessWidget {
   Widget build(BuildContext context) {
     final typography = context.theme.typography;
     return Container(
-      padding: const EdgeInsets.all(Space.md),
+      padding: const .all(Space.md),
       decoration: BoxDecoration(
         color: tone.subtle,
-        borderRadius: BorderRadius.circular(Radii.sm + 2),
+        borderRadius: .circular(Radii.sm + 2),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: .start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 1),
+            padding: const .only(top: 1),
             child: Icon(icon, size: 16, color: tone.onSubtle),
           ),
           const SizedBox(width: Space.sm + 2),
@@ -60,45 +52,6 @@ class GuideCallout extends StatelessWidget {
               ),
               child: child,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A short labelled fact ("One-time setup · About 2 min").
-class _Fact extends StatelessWidget {
-  const _Fact({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.theme.colors;
-    final typography = context.theme.typography;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: Space.sm),
-      decoration: BoxDecoration(
-        color: colors.muted,
-        borderRadius: BorderRadius.circular(Radii.sm),
-        border: Border.all(color: colors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: typography.body.xs.copyWith(
-              color: colors.mutedForeground,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -149,17 +102,17 @@ class OtpMethodCard extends StatelessWidget {
     final typography = context.theme.typography;
     final app = colors.app;
     return Container(
-      padding: const EdgeInsets.all(Space.lg),
+      padding: const .all(Space.lg),
       decoration: BoxDecoration(
         color: colors.card,
-        borderRadius: BorderRadius.circular(Radii.md),
+        borderRadius: .circular(Radii.md),
         border: Border.all(
           color: highlighted ? app.accent : colors.border,
           width: highlighted ? 1.5 : 1,
         ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Row(
             children: [
@@ -168,19 +121,19 @@ class OtpMethodCard extends StatelessWidget {
                 height: 36,
                 decoration: BoxDecoration(
                   color: iconTone.subtle,
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius: .circular(9),
                 ),
                 child: Icon(icon, size: 20, color: iconTone.onSubtle),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: .start,
                   children: [
                     Text(
                       eyebrow,
                       style: typography.body.xs.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: .w600,
                         letterSpacing: 0.3,
                         color: highlighted
                             ? app.accent
@@ -189,9 +142,7 @@ class OtpMethodCard extends StatelessWidget {
                     ),
                     Text(
                       title,
-                      style: typography.body.md.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: typography.body.md.copyWith(fontWeight: .w600),
                     ),
                   ],
                 ),
@@ -216,7 +167,35 @@ class OtpMethodCard extends StatelessWidget {
               for (final (index, (label, value)) in facts.indexed) ...[
                 if (index > 0) const SizedBox(width: Space.sm),
                 Expanded(
-                  child: _Fact(label: label, value: value),
+                  // A short labelled fact ("One-time setup · About 2 min").
+                  child: Container(
+                    padding: const .symmetric(
+                      horizontal: 10,
+                      vertical: Space.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.muted,
+                      borderRadius: .circular(Radii.sm),
+                      border: Border.all(color: colors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: .start,
+                      children: [
+                        Text(
+                          label,
+                          style: typography.body.xs.copyWith(
+                            color: colors.mutedForeground,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          value,
+                          style: typography.body.sm.copyWith(fontWeight: .w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ],
@@ -224,12 +203,12 @@ class OtpMethodCard extends StatelessWidget {
           const SizedBox(height: Space.md),
           for (final point in points)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const .only(bottom: 6),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 2),
+                    padding: const .only(top: 2),
                     child: Icon(
                       point.caveat
                           ? FLucideIcons.circleAlert
@@ -280,7 +259,7 @@ class GuideProgress extends StatelessWidget {
         ? 'All $total steps done'
         : 'Step ${current! + 1} of $total';
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Row(
           children: [
@@ -305,7 +284,7 @@ class GuideProgress extends StatelessWidget {
                   duration: Motion.medium,
                   height: 4,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: .circular(2),
                     color: done.contains(index)
                         ? app.accent
                         : index == current
@@ -320,13 +299,6 @@ class GuideProgress extends StatelessWidget {
       ],
     );
   }
-}
-
-/// The page a step happens on, opened by its "Open" button.
-class GuideLink {
-  const GuideLink(this.url);
-
-  final String url;
 }
 
 /// One step of a setup guide. Collapsed it is one line with its state;
@@ -357,7 +329,9 @@ class GuideStepTile extends StatelessWidget {
   final List<String> actions;
   final String? warning;
   final String? doneWhen;
-  final GuideLink? link;
+
+  /// The page the step happens on, opened by its "Open" button.
+  final String? link;
   final String? badge;
 
   /// Live content under the actions (a copyable value, a status).
@@ -372,9 +346,9 @@ class GuideStepTile extends StatelessWidget {
     final marker = Container(
       width: 26,
       height: 26,
-      alignment: Alignment.center,
+      alignment: .center,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        shape: .circle,
         color: done
             ? app.success.base
             : open
@@ -389,7 +363,7 @@ class GuideStepTile extends StatelessWidget {
           : Text(
               '$number',
               style: typography.body.xs.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: open ? app.onAccent : colors.mutedForeground,
               ),
             ),
@@ -403,14 +377,14 @@ class GuideStepTile extends StatelessWidget {
           child: Text(
             title,
             style: typography.body.sm.copyWith(
-              fontWeight: open ? FontWeight.w600 : FontWeight.w500,
+              fontWeight: open ? .w600 : .w500,
               color: done && !open ? colors.mutedForeground : null,
             ),
           ),
         ),
         if (badge case final badge? when !done) ...[
           const SizedBox(width: Space.sm),
-          FBadge(variant: FBadgeVariant.secondary, child: Text(badge)),
+          FBadge(variant: .secondary, child: Text(badge)),
         ],
         if (!open) ...[
           const SizedBox(width: Space.xs),
@@ -424,15 +398,15 @@ class GuideStepTile extends StatelessWidget {
     );
 
     final body = Padding(
-      padding: const EdgeInsets.only(left: 38, top: Space.md),
+      padding: const .only(left: 38, top: Space.md),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           for (final (index, action) in actions.indexed)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const .only(bottom: 6),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   SizedBox(
                     width: 18,
@@ -474,7 +448,7 @@ class GuideStepTile extends StatelessWidget {
                   TextSpan(
                     text: 'Done when ',
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: app.success.onSubtle,
                     ),
                   ),
@@ -493,9 +467,9 @@ class GuideStepTile extends StatelessWidget {
               if (link case final link?) ...[
                 Expanded(
                   child: FButton(
-                    variant: FButtonVariant.outline,
-                    size: FButtonSizeVariant.sm,
-                    onPress: () => openExternalLink(context, link.url),
+                    variant: .outline,
+                    size: .sm,
+                    onPress: () => openExternalLink(context, link),
                     suffix: const Icon(FLucideIcons.externalLink),
                     child: const Text('Open'),
                   ),
@@ -504,10 +478,8 @@ class GuideStepTile extends StatelessWidget {
               ],
               Expanded(
                 child: FButton(
-                  variant: done
-                      ? FButtonVariant.outline
-                      : FButtonVariant.primary,
-                  size: FButtonSizeVariant.sm,
+                  variant: done ? .outline : .primary,
+                  size: .sm,
                   onPress: onToggleDone,
                   child: Text(done ? 'Mark not done' : 'Mark done'),
                 ),
@@ -523,20 +495,20 @@ class GuideStepTile extends StatelessWidget {
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
         color: colors.card,
-        borderRadius: BorderRadius.circular(open ? Radii.md : Radii.sm + 2),
+        borderRadius: .circular(open ? Radii.md : Radii.sm + 2),
         border: Border.all(
           color: open ? app.accent : colors.border,
           width: open ? 1.5 : 1,
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(open ? 14 : Space.md),
+        padding: .all(open ? 14 : Space.md),
         child: AnimatedSize(
           duration: Motion.medium,
           curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
+          alignment: .topCenter,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: .stretch,
             children: [
               FTappable(onPress: open ? null : onTap, child: header),
               if (open) body,
@@ -566,21 +538,16 @@ class CopyValue extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        Space.md,
-        Space.sm,
-        Space.xs,
-        Space.sm,
-      ),
+      padding: const .fromLTRB(Space.md, Space.sm, Space.xs, Space.sm),
       decoration: BoxDecoration(
         color: colors.muted,
-        borderRadius: BorderRadius.circular(Radii.sm),
+        borderRadius: .circular(Radii.sm),
       ),
       child: Row(
         children: [
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 Text(
                   label,
@@ -593,7 +560,7 @@ class CopyValue extends StatelessWidget {
                 Text(
                   value,
                   style: (large ? typography.body.md : typography.body.sm).nums(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     letterSpacing: large ? 1 : null,
                   ),
                 ),
@@ -601,9 +568,12 @@ class CopyValue extends StatelessWidget {
             ),
           ),
           FButton.icon(
-            variant: FButtonVariant.ghost,
+            variant: .ghost,
             semanticsLabel: 'Copy $label',
-            onPress: () => copyText(context, value, label),
+            onPress: () async {
+              await Clipboard.setData(ClipboardData(text: value));
+              if (context.mounted) dispToast(context, 'Copied', label);
+            },
             child: const Icon(FLucideIcons.copy),
           ),
         ],
@@ -622,11 +592,11 @@ class GuideTroubleshooting extends StatelessWidget {
   Widget build(BuildContext context) {
     final typography = context.theme.typography;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Text(
           'Something went wrong?',
-          style: typography.body.sm.copyWith(fontWeight: FontWeight.w600),
+          style: typography.body.sm.copyWith(fontWeight: .w600),
         ),
         const SizedBox(height: Space.xs),
         FAccordion(

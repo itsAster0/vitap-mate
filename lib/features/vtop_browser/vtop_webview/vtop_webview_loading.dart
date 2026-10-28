@@ -63,19 +63,19 @@ class _VtopWebviewLoadingState extends State<VtopWebviewLoading> {
     return Container(
       width: double.infinity,
       color: colors.background,
-      padding: const EdgeInsets.all(24),
+      padding: const .all(24),
       child: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 340),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: .min,
+              mainAxisAlignment: .center,
               children: [
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: colors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: .circular(8),
                     border: Border.all(
                       color: hasError
                           ? colors.destructive.withValues(alpha: 0.28)
@@ -104,10 +104,10 @@ class _VtopWebviewLoadingState extends State<VtopWebviewLoading> {
                       : widget.reconnecting
                       ? 'Reconnecting to VTOP'
                       : 'Opening VTOP',
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   style: typography.body.lg.copyWith(
                     color: colors.foreground,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -117,7 +117,7 @@ class _VtopWebviewLoadingState extends State<VtopWebviewLoading> {
                       : _slow
                       ? 'VTOP is taking longer than usual. Please keep waiting.'
                       : 'Preparing your login session securely.',
-                  textAlign: TextAlign.center,
+                  textAlign: .center,
                   style: typography.body.sm.copyWith(
                     color: colors.mutedForeground,
                     height: 1.35,

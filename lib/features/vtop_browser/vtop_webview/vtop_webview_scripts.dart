@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 const _darkModeScript = '''
 (function() {
@@ -61,34 +60,8 @@ const _desktopModeScript = '''
 })();
 ''';
 
-extension VtopWebviewScripts on InAppWebViewController {
-  Future<void> setVtopDarkMode(bool enabled) {
-    return evaluateJavascript(
-      source: enabled ? _darkModeScript : _removeDarkModeScript,
-    );
-  }
-
-  Future<void> setVtopDesktopMode(bool enabled) {
-    return evaluateJavascript(
-      source: enabled ? _desktopModeScript : _resetDesktopModeScript,
-    );
-  }
-
-  Future<void> setVtopCompactSpacing({int padding = 2}) {
-    return evaluateJavascript(source: _compactSpacingScript(padding));
-  }
-
-  Future<void> resetVtopSpacing() {
-    return evaluateJavascript(source: _resetSpacingScript);
-  }
-
-  Future<dynamic> clickVtopMenuLink(String url) {
-    return evaluateJavascript(source: _clickMenuLinkScript(url));
-  }
-}
-
-String _compactSpacingScript(int padding) {
-  return '''
+String _compactSpacingScript(int padding) =>
+    '''
 (function() {
   if (document.getElementById('custom-spacing-style')) return;
     const style = document.createElement('style');
@@ -146,19 +119,6 @@ String _compactSpacingScript(int padding) {
     (document.head || document.documentElement).appendChild(style);
 })();
 ''';
-}
-
-String _clickMenuLinkScript(String url) =>
-    """
-(function() {
-  const target = ${jsonEncode(url)};
-  const link = Array.from(document.querySelectorAll('a[data-url]'))
-    .find(link => link.getAttribute('data-url') === target);
-  if (!link) return false;
-  link.click();
-  return true;
-})();
-""";
 
 String vtopPreferencesScript({
   required bool dark,

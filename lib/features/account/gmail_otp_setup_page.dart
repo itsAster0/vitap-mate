@@ -44,9 +44,10 @@ class GmailOtpSetupPage extends HookConsumerWidget {
 
     Future<void> refresh() async {
       session.value = await oauth.loadSession();
-      ref.invalidate(emailOtpReadyProvider);
-      ref.invalidate(anyEmailOtpReadyProvider);
-      ref.invalidate(mailForwardingProvider);
+      ref
+        ..invalidate(emailOtpReadyProvider)
+        ..invalidate(anyEmailOtpReadyProvider)
+        ..invalidate(mailForwardingProvider);
     }
 
     useEffect(() {
@@ -92,15 +93,16 @@ class GmailOtpSetupPage extends HookConsumerWidget {
     }
 
     Future<void> disconnect() async {
-      final confirmed = await confirm(
+      if (!await confirm(
         context,
         title: 'Disconnect Gmail?',
         body:
             'This removes the saved Google key and Gmail tokens from this phone.',
         action: 'Disconnect',
         destructive: true,
-      );
-      if (!confirmed) return;
+      )) {
+        return;
+      }
       busy.value = true;
       try {
         await oauth.clearSession();
@@ -152,7 +154,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
             text,
             style: typography.body.xs.copyWith(
               color: app.success.onSubtle,
-              fontWeight: FontWeight.w500,
+              fontWeight: .w500,
             ),
           ),
         ),
@@ -180,14 +182,9 @@ class GmailOtpSetupPage extends HookConsumerWidget {
     };
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.page,
-        Space.sm,
-        Space.page,
-        Space.xl,
-      ),
+      padding: const .fromLTRB(Space.page, Space.sm, Space.page, Space.xl),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           GuideCallout(
             icon: gmail != null || forwarding != null
@@ -199,7 +196,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                 children: [
                   TextSpan(
                     text: '$statusTitle · ',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontWeight: .w600),
                   ),
                   TextSpan(text: statusText),
                 ],
@@ -233,8 +230,8 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                   ),
             action: FButton(
               variant: ownKey == null && forwarding == null
-                  ? FButtonVariant.primary
-                  : FButtonVariant.outline,
+                  ? .primary
+                  : .outline,
               onPress: () => openRoute(Paths.mailForwarding),
               suffix: const Icon(FLucideIcons.arrowRight),
               child: Text(
@@ -273,8 +270,8 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                     children: [
                       Expanded(
                         child: FButton(
-                          variant: FButtonVariant.outline,
-                          size: FButtonSizeVariant.sm,
+                          variant: .outline,
+                          size: .sm,
                           onPress: busy.value ? null : testGmail,
                           child: const Text('Test Gmail'),
                         ),
@@ -282,8 +279,8 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                       const SizedBox(width: Space.sm),
                       Expanded(
                         child: FButton(
-                          variant: FButtonVariant.outline,
-                          size: FButtonSizeVariant.sm,
+                          variant: .outline,
+                          size: .sm,
                           onPress: busy.value ? null : disconnect,
                           child: Text(
                             'Disconnect',
@@ -295,7 +292,7 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                   )
                 : android
                 ? FButton(
-                    variant: FButtonVariant.outline,
+                    variant: .outline,
                     onPress: () => openRoute(Paths.gmailOauthGuide),
                     suffix: const Icon(FLucideIcons.arrowRight),
                     child: const Text('Start the guide'),
@@ -331,9 +328,9 @@ class GmailOtpSetupPage extends HookConsumerWidget {
                       ? const FCircularProgress.pinwheel()
                       : shared != null
                       ? FButton(
-                          variant: FButtonVariant.ghost,
-                          size: FButtonSizeVariant.sm,
-                          mainAxisSize: MainAxisSize.min,
+                          variant: .ghost,
+                          size: .sm,
+                          mainAxisSize: .min,
                           onPress: disconnect,
                           child: const Text('Disconnect'),
                         )

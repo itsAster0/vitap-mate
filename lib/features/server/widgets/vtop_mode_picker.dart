@@ -19,7 +19,7 @@ class VtopModePicker extends ConsumerWidget {
       onSelect: (mode) => setVtopMode(ref, mode),
       options: [
         PickerOption(
-          value: VtopServerMode.off,
+          value: .off,
           title: 'Phone only',
           summary: 'Most data',
           detail:
@@ -28,7 +28,7 @@ class VtopModePicker extends ConsumerWidget {
           tone: colors.app.accentTone,
         ),
         PickerOption(
-          value: VtopServerMode.compress,
+          value: .compress,
           title: 'Compress through the server',
           summary: 'About 6× less data',
           detail:
@@ -37,7 +37,7 @@ class VtopModePicker extends ConsumerWidget {
           tone: colors.app.lab,
         ),
         PickerOption(
-          value: VtopServerMode.server,
+          value: .server,
           title: 'Fetch on the server',
           summary: 'About 25× less data',
           detail:

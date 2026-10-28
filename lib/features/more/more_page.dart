@@ -20,44 +20,31 @@ class MorePage extends HookConsumerWidget {
           error: (_, _) => false,
         );
 
-    void openVtop([String? menuUrl]) {
-      GoRouter.of(context).pushNamed(Paths.vtopweb, extra: menuUrl);
-    }
-
-    void push(String name) => GoRouter.of(context).pushNamed(name);
+    void openVtop([String? menuUrl]) =>
+        context.pushNamed(Paths.vtopweb, extra: menuUrl);
     final recentPages = ref.watch(vtopRecentPagesProvider);
 
     final colors = context.theme.colors;
     // Each group gets its own icon tone so a tile can be found by colour and
     // position without reading every label.
-    final sections = [
+    final sections = <(String, Tone, List<_Tool>)>[
       (
         'Results',
         colors.app.accentTone,
         [
-          _Tool(
-            FLucideIcons.clipboardList,
-            'Marks',
-            'Scores so far',
-            () => push(Paths.marks),
-          ),
-          _Tool(
-            FLucideIcons.graduationCap,
-            'Grades',
-            'This semester',
-            () => push(Paths.grades),
-          ),
-          _Tool(
+          (FLucideIcons.clipboardList, 'Marks', 'Scores so far', Paths.marks),
+          (FLucideIcons.graduationCap, 'Grades', 'This semester', Paths.grades),
+          (
             FLucideIcons.history,
             'Grade History',
             'All semesters',
-            () => push(Paths.gradeHistory),
+            Paths.gradeHistory,
           ),
-          _Tool(
+          (
             FLucideIcons.calculator,
             'GPA Planner',
             'Plan your CGPA',
-            () => push(Paths.gpaCalculator),
+            Paths.gpaCalculator,
           ),
         ],
       ),
@@ -65,23 +52,23 @@ class MorePage extends HookConsumerWidget {
         'Schedule',
         colors.app.warning,
         [
-          _Tool(
+          (
             FLucideIcons.calendarDays,
             'Exams',
             'Schedule & seats',
-            () => push(Paths.examSchedule),
+            Paths.examSchedule,
           ),
-          _Tool(
+          (
             FLucideIcons.partyPopper,
             'Calendar',
             'Holidays & exams',
-            () => push(Paths.academicCalendar),
+            Paths.academicCalendar,
           ),
-          _Tool(
+          (
             FLucideIcons.bookOpen,
             'Course Page',
             'Lecture notes',
-            () => push(Paths.coursePage),
+            Paths.coursePage,
           ),
         ],
       ),
@@ -89,45 +76,30 @@ class MorePage extends HookConsumerWidget {
         'Campus',
         colors.app.lab,
         [
-          _Tool(
-            FLucideIcons.idCard,
-            'Profile',
-            'You & mentor',
-            () => push(Paths.profile),
-          ),
-          _Tool(
+          (FLucideIcons.idCard, 'Profile', 'You & mentor', Paths.profile),
+          (
             FLucideIcons.scanFace,
             'Biometric',
             'Entry logs',
-            () => push(Paths.biometricHistory),
+            Paths.biometricHistory,
           ),
-          _Tool(
-            FLucideIcons.doorOpen,
-            'Outing',
-            'Leave & passes',
-            () => push(Paths.outing),
-          ),
+          (FLucideIcons.doorOpen, 'Outing', 'Leave & passes', Paths.outing),
         ],
       ),
     ];
 
     var index = 0;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(
-        Space.sm,
-        Space.xs,
-        Space.sm,
-        Space.xl,
-      ),
+      padding: const .fromLTRB(Space.sm, Space.xs, Space.sm, Space.xl),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           for (final (title, tone, tools) in sections) ...[
             SectionHeader(title: title),
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
-              padding: EdgeInsets.zero,
+              padding: .zero,
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: Space.sm + 2,
               crossAxisSpacing: Space.sm + 2,
@@ -158,7 +130,7 @@ class MorePage extends HookConsumerWidget {
               pages: recentPages,
               onOpen: (page) => openVtop(page.url),
             ),
-          if (cookieBridgeAvailable == true) ...[
+          if (cookieBridgeAvailable) ...[
             const SizedBox(height: Space.lg),
             FTileGroup(
               children: [
@@ -167,7 +139,7 @@ class MorePage extends HookConsumerWidget {
                   title: const Text("Connected apps"),
                   subtitle: const Text("Browser extension and AI agents (MCP)"),
                   suffix: const Icon(FLucideIcons.chevronRight),
-                  onPress: () => push(Paths.serverApps),
+                  onPress: () => context.pushNamed(Paths.serverApps),
                 ),
               ],
             ),
@@ -178,14 +150,7 @@ class MorePage extends HookConsumerWidget {
   }
 }
 
-class _Tool {
-  const _Tool(this.icon, this.title, this.subtitle, this.onPress);
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onPress;
-}
+typedef _Tool = (IconData icon, String title, String subtitle, String route);
 
 class _ToolTile extends StatelessWidget {
   const _ToolTile({required this.tool, required this.tone});
@@ -197,13 +162,11 @@ class _ToolTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
+    final (icon, title, subtitle, route) = tool;
     return Surface(
-      onPress: tool.onPress,
-      semanticsLabel: tool.title,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.md,
-        vertical: Space.sm + 2,
-      ),
+      onPress: () => context.pushNamed(route),
+      semanticsLabel: title,
+      padding: const .symmetric(horizontal: Space.md, vertical: Space.sm + 2),
       child: Row(
         children: [
           Container(
@@ -211,29 +174,29 @@ class _ToolTile extends StatelessWidget {
             height: 34,
             decoration: BoxDecoration(
               color: tone.subtle,
-              borderRadius: BorderRadius.circular(Radii.sm + 2),
+              borderRadius: .circular(Radii.sm + 2),
             ),
-            child: Icon(tool.icon, size: 17, color: tone.onSubtle),
+            child: Icon(icon, size: 17, color: tone.onSubtle),
           ),
           const SizedBox(width: Space.sm + 2),
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: .center,
+              crossAxisAlignment: .start,
               children: [
                 Text(
-                  tool.title,
+                  title,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.sm.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: colors.foreground,
                   ),
                 ),
                 Text(
-                  tool.subtitle,
+                  subtitle,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow: .ellipsis,
                   style: typography.body.xs.copyWith(
                     color: colors.mutedForeground,
                   ),
@@ -259,19 +222,19 @@ class _RecentVtopPages extends StatelessWidget {
     final colors = context.theme.colors;
     final typography = context.theme.typography;
     return Padding(
-      padding: const EdgeInsets.only(top: Space.sm + 2),
+      padding: const .only(top: Space.sm + 2),
       child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
+        scrollDirection: .horizontal,
+        clipBehavior: .none,
         child: Row(
           spacing: Space.sm,
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 2, right: Space.xs),
+              padding: const .only(left: 2, right: Space.xs),
               child: Text(
                 'RECENT',
                 style: typography.body.xs.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: .w600,
                   letterSpacing: 0.6,
                   color: colors.mutedForeground,
                 ),
@@ -285,16 +248,16 @@ class _RecentVtopPages extends StatelessWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: colors.card,
-                    borderRadius: BorderRadius.circular(Radii.pill),
+                    borderRadius: .circular(Radii.pill),
                     border: Border.all(color: colors.border),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(
+                    padding: const .symmetric(
                       horizontal: Space.md,
                       vertical: Space.sm,
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: .min,
                       spacing: 6,
                       children: [
                         Icon(
@@ -306,7 +269,7 @@ class _RecentVtopPages extends StatelessWidget {
                           page.title,
                           style: typography.body.sm.copyWith(
                             color: colors.foreground,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: .w500,
                           ),
                         ),
                       ],

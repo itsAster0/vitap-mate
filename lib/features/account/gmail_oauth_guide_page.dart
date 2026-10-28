@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/widgets.dart';
@@ -31,7 +30,7 @@ class _Step {
   final List<String> actions;
   final String doneWhen;
   final String? warning;
-  final GuideLink? link;
+  final String? link;
   final String? badge;
 }
 
@@ -44,7 +43,7 @@ const _steps = <_Step>[
       'Tap Create, wait a few seconds, then pick the new project in the picker at the top.',
     ],
     doneWhen: 'the project picker at the top shows your new project.',
-    link: GuideLink('https://console.cloud.google.com/projectcreate'),
+    link: 'https://console.cloud.google.com/projectcreate',
   ),
   _Step(
     title: 'Turn on the Gmail API',
@@ -53,9 +52,7 @@ const _steps = <_Step>[
       'Tap Enable.',
     ],
     doneWhen: 'the page shows “API Enabled” or a Manage button.',
-    link: GuideLink(
-      'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
-    ),
+    link: 'https://console.cloud.google.com/apis/library/gmail.googleapis.com',
   ),
   _Step(
     title: 'Set up the consent screen',
@@ -67,7 +64,7 @@ const _steps = <_Step>[
     ],
     warning: 'Pick External. Internal only works for Workspace organisations.',
     doneWhen: 'you land on the Google Auth Platform overview.',
-    link: GuideLink('https://console.cloud.google.com/auth/branding'),
+    link: 'https://console.cloud.google.com/auth/branding',
   ),
   _Step(
     title: 'Add your college email as a test user',
@@ -77,7 +74,7 @@ const _steps = <_Step>[
       'Sharing this project with friends? Add their college emails too.',
     ],
     doneWhen: 'your college email is listed under Test users.',
-    link: GuideLink('https://console.cloud.google.com/auth/audience'),
+    link: 'https://console.cloud.google.com/auth/audience',
   ),
   _Step(
     title: 'Create a Desktop app client, download the JSON',
@@ -90,7 +87,7 @@ const _steps = <_Step>[
     warning:
         'Pick Desktop app, not Android or Web. Download the JSON from the popup right away: Google never shows the secret again. Missed it? Create a new client.',
     doneWhen: 'a client_secret_….json file is in this phone’s Downloads.',
-    link: GuideLink('https://console.cloud.google.com/auth/clients'),
+    link: 'https://console.cloud.google.com/auth/clients',
   ),
   _Step(
     title: 'Publish the app',
@@ -102,7 +99,7 @@ const _steps = <_Step>[
     warning:
         'While the status is Testing, Google ends the connection every 7 days. If VIT blocks publishing, stay in Testing and reconnect each week.',
     doneWhen: 'Publishing status says “In production”.',
-    link: GuideLink('https://console.cloud.google.com/auth/audience'),
+    link: 'https://console.cloud.google.com/auth/audience',
   ),
   _Step(
     title: 'Connect in Vitap Mate',
@@ -180,8 +177,9 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
 
     Future<void> refreshSession() async {
       session.value = await oauth.loadSession();
-      ref.invalidate(emailOtpReadyProvider);
-      ref.invalidate(anyEmailOtpReadyProvider);
+      ref
+        ..invalidate(emailOtpReadyProvider)
+        ..invalidate(anyEmailOtpReadyProvider);
     }
 
     useEffect(() {
@@ -236,8 +234,9 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
             'The OAuth file must be smaller than 64 KB.',
           );
         }
-        final Uint8List bytes = await picked.readAsBytes();
-        credentials.value = oauth.parseByokCredentials(bytes);
+        credentials.value = oauth.parseByokCredentials(
+          await picked.readAsBytes(),
+        );
         status.value = null;
       } on GoogleDesktopOAuthException catch (error) {
         credentials.value = null;
@@ -275,9 +274,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
               ref.invalidate(emailOtpReadyProvider);
             },
             onDone: () {
-              if (!context.mounted || !busy.value || pollDetected.value) {
-                return;
-              }
+              if (!context.mounted || !busy.value || pollDetected.value) return;
               status.value =
                   'Google took longer than five minutes. Retry and keep Vitap Mate running while the browser is open.';
               busy.value = false;
@@ -288,8 +285,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
         final result = await oauth.setupByok(
           credentials: selected,
           expectedUsername: account,
-          openBrowser: (uri) =>
-              launchUrl(uri, mode: LaunchMode.externalApplication),
+          openBrowser: (uri) => launchUrl(uri, mode: .externalApplication),
           beforeTokenExchange: waitUntilForeground,
           onProgress: (message) {
             if (context.mounted) status.value = message;
@@ -320,7 +316,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
     Widget bottomBar() {
       if (connected != null) {
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             GuideCallout(
               icon: FLucideIcons.circleCheck,
@@ -340,7 +336,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
       }
       final selected = credentials.value;
       return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           if (status.value case final message?) ...[
             Row(
@@ -371,7 +367,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
             children: [
               Expanded(
                 child: FButton(
-                  variant: FButtonVariant.outline,
+                  variant: .outline,
                   onPress: busy.value ? null : importJson,
                   prefix: const Icon(FLucideIcons.fileJson),
                   child: Text(selected == null ? 'Import JSON' : 'Replace'),
@@ -391,7 +387,7 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
             selected == null
                 ? 'Import the JSON from step 5 to connect.'
                 : '${selected.projectId} · ${selected.redactedClientId}',
-            textAlign: TextAlign.center,
+            textAlign: .center,
             style: typography.body.xs.copyWith(color: colors.mutedForeground),
           ),
         ],
@@ -399,18 +395,18 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
+            padding: const .fromLTRB(
               Space.page,
               Space.sm,
               Space.page,
               Space.xl,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: .stretch,
               children: [
                 Text(
                   'Option 2 · about 10 minutes, once. Vitap Mate then reads the OTP from Gmail on this phone.',
@@ -466,11 +462,9 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
             border: Border(top: BorderSide(color: colors.border)),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Space.page,
-              Space.md,
-              Space.page,
-              Space.md,
+            padding: const .symmetric(
+              horizontal: Space.page,
+              vertical: Space.md,
             ),
             child: bottomBar(),
           ),

@@ -14,7 +14,7 @@ Future<void> showVtopPageSearch(
 }) {
   return showFSheet(
     context: context,
-    side: FLayout.btt,
+    side: .btt,
     useRootNavigator: true,
     mainAxisMaxRatio: 0.88,
     builder: (context) => SizedBox(
@@ -62,12 +62,12 @@ class VtopPageSearchSheet extends HookWidget {
     final all = snapshot.data ?? const <VtopPage>[];
 
     Widget caption(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(4, Space.lg, 4, Space.sm),
+      padding: const .fromLTRB(4, Space.lg, 4, Space.sm),
       child: Text(
         text.toUpperCase(),
         style: typography.body.xs.copyWith(
           color: colors.mutedForeground,
-          fontWeight: FontWeight.w600,
+          fontWeight: .w600,
           letterSpacing: 0.6,
         ),
       ),
@@ -88,87 +88,42 @@ class VtopPageSearchSheet extends HookWidget {
           ],
         );
 
-    final children = <Widget>[];
-    if (query.isNotEmpty) {
-      final words = query.split(RegExp(r'\s+'));
-      final matches = all.where((page) {
-        final text = '${page.title} ${page.section}'.toLowerCase();
-        return words.every(text.contains);
-      }).toList();
-      // Title matches first; section-only matches after.
-      matches.sort((a, b) {
-        final aTitle = a.title.toLowerCase().contains(words.first) ? 0 : 1;
-        final bTitle = b.title.toLowerCase().contains(words.first) ? 0 : 1;
-        return aTitle - bTitle;
-      });
-      if (matches.isEmpty) {
-        children.add(_Message(text: 'No VTOP page matches "$query".'));
-      } else {
-        children
-          ..add(caption('${matches.length} pages'))
-          ..add(group(matches, showSection: true));
-      }
-    } else {
-      if (recent.isNotEmpty) {
-        children
-          ..add(caption('Recent'))
-          ..add(group(recent, showSection: true));
-      }
-      final sections = <String, List<VtopPage>>{};
-      for (final page in all) {
-        sections.putIfAbsent(page.section, () => []).add(page);
-      }
-      // Links outside any sidebar section go last.
-      final other = sections.remove('');
-      if (other != null) sections['Other'] = other;
-      for (final MapEntry(key: section, value: pages) in sections.entries) {
-        children
-          ..add(caption(section))
-          ..add(group(pages));
-      }
-      if (all.isEmpty) {
-        children.add(
-          snapshot.connectionState == ConnectionState.done
-              ? const _Message(
-                  text: 'VTOP pages appear once VTOP has finished loading.',
-                )
-              : const Padding(
-                  padding: EdgeInsets.all(Space.xl),
-                  child: Center(
-                    child: FCircularProgress(
-                      semanticsLabel: 'Loading VTOP pages',
-                    ),
-                  ),
-                ),
-        );
-      }
+    final words = query.split(RegExp(r'\s+'));
+    final matches = all.where((page) {
+      final text = '${page.title} ${page.section}'.toLowerCase();
+      return words.every(text.contains);
+    }).toList();
+    // Title matches first; section-only matches after.
+    matches.sort((a, b) {
+      final aTitle = a.title.toLowerCase().contains(words.first) ? 0 : 1;
+      final bTitle = b.title.toLowerCase().contains(words.first) ? 0 : 1;
+      return aTitle - bTitle;
+    });
+    final sections = <String, List<VtopPage>>{};
+    for (final page in all) {
+      sections.putIfAbsent(page.section, () => []).add(page);
     }
+    // Links outside any sidebar section go last.
+    if (sections.remove('') case final other?) sections['Other'] = other;
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(Radii.lg + 4),
-        ),
+        borderRadius: const .vertical(top: Radius.circular(Radii.lg + 4)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           const SheetHandle(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Space.page,
-              Space.sm,
-              Space.page,
-              0,
-            ),
+            padding: const .fromLTRB(Space.page, Space.sm, Space.page, 0),
             child: FTextField(
               control: FTextFieldControl.managed(controller: search),
               hint: 'Search VTOP pages',
               autofocus: true,
-              textInputAction: TextInputAction.search,
+              textInputAction: .search,
               prefixBuilder: (_, _, _) => Padding(
-                padding: const EdgeInsets.only(left: 12, right: 8),
+                padding: const .only(left: 12, right: 8),
                 child: Icon(
                   FLucideIcons.search,
                   size: 18,
@@ -190,9 +145,39 @@ class VtopPageSearchSheet extends HookWidget {
           ),
           Expanded(
             child: ListView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(Space.page, 0, Space.page, Space.xl),
-              children: children,
+              keyboardDismissBehavior: .onDrag,
+              padding: .fromLTRB(Space.page, 0, Space.page, Space.xl),
+              children: [
+                if (query.isNotEmpty)
+                  if (matches.isEmpty)
+                    _Message(text: 'No VTOP page matches "$query".')
+                  else ...[
+                    caption('${matches.length} pages'),
+                    group(matches, showSection: true),
+                  ]
+                else ...[
+                  if (recent.isNotEmpty) ...[
+                    caption('Recent'),
+                    group(recent, showSection: true),
+                  ],
+                  for (final MapEntry(key: section, value: pages)
+                      in sections.entries) ...[caption(section), group(pages)],
+                  if (all.isEmpty)
+                    snapshot.connectionState == ConnectionState.done
+                        ? const _Message(
+                            text:
+                                'VTOP pages appear once VTOP has finished loading.',
+                          )
+                        : const Padding(
+                            padding: .all(Space.xl),
+                            child: Center(
+                              child: FCircularProgress(
+                                semanticsLabel: 'Loading VTOP pages',
+                              ),
+                            ),
+                          ),
+                ],
+              ],
             ),
           ),
         ],
@@ -207,16 +192,14 @@ class _Message extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(Space.xl),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: context.theme.typography.body.sm.copyWith(
-          color: context.theme.colors.mutedForeground,
-        ),
+  Widget build(BuildContext context) => Padding(
+    padding: const .all(Space.xl),
+    child: Text(
+      text,
+      textAlign: .center,
+      style: context.theme.typography.body.sm.copyWith(
+        color: context.theme.colors.mutedForeground,
       ),
-    );
-  }
+    ),
+  );
 }

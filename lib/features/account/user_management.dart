@@ -36,60 +36,31 @@ class UserBox extends HookConsumerWidget {
           log('auto refresh failed: $e', stackTrace: st);
         }
       });
-
       return null;
     }, const []);
 
-    final user = ref.watch(vtopUserProvider);
-
-    return user.when(
-      data: (data) {
-        if ((data.username ?? '').isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return UserCard(user: data);
-      },
-      error: (e, _) {
-        return Center(
-          child: Text(
-            'Unable to load account details',
-            style: TextStyle(color: context.theme.colors.destructive),
+    return ref
+        .watch(vtopUserProvider)
+        .when(
+          data: (data) => (data.username ?? '').isEmpty
+              ? const SizedBox.shrink()
+              : UserCard(user: data),
+          error: (e, _) => Center(
+            child: Text(
+              'Unable to load account details',
+              style: TextStyle(color: context.theme.colors.destructive),
+            ),
           ),
-        );
-      },
-      loading: () {
-        return Center(
-          child: SizedBox(
-            width: 100,
-            height: 100,
-            child: CircularProgressIndicator(
-              color: context.theme.colors.primary,
+          loading: () => Center(
+            child: SizedBox(
+              width: 100,
+              height: 100,
+              child: CircularProgressIndicator(
+                color: context.theme.colors.primary,
+              ),
             ),
           ),
         );
-      },
-    );
-  }
-}
-
-class UserSemChange extends HookConsumerWidget {
-  final VtopUserEntity user;
-  const UserSemChange({super.key, required this.user});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        FButton(
-          onPress: () => showAdaptiveDialog(
-            context: context,
-            builder: (_) => SemesterDialog(user: user, outerContext: context),
-          ),
-          child: const Text("Change Semester"),
-        ),
-      ],
-    );
   }
 }
 
@@ -105,163 +76,125 @@ class SemesterDialog extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final disableCanecel = useState(false);
+    final busy = useState(false);
     // The semester being saved, for its row's spinner.
     final saving = useState<String?>(null);
-
     final isRefreshing = useState(false);
     final semester = ref.watch(semesterIdProvider);
 
     Future<void> handleRefresh() async {
       if (isRefreshing.value) return;
-
       isRefreshing.value = true;
       try {
         await ref.read(semesterIdProvider.notifier).refresh();
         ref.invalidate(semesterIdProvider);
       } catch (e) {
-        if (context.mounted) {
-          Navigator.of(context).pop();
-        }
-        if (outerContext.mounted) {
-          disCommonToast(outerContext, e);
-        }
+        if (context.mounted) Navigator.of(context).pop();
+        if (outerContext.mounted) disCommonToast(outerContext, e);
       } finally {
         isRefreshing.value = false;
       }
     }
 
-    Future<void> handleSemesterChange(Set<String> values) async {
-      final selected = values.isEmpty ? null : values.first;
-      if (selected == null || disableCanecel.value) return;
-      if (selected == user.semid) {
-        Navigator.of(context).pop();
-        return;
-      }
-
-      disableCanecel.value = true;
+    Future<void> handleSemesterChange(String selected) async {
+      if (busy.value) return;
+      if (selected == user.semid) return Navigator.of(context).pop();
+      busy.value = true;
       saving.value = selected;
       try {
         await ref
             .read(vtopusersutilsProvider.notifier)
             .vtopUserSave(user.withSemester(selected));
 
-        ref.invalidate(vtopUserProvider);
-        ref.invalidate(vClientProvider);
-
-        final notifSetting = ref.read(classReminderSettingsProvider);
-        if (notifSetting.enabled) {
+        ref
+          ..invalidate(vtopUserProvider)
+          ..invalidate(vClientProvider);
+        if (ref.read(classReminderSettingsProvider).enabled) {
           await ref.read(timetableProvider.notifier).refresh();
         }
-
-        final examNotifSetting = ref.read(examReminderSettingsProvider);
-        if (examNotifSetting.enabled) {
+        if (ref.read(examReminderSettingsProvider).enabled) {
           await ref.read(examScheduleProvider.notifier).refresh();
         }
-
-        if (context.mounted) {
-          Navigator.of(context).pop();
-        }
+        if (context.mounted) Navigator.of(context).pop();
       } finally {
-        disableCanecel.value = false;
+        busy.value = false;
         if (context.mounted) saving.value = null;
       }
     }
 
+    final cancel = FButton(
+      variant: .outline,
+      onPress: () => Navigator.of(context).pop(),
+      child: const Text('Cancel'),
+    );
+    Widget status(Widget child) => AppDialog(
+      title: const Text('Semesters'),
+      body: Container(
+        decoration: BoxDecoration(color: context.theme.colors.secondary),
+        child: child,
+      ),
+      actions: [cancel],
+    );
+
     return semester.when(
-      data: (data) {
-        return AppDialog(
-          title: Row(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              const Expanded(child: Text('Semester')),
-              if (!isRefreshing.value)
-                FTappable(
-                  onPress: handleRefresh,
-                  child: const Icon(FLucideIcons.rotateCcw),
-                )
-              else
-                const FCircularProgress.pinwheel(),
-            ],
-          ),
-          body: ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 400),
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Pick which semester the app shows.',
-                    style: context.theme.typography.body.sm.copyWith(
-                      color: context.theme.colors.mutedForeground,
+      data: (data) => AppDialog(
+        title: Row(
+          mainAxisSize: .max,
+          children: [
+            const Expanded(child: Text('Semester')),
+            if (!isRefreshing.value)
+              FTappable(
+                onPress: handleRefresh,
+                child: const Icon(FLucideIcons.rotateCcw),
+              )
+            else
+              const FCircularProgress.pinwheel(),
+          ],
+        ),
+        body: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 400),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: .stretch,
+              children: [
+                Text(
+                  'Pick which semester the app shows.',
+                  style: context.theme.typography.body.sm.copyWith(
+                    color: context.theme.colors.mutedForeground,
+                  ),
+                ),
+                for (final group in _groupByYear(data.semesters)) ...[
+                  Padding(
+                    padding: const .only(top: 14, bottom: 6),
+                    child: Text(
+                      group.year,
+                      style: context.theme.typography.body.xs.copyWith(
+                        fontWeight: .w600,
+                        letterSpacing: 0.6,
+                        color: context.theme.colors.mutedForeground,
+                      ),
                     ),
                   ),
-                  for (final group in _groupByYear(data.semesters)) ...[
+                  for (final sem in group.items)
                     Padding(
-                      padding: const EdgeInsets.only(top: 14, bottom: 6),
-                      child: Text(
-                        group.year,
-                        style: context.theme.typography.body.xs.copyWith(
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.6,
-                          color: context.theme.colors.mutedForeground,
-                        ),
+                      padding: const .only(bottom: 6),
+                      child: _SemesterRow(
+                        semester: sem,
+                        selected: sem.id == user.semid,
+                        saving: saving.value == sem.id,
+                        enabled: !busy.value,
+                        onPress: () => handleSemesterChange(sem.id),
                       ),
                     ),
-                    for (final sem in group.items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _SemesterRow(
-                          semester: sem,
-                          selected: sem.id == user.semid,
-                          saving: saving.value == sem.id,
-                          enabled: !disableCanecel.value,
-                          onPress: () => handleSemesterChange({sem.id}),
-                        ),
-                      ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
-          actions: [
-            if (!disableCanecel.value)
-              FButton(
-                variant: FButtonVariant.outline,
-                onPress: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-          ],
-        );
-      },
-      error: (e, _) => AppDialog(
-        title: const Text('Semesters'),
-        body: Container(
-          decoration: BoxDecoration(color: context.theme.colors.secondary),
-          child: Text('$e'),
         ),
-        actions: [
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
+        actions: [if (!busy.value) cancel],
       ),
-      loading: () => AppDialog(
-        title: const Text('Semesters'),
-        body: Container(
-          decoration: BoxDecoration(color: context.theme.colors.secondary),
-          child: const FCircularProgress(),
-        ),
-        actions: [
-          FButton(
-            variant: FButtonVariant.outline,
-            onPress: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+      error: (e, _) => status(Text('$e')),
+      loading: () => status(const FCircularProgress()),
     );
   }
 }
@@ -324,13 +257,10 @@ class _SemesterRow extends StatelessWidget {
       onPress: enabled ? onPress : () {},
       child: AnimatedContainer(
         duration: Motion.medium,
-        padding: const EdgeInsets.symmetric(
-          horizontal: Space.md,
-          vertical: Space.sm + 2,
-        ),
+        padding: const .symmetric(horizontal: Space.md, vertical: Space.sm + 2),
         decoration: BoxDecoration(
           color: tone?.subtle ?? colors.secondary,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
           border: Border.all(
             color: selected ? colors.app.accent : colors.border,
             width: selected ? 1.5 : 1,
@@ -350,7 +280,7 @@ class _SemesterRow extends StatelessWidget {
                     ? semester.name
                     : '${parsed.season[0].toUpperCase()}${parsed.season.substring(1).toLowerCase()}',
                 style: typography.body.md.copyWith(
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  fontWeight: selected ? .w600 : .w500,
                   color: colors.foreground,
                 ),
               ),
@@ -362,9 +292,7 @@ class _SemesterRow extends StatelessWidget {
             SizedBox(
               width: 18,
               child: saving
-                  ? const FCircularProgress(
-                      size: FCircularProgressSizeVariant.sm,
-                    )
+                  ? const FCircularProgress(size: .sm)
                   : selected
                   ? Icon(
                       FLucideIcons.check,
@@ -388,119 +316,113 @@ class UserPassChange extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final outerContext = context;
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: .center,
       children: [
         FButton(
-          variant: FButtonVariant.outline,
-          size: FButtonSizeVariant.sm,
+          variant: .outline,
+          size: .sm,
           prefix: const Icon(FLucideIcons.userPen),
-          onPress: () {
-            showAdaptiveDialog(
-              context: outerContext,
-              builder: (dialogContext) {
-                return HookBuilder(
-                  builder: (context) {
-                    final usernameController = useTextEditingController(
-                      text: user.username ?? '',
-                    );
-                    final passwordController = useTextEditingController(
-                      text: user.password ?? '',
-                    );
-                    final isLoading = useState(false);
+          onPress: () => showAdaptiveDialog(
+            context: outerContext,
+            builder: (dialogContext) => HookBuilder(
+              builder: (context) {
+                final usernameController = useTextEditingController(
+                  text: user.username ?? '',
+                );
+                final passwordController = useTextEditingController(
+                  text: user.password ?? '',
+                );
+                final isLoading = useState(false);
 
-                    return AppDialog(
-                      title: const Text('Update Credentials'),
-                      body: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        spacing: 12,
-                        children: [
-                          FTextField(
-                            control: FTextFieldControl.managed(
-                              controller: usernameController,
-                            ),
-                            label: const Text("Username"),
-                          ),
-                          FTextField.password(
-                            control: FTextFieldControl.managed(
-                              controller: passwordController,
-                            ),
-                            obscuringCharacter: '*',
-                            label: const Text("New Password"),
-                          ),
-                        ],
-                      ),
-                      actions: [
-                        if (!isLoading.value)
-                          FButton(
-                            onPress: () async {
-                              final newUsername = usernameController.text
-                                  .trim();
-                              final newPassword = passwordController.text
-                                  .trim();
-                              if (newUsername.isEmpty || newPassword.isEmpty) {
-                                return;
-                              }
-
-                              isLoading.value = true;
-                              try {
-                                final client = await createVtopClient(
-                                  username: newUsername,
-                                  password: newPassword,
-                                );
-                                if (!context.mounted) return;
-                                await loginWithSecurityOtpPrompt(
-                                  context: context,
-                                  client: client,
-                                );
-                                await ref
-                                    .read(vtopusersutilsProvider.notifier)
-                                    .vtopUserSave(
-                                      user.withCredentials(
-                                        newUsername,
-                                        newPassword,
-                                      ),
-                                    );
-                                if (user.username != null &&
-                                    user.username != newUsername) {
-                                  await clearStoredVtopSession(user.username!);
-                                }
-                                ref.invalidate(vtopUserProvider);
-                                ref.invalidate(vClientProvider);
-                              } catch (e) {
-                                if (outerContext.mounted) {
-                                  disOnbardingCommonToast(outerContext, e);
-                                }
-                              } finally {
-                                isLoading.value = false;
-                              }
-
-                              if (dialogContext.mounted) {
-                                Navigator.of(dialogContext).pop();
-                              }
-                            },
-                            child: const Text('Update'),
-                          )
-                        else
-                          SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: context.theme.colors.primary,
-                            ),
-                          ),
-                        FButton(
-                          variant: FButtonVariant.outline,
-                          onPress: () => Navigator.of(dialogContext).pop(),
-                          child: const Text('Cancel'),
+                return AppDialog(
+                  title: const Text('Update Credentials'),
+                  body: Column(
+                    mainAxisSize: .min,
+                    spacing: 12,
+                    children: [
+                      FTextField(
+                        control: FTextFieldControl.managed(
+                          controller: usernameController,
                         ),
-                      ],
-                    );
-                  },
+                        label: const Text("Username"),
+                      ),
+                      FTextField.password(
+                        control: FTextFieldControl.managed(
+                          controller: passwordController,
+                        ),
+                        obscuringCharacter: '*',
+                        label: const Text("New Password"),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    if (!isLoading.value)
+                      FButton(
+                        onPress: () async {
+                          final newUsername = usernameController.text.trim();
+                          final newPassword = passwordController.text.trim();
+                          if (newUsername.isEmpty || newPassword.isEmpty) {
+                            return;
+                          }
+
+                          isLoading.value = true;
+                          try {
+                            final client = await createVtopClient(
+                              username: newUsername,
+                              password: newPassword,
+                            );
+                            if (!context.mounted) return;
+                            await loginWithSecurityOtpPrompt(
+                              context: context,
+                              client: client,
+                            );
+                            await ref
+                                .read(vtopusersutilsProvider.notifier)
+                                .vtopUserSave(
+                                  user.withCredentials(
+                                    newUsername,
+                                    newPassword,
+                                  ),
+                                );
+                            if (user.username != null &&
+                                user.username != newUsername) {
+                              await clearStoredVtopSession(user.username!);
+                            }
+                            ref.invalidate(vtopUserProvider);
+                            ref.invalidate(vClientProvider);
+                          } catch (e) {
+                            if (outerContext.mounted) {
+                              disOnbardingCommonToast(outerContext, e);
+                            }
+                          } finally {
+                            isLoading.value = false;
+                          }
+
+                          if (dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        },
+                        child: const Text('Update'),
+                      )
+                    else
+                      SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: context.theme.colors.primary,
+                        ),
+                      ),
+                    FButton(
+                      variant: .outline,
+                      onPress: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ],
                 );
               },
-            );
-          },
+            ),
+          ),
           child: const Text('Update details'),
         ),
       ],

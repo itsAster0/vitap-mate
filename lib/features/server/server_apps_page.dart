@@ -114,7 +114,7 @@ class ServerAppsPage extends HookConsumerWidget {
             ? outingPermissionDetail
             : 'AI agents using this key can still see your outings, but no longer apply for or cancel them.',
         action: on ? 'Allow' : 'Stop',
-        direction: Axis.horizontal,
+        direction: .horizontal,
       )) {
         return;
       }
@@ -142,12 +142,11 @@ class ServerAppsPage extends HookConsumerWidget {
         ? _Offline.wait10
         : _Offline.wait20;
 
-    Future<void> saveOffline(_Offline mode) =>
-        run('Could not change', () async {
-          if (mode == _Offline.phone) {
-            await actions.setServerSignIn(false);
-            return;
-          }
+    Future<void> chooseOffline(_Offline mode) async {
+      pendingOffline.value = mode;
+      try {
+        await run('Could not change', () async {
+          if (mode == .phone) return actions.setServerSignIn(false);
           // Seal the password first if it is not already (needs OTP
           // forwarding or Gmail).
           if (!(account.value?.savedCredentials ?? false)) {
@@ -155,16 +154,11 @@ class ServerAppsPage extends HookConsumerWidget {
           }
           await actions.updateSettings(
             BridgeSettings(
-              alwaysUseVault: mode == _Offline.server,
-              phoneWaitSecs: mode == _Offline.wait10 ? 10 : 20,
+              alwaysUseVault: mode == .server,
+              phoneWaitSecs: mode == .wait10 ? 10 : 20,
             ),
           );
         });
-
-    Future<void> chooseOffline(_Offline mode) async {
-      pendingOffline.value = mode;
-      try {
-        await saveOffline(mode);
       } finally {
         if (context.mounted) pendingOffline.value = null;
       }
@@ -181,13 +175,13 @@ class ServerAppsPage extends HookConsumerWidget {
         else if (!account.hasValue) ...[
           const SizedBox(height: Space.md),
           FAlert(
-            variant: FAlertVariant.destructive,
+            variant: .destructive,
             title: const Text('Could not load your account'),
             subtitle: Text('${account.error}'),
           ),
           const SizedBox(height: Space.sm),
           FButton(
-            variant: FButtonVariant.outline,
+            variant: .outline,
             onPress: account.isLoading
                 ? null
                 : () => ref.invalidate(serverAccountProvider),
@@ -201,7 +195,7 @@ class ServerAppsPage extends HookConsumerWidget {
               when status?.vaultSavedAt == null ||
                   rejected.isAfter(status!.vaultSavedAt!)) ...[
             const FAlert(
-              variant: FAlertVariant.destructive,
+              variant: .destructive,
               title: Text('VTOP rejected your saved password'),
               subtitle: Text('Pick a server option again to save a fresh one.'),
             ),
@@ -215,7 +209,7 @@ class ServerAppsPage extends HookConsumerWidget {
             onSelect: chooseOffline,
             options: [
               PickerOption(
-                value: _Offline.phone,
+                value: .phone,
                 title: 'Only this phone',
                 summary: 'Nothing on the server',
                 detail: 'Apps wait for this phone to sign in.',
@@ -223,7 +217,7 @@ class ServerAppsPage extends HookConsumerWidget {
                 tone: colors.app.accentTone,
               ),
               PickerOption(
-                value: _Offline.wait10,
+                value: .wait10,
                 title: 'Wait 10s, then the server',
                 summary: 'This phone first',
                 detail: 'Give this phone 10 seconds, then the server signs in.',
@@ -231,7 +225,7 @@ class ServerAppsPage extends HookConsumerWidget {
                 tone: colors.app.lab,
               ),
               PickerOption(
-                value: _Offline.wait20,
+                value: .wait20,
                 title: 'Wait 20s, then the server',
                 summary: 'This phone first, longer',
                 detail: 'Give this phone 20 seconds, then the server signs in.',
@@ -239,7 +233,7 @@ class ServerAppsPage extends HookConsumerWidget {
                 tone: colors.app.lab,
               ),
               PickerOption(
-                value: _Offline.server,
+                value: .server,
                 title: 'Server signs in right away',
                 summary: 'Fastest for apps',
                 detail: 'This phone is not asked first.',
@@ -256,7 +250,7 @@ class ServerAppsPage extends HookConsumerWidget {
             trailing: Text('${keys.length}/$_maxKeys'),
           ),
           FTileGroup(
-            divider: FItemDivider.indented,
+            divider: .indented,
             children: [
               for (final key in keys)
                 FTile(
@@ -285,11 +279,11 @@ class ServerAppsPage extends HookConsumerWidget {
                   onLongPress: busy.value ? null : () => showSaved(key),
                   suffix: revoking.value == key.id
                       ? const Padding(
-                          padding: EdgeInsets.all(Space.sm),
+                          padding: .all(Space.sm),
                           child: FCircularProgress.pinwheel(),
                         )
                       : FButton.icon(
-                          variant: FButtonVariant.ghost,
+                          variant: .ghost,
                           onPress: busy.value ? null : () => revoke(key),
                           child: const Icon(FLucideIcons.trash2),
                         ),
@@ -346,29 +340,29 @@ class _AppsSkeleton extends StatelessWidget {
     FTile row(double title, double subtitle) => FTile(
       prefix: const Skeleton(width: 30, height: 30, radius: Radii.sm + 1),
       title: Align(
-        alignment: Alignment.centerLeft,
+        alignment: .centerLeft,
         child: Skeleton(width: title, height: 14),
       ),
       subtitle: Padding(
-        padding: const EdgeInsets.only(top: 6),
+        padding: const .only(top: 6),
         child: Align(
-          alignment: Alignment.centerLeft,
+          alignment: .centerLeft,
           child: Skeleton(width: subtitle, height: 11),
         ),
       ),
     );
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: .stretch,
       children: [
         const SizedBox(height: Space.md),
         FTileGroup(children: [row(170, 120)]),
         const SizedBox(height: Space.lg),
         const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: Space.sm),
+          padding: .only(left: 4, bottom: Space.sm),
           child: Skeleton(width: 90, height: 14),
         ),
         FTileGroup(
-          divider: FItemDivider.indented,
+          divider: .indented,
           children: [row(110, 190), row(130, 160), row(90, 150)],
         ),
       ],

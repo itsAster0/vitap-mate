@@ -83,16 +83,16 @@ class ServerPage extends ConsumerWidget {
         const SectionHeader(title: 'VTOP'),
         const VtopModePicker(),
         ServerNote(switch (mode) {
-          VtopServerMode.off => 'Nothing about VTOP goes through the server.',
-          VtopServerMode.compress =>
+          .off => 'Nothing about VTOP goes through the server.',
+          .compress =>
             'VTOP\'s pages reach the phone compressed through the server.',
-          VtopServerMode.server =>
+          .server =>
             'Your password goes to the server for each sign-in and is not kept; nor is the session. Outing requests and file downloads still go from the phone. If the server is down, the phone fetches itself.',
         }),
-        if (mode == VtopServerMode.server) const UdpModeTile(),
+        if (mode == .server) const UdpModeTile(),
         const SectionHeader(title: 'Apps and phones'),
         FTileGroup(
-          divider: FItemDivider.indented,
+          divider: .indented,
           children: [
             row(
               'Connected apps',
@@ -114,7 +114,7 @@ class ServerPage extends ConsumerWidget {
         ),
         const SectionHeader(title: 'Server'),
         FTileGroup(
-          divider: FItemDivider.indented,
+          divider: .indented,
           children: [
             row(
               'Server address',

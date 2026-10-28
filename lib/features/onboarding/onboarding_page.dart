@@ -32,12 +32,12 @@ class OnboardingPage extends HookConsumerWidget {
       resizeToAvoidBottomInset: true,
       header: FHeader.nested(title: const Text("Vitap Mate")),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const .only(bottom: 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: .stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.only(right: 50, left: 50, top: 10),
+              padding: const .only(right: 50, left: 50, top: 10),
               child: Row(
                 children: [
                   CircleAvatar(
@@ -69,19 +69,16 @@ class OnboardingPage extends HookConsumerWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const .symmetric(horizontal: 12),
               child: !stepTwo.value ? Step1(two: stepTwo) : const Step2(),
             ),
-
             const SizedBox(height: 20),
             const Padding(
-              padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
+              padding: .symmetric(horizontal: 12),
               child: FAlert(
-                variant: FAlertVariant.primary,
+                variant: .primary,
                 title: Text('Login failed?'),
                 subtitle: Text(
                   'Try logging in on the VTOP website, then try again here.',
@@ -90,9 +87,9 @@ class OnboardingPage extends HookConsumerWidget {
             ),
             const SizedBox(height: 8),
             const Padding(
-              padding: EdgeInsets.fromLTRB(12, 0, 12, 0),
+              padding: .symmetric(horizontal: 12),
               child: FAlert(
-                variant: FAlertVariant.destructive,
+                variant: .destructive,
                 title: Text('NOTE!'),
                 subtitle: Text(
                   'Please install or update the app from Play Store only.',
@@ -107,7 +104,7 @@ class OnboardingPage extends HookConsumerWidget {
 }
 
 class Step1 extends HookConsumerWidget {
-  final ValueNotifier two;
+  final ValueNotifier<bool> two;
   const Step1({super.key, required this.two});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -117,7 +114,6 @@ class Step1 extends HookConsumerWidget {
     final password = useTextEditingController();
     Future<void> handlePress() async {
       isloading.value = true;
-
       try {
         final client = await createVtopClient(
           username: username.text,
@@ -130,9 +126,7 @@ class Step1 extends HookConsumerWidget {
         _globalClient = client;
         two.value = true;
       } catch (e) {
-        if (context.mounted) {
-          disOnbardingCommonToast(context, e);
-        }
+        if (context.mounted) disOnbardingCommonToast(context, e);
       } finally {
         isloading.value = false;
       }
@@ -141,7 +135,7 @@ class Step1 extends HookConsumerWidget {
     return Form(
       key: formKey,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: .start,
         children: [
           SizedBox(height: 25),
           FTextFormField(
@@ -167,10 +161,7 @@ class Step1 extends HookConsumerWidget {
               ? FButton(
                   child: const Text('Next'),
                   onPress: () {
-                    if (formKey.currentState!.validate()) {
-                      handlePress();
-                      return;
-                    }
+                    if (formKey.currentState!.validate()) handlePress();
                   },
                 )
               : SizedBox(
@@ -199,21 +190,16 @@ class Step2 extends HookConsumerWidget {
     Future<void> getSemData() async {
       fetching.value = true;
       try {
-        SemesterData semdata = await fetchSemesters(client: _globalClient);
-        data.value = semdata;
+        data.value = await fetchSemesters(client: _globalClient);
       } catch (e) {
-        if (context.mounted) {
-          disOnbardingCommonToast(context, e);
-        }
+        if (context.mounted) disOnbardingCommonToast(context, e);
       } finally {
         fetching.value = false;
       }
     }
 
     useEffect(() {
-      Future.microtask(() async {
-        getSemData();
-      });
+      Future.microtask(getSemData);
       return null;
     }, []);
 
@@ -221,8 +207,8 @@ class Step2 extends HookConsumerWidget {
       return Form(
         key: formKey,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisAlignment: .start,
+          crossAxisAlignment: .center,
           children: [
             FSelectTileGroup(
               control: FMultiValueControl.managedRadio(
@@ -261,11 +247,8 @@ class Step2 extends HookConsumerWidget {
                     await saveStoredVtopSession(snapshot);
                     ref.invalidate(vtopUserProvider);
                     await ref.read(vtopUserProvider.future);
-
                     await ref.read(vClientProvider.future);
-                    if (context.mounted) {
-                      GoRouter.of(context).goNamed(Paths.timetable);
-                    }
+                    if (context.mounted) context.goNamed(Paths.timetable);
                   } catch (e) {
                     log("$e");
                   }
@@ -278,24 +261,19 @@ class Step2 extends HookConsumerWidget {
           ],
         ),
       );
-    } else if (fetching.value && data.value == null) {
-      return Center(child: CircularProgressIndicator(color: Colors.black));
-    } else {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 20,
-          children: [
-            Text("Failed to get semesters data"),
-            FButton(
-              onPress: () async {
-                await getSemData();
-              },
-              child: const Text('Try again'),
-            ),
-          ],
-        ),
-      );
     }
+    if (fetching.value && data.value == null) {
+      return Center(child: CircularProgressIndicator(color: Colors.black));
+    }
+    return Center(
+      child: Column(
+        mainAxisAlignment: .center,
+        spacing: 20,
+        children: [
+          Text("Failed to get semesters data"),
+          FButton(onPress: getSemData, child: const Text('Try again')),
+        ],
+      ),
+    );
   }
 }
