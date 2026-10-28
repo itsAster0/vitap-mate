@@ -11,6 +11,28 @@ const _maximumCredentialFileBytes = 64 * 1024;
 const _googleAuthorizationEndpoint =
     'https://accounts.google.com/o/oauth2/v2/auth';
 const _googleTokenEndpoint = 'https://oauth2.googleapis.com/token';
+const _cancelled = GoogleDesktopOAuthException(
+  'cancelled',
+  'Google authorization was cancelled.',
+);
+
+/// A request to Google that failed on the network rather than with an answer.
+bool isNetworkError(Object error) =>
+    error is TimeoutException ||
+    error is SocketException ||
+    error is http.ClientException;
+
+/// [body] as a JSON object, or empty when it is not one.
+Map<String, dynamic> decodeJsonObject(String body) {
+  try {
+    return switch (jsonDecode(body)) {
+      final Map<String, dynamic> decoded => decoded,
+      _ => const {},
+    };
+  } catch (_) {
+    return const {};
+  }
+}
 
 class GoogleDesktopOAuthCredentials {
   const GoogleDesktopOAuthCredentials({
@@ -188,6 +210,8 @@ class GoogleLoopbackOAuthCoordinator {
         .encode(sha256.convert(ascii.encode(verifier)).bytes)
         .replaceAll('=', '');
     final callback = Completer<Uri>();
+    Future<T> cancelled<T>() =>
+        _cancellation!.future.then<T>((_) => throw _cancelled);
     late final StreamSubscription<HttpRequest> subscription;
     subscription = server.listen((request) async {
       if (request.uri.path != '/oauth2callback') {
@@ -259,12 +283,7 @@ class GoogleLoopbackOAuthCoordinator {
             'Google authorization timed out. If the browser could not connect, return to the app and retry.',
           ),
         ),
-        _cancellation!.future.then<Uri>(
-          (_) => throw const GoogleDesktopOAuthException(
-            'cancelled',
-            'Google authorization was cancelled.',
-          ),
-        ),
+        cancelled<Uri>(),
       ]);
 
       onProgress?.call(
@@ -292,12 +311,7 @@ class GoogleLoopbackOAuthCoordinator {
         );
         await Future.any<void>([
           beforeTokenExchange(),
-          _cancellation!.future.then<void>(
-            (_) => throw const GoogleDesktopOAuthException(
-              'cancelled',
-              'Google authorization was cancelled.',
-            ),
-          ),
+          cancelled<void>(),
           Future<void>.delayed(
             timeout,
             () => throw const GoogleDesktopOAuthException(
@@ -308,18 +322,15 @@ class GoogleLoopbackOAuthCoordinator {
         ]);
       }
 
-      final body = <String, String>{
+      final response = await _exchangeCode({
         'client_id': credentials.clientId,
         'code': code,
         'code_verifier': verifier,
         'grant_type': 'authorization_code',
         'redirect_uri': redirectUri.toString(),
-      };
-      if (credentials.clientSecret case final secret?) {
-        body['client_secret'] = secret;
-      }
-      final response = await _exchangeCode(body);
-      final decoded = _decodeResponse(response.body);
+        'client_secret': ?credentials.clientSecret,
+      });
+      final decoded = decodeJsonObject(response.body);
       if (response.statusCode != HttpStatus.ok) {
         final error = '${decoded['error'] ?? 'token_exchange_failed'}';
         throw GoogleDesktopOAuthException(error, _tokenErrorMessage(error));
@@ -379,18 +390,15 @@ class GoogleLoopbackOAuthCoordinator {
         return await _httpClient
             .post(tokenEndpoint, body: body)
             .timeout(const Duration(seconds: 30));
-      } on TimeoutException {
-        // Retry once after the app has returned to the foreground.
-      } on SocketException {
-        // Retry once after the app has returned to the foreground.
-      } on http.ClientException {
+      } catch (error) {
+        if (!isNetworkError(error)) rethrow;
         // Retry once after the app has returned to the foreground.
       }
       if (attempt == 0) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
       }
     }
-    throw GoogleDesktopOAuthException(
+    throw const GoogleDesktopOAuthException(
       'token_network_failed',
       'Google approved access, but the app could not reach Google to finish setup. Return to Vitap Mate, check your connection, and retry.',
     );
@@ -399,15 +407,6 @@ class GoogleLoopbackOAuthCoordinator {
   String _randomUrlSafeString(int byteCount) {
     final bytes = List<int>.generate(byteCount, (_) => _random.nextInt(256));
     return base64Url.encode(bytes).replaceAll('=', '');
-  }
-
-  Map<String, dynamic> _decodeResponse(String body) {
-    try {
-      final decoded = jsonDecode(body);
-      return decoded is Map<String, dynamic> ? decoded : const {};
-    } catch (_) {
-      return const {};
-    }
   }
 
   String _authorizationErrorMessage(String error) => switch (error) {

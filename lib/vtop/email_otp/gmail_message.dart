@@ -4,14 +4,14 @@ import 'dart:convert';
 
 /// The value of the [message]'s first [name] header, trimmed.
 String? gmailHeader(Map<String, dynamic> message, String name) {
-  final payload = message['payload'];
-  if (payload is! Map<String, dynamic>) return null;
-  final headers = payload['headers'];
-  if (headers is! List<dynamic>) return null;
-  for (final item in headers) {
-    if (item is Map<String, dynamic> &&
-        '${item['name']}'.toLowerCase() == name.toLowerCase()) {
-      return '${item['value']}'.trim();
+  if (message['payload'] case <String, dynamic>{
+    'headers': final List<dynamic> headers,
+  }) {
+    for (final item in headers) {
+      if (item is Map<String, dynamic> &&
+          '${item['name']}'.toLowerCase() == name.toLowerCase()) {
+        return '${item['value']}'.trim();
+      }
     }
   }
   return null;
@@ -32,8 +32,7 @@ String gmailMessageText(Map<String, dynamic> message) {
   if (snippet is String && snippet.isNotEmpty) buffer.writeln(snippet);
   void append(Object? payload) {
     if (payload is! Map<String, dynamic>) return;
-    final data = payload['body'] is Map ? payload['body']['data'] : null;
-    if (data is String && data.isNotEmpty) {
+    if (payload['body'] case {'data': final String data} when data.isNotEmpty) {
       final text = _decodeBase64Url(data);
       if (text.isNotEmpty) buffer.writeln(text);
     }

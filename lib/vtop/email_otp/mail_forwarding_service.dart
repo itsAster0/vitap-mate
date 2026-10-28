@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:vitapmate/observability/log.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/vtop/route/server_url.dart';
+import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/src/api/mail_otp.dart';
 import 'package:vitapmate/vtop/edge/edge_device.dart';
 import 'package:vitapmate/vtop/edge/edge_events.dart';
-import 'package:vitapmate/src/api/mail_otp.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
+import 'package:vitapmate/vtop/route/server_url.dart';
 
 part 'mail_forwarding_service.g.dart';
 
@@ -74,26 +74,30 @@ class MailForwarding {
     'ownerClaimed': ownerClaimed,
   };
 
-  static MailForwarding? fromJson(Object? json) {
-    if (json is! Map) return null;
-    final id = json['id'], address = json['address'];
-    final secret = json['secret'], privateKey = json['privateKey'];
-    if (id is! String || address is! String) return null;
-    if (secret is! String || privateKey is! String) return null;
-    final fcmToken = json['fcmToken'];
-    final lastOtpAt = json['lastOtpAt'];
-    return MailForwarding(
-      id: id,
-      address: address,
-      secret: secret,
-      privateKey: privateKey,
-      fcmToken: fcmToken is String ? fcmToken : null,
-      lastOtpAt: lastOtpAt is int
-          ? DateTime.fromMillisecondsSinceEpoch(lastOtpAt)
-          : null,
-      ownerClaimed: json['ownerClaimed'] == true,
-    );
-  }
+  static MailForwarding? fromJson(Object? json) => switch (json) {
+    {
+      'id': final String id,
+      'address': final String address,
+      'secret': final String secret,
+      'privateKey': final String privateKey,
+    } =>
+      MailForwarding(
+        id: id,
+        address: address,
+        secret: secret,
+        privateKey: privateKey,
+        fcmToken: switch (json['fcmToken']) {
+          final String token => token,
+          _ => null,
+        },
+        lastOtpAt: switch (json['lastOtpAt']) {
+          final int ms => DateTime.fromMillisecondsSinceEpoch(ms),
+          _ => null,
+        },
+        ownerClaimed: json['ownerClaimed'] == true,
+      ),
+    _ => null,
+  };
 }
 
 /// One install an address forwards to, as the edge lists them.
@@ -182,17 +186,19 @@ class MailOtpPayload {
       final kind = json['kind'];
       if (kind is! String) return null;
       final sentAt = json['sentAt'];
+      String? field(String key) => switch (json[key]) {
+        final String value => value,
+        _ => null,
+      };
       return MailOtpPayload(
         kind: kind,
         sentAt: DateTime.fromMillisecondsSinceEpoch(
           (sentAt is int ? sentAt : 0) * 1000,
           isUtc: true,
         ),
-        code: json['code'] is String ? json['code'] as String : null,
-        link: json['link'] is String ? json['link'] as String : null,
-        requester: json['requester'] is String
-            ? json['requester'] as String
-            : null,
+        code: field('code'),
+        link: field('link'),
+        requester: field('requester'),
       );
     } catch (_) {
       return null;
@@ -258,9 +264,8 @@ final _events = StreamController<MailOtpPayload>.broadcast();
 Stream<MailOtpPayload> get mailOtpEvents => _events.stream;
 
 /// An edge event carrying a box: opened like a push.
-Future<void> handleMailOtpEvent(EdgeEvent event) async {
-  await MailForwardingService().handlePush(event.data);
-}
+Future<void> handleMailOtpEvent(EdgeEvent event) =>
+    MailForwardingService().handlePush(event.data);
 
 /// Talks to the edge's `/v1/mail-otp` routes and opens boxes locally.
 /// Never logs codes, secrets or keys.
@@ -293,68 +298,81 @@ class MailForwardingService {
 
   Future<bool> isReady() async => await _store.read() != null;
 
-  Future<Map<String, dynamic>> _post(
+  /// [call], with the edge's errors as [MailForwardingException]s.
+  static Future<T> _edge<T>(Future<T> Function() call) async {
+    try {
+      return await call();
+    } on EdgeException catch (error) {
+      throw MailForwardingException(
+        error.code,
+        error.message,
+        statusCode: error.statusCode,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _post(String path, Map<String, dynamic> body) =>
+      _edge(() async {
+        final base = _baseUrl ?? await currentServerUrl();
+        return edgePost(_client, base, '/v1/mail-otp/$path', body);
+      });
+
+  /// [_post] as the owner of [forwarding].
+  Future<Map<String, dynamic>> _postAs(
+    MailForwarding forwarding,
+    String path, [
+    Map<String, dynamic> extra = const {},
+  ]) =>
+      _post(path, {'id': forwarding.id, 'secret': forwarding.secret, ...extra});
+
+  /// Puts this install on an address (`register` or `reclaim`) with a fresh
+  /// key pair, registering the install again when the edge lost it (see
+  /// [EdgeDeviceService.withInstall]).
+  Future<MailForwarding> _join(
     String path,
-    Map<String, dynamic> body,
-  ) async {
-    try {
-      final base = _baseUrl ?? await currentServerUrl();
-      return await edgePost(_client, base, '/v1/mail-otp/$path', body);
-    } on EdgeException catch (error) {
-      throw MailForwardingException(
-        error.code,
-        error.message,
-        statusCode: error.statusCode,
-      );
-    }
-  }
-
-  /// Runs [call] with this install, registering it again when the edge
-  /// lost it (see [EdgeDeviceService.withInstall]).
-  Future<T> _withDevice<T>(
-    String fcmToken,
-    Future<T> Function(EdgeDevice device) call,
-  ) async {
-    try {
-      return await _devices.withInstall(fcmToken, call);
-    } on EdgeException catch (error) {
-      throw MailForwardingException(
-        error.code,
-        error.message,
-        statusCode: error.statusCode,
-      );
-    }
-  }
-
-  /// Creates a new forwarding address with a fresh keypair, replacing any
-  /// previous one on this phone.
-  Future<MailForwarding> register({required String fcmToken}) async {
+    String fcmToken, {
+    String? cookies,
+    bool ownerClaimed = false,
+  }) async {
     final keypair = _keypair();
     final label = await _deviceLabel();
-    final body = await _withDevice(
-      fcmToken,
-      (device) => _post('register', {
-        'publicKey': keypair.publicKey,
-        'deviceId': device.id,
-        'deviceSecret': device.secret,
-        'label': ?label,
-      }),
+    final body = await _edge(
+      () => _devices.withInstall(
+        fcmToken,
+        (device) => _post(path, {
+          if (cookies != null) 'session': {'cookies': cookies},
+          'publicKey': keypair.publicKey,
+          'deviceId': device.id,
+          'deviceSecret': device.secret,
+          'label': ?label,
+        }),
+      ),
     );
-    final id = body['id'], address = body['address'], secret = body['secret'];
-    if (id is! String || address is! String || secret is! String) {
-      throw const MailForwardingException(
-        'bad_response',
-        'The bridge sent an unexpected answer.',
+    if (body case {
+      'id': final String id,
+      'address': final String address,
+      'secret': final String secret,
+    }) {
+      return MailForwarding(
+        id: id,
+        address: address,
+        secret: secret,
+        privateKey: keypair.secret,
+        fcmToken: fcmToken,
+        ownerClaimed: ownerClaimed,
       );
     }
-    final previous = await _store.read();
-    final forwarding = MailForwarding(
-      id: id,
-      address: address,
-      secret: secret,
-      privateKey: keypair.secret,
-      fcmToken: fcmToken,
+    throw const MailForwardingException(
+      'bad_response',
+      'The bridge sent an unexpected answer.',
     );
+  }
+
+  /// Creates a new forwarding address, replacing any previous one on this
+  /// phone.
+  Future<MailForwarding> register({required String fcmToken}) async {
+    final forwarding = await _join('register', fcmToken);
+    final previous = await _store.read();
     await _store.write(forwarding);
     if (previous != null) unawaited(_deleteRemote(previous));
     unawaited(EdgeEventChannel.instance.connect());
@@ -367,9 +385,7 @@ class MailForwardingService {
   Future<void> claimOwner({required String cookies}) async {
     final forwarding = await _store.read();
     if (forwarding == null) return;
-    await _post('owner', {
-      'id': forwarding.id,
-      'secret': forwarding.secret,
+    await _postAs(forwarding, 'owner', {
       'session': {'cookies': cookies},
     });
     await _store.write(forwarding.copyWith(ownerClaimed: true));
@@ -382,39 +398,18 @@ class MailForwardingService {
     required String cookies,
     required String fcmToken,
   }) async {
-    final keypair = _keypair();
-    final label = await _deviceLabel();
-    final Map<String, dynamic> body;
+    final MailForwarding forwarding;
     try {
-      body = await _withDevice(
+      forwarding = await _join(
+        'reclaim',
         fcmToken,
-        (device) => _post('reclaim', {
-          'session': {'cookies': cookies},
-          'publicKey': keypair.publicKey,
-          'deviceId': device.id,
-          'deviceSecret': device.secret,
-          'label': ?label,
-        }),
+        cookies: cookies,
+        ownerClaimed: true,
       );
     } on MailForwardingException catch (error) {
       if (error.mailboxGone) return null;
       rethrow;
     }
-    final id = body['id'], address = body['address'], secret = body['secret'];
-    if (id is! String || address is! String || secret is! String) {
-      throw const MailForwardingException(
-        'bad_response',
-        'The bridge sent an unexpected answer.',
-      );
-    }
-    final forwarding = MailForwarding(
-      id: id,
-      address: address,
-      secret: secret,
-      privateKey: keypair.secret,
-      fcmToken: fcmToken,
-      ownerClaimed: true,
-    );
     await _store.write(forwarding);
     unawaited(EdgeEventChannel.instance.connect());
     return forwarding;
@@ -423,22 +418,11 @@ class MailForwardingService {
   /// Tells the edge about a new FCM token, when it changed. Pushes go to
   /// the install, so the address follows it if it had to register again.
   Future<void> syncFcmToken(String? token) async {
-    final EdgeDevice? moved;
-    try {
-      moved = await _devices.syncFcmToken(token);
-    } on EdgeException catch (error) {
-      throw MailForwardingException(
-        error.code,
-        error.message,
-        statusCode: error.statusCode,
-      );
-    }
+    final moved = await _edge(() => _devices.syncFcmToken(token));
     if (moved == null) return;
     final forwarding = await _store.read();
     if (forwarding != null) {
-      await _post('update', {
-        'id': forwarding.id,
-        'secret': forwarding.secret,
+      await _postAs(forwarding, 'update', {
         'deviceId': moved.id,
         'deviceSecret': moved.secret,
       });
@@ -462,11 +446,7 @@ class MailForwardingService {
     bool everywhere = false,
   }) async {
     try {
-      await _post('delete', {
-        'id': forwarding.id,
-        'secret': forwarding.secret,
-        if (everywhere) 'everywhere': true,
-      });
+      await _postAs(forwarding, 'delete', {if (everywhere) 'everywhere': true});
     } on MailForwardingException catch (error) {
       if (!error.mailboxGone) rethrow;
     }
@@ -480,10 +460,7 @@ class MailForwardingService {
   Future<List<MailForwardingDevice>> devices() async {
     final forwarding = await _store.read();
     if (forwarding == null) return const [];
-    final body = await _post('devices', {
-      'id': forwarding.id,
-      'secret': forwarding.secret,
-    });
+    final body = await _postAs(forwarding, 'devices');
     final list = body['devices'];
     if (list is! List) return const [];
     return [for (final item in list) ?MailForwardingDevice.fromJson(item)];
@@ -493,11 +470,7 @@ class MailForwardingService {
   Future<void> removeDevice(String deviceId) async {
     final forwarding = await _store.read();
     if (forwarding == null) return;
-    await _post('devices/remove', {
-      'id': forwarding.id,
-      'secret': forwarding.secret,
-      'removeDevice': deviceId,
-    });
+    await _postAs(forwarding, 'devices/remove', {'removeDevice': deviceId});
   }
 
   /// The latest box the edge holds (kept 5 minutes), opened. For when a
@@ -505,10 +478,7 @@ class MailForwardingService {
   Future<MailOtpPayload?> pullInbox() async {
     final forwarding = await _store.read();
     if (forwarding == null) return null;
-    final body = await _post('inbox', {
-      'id': forwarding.id,
-      'secret': forwarding.secret,
-    });
+    final body = await _postAs(forwarding, 'inbox');
     final sealed = body['sealed'];
     if (sealed is! String || sealed.isEmpty) return null;
     return _deliver(forwarding, sealed);

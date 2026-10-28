@@ -1,22 +1,21 @@
-import 'package:vitapmate/observability/log.dart';
-import 'package:vitapmate/src/api/email_otp.dart';
-import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/src/api/email_otp.dart';
+import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/vtop/email_otp/gmail_message.dart';
 import 'package:vitapmate/vtop/email_otp/google_oauth_loopback.dart';
-
-export 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
+
+export 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
 
 part 'google_email_oauth_service.g.dart';
 
@@ -36,13 +35,16 @@ const gmailOauthScopes = <String>[
   'openid',
   'email',
   'profile',
-  'https://www.googleapis.com/auth/gmail.modify',
+  _gmailModifyScope,
 ];
 const _googleServiceConfiguration = AuthorizationServiceConfiguration(
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
   tokenEndpoint: 'https://oauth2.googleapis.com/token',
 );
 const _oauthStorageKey = 'email_otp_oauth_session_v1';
+const _gmailModifyScope = 'https://www.googleapis.com/auth/gmail.modify';
+const _gmailRevoked =
+    'Google authorization expired or was revoked. Reconnect Gmail.';
 
 typedef GmailOtpFinder =
     Future<GmailOtpCode?> Function({
@@ -72,22 +74,19 @@ GoogleEmailOtpAuthService googleEmailOtpAuthService(Ref ref) {
 
 /// Gmail access is connected (own key or shared). Server sign-in needs it.
 @Riverpod(keepAlive: true)
-Future<bool> emailOtpReady(Ref ref) {
-  return ref.watch(googleEmailOtpAuthServiceProvider).isReady();
-}
+Future<bool> emailOtpReady(Ref ref) =>
+    ref.watch(googleEmailOtpAuthServiceProvider).isReady();
 
 /// Some way of reading the OTP is set up: Gmail or a forwarding address.
 @Riverpod(keepAlive: true)
-Future<bool> anyEmailOtpReady(Ref ref) async {
-  return await ref.watch(emailOtpReadyProvider.future) ||
-      (!ref.watch(onDeviceModeProvider) &&
-          await ref.watch(mailForwardingServiceProvider).isReady());
-}
+Future<bool> anyEmailOtpReady(Ref ref) async =>
+    await ref.watch(emailOtpReadyProvider.future) ||
+    (!ref.watch(onDeviceModeProvider) &&
+        await ref.watch(mailForwardingServiceProvider).isReady());
 
 @Riverpod(keepAlive: true)
-Future<bool> emailOtpSetupNeeded(Ref ref) async {
-  return !await ref.watch(anyEmailOtpReadyProvider.future);
-}
+Future<bool> emailOtpSetupNeeded(Ref ref) async =>
+    !await ref.watch(anyEmailOtpReadyProvider.future);
 
 class GoogleEmailOtpAuthService {
   GoogleEmailOtpAuthService({
@@ -97,8 +96,8 @@ class GoogleEmailOtpAuthService {
     required GoogleLoopbackOAuthCoordinator loopbackOAuth,
     GmailOtpFinder? findOtp,
     GmailOtpTidier? tidyUp,
-  }) : _findOtp = findOtp ?? _rustFindOtp,
-       _tidyUp = tidyUp ?? _rustTidyUp,
+  }) : _findOtp = findOtp ?? gmailFindOtp,
+       _tidyUp = tidyUp ?? gmailTidyUp,
        _appAuth = appAuth,
        _storage = storage,
        _http = httpClient,
@@ -107,6 +106,7 @@ class GoogleEmailOtpAuthService {
   final FlutterAppAuth _appAuth;
   final FlutterSecureStorage _storage;
   final http.Client _http;
+  final GoogleLoopbackOAuthCoordinator _loopbackOAuth;
   final Set<String> _consumedOtpMessageIds = {};
 
   /// Rust's Gmail OTP reader (`vtop_core::gmail`) by default; swappable so
@@ -114,40 +114,23 @@ class GoogleEmailOtpAuthService {
   final GmailOtpFinder _findOtp;
   final GmailOtpTidier _tidyUp;
 
-  static Future<GmailOtpCode?> _rustFindOtp({
-    required String accessToken,
-    BigInt? expiresAtUnix,
-    required BigInt issuedAtUnix,
-    required List<String> skipMessageIds,
-  }) => gmailFindOtp(
-    accessToken: accessToken,
-    expiresAtUnix: expiresAtUnix,
-    issuedAtUnix: issuedAtUnix,
-    skipMessageIds: skipMessageIds,
-  );
-
-  static Future<void> _rustTidyUp({
-    required String accessToken,
-    required String messageId,
-    required bool deleteAfterReading,
-  }) => gmailTidyUp(
-    accessToken: accessToken,
-    messageId: messageId,
-    deleteAfterReading: deleteAfterReading,
-  );
-  final GoogleLoopbackOAuthCoordinator _loopbackOAuth;
-
   Future<EmailOtpOAuthSession?> loadSession() async {
     final raw = await _storage.read(key: _oauthStorageKey);
     if (raw == null || raw.isEmpty) return null;
     try {
-      final json = jsonDecode(raw);
-      if (json is! Map<String, dynamic>) return null;
-      return EmailOtpOAuthSession.fromJson(json);
+      return switch (jsonDecode(raw)) {
+        final Map<String, dynamic> json => EmailOtpOAuthSession.fromJson(json),
+        _ => null,
+      };
     } catch (_) {
       return null;
     }
   }
+
+  Future<void> _saveSession(EmailOtpOAuthSession session) => _storage.write(
+    key: _oauthStorageKey,
+    value: jsonEncode(session.toJson()),
+  );
 
   Future<void> clearSession() async {
     await _loopbackOAuth.cancel();
@@ -156,11 +139,10 @@ class GoogleEmailOtpAuthService {
 
   Future<void> cancelByokSetup() => _loopbackOAuth.cancel();
 
-  GoogleDesktopOAuthCredentials parseByokCredentials(List<int> bytes) {
-    return GoogleDesktopOAuthCredentials.parseBytes(
-      bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
-    );
-  }
+  GoogleDesktopOAuthCredentials parseByokCredentials(List<int> bytes) =>
+      GoogleDesktopOAuthCredentials.parseBytes(
+        bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+      );
 
   Future<bool> isReady() async {
     final session = await loadSession();
@@ -272,10 +254,7 @@ class GoogleEmailOtpAuthService {
       );
       stage = 'saving access securely on this device';
       onProgress?.call('College account verified. Saving Gmail access…');
-      await _storage.write(
-        key: _oauthStorageKey,
-        value: jsonEncode(session.toJson()),
-      );
+      await _saveSession(session);
       final saved = await loadSession();
       if (saved == null ||
           saved.authSource != EmailOtpAuthSource.personalByok ||
@@ -401,9 +380,7 @@ class GoogleEmailOtpAuthService {
       final grantedScopes = gmailTokens.scopes?.isNotEmpty == true
           ? gmailTokens.scopes!
           : gmailOauthScopes;
-      if (!grantedScopes.contains(
-        'https://www.googleapis.com/auth/gmail.modify',
-      )) {
+      if (!grantedScopes.contains(_gmailModifyScope)) {
         return const EmailOtpSetupResult.failed(
           'Google sign-in completed, but Gmail access was not granted. Retry and approve the Gmail permission.',
         );
@@ -431,10 +408,7 @@ class GoogleEmailOtpAuthService {
         accessTokenExpiryEpochMs: expiry.millisecondsSinceEpoch,
         authSource: EmailOtpAuthSource.sharedBuiltIn,
       );
-      await _storage.write(
-        key: _oauthStorageKey,
-        value: jsonEncode(session.toJson()),
-      );
+      await _saveSession(session);
       return EmailOtpSetupResult.ok(
         'Email OTP autofetch is enabled.',
         email: email,
@@ -483,10 +457,7 @@ class GoogleEmailOtpAuthService {
                   DateTime.now().toUtc().add(const Duration(minutes: 50)))
               .millisecondsSinceEpoch,
     );
-    await _storage.write(
-      key: _oauthStorageKey,
-      value: jsonEncode(refreshed.toJson()),
-    );
+    await _saveSession(refreshed);
     return refreshed;
   }
 
@@ -500,24 +471,17 @@ class GoogleEmailOtpAuthService {
         'Personal OAuth credentials are missing. Import the Desktop OAuth JSON again.',
       );
     }
-    final body = <String, String>{
-      'client_id': clientId,
-      'refresh_token': session.refreshToken,
-      'grant_type': 'refresh_token',
-    };
     final secret = session.oauthClientSecret?.trim();
-    if (secret != null && secret.isNotEmpty) {
-      body['client_secret'] = secret;
-    }
     final response = await _http.post(
       Uri.parse('https://oauth2.googleapis.com/token'),
-      body: body,
+      body: {
+        'client_id': clientId,
+        'refresh_token': session.refreshToken,
+        'grant_type': 'refresh_token',
+        if (secret != null && secret.isNotEmpty) 'client_secret': secret,
+      },
     );
-    Map<String, dynamic> decoded = const {};
-    try {
-      final value = jsonDecode(response.body);
-      if (value is Map<String, dynamic>) decoded = value;
-    } catch (_) {}
+    final decoded = decodeJsonObject(response.body);
     if (response.statusCode != 200) {
       final error = '${decoded['error'] ?? 'refresh_failed'}';
       if (error == 'invalid_grant') {
@@ -546,10 +510,7 @@ class GoogleEmailOtpAuthService {
           .add(Duration(seconds: seconds))
           .millisecondsSinceEpoch,
     );
-    await _storage.write(
-      key: _oauthStorageKey,
-      value: jsonEncode(refreshed.toJson()),
-    );
+    await _saveSession(refreshed);
     return refreshed;
   }
 
@@ -587,9 +548,7 @@ class GoogleEmailOtpAuthService {
       } on VtopError catch (retryError) {
         if (_gmailErrorCode(retryError) == 'gmail_unauthorized') {
           await clearSession();
-          throw StateError(
-            'Google authorization expired or was revoked. Reconnect Gmail.',
-          );
+          throw StateError(_gmailRevoked);
         }
         throw _gmailStateError(retryError);
       }
@@ -608,18 +567,14 @@ class GoogleEmailOtpAuthService {
   String? _gmailErrorCode(VtopError error) =>
       error.maybeWhen(configurationError: (code) => code, orElse: () => null);
 
-  StateError _gmailStateError(VtopError error) {
-    switch (_gmailErrorCode(error)) {
-      case 'gmail_forbidden':
-        return StateError(
-          'Gmail refused access. Check the Gmail API is enabled and access was granted, or reconnect Gmail.',
-        );
-      case 'gmail_unavailable':
-        return StateError('Could not reach Gmail. Check your connection.');
-      default:
-        return StateError('Unable to read Gmail inbox ($error).');
-    }
-  }
+  StateError _gmailStateError(
+    VtopError error,
+  ) => StateError(switch (_gmailErrorCode(error)) {
+    'gmail_forbidden' =>
+      'Gmail refused access. Check the Gmail API is enabled and access was granted, or reconnect Gmail.',
+    'gmail_unavailable' => 'Could not reach Gmail. Check your connection.',
+    _ => 'Unable to read Gmail inbox ($error).',
+  });
 
   Future<LatestInfoEmail?> fetchLatestInfoEmail({
     bool deleteAfterReading = true,
@@ -681,11 +636,11 @@ class GoogleEmailOtpAuthService {
     String accessToken,
   ) async {
     final raw = jsonDecode(listResponseBody) as Map<String, dynamic>;
-    final messages = raw['messages'];
-    if (messages is! List<dynamic> || messages.isEmpty) return null;
-    final first = messages.first;
-    if (first is! Map<String, dynamic>) return null;
-    final id = first['id'] as String?;
+    final first = switch (raw['messages']) {
+      [final Map<String, dynamic> first, ...] => first,
+      _ => null,
+    };
+    final id = first?['id'] as String?;
     if (id == null || id.isEmpty) return null;
 
     final res = await _http.get(
@@ -695,9 +650,10 @@ class GoogleEmailOtpAuthService {
       headers: {'Authorization': 'Bearer $accessToken'},
     );
     if (res.statusCode != 200) return null;
-    final message = jsonDecode(res.body);
-    if (message is! Map<String, dynamic>) return null;
-    return message;
+    return switch (jsonDecode(res.body)) {
+      final Map<String, dynamic> message => message,
+      _ => null,
+    };
   }
 
   Future<void> _verifyGmailAccess(String accessToken) async {
@@ -718,9 +674,7 @@ class GoogleEmailOtpAuthService {
     if (response.statusCode == 200) return;
     if (response.statusCode == 401) {
       await clearSession();
-      throw StateError(
-        'Google authorization expired or was revoked. Reconnect Gmail.',
-      );
+      throw StateError(_gmailRevoked);
     }
     if (response.statusCode == 403) {
       final message = _gmailAccessFailureMessage(response);
@@ -740,7 +694,7 @@ class GoogleEmailOtpAuthService {
   String _gmailAccessFailureMessage(http.Response response) {
     final body = response.body.toLowerCase();
     if (response.statusCode == 401) {
-      return 'Google authorization expired or was revoked. Reconnect Gmail.';
+      return _gmailRevoked;
     }
     if (_gmailApiDisabled(body)) {
       return 'The Gmail API is not enabled for this Google Cloud project. Enable Gmail API, wait a minute, then retry.';
@@ -758,10 +712,9 @@ class GoogleEmailOtpAuthService {
         body.contains('failed_precondition')) {
       return 'Gmail is not enabled for this Google account. Open Gmail once or ask the VIT Workspace administrator to enable Gmail, then retry.';
     }
-    if (body.contains('insufficientpermissions') ||
-        body.contains('access_token_scope_insufficient') ||
-        body.contains('insufficient authentication scopes') ||
-        body.contains('insufficient') ||
+    // Covers insufficientPermissions, ACCESS_TOKEN_SCOPE_INSUFFICIENT and
+    // "insufficient authentication scopes".
+    if (body.contains('insufficient') ||
         body.contains('permission') ||
         body.contains('autherror')) {
       return 'Gmail permission was not granted. Reconnect and approve Gmail access on Google’s consent screen.';
@@ -798,11 +751,8 @@ class GoogleEmailOtpAuthService {
         if (json is! Map<String, dynamic>) continue;
         final email = (json[field] as String?)?.trim();
         if (email != null && email.isNotEmpty) return email;
-      } on TimeoutException catch (error) {
-        networkError = error;
-      } on SocketException catch (error) {
-        networkError = error;
-      } on http.ClientException catch (error) {
+      } catch (error) {
+        if (!isNetworkError(error)) rethrow;
         networkError = error;
       }
     }
@@ -811,34 +761,31 @@ class GoogleEmailOtpAuthService {
   }
 
   String _byokFailureMessage(String stage, Object error) {
-    if (error is TimeoutException ||
-        error is SocketException ||
-        error is http.ClientException) {
+    if (isNetworkError(error)) {
       return 'Google approved access, but the app lost its internet connection while $stage. Check the connection and retry BYOK.';
     }
-    if (stage == 'saving access securely on this device') {
-      return 'Google access was approved, but Vitap Mate could not save it securely. Unlock the device, restart the app, and retry BYOK.';
-    }
-    if (stage == 'verifying the Google account') {
-      return 'Google access was approved, but Vitap Mate could not verify the account email. Retry BYOK and keep the app running.';
-    }
-    return 'Personal Google setup failed while $stage. Retry BYOK and keep Vitap Mate running.';
+    return switch (stage) {
+      'saving access securely on this device' =>
+        'Google access was approved, but Vitap Mate could not save it securely. Unlock the device, restart the app, and retry BYOK.',
+      'verifying the Google account' =>
+        'Google access was approved, but Vitap Mate could not verify the account email. Retry BYOK and keep the app running.',
+      _ =>
+        'Personal Google setup failed while $stage. Retry BYOK and keep Vitap Mate running.',
+    };
   }
 
   String? _emailFromIdToken(String? idToken) {
-    if (idToken == null || idToken.isEmpty) return null;
-    final parts = idToken.split('.');
-    if (parts.length < 2) return null;
-    final payload = parts[1];
-    final normalized = base64Url.normalize(payload);
-    try {
-      final data = utf8.decode(base64Url.decode(normalized));
-      final json = jsonDecode(data);
-      if (json is! Map<String, dynamic>) return null;
-      return (json['email'] as String?)?.trim();
-    } catch (_) {
-      return null;
+    if (idToken?.split('.') case [_, final payload, ...]) {
+      final normalized = base64Url.normalize(payload);
+      try {
+        final json = jsonDecode(utf8.decode(base64Url.decode(normalized)));
+        if (json is! Map<String, dynamic>) return null;
+        return (json['email'] as String?)?.trim();
+      } catch (_) {
+        return null;
+      }
     }
+    return null;
   }
 
   String? _validateCollegeAccount({
@@ -851,7 +798,16 @@ class GoogleEmailOtpAuthService {
     if (!email.toLowerCase().endsWith('@vitapstudent.ac.in')) {
       return 'Use your @vitapstudent.ac.in email for OTP autofetch.';
     }
-    final fromEmail = _usernameFromCollegeEmail(email);
+    // The registration number is the last dot-separated part before the @.
+    final fromEmail =
+        email
+            .split('@')
+            .first
+            .split('.')
+            .where((part) => part.isNotEmpty)
+            .lastOrNull
+            ?.toLowerCase() ??
+        '';
     final fromClient = expectedUsername.trim().toLowerCase().replaceAll(
       RegExp(r'[^a-z0-9]'),
       '',
@@ -879,19 +835,9 @@ class GoogleEmailOtpAuthService {
     }
   }
 
-  String _usernameFromCollegeEmail(String email) {
-    final localPart = email.split('@').first;
-    final parts = localPart
-        .split('.')
-        .where((part) => part.isNotEmpty)
-        .toList(growable: false);
-    if (parts.isEmpty) return '';
-    return parts.last.toLowerCase();
-  }
-
   String _friendlyOauthError(Object error) {
     final text = error.toString().toLowerCase();
-    if (text.contains('user cancelled') || text.contains('cancelled')) {
+    if (text.contains('cancelled')) {
       return 'Google sign-in was cancelled.';
     }
     if (text.contains('null_intent') || text.contains('failed to authorize')) {
