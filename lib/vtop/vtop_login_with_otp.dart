@@ -1,26 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
-import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/vtop/vtop_session_store.dart';
 
-bool _isSecurityOtpRequiredError(Object error) {
-  if (error is! VtopError) return false;
-  return error.maybeWhen(otpRequired: (_, _) => true, orElse: () => false);
-}
+bool isSecurityOtpRequiredError(Object error) => error is VtopError_OTPRequired;
 
-DateTime? securityOtpRequiredAt(Object error) {
-  if (error is! VtopError) return null;
-  return error.maybeWhen(
-    otpRequired: (_, timestampSeconds) => DateTime.fromMillisecondsSinceEpoch(
-      timestampSeconds.toInt() * 1000,
-      isUtc: true,
-    ),
-    orElse: () => null,
-  );
-}
+DateTime? securityOtpRequiredAt(Object error) => switch (error) {
+  VtopError_OTPRequired(:final field1) => utcFromUnixSeconds(field1),
+  _ => null,
+};
 
 Future<void> loginWithSecurityOtpPrompt({
   required BuildContext context,
@@ -31,47 +23,21 @@ Future<void> loginWithSecurityOtpPrompt({
       context,
       listen: false,
     ).read(vtopAuthenticatorProvider).login(client);
-    return;
   } catch (error) {
-    if (!_isSecurityOtpRequiredError(error)) rethrow;
-    final otpRequiredAt = securityOtpRequiredAt(error);
+    if (!isSecurityOtpRequiredError(error)) rethrow;
     if (!context.mounted) {
       throw VtopError.authenticationFailed('OTP verification cancelled');
     }
-    final container = ProviderScope.containerOf(context, listen: false);
-    await container
+    await ProviderScope.containerOf(context, listen: false)
         .read(vtopOtpChallengeProvider.notifier)
         .requestOtp(
           client: client,
-          message:
-              'Additional verification required. OTP sent to your registered email.',
-          otpRequiredAt: otpRequiredAt,
+          otpRequiredAt: securityOtpRequiredAt(error),
         );
     if (!await fetchIsAuth(client: client)) {
       throw VtopError.authenticationFailed(
         'OTP verification completed but login session is not authenticated.',
       );
     }
-    return;
   }
-}
-
-bool isSecurityOtpRequiredError(Object error) {
-  return _isSecurityOtpRequiredError(error);
-}
-
-Future<void> requestSecurityOtpForClient({
-  required ProviderContainer container,
-  required VtopClient client,
-  String message =
-      'Additional verification required. OTP sent to your registered email.',
-  DateTime? otpRequiredAt,
-}) {
-  return container
-      .read(vtopOtpChallengeProvider.notifier)
-      .requestOtp(
-        client: client,
-        message: message,
-        otpRequiredAt: otpRequiredAt,
-      );
 }

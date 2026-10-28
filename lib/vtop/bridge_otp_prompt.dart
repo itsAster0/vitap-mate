@@ -1,22 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:vitapmate/observability/log.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/rust_runtime.dart';
-import 'package:vitapmate/vtop/client_provider.dart';
-import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
-import 'package:vitapmate/vtop/vtop_user_provider.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
-import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
+import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
+import 'package:vitapmate/vtop/rust_runtime.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/vtop/vtop_session_store.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
 
 /// When a browser or AI agent asks the phone to sign in and VTOP wants an
 /// OTP that Gmail auto-fetch cannot supply, the half-finished login is
@@ -81,33 +81,33 @@ class PendingBridgeOtp {
   };
 
   static PendingBridgeOtp? fromJson(Map<String, dynamic> json) {
-    final state = json['state'];
-    final requestId = json['requestId'];
-    final responseToken = json['responseToken'];
-    final callbackUrl = json['callbackUrl'];
-    if (state is! Map<String, dynamic> ||
-        requestId is! String ||
-        responseToken is! String ||
-        callbackUrl is! String ||
-        state['cookies'] is! String) {
-      return null;
+    if (json case {
+      'state': Map<String, dynamic> state && {'cookies': String cookies},
+      'requestId': String requestId,
+      'responseToken': String responseToken,
+      'callbackUrl': String callbackUrl,
+    }) {
+      BigInt? big(Object? value) =>
+          value is String ? BigInt.tryParse(value) : null;
+      return PendingBridgeOtp(
+        requestId: requestId,
+        responseToken: responseToken,
+        callbackUrl: callbackUrl,
+        wantCredentials: json['wantCredentials'] == true,
+        createdAtMs: switch (json['createdAtMs']) {
+          int ms => ms,
+          _ => 0,
+        },
+        state: SessionState(
+          cookies: cookies,
+          csrfToken: state['csrfToken'] as String?,
+          registrationNumber: state['registrationNumber'] as String?,
+          otpIssuedAt: big(state['otpIssuedAt']),
+          loggedInAt: big(state['loggedInAt']),
+        ),
+      );
     }
-    BigInt? big(Object? value) =>
-        value is String ? BigInt.tryParse(value) : null;
-    return PendingBridgeOtp(
-      requestId: requestId,
-      responseToken: responseToken,
-      callbackUrl: callbackUrl,
-      wantCredentials: json['wantCredentials'] == true,
-      createdAtMs: json['createdAtMs'] is int ? json['createdAtMs'] as int : 0,
-      state: SessionState(
-        cookies: state['cookies'] as String,
-        csrfToken: state['csrfToken'] as String?,
-        registrationNumber: state['registrationNumber'] as String?,
-        otpIssuedAt: big(state['otpIssuedAt']),
-        loggedInAt: big(state['loggedInAt']),
-      ),
-    );
+    return null;
   }
 }
 
@@ -299,12 +299,10 @@ Future<void> answerPendingBridgeOtpInApp(ProviderContainer container) async {
         .requestOtp(
           client: client,
           message: 'Enter the OTP to sign in your browser or AI agent.',
-          otpRequiredAt: pending.state.otpIssuedAt == null
-              ? null
-              : DateTime.fromMillisecondsSinceEpoch(
-                  pending.state.otpIssuedAt!.toInt() * 1000,
-                  isUtc: true,
-                ),
+          otpRequiredAt: switch (pending.state.otpIssuedAt) {
+            final issuedAt? => utcFromUnixSeconds(issuedAt),
+            null => null,
+          },
         );
     await _answerPending(container, client, pending);
   } catch (error, stackTrace) {
@@ -332,12 +330,10 @@ Future<void> _answerPending(
   );
   String? fcmToken;
   try {
-    fcmToken = await ensureFirebaseReady()
-        ? await FirebaseMessaging.instance.getToken()
-        : null;
-  } catch (_) {
-    fcmToken = null;
-  }
+    if (await ensureFirebaseReady()) {
+      fcmToken = await FirebaseMessaging.instance.getToken();
+    }
+  } catch (_) {}
   await postCookieCallbackWithRetry(
     callbackUrl: pending.callbackUrl,
     requestId: pending.requestId,

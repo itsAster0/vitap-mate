@@ -8,28 +8,24 @@ sealed class VtopUserEntity {
     required String password,
     required String semesterId,
     String? registrationNumber,
-  }) {
-    return ConfiguredVtopUser._(
-      username: _requiredValue(username, 'username'),
-      password: _requiredSecret(password),
-      semesterId: _requiredValue(semesterId, 'semesterId'),
-      registrationNumber: _optional(registrationNumber),
-    );
-  }
+  }) => ConfiguredVtopUser._(
+    username: _requiredValue(username, 'username'),
+    password: _requiredSecret(password),
+    semesterId: _requiredValue(semesterId, 'semesterId'),
+    registrationNumber: _optional(registrationNumber),
+  );
 
   factory VtopUserEntity.credentialsRejected({
     required String username,
     required String password,
     required String semesterId,
     String? registrationNumber,
-  }) {
-    return RejectedVtopUser._(
-      username: _requiredValue(username, 'username'),
-      password: _requiredSecret(password),
-      semesterId: _requiredValue(semesterId, 'semesterId'),
-      registrationNumber: _optional(registrationNumber),
-    );
-  }
+  }) => RejectedVtopUser._(
+    username: _requiredValue(username, 'username'),
+    password: _requiredSecret(password),
+    semesterId: _requiredValue(semesterId, 'semesterId'),
+    registrationNumber: _optional(registrationNumber),
+  );
 
   factory VtopUserEntity.fromJson(Map<String, dynamic> json) {
     final state = json['state'];
@@ -46,19 +42,14 @@ sealed class VtopUserEntity {
     final registrationNumber = _optional(json['registrationNumber'] as String?);
 
     final rejected = state == 'credentialsRejected' || json['isValid'] == false;
-    return rejected
-        ? VtopUserEntity.credentialsRejected(
-            username: username,
-            password: password,
-            semesterId: semesterId,
-            registrationNumber: registrationNumber,
-          )
-        : VtopUserEntity.configured(
-            username: username,
-            password: password,
-            semesterId: semesterId,
-            registrationNumber: registrationNumber,
-          );
+    return (rejected
+        ? VtopUserEntity.credentialsRejected
+        : VtopUserEntity.configured)(
+      username: username,
+      password: password,
+      semesterId: semesterId,
+      registrationNumber: registrationNumber,
+    );
   }
 
   String? get username;
@@ -142,6 +133,53 @@ sealed class StoredVtopUser extends VtopUserEntity {
   final String semid;
   @override
   final String? registrationNumber;
+
+  bool get _rejected => this is RejectedVtopUser;
+
+  /// The same account in the same state (configured or rejected).
+  VtopUserEntity _same({
+    required String semesterId,
+    required String? registrationNumber,
+  }) =>
+      (_rejected
+      ? VtopUserEntity.credentialsRejected
+      : VtopUserEntity.configured)(
+        username: username,
+        password: password,
+        semesterId: semesterId,
+        registrationNumber: registrationNumber,
+      );
+
+  @override
+  VtopUserEntity withSemester(String semesterId) =>
+      _same(semesterId: semesterId, registrationNumber: registrationNumber);
+  @override
+  VtopUserEntity withCredentials(String username, String password) =>
+      VtopUserEntity.configured(
+        username: username,
+        password: password,
+        semesterId: semid,
+      );
+  @override
+  VtopUserEntity withRegistrationNumber(String registrationNumber) =>
+      _same(semesterId: semid, registrationNumber: registrationNumber);
+  @override
+  VtopUserEntity rejectCredentials() => _rejected
+      ? this
+      : VtopUserEntity.credentialsRejected(
+          username: username,
+          password: password,
+          semesterId: semid,
+          registrationNumber: registrationNumber,
+        );
+  @override
+  Map<String, dynamic> toJson() => {
+    'state': _rejected ? 'credentialsRejected' : 'configured',
+    'username': username,
+    'password': password,
+    'semesterId': semid,
+    'registrationNumber': ?registrationNumber,
+  };
 }
 
 final class ConfiguredVtopUser extends StoredVtopUser {
@@ -151,44 +189,6 @@ final class ConfiguredVtopUser extends StoredVtopUser {
     required super.semesterId,
     required super.registrationNumber,
   });
-
-  @override
-  VtopUserEntity withSemester(String semesterId) => VtopUserEntity.configured(
-    username: username,
-    password: password,
-    semesterId: semesterId,
-    registrationNumber: registrationNumber,
-  );
-  @override
-  VtopUserEntity withCredentials(String username, String password) =>
-      VtopUserEntity.configured(
-        username: username,
-        password: password,
-        semesterId: semid,
-      );
-  @override
-  VtopUserEntity withRegistrationNumber(String registrationNumber) =>
-      VtopUserEntity.configured(
-        username: username,
-        password: password,
-        semesterId: semid,
-        registrationNumber: registrationNumber,
-      );
-  @override
-  VtopUserEntity rejectCredentials() => VtopUserEntity.credentialsRejected(
-    username: username,
-    password: password,
-    semesterId: semid,
-    registrationNumber: registrationNumber,
-  );
-  @override
-  Map<String, dynamic> toJson() => {
-    'state': 'configured',
-    'username': username,
-    'password': password,
-    'semesterId': semid,
-    if (registrationNumber != null) 'registrationNumber': registrationNumber,
-  };
 }
 
 final class RejectedVtopUser extends StoredVtopUser {
@@ -198,38 +198,4 @@ final class RejectedVtopUser extends StoredVtopUser {
     required super.semesterId,
     required super.registrationNumber,
   });
-
-  @override
-  VtopUserEntity withSemester(String semesterId) =>
-      VtopUserEntity.credentialsRejected(
-        username: username,
-        password: password,
-        semesterId: semesterId,
-        registrationNumber: registrationNumber,
-      );
-  @override
-  VtopUserEntity withCredentials(String username, String password) =>
-      VtopUserEntity.configured(
-        username: username,
-        password: password,
-        semesterId: semid,
-      );
-  @override
-  VtopUserEntity withRegistrationNumber(String registrationNumber) =>
-      VtopUserEntity.credentialsRejected(
-        username: username,
-        password: password,
-        semesterId: semid,
-        registrationNumber: registrationNumber,
-      );
-  @override
-  VtopUserEntity rejectCredentials() => this;
-  @override
-  Map<String, dynamic> toJson() => {
-    'state': 'credentialsRejected',
-    'username': username,
-    'password': password,
-    'semesterId': semid,
-    if (registrationNumber != null) 'registrationNumber': registrationNumber,
-  };
 }

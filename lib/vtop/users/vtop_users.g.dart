@@ -41,7 +41,7 @@ final class VtopUsersProvider
   }
 }
 
-String _$vtopUsersHash() => r'7211bbd832d0dc623ea1362eba52b4f37c6af8a5';
+String _$vtopUsersHash() => r'7461c763b84ef7e8df8ad20805f573aeb895b26f';
 
 abstract class _$VtopUsers extends $Notifier<FlutterSecureStorage> {
   FlutterSecureStorage build();
@@ -60,44 +60,3 @@ abstract class _$VtopUsers extends $Notifier<FlutterSecureStorage> {
     element.handleCreate(ref, build);
   }
 }
-
-@ProviderFor(allUsersProvider)
-final allUsersProviderProvider = AllUsersProviderProvider._();
-
-final class AllUsersProviderProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<(List<VtopUserEntity>, String?)>,
-          (List<VtopUserEntity>, String?),
-          FutureOr<(List<VtopUserEntity>, String?)>
-        >
-    with
-        $FutureModifier<(List<VtopUserEntity>, String?)>,
-        $FutureProvider<(List<VtopUserEntity>, String?)> {
-  AllUsersProviderProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'allUsersProviderProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$allUsersProviderHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<(List<VtopUserEntity>, String?)> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<(List<VtopUserEntity>, String?)> create(Ref ref) {
-    return allUsersProvider(ref);
-  }
-}
-
-String _$allUsersProviderHash() => r'dc932b3aea3a904d9ae03d0da7c75c8b16d560f8';
