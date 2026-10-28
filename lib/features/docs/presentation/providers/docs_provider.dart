@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';

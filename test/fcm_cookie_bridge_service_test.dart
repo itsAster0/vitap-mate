@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 
-import 'package:vitapmate/core/utils/email_otp/email_otp_oauth_session.dart';
-import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
+import 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
+import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
 
 void main() {
   tearDown(() {

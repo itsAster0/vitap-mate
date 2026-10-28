@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
+import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/features/course_page/data/course_page_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// Start of each meal, breakfast to dinner: "7:15 · 12:30 · 4:30 · 7:15".
 String messTimingsSummary(MealWindows windows) {

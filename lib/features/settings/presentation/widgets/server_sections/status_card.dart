@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/server_url.dart';
-import 'package:vitapmate/core/utils/edge/server_status.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/widgets/app_card.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/vtop/route/server_url.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/ui/app_card.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
 
 enum CardState { checking, connected, slow, unreachable, notLinked }

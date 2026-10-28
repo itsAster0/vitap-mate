@@ -2,10 +2,10 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/router/paths.dart';
-import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
-import 'package:vitapmate/core/utils/vtop_webview_pages.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/app/router/paths.dart';
+import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
+import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 class MorePage extends HookConsumerWidget {
   const MorePage({super.key});

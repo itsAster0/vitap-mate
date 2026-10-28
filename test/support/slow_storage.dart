@@ -1,4 +1,4 @@
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 
 /// In-memory storage whose reads and writes take a moment, so concurrent
 /// saves overlap the way they do on a phone.

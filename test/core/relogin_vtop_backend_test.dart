@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/vtop_backend/relogin_vtop_backend.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
+import 'package:vitapmate/vtop/backend/relogin_vtop_backend.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_query.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 

@@ -1,12 +1,12 @@
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/logging/app_logger.dart';
-import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
+import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/features/calendar/data/academic_calendar_repository.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';

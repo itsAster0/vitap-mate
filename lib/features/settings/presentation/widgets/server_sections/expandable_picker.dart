@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/icon_box.dart';
 
 /// One choice of an [ExpandablePicker].

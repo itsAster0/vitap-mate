@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
+import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 
 void main() {
   group('VtopUserEntity', () {

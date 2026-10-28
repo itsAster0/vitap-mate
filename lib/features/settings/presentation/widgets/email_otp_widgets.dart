@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/theme/app_palette.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/app_palette.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// Opens [url] outside the app; toasts when nothing can open it.
 Future<void> openExternalLink(BuildContext context, String url) async {

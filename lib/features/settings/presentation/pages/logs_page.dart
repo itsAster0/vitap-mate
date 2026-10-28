@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/logging/app_logger.dart';
+import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/src/api/native_logs.dart';
 
 class LogsPage extends HookWidget {

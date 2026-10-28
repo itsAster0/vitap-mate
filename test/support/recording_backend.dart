@@ -1,5 +1,5 @@
-import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend.dart';
+import 'package:vitapmate/vtop/backend/vtop_query.dart';
 
 /// Records what is asked for and answers with [answer].
 class RecordingBackend implements VtopBackend {

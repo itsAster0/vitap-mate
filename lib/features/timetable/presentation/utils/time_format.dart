@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/ui/extention.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

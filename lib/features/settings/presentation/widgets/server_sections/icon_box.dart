@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 /// The tinted square icon the Server page's tiles lead with.
 class ServerIconBox extends StatelessWidget {

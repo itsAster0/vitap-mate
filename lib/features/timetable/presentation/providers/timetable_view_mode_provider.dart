@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/app/settings.dart';
 
 enum TimetableViewMode { agenda, weekly }
 

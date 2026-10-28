@@ -1,7 +1,7 @@
 import 'dart:developer';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/presentation/providers/full_attendance_provider.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';

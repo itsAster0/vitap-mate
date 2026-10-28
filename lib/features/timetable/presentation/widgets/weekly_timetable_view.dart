@@ -5,13 +5,13 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
 import 'package:vitapmate/features/attendance/presentation/widgets/attendance.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// The whole week on one screen: a compact grid with a column per class day.
 /// Blocks show course code and room; tap one for the full details.

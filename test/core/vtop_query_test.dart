@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_query.dart';
 
 void main() {
   test('keys match the shared vectors', () {

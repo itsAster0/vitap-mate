@@ -1,11 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
-import 'package:vitapmate/core/widgets/fit_calendar.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/fit_calendar.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/outing/domain/outing_rules.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 Tone statusTone(BuildContext context, OutingStatus status) {
   final colors = context.theme.colors;

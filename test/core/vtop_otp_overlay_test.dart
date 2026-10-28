@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
-import 'package:vitapmate/core/providers/theme_provider.dart';
-import 'package:vitapmate/core/widgets/vtop_otp_overlay.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/app/theme_provider.dart';
+import 'package:vitapmate/app/vtop_otp_overlay.dart';
 
 class _Challenge extends VtopOtpChallenge {
   _Challenge(this.initial);

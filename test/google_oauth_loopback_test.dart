@@ -10,8 +10,8 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
+import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/vtop/email_otp/google_oauth_loopback.dart';
 
 EmailOtpOAuthSession _session() => const EmailOtpOAuthSession(
   email: 'student@example.com',

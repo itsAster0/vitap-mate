@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/docs_repository.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';

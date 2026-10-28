@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
 import 'package:vitapmate/features/settings/presentation/providers/server_account.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/icon_box.dart';

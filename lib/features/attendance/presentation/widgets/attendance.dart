@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:intl/intl.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/extention.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_history.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
@@ -15,7 +15,7 @@ import 'package:vitapmate/features/calendar/presentation/providers/academic_cale
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/utils/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// One course in the attendance list: ring, name, and what to do next.
 class AttendanceCard extends ConsumerWidget {

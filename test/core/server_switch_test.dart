@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/utils/edge/edge_device.dart';
-import 'package:vitapmate/core/utils/edge/server_switch.dart';
-import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/vtop/edge/edge_device.dart';
+import 'package:vitapmate/vtop/edge/server_switch.dart';
+import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 
 class _Devices implements EdgeDeviceStore {
   EdgeDevice? value = const EdgeDevice(id: 'd', secret: 's', fcmToken: 't');

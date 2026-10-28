@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 /// "just now", "5 min ago", "3 h ago", "2 d ago".
 String ago(DateTime time, {DateTime? now}) {

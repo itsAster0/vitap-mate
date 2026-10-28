@@ -6,11 +6,11 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:vitapmate/core/utils/edge/server_status.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/email_otp_widgets.dart';
 
 /// A yes/no question with a destructive [action] button.

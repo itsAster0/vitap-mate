@@ -4,9 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/core/utils/edge/edge_device.dart';
-import 'package:vitapmate/core/utils/edge/edge_events.dart';
-import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/vtop/edge/edge_device.dart';
+import 'package:vitapmate/vtop/edge/edge_events.dart';
+import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
 import 'package:vitapmate/src/api/mail_otp.dart';
 
 class _MemoryStore implements MailForwardingStore {

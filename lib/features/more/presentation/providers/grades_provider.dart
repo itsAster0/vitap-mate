@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
 import 'package:vitapmate/features/settings/presentation/providers/semester_id_provider.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';

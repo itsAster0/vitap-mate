@@ -5,8 +5,8 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/app/app_urls.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
 
 /// How to install the browser extension and sign it in with an access key.
 class ChromeExtensionPage extends HookConsumerWidget {

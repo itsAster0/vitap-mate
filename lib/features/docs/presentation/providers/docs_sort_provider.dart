@@ -1,5 +1,5 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/features/docs/domain/docs_query.dart';
 
 final docsSortProvider = AsyncNotifierProvider<DocsSortNotifier, DocSort>(

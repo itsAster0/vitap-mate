@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
-import 'package:vitapmate/core/router/paths.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/app/router/paths.dart';
+import 'package:vitapmate/ui/ui.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// Opens [AttendanceGuidePage] inside the current tab, so the timetable and
 /// attendance tabs each keep their own back stack.
