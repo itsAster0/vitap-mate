@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib"]
 
 [workspace]
-members = ["vtop-shared", "vtop-core", "vtop-bridge", "vtop-mcp"]
+members = ["vtop-shared", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway"]
 
 [workspace.dependencies]
 reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls-webpki-roots", "http2", "json", "multipart", "cookies", "gzip", "brotli"] }
@@ -18,6 +18,8 @@ log = "0.4"
 
 [dependencies]
 vtop-core = { path = "vtop-core" }
+vtop-shared = { path = "vtop-shared" }
+vtop-wire = { path = "vtop-wire" }
 flutter_rust_bridge = "=2.12.0"
 serde = { workspace = true }
 log = { workspace = true }

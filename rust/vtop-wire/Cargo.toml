@@ -1,0 +1,15 @@
+[package]
+name = "vtop-wire"
+version = "0.1.0"
+edition = "2021"
+description = "The phone ↔ gateway UDP transport for slow, lossy networks: Noise IK, explicit-counter framing, Reed-Solomon repair. Used by the app and by vtop-gateway."
+
+[dependencies]
+chacha20poly1305 = "0.10"
+reed-solomon-simd = "3"
+snow = { version = "0.10", features = ["risky-raw-split"] }
+tokio = { workspace = true, features = ["net", "time", "rt", "macros", "sync"] }
+log = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }

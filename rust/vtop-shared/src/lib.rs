@@ -9,3 +9,4 @@ pub mod mail_seal;
 pub mod mailbox;
 pub mod page_dictionary;
 pub mod tokens;
+pub mod wire_page;
