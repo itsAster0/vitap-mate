@@ -5,8 +5,8 @@
 #   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
 #   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
 #                              /internal/*
-# The engine (vtop-bridge) runs on Railway from ../Dockerfile.engine, at
-# ENGINE_URL below.
+# The engine (vtop-bridge, with UDP mode's gateway) runs on Fly from
+# ../Dockerfile.engine (see ../fly.toml), at ENGINE_URL below.
 name = "vitapmate-edge"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
@@ -17,7 +17,7 @@ routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
 # Every address the edge uses; nothing is hard-coded. ENGINE_URL serves the
 # engine routes and /mcp.
 MAIL_DOMAIN = "aster0.dev"
-ENGINE_URL = "https://vitap-mate-production.up.railway.app"
+ENGINE_URL = "https://vmate-node.aster0.dev"
 FCM_URL = "https://fcm.googleapis.com"
 # This Worker's own address, for links it hands out; MCP clients get its /mcp.
 PUBLIC_URL = "https://vmate-api.aster0.dev"

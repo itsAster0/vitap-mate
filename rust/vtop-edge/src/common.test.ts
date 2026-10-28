@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Env, healthBody, mcpUrl, unknownDevice } from "./common";
+import { benchResponse, type Env, healthBody, mcpUrl, unknownDevice } from "./common";
 import { EDGE_VERSION } from "./version";
 
 describe("mcpUrl", () => {
@@ -15,6 +15,16 @@ describe("unknownDevice", () => {
     const response = unknownDevice();
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ code: "unknown_device", error: "This install is not registered." });
+  });
+});
+
+describe("benchResponse", () => {
+  it("sends the asked size, capped, uncached", async () => {
+    const r = benchResponse(new URL("https://e.example/v1/bench?size=300"));
+    expect((await r.arrayBuffer()).byteLength).toBe(300);
+    expect(r.headers.get("cache-control")).toBe("no-store");
+    expect((await benchResponse(new URL("https://e.example/v1/bench?size=99999")).arrayBuffer()).byteLength).toBe(20_000);
+    expect((await benchResponse(new URL("https://e.example/v1/bench?size=x")).arrayBuffer()).byteLength).toBe(0);
   });
 });
 
