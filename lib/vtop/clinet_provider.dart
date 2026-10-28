@@ -203,14 +203,9 @@ class VClient extends _$VClient {
         // The server must not keep trying the same password either.
         unawaited(_reportCredentialsRejected(user.username));
       }
-      if (uname != null &&
-          uname.isNotEmpty &&
-          e is VtopError &&
-          e is! VtopError_NetworkError) {
+      if (uname != null && uname.isNotEmpty && vtopRefusedSignIn(e)) {
         await clearStoredVtopSession(uname);
-        _session.warn(
-          '$flowLabel cleared saved session after a terminal authentication failure',
-        );
+        _session.warn('$flowLabel cleared saved session: VTOP refused it');
       }
 
       _auth.error('$flowLabel failed: $e');
@@ -219,6 +214,14 @@ class VClient extends _$VClient {
     }
   }
 }
+
+/// Whether [error] means VTOP refused the sign-in, so the saved session is
+/// useless. VTOP being slow or down, the phone offline, or an OTP still
+/// pending leave the session worth trying again.
+bool vtopRefusedSignIn(Object error) =>
+    error is VtopError_InvalidCredentials ||
+    error is VtopError_AuthenticationFailed ||
+    error is VtopError_SessionExpired;
 
 Future<void> _reportCredentialsRejected(String? username) async {
   if (username == null || username.trim().isEmpty) return;
