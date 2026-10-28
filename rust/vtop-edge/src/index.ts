@@ -46,6 +46,7 @@ import {
   str,
   variable,
   unknownDevice,
+  benchResponse,
 } from "./common";
 import { type Payload, payloadFor } from "./mail";
 import { MAIL_OWNER, type OtpAwait } from "./shared/engine-api";
@@ -432,6 +433,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (method === "GET" && path === "/healthz") {
     return Response.json(healthBody(req.cf as { colo?: unknown } | undefined));
   }
+  if (method === "GET" && path === "/v1/bench") return benchResponse(new URL(req.url));
   if (isVtopPath(path)) return proxyVtop(req);
   if (path in PHONE_ROUTES) return phoneVtop(req, env);
   if (method === "GET" && path === "/v1/events") return events(req, env);
