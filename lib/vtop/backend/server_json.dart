@@ -1,23 +1,29 @@
+import 'dart:convert';
+
 import 'package:vitapmate/src/api/vtop/types.dart';
+
+/// The JSON object in a server answer's [body]; empty when it is not one.
+Map<String, dynamic> jsonObject(String body) {
+  try {
+    if (jsonDecode(body) case final Map<String, dynamic> json) return json;
+  } catch (_) {}
+  return const {};
+}
 
 /// Converts the engine's JSON (Rust serde: snake_case keys, `update_time`
 /// as a number, `ClassKind` as `"Theory"`) into the shape the generated
 /// `fromJson` constructors expect (camelCase keys, `updateTime` as a
 /// string, `"theory"`). Checked against vtop-core's parser snapshots.
-Object? rustJsonToDart(Object? value, [String? key]) {
-  if (value is Map) {
-    return <String, dynamic>{
-      for (final entry in value.entries)
-        _camelCase('${entry.key}'): rustJsonToDart(entry.value, '${entry.key}'),
-    };
-  }
-  if (value is List) {
-    return [for (final item in value) rustJsonToDart(item)];
-  }
-  if (key == 'update_time' && value is num) return value.toInt().toString();
-  if (key == 'kind' && value is String) return value.toLowerCase();
-  return value;
-}
+Object? rustJsonToDart(Object? value, [String? key]) => switch (value) {
+  final Map map => <String, dynamic>{
+    for (final MapEntry(key: k, value: v) in map.entries)
+      _camelCase('$k'): rustJsonToDart(v, '$k'),
+  },
+  final List list => [for (final item in list) rustJsonToDart(item)],
+  final num n when key == 'update_time' => n.toInt().toString(),
+  final String s when key == 'kind' => s.toLowerCase(),
+  _ => value,
+};
 
 String _camelCase(String snake) {
   final parts = snake.split('_');
@@ -44,12 +50,10 @@ const _reserved = {
 /// [SessionState] in the engine's JSON shape.
 Map<String, Object?> sessionToServerJson(SessionState session) => {
   'cookies': session.cookies,
-  if (session.csrfToken != null) 'csrf_token': session.csrfToken,
-  if (session.registrationNumber != null)
-    'registration_number': session.registrationNumber,
-  if (session.otpIssuedAt != null)
-    'otp_issued_at': session.otpIssuedAt!.toInt(),
-  if (session.loggedInAt != null) 'logged_in_at': session.loggedInAt!.toInt(),
+  'csrf_token': ?session.csrfToken,
+  'registration_number': ?session.registrationNumber,
+  'otp_issued_at': ?session.otpIssuedAt?.toInt(),
+  'logged_in_at': ?session.loggedInAt?.toInt(),
 };
 
 /// A session the engine sent back.

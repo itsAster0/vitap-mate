@@ -37,14 +37,9 @@ const vtopProxySettingKey = 'settings_vtop_proxy';
 const _proxyByDefault = bool.fromEnvironment('VTOP_PROXY_DEFAULT');
 
 /// The saved mode, from the new key or else the old switch.
-VtopServerMode vtopModeFrom({String? saved, bool? oldProxy}) {
-  for (final mode in VtopServerMode.values) {
-    if (mode.name == saved) return mode;
-  }
-  return (oldProxy ?? _proxyByDefault)
-      ? VtopServerMode.compress
-      : VtopServerMode.off;
-}
+VtopServerMode vtopModeFrom({String? saved, bool? oldProxy}) =>
+    VtopServerMode.values.asNameMap()[saved] ??
+    ((oldProxy ?? _proxyByDefault) ? .compress : .off);
 
 /// The VTOP origin the phone's client uses: the server's proxy of VTOP,
 /// or null for VTOP itself.

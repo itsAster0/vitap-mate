@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/vtop/backend/server_json.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
@@ -30,12 +31,15 @@ class EdgeDevice {
     'fcmToken': fcmToken,
   };
 
-  static EdgeDevice? fromJson(Object? json) {
-    if (json is! Map) return null;
-    final id = json['id'], secret = json['secret'], token = json['fcmToken'];
-    if (id is! String || secret is! String || token is! String) return null;
-    return EdgeDevice(id: id, secret: secret, fcmToken: token);
-  }
+  static EdgeDevice? fromJson(Object? json) => switch (json) {
+    {
+      'id': final String id,
+      'secret': final String secret,
+      'fcmToken': final String token,
+    } =>
+      EdgeDevice(id: id, secret: secret, fcmToken: token),
+    _ => null,
+  };
 }
 
 /// The edge does not know this install (its data was reset, or the install
@@ -119,13 +123,7 @@ Future<Map<String, dynamic>> edgePost(
         body: jsonEncode(body),
       )
       .timeout(const Duration(seconds: 15));
-  Map<String, dynamic> decoded;
-  try {
-    final parsed = jsonDecode(response.body);
-    decoded = parsed is Map<String, dynamic> ? parsed : const {};
-  } catch (_) {
-    decoded = const {};
-  }
+  final decoded = jsonObject(response.body);
   final status = response.statusCode;
   if (status < 200 || status >= 300) {
     throw EdgeException(
@@ -187,14 +185,17 @@ class EdgeDeviceService {
       '/v1/devices/register',
       {'fcmToken': fcmToken},
     );
-    final id = body['id'], secret = body['secret'];
-    if (id is! String || secret is! String) {
-      throw const EdgeException(
+    final device = switch (body) {
+      {'id': final String id, 'secret': final String secret} => EdgeDevice(
+        id: id,
+        secret: secret,
+        fcmToken: fcmToken,
+      ),
+      _ => throw const EdgeException(
         'bad_response',
         'The server sent an unexpected answer.',
-      );
-    }
-    final device = EdgeDevice(id: id, secret: secret, fcmToken: fcmToken);
+      ),
+    };
     await _store.write(device);
     return device;
   }

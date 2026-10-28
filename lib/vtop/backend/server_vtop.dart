@@ -205,45 +205,35 @@ class ServerVtopApi {
     return data;
   }
 
-  Future<ServerLogin> login(String username, String password) async => _login(
-    await _post('/v1/vtop/login', {'username': username, 'password': password}),
+  Future<ServerLogin> login(String username, String password) =>
+      _login('/v1/vtop/login', {'username': username, 'password': password});
+
+  Future<ServerLogin> submitOtp(SessionState pending, String otp) => _login(
+    '/v1/vtop/login/otp',
+    {'session': sessionToServerJson(pending), 'otp': otp},
   );
 
-  Future<ServerLogin> submitOtp(SessionState pending, String otp) async =>
-      _login(
-        await _post('/v1/vtop/login/otp', {
-          'session': sessionToServerJson(pending),
-          'otp': otp,
-        }),
-      );
-
-  Future<ServerLogin> resendOtp(SessionState pending) async => _login(
-    await _post('/v1/vtop/login/resend', {
-      'session': sessionToServerJson(pending),
-    }),
+  Future<ServerLogin> resendOtp(SessionState pending) => _login(
+    '/v1/vtop/login/resend',
+    {'session': sessionToServerJson(pending)},
   );
 
-  ServerLogin _login(Map<String, dynamic> body) {
-    final session = body['session'];
-    if (session is! Map<String, dynamic>) {
-      throw const ServerVtopUnavailable('the server sent no session');
-    }
-    final state = sessionFromServerJson(session);
-    if (body['status'] == 'otp_required') {
-      final at = body['issuedAt'];
-      return ServerOtpRequired(
-        state,
-        '${body['message'] ?? 'OTP required'}',
-        at is num ? BigInt.from(at.toInt()) : BigInt.zero,
-      );
-    }
-    return ServerSignedIn(state);
+  Future<ServerLogin> _login(String path, Map<String, Object?> request) async {
+    final body = _json(await _send(path, request));
+    final state = switch (body['session']) {
+      final Map<String, dynamic> session => sessionFromServerJson(session),
+      _ => throw const ServerVtopUnavailable('the server sent no session'),
+    };
+    if (body['status'] != 'otp_required') return ServerSignedIn(state);
+    return ServerOtpRequired(
+      state,
+      '${body['message'] ?? 'OTP required'}',
+      switch (body['issuedAt']) {
+        final num at => BigInt.from(at.toInt()),
+        _ => BigInt.zero,
+      },
+    );
   }
-
-  Future<Map<String, dynamic>> _post(
-    String path,
-    Map<String, Object?> body,
-  ) async => _json(await _send(path, body));
 
   /// The page over UDP, shaped as the edge's answer; null to use HTTPS:
   /// the mode is off, the gateway did not answer lately, or the page does
@@ -258,8 +248,9 @@ class ServerVtopApi {
   ) async {
     final wire = _wire;
     if (wire == null || !await _useWire()) return null;
-    final off = _wireOffUntil;
-    if (off != null && DateTime.now().isBefore(off)) return null;
+    if (_wireOffUntil case final off? when DateTime.now().isBefore(off)) {
+      return null;
+    }
     final WirePage page;
     try {
       page = await wire(
@@ -308,9 +299,8 @@ class ServerVtopApi {
       '',
     );
     if (base.isEmpty) throw const ServerVtopUnavailable('no server URL');
-    final http.Response response;
     try {
-      response = await _client
+      return await _client
           .post(
             Uri.parse('$base$path'),
             headers: {'content-type': 'application/json'},
@@ -324,18 +314,11 @@ class ServerVtopApi {
     } catch (error) {
       throw ServerVtopUnavailable('$error');
     }
-    return response;
   }
 
   /// The JSON of a 2xx [response]; a refusal is thrown as [serverError].
   Map<String, dynamic> _json(http.Response response) {
-    Object? decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } catch (_) {}
-    final json = decoded is Map<String, dynamic>
-        ? decoded
-        : const <String, dynamic>{};
+    final json = jsonObject(response.body);
     final status = response.statusCode;
     if (status >= 200 && status < 300) return json;
     throw serverError(

@@ -1,8 +1,8 @@
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
-/// Signs a [VtopClient] in on the device. (The edge signs in on its own;
-/// see EdgeVtopBackend.)
+/// Signs a [VtopClient] in, on the device or (ServerVtopAuthenticator) on
+/// the server.
 ///
 /// It leaves the signed-in session in the local client, so persisting, the
 /// WebView cookie bridge and local fetches keep working unchanged. It

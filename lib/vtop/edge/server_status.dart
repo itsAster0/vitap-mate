@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/vtop/backend/server_json.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
@@ -142,7 +143,10 @@ class ServerStatus {
       vaultGmail: json['vaultGmail'] == true,
       credentialsRejectedAt: _time(json['credentialsRejectedAt']),
       forwarding: json['forwarding'] as String?,
-      phones: json['phones'] is int ? json['phones'] as int : 0,
+      phones: switch (json['phones']) {
+        final int phones => phones,
+        _ => 0,
+      },
       signIns: [
         for (final s in maps(json['signIns']))
           if (_time(s['at']) case final at?)
@@ -216,11 +220,7 @@ class ServerStatusService {
           }),
         )
         .timeout(const Duration(seconds: 15));
-    Object? body;
-    try {
-      body = jsonDecode(response.body);
-    } catch (_) {}
-    final json = body is Map<String, dynamic> ? body : <String, dynamic>{};
+    final json = jsonObject(response.body);
     if (response.statusCode == 403 && json['code'] == 'not_linked') {
       throw const ServerNotLinked();
     }
