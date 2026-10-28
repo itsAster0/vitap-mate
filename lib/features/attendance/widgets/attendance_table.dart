@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -42,7 +41,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(provider.notifier).updateAttendance().catchError((e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.info('features.attendance', 'auto refresh failed: $e');
         });
       });
       return null;

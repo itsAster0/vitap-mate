@@ -1,4 +1,4 @@
-import 'dart:developer';
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -250,7 +250,7 @@ class Step2 extends HookConsumerWidget {
                     await ref.read(vClientProvider.future);
                     if (context.mounted) context.goNamed(Paths.timetable);
                   } catch (e) {
-                    log("$e");
+                    Log.info('features.onboarding', "$e");
                   }
                   return;
                 }

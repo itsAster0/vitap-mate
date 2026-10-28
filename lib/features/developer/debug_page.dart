@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer' show log;
+import 'package:vitapmate/observability/log.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -213,12 +213,7 @@ Future<void> _toggleNetLog(BuildContext context) async {
       dispToast(context, 'Saved', 'Open it at netlog-viewer.appspot.com.');
     }
   } catch (error, stackTrace) {
-    log(
-      'Cronet net log failed',
-      name: 'settings.netlog',
-      error: error,
-      stackTrace: stackTrace,
-    );
+    Log.error('settings.netlog', 'Cronet net log failed: $error\n$stackTrace');
     if (context.mounted) disCommonToast(context, error);
   }
 }
@@ -264,12 +259,7 @@ Future<void> _copySavedCookies(BuildContext context, WidgetRef ref) async {
       dispToast(context, "Copied", "Cookie-Editor JSON copied to clipboard.");
     }
   } catch (error, stackTrace) {
-    log(
-      'Failed to copy saved cookies',
-      name: 'settings',
-      error: error,
-      stackTrace: stackTrace,
-    );
+    Log.error('settings', 'Failed to copy saved cookies: $error\n$stackTrace');
     if (context.mounted) {
       dispToast(context, "Failed", "Could not copy cookies right now.");
     }
@@ -291,12 +281,7 @@ Future<void> _copyFcmToken(BuildContext context) async {
       dispToast(context, "Copied", "Token copied to clipboard.");
     }
   } catch (error, stackTrace) {
-    log(
-      'Failed to copy FCM token',
-      name: 'settings.fcm',
-      error: error,
-      stackTrace: stackTrace,
-    );
+    Log.error('settings.fcm', 'Failed to copy FCM token: $error\n$stackTrace');
     if (context.mounted) {
       dispToast(context, "Failed", "Could not copy your Token right now.");
     }
@@ -402,12 +387,7 @@ Future<void> _clearSavedCookies(BuildContext context, WidgetRef ref) async {
       dispToast(context, "Cleared", "Saved VTOP cookies were cleared.");
     }
   } catch (error, stackTrace) {
-    log(
-      'Failed to clear saved cookies',
-      name: 'settings',
-      error: error,
-      stackTrace: stackTrace,
-    );
+    Log.error('settings', 'Failed to clear saved cookies: $error\n$stackTrace');
     if (context.mounted) {
       dispToast(context, "Failed", "Could not clear cookies right now.");
     }
@@ -525,11 +505,9 @@ Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
       ),
     );
   } catch (error, stackTrace) {
-    log(
-      'Failed to fetch latest info1 email',
-      name: 'settings.email_otp',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'settings.email_otp',
+      'Failed to fetch latest info1 email: $error\n$stackTrace',
     );
     if (context.mounted) dispToast(context, "Test Failed", "$error");
   }

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer';
+import 'package:vitapmate/observability/log.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/vtop/entity/global_async_queue_entity.dart';
 part 'global_async_queue_provider.g.dart';
@@ -28,7 +28,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   Future<T> run<T>(String id, Future<T> Function() task) async {
     final current = state.running;
     if (current.containsKey(id)) {
-      log("already contains $id", level: 400);
+      Log.info('vtop', "already contains $id");
       return current[id] as Future<T>;
     }
     final completer = Completer<T>();
@@ -48,7 +48,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
               .map((entry) => entry.value)
               .toList();
           if (mainFutures.isNotEmpty) {
-            log("waiting for the on start run code ", level: 400);
+            Log.info('vtop', "waiting for the on start run code ");
             await Future.wait(mainFutures);
           }
         }
@@ -67,7 +67,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
         final after = {...before1}..remove(id);
         state = state.copyWith(running: after);
         _taskEvents.add(after.keys.toSet());
-        log("$state");
+        Log.info('vtop', "$state");
       }
     }());
 

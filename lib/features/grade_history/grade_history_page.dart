@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -67,7 +66,7 @@ class GradeHistoryPage extends HookConsumerWidget {
       try {
         await ref.read(gradeHistoryProvider.notifier).refresh();
       } catch (e) {
-        log("$e");
+        Log.info('features.grade_history', "$e");
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -76,7 +75,7 @@ class GradeHistoryPage extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!await isAutoRefreshEnabled(ref)) return;
         ref.read(gradeHistoryProvider.notifier).refresh().catchError((e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.info('features.grade_history', 'auto refresh failed: $e');
         });
       });
       return null;

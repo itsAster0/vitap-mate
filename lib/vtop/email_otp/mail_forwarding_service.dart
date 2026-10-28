@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' show log;
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
@@ -520,7 +520,7 @@ class MailForwardingService {
     final mailbox = '${data['mailbox'] ?? ''}';
     final sealed = '${data['sealed'] ?? ''}';
     if (forwarding == null || mailbox != forwarding.id || sealed.isEmpty) {
-      log('Ignoring a mail OTP push for another mailbox', name: 'mail.otp');
+      Log.info('mail.otp', 'Ignoring a mail OTP push for another mailbox');
       return null;
     }
     return _deliver(forwarding, sealed);
@@ -549,7 +549,7 @@ class MailForwardingService {
         ),
       );
     } catch (error) {
-      log('Could not open a mail OTP box: $error', name: 'mail.otp');
+      Log.info('mail.otp', 'Could not open a mail OTP box: $error');
       return null;
     }
   }

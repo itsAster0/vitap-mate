@@ -1,8 +1,8 @@
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/src/api/email_otp.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' show log;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -293,13 +293,10 @@ class GoogleEmailOtpAuthService {
     } on GoogleDesktopOAuthException catch (error) {
       return EmailOtpSetupResult.failed(error.message);
     } catch (error, stackTrace) {
-      log(
-        'Personal OAuth setup failed while $stage',
-        name: 'email_otp.oauth',
-        error: error,
-        stackTrace: stackTrace,
+      Log.error(
+        'email_otp.oauth',
+        'Personal OAuth setup failed while $stage: $error\n$stackTrace',
       );
-      debugPrint('Gmail BYOK failed while $stage (${error.runtimeType}).');
       return EmailOtpSetupResult.failed(_byokFailureMessage(stage, error));
     }
   }
@@ -323,9 +320,9 @@ class GoogleEmailOtpAuthService {
       );
     }
     try {
-      log(
+      Log.info(
+        'email_otp.oauth',
         'Starting identity OAuth request with scopes: ${googleEmailScopes.join(', ')}',
-        name: 'email_otp.oauth',
       );
       final identityTokens = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
@@ -364,12 +361,7 @@ class GoogleEmailOtpAuthService {
         email: email,
       );
     } catch (error, stackTrace) {
-      log(
-        'Identity step failed',
-        name: 'email_otp.oauth',
-        error: error,
-        stackTrace: stackTrace,
-      );
+      Log.error('email_otp.oauth', 'Identity step failed: $error\n$stackTrace');
       return EmailOtpSetupResult.failed(_friendlyOauthError(error));
     }
   }
@@ -383,9 +375,9 @@ class GoogleEmailOtpAuthService {
       );
     }
     try {
-      log(
+      Log.info(
+        'email_otp.oauth',
         'Starting shared Gmail token OAuth request with scopes: ${gmailOauthScopes.join(', ')}',
-        name: 'email_otp.oauth',
       );
       final gmailTokens = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
@@ -448,12 +440,7 @@ class GoogleEmailOtpAuthService {
         email: email,
       );
     } catch (error, stackTrace) {
-      log(
-        'Token step failed',
-        name: 'email_otp.oauth',
-        error: error,
-        stackTrace: stackTrace,
-      );
+      Log.error('email_otp.oauth', 'Token step failed: $error\n$stackTrace');
       return EmailOtpSetupResult.failed(_friendlyOauthError(error));
     }
   }

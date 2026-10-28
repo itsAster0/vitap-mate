@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/vtop/users/saved_credentials.dart';
 import 'package:vitapmate/vtop/edge/credentials_rejected.dart';
 import 'package:vitapmate/vtop/bridge_otp_prompt.dart';
@@ -20,13 +21,15 @@ import 'package:vitapmate/app/vtop_otp_overlay.dart';
 import 'package:vitapmate/platform/background/controller.dart';
 import 'package:vitapmate/platform/background/sync.dart';
 import 'package:vitapmate/platform/update/update_service.dart';
-import 'package:vitapmate/src/frb_generated.dart';
 import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Independent, so start both rather than waiting on one then the other.
-  final (firebaseReady, _) = await (ensureFirebaseReady(), RustLib.init()).wait;
+  final (firebaseReady, _) = await (
+    ensureFirebaseReady(),
+    startRustRuntime(),
+  ).wait;
   if (firebaseReady) {
     FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
   }

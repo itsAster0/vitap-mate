@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
@@ -75,7 +74,7 @@ void disCommonToast(BuildContext context, Object e) {
     _ when _isSignInError(e) => ('Sign-In Problem', _authFailedMessage(e)),
     VtopError() => ('VTOP Problem', vtopErrorMessage(e)),
     _ => () {
-      log('Unexpected error in disCommonToast: $e');
+      Log.info('app.widgets', 'Unexpected error in disCommonToast: $e');
       return ('Error occurred', 'Please try again');
     }(),
   };

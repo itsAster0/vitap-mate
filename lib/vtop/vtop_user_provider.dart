@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
@@ -11,15 +10,17 @@ part 'vtop_user_provider.g.dart';
 class VtopUser extends _$VtopUser {
   @override
   Future<VtopUserEntity> build() async {
-    log("VtopUser build start");
-    var user = await ref
+    final user = await ref
         .read(vtopusersutilsProvider.notifier)
         .vtopUserDefault();
-    log("VtopUser build sucessfull $user");
     await vtopWebviewStore.clearIfDifferent(user?.username);
     if (user == null) {
+      Log.regno = null;
+      Log.info('vtop.user', 'no saved account');
       return const VtopUserEntity.unconfigured();
     }
+    Log.regno = (user.registrationNumber ?? user.username)?.toUpperCase();
+    Log.info('vtop.user', 'account loaded');
     return user;
   }
 }

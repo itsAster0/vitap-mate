@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -33,7 +32,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || !await isAutoRefreshEnabled(ref)) return;
       _load().catchError((e, st) {
-        log('auto refresh failed: $e', stackTrace: st);
+        Log.info('features.biometric', 'auto refresh failed: $e');
       });
     });
   }
@@ -48,7 +47,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
     try {
       await _load();
     } catch (e) {
-      log('$e');
+      Log.info('features.biometric', '$e');
       if (mounted) disCommonToast(context, e);
     }
   }

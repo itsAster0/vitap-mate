@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' show log;
 import 'dart:io' show HttpException;
 import 'dart:math' show Random, min;
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:http/http.dart' as http;
@@ -180,7 +180,7 @@ class EdgeEventChannel {
           );
       _watchdog = Timer.periodic(_heartbeat, (_) => _checkBeat());
     } catch (error) {
-      log('Event stream failed: $error', name: 'edge.events');
+      Log.info('edge.events', 'Event stream failed: $error');
       _scheduleRetry();
     } finally {
       _connecting = false;
@@ -190,7 +190,7 @@ class EdgeEventChannel {
   void _checkBeat() {
     // Two beats missed: the link is dead even if no one said so.
     if (DateTime.now().difference(_lastBeat) > _heartbeat * 2) {
-      log('Event stream stopped beating', name: 'edge.events');
+      Log.info('edge.events', 'Event stream stopped beating');
       _onDropped();
     }
   }
@@ -295,7 +295,7 @@ class EdgeEventChannel {
     try {
       await handler(event);
     } catch (error) {
-      log('Event ${event.kind} failed: $error', name: 'edge.events');
+      Log.info('edge.events', 'Event ${event.kind} failed: $error');
     }
   }
 

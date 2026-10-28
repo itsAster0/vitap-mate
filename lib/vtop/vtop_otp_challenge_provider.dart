@@ -2,7 +2,7 @@ import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'dart:async';
 import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
@@ -278,12 +278,9 @@ class VtopOtpChallenge extends _$VtopOtpChallenge {
   String _logContext = 'otp.flow';
 
   // Logs under `client.otp`, prefixed with this challenge's id.
-  void _info(String m) =>
-      AppLogger.instance.info('client.otp', '$_logContext $m');
-  void _warn(String m) =>
-      AppLogger.instance.warning('client.otp', '$_logContext $m');
-  void _error(String m) =>
-      AppLogger.instance.error('client.otp', '$_logContext $m');
+  void _info(String m) => Log.info('client.otp', '$_logContext $m');
+  void _warn(String m) => Log.warn('client.otp', '$_logContext $m');
+  void _error(String m) => Log.error('client.otp', '$_logContext $m');
 
   @override
   VtopOtpChallengeState build() {

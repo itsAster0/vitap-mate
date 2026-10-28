@@ -1,7 +1,8 @@
+import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' show log;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -27,7 +28,6 @@ import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/firebase_options.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
-import 'package:vitapmate/src/frb_generated.dart';
 import 'package:vitapmate/platform/notifications/class_reminder_notification_service.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 
@@ -63,20 +63,16 @@ Future<bool> ensureFirebaseReady() async {
       await Firebase.initializeApp();
       return true;
     } catch (error, stackTrace) {
-      log(
-        'Firebase initialization is unavailable on this platform',
-        name: 'fcm.cookie',
-        error: error,
-        stackTrace: stackTrace,
+      Log.error(
+        'fcm.cookie',
+        'Firebase initialization is unavailable on this platform: $error\n$stackTrace',
       );
       return false;
     }
   } catch (error, stackTrace) {
-    log(
-      'Firebase initialization failed',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Firebase initialization failed: $error\n$stackTrace',
     );
     return false;
   }
@@ -115,7 +111,7 @@ Future<void> _startVtopCookieBridgeListener() async {
   });
 
   FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-    log('FCM token refreshed (${token.length} chars)', name: 'fcm.cookie');
+    Log.info('fcm.cookie', 'FCM token refreshed (${token.length} chars)');
     unawaited(syncBridgeFcmToken(token));
     unawaited(_syncMailForwardingFcmToken(token));
   });
@@ -129,11 +125,9 @@ Future<void> _syncFcmTokens() async {
     unawaited(_syncMailForwardingFcmToken(token));
     await syncBridgeFcmToken(token);
   } catch (error, stackTrace) {
-    log(
-      'Failed to sync the FCM token with the vtop-bridge',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Failed to sync the FCM token with the vtop-bridge: $error\n$stackTrace',
     );
   }
 }
@@ -160,7 +154,7 @@ Future<void> pauseServerFeatures() async {
     await FirebaseMessaging.instance.setAutoInitEnabled(false);
     await FirebaseMessaging.instance.deleteToken();
   } catch (error) {
-    log('Failed to drop the FCM token: $error', name: 'fcm.cookie');
+    Log.info('fcm.cookie', 'Failed to drop the FCM token: $error');
   }
 }
 
@@ -185,7 +179,7 @@ Future<void> resumeServerFeatures() async {
 Future<void> vtopCookieBridgeBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!await ensureFirebaseReady()) return;
-  await RustLib.init();
+  await startRustRuntime();
   await handleVtopCookieBridgeMessage(message.data);
 }
 
@@ -193,9 +187,9 @@ Future<void> _syncMailForwardingFcmToken(String? token) async {
   try {
     await MailForwardingService().syncFcmToken(token);
   } catch (error) {
-    log(
+    Log.info(
+      'mail.otp',
       'Failed to sync the FCM token for mail forwarding: $error',
-      name: 'mail.otp',
     );
   }
 }
@@ -252,7 +246,7 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
   final responseToken = '${data['responseToken'] ?? ''}'.trim();
   final callbackUrl = resolveCookieCallbackUrlForTest(data);
   if (requestId.isEmpty || responseToken.isEmpty || callbackUrl.isEmpty) {
-    log('Ignoring malformed FCM cookie request', name: 'fcm.cookie');
+    Log.info('fcm.cookie', 'Ignoring malformed FCM cookie request');
     return;
   }
 
@@ -286,15 +280,13 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
     );
     await FcmCookieNotificationService.cancel();
     await showBridgeOtpNotification();
-    log('Cookie request $requestId waits for the OTP', name: 'fcm.cookie');
+    Log.info('fcm.cookie', 'Cookie request $requestId waits for the OTP');
     return;
   } catch (error, stackTrace) {
     callbackError = '$error';
-    log(
-      'Failed to prepare cookie request $requestId',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Failed to prepare cookie request $requestId: $error\n$stackTrace',
     );
   }
 
@@ -318,14 +310,12 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
       deviceId: await currentEdgeDeviceId(),
       credentials: credentials,
     );
-    log('Completed cookie request $requestId', name: 'fcm.cookie');
+    Log.info('fcm.cookie', 'Completed cookie request $requestId');
     await FcmCookieNotificationService.cancel();
   } catch (error, stackTrace) {
-    log(
-      'Cookie callback failed for request $requestId',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Cookie callback failed for request $requestId: $error\n$stackTrace',
     );
     await FcmCookieNotificationService.showFailure();
   }
@@ -479,11 +469,9 @@ Future<void> syncBridgeFcmToken(String? token) async {
     ).updateFcmToken(cookies: cookieHeader, fcmToken: current, device: device);
     await prefs.setString(bridgeLastFcmTokenSettingKey, current);
   } catch (error, stackTrace) {
-    log(
-      'Failed to sync the FCM token with the vtop-bridge',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Failed to sync the FCM token with the vtop-bridge: $error\n$stackTrace',
     );
   } finally {
     container.dispose();
@@ -514,11 +502,9 @@ Future<void> syncBridgeSemester(String? semesterId) async {
     ).updateSemester(cookies: cookieHeader, semesterId: current);
     await prefs.setString(bridgeLastSemesterSettingKey, current);
   } catch (error, stackTrace) {
-    log(
-      'Failed to sync the semester with the vtop-bridge',
-      name: 'fcm.cookie',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'fcm.cookie',
+      'Failed to sync the semester with the vtop-bridge: $error\n$stackTrace',
     );
   } finally {
     container.dispose();
@@ -666,9 +652,9 @@ Future<void> postCookieCallbackWithRetry({
     }
 
     if (attempt < 3) {
-      log(
+      Log.info(
+        'fcm.cookie',
         'Retrying cookie callback for request $requestId after attempt $attempt',
-        name: 'fcm.cookie',
       );
       await wait(Duration(seconds: 1 << (attempt - 1)));
     }

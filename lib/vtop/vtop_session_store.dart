@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
@@ -72,7 +72,7 @@ Future<StoredVtopSession?> loadStoredVtopSession(String username) async {
       ttl: ttl,
     );
   } catch (error) {
-    AppLogger.instance.warning(
+    Log.warn(
       'client.session',
       'stored session was unreadable and will be cleared',
     );

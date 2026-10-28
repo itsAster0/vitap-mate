@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -28,7 +27,7 @@ class CoursePagePage extends ConsumerWidget {
       try {
         await ref.read(coursePageCoursesProvider.future);
       } catch (e) {
-        log('course page refresh failed: $e');
+        Log.info('features.course_page', 'course page refresh failed: $e');
         if (context.mounted) disCommonToast(context, e);
       }
     }

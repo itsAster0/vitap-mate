@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:developer' show log;
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -37,7 +37,7 @@ class ProfilePage extends HookConsumerWidget {
           .mentor => ref.read(mentorProvider.notifier).refresh(),
         };
       } catch (e) {
-        log('$e');
+        Log.info('features.profile', '$e');
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -50,7 +50,7 @@ class ProfilePage extends HookConsumerWidget {
           ref.read(mentorProvider.notifier).refresh,
         ]) {
           notifier().catchError((e, st) {
-            log('auto refresh failed: $e', stackTrace: st);
+            Log.info('features.profile', 'auto refresh failed: $e');
           });
         }
       });

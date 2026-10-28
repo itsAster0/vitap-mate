@@ -1,5 +1,4 @@
-import 'dart:developer';
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -46,7 +45,7 @@ class TimetablePage extends HookConsumerWidget {
         try {
           await ref.read(timetableProvider.notifier).refresh();
         } catch (e, st) {
-          log('auto refresh failed: $e', stackTrace: st);
+          Log.warn('features.timetable', 'auto refresh failed: $e\n$st');
         }
         // On an exam day, pull the exam schedule too so a moved venue,
         // seat or time shows up.
@@ -68,7 +67,10 @@ class TimetablePage extends HookConsumerWidget {
           if (!examToday) return;
           await ref.read(examScheduleProvider.notifier).refresh();
         } catch (e, st) {
-          log('exam schedule auto refresh failed: $e', stackTrace: st);
+          Log.warn(
+            'features.timetable',
+            'exam schedule auto refresh failed: $e\n$st',
+          );
         }
       });
       return null;
@@ -97,7 +99,7 @@ class TimetablePage extends HookConsumerWidget {
       try {
         await ref.read(timetableProvider.notifier).refresh();
       } catch (e) {
-        log('$e');
+        Log.info('features.timetable', '$e');
         if (context.mounted) disCommonToast(context, e);
       }
     }

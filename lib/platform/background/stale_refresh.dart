@@ -10,7 +10,7 @@ import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/platform/background/sync.dart';
 import 'package:vitapmate/features/exams/exams.dart';
@@ -73,7 +73,7 @@ class StaleRefresher {
       await refresh();
     } catch (error) {
       // Saved data stays as it was; the next quick fetch tries again.
-      AppLogger.instance.info('sync.stale', 'refresh stopped: $error');
+      Log.info('sync.stale', 'refresh stopped: $error');
     } finally {
       _running = false;
     }

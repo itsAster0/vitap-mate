@@ -11,7 +11,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/route/vtop_udp.dart';
@@ -277,14 +277,14 @@ class ServerVtopApi {
           );
         case WireFetchError_Unreachable():
           _wireOffUntil = DateTime.now().add(wireRetryAfter);
-          _log.warning('$name: the UDP gateway did not answer; using HTTPS');
+          _log.warn('$name: the UDP gateway did not answer; using HTTPS');
         case WireFetchError_Unsupported(:final field0) ||
             WireFetchError_Failed(:final field0):
-          _log.warning('$name over UDP: $field0; using HTTPS');
+          _log.warn('$name over UDP: $field0; using HTTPS');
       }
       return null;
     } catch (error) {
-      _log.warning('$name over UDP: $error; using HTTPS');
+      _log.warn('$name over UDP: $error; using HTTPS');
       return null;
     }
     _log.info(
@@ -409,7 +409,7 @@ class ServerVtopBackend implements VtopBackend {
       );
       return query.fromJson(data);
     } on ServerVtopUnavailable catch (error) {
-      _log.warning('${query.name}: $error; fetching on the phone');
+      _log.warn('${query.name}: $error; fetching on the phone');
       return _local.fetch(query);
     }
   }
@@ -449,7 +449,7 @@ class ServerVtopAuthenticator implements VtopAuthenticator {
     try {
       outcome = await _api.login(credentials.username, credentials.password);
     } on ServerVtopUnavailable catch (error) {
-      _log.warning('sign-in: $error; signing in on the phone');
+      _log.warn('sign-in: $error; signing in on the phone');
       return _local.login(client);
     }
     _apply(client, outcome);

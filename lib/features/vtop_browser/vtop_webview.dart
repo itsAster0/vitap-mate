@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/clinet_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
-import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/app/theme_provider.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
@@ -97,7 +97,7 @@ class _VtopWebviewState extends ConsumerState<VtopWebview> {
       );
       if (!current()) return;
       if (session == null) throw StateError('Could not prepare VTOP cookies.');
-      AppLogger.instance.info(
+      Log.info(
         'vtop.webview',
         'prepareMs=${timer.elapsedMilliseconds} cookieSyncMs=${cookieTimer.elapsedMilliseconds}',
       );

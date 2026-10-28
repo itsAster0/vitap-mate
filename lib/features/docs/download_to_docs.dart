@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:developer';
 import 'dart:io';
 
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
@@ -107,10 +107,9 @@ Future<void> watchDocsDownload(int id) async {
     }
     await _acknowledgeDownload(id);
   } catch (error, stackTrace) {
-    log(
-      'Docs copy failed; will retry on next launch',
-      error: error,
-      stackTrace: stackTrace,
+    Log.error(
+      'features.docs',
+      'Docs copy failed; will retry on next launch: $error\n$stackTrace',
     );
   } finally {
     _watching.remove(id);

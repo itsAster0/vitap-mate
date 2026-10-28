@@ -1,5 +1,4 @@
-import 'dart:developer' show log;
-
+import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
@@ -41,7 +40,7 @@ class OutingPage extends HookConsumerWidget {
       try {
         await ref.read(provider.future);
       } catch (e) {
-        log('outing refresh failed: $e');
+        Log.info('features.outing', 'outing refresh failed: $e');
         if (context.mounted) disCommonToast(context, e);
       }
     }
@@ -351,7 +350,7 @@ class _PassCard extends HookConsumerWidget {
         );
         ref.invalidate(weekend ? weekendOutingProvider : generalOutingProvider);
       } catch (e) {
-        log('outing cancel failed: $e');
+        Log.info('features.outing', 'outing cancel failed: $e');
         if (context.mounted) {
           dispToast(context, "Couldn't cancel", vtopErrorMessage(e));
         }
@@ -370,7 +369,7 @@ class _PassCard extends HookConsumerWidget {
           GoRouter.of(context).pushNamed(Paths.outingPass, extra: doc);
         }
       } catch (e) {
-        log('outing pass failed: $e');
+        Log.info('features.outing', 'outing pass failed: $e');
         if (context.mounted) {
           dispToast(context, "Couldn't get the pass", vtopErrorMessage(e));
         }

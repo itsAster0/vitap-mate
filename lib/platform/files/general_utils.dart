@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:developer';
 import 'dart:io';
+import 'package:vitapmate/observability/log.dart';
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
@@ -100,7 +100,10 @@ Future<void> downloadFile(
   }
   if (saveToDocs) {
     if (account == null) {
-      log('Downloaded file could not be copied to Docs: no active account');
+      Log.info(
+        'platform.files',
+        'Downloaded file could not be copied to Docs: no active account',
+      );
       return;
     }
     final path = await task.filePath();
