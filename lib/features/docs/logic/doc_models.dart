@@ -32,7 +32,7 @@ class DocWindow {
     this.scrollOffset = 0.0,
   });
 
-  bool get hasFile => fileName != null && (kind != DocKind.none);
+  bool get hasFile => fileName != null && (kind != .none);
 
   DocWindow copyWith({
     String? name,
@@ -45,22 +45,20 @@ class DocWindow {
     double? offsetX,
     double? offsetY,
     double? scrollOffset,
-  }) {
-    return DocWindow(
-      id: id,
-      name: name ?? this.name,
-      kind: kind ?? this.kind,
-      fileName: fileName ?? this.fileName,
-      isPreset: isPreset,
-      asMessMenu: asMessMenu ?? this.asMessMenu,
-      addedAt: addedAt ?? this.addedAt,
-      lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
-      scale: scale ?? this.scale,
-      offsetX: offsetX ?? this.offsetX,
-      offsetY: offsetY ?? this.offsetY,
-      scrollOffset: scrollOffset ?? this.scrollOffset,
-    );
-  }
+  }) => DocWindow(
+    id: id,
+    name: name ?? this.name,
+    kind: kind ?? this.kind,
+    fileName: fileName ?? this.fileName,
+    isPreset: isPreset,
+    asMessMenu: asMessMenu ?? this.asMessMenu,
+    addedAt: addedAt ?? this.addedAt,
+    lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
+    scale: scale ?? this.scale,
+    offsetX: offsetX ?? this.offsetX,
+    offsetY: offsetY ?? this.offsetY,
+    scrollOffset: scrollOffset ?? this.scrollOffset,
+  );
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -80,10 +78,7 @@ class DocWindow {
   factory DocWindow.fromJson(Map<String, dynamic> json) => DocWindow(
     id: json['id'] as String,
     name: json['name'] as String,
-    kind: DocKind.values.firstWhere(
-      (k) => k.name == json['kind'],
-      orElse: () => DocKind.none,
-    ),
+    kind: DocKind.values.asNameMap()[json['kind']] ?? .none,
     fileName: json['fileName'] as String?,
     isPreset: json['isPreset'] as bool? ?? false,
     asMessMenu: json['asMessMenu'] as bool? ?? false,
@@ -96,32 +91,18 @@ class DocWindow {
   );
 }
 
+/// The extensions Docs reads, by kind; anything else is a plain file.
+const docExtensions = {
+  DocKind.pdf: ['pdf'],
+  DocKind.image: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'],
+  DocKind.spreadsheet: ['xlsx', 'xlsm', 'xls', 'ods'],
+  DocKind.text: ['xml', 'html', 'htm', 'txt', 'json', 'md', 'csv'],
+};
+
 DocKind docKindFromExtension(String path) {
   final ext = path.split('.').last.toLowerCase();
-  switch (ext) {
-    case 'pdf':
-      return DocKind.pdf;
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'webp':
-    case 'gif':
-    case 'bmp':
-      return DocKind.image;
-    case 'xlsx':
-    case 'xlsm':
-    case 'xls':
-    case 'ods':
-      return DocKind.spreadsheet;
-    case 'xml':
-    case 'html':
-    case 'htm':
-    case 'txt':
-    case 'json':
-    case 'md':
-    case 'csv':
-      return DocKind.text;
-    default:
-      return DocKind.file;
+  for (final MapEntry(key: kind, value: extensions) in docExtensions.entries) {
+    if (extensions.contains(ext)) return kind;
   }
+  return .file;
 }

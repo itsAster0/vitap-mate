@@ -82,34 +82,30 @@ final _watching = <int>{};
 Future<void> watchDocsDownload(int id) async {
   if (!_watching.add(id)) return;
   try {
-    while (true) {
-      final copy = await _copyCompletedDownload(id);
-      if (copy.status == 'pending') {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        continue;
-      }
-      if (copy.status == 'failed') {
-        await _acknowledgeDownload(id);
-        return;
-      }
-      if (copy.status != 'complete' || copy.path == null) {
-        throw StateError('Could not copy the completed download.');
-      }
-      final jobs = await _pendingDocsDownloads();
-      final job = jobs.where((item) => item['id'] == id).firstOrNull;
-      if (job == null) return;
-      final repository = DocsRepository(
-        JsonFileStorage(username: job['account'] as String),
-      );
-      await saveDownloadedFileToDocs(
-        repository: repository,
-        sourcePath: copy.path!,
-        filename: job['filename'] as String,
-        archiveId: 'download-$id',
-      );
-      await _acknowledgeDownload(id);
-      return;
+    var copy = await _copyCompletedDownload(id);
+    while (copy.status == 'pending') {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      copy = await _copyCompletedDownload(id);
     }
+    switch (copy) {
+      case (status: 'failed', path: _):
+        break;
+      case (status: 'complete', :final path?):
+        final jobs = await _pendingDocsDownloads();
+        final job = jobs.where((item) => item['id'] == id).firstOrNull;
+        if (job == null) return;
+        await saveDownloadedFileToDocs(
+          repository: DocsRepository(
+            JsonFileStorage(username: job['account'] as String),
+          ),
+          sourcePath: path,
+          filename: job['filename'] as String,
+          archiveId: 'download-$id',
+        );
+      default:
+        throw StateError('Could not copy the completed download.');
+    }
+    await _acknowledgeDownload(id);
   } catch (error, stackTrace) {
     log(
       'Docs copy failed; will retry on next launch',

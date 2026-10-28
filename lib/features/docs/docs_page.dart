@@ -5,7 +5,6 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:open_file/open_file.dart';
-import 'package:vitapmate/app/theme_provider.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
@@ -43,12 +42,6 @@ class DocsPage extends HookConsumerWidget {
       }
     }
 
-    // "System" follows the phone's setting, not just an explicit Dark.
-    final themeMode = ref.watch(themeProvider);
-    final darkMode =
-        themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
     final entrance = useAnimationController(
       duration: const Duration(milliseconds: 450),
     )..forward();
@@ -81,7 +74,7 @@ class DocsPage extends HookConsumerWidget {
             .read(docsRegistryProvider.notifier)
             .importNew(pickedPath, suggested);
         if (asMessMenu && doc != null) {
-          if (doc.kind == DocKind.spreadsheet) {
+          if (doc.kind == .spreadsheet) {
             await setMessMenu(doc, true);
           } else if (context.mounted) {
             dispToast(
@@ -96,75 +89,59 @@ class DocsPage extends HookConsumerWidget {
       }
     }
 
-    void openRename(DocWindow doc) async {
-      final controller = TextEditingController(text: doc.name);
-      await showFDialog(
-        context: context,
-        // Above the tab shell, so the keyboard inset is counted once.
-        useRootNavigator: true,
-        builder: (context, style, animation) => AppDialog(
-          animation: animation,
-          direction: Axis.horizontal,
-          title: const Text('Rename document'),
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FTextField(
-                control: FTextFieldControl.managed(controller: controller),
+    /// A Cancel / [action] dialog; [onAction] runs after it closes.
+    void ask(Widget title, Widget body, String action, VoidCallback onAction) =>
+        showFDialog(
+          context: context,
+          // Above the tab shell, so the keyboard inset is counted once.
+          useRootNavigator: true,
+          builder: (context, style, animation) => AppDialog(
+            animation: animation,
+            direction: .horizontal,
+            title: title,
+            body: body,
+            actions: [
+              FButton(
+                variant: .outline,
+                onPress: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              FButton(
+                onPress: () {
+                  Navigator.of(context).pop();
+                  onAction();
+                },
+                child: Text(action),
               ),
             ],
           ),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              onPress: () {
-                Navigator.of(context).pop();
-                ref
-                    .read(docsRegistryProvider.notifier)
-                    .rename(doc.id, controller.text);
-              },
-              child: const Text('Save'),
-            ),
-          ],
+        );
+
+    void openRename(DocWindow doc) {
+      final controller = TextEditingController(text: doc.name);
+      ask(
+        const Text('Rename document'),
+        Column(
+          mainAxisSize: .min,
+          crossAxisAlignment: .start,
+          children: [FTextField(control: .managed(controller: controller))],
         ),
+        'Save',
+        () => ref
+            .read(docsRegistryProvider.notifier)
+            .rename(doc.id, controller.text),
       );
     }
 
-    void openDelete(DocWindow doc) async {
-      await showFDialog(
-        context: context,
-        // Above the tab shell, so the keyboard inset is counted once.
-        useRootNavigator: true,
-        builder: (context, style, animation) => AppDialog(
-          animation: animation,
-          direction: Axis.horizontal,
-          title: Text('Delete "${doc.name}"?'),
-          body: const Text('The imported file will be removed from the app.'),
-          actions: [
-            FButton(
-              variant: FButtonVariant.outline,
-              onPress: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              onPress: () {
-                Navigator.of(context).pop();
-                ref.read(docsRegistryProvider.notifier).remove(doc.id);
-              },
-              child: const Text('Delete'),
-            ),
-          ],
-        ),
-      );
-    }
+    void openDelete(DocWindow doc) => ask(
+      Text('Delete "${doc.name}"?'),
+      const Text('The imported file will be removed from the app.'),
+      'Delete',
+      () => ref.read(docsRegistryProvider.notifier).remove(doc.id),
+    );
 
     Future<void> openDoc(DocWindow doc) async {
-      if (doc.kind == DocKind.file) {
+      if (doc.kind == .file) {
         try {
           final repo = await ref.read(docsRepositoryProvider.future);
           final path = await repo.storedFilePathOf(doc);
@@ -187,21 +164,19 @@ class DocsPage extends HookConsumerWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.sm),
+      padding: const .symmetric(horizontal: Space.sm),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const .only(bottom: 12),
             child: Row(
               children: [
                 Expanded(
                   child: FTextField(
-                    control: FTextFieldControl.managed(
-                      controller: searchController,
-                    ),
+                    control: .managed(controller: searchController),
                     hint: 'Search documents',
                     prefixBuilder: (_, _, _) => Padding(
-                      padding: const EdgeInsets.only(left: 12, right: 8),
+                      padding: const .only(left: 12, right: 8),
                       child: Icon(
                         FLucideIcons.search,
                         size: 18,
@@ -223,8 +198,8 @@ class DocsPage extends HookConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 FPopoverMenu(
-                  menuAnchor: Alignment.topLeft,
-                  childAnchor: Alignment.bottomLeft,
+                  menuAnchor: .topLeft,
+                  childAnchor: .bottomLeft,
                   menu: [
                     FItemGroup(
                       children: [
@@ -242,7 +217,7 @@ class DocsPage extends HookConsumerWidget {
                     ),
                   ],
                   builder: (_, controller, _) => FButton(
-                    variant: FButtonVariant.outline,
+                    variant: .outline,
                     onPress: sortAsync.isLoading ? null : controller.toggle,
                     child: const Text('Sort'),
                   ),
@@ -258,36 +233,33 @@ class DocsPage extends HookConsumerWidget {
                 title: 'Unable to load documents',
                 subtitle: '$e',
               ),
-              data: (windows) {
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: windows.isEmpty
-                      ? _EmptyState(
-                          key: const ValueKey('empty'),
-                          onImport: () => importFlow(),
-                          onMess: () => importFlow(asMessMenu: true),
-                        )
-                      : _Grid(
-                          key: const ValueKey('grid'),
-                          windows: queryDocs(
-                            windows,
-                            sort: sort,
-                            query: searchController.text,
-                          ),
-                          searching: searching,
-                          totalCount: windows.length,
-                          onClearSearch: searchController.clear,
-                          darkMode: darkMode,
-                          entrance: entrance,
-                          onOpen: openDoc,
-                          onRename: openRename,
-                          onDelete: openDelete,
-                          onToggleMessMenu: (doc) =>
-                              setMessMenu(doc, !doc.asMessMenu),
-                          onImport: () => importFlow(),
+              data: (windows) => AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: windows.isEmpty
+                    ? _EmptyState(
+                        key: const ValueKey('empty'),
+                        onImport: () => importFlow(),
+                        onMess: () => importFlow(asMessMenu: true),
+                      )
+                    : _Grid(
+                        key: const ValueKey('grid'),
+                        windows: queryDocs(
+                          windows,
+                          sort: sort,
+                          query: searchController.text,
                         ),
-                );
-              },
+                        searching: searching,
+                        totalCount: windows.length,
+                        onClearSearch: searchController.clear,
+                        entrance: entrance,
+                        onOpen: openDoc,
+                        onRename: openRename,
+                        onDelete: openDelete,
+                        onToggleMessMenu: (doc) =>
+                            setMessMenu(doc, !doc.asMessMenu),
+                        onImport: () => importFlow(),
+                      ),
+              ),
             ),
           ),
         ],
@@ -301,7 +273,6 @@ class _Grid extends StatefulWidget {
   final bool searching;
   final int totalCount;
   final VoidCallback onClearSearch;
-  final bool darkMode;
   final AnimationController entrance;
   final void Function(DocWindow) onOpen;
   final void Function(DocWindow) onRename;
@@ -315,7 +286,6 @@ class _Grid extends StatefulWidget {
     required this.searching,
     required this.totalCount,
     required this.onClearSearch,
-    required this.darkMode,
     required this.entrance,
     required this.onOpen,
     required this.onRename,
@@ -338,17 +308,15 @@ class _GridState extends State<_Grid> {
 
   @override
   Widget build(BuildContext context) {
-    DocWindow? recent;
-    for (final window in widget.windows) {
-      if (!window.hasFile ||
-          window.kind == DocKind.file ||
-          window.lastOpenedAt == null) {
-        continue;
-      }
-      if (recent == null || window.lastOpenedAt! > (recent.lastOpenedAt ?? 0)) {
-        recent = window;
-      }
-    }
+    final recent = widget.windows
+        .where((w) => w.hasFile && w.kind != .file && w.lastOpenedAt != null)
+        .fold<DocWindow?>(
+          null,
+          (best, w) =>
+              best == null || w.lastOpenedAt! > (best.lastOpenedAt ?? 0)
+              ? w
+              : best,
+        );
 
     return CustomScrollView(
       physics: _previewActive && !widget.searching
@@ -356,7 +324,7 @@ class _GridState extends State<_Grid> {
           : const AlwaysScrollableScrollPhysics(),
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+          padding: const .fromLTRB(0, 4, 0, 8),
           sliver: SliverToBoxAdapter(
             child: Row(
               children: [
@@ -366,7 +334,7 @@ class _GridState extends State<_Grid> {
                       : '${widget.windows.length} document${widget.windows.length == 1 ? '' : 's'}',
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: .w600,
                     color: context.theme.colors.mutedForeground,
                   ),
                 ),
@@ -374,16 +342,13 @@ class _GridState extends State<_Grid> {
                 FTappable(
                   onPress: widget.onImport,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                    padding: const .symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: context.theme.colors.primary,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: .circular(10),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: .min,
                       children: [
                         Icon(
                           FLucideIcons.filePlus2,
@@ -395,7 +360,7 @@ class _GridState extends State<_Grid> {
                           'Add',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: .w600,
                             color: context.theme.colors.primaryForeground,
                           ),
                         ),
@@ -409,12 +374,11 @@ class _GridState extends State<_Grid> {
         ),
         if (recent != null && !widget.searching)
           SliverPadding(
-            padding: const EdgeInsets.only(bottom: 14),
+            padding: const .only(bottom: 14),
             sliver: SliverToBoxAdapter(
               child: _RecentDocumentPreview(
                 doc: recent,
-                darkMode: widget.darkMode,
-                onOpen: () => widget.onOpen(recent!),
+                onOpen: () => widget.onOpen(recent),
                 onInteractionStart: () => _setPreviewActive(true),
                 onInteractionEnd: () => _setPreviewActive(false),
               ),
@@ -424,7 +388,7 @@ class _GridState extends State<_Grid> {
           SliverFillRemaining(
             hasScrollBody: false,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: .center,
               children: [
                 const _CenterInfo(
                   icon: FLucideIcons.search,
@@ -433,7 +397,7 @@ class _GridState extends State<_Grid> {
                 ),
                 const SizedBox(height: 16),
                 FButton(
-                  variant: FButtonVariant.outline,
+                  variant: .outline,
                   onPress: widget.onClearSearch,
                   child: const Text('Clear search'),
                 ),
@@ -484,14 +448,12 @@ class _GridState extends State<_Grid> {
 
 class _RecentDocumentPreview extends StatelessWidget {
   final DocWindow doc;
-  final bool darkMode;
   final VoidCallback onOpen;
   final VoidCallback onInteractionStart;
   final VoidCallback onInteractionEnd;
 
   const _RecentDocumentPreview({
     required this.doc,
-    required this.darkMode,
     required this.onOpen,
     required this.onInteractionStart,
     required this.onInteractionEnd,
@@ -504,7 +466,7 @@ class _RecentDocumentPreview extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: context.theme.colors.card,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: .circular(16),
         border: Border.all(color: context.theme.colors.border),
         boxShadow: const [
           BoxShadow(
@@ -515,30 +477,30 @@ class _RecentDocumentPreview extends StatelessWidget {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            padding: const .fromLTRB(14, 12, 10, 12),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const .all(8),
                   decoration: BoxDecoration(
                     color: visual.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: .circular(10),
                   ),
                   child: Icon(visual.icon, size: 19, color: visual.accent),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: .start,
                     children: [
                       Text(
                         'Continue viewing',
                         style: TextStyle(
                           fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: .w700,
                           letterSpacing: 0.3,
                           color: context.theme.colors.mutedForeground,
                         ),
@@ -547,10 +509,10 @@ class _RecentDocumentPreview extends StatelessWidget {
                       Text(
                         doc.name,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow: .ellipsis,
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: .w700,
                           color: context.theme.colors.primary,
                         ),
                       ),
@@ -561,16 +523,13 @@ class _RecentDocumentPreview extends StatelessWidget {
                 FTappable(
                   onPress: onOpen,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
+                    padding: const .symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
                       color: context.theme.colors.primary,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: .circular(10),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisSize: .min,
                       children: [
                         Icon(
                           FLucideIcons.externalLink,
@@ -582,7 +541,7 @@ class _RecentDocumentPreview extends StatelessWidget {
                           'Full screen',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: .w700,
                             color: context.theme.colors.primaryForeground,
                           ),
                         ),
@@ -601,14 +560,12 @@ class _RecentDocumentPreview extends StatelessWidget {
                 onEnter: (_) => onInteractionStart(),
                 onExit: (_) => onInteractionEnd(),
                 child: Listener(
-                  behavior: HitTestBehavior.opaque,
+                  behavior: .opaque,
                   onPointerDown: (_) => onInteractionStart(),
                   onPointerUp: (_) => onInteractionEnd(),
                   onPointerCancel: (_) => onInteractionEnd(),
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(15),
-                    ),
+                    borderRadius: const .vertical(bottom: Radius.circular(15)),
                     child: ColoredBox(
                       color: context.theme.colors.background,
                       child: DocumentViewerPage(
@@ -628,81 +585,79 @@ class _RecentDocumentPreview extends StatelessWidget {
   }
 }
 
-class _EmptyState extends ConsumerWidget {
+class _EmptyState extends StatelessWidget {
   final VoidCallback onImport;
   final VoidCallback onMess;
   const _EmptyState({super.key, required this.onImport, required this.onMess});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: context.theme.colors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                FLucideIcons.files,
-                size: 44,
-                color: context.theme.colors.primary,
-              ),
+  Widget build(BuildContext context) => Center(
+    child: SingleChildScrollView(
+      child: Column(
+        mainAxisAlignment: .center,
+        children: [
+          Container(
+            padding: const .all(24),
+            decoration: BoxDecoration(
+              color: context.theme.colors.primary.withValues(alpha: 0.1),
+              shape: .circle,
             ),
-            const SizedBox(height: 18),
-            Text(
-              'Your personal board',
+            child: Icon(
+              FLucideIcons.files,
+              size: 44,
+              color: context.theme.colors.primary,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Your personal board',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: .w700,
+              color: context.theme.colors.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const .symmetric(horizontal: 40),
+            child: Text(
+              'Import a PDF or image — like your mess menu — and it stays here, right where you left off.',
+              textAlign: .center,
               style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                height: 1.4,
+                color: context.theme.colors.mutedForeground,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          FButton(
+            onPress: onImport,
+            child: const Row(
+              mainAxisSize: .min,
+              children: [
+                Icon(FLucideIcons.filePlus2, size: 16),
+                SizedBox(width: 8),
+                Text('Import a document'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          FTappable(
+            onPress: onMess,
+            child: Text(
+              'or add the mess menu (.xlsx)',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: .w600,
                 color: context.theme.colors.primary,
               ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Import a PDF or image — like your mess menu — and it stays here, right where you left off.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  height: 1.4,
-                  color: context.theme.colors.mutedForeground,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            FButton(
-              onPress: () => onImport(),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(FLucideIcons.filePlus2, size: 16),
-                  SizedBox(width: 8),
-                  Text('Import a document'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            FTappable(
-              onPress: onMess,
-              child: Text(
-                'or add the mess menu (.xlsx)',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: context.theme.colors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _CenterInfo extends StatelessWidget {
@@ -713,30 +668,28 @@ class _CenterInfo extends StatelessWidget {
   const _CenterInfo({required this.icon, required this.title, this.subtitle});
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 28, color: context.theme.colors.mutedForeground),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: context.theme.colors.primary,
-            ),
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisAlignment: .center,
+      children: [
+        Icon(icon, size: 28, color: context.theme.colors.mutedForeground),
+        const SizedBox(height: 10),
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: .w600,
+            color: context.theme.colors.primary,
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              subtitle!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.theme.colors.mutedForeground),
-            ),
-          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle!,
+            textAlign: .center,
+            style: TextStyle(color: context.theme.colors.mutedForeground),
+          ),
         ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }

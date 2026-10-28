@@ -26,25 +26,18 @@ List<DocWindow> queryDocs(
       .toList();
   result.sort((a, b) {
     final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    final int primary;
-    switch (sort) {
-      case DocSort.recentlyOpened:
-        if (a.lastOpenedAt == null || b.lastOpenedAt == null) {
-          primary = a.lastOpenedAt == b.lastOpenedAt
-              ? 0
-              : a.lastOpenedAt == null
-              ? 1
-              : -1;
-        } else {
-          primary = b.lastOpenedAt!.compareTo(a.lastOpenedAt!);
-        }
-      case DocSort.recentlyAdded:
-        primary = b.addedAt.compareTo(a.addedAt);
-      case DocSort.nameAscending:
-        primary = byName;
-      case DocSort.nameDescending:
-        primary = -byName;
-    }
+    final primary = switch (sort) {
+      // Never-opened documents go last.
+      .recentlyOpened => switch ((a.lastOpenedAt, b.lastOpenedAt)) {
+        (final x?, final y?) => y.compareTo(x),
+        (null, null) => 0,
+        (null, _) => 1,
+        _ => -1,
+      },
+      .recentlyAdded => b.addedAt.compareTo(a.addedAt),
+      .nameAscending => byName,
+      .nameDescending => -byName,
+    };
     if (primary != 0) return primary;
     if (byName != 0) return byName;
     return a.id.compareTo(b.id);

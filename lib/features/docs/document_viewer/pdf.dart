@@ -4,56 +4,40 @@ part of '../document_viewer_page.dart';
 class _PdfContent extends HookConsumerWidget {
   final DocWindow doc;
   final double dpr;
-  final bool darkMode;
   final TransformationController transform;
   final void Function({double scrollOffset}) persist;
 
   const _PdfContent({
     required this.doc,
     required this.dpr,
-    required this.darkMode,
     required this.transform,
     required this.persist,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pathState = useFuture(
-      useMemoized(() async {
-        final repo = await ref.read(docsRepositoryProvider.future);
-        return repo.storedFilePathOf(doc);
-      }, [doc.fileName]),
-    );
-
+    final pathState = _useStoredPath(ref, doc);
     if (pathState.connectionState != ConnectionState.done) {
       return const Spinner();
     }
     final path = pathState.data;
     if (path == null) {
-      return Center(
-        child: Text(
-          'File missing. Remove and re-import this document.',
-          style: TextStyle(color: context.theme.colors.mutedForeground),
-        ),
-      );
+      return const _Notice('File missing. Remove and re-import this document.');
     }
-
     return _PdfLoaded(
       path: path,
       doc: doc,
       dpr: dpr,
-      darkMode: darkMode,
       transform: transform,
       persist: persist,
     );
   }
 }
 
-class _PdfLoaded extends HookConsumerWidget {
+class _PdfLoaded extends HookWidget {
   final String path;
   final DocWindow doc;
   final double dpr;
-  final bool darkMode;
   final TransformationController transform;
   final void Function({double scrollOffset}) persist;
 
@@ -61,13 +45,12 @@ class _PdfLoaded extends HookConsumerWidget {
     required this.path,
     required this.doc,
     required this.dpr,
-    required this.darkMode,
     required this.transform,
     required this.persist,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final docFuture = useFuture(
       useMemoized(() => pdfx.PdfDocument.openFile(path), [path]),
     );
@@ -84,15 +67,9 @@ class _PdfLoaded extends HookConsumerWidget {
 
     final pdfDoc = docFuture.data;
     if (docFuture.connectionState != ConnectionState.done || pdfDoc == null) {
-      if (docFuture.hasError) {
-        return Center(
-          child: Text(
-            'Unable to open this PDF.',
-            style: TextStyle(color: context.theme.colors.mutedForeground),
-          ),
-        );
-      }
-      return const Spinner();
+      return docFuture.hasError
+          ? const _Notice('Unable to open this PDF.')
+          : const Spinner();
     }
     return NotificationListener<ScrollNotification>(
       onNotification: onScrollNotification,
@@ -103,12 +80,7 @@ class _PdfLoaded extends HookConsumerWidget {
         onInteractionEnd: () => persist(scrollOffset: scroll.offset),
         pageBuilder: (context, i) => RepaintBoundary(
           key: ValueKey('page-$i'),
-          child: _PdfPageTile(
-            document: pdfDoc,
-            pageNumber: i + 1,
-            dpr: dpr,
-            darkMode: darkMode,
-          ),
+          child: _PdfPageTile(document: pdfDoc, pageNumber: i + 1, dpr: dpr),
         ),
       ),
     );
@@ -119,13 +91,11 @@ class _PdfPageTile extends StatefulWidget {
   final pdfx.PdfDocument document;
   final int pageNumber;
   final double dpr;
-  final bool darkMode;
 
   const _PdfPageTile({
     required this.document,
     required this.pageNumber,
     required this.dpr,
-    required this.darkMode,
   });
 
   @override
@@ -174,58 +144,47 @@ class _PdfPageTileState extends State<_PdfPageTile>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_bytes != null && _aspect != null) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+    final placeholder = BoxDecoration(
+      color: context.theme.colors.primaryForeground,
+      borderRadius: .circular(8),
+      border: Border.all(color: context.theme.colors.border),
+    );
+    return Padding(
+      padding: const .only(bottom: 14),
+      child: switch ((_bytes, _aspect)) {
+        (final bytes?, final aspect?) => ClipRRect(
+          borderRadius: .circular(8),
           child: AspectRatio(
-            aspectRatio: _aspect!,
+            aspectRatio: aspect,
             child: Image.memory(
-              _bytes!,
-              fit: BoxFit.fill,
-              filterQuality: FilterQuality.medium,
+              bytes,
+              fit: .fill,
+              filterQuality: .medium,
               gaplessPlayback: true,
             ),
           ),
         ),
-      );
-    }
-    if (_failed) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Container(
+        _ when _failed => Container(
           height: 120,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: context.theme.colors.primaryForeground,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.theme.colors.border),
-          ),
+          alignment: .center,
+          decoration: placeholder,
           child: Text(
             'Failed to render page ${widget.pageNumber}',
             style: TextStyle(color: context.theme.colors.mutedForeground),
           ),
         ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: AspectRatio(
-        aspectRatio: 1 / 1.414,
-        child: Container(
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: context.theme.colors.primaryForeground,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: context.theme.colors.border),
-          ),
-          child: CircularProgressIndicator(
-            color: context.theme.colors.primary,
-            strokeWidth: 2.5,
+        _ => AspectRatio(
+          aspectRatio: 1 / 1.414,
+          child: Container(
+            alignment: .center,
+            decoration: placeholder,
+            child: CircularProgressIndicator(
+              color: context.theme.colors.primary,
+              strokeWidth: 2.5,
+            ),
           ),
         ),
-      ),
+      },
     );
   }
 }

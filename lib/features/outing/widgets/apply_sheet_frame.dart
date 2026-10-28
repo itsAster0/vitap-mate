@@ -3,9 +3,6 @@ import 'package:forui/forui.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:vitapmate/ui/ui.dart';
 
-/// Collapses runs of whitespace, as VTOP's own form effectively does.
-String tidyText(String value) => value.trim().split(RegExp(r'\s+')).join(' ');
-
 /// Shows what is about to be sent and asks to send it.
 Future<bool> confirmApplication(
   BuildContext context, {
@@ -22,14 +19,14 @@ Future<bool> confirmApplication(
     cancel: 'Edit',
     actionFirst: true,
     body: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: .min,
+      crossAxisAlignment: .stretch,
       children: [
         for (final (label, value) in rows)
           Padding(
-            padding: const EdgeInsets.only(bottom: Space.xs + 2),
+            padding: const .only(bottom: Space.xs + 2),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: .start,
               children: [
                 SizedBox(
                   width: 72,
@@ -44,7 +41,7 @@ Future<bool> confirmApplication(
                   child: Text(
                     value,
                     style: typography.body.sm.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: .w600,
                       color: colors.foreground,
                     ),
                   ),
@@ -99,30 +96,25 @@ class ApplySheetFrame extends StatelessWidget {
       constraints: BoxConstraints(maxHeight: maxHeight),
       decoration: BoxDecoration(
         color: colors.background,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+        borderRadius: const .vertical(top: Radius.circular(10)),
       ),
       child: SafeArea(
         top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: .min,
+          crossAxisAlignment: .stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.lg,
-                Space.md,
-                Space.lg,
-                0,
-              ),
+              padding: const .fromLTRB(Space.lg, Space.md, Space.lg, 0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   const SheetHandle(),
                   const SizedBox(height: Space.md),
                   Text(
                     title,
                     style: typography.body.lg.copyWith(
-                      fontWeight: FontWeight.w700,
+                      fontWeight: .w700,
                       color: colors.foreground,
                     ),
                   ),
@@ -138,34 +130,26 @@ class ApplySheetFrame extends StatelessWidget {
             ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(
+                padding: const .fromLTRB(
                   Space.lg,
                   Space.lg,
                   Space.lg,
                   Space.sm,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
-                ),
+                child: Column(crossAxisAlignment: .stretch, children: children),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Space.lg,
-                Space.xs,
-                Space.lg,
-                Space.md,
-              ),
+              padding: const .fromLTRB(Space.lg, Space.xs, Space.lg, Space.md),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   if (failure != null) ...[
                     Container(
-                      padding: const EdgeInsets.all(Space.sm + 2),
+                      padding: const .all(Space.sm + 2),
                       decoration: BoxDecoration(
                         color: colors.app.danger.subtle,
-                        borderRadius: BorderRadius.circular(Radii.md),
+                        borderRadius: .circular(Radii.md),
                       ),
                       child: Text(
                         failure!,

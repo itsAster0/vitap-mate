@@ -44,12 +44,7 @@ class CoursePagePage extends ConsumerWidget {
         color: colors.foreground,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            Space.sm,
-            Space.sm,
-            Space.sm,
-            Space.xl,
-          ),
+          padding: const .fromLTRB(Space.sm, Space.sm, Space.sm, Space.xl),
           children: data.when(
             skipLoadingOnRefresh: true,
             loading: () => const [SkeletonList(count: 6, height: 84)],
@@ -60,9 +55,9 @@ class CoursePagePage extends ConsumerWidget {
                 message:
                     'VTOP did not answer. Check your connection and retry.',
                 action: FButton(
-                  variant: FButtonVariant.outline,
+                  variant: .outline,
                   prefix: const Icon(FLucideIcons.rotateCw),
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: .min,
                   onPress: () => ref.invalidate(coursePageCoursesProvider),
                   child: const Text('Retry'),
                 ),
@@ -81,7 +76,7 @@ class CoursePagePage extends ConsumerWidget {
               }
               return [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(2, 0, 2, Space.sm),
+                  padding: const .fromLTRB(2, 0, 2, Space.sm),
                   child: Text(
                     'Lecture plans and material from your faculty.',
                     style: context.theme.typography.body.xs.copyWith(
@@ -91,7 +86,7 @@ class CoursePagePage extends ConsumerWidget {
                 ),
                 for (final (i, group) in groups.indexed)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: Space.sm),
+                    padding: const .only(bottom: Space.sm),
                     child: EnterFade(
                       index: i,
                       child: _CourseCard(group: group, onOpen: open),
@@ -117,14 +112,14 @@ class _CourseCard extends StatelessWidget {
     final colors = context.theme.colors;
     return Surface(
       semanticsLabel: '${group.code} ${group.title}',
-      padding: const EdgeInsets.all(Space.md + 2),
+      padding: const .all(Space.md + 2),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Text(
             group.code,
             style: context.theme.typography.body.xs.copyWith(
-              fontWeight: FontWeight.w600,
+              fontWeight: .w600,
               letterSpacing: 0.3,
               color: colors.mutedForeground,
             ),
@@ -133,7 +128,7 @@ class _CourseCard extends StatelessWidget {
           Text(
             group.title,
             style: context.theme.typography.body.md.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: .w700,
               color: colors.foreground,
             ),
           ),
@@ -182,10 +177,10 @@ class _PartButton extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           color: tone.subtle,
-          borderRadius: BorderRadius.circular(Radii.md),
+          borderRadius: .circular(Radii.md),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: .center,
           children: [
             Icon(
               lab ? FLucideIcons.flaskConical : FLucideIcons.bookOpen,
@@ -196,7 +191,7 @@ class _PartButton extends StatelessWidget {
             Text(
               label,
               style: context.theme.typography.body.sm.copyWith(
-                fontWeight: FontWeight.w600,
+                fontWeight: .w600,
                 color: tone.onSubtle,
               ),
             ),
