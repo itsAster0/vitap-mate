@@ -1,11 +1,11 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
+import 'package:vitapmate/vtop/vtop.dart';
 
 /// The registration number Gmail access is checked against, signing in to
 /// VTOP first if needed. Toasts and returns null when that fails.
@@ -46,11 +46,7 @@ Future<String?> vtopCookies(WidgetRef ref, {required bool signIn}) async {
     final client = signIn
         ? await ref.read(vClientProvider.notifier).ensureLogin()
         : await ref.read(vClientProvider.future);
-    if (!await fetchIsAuth(client: client)) return null;
-    final cookies =
-        createPersistedVtopSessionSnapshot(client: client).cookies?.trim() ??
-        '';
-    return cookies.isEmpty ? null : cookies;
+    return await signedInCookies(client);
   } catch (_) {
     return null;
   }

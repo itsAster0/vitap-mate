@@ -16,7 +16,7 @@ import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/edge/edge_device.dart';
@@ -12,7 +12,6 @@ import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
-import 'package:vitapmate/src/api/vtop_get_client.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 
 /// The account calls the Server pages make. They need a VTOP session from
@@ -45,14 +44,8 @@ class _BridgeServerAccountApi implements ServerAccountApi {
     final client = await _ref
         .read(vClientProvider.notifier)
         .ensureLogin(force: force);
-    if (!await fetchIsAuth(client: client)) {
-      throw StateError('Sign in to VTOP first.');
-    }
-    final cookies =
-        createPersistedVtopSessionSnapshot(client: client).cookies?.trim() ??
-        '';
-    if (cookies.isEmpty) throw StateError('Sign in to VTOP first.');
-    return cookies;
+    return await signedInCookies(client) ??
+        (throw StateError('Sign in to VTOP first.'));
   }
 
   Future<T> _withService<T>(

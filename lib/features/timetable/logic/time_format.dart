@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

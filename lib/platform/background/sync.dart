@@ -7,7 +7,7 @@ import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hooks_riverpod/misc.dart' show ProviderListenable;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/observability/log.dart';

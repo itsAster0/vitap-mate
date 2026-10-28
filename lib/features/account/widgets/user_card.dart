@@ -8,11 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/features/account/user_management.dart';
 import 'package:vitapmate/vtop/semesters.dart';
@@ -300,7 +300,7 @@ class UserCard extends HookConsumerWidget {
                   if (username != null && username.isNotEmpty) {
                     await clearStoredVtopSession(username);
                     await ref
-                        .read(vtopusersutilsProvider.notifier)
+                        .read(vtopUsersProvider.notifier)
                         .vtopUserDelete(username);
                   }
                   ref

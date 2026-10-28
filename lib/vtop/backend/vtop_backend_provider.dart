@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/users/saved_credentials.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_authenticator.dart';
 import 'package:vitapmate/vtop/backend/local_vtop_backend.dart';
@@ -89,7 +89,7 @@ VtopBackend vtopBackend(Ref ref) {
         ),
     // VTOP turned the saved password down: mark it, so the app asks again.
     onCredentialsRejected: () async {
-      final users = ref.read(vtopusersutilsProvider.notifier);
+      final users = ref.read(vtopUsersProvider.notifier);
       if (await rejectSavedCredentials(
         load: users.vtopUserDefault,
         save: users.vtopUserSave,

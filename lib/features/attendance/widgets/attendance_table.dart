@@ -8,7 +8,7 @@ import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/ui/data_updated_footer.dart';
@@ -58,7 +58,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
       }
     }
 
-    final (code, name) = formateName(record.courseName);
+    final (code, name) = formatName(record.courseName);
     // In sessions for labs; exactly the history's count whenever it agrees.
     final standing = AttendanceStanding.sessions(record);
     final tone = attendanceTone(

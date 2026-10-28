@@ -6,7 +6,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/app/settings.dart';

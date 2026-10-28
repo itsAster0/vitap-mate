@@ -78,7 +78,7 @@ final routerProvider = Provider<GoRouter>(
     routes: [
       GoRoute(
         path: '/onboarding',
-        name: Paths.onbaording,
+        name: Paths.onboarding,
         builder: (context, state) => OnboardingPage(),
       ),
       _slide(

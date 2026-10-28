@@ -3,13 +3,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 
-part 'vtop_users_utils.g.dart';
+part 'vtop_users.g.dart';
 
 const _singleUserKey = 'vtopUser';
 const _defaultUserKey = 'defaultUser';
 
 @riverpod
-class Vtopusersutils extends _$Vtopusersutils {
+class VtopUsers extends _$VtopUsers {
   late FlutterSecureStorage _storage;
 
   @override
@@ -114,5 +114,5 @@ class Vtopusersutils extends _$Vtopusersutils {
 
 @riverpod
 Future<(List<VtopUserEntity>, String?)> allUsersProvider(Ref ref) async {
-  return ref.watch(vtopusersutilsProvider.notifier).getAllUsers();
+  return ref.watch(vtopUsersProvider.notifier).getAllUsers();
 }

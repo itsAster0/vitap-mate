@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/features/marks/logic/weightage_totals.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';

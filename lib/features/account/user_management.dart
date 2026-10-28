@@ -7,13 +7,13 @@ import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/vtop_user_provider.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
-import 'package:vitapmate/vtop/users/vtop_users_utils.dart';
+import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/vtop/semesters.dart';
@@ -102,7 +102,7 @@ class SemesterDialog extends HookConsumerWidget {
       saving.value = selected;
       try {
         await ref
-            .read(vtopusersutilsProvider.notifier)
+            .read(vtopUsersProvider.notifier)
             .vtopUserSave(user.withSemester(selected));
 
         ref
@@ -376,7 +376,7 @@ class UserPassChange extends HookConsumerWidget {
                               client: client,
                             );
                             await ref
-                                .read(vtopusersutilsProvider.notifier)
+                                .read(vtopUsersProvider.notifier)
                                 .vtopUserSave(
                                   user.withCredentials(
                                     newUsername,
@@ -391,7 +391,7 @@ class UserPassChange extends HookConsumerWidget {
                             ref.invalidate(vClientProvider);
                           } catch (e) {
                             if (outerContext.mounted) {
-                              disOnbardingCommonToast(outerContext, e);
+                              disOnboardingCommonToast(outerContext, e);
                             }
                           } finally {
                             isLoading.value = false;

@@ -5,7 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_projection.dart';
 import 'package:vitapmate/features/attendance/widgets/attendance_table.dart';
@@ -34,7 +34,7 @@ class AttendanceCard extends ConsumerWidget {
       safe: plan.isSafe,
       atEdge: plan.canSkip == 0,
     );
-    final (code, name) = formateName(record.courseName);
+    final (code, name) = formatName(record.courseName);
     final isLab = record.islab();
     final timetable = ref.watch(timetableProvider).value;
     final calendar = ref.watch(semesterCalendarProvider);
@@ -274,7 +274,7 @@ void showAttendanceDetails(BuildContext context, AttendanceRecord record) {
 }
 
 /// Splits "CODE - Name - Type" into (code, name).
-(String, String) formateName(String name) => switch (name.split('-')) {
+(String, String) formatName(String name) => switch (name.split('-')) {
   [final code, final first, final second, _, ...] => (code, '$first-$second'),
   [final code, final first, ...] => (code, first),
   _ => ('', name),

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'vtop_users_utils.dart';
+part of 'vtop_users.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,28 +9,28 @@ part of 'vtop_users_utils.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(Vtopusersutils)
-final vtopusersutilsProvider = VtopusersutilsProvider._();
+@ProviderFor(VtopUsers)
+final vtopUsersProvider = VtopUsersProvider._();
 
-final class VtopusersutilsProvider
-    extends $NotifierProvider<Vtopusersutils, FlutterSecureStorage> {
-  VtopusersutilsProvider._()
+final class VtopUsersProvider
+    extends $NotifierProvider<VtopUsers, FlutterSecureStorage> {
+  VtopUsersProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'vtopusersutilsProvider',
+        name: r'vtopUsersProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$vtopusersutilsHash();
+  String debugGetCreateSourceHash() => _$vtopUsersHash();
 
   @$internal
   @override
-  Vtopusersutils create() => Vtopusersutils();
+  VtopUsers create() => VtopUsers();
 
   /// {@macro riverpod.override_with_value}
   Override overrideWithValue(FlutterSecureStorage value) {
@@ -41,9 +41,9 @@ final class VtopusersutilsProvider
   }
 }
 
-String _$vtopusersutilsHash() => r'a436185431efddac3dcd741abd52fc3927bafa63';
+String _$vtopUsersHash() => r'7211bbd832d0dc623ea1362eba52b4f37c6af8a5';
 
-abstract class _$Vtopusersutils extends $Notifier<FlutterSecureStorage> {
+abstract class _$VtopUsers extends $Notifier<FlutterSecureStorage> {
   FlutterSecureStorage build();
   @$mustCallSuper
   @override
@@ -100,4 +100,4 @@ final class AllUsersProviderProvider
   }
 }
 
-String _$allUsersProviderHash() => r'33ab72898d4dfb5f8220887a838b5bd779417cee';
+String _$allUsersProviderHash() => r'dc932b3aea3a904d9ae03d0da7c75c8b16d560f8';

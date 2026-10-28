@@ -1,4 +1,4 @@
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// Minimum attendance VIT requires.

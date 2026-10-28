@@ -16,7 +16,7 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/timetable/timetable_view_mode_provider.dart';
 import 'package:vitapmate/features/timetable/logic/timetable_slot_merge.dart';
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/timetable/widgets/agenda_timetable_view.dart';
 import 'package:vitapmate/features/timetable/widgets/weekly_timetable_view.dart';

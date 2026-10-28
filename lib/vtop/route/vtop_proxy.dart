@@ -6,7 +6,7 @@ library;
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/client_provider.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/app/settings.dart';

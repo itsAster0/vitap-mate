@@ -1,4 +1,4 @@
-import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_standing.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
