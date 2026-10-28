@@ -13,18 +13,17 @@ class JsonFileStorage {
   JsonFileStorage({required this.username, Future<Directory> Function()? root})
     : _root = root ?? getApplicationSupportDirectory;
 
-  String _normalize(String value) {
-    return value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
-  }
+  static String _normalize(String value) =>
+      value.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
 
   Future<Directory> _initStorageDir() async {
-    final storageDir = await _getUserDir('data');
-    final legacyCacheDir = await _getUserDir('cache', create: false);
+    final storageDir = await userDir('data');
+    final legacyCacheDir = await userDir('cache', create: false);
     await _migrateLegacyCacheDir(from: legacyCacheDir, to: storageDir);
     return storageDir;
   }
 
-  Future<Directory> _getUserDir(String name, {bool create = true}) async {
+  Future<Directory> userDir(String name, {bool create = true}) async {
     final root = await _root();
     final safeUser = _normalize(username.isEmpty ? 'NO_USERNAME' : username);
     final dir = Directory('${root.path}/$name/$safeUser');
@@ -53,11 +52,8 @@ class JsonFileStorage {
     }
   }
 
-  Future<File> _fileFor(String key) async {
-    final storageDir = await _storageDir;
-    final safeKey = _normalize(key);
-    return File('${storageDir.path}/$safeKey.json');
-  }
+  Future<File> _fileFor(String key) async =>
+      File('${(await _storageDir).path}/${_normalize(key)}.json');
 
   Future<Map<String, dynamic>?> readJson(String key) async {
     final file = await _fileFor(key);
@@ -71,8 +67,7 @@ class JsonFileStorage {
       // A file cut short (from before writes were atomic) is a cache miss.
       return null;
     }
-    if (decoded is Map<String, dynamic>) return decoded;
-    return null;
+    return decoded is Map<String, dynamic> ? decoded : null;
   }
 
   /// Writes beside the file, then renames over it, so a write cut short
@@ -91,16 +86,12 @@ class JsonFileStorage {
     }
   }
 
-  Future<Directory> userDir(String name, {bool create = true}) {
-    return _getUserDir(name, create: create);
-  }
-
   Future<String> copyIntoUserDir(
     String subDir,
     String sourcePath, {
     String? fileName,
   }) async {
-    final dir = await _getUserDir(subDir);
+    final dir = await userDir(subDir);
     final safeName = _normalize(fileName ?? sourcePath.split('/').last);
     final target = File('${dir.path}/$safeName');
     await File(sourcePath).copy(target.path);

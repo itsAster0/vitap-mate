@@ -190,4 +190,8 @@ abstract final class Motion {
   static const fast = Duration(milliseconds: 120);
   static const medium = Duration(milliseconds: 220);
   static const slow = Duration(milliseconds: 360);
+
+  /// Whether the platform asks for reduced motion.
+  static bool reduced(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
 }

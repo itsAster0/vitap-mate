@@ -250,7 +250,7 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
   if (await isOnDeviceMode()) return;
   final requestId = '${data['requestId'] ?? ''}'.trim();
   final responseToken = '${data['responseToken'] ?? ''}'.trim();
-  final callbackUrl = _resolveCookieCallbackUrl(data);
+  final callbackUrl = resolveCookieCallbackUrlForTest(data);
   if (requestId.isEmpty || responseToken.isEmpty || callbackUrl.isEmpty) {
     log('Ignoring malformed FCM cookie request', name: 'fcm.cookie');
     return;
@@ -331,13 +331,8 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
   }
 }
 
-String _resolveCookieCallbackUrl(Map<String, dynamic> data) {
-  return resolveCookieCallbackUrlForTest(data);
-}
-
-String resolveCookieCallbackUrlForTest(Map<String, dynamic> data) {
-  return '${data['callbackUrl'] ?? ''}'.trim();
-}
+String resolveCookieCallbackUrlForTest(Map<String, dynamic> data) =>
+    '${data['callbackUrl'] ?? ''}'.trim();
 
 typedef _PreparedCookieBridgePayload = ({
   List<Map<String, dynamic>> cookies,

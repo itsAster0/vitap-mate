@@ -1,56 +1,55 @@
 import 'dart:convert';
 
-import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/platform/background/entity_sync.dart';
+import 'package:vitapmate/platform/background/sync.dart';
 import 'package:workmanager/workmanager.dart';
-part 'controller.g.dart';
 
-@Riverpod(keepAlive: true)
-class BackgroundSync extends _$BackgroundSync {
-  final _keySync = "background_sync_key_v3";
+/// How often the periodic background sync runs; zero turns it off.
+typedef SyncState = ({Duration freq});
+
+final backgroundSyncProvider = AsyncNotifierProvider<BackgroundSync, SyncState>(
+  BackgroundSync.new,
+);
+
+class BackgroundSync extends AsyncNotifier<SyncState> {
+  static const _keySync = "background_sync_key_v3";
+
   @override
   Future<SyncState> build() async {
     final prefs = await SharedPreferences.getInstance();
-    final syncjsonstr = prefs.getString(_keySync);
-    if (syncjsonstr == null) {
-      final freq = Duration(hours: 0);
-      final k = SyncState(freq: freq);
-
-      _save(k);
-      return k;
+    if (prefs.getString(_keySync) case final json?) {
+      final micros = (jsonDecode(json) as Map<String, dynamic>)['freq'] as num;
+      return (freq: Duration(microseconds: micros.toInt()));
     }
-    return SyncState.fromJson(jsonDecode(syncjsonstr));
+    const initial = (freq: Duration.zero);
+    _save(initial);
+    return initial;
   }
 
-  void _save(SyncState k) async {
+  void _save(SyncState sync) async {
     final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString(_keySync, jsonEncode(k.toJson()));
-    _configure(k.freq);
+    await prefs.setString(
+      _keySync,
+      jsonEncode({'freq': sync.freq.inMicroseconds}),
+    );
+    if (sync.freq == Duration.zero) {
+      Workmanager().cancelByUniqueName(backgroundSyncTask);
+    } else {
+      Workmanager().registerPeriodicTask(
+        backgroundSyncTask,
+        backgroundSyncTask,
+        existingWorkPolicy: .update,
+        frequency: sync.freq,
+        constraints: Constraints(networkType: .connected),
+      );
+    }
   }
 
   void updateFreq(Duration freq) async {
-    final sync = await future;
-    final newSync = sync.copyWith(freq: freq);
-    state = AsyncData(newSync);
-
-    _save(newSync);
-  }
-
-  void _configure(Duration freqk) async {
-    final freq = freqk == Duration(seconds: 0) ? null : freqk;
-    final valToken = "sync_vtop";
-    if (freq != null) {
-      Workmanager().registerPeriodicTask(
-        valToken,
-        valToken,
-        existingWorkPolicy: ExistingPeriodicWorkPolicy.update,
-        frequency: freq,
-        constraints: Constraints(networkType: NetworkType.connected),
-      );
-    } else {
-      Workmanager().cancelByUniqueName(valToken);
-    }
+    await future;
+    final sync = (freq: freq);
+    state = AsyncData(sync);
+    _save(sync);
   }
 }

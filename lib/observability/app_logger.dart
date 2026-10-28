@@ -3,7 +3,19 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 
-enum AppLogLevel { debug, info, warning, error }
+enum AppLogLevel {
+  debug('DEBUG', 500),
+  info('INFO', 800),
+  warning('WARN', 900),
+  error('ERROR', 1000);
+
+  const AppLogLevel(this.label, this.value);
+
+  final String label;
+
+  /// The level for `dart:developer` logs.
+  final int value;
+}
 
 class AppLogEntry {
   final DateTime timestamp;
@@ -18,16 +30,10 @@ class AppLogEntry {
     required this.message,
   });
 
-  String get levelLabel => switch (level) {
-    AppLogLevel.debug => 'DEBUG',
-    AppLogLevel.info => 'INFO',
-    AppLogLevel.warning => 'WARN',
-    AppLogLevel.error => 'ERROR',
-  };
+  String get levelLabel => level.label;
 
-  String toLine() {
-    return '[${timestamp.toIso8601String()}][$levelLabel][$source] $message';
-  }
+  String toLine() =>
+      '[${timestamp.toIso8601String()}][$levelLabel][$source] $message';
 }
 
 class AppLogger extends ChangeNotifier {
@@ -42,21 +48,17 @@ class AppLogger extends ChangeNotifier {
   UnmodifiableListView<AppLogEntry> get entries =>
       UnmodifiableListView<AppLogEntry>(_entries);
 
-  void debug(String source, String message) {
-    _add(AppLogLevel.debug, source, message);
-  }
+  void debug(String source, String message) =>
+      _add(AppLogLevel.debug, source, message);
 
-  void info(String source, String message) {
-    _add(AppLogLevel.info, source, message);
-  }
+  void info(String source, String message) =>
+      _add(AppLogLevel.info, source, message);
 
-  void warning(String source, String message) {
-    _add(AppLogLevel.warning, source, message);
-  }
+  void warning(String source, String message) =>
+      _add(AppLogLevel.warning, source, message);
 
-  void error(String source, String message) {
-    _add(AppLogLevel.error, source, message);
-  }
+  void error(String source, String message) =>
+      _add(AppLogLevel.error, source, message);
 
   Future<T> trackRequest<T>({
     required String source,
@@ -65,7 +67,6 @@ class AppLogger extends ChangeNotifier {
   }) async {
     final stopwatch = Stopwatch()..start();
     info(source, 'request.start $action');
-
     try {
       final result = await run();
       info(
@@ -94,34 +95,19 @@ class AppLogger extends ChangeNotifier {
       source: source,
       message: message,
     );
-    developer.log(
-      entry.toLine(),
-      name: source,
-      level: switch (level) {
-        AppLogLevel.debug => 500,
-        AppLogLevel.info => 800,
-        AppLogLevel.warning => 900,
-        AppLogLevel.error => 1000,
-      },
-      time: entry.timestamp,
-    );
-
+    // Logged twice, as the full line and as the bare message.
+    for (final text in [entry.toLine(), message]) {
+      developer.log(
+        text,
+        name: source,
+        level: level.value,
+        time: entry.timestamp,
+      );
+    }
     _entries.insert(0, entry);
     if (_entries.length > _maxEntries) {
       _entries.removeRange(_maxEntries, _entries.length);
     }
-
-    developer.log(
-      message,
-      name: source,
-      level: switch (level) {
-        AppLogLevel.debug => 500,
-        AppLogLevel.info => 800,
-        AppLogLevel.warning => 900,
-        AppLogLevel.error => 1000,
-      },
-      time: entry.timestamp,
-    );
     notifyListeners();
   }
 }

@@ -5,7 +5,17 @@ import 'package:meta/meta.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
 
-enum ChangeAlertType { attendance, marks, timetable, examSchedule }
+enum ChangeAlertType {
+  attendance('settings_change_alerts_attendance'),
+  marks('settings_change_alerts_marks'),
+  timetable('settings_change_alerts_timetable'),
+  examSchedule('settings_change_alerts_exam_schedule');
+
+  const ChangeAlertType(this.prefKey);
+
+  /// The setting that turns this kind of alert on or off.
+  final String prefKey;
+}
 
 class ChangeAlertNotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -15,20 +25,15 @@ class ChangeAlertNotificationService {
   static const String _channelName = 'VTOP Changes';
   static const String _payloadType = 'change_alert';
   static const String _masterKey = 'settings_change_alerts_enabled';
-  static const String _attendanceKey = 'settings_change_alerts_attendance';
-  static const String _marksKey = 'settings_change_alerts_marks';
-  static const String _timetableKey = 'settings_change_alerts_timetable';
-  static const String _examScheduleKey = 'settings_change_alerts_exam_schedule';
 
   static bool _initialized = false;
 
   static Future<void> ensureInitialized() async {
     if (_initialized) return;
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/launcher_icon',
-    );
     await _notifications.initialize(
-      settings: const InitializationSettings(android: androidSettings),
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+      ),
     );
     await _notifications
         .resolvePlatformSpecificImplementation<
@@ -48,17 +53,8 @@ class ChangeAlertNotificationService {
   static Future<bool> isEnabled(ChangeAlertType type) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
-    if (!(prefs.getBool(_masterKey) ?? true)) return false;
-    switch (type) {
-      case ChangeAlertType.attendance:
-        return prefs.getBool(_attendanceKey) ?? true;
-      case ChangeAlertType.marks:
-        return prefs.getBool(_marksKey) ?? true;
-      case ChangeAlertType.timetable:
-        return prefs.getBool(_timetableKey) ?? true;
-      case ChangeAlertType.examSchedule:
-        return prefs.getBool(_examScheduleKey) ?? true;
-    }
+    return (prefs.getBool(_masterKey) ?? true) &&
+        (prefs.getBool(type.prefKey) ?? true);
   }
 
   static Future<void> showDataChange({

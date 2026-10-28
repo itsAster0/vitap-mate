@@ -18,18 +18,18 @@ class VtopPage {
   bool get isHome => url.isEmpty;
 
   static VtopPage? fromJson(Object? json) {
-    if (json is! Map) return null;
-    final url = json['url'];
-    final title = json['title'];
-    if (url is! String || title is! String || url.isEmpty || title.isEmpty) {
-      return null;
+    if (json case {
+      'url': final String url,
+      'title': final String title,
+    } when url.isNotEmpty && title.isNotEmpty) {
+      final section = json['section'];
+      return VtopPage(
+        url: url,
+        title: title,
+        section: section is String ? section : '',
+      );
     }
-    final section = json['section'];
-    return VtopPage(
-      url: url,
-      title: title,
-      section: section is String ? section : '',
-    );
+    return null;
   }
 
   Map<String, String> toJson() => {
@@ -42,40 +42,22 @@ class VtopPage {
 const _maxRecentPages = 6;
 
 /// Recent pages belong to one account; another account's list reads as empty.
-List<VtopPage> readRecentVtopPages(
+List<VtopPage> _readRecentVtopPages(
   SharedPreferencesWithCache prefs,
   String username,
 ) {
   try {
     final stored = jsonDecode(prefs.getString(vtopRecentPagesSettingKey) ?? '');
-    if (stored is! Map || stored['user'] != username.toUpperCase()) return [];
-    final pages = stored['pages'];
-    if (pages is! List) return [];
-    return pages.map(VtopPage.fromJson).whereType<VtopPage>().toList();
+    if (stored case {
+      'user': final user,
+      'pages': final List pages,
+    } when user == username.toUpperCase()) {
+      return pages.map(VtopPage.fromJson).whereType<VtopPage>().toList();
+    }
+    return [];
   } catch (_) {
     return [];
   }
-}
-
-Future<void> addRecentVtopPage(
-  SharedPreferencesWithCache prefs,
-  String username,
-  VtopPage page,
-) {
-  final pages = [
-    page,
-    ...readRecentVtopPages(
-      prefs,
-      username,
-    ).where((recent) => recent.url != page.url),
-  ].take(_maxRecentPages);
-  return prefs.setString(
-    vtopRecentPagesSettingKey,
-    jsonEncode({
-      'user': username.toUpperCase(),
-      'pages': pages.map((page) => page.toJson()).toList(),
-    }),
-  );
 }
 
 /// Recently opened VTOP pages for the signed-in account, newest first.
@@ -87,7 +69,7 @@ class VtopRecentPages extends Notifier<List<VtopPage>> {
     final prefs = ref.watch(settingsProvider).value;
     final username = ref.watch(vtopUserProvider).value?.username;
     if (prefs == null || username == null) return const [];
-    return readRecentVtopPages(prefs, username);
+    return _readRecentVtopPages(prefs, username);
   }
 
   Future<void> add(VtopPage page) {
@@ -99,7 +81,20 @@ class VtopRecentPages extends Notifier<List<VtopPage>> {
     ].take(_maxRecentPages).toList();
     final write = _writes.then((_) async {
       final prefs = await ref.read(settingsProvider.future);
-      await addRecentVtopPage(prefs, username, page);
+      final pages = [
+        page,
+        ..._readRecentVtopPages(
+          prefs,
+          username,
+        ).where((recent) => recent.url != page.url),
+      ].take(_maxRecentPages);
+      await prefs.setString(
+        vtopRecentPagesSettingKey,
+        jsonEncode({
+          'user': username.toUpperCase(),
+          'pages': [for (final page in pages) page.toJson()],
+        }),
+      );
     });
     // Recents are a convenience; a failed write only loses the ordering.
     _writes = write.catchError((Object _) {});

@@ -25,11 +25,10 @@ class ExamReminderNotificationService {
       _tzInitialized = true;
     }
 
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/launcher_icon',
-    );
     await _notifications.initialize(
-      settings: const InitializationSettings(android: androidSettings),
+      settings: const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+      ),
     );
 
     await _notifications
@@ -47,18 +46,14 @@ class ExamReminderNotificationService {
   }
 
   static Future<void> cancelAll() async {
-    final pending = await _notifications.pendingNotificationRequests();
-    for (final request in pending) {
+    for (final request in await _notifications.pendingNotificationRequests()) {
       try {
-        final payload = request.payload;
-        if (payload == null) continue;
-        final parsed = jsonDecode(payload);
-        if (parsed is Map<String, dynamic> && parsed["type"] == _payloadType) {
+        if (jsonDecode(request.payload ?? 'null') case <String, dynamic>{
+          'type': _payloadType,
+        }) {
           await _notifications.cancel(id: request.id);
         }
-      } catch (_) {
-        continue;
-      }
+      } catch (_) {}
     }
   }
 
@@ -66,28 +61,18 @@ class ExamReminderNotificationService {
     await ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload();
-    final enabled = prefs.getBool(_enabledKey) ?? false;
-    if (!enabled) {
-      await cancelAll();
-      return;
-    }
-    final beforeMinutes = prefs.getInt(_beforeKey) ?? 10;
     await cancelAll();
-
-    var scheduled = 0;
+    if (!(prefs.getBool(_enabledKey) ?? false)) return;
+    final beforeMinutes = prefs.getInt(_beforeKey) ?? 10;
 
     for (final group in data.exams) {
       for (final exam in group.records) {
         final examDateTime = _parseExamDateTime(exam);
-        if (examDateTime == null) {
-          continue;
-        }
+        if (examDateTime == null) continue;
         final remindAt = examDateTime.subtract(
           Duration(minutes: beforeMinutes),
         );
-        if (!remindAt.isAfter(DateTime.now())) {
-          continue;
-        }
+        if (!remindAt.isAfter(DateTime.now())) continue;
 
         final id =
             Object.hash(
@@ -98,20 +83,13 @@ class ExamReminderNotificationService {
             ) &
             0x7fffffff;
 
-        final payload = jsonEncode({
-          "type": _payloadType,
-          "semesterId": data.semesterId,
-          "courseId": exam.courseId,
-          "courseName": exam.courseName,
-        });
-
         await _notifications.zonedSchedule(
           id: id,
           title: "Exam Reminder",
           body:
               "${exam.courseCode} ${exam.courseName} in $beforeMinutes minutes",
           scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-          notificationDetails: NotificationDetails(
+          notificationDetails: const NotificationDetails(
             android: AndroidNotificationDetails(
               channelId,
               "Exam reminders",
@@ -120,10 +98,14 @@ class ExamReminderNotificationService {
               priority: Priority.high,
             ),
           ),
-          payload: payload,
+          payload: jsonEncode({
+            "type": _payloadType,
+            "semesterId": data.semesterId,
+            "courseId": exam.courseId,
+            "courseName": exam.courseName,
+          }),
           androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         );
-        scheduled++;
       }
     }
   }
@@ -131,41 +113,36 @@ class ExamReminderNotificationService {
   static DateTime? _parseExamDateTime(ExamScheduleRecord exam) {
     final date = DateTime.tryParse(exam.examDate);
     if (date == null) return null;
-
     if (date.hour != 0 || date.minute != 0 || date.second != 0) return date;
-    final parsedTime =
+    final time =
         _tryParseTime(exam.reportingTime) ?? _tryParseTime(exam.examTime);
-    if (parsedTime == null) {
-      return DateTime(date.year, date.month, date.day, 9, 0);
-    }
     return DateTime(
       date.year,
       date.month,
       date.day,
-      parsedTime.hour,
-      parsedTime.minute,
+      time?.hour ?? 9,
+      time?.minute ?? 0,
     );
   }
+
+  static const _timeFormats = [
+    "HH:mm",
+    "HH:mm:ss",
+    "H:mm",
+    "h:mm a",
+    "hh:mm a",
+    "h a",
+    "hh a",
+  ];
 
   static DateTime? _tryParseTime(String time) {
     final raw = time.trim();
     if (raw.isEmpty) return null;
     final normalized = raw.toUpperCase().replaceAll(".", "");
-    final formats = <String>[
-      "HH:mm",
-      "HH:mm:ss",
-      "H:mm",
-      "h:mm a",
-      "hh:mm a",
-      "h a",
-      "hh a",
-    ];
-    for (final format in formats) {
+    for (final format in _timeFormats) {
       try {
         return DateFormat(format).parseStrict(normalized);
-      } catch (_) {
-        continue;
-      }
+      } catch (_) {}
     }
     return null;
   }
