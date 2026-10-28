@@ -4,11 +4,11 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/more/presentation/providers/exam_schedule.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
 

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 
 void main() {
   late ProviderContainer container;

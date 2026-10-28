@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:vitapmate/core/utils/edge/edge_device.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/vtop/edge/edge_device.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 
 class _Devices implements EdgeDeviceStore {
   _Devices(this.value);

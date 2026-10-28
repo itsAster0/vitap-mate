@@ -6,11 +6,11 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:vitapmate/core/providers/on_device_mode.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/app_http_client.dart';
-import 'package:vitapmate/core/utils/edge/server_status.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
+import 'package:vitapmate/vtop/route/on_device_mode.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/features/settings/presentation/pages/server_page.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/status_card.dart';
 

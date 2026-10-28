@@ -1,4 +1,4 @@
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 
 class DocsTestStorage extends JsonFileStorage {
   DocsTestStorage() : super(username: 'docs-test');

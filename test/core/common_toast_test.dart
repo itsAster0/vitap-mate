@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
 
 void main() {
   testWidgets('a long message is cut short, not overflowing', (tester) async {

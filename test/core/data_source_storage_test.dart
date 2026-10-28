@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/features/attendance/data/datasources/data_source.dart';
 import 'package:vitapmate/features/more/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';

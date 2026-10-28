@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:vitapmate/core/utils/edge/server_status.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart';
 
 void main() {
   test('health reads version and region', () async {

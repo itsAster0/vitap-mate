@@ -1,9 +1,9 @@
 import 'dart:developer';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
 import 'package:vitapmate/features/more/presentation/providers/state/exam_schedule.dart';
-import 'package:vitapmate/services/exam_reminder_notification_service.dart';
+import 'package:vitapmate/platform/notifications/exam_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 part 'exam_schedule.g.dart';

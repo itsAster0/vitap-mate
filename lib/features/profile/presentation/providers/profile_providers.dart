@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
-import 'package:vitapmate/core/storage/json_file_storage_provider.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
+import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/features/profile/data/profile_data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

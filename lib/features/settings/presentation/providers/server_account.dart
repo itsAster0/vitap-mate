@@ -1,19 +1,19 @@
 import 'dart:async';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/di/provider/vtop_user_provider.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/edge/edge_device.dart';
-import 'package:vitapmate/core/utils/edge/edge_events.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/core/utils/entity/vtop_user_entity.dart';
-import 'package:vitapmate/core/utils/fcm_cookie_bridge_service.dart';
-import 'package:vitapmate/core/utils/vtop_bridge_account_service.dart';
-import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/vtop/vtop_user_provider.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/vtop/edge/edge_device.dart';
+import 'package:vitapmate/vtop/edge/edge_events.dart';
+import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
+import 'package:vitapmate/platform/fcm_cookie_bridge_service.dart';
+import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
+import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
-import 'package:vitapmate/core/utils/app_http_client.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 
 /// The account calls the Server pages make. They need a VTOP session from
 /// the phone (the server checks whose account it is).

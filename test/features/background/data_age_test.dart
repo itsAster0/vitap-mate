@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/background/stale_refresh.dart';
-import 'package:vitapmate/features/background/sync.dart';
+import 'package:vitapmate/platform/background/stale_refresh.dart';
+import 'package:vitapmate/platform/background/sync.dart';
 
 void main() {
   BigInt savedAgo(Duration ago) =>

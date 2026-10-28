@@ -1,4 +1,4 @@
-import 'package:vitapmate/core/utils/cached_repository.dart';
+import 'package:vitapmate/vtop/cached_repository.dart';
 import 'package:vitapmate/features/settings/data/datasources/data_source.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

@@ -1,10 +1,10 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/di/provider/clinet_provider.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/utils/vtop_session_store.dart';
+import 'package:vitapmate/vtop/clinet_provider.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart';
 
 /// The registration number Gmail access is checked against, signing in to

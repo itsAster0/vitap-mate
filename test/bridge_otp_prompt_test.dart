@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/utils/bridge_otp_prompt.dart';
+import 'package:vitapmate/vtop/bridge_otp_prompt.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 void main() {

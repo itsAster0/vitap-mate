@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/providers/vtop_proxy.dart';
+import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 
 void main() {
   test('the phone reaches VTOP through the server only when asked', () {

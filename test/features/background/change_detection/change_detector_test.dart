@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/features/background/change_detection/change_detector.dart';
+import 'package:vitapmate/platform/background/change_detection/change_detector.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 AttendanceRecord attRecord(

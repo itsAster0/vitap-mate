@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
 
 void main() {
   group('VtopOtpChallengeState', () {

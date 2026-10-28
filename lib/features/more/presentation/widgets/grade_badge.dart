@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 /// Tone for a VIT grade letter: S green, A teal, B indigo, C/D amber,
 /// E/F/N red — distinct so a grade mix reads at a glance.

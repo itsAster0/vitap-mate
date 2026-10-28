@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/vtop_proxy.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/vtop/route/vtop_proxy.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/expandable_picker.dart';
 
 /// The VTOP mode. The data figures are measured: one sign-in with OTP and a

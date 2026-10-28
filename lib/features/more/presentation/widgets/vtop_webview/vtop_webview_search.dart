@@ -3,8 +3,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/utils/vtop_webview_pages.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 Future<void> showVtopPageSearch(
   BuildContext context, {

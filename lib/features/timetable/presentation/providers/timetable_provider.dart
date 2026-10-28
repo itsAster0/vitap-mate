@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:vitapmate/core/utils/vtop_controller.dart';
+import 'package:vitapmate/vtop/vtop_controller.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/state/timetable_repo.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/class_reminder_scheduler.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';

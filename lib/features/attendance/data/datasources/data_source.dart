@@ -1,9 +1,9 @@
-import 'package:vitapmate/core/di/provider/global_async_queue_provider.dart';
-import 'package:vitapmate/core/logging/app_logger.dart';
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/vtop/global_async_queue_provider.dart';
+import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend.dart';
 
 class AttendanceDataSource {
   final JsonFileStorage _storage;

@@ -9,11 +9,11 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/theme/app_palette.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/email_otp/google_oauth_loopback.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/ui/app_palette.dart';
+import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/vtop/email_otp/google_oauth_loopback.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/features/settings/presentation/email_otp_support.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/email_otp_widgets.dart';
 

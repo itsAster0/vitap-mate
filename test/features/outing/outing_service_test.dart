@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/features/outing/data/outing_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';

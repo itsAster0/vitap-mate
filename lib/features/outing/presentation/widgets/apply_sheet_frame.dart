@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
+import 'package:vitapmate/ui/ui.dart';
 
 /// Collapses runs of whitespace, as VTOP's own form effectively does.
 String tidyText(String value) => value.trim().split(RegExp(r'\s+')).join(' ');

@@ -3,13 +3,13 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:vitapmate/core/providers/server_url.dart';
-import 'package:vitapmate/core/utils/app_urls.dart';
-import 'package:vitapmate/core/utils/app_http_client.dart';
-import 'package:vitapmate/core/utils/edge/server_switch.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/widgets/app_dialog.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/vtop/route/server_url.dart';
+import 'package:vitapmate/app/app_urls.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
+import 'package:vitapmate/vtop/edge/server_switch.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/ui/app_dialog.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/settings/presentation/widgets/server_sections/icon_box.dart';
 
 const serverUrlFormatError =

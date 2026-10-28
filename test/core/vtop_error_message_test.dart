@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/core/utils/vtop_client_call.dart';
+import 'package:vitapmate/vtop/vtop_client_call.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 
 void main() {

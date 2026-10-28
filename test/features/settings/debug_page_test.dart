@@ -4,8 +4,8 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
 import 'package:vitapmate/features/settings/presentation/pages/debug_page.dart';
 
 void main() {

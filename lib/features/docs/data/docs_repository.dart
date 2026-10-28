@@ -1,7 +1,7 @@
 import 'dart:developer';
 import 'dart:io';
 
-import 'package:vitapmate/core/storage/json_file_storage.dart';
+import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 
 class DocsRepository {

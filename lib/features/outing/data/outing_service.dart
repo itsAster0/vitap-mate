@@ -1,7 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_queries.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_query.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/backend/vtop_queries.dart';
+import 'package:vitapmate/vtop/backend/vtop_query.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/data/download_to_docs.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';

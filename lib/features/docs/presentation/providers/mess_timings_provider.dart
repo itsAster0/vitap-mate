@@ -1,5 +1,5 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:vitapmate/core/providers/settings.dart';
+import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 
 /// Mess serving hours, set in Settings → Mess Timings.

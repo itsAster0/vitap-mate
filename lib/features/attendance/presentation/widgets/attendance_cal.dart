@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/domain/attendance_standing.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// "What if" planner: choose how many upcoming classes to attend or skip and
 /// see where the percentage lands. Current counts can be corrected too.

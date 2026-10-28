@@ -8,12 +8,12 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vitapmate/core/providers/settings.dart';
-import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/widgets/data_updated_footer.dart';
-import 'package:vitapmate/core/widgets/screen_refresh.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/platform/files/general_utils.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/ui/data_updated_footer.dart';
+import 'package:vitapmate/app/widgets/screen_refresh.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/profile/presentation/providers/profile_providers.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 

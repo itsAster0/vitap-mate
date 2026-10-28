@@ -3,11 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:vitapmate/core/di/provider/vtop_otp_challenge_provider.dart';
-import 'package:vitapmate/core/utils/email_otp/google_email_oauth_service.dart';
-import 'package:vitapmate/core/utils/email_otp/mail_forwarding_service.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_authenticator.dart';
-import 'package:vitapmate/core/vtop_backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/vtop_otp_challenge_provider.dart';
+import 'package:vitapmate/vtop/email_otp/google_email_oauth_service.dart';
+import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/vtop/backend/vtop_authenticator.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop/vtop_errors.dart';
 

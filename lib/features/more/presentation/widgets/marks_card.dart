@@ -3,11 +3,11 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/utils/extention.dart';
-import 'package:vitapmate/core/utils/weightage_totals.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/extention.dart';
+import 'package:vitapmate/features/more/domain/weightage_totals.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 /// Tone for a score percentage: strong, fine, or needs work.
 Tone scoreTone(BuildContext context, double percent) {

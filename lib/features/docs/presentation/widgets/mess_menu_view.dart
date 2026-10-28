@@ -6,12 +6,12 @@ import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vitapmate/core/widgets/ui/ui.dart';
+import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/docs/data/doc_models.dart';
 import 'package:vitapmate/features/docs/domain/mess_menu.dart';
 import 'package:vitapmate/features/docs/presentation/providers/docs_provider.dart';
 import 'package:vitapmate/features/docs/presentation/providers/mess_timings_provider.dart';
-import 'package:vitapmate/core/widgets/ui/text_nums.dart';
+import 'package:vitapmate/ui/text_nums.dart';
 
 const _sheetPrefKey = 'mess_menu_sheet';
 

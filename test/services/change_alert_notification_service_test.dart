@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vitapmate/services/change_alert_notification_service.dart';
+import 'package:vitapmate/platform/notifications/change_alert_notification_service.dart';
 
 void main() {
   group('stable hash', () {

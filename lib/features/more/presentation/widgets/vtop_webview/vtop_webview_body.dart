@@ -5,11 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
-import 'package:vitapmate/core/logging/app_logger.dart';
-import 'package:vitapmate/core/utils/general_utils.dart';
-import 'package:vitapmate/core/utils/toast/common_toast.dart';
-import 'package:vitapmate/core/utils/vtop_webview_pages.dart';
-import 'package:vitapmate/core/utils/vtop_webview_store.dart';
+import 'package:vitapmate/observability/app_logger.dart';
+import 'package:vitapmate/platform/files/general_utils.dart';
+import 'package:vitapmate/app/widgets/common_toast.dart';
+import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
+import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_cookie_service.dart';
 import 'package:vitapmate/features/more/presentation/widgets/vtop_webview/vtop_webview_scripts.dart';
 

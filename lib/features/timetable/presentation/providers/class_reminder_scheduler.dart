@@ -1,10 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart'
     show ProviderListenable;
-import 'package:vitapmate/core/logging/app_logger.dart';
+import 'package:vitapmate/observability/app_logger.dart';
 import 'package:vitapmate/features/calendar/domain/semester_calendar.dart';
 import 'package:vitapmate/features/calendar/presentation/providers/academic_calendar_provider.dart';
 import 'package:vitapmate/features/timetable/presentation/providers/timetable_provider.dart';
-import 'package:vitapmate/services/class_reminder_notification_service.dart';
+import 'package:vitapmate/platform/notifications/class_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 /// Reschedules class reminders from the saved timetable and academic

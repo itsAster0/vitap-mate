@@ -1,5 +1,5 @@
 import 'package:intl/intl.dart';
-import 'package:vitapmate/core/utils/extention.dart';
+import 'package:vitapmate/ui/extention.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 enum ClassStatus { present, onDuty, absent, other }
