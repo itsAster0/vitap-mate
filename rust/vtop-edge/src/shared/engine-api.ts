@@ -33,6 +33,9 @@ export interface SessionChecked {
   registrationNumber?: string;
   /** The `Cookie` header, when valid, or unknown for a cached one. */
   cookies?: string;
+  /** The CSRF token that goes with `cookies`, when the session has one (a
+   * cached session does; bare cookies do not). */
+  csrfToken?: string;
   /** The session sealed for caching, when valid. */
   sealedSession?: string;
   /** The student's mailbox owner hash, when valid. */
@@ -69,7 +72,7 @@ export interface LoginStart {
 }
 
 export type LoginOutcome =
-  | { status: "ok"; cookies: string; sealedSession: string }
+  | { status: "ok"; cookies: string; sealedSession: string; csrfToken?: string }
   /** VTOP rejected the saved username or password. */
   | { status: "invalid_credentials" }
   /** The saved credentials belong to someone else, or no longer open. */

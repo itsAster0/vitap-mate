@@ -2578,6 +2578,7 @@ fn wire__crate__api__wire__wire_fetch_page_impl(
             let api_account_json = <Option<String>>::sse_decode(&mut deserializer);
             let api_secret = <bool>::sse_decode(&mut deserializer);
             let api_timeout_ms = <u32>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::wire::WireFetchError>(
@@ -2592,6 +2593,7 @@ fn wire__crate__api__wire__wire_fetch_page_impl(
                             api_account_json,
                             api_secret,
                             api_timeout_ms,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)

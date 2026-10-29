@@ -341,6 +341,7 @@ abstract class RustLibApi extends BaseApi {
     String? accountJson,
     required bool secret,
     required int timeoutMs,
+    String? flow,
   });
 
   RustArcIncrementStrongCountFnType
@@ -2053,6 +2054,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     String? accountJson,
     required bool secret,
     required int timeoutMs,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -2067,6 +2069,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_String(accountJson, serializer);
           sse_encode_bool(secret, serializer);
           sse_encode_u_32(timeoutMs, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -2089,6 +2092,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           accountJson,
           secret,
           timeoutMs,
+          flow,
         ],
         apiImpl: this,
       ),
@@ -2107,6 +2111,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       "accountJson",
       "secret",
       "timeoutMs",
+      "flow",
     ],
   );
 

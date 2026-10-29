@@ -6,6 +6,12 @@
 //! (~700 bytes of cookies) goes once; the gateway keeps it per device and
 //! later requests carry only its [`session_hash`]. When the gateway does not
 //! hold that session it answers [`NEED_SESSION`] and the app sends it again.
+//!
+//! A request starts with a zero byte (no name is empty) and its format's
+//! [`VERSION`], then the flow id the phone logs it under (8 hex digits, as
+//! 4 bytes; zero for none); requests from
+//! before versions start with the name. A gateway older than a request
+//! answers [`UNSUPPORTED`].
 
 use std::collections::BTreeMap;
 
@@ -15,6 +21,10 @@ pub const NEED_SESSION: u16 = 428;
 pub const TOO_LARGE: u16 = 413;
 /// The gateway has as many engine calls running as it allows: use HTTPS.
 pub const BUSY: u16 = 429;
+/// The request is in a newer format than the gateway reads: use HTTPS.
+pub const UNSUPPORTED: u16 = 426;
+/// The request format this code writes and reads.
+pub const VERSION: u8 = 1;
 /// Sign-in requests are named by the edge path the phone uses over HTTPS
 /// (`/v1/vtop/login`, its `/otp` and `/resend`, and `/v1/app/login`), with
 /// that request's JSON body in `args[SIGN_IN_BODY]`. They carry no session.
@@ -22,6 +32,9 @@ pub const SIGN_IN_BODY: &str = "body";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WirePageRequest {
+    /// The phone's flow id (8 hex digits), for matching its logs with the
+    /// server's.
+    pub request_id: Option<String>,
     pub name: String,
     pub semester: Option<String>,
     pub args: BTreeMap<String, String>,
@@ -69,7 +82,15 @@ pub fn session_hash(session_json: &str) -> u64 {
 
 impl WirePageRequest {
     pub fn encode(&self) -> Option<Vec<u8>> {
-        let mut v = Vec::new();
+        let mut v = vec![0, VERSION];
+        // An id that is not 8 hex digits goes as none rather than failing.
+        let id = self
+            .request_id
+            .as_deref()
+            .filter(|id| id.len() == 8)
+            .and_then(|id| u32::from_str_radix(id, 16).ok())
+            .unwrap_or(0);
+        v.extend_from_slice(&id.to_be_bytes());
         short(&mut v, &self.name)?;
         short(&mut v, self.semester.as_deref().unwrap_or(""))?;
         v.push(u8::try_from(self.args.len()).ok()?);
@@ -87,8 +108,25 @@ impl WirePageRequest {
         Some(v)
     }
 
+    /// The format [b] is in: 0 for requests from before versions.
+    pub fn version(b: &[u8]) -> u8 {
+        match b {
+            [0, version, ..] => *version,
+            _ => 0,
+        }
+    }
+
     pub fn decode(b: &[u8]) -> Option<Self> {
         let mut r = Reader(b);
+        let request_id = match Self::version(b) {
+            0 => None,
+            VERSION => {
+                r.take(2)?;
+                let id = u32::from_be_bytes(r.take(4)?.try_into().ok()?);
+                (id != 0).then(|| format!("{id:08x}"))
+            }
+            _ => return None,
+        };
         let name = r.short()?;
         let semester = Some(r.short()?).filter(|s| !s.is_empty());
         let mut args = BTreeMap::new();
@@ -105,6 +143,7 @@ impl WirePageRequest {
             Some(r.long()?)
         };
         r.0.is_empty().then_some(Self {
+            request_id,
             name,
             semester,
             args,
@@ -194,6 +233,7 @@ mod tests {
     #[test]
     fn requests_round_trip_and_stay_small() {
         let mut req = WirePageRequest {
+            request_id: Some("9a7420b6".into()),
             name: "attendance".into(),
             semester: Some("AP2026275".into()),
             args: BTreeMap::new(),
@@ -203,7 +243,7 @@ mod tests {
             account: None,
         };
         let small = req.encode().unwrap();
-        assert!(small.len() <= 48, "{} bytes", small.len());
+        assert!(small.len() <= 54, "{} bytes", small.len());
         assert_eq!(WirePageRequest::decode(&small).unwrap(), req);
         req.args.insert("date".into(), "28/10/2026".into());
         req.session = Some(r#"{"cookies":"JSESSIONID=x"}"#.into());
@@ -217,6 +257,26 @@ mod tests {
             WirePageRequest::decode(&req.encode().unwrap()).unwrap(),
             req
         );
+    }
+
+    #[test]
+    fn requests_from_before_versions_still_decode() {
+        // name, semester, no args, dictionary, hash, no session.
+        let mut old = vec![5];
+        old.extend_from_slice(b"marks");
+        old.extend_from_slice(&[0, 0, 0]);
+        old.extend_from_slice(&7u64.to_be_bytes());
+        old.extend_from_slice(&[0, 0]);
+        assert_eq!(WirePageRequest::version(&old), 0);
+        let req = WirePageRequest::decode(&old).unwrap();
+        assert_eq!((req.name.as_str(), req.request_id), ("marks", None));
+    }
+
+    #[test]
+    fn a_newer_request_is_told_apart() {
+        let newer = [0, VERSION + 1, 0];
+        assert_eq!(WirePageRequest::version(&newer), VERSION + 1);
+        assert!(WirePageRequest::decode(&newer).is_none());
     }
 
     #[test]

@@ -55,7 +55,7 @@ pub enum WireFetchError {
 /// `secret` request goes only on a forward-secret session, after the
 /// handshake rather than in it. `account_json` (`/v1/app/login`'s body)
 /// goes with the session, so the gateway can renew it in the fetch; it is
-/// secret too.
+/// secret too. `flow` is the Dart flow id, which the gateway logs.
 #[allow(clippy::too_many_arguments)]
 pub async fn wire_fetch_page(
     config: WireConfig,
@@ -67,6 +67,7 @@ pub async fn wire_fetch_page(
     account_json: Option<String>,
     secret: bool,
     timeout_ms: u32,
+    flow: Option<String>,
 ) -> Result<WirePage, WireFetchError> {
     let server_key: [u8; 32] = vtop_wire::unhex(&config.server_key)
         .and_then(|k| k.try_into().ok())
@@ -83,6 +84,7 @@ pub async fn wire_fetch_page(
     };
     let hash = session_hash(&session_json);
     let mut request = WirePageRequest {
+        request_id: flow,
         name,
         semester,
         args: args.into_iter().collect(),

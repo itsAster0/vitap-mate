@@ -15,7 +15,7 @@ part 'wire.freezed.dart';
 /// `secret` request goes only on a forward-secret session, after the
 /// handshake rather than in it. `account_json` (`/v1/app/login`'s body)
 /// goes with the session, so the gateway can renew it in the fetch; it is
-/// secret too.
+/// secret too. `flow` is the Dart flow id, which the gateway logs.
 Future<WirePage> wireFetchPage({
   required WireConfig config,
   required String sessionJson,
@@ -26,6 +26,7 @@ Future<WirePage> wireFetchPage({
   String? accountJson,
   required bool secret,
   required int timeoutMs,
+  String? flow,
 }) => RustLib.instance.api.crateApiWireWireFetchPage(
   config: config,
   sessionJson: sessionJson,
@@ -36,6 +37,7 @@ Future<WirePage> wireFetchPage({
   accountJson: accountJson,
   secret: secret,
   timeoutMs: timeoutMs,
+  flow: flow,
 );
 
 class WireConfig {

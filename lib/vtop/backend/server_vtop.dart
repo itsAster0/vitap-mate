@@ -145,6 +145,7 @@ Future<WirePage> rustWirePage({
   secret: secret,
   timeoutMs: (timeout ?? Duration(seconds: await currentTunable(udpTimeout)))
       .inMilliseconds,
+  flow: currentFlow,
 );
 
 Future<bool> _never() async => false;
@@ -300,8 +301,11 @@ class ServerVtopApi {
             timeout: serverLoginTimeout,
           );
       return switch (_json(response)['session']) {
-        final Map<String, dynamic> session => sessionFromServerJson(session),
-        _ => null,
+        // Without its CSRF token (an older server) the session would not
+        // count as signed in, and the phone would only ask again.
+        {'csrf_token': String _} && final Map<String, dynamic> session =>
+          sessionFromServerJson(session),
+        _ => throw const ServerVtopUnavailable('no CSRF token in the session'),
       };
     } on ServerVtopUnavailable catch (error) {
       _log.info('no sign-in by the server ($error); signing in as usual');
@@ -393,7 +397,8 @@ class ServerVtopApi {
     // fetching the page.
     if (page.status case 413 || 429) return null;
     // An older gateway cannot read this request: HTTPS for a while.
-    if (page.status == 400 && utf8.decode(page.body).contains('bad_request')) {
+    if (page.status == 426 ||
+        page.status == 400 && utf8.decode(page.body).contains('bad_request')) {
       wireOffUntil.value = DateTime.now().add(wireRetryAfter);
       _log.warn('$name: the UDP gateway cannot read the request; using HTTPS');
       return null;

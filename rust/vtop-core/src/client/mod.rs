@@ -358,7 +358,8 @@ impl VtopClient {
     /// storing every `Set-Cookie` along the way. The HTTP client is shared
     /// between sessions (one warm connection pool), so cookies are handled
     /// here rather than by reqwest. An explicit `Cookie` header on the
-    /// request wins over the jar for the first hop.
+    /// request wins over the jar for the first hop. Logs the answer: host,
+    /// path, status, size when known and time, redirects included.
     pub(super) async fn send_request(
         &self,
         builder: reqwest::RequestBuilder,
@@ -366,7 +367,22 @@ impl VtopClient {
         use reqwest::header::{COOKIE, LOCATION, SET_COOKIE};
 
         let mut request = builder.build()?;
+        let started = std::time::Instant::now();
         let mut hops = 0;
+        let answered = |response: Response| {
+            let size = response
+                .content_length()
+                .map_or(String::new(), |bytes| format!(" {bytes}B"));
+            info!(
+                target: NETWORK,
+                "response {}{} {}{size} {}ms",
+                response.url().host_str().unwrap_or(""),
+                response.url().path(),
+                response.status().as_u16(),
+                started.elapsed().as_millis()
+            );
+            response
+        };
         loop {
             let url = request.url().clone();
             if !request.headers().contains_key(COOKIE) {
@@ -382,7 +398,7 @@ impl VtopClient {
             // 307/308 would need the original body again; VTOP only uses
             // 301/302/303, which continue as a GET.
             if !matches!(status.as_u16(), 301..=303) || hops >= MAX_REDIRECTS {
-                return Ok(response);
+                return Ok(answered(response));
             }
             let Some(next) = response
                 .headers()
@@ -390,7 +406,7 @@ impl VtopClient {
                 .and_then(|location| location.to_str().ok())
                 .and_then(|location| url.join(location).ok())
             else {
-                return Ok(response);
+                return Ok(answered(response));
             };
             hops += 1;
             request = self.http.get(next).build()?;

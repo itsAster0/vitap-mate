@@ -4,7 +4,8 @@ use tokio::net::UdpSocket;
 use vtop_gateway::{public_key, run, Config};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY,
+    session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY, UNSUPPORTED,
+    VERSION,
 };
 use vtop_wire::client::{fetch, ClientConfig};
 use wiremock::matchers::{body_partial_json, header, method, path};
@@ -28,6 +29,7 @@ async fn gateway(engine: &MockServer) -> (u16, [u8; 32]) {
 
 fn request(session: Option<&str>, hash_of: &str) -> Vec<u8> {
     WirePageRequest {
+        request_id: Some("0f10d00e".into()),
         name: "attendance".into(),
         semester: Some("AP2026275".into()),
         args: Default::default(),
@@ -47,6 +49,7 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
     Mock::given(method("POST"))
         .and(path("/engine/fetch"))
         .and(header("authorization", "Bearer relay-secret"))
+        .and(header("x-request-id", "0f10d00e"))
         .and(body_partial_json(serde_json::json!({
             "name": "attendance",
             "semester": "AP2026275",
@@ -105,6 +108,27 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
     );
 }
 
+#[tokio::test]
+async fn a_request_newer_than_the_gateway_is_told_to_use_https() {
+    let engine = MockServer::start().await;
+    let (port, key) = gateway(&engine).await;
+    let cfg = ClientConfig {
+        host: "127.0.0.1".into(),
+        ports: vec![port],
+        server_key: key,
+        state_dir: std::env::temp_dir().join(format!("vtop-gateway-newer-{}", std::process::id())),
+        request_in_handshake: true,
+    };
+    let got = fetch(&cfg, &[0, VERSION + 1, 0, 0, 0, 0], Duration::from_secs(20))
+        .await
+        .unwrap();
+    assert_eq!(
+        WirePageResponse::decode(&got.body).unwrap().status,
+        UNSUPPORTED
+    );
+    assert!(engine.received_requests().await.unwrap().is_empty());
+}
+
 /// A sign-in request named by its edge path, after the handshake.
 async fn sign_in(port: u16, key: [u8; 32], path: &str, body: &str) -> WirePageResponse {
     let dir = std::env::temp_dir().join(format!(
@@ -120,6 +144,7 @@ async fn sign_in(port: u16, key: [u8; 32], path: &str, body: &str) -> WirePageRe
         request_in_handshake: false,
     };
     let request = WirePageRequest {
+        request_id: None,
         name: path.into(),
         semester: None,
         args: [(SIGN_IN_BODY.to_string(), body.to_string())]
@@ -228,6 +253,7 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
     };
     let old = r#"{"cookies":"JSESSIONID=old"}"#;
     let mut request = WirePageRequest {
+        request_id: None,
         name: "attendance".into(),
         semester: None,
         args: Default::default(),

@@ -100,13 +100,29 @@ describe("app login", () => {
     await rig.account.loginDone({
       account: "22BCE0001",
       requestId: started[0],
-      outcome: { status: "ok", cookies: "JSESSIONID=s", sealedSession: "sealed-s" },
+      outcome: { status: "ok", cookies: "JSESSIONID=s", sealedSession: "sealed-s", csrfToken: "c" },
     });
     const response = await answer;
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       status: "ok",
-      session: { cookies: "JSESSIONID=s", registration_number: "22BCE0001" },
+      session: { cookies: "JSESSIONID=s", csrf_token: "c", registration_number: "22BCE0001" },
+    });
+  });
+
+  it("hands out the cached session with its CSRF token", async () => {
+    const rig = accountObject((path) =>
+      path === "/engine/session"
+        ? Response.json({ status: "valid", cookies: "JSESSIONID=c", csrfToken: "t" })
+        : new Response(null, { status: 503 }),
+    );
+    const a = withVault();
+    a.saveSession("sealed-c", now(), "server");
+    rig.seed(a);
+    const response = await rig.account.appLogin(body());
+    expect(await response.json()).toEqual({
+      status: "ok",
+      session: { cookies: "JSESSIONID=c", csrf_token: "t", registration_number: "22BCE0001" },
     });
   });
 

@@ -33,7 +33,12 @@ void callbackDispatcher() {
     if (task == backgroundSyncTask) {
       await BackgroundNotificationService.initialize();
       await BackgroundNotificationService.showProgress();
-      final success = await _syncData(task: task);
+      // Opens the log first, so the flow's lines are kept.
+      await startRustRuntime();
+      final success = await flow(
+        'background sync',
+        () => _syncData(task: task),
+      );
       await BackgroundNotificationService.stop(success: success);
     }
     return true;

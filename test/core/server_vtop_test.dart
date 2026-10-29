@@ -421,26 +421,23 @@ void main() {
       },
     );
 
-    test(
-      'a gateway that cannot read the request is skipped for a while',
-      () async {
-        final asked = <String>[];
-        final server = api(
-          asked,
-          () async => page(400, {
-            'code': 'bad_request',
-            'error': 'The request does not decode.',
-          }),
-        );
-        expect(await server.fetch(session: _session, name: 'marks'), {
-          'via': 'https',
-        });
-        expect(await server.fetch(session: _session, name: 'marks'), {
-          'via': 'https',
-        });
-        expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
-      },
-    );
+    test('a gateway older than the request is skipped for a while', () async {
+      final asked = <String>[];
+      final server = api(
+        asked,
+        () async => page(426, {
+          'code': 'unsupported_version',
+          'error': 'The gateway is older than the app.',
+        }),
+      );
+      expect(await server.fetch(session: _session, name: 'marks'), {
+        'via': 'https',
+      });
+      expect(await server.fetch(session: _session, name: 'marks'), {
+        'via': 'https',
+      });
+      expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
+    });
 
     test('a page too large for UDP comes over HTTPS', () async {
       final asked = <String>[];
@@ -540,13 +537,24 @@ void main() {
         sent,
         () async => answer(200, {
           'status': 'ok',
-          'session': {'cookies': 'JSESSIONID=s'},
+          'session': {'cookies': 'JSESSIONID=s', 'csrf_token': 'c'},
         }),
       ).loginOnServer();
-      expect(session?.cookies, 'JSESSIONID=s');
+      expect((session?.cookies, session?.csrfToken), ('JSESSIONID=s', 'c'));
       final (name, secret, body) = sent.single;
       expect((name, secret), ('/v1/app/login', true));
       expect(body, {'registrationNumber': '23BCE7000', 'appSecret': 'vta_x'});
+    });
+
+    test('a session without its CSRF token is not taken', () async {
+      final session = await api(
+        [],
+        () async => answer(200, {
+          'status': 'ok',
+          'session': {'cookies': 'JSESSIONID=s'},
+        }),
+      ).loginOnServer();
+      expect(session, isNull);
     });
 
     test('without a saved password the phone signs in as usual', () async {
@@ -665,7 +673,7 @@ void main() {
       client: MockClient((request) async {
         asked.add(request.url.path);
         return http.Response(
-          '{"status":"ok","session":{"cookies":"JSESSIONID=s"}}',
+          '{"status":"ok","session":{"cookies":"JSESSIONID=s","csrf_token":"c"}}',
           200,
         );
       }),

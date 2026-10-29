@@ -260,6 +260,7 @@ fn checked(status: SessionStatus) -> SessionChecked {
         status,
         registration_number: None,
         cookies: None,
+        csrf_token: None,
         sealed_session: None,
         owner_hash: None,
     }
@@ -304,6 +305,7 @@ pub async fn session(
                         .seal_json(&accounts_aad(&owner), &session),
                 ),
                 owner_hash: Some(owner_hash(&state.config.vault_key, &owner)),
+                csrf_token: session.csrf_token.clone(),
                 cookies: Some(session.cookies),
                 registration_number: Some(owner),
             }
@@ -313,6 +315,7 @@ pub async fn session(
             tracing::info!("engine: cannot check a session: {reason}");
             SessionChecked {
                 // Only a cached session is handed out unchecked.
+                csrf_token: expected.as_ref().and(session.csrf_token.clone()),
                 cookies: expected.map(|_| session.cookies),
                 ..checked(SessionStatus::Unknown)
             }
@@ -484,6 +487,7 @@ fn signed_in(
                 sealed_session: state
                     .accounts_sealer()
                     .seal_json(&accounts_aad(account), &session),
+                csrf_token: session.csrf_token.clone(),
                 cookies: session.cookies,
             }
         }
@@ -785,6 +789,7 @@ mod tests {
         let LoginOutcome::Ok {
             cookies,
             sealed_session,
+            ..
         } = done.outcome
         else {
             panic!("not signed in");

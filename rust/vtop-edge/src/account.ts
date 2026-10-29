@@ -358,6 +358,8 @@ const EXTRA_SCHEMA = [
 const EXTRA_ACCOUNT_COLUMNS = [["vault_gmail", "INTEGER NOT NULL DEFAULT 0"]];
 /** `keys` columns added after `SCHEMA`. */
 const EXTRA_KEY_COLUMNS = [["outings", "INTEGER NOT NULL DEFAULT 0"]];
+/** `requests` columns added after `SCHEMA`. */
+const EXTRA_REQUEST_COLUMNS = [["csrf_token", "TEXT"]];
 
 function addColumns(db: SqlStorage, table: string, wanted: string[][]): void {
   const columns = new Set(sql.rows(db, `PRAGMA table_info(${table})`).map((row) => sql.text(row, "name")));
@@ -371,6 +373,7 @@ export function prepareAccountDb(db: SqlStorage): void {
   for (const statement of EXTRA_SCHEMA) db.exec(statement);
   addColumns(db, "account", EXTRA_ACCOUNT_COLUMNS);
   addColumns(db, "keys", EXTRA_KEY_COLUMNS);
+  addColumns(db, "requests", EXTRA_REQUEST_COLUMNS);
 }
 
 type Value = string | number | null;
@@ -531,6 +534,7 @@ function requestFrom(row: sql.Row): RequestRecord | null {
   const request = new RequestRecord(id, responseToken, createdAt);
   request.status = status as RequestStatus;
   request.cookies = sql.text(row, "cookies");
+  request.csrfToken = sql.text(row, "csrf_token");
   request.error = sql.text(row, "error");
   request.expiresAt = expiresAt;
   request.vaultDueAt = sql.int(row, "vault_due_at");
@@ -729,8 +733,8 @@ export class Account extends DurableObject<Env> {
   private putRequest(request: RequestRecord): void {
     this.db.exec(
       `INSERT OR REPLACE INTO requests (id, response_token, status, cookies, error, created_at, expires_at,
-           vault_due_at, vault_started, phone_asked, phone_error, source, phones)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           vault_due_at, vault_started, phone_asked, phone_error, source, phones, csrf_token)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       request.id,
       request.responseToken,
       request.status,
@@ -744,6 +748,7 @@ export class Account extends DurableObject<Env> {
       request.phoneError,
       request.source,
       request.phones.join(","),
+      request.csrfToken,
     );
   }
 
@@ -802,10 +807,10 @@ export class Account extends DurableObject<Env> {
     }
     doc.touchKey(keyHash, at, via);
 
-    const cookies = await this.cachedCookies(doc, at);
-    if (cookies !== null) {
+    const cached = await this.cachedSession(doc, at);
+    if (cached !== null) {
       this.save(doc);
-      return Response.json(ready(cookies, doc.cachedSource()));
+      return Response.json(ready(cached.cookies, doc.cachedSource()));
     }
 
     const pendingId = this.pendingId();
@@ -829,9 +834,12 @@ export class Account extends DurableObject<Env> {
     return pending(request);
   }
 
-  /** The cached session's cookies when the engine finds it still works;
-   * one that expired is dropped. */
-  private async cachedCookies(doc: AccountRecord, at: number): Promise<string | null> {
+  /** The cached session's cookies and CSRF token when the engine finds it
+   * still works; one that expired is dropped. */
+  private async cachedSession(
+    doc: AccountRecord,
+    at: number,
+  ): Promise<{ cookies: string; csrfToken: string | null } | null> {
     const cached = doc.cachedSession(at);
     if (cached === null) return null;
     const check: SessionCheck = { sealedSession: cached, account: doc.id };
@@ -842,7 +850,7 @@ export class Account extends DurableObject<Env> {
         doc.clearSession();
         return null;
       }
-      return checked.cookies ?? null;
+      return checked.cookies ? { cookies: checked.cookies, csrfToken: checked.csrfToken ?? null } : null;
     } catch (e) {
       console.log(`account: cannot check the cache: ${e}`);
       return null;
@@ -959,7 +967,7 @@ export class Account extends DurableObject<Env> {
       case "ok":
         doc.recordSignIn(at, "server", true);
         doc.saveSession(outcome.sealedSession, at, "server");
-        if (request?.pending(at)) request.succeed(outcome.cookies, "server");
+        if (request?.pending(at)) request.succeed(outcome.cookies, "server", outcome.csrfToken ?? null);
         break;
       case "invalid_credentials":
         console.log("account: VTOP rejected saved credentials; dropping them");
@@ -1059,12 +1067,17 @@ export class Account extends DurableObject<Env> {
       return error(409, "no_saved_credentials", "The server keeps no password for this account.");
     }
     const registrationNumber = str(body.registrationNumber)?.trim().toUpperCase() ?? null;
-    const signedIn = (cookies: string) =>
-      Response.json({ status: "ok", session: { cookies, registration_number: registrationNumber } });
-    const cookies = await this.cachedCookies(doc, at);
-    if (cookies !== null) {
+    // The app's `SessionState`: without the CSRF token it would not count
+    // the session as signed in.
+    const signedIn = (cookies: string, csrfToken: string | null) =>
+      Response.json({
+        status: "ok",
+        session: { cookies, csrf_token: csrfToken, registration_number: registrationNumber },
+      });
+    const cached = await this.cachedSession(doc, at);
+    if (cached !== null) {
       this.save(doc);
-      return signedIn(cookies);
+      return signedIn(cached.cookies, cached.csrfToken);
     }
 
     const pendingId = this.pendingId();
@@ -1094,7 +1107,7 @@ export class Account extends DurableObject<Env> {
     }
     switch (current?.status) {
       case "success":
-        return signedIn(current.cookies ?? "");
+        return signedIn(current.cookies ?? "", current.csrfToken);
       case "error":
         if (errorCode(current.error ?? "") === "credentials_rejected") {
           return error(401, "invalid_credentials", "VTOP rejected the saved password.");
