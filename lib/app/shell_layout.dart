@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/timetable/widgets/timetable_view_toggle_button.dart';
 import 'package:vitapmate/features/attendance/attendance_guide_page.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
@@ -102,6 +104,7 @@ class ShellLayout extends HookConsumerWidget {
             : _tabs[selected.value].label,
         location,
         headerSubtitle,
+        runningTasks,
       ),
       footer: SafeArea(
         top: false,
@@ -144,6 +147,7 @@ Widget _buildHeader(
   String data,
   String path,
   String? subtitle,
+  List<String> tasks,
 ) {
   if (path.split('/').length - 1 > 1) {
     data = switch (path.split('/')[2]) {
@@ -177,6 +181,7 @@ Widget _buildHeader(
       title: _HeaderTitle(
         title: data,
         subtitle: subtitle,
+        tasks: tasks,
         titleStyle: _headerTitleStyle(context, subtitle),
       ),
       prefixes: [FHeaderAction.back(onPress: () => GoRouter.of(context).pop())],
@@ -188,6 +193,7 @@ Widget _buildHeader(
     title: _HeaderTitle(
       title: data,
       subtitle: subtitle,
+      tasks: tasks,
       titleStyle: _headerTitleStyle(context, subtitle),
     ),
 
@@ -208,80 +214,212 @@ TextStyle _headerTitleStyle(BuildContext context, String? subtitle) =>
             : context.theme.typography.body.lg)
         .copyWith(fontWeight: FontWeight.w600);
 
-class _HeaderTitle extends StatelessWidget {
+/// The page title, with the status line under it while VTOP work runs.
+/// Holding the status line lists every running task, with how long it has
+/// run, until it is let go. Tasks waiting on a sign-in are dimmed.
+class _HeaderTitle extends HookConsumerWidget {
   const _HeaderTitle({
     required this.title,
     required this.subtitle,
+    required this.tasks,
     required this.titleStyle,
   });
 
   final String title;
   final String? subtitle;
+  final List<String> tasks;
   final TextStyle titleStyle;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = useMemoized(OverlayPortalController.new);
+    final link = useMemoized(LayerLink.new);
+    final theme = context.theme;
+    final muted = theme.typography.body.sm.copyWith(
+      color: theme.colors.mutedForeground,
+      fontWeight: .w500,
+    );
     return Center(
       widthFactor: 1,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: titleStyle,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (subtitle != null)
-            Text(
-              subtitle!,
-              style: context.theme.typography.body.sm.copyWith(
-                color: context.theme.colors.mutedForeground,
-                fontWeight: FontWeight.w500,
+      child: GestureDetector(
+        behavior: .opaque,
+        onLongPressStart: (_) => list.show(),
+        onLongPressEnd: (_) => list.hide(),
+        onLongPressCancel: list.hide,
+        child: CompositedTransformTarget(
+          link: link,
+          child: OverlayPortal(
+            controller: list,
+            overlayChildBuilder: (_) => Align(
+              alignment: .topLeft,
+              child: CompositedTransformFollower(
+                link: link,
+                targetAnchor: .bottomCenter,
+                followerAnchor: .topCenter,
+                offset: const Offset(0, 8),
+                // The overlay sits outside the app's theme: style it here.
+                child: _RunningTasks(
+                  queue: ref.read(globalAsyncQueueProvider.notifier),
+                  tasks: tasks,
+                  theme: theme,
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
+            child: Column(
+              mainAxisSize: .min,
+              children: [
+                Text(
+                  title,
+                  style: titleStyle,
+                  textAlign: .center,
+                  maxLines: 1,
+                  overflow: .ellipsis,
+                ),
+                if (subtitle case final subtitle?)
+                  Text(
+                    subtitle,
+                    style: muted,
+                    textAlign: .center,
+                    maxLines: 1,
+                    overflow: .ellipsis,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+typedef _TaskRow = ({String label, int count, Duration age, bool waiting});
+
+/// One row per label: how many run, the oldest one's age, and whether all
+/// of them wait on a sign-in.
+List<_TaskRow> _taskRows(GlobalAsyncQueue queue, List<String> tasks) {
+  final now = DateTime.now();
+  final rows = <String, _TaskRow>{};
+  for (final id in tasks) {
+    final age = now.difference(queue.startedAt(id) ?? now);
+    final waiting = queue.isWaiting(id);
+    rows.update(
+      vtopTaskLabel(id),
+      (row) => (
+        label: row.label,
+        count: row.count + 1,
+        age: age > row.age ? age : row.age,
+        waiting: row.waiting && waiting,
+      ),
+      ifAbsent: () =>
+          (label: vtopTaskLabel(id), count: 1, age: age, waiting: waiting),
+    );
+  }
+  return rows.values.toList();
+}
+
+/// The list shown while the status line is held; ticks every second.
+class _RunningTasks extends HookWidget {
+  const _RunningTasks({
+    required this.queue,
+    required this.tasks,
+    required this.theme,
+  });
+
+  final GlobalAsyncQueue queue;
+  final List<String> tasks;
+  final FThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final tick = useState(0);
+    useEffect(
+      () => Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => tick.value++,
+      ).cancel,
+      const [],
+    );
+    final rows = _taskRows(queue, tasks);
+    final colors = theme.colors;
+    final label = theme.typography.body.sm.copyWith(color: colors.foreground);
+    final small = theme.typography.body.xs.copyWith(
+      color: colors.mutedForeground,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Container(
+      width: 260,
+      decoration: BoxDecoration(
+        color: colors.background,
+        border: .all(color: colors.border),
+        borderRadius: .circular(12),
+      ),
+      padding: const .symmetric(vertical: 4),
+      child: Column(
+        mainAxisSize: .min,
+        children: [
+          if (rows.isEmpty)
+            Padding(
+              padding: const .all(12),
+              child: Text('Nothing running', style: small),
+            ),
+          for (final (i, row) in rows.indexed) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: colors.border),
+            Opacity(
+              opacity: row.waiting ? 0.5 : 1,
+              child: Padding(
+                padding: const .symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.label,
+                        style: label,
+                        maxLines: 1,
+                        overflow: .ellipsis,
+                      ),
+                    ),
+                    if (row.count > 1) Text('×${row.count}', style: small),
+                    // Each new value slides up into place.
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween(
+                            begin: const Offset(0, 0.5),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: Text(
+                        row.waiting ? 'waiting' : _age(row.age),
+                        key: ValueKey(row.waiting ? 'waiting' : _age(row.age)),
+                        style: small,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
+String _age(Duration age) =>
+    age.inMinutes > 0 ? '${age.inMinutes}m' : '${age.inSeconds}s';
+
 String? _queueStatusText(List<String> runningTasks) {
   if (runningTasks.isEmpty) return null;
-  final visibleTasks = runningTasks.map(_taskLabel).toSet();
+  final visibleTasks = runningTasks.map(vtopTaskLabel).toSet();
   final extraCount = visibleTasks.length - 1;
   return extraCount <= 0
       ? visibleTasks.first
       : '${visibleTasks.first} + $extraCount more';
-}
-
-/// Queue task id prefixes and what the header says while they run.
-const _taskLabels = [
-  ('vtop_login', 'Logging in to VTOP...'),
-  ('vtop_attendance', 'Fetching attendance...'),
-  ('vtop_fullattendance', 'Fetching attendance details...'),
-  ('vtop_timetable', 'Fetching timetable...'),
-  ('vtop_fetchSchedule', 'Fetching exam schedule...'),
-  ('vtop_marks', 'Fetching marks...'),
-  ('vtop_grades', 'Fetching grades...'),
-  ('vtop_grade_details', 'Fetching grade details...'),
-  ('vtop_grade_history', 'Fetching grade history...'),
-  ('vtop_semids', 'Fetching semesters...'),
-  ('toStorage', 'Saving data...'),
-  ('fromStorage', 'Loading data...'),
-];
-
-String _taskLabel(String id) {
-  if (id == 'get_semids_storage') return 'Loading data...';
-  for (final (prefix, label) in _taskLabels) {
-    if (id.startsWith(prefix)) return label;
-  }
-  return 'Working...';
 }
 
 /// The bottom bar's tabs, in order, with the paths that select each.

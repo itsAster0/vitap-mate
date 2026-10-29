@@ -97,7 +97,7 @@ class _BiometricHistoryPageState extends ConsumerState<BiometricHistoryPage> {
 
     return ScreenRefresh(
       onRefresh: _refresh,
-      tasks: const ['vtop_biometric_history'],
+      tasks: const ['vtop_biometric'],
       child: RefreshIndicator(
         onRefresh: _refresh,
         backgroundColor: colors.background,

@@ -22,6 +22,18 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   Stream<void> get quickFetches => _quickFetches.stream;
   static const quickFetchLimit = Duration(seconds: 2);
 
+  final _startedAt = <String, DateTime>{};
+
+  /// When the running task [id] was queued, for the status line.
+  DateTime? startedAt(String id) => _startedAt[id];
+
+  /// Whether [id] is held back by a sign-in under way: every VTOP call waits
+  /// for one (see [run]).
+  bool isWaiting(String id) =>
+      id.startsWith('vtop_') &&
+      !id.startsWith('vtop_login') &&
+      state.running.keys.any((key) => key.startsWith('vtop_login'));
+
   @override
   GlobalAsyncQueueEntity build() => const GlobalAsyncQueueEntity();
 
@@ -29,12 +41,13 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
   Future<T> run<T>(String id, Future<T> Function() task) async {
     final current = state.running;
     if (current.containsKey(id)) {
-      Log.info('vtop', "already contains $id");
+      Log.debug('vtop.queue', '$id already running; joining it');
       return current[id] as Future<T>;
     }
     final completer = Completer<T>();
     final future = completer.future;
     final running = {...current, id: future};
+    _startedAt[id] = DateTime.now();
     state = state.copyWith(running: running);
     _taskEvents.add(running.keys.toSet());
 
@@ -47,7 +60,7 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
               if (key.startsWith('vtop_login') && key != id) value,
           ];
           if (mainFutures.isNotEmpty) {
-            Log.info('vtop', "waiting for the on start run code ");
+            Log.info('vtop.queue', '$id waiting for sign-in');
             await Future.wait(mainFutures);
           }
         }
@@ -63,9 +76,9 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
         completer.completeError(e, st);
       } finally {
         final after = {...state.running}..remove(id);
+        _startedAt.remove(id);
         state = state.copyWith(running: after);
         _taskEvents.add(after.keys.toSet());
-        Log.info('vtop', "$state");
       }
     }());
 

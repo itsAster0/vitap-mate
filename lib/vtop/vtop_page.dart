@@ -129,3 +129,38 @@ Future<void> writeSavedPage<T>(Read read, VtopQuery<T> query, T data) async {
   // Every page type is generated with toJson.
   await storage.writeJson(savedPageKey(query), (data as dynamic).toJson());
 }
+
+/// What the app is doing while queue task [id] runs, for the status line.
+/// Page fetches are queued as `vtop_<savedPageKey>` by [fetchPage].
+String vtopTaskLabel(String id) {
+  if (id.startsWith('vtop_login')) return 'Logging in to VTOP...';
+  for (final (name, label) in _pageLabels) {
+    if (id.startsWith('vtop_$name')) return 'Fetching $label...';
+  }
+  if (id.startsWith('toStorage')) return 'Saving data...';
+  if (id.startsWith('fromStorage') || id == 'get_semids_storage') {
+    return 'Loading data...';
+  }
+  // A task without a label still says what it is.
+  return id.startsWith('vtop_')
+      ? 'Fetching ${id.substring(5).replaceAll('_', ' ')}...'
+      : id;
+}
+
+/// Page names (see `VtopQueries`) and how the status line names them.
+/// Longer names first where one starts with another.
+const _pageLabels = [
+  ('full_attendance', 'attendance details'),
+  ('attendance', 'attendance'),
+  ('timetable', 'timetable'),
+  ('marks', 'marks'),
+  ('exam_schedule', 'exam schedule'),
+  ('grade_details', 'grade details'),
+  ('grade_history', 'grade history'),
+  ('grades', 'grades'),
+  ('academic_calendar', 'academic calendar'),
+  ('biometric', 'biometric history'),
+  ('profile', 'profile'),
+  ('mentor', 'mentor'),
+  ('semesters', 'semesters'),
+];
