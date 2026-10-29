@@ -1046,8 +1046,7 @@ mod tests {
     #[tokio::test]
     async fn neither_forwarding_nor_gmail_means_no_server_sign_in() {
         let login = Arc::new(FakeLogin::default());
-        let (outcome, _) =
-            sign_in_once(no_mailbox(), login.clone(), Arc::default(), None).await;
+        let (outcome, _) = sign_in_once(no_mailbox(), login.clone(), Arc::default(), None).await;
         assert!(outcome == LoginOutcome::ForwardingRequired);
         assert_eq!(login.calls(), 0);
     }

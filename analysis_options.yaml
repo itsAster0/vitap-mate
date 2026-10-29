@@ -16,6 +16,7 @@ analyzer:
     - build/**
     - android/**
     - ios/**
+    - rust_builder/**
   plugins:
     - custom_lint
 linter:

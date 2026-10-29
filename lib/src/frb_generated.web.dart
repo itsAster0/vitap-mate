@@ -9,7 +9,6 @@
 import 'api/email_otp.dart';
 import 'api/mail_otp.dart';
 import 'api/native_logs.dart';
-import 'api/platform_http.dart';
 import 'api/server_page.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
@@ -35,9 +34,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient;
 
   @protected
-  AnyhowException dco_decode_AnyhowException(dynamic raw);
-
-  @protected
   VtopClient
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
     dynamic raw,
@@ -54,15 +50,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
     dynamic raw,
   );
-
-  @protected
-  FutureOr<PlatformHttpResponse> Function(PlatformHttpRequest)
-  dco_decode_DartFn_Inputs_platform_http_request_Output_platform_http_response_AnyhowException(
-    dynamic raw,
-  );
-
-  @protected
-  Object dco_decode_DartOpaque(dynamic raw);
 
   @protected
   VtopClient
@@ -99,11 +86,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PersistedVtopSession dco_decode_box_autoadd_persisted_vtop_session(
-    dynamic raw,
-  );
-
-  @protected
-  PlatformHttpErrorKind dco_decode_box_autoadd_platform_http_error_kind(
     dynamic raw,
   );
 
@@ -199,9 +181,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_i_32(dynamic raw);
-
-  @protected
-  PlatformInt64 dco_decode_isize(dynamic raw);
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
@@ -336,11 +315,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PlatformHttpErrorKind? dco_decode_opt_box_autoadd_platform_http_error_kind(
-    dynamic raw,
-  );
-
-  @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
 
   @protected
@@ -360,15 +334,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PersistedVtopSession dco_decode_persisted_vtop_session(dynamic raw);
-
-  @protected
-  PlatformHttpErrorKind dco_decode_platform_http_error_kind(dynamic raw);
-
-  @protected
-  PlatformHttpRequest dco_decode_platform_http_request(dynamic raw);
-
-  @protected
-  PlatformHttpResponse dco_decode_platform_http_response(dynamic raw);
 
   @protected
   ProfileField dco_decode_profile_field(dynamic raw);
@@ -443,9 +408,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WirePage dco_decode_wire_page(dynamic raw);
 
   @protected
-  AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
-
-  @protected
   VtopClient
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
     SseDeserializer deserializer,
@@ -462,9 +424,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
     SseDeserializer deserializer,
   );
-
-  @protected
-  Object sse_decode_DartOpaque(SseDeserializer deserializer);
 
   @protected
   VtopClient
@@ -507,11 +466,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PersistedVtopSession sse_decode_box_autoadd_persisted_vtop_session(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PlatformHttpErrorKind sse_decode_box_autoadd_platform_http_error_kind(
     SseDeserializer deserializer,
   );
 
@@ -631,9 +585,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
-
-  @protected
-  PlatformInt64 sse_decode_isize(SseDeserializer deserializer);
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
@@ -820,11 +771,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  PlatformHttpErrorKind? sse_decode_opt_box_autoadd_platform_http_error_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
 
   @protected
@@ -850,21 +796,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PersistedVtopSession sse_decode_persisted_vtop_session(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PlatformHttpErrorKind sse_decode_platform_http_error_kind(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PlatformHttpRequest sse_decode_platform_http_request(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  PlatformHttpResponse sse_decode_platform_http_response(
     SseDeserializer deserializer,
   );
 
@@ -947,12 +878,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WirePage sse_decode_wire_page(SseDeserializer deserializer);
 
   @protected
-  void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
     VtopClient self,
@@ -972,16 +897,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     VtopClient self,
     SseSerializer serializer,
   );
-
-  @protected
-  void
-  sse_encode_DartFn_Inputs_platform_http_request_Output_platform_http_response_AnyhowException(
-    FutureOr<PlatformHttpResponse> Function(PlatformHttpRequest) self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_DartOpaque(Object self, SseSerializer serializer);
 
   @protected
   void
@@ -1038,12 +953,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_persisted_vtop_session(
     PersistedVtopSession self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_box_autoadd_platform_http_error_kind(
-    PlatformHttpErrorKind self,
     SseSerializer serializer,
   );
 
@@ -1208,9 +1117,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_isize(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
@@ -1444,12 +1350,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_opt_box_autoadd_platform_http_error_kind(
-    PlatformHttpErrorKind? self,
-    SseSerializer serializer,
-  );
-
-  @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
 
   @protected
@@ -1479,24 +1379,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_persisted_vtop_session(
     PersistedVtopSession self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_platform_http_error_kind(
-    PlatformHttpErrorKind self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_platform_http_request(
-    PlatformHttpRequest self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_platform_http_response(
-    PlatformHttpResponse self,
     SseSerializer serializer,
   );
 

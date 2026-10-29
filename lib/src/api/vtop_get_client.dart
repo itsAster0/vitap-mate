@@ -6,7 +6,6 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:meta/meta.dart' as meta;
-import 'platform_http.dart';
 import 'vtop/types.dart';
 import 'vtop/vtop_client.dart';
 import 'vtop/vtop_errors.dart';
@@ -23,22 +22,6 @@ Future<VtopClient> getVtopClient({
   password: password,
   persistedSession: persistedSession,
   baseUrl: baseUrl,
-);
-
-/// [`get_vtop_client`], sending every request through `send`: the phone's
-/// HTTP stack, for HTTP/3 to the proxy.
-Future<VtopClient> getVtopClientViaPlatform({
-  required String username,
-  required String password,
-  PersistedVtopSession? persistedSession,
-  String? baseUrl,
-  required FutureOr<PlatformHttpResponse> Function(PlatformHttpRequest) send,
-}) => RustLib.instance.api.crateApiVtopGetClientGetVtopClientViaPlatform(
-  username: username,
-  password: password,
-  persistedSession: persistedSession,
-  baseUrl: baseUrl,
-  send: send,
 );
 
 Future<void> vtopClientLogin({required VtopClient client}) =>

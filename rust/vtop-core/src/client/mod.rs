@@ -17,7 +17,6 @@ mod hostel;
 mod http;
 mod otp;
 mod profile;
-pub mod transport;
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -29,7 +28,6 @@ use crate::error::{VtopError, VtopResult};
 use crate::inputs::{Password, RegistrationNumber, Username};
 use crate::session::{parse_cookie_pairs, ResettableJar, SessionManager, SessionState};
 use crate::types::PersistedVtopSession;
-use transport::{Transport, TransportError, TransportErrorKind};
 
 pub use course_page::{CourseFile, CourseFileInfo};
 pub use email_otp::EmailOtpLogin;
@@ -80,8 +78,6 @@ struct AuthorizedRequest {
 
 pub struct VtopClient {
     http: Client,
-    /// Sends requests in place of `http` when set (see [`transport`]).
-    transport: Option<Arc<dyn Transport>>,
     config: Arc<VtopConfig>,
     jar: Arc<ResettableJar>,
     credentials: Option<Credentials>,
@@ -106,7 +102,6 @@ impl std::fmt::Debug for VtopClient {
 #[derive(Debug, Default)]
 pub struct VtopClientBuilder {
     config: VtopConfig,
-    transport: Option<Arc<dyn Transport>>,
 }
 
 impl VtopClientBuilder {
@@ -115,18 +110,11 @@ impl VtopClientBuilder {
         self
     }
 
-    /// Sends every request through `transport` instead of reqwest.
-    pub fn transport(mut self, transport: Arc<dyn Transport>) -> Self {
-        self.transport = Some(transport);
-        self
-    }
-
     fn build(self, credentials: Option<Credentials>) -> VtopResult<VtopClient> {
         let jar = Arc::new(ResettableJar::default());
         let http = http::shared_client(&self.config)?;
         Ok(VtopClient {
             http,
-            transport: self.transport,
             config: Arc::new(self.config),
             jar,
             credentials,
@@ -374,7 +362,7 @@ impl VtopClient {
     pub(super) async fn send_request(
         &self,
         builder: reqwest::RequestBuilder,
-    ) -> Result<Response, SendError> {
+    ) -> Result<Response, reqwest::Error> {
         use reqwest::header::{COOKIE, LOCATION, SET_COOKIE};
 
         let mut request = builder.build()?;
@@ -386,7 +374,7 @@ impl VtopClient {
                     request.headers_mut().insert(COOKIE, cookies);
                 }
             }
-            let response = self.execute(request).await?;
+            let response = self.http.execute(request).await?;
             self.jar
                 .set_cookies(&mut response.headers().get_all(SET_COOKIE).iter(), &url);
 
@@ -407,22 +395,6 @@ impl VtopClient {
             hops += 1;
             request = self.http.get(next).build()?;
         }
-    }
-
-    /// One hop of [`Self::send_request`], on the transport when there is one.
-    async fn execute(&self, request: reqwest::Request) -> Result<Response, SendError> {
-        let Some(transport) = &self.transport else {
-            return Ok(self.http.execute(request).await?);
-        };
-        let request = transport::to_transport_request(
-            request,
-            http::default_headers(),
-            self.config.request_timeout,
-        )
-        .await?;
-        Ok(transport::to_reqwest_response(
-            transport.send(request).await?,
-        )?)
     }
 
     // ---- session import / export ----------------------------------------
@@ -611,7 +583,7 @@ fn unavailable(context: &str, reason: &str) -> VtopError {
 
 /// A request that got no answer. A timeout is VTOP being slow; anything
 /// else may be the phone's own connection.
-fn send_error(context: &str, error: SendError) -> VtopError {
+fn send_error(context: &str, error: reqwest::Error) -> VtopError {
     if error.is_timeout() {
         warn!(target: NETWORK, "{context}: {error}");
         return slow_vtop_error(context);
@@ -652,58 +624,14 @@ pub(super) trait SendWith {
     fn send_with<'a>(
         self,
         client: &'a VtopClient,
-    ) -> impl std::future::Future<Output = Result<Response, SendError>> + Send + 'a;
+    ) -> impl std::future::Future<Output = Result<Response, reqwest::Error>> + Send + 'a;
 }
 
 impl SendWith for reqwest::RequestBuilder {
     fn send_with<'a>(
         self,
         client: &'a VtopClient,
-    ) -> impl std::future::Future<Output = Result<Response, SendError>> + Send + 'a {
+    ) -> impl std::future::Future<Output = Result<Response, reqwest::Error>> + Send + 'a {
         client.send_request(self)
-    }
-}
-
-/// Why a request got no response, from reqwest or a [`Transport`].
-#[derive(Debug)]
-pub(super) enum SendError {
-    Http(reqwest::Error),
-    Transport(TransportError),
-}
-
-impl SendError {
-    fn is_timeout(&self) -> bool {
-        match self {
-            Self::Http(error) => error.is_timeout(),
-            Self::Transport(error) => error.kind == TransportErrorKind::Timeout,
-        }
-    }
-
-    fn is_connect(&self) -> bool {
-        match self {
-            Self::Http(error) => error.is_connect(),
-            Self::Transport(error) => error.kind == TransportErrorKind::Connect,
-        }
-    }
-}
-
-impl std::fmt::Display for SendError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Http(error) => error.fmt(formatter),
-            Self::Transport(error) => error.fmt(formatter),
-        }
-    }
-}
-
-impl From<reqwest::Error> for SendError {
-    fn from(error: reqwest::Error) -> Self {
-        Self::Http(error)
-    }
-}
-
-impl From<TransportError> for SendError {
-    fn from(error: TransportError) -> Self {
-        Self::Transport(error)
     }
 }

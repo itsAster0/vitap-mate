@@ -1,7 +1,7 @@
 //! The experimental UDP mode: one page through `vtop-gateway` over
 //! `vtop-wire`, for "Fetch on the server" on slow, lossy networks. Dart
 //! falls back to HTTPS when this reports the gateway unreachable; see
-//! `lib/core/vtop_backend/server_vtop.dart`.
+//! `lib/vtop/backend/server_vtop.dart`.
 //!
 //! The VTOP session goes along only when the gateway may not hold it: on the
 //! first fetch, after it changes, or after five hours (the gateway keeps it

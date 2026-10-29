@@ -2,7 +2,7 @@
 library;
 
 import 'package:vitapmate/observability/log.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/features/attendance/logic/attendance_history.dart';
 import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';

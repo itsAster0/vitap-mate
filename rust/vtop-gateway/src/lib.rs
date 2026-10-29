@@ -1,11 +1,11 @@
 //! The UDP gateway: phones speak `vtop-wire` to it, it asks the engine.
 //!
 //! ```text
-//! phone ──UDP (vtop-wire)──► gateway (Fly) ──HTTPS──► engine /engine/fetch (Railway) ──► VTOP
+//! phone ──UDP (vtop-wire)──► gateway ──loopback──► engine /engine/fetch ──► VTOP
 //! ```
 //!
 //! Page fetches only; sign-in, OTP and changes to VTOP stay on HTTPS. It
-//! calls the engine exactly as the edge does (`BRIDGE_SECRET`, the phone's
+//! runs in the engine's process and calls it exactly as the edge does (`BRIDGE_SECRET`, the phone's
 //! session in the body) and passes the answer back byte for byte, so it
 //! holds no VTOP logic. What it keeps, in memory only: Noise sessions, and
 //! each device's VTOP session for six hours, so a fetch can carry an 8-byte
@@ -21,7 +21,8 @@ use tokio::sync::mpsc;
 use vtop_shared::engine::{PageFetch, FETCH};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    session_hash, WirePageRequest, WirePageResponse, BENCH_MAX, BENCH_PAGE, NEED_SESSION, TOO_LARGE,
+    session_hash, WirePageRequest, WirePageResponse, BENCH_MAX, BENCH_PAGE, BUSY, NEED_SESSION,
+    TOO_LARGE,
 };
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
@@ -29,7 +30,11 @@ use vtop_wire::gateway::{Gateway, NewRequest, Token};
 /// Over the engine's own VTOP limit (25 s a page), like the edge's.
 const ENGINE_TIMEOUT: Duration = Duration::from_secs(32);
 const SESSION_KEEP: Duration = Duration::from_secs(6 * 3600);
-const MAX_SESSIONS: usize = 100_000;
+const MAX_SESSIONS: usize = 20_000;
+/// Engine calls at once; more are told to use HTTPS. Anyone with the app
+/// can make a device key, so this bounds what UDP mode costs the engine
+/// and VTOP.
+const MAX_ENGINE_CALLS: usize = 256;
 const SWEEP_EVERY: Duration = Duration::from_secs(30);
 
 pub struct Config {
@@ -117,6 +122,7 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
     }
     let (done_tx, mut done_rx) = mpsc::unbounded_channel::<(Token, Vec<u8>)>();
     let engine = Arc::new(Engine::new(config.engine_url, config.engine_secret));
+    let calls = Arc::new(tokio::sync::Semaphore::new(MAX_ENGINE_CALLS));
     let mut gw = Gateway::new(config.private_key);
     let mut last_sweep = Instant::now();
     loop {
@@ -127,9 +133,17 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
             Some((socket, from, packet)) = in_rx.recv() => {
                 if let Some(request) = gw.receive(&packet, socket, from, Instant::now()) {
                     let (engine, tx) = (engine.clone(), done_tx.clone());
+                    let permit = calls.clone().try_acquire_owned();
                     tokio::spawn(async move {
                         let token = request.token;
-                        let _ = tx.send((token, engine.answer(request).await));
+                        let body = match permit {
+                            Ok(_permit) => engine.answer(request).await,
+                            Err(_) => {
+                                tracing::warn!("engine calls at the limit; sent BUSY");
+                                error(BUSY, "busy", "The server is busy.").encode()
+                            }
+                        };
+                        let _ = tx.send((token, body));
                     });
                 }
             }

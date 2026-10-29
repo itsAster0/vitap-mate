@@ -1,6 +1,6 @@
 //! Every VTOP page the engine fetches for a phone, by name: the arguments
 //! it takes and the [`VtopClient`] call behind it. The names and arguments
-//! are the app's (`lib/core/vtop_backend/vtop_queries.dart`), so a new page
+//! are the app's (`lib/vtop/backend/vtop_queries.dart`), so a new page
 //! is one entry there and one here. Only reads: what changes VTOP (outing
 //! applies and cancels) is always sent by the phone itself.
 

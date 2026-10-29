@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -130635582;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1951208430;
 
 // Section: executor
 
@@ -1883,25 +1883,6 @@ fn wire__crate__api__vtop_get_client__get_vtop_client_impl(
         },
     )
 }
-fn wire__crate__api__vtop_get_client__get_vtop_client_via_platform_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec,_,_,_>(flutter_rust_bridge::for_generated::TaskInfo{ debug_name: "get_vtop_client_via_platform", port: Some(port_), mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal }, move || { 
-            let message = unsafe { flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(ptr_, rust_vec_len_, data_len_) };
-            let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_username = <String>::sse_decode(&mut deserializer);
-let api_password = <String>::sse_decode(&mut deserializer);
-let api_persisted_session = <Option<crate::api::vtop::types::PersistedVtopSession>>::sse_decode(&mut deserializer);
-let api_base_url = <Option<String>>::sse_decode(&mut deserializer);
-let api_send = decode_DartFn_Inputs_platform_http_request_Output_platform_http_response_AnyhowException(<flutter_rust_bridge::DartOpaque>::sse_decode(&mut deserializer));deserializer.end(); move |context| async move {
-                    transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>((move || async move {
-                         let output_ok = crate::api::vtop_get_client::get_vtop_client_via_platform(api_username, api_password, api_persisted_session, api_base_url, api_send).await?;   Ok(output_ok)
-                    })().await)
-                } })
-}
 fn wire__crate__api__email_otp__gmail_find_otp_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3054,58 +3035,11 @@ const _: fn() = || {
 
 // Section: related_funcs
 
-fn decode_DartFn_Inputs_platform_http_request_Output_platform_http_response_AnyhowException(
-    dart_opaque: flutter_rust_bridge::DartOpaque,
-) -> impl Fn(
-    crate::api::platform_http::PlatformHttpRequest,
-) -> flutter_rust_bridge::DartFnFuture<crate::api::platform_http::PlatformHttpResponse> {
-    use flutter_rust_bridge::IntoDart;
-
-    async fn body(
-        dart_opaque: flutter_rust_bridge::DartOpaque,
-        arg0: crate::api::platform_http::PlatformHttpRequest,
-    ) -> crate::api::platform_http::PlatformHttpResponse {
-        let args = vec![arg0.into_into_dart().into_dart()];
-        let message = FLUTTER_RUST_BRIDGE_HANDLER
-            .dart_fn_invoke(dart_opaque, args)
-            .await;
-
-        let mut deserializer = flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-        let action = deserializer.cursor.read_u8().unwrap();
-        let ans = match action {
-            0 => std::result::Result::Ok(
-                <crate::api::platform_http::PlatformHttpResponse>::sse_decode(&mut deserializer),
-            ),
-            1 => std::result::Result::Err(
-                <flutter_rust_bridge::for_generated::anyhow::Error>::sse_decode(&mut deserializer),
-            ),
-            _ => unreachable!(),
-        };
-        deserializer.end();
-        let ans = ans.expect("Dart throws exception but Rust side assume it is not failable");
-        ans
-    }
-
-    move |arg0: crate::api::platform_http::PlatformHttpRequest| {
-        flutter_rust_bridge::for_generated::convert_into_dart_fn_future(body(
-            dart_opaque.clone(),
-            arg0,
-        ))
-    }
-}
 flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>
 );
 
 // Section: dart2rust
-
-impl SseDecode for flutter_rust_bridge::for_generated::anyhow::Error {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <String>::sse_decode(deserializer);
-        return flutter_rust_bridge::for_generated::anyhow::anyhow!("{}", inner);
-    }
-}
 
 impl SseDecode for VtopClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -3114,14 +3048,6 @@ impl SseDecode for VtopClient {
             flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
         >>::sse_decode(deserializer);
         return flutter_rust_bridge::for_generated::rust_auto_opaque_decode_owned(inner);
-    }
-}
-
-impl SseDecode for flutter_rust_bridge::DartOpaque {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <usize>::sse_decode(deserializer);
-        return unsafe { flutter_rust_bridge::for_generated::sse_decode_dart_opaque(inner) };
     }
 }
 
@@ -3809,13 +3735,6 @@ impl SseDecode for i32 {
     }
 }
 
-impl SseDecode for isize {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        deserializer.cursor.read_i64::<NativeEndian>().unwrap() as _
-    }
-}
-
 impl SseDecode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4387,19 +4306,6 @@ impl SseDecode for Option<crate::api::vtop::types::PersistedVtopSession> {
     }
 }
 
-impl SseDecode for Option<crate::api::platform_http::PlatformHttpErrorKind> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        if (<bool>::sse_decode(deserializer)) {
-            return Some(
-                <crate::api::platform_http::PlatformHttpErrorKind>::sse_decode(deserializer),
-            );
-        } else {
-            return None;
-        }
-    }
-}
-
 impl SseDecode for Option<u64> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -4498,58 +4404,6 @@ impl SseDecode for crate::api::vtop::types::PersistedVtopSession {
             csrf_token: var_csrfToken,
             registration_number: var_registrationNumber,
             logged_in_at: var_loggedInAt,
-        };
-    }
-}
-
-impl SseDecode for crate::api::platform_http::PlatformHttpErrorKind {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut inner = <i32>::sse_decode(deserializer);
-        return match inner {
-            0 => crate::api::platform_http::PlatformHttpErrorKind::Timeout,
-            1 => crate::api::platform_http::PlatformHttpErrorKind::Connect,
-            2 => crate::api::platform_http::PlatformHttpErrorKind::Other,
-            _ => unreachable!("Invalid variant for PlatformHttpErrorKind: {}", inner),
-        };
-    }
-}
-
-impl SseDecode for crate::api::platform_http::PlatformHttpRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_method = <String>::sse_decode(deserializer);
-        let mut var_url = <String>::sse_decode(deserializer);
-        let mut var_headers = <Vec<(String, String)>>::sse_decode(deserializer);
-        let mut var_body = <Vec<u8>>::sse_decode(deserializer);
-        let mut var_timeoutMs = <u32>::sse_decode(deserializer);
-        return crate::api::platform_http::PlatformHttpRequest {
-            method: var_method,
-            url: var_url,
-            headers: var_headers,
-            body: var_body,
-            timeout_ms: var_timeoutMs,
-        };
-    }
-}
-
-impl SseDecode for crate::api::platform_http::PlatformHttpResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_status = <u16>::sse_decode(deserializer);
-        let mut var_url = <String>::sse_decode(deserializer);
-        let mut var_headers = <Vec<(String, String)>>::sse_decode(deserializer);
-        let mut var_body = <Vec<u8>>::sse_decode(deserializer);
-        let mut var_errorKind =
-            <Option<crate::api::platform_http::PlatformHttpErrorKind>>::sse_decode(deserializer);
-        let mut var_error = <Option<String>>::sse_decode(deserializer);
-        return crate::api::platform_http::PlatformHttpResponse {
-            status: var_status,
-            url: var_url,
-            headers: var_headers,
-            body: var_body,
-            error_kind: var_errorKind,
-            error: var_error,
         };
     }
 }
@@ -5136,38 +4990,32 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__vtop_get_client__get_vtop_client_via_platform_impl(
-            port,
-            ptr,
-            rust_vec_len,
-            data_len,
-        ),
-        32 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        37 => {
+        31 => wire__crate__api__email_otp__gmail_find_otp_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__email_otp__gmail_tidy_up_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        36 => {
             wire__crate__api__native_logs__native_logs_open_impl(port, ptr, rust_vec_len, data_len)
         }
-        40 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        39 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        42 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        41 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        43 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        45 => wire__crate__api__wire__wire_bench_impl(port, ptr, rust_vec_len, data_len),
-        46 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__wire__wire_bench_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -5190,20 +5038,20 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        35 => {
+        34 => {
             wire__crate__api__mail_otp__mail_otp_generate_keypair_impl(ptr, rust_vec_len, data_len)
         }
-        36 => wire__crate__api__mail_otp__mail_otp_open_impl(ptr, rust_vec_len, data_len),
-        38 => {
+        35 => wire__crate__api__mail_otp__mail_otp_open_impl(ptr, rust_vec_len, data_len),
+        37 => {
             wire__crate__api__server_page__server_page_dictionary_impl(ptr, rust_vec_len, data_len)
         }
-        39 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        38 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+        42 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,
@@ -6299,77 +6147,6 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Persi
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::platform_http::PlatformHttpErrorKind {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        match self {
-            Self::Timeout => 0.into_dart(),
-            Self::Connect => 1.into_dart(),
-            Self::Other => 2.into_dart(),
-            _ => unreachable!(),
-        }
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::platform_http::PlatformHttpErrorKind
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::platform_http::PlatformHttpErrorKind>
-    for crate::api::platform_http::PlatformHttpErrorKind
-{
-    fn into_into_dart(self) -> crate::api::platform_http::PlatformHttpErrorKind {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::platform_http::PlatformHttpRequest {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.method.into_into_dart().into_dart(),
-            self.url.into_into_dart().into_dart(),
-            self.headers.into_into_dart().into_dart(),
-            self.body.into_into_dart().into_dart(),
-            self.timeout_ms.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::platform_http::PlatformHttpRequest
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::platform_http::PlatformHttpRequest>
-    for crate::api::platform_http::PlatformHttpRequest
-{
-    fn into_into_dart(self) -> crate::api::platform_http::PlatformHttpRequest {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::platform_http::PlatformHttpResponse {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.status.into_into_dart().into_dart(),
-            self.url.into_into_dart().into_dart(),
-            self.headers.into_into_dart().into_dart(),
-            self.body.into_into_dart().into_dart(),
-            self.error_kind.into_into_dart().into_dart(),
-            self.error.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
-    for crate::api::platform_http::PlatformHttpResponse
-{
-}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::platform_http::PlatformHttpResponse>
-    for crate::api::platform_http::PlatformHttpResponse
-{
-    fn into_into_dart(self) -> crate::api::platform_http::PlatformHttpResponse {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<crate::api::vtop::types::ProfileField> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -6810,24 +6587,10 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WirePage> for crate::ap
     }
 }
 
-impl SseEncode for flutter_rust_bridge::for_generated::anyhow::Error {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(format!("{:?}", self), serializer);
-    }
-}
-
 impl SseEncode for VtopClient {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>>::sse_encode(flutter_rust_bridge::for_generated::rust_auto_opaque_encode::<_, MoiArc<_>>(self), serializer);
-    }
-}
-
-impl SseEncode for flutter_rust_bridge::DartOpaque {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <usize>::sse_encode(self.encode(), serializer);
     }
 }
 
@@ -7252,16 +7015,6 @@ impl SseEncode for i32 {
     }
 }
 
-impl SseEncode for isize {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        serializer
-            .cursor
-            .write_i64::<NativeEndian>(self as _)
-            .unwrap();
-    }
-}
-
 impl SseEncode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7672,16 +7425,6 @@ impl SseEncode for Option<crate::api::vtop::types::PersistedVtopSession> {
     }
 }
 
-impl SseEncode for Option<crate::api::platform_http::PlatformHttpErrorKind> {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <bool>::sse_encode(self.is_some(), serializer);
-        if let Some(value) = self {
-            <crate::api::platform_http::PlatformHttpErrorKind>::sse_encode(value, serializer);
-        }
-    }
-}
-
 impl SseEncode for Option<u64> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7746,49 +7489,6 @@ impl SseEncode for crate::api::vtop::types::PersistedVtopSession {
         <Option<String>>::sse_encode(self.csrf_token, serializer);
         <Option<String>>::sse_encode(self.registration_number, serializer);
         <Option<u64>>::sse_encode(self.logged_in_at, serializer);
-    }
-}
-
-impl SseEncode for crate::api::platform_http::PlatformHttpErrorKind {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <i32>::sse_encode(
-            match self {
-                crate::api::platform_http::PlatformHttpErrorKind::Timeout => 0,
-                crate::api::platform_http::PlatformHttpErrorKind::Connect => 1,
-                crate::api::platform_http::PlatformHttpErrorKind::Other => 2,
-                _ => {
-                    unimplemented!("");
-                }
-            },
-            serializer,
-        );
-    }
-}
-
-impl SseEncode for crate::api::platform_http::PlatformHttpRequest {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.method, serializer);
-        <String>::sse_encode(self.url, serializer);
-        <Vec<(String, String)>>::sse_encode(self.headers, serializer);
-        <Vec<u8>>::sse_encode(self.body, serializer);
-        <u32>::sse_encode(self.timeout_ms, serializer);
-    }
-}
-
-impl SseEncode for crate::api::platform_http::PlatformHttpResponse {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <u16>::sse_encode(self.status, serializer);
-        <String>::sse_encode(self.url, serializer);
-        <Vec<(String, String)>>::sse_encode(self.headers, serializer);
-        <Vec<u8>>::sse_encode(self.body, serializer);
-        <Option<crate::api::platform_http::PlatformHttpErrorKind>>::sse_encode(
-            self.error_kind,
-            serializer,
-        );
-        <Option<String>>::sse_encode(self.error, serializer);
     }
 }
 

@@ -8,7 +8,7 @@ rust/                    Cargo workspace; the root package is the app's FFI crat
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
 ├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out (run inside the Engine on Fly)
 └── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
-lib/core/vtop_backend/   Dart: VtopBackend interface, local (FRB) and edge (HTTP, NDJSON)
+lib/vtop/backend/        Dart: VtopBackend interface, local (FRB) and edge (HTTP, NDJSON)
 ```
 
 ## vtop-core
@@ -81,7 +81,7 @@ phone ──UDP (vtop-wire)──► gateway ─loopback─► Engine /engine/fe
                (one process on Fly: vmate-node.aster0.dev, sin)
 ```
 
-A switch under "Fetch on the server" (`lib/core/providers/vtop_udp.dart`)
+A switch under "Fetch on the server" (`lib/vtop/route/vtop_udp.dart`)
 sends page fetches over UDP, for slow, lossy networks. Sign-in, OTP and
 changes to VTOP stay on HTTPS, and `ServerVtopApi.fetch` falls back to
 HTTPS for ten minutes when the gateway does not answer, and for any page
@@ -105,9 +105,12 @@ too large for UDP.
   engine's own relay secret, returning the answer byte for byte.
   It keeps each device's VTOP session for six hours so requests carry an
   8-byte hash instead of the cookies (`vtop_shared::wire_page`).
-- **Abuse limits**: message 1 must be fresh and its timestamp unseen for
-  the device; unproven addresses get at most 3x the bytes they sent; per
-  device and per IP rate limits; sending stops after 30 s of silence.
+- **Abuse limits** (no rate limits: a campus shares one IP): message 1
+  must be fresh and its timestamp unseen for the device; unproven
+  addresses get at most 3x the bytes they sent, and a reset is never
+  larger than the packet behind it; at most 4 requests open per session,
+  50,000 sessions (the longest idle makes room) and 256 engine calls at once
+  (more get "busy" and use HTTPS); sending stops after 30 s of silence.
 
 Deploy: `flyctl deploy --ha=false` from `rust/` (config `rust/fly.toml`,
 which describes the secrets, ports and the dedicated IPv4).

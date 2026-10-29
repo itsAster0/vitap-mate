@@ -14,7 +14,6 @@ import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/vtop/vtop.dart';
-import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
 
 late VtopClient _globalClient;
 late String _globalUsername;

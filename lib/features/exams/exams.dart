@@ -3,7 +3,7 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/platform/notifications/exam_reminder_notification_service.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';

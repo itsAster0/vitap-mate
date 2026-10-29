@@ -20,7 +20,9 @@ static LOG_FILE: Mutex<Option<LogFile>> = Mutex::new(None);
 
 fn log_file() -> MutexGuard<'static, Option<LogFile>> {
     // A poisoned lock only means another write panicked; keep logging.
-    LOG_FILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    LOG_FILE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Starts writing Rust's log to `dir/rust.log`.

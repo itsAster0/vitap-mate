@@ -166,13 +166,12 @@ same pass, then background timeouts, then APK size.
    (`cronet_http`, `third_party/cronet_http`, `cupertino_http`, platform HTTP;
    Rust does all HTTP) and dependencies the report shows are unused (each
    confirmed first). No native-lib compression, no obfuscation.
+   Done for Cronet: arm64 release 32.8 → 32.0 MB; vtop-core's `Transport`
+   hook went with it.
 
 ## Open questions
 
-1. Network stacks: drop Cronet (and the `third_party/cronet_http` fork),
-   platform HTTP and `cupertino_http`, so Rust does all HTTP? Default: keep
-   them until the size numbers show what they cost.
-2. Riverpod: keep code generation (`riverpod_generator`, `freezed`) or write
+1. Riverpod: keep code generation (`riverpod_generator`, `freezed`) or write
    providers by hand? Default: keep, to avoid rewriting providers.
-3. Desktop and web folders (`linux/ macos/ windows/ web/`): delete?
+2. Desktop and web folders (`linux/ macos/ windows/ web/`): delete?
    Default: delete in step 6 after confirming.
