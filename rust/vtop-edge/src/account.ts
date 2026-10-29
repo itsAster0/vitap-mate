@@ -38,6 +38,7 @@ import {
   REQUEST_KEEP_SECS,
   RequestRecord,
   type RequestStatus,
+  errorCode,
   isAccountId,
   keyId,
   keyLabel,
@@ -88,6 +89,10 @@ import {
 import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
 import * as sql from "./sql";
 import { address as mailAddress, memberLabel } from "./state";
+
+/** How long `/v1/app/login` waits for the server's sign-in: over the
+ * engine's VTOP sign-in and its wait for the OTP mail (45 s). */
+const APP_LOGIN_WAIT_MS = 90_000;
 
 const PHONE_UNAVAILABLE = "phone_unavailable: Could not reach the phone right now.";
 const PHONE_SESSION_INVALID =
@@ -217,15 +222,23 @@ async function withSession(req: Request, env: Env, op: AppOp): Promise<Response>
 /** `POST /v1/data/refresh`: VTOP data through the engine, streamed (see
  * data-refresh.ts). The phone names its account by registration number and
  * proves it is one of its phones with its app secret. */
-/** `POST /v1/app/status` and `/v1/app/session/clear`: a linked phone's
- * view of its account, authenticated like `/v1/data/refresh`. */
-export async function appCall(req: Request, env: Env, op: "status" | "session-clear"): Promise<Response> {
+/** `POST /v1/app/status`, `/v1/app/session/clear` and `/v1/app/login`: a
+ * linked phone's view of its account, and a sign-in by the server,
+ * authenticated like `/v1/data/refresh`. */
+export async function appCall(req: Request, env: Env, op: "status" | "session-clear" | "login"): Promise<Response> {
   const body = await jsonBody(req);
   if (!body) return badRequest("Invalid JSON body.");
   const registrationNumber = str(body.registrationNumber)?.trim();
   if (!registrationNumber) return badRequest("registrationNumber is required.");
   const stub = accountStub(env, accountId(registrationNumber));
-  return op === "status" ? stub.appStatus(body) : stub.appSessionClear(body);
+  switch (op) {
+    case "status":
+      return stub.appStatus(body);
+    case "session-clear":
+      return stub.appSessionClear(body);
+    case "login":
+      return stub.appLogin(body);
+  }
 }
 
 /** `POST /internal/accounts/login-done`, from the engine. */
@@ -789,23 +802,10 @@ export class Account extends DurableObject<Env> {
     }
     doc.touchKey(keyHash, at, via);
 
-    const cached = doc.cachedSession(at);
-    if (cached !== null) {
-      const check: SessionCheck = { sealedSession: cached, account: doc.id };
-      try {
-        const checked = await engineJson<SessionChecked>(this.env, SESSION, check);
-        if (checked.status !== "expired") {
-          if (checked.cookies) {
-            this.save(doc);
-            return Response.json(ready(checked.cookies, doc.cachedSource()));
-          }
-        } else {
-          console.log("account: cached session no longer works");
-          doc.clearSession();
-        }
-      } catch (e) {
-        console.log(`account: cannot check the cache: ${e}`);
-      }
+    const cookies = await this.cachedCookies(doc, at);
+    if (cookies !== null) {
+      this.save(doc);
+      return Response.json(ready(cookies, doc.cachedSource()));
     }
 
     const pendingId = this.pendingId();
@@ -827,6 +827,26 @@ export class Account extends DurableObject<Env> {
     if (this.request(request.id)?.pending(at)) this.putRequest(request);
     await this.reschedule(doc);
     return pending(request);
+  }
+
+  /** The cached session's cookies when the engine finds it still works;
+   * one that expired is dropped. */
+  private async cachedCookies(doc: AccountRecord, at: number): Promise<string | null> {
+    const cached = doc.cachedSession(at);
+    if (cached === null) return null;
+    const check: SessionCheck = { sealedSession: cached, account: doc.id };
+    try {
+      const checked = await engineJson<SessionChecked>(this.env, SESSION, check);
+      if (checked.status === "expired") {
+        console.log("account: cached session no longer works");
+        doc.clearSession();
+        return null;
+      }
+      return checked.cookies ?? null;
+    } catch (e) {
+      console.log(`account: cannot check the cache: ${e}`);
+      return null;
+    }
   }
 
   /** Asks the key's phones and/or starts a sign-in, in the order the
@@ -1024,6 +1044,65 @@ export class Account extends DurableObject<Env> {
       }
     }
     return Response.json(doc.statusView(forwarding));
+  }
+
+  /** A linked phone in UDP mode asks the server to sign it in with the
+   * saved password, the engine reading the OTP from forwarded mail or
+   * Gmail, so the phone sends nothing secret but its app secret. Answers
+   * once done, like `/v1/vtop/login`; a rejected password is
+   * `invalid_credentials`, and the saved one is dropped (see [loginDone]). */
+  async appLogin(body: Record<string, unknown>): Promise<Response> {
+    const doc = this.phoneDoc(body);
+    if (doc instanceof Response) return doc;
+    const at = now();
+    if (doc.usableVault(at) === null) {
+      return error(409, "no_saved_credentials", "The server keeps no password for this account.");
+    }
+    const registrationNumber = str(body.registrationNumber)?.trim().toUpperCase() ?? null;
+    const signedIn = (cookies: string) =>
+      Response.json({ status: "ok", session: { cookies, registration_number: registrationNumber } });
+    const cookies = await this.cachedCookies(doc, at);
+    if (cookies !== null) {
+      this.save(doc);
+      return signedIn(cookies);
+    }
+
+    const pendingId = this.pendingId();
+    let request = pendingId === null ? null : this.request(pendingId);
+    if (!request?.pending(at)) {
+      // No phones to ask: this phone is the one asking.
+      request = new RequestRecord(crypto.randomUUID(), randomToken(""), at);
+      this.putRequest(request);
+      this.setPending(request.id);
+      const started = await this.startLogin(doc, request, at);
+      this.save(doc);
+      if (!started) {
+        request.fail("server_login_failed: The server could not start a sign-in.");
+        this.putRequest(request);
+        return error(503, "server_login_failed", "The server could not start a sign-in.");
+      }
+      // The engine may have finished it already.
+      if (this.request(request.id)?.pending(at)) this.putRequest(request);
+    }
+
+    const id = request.id;
+    const until = Date.now() + APP_LOGIN_WAIT_MS;
+    let current = this.request(id);
+    while (current?.pending(now()) && Date.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      current = this.request(id);
+    }
+    switch (current?.status) {
+      case "success":
+        return signedIn(current.cookies ?? "");
+      case "error":
+        if (errorCode(current.error ?? "") === "credentials_rejected") {
+          return error(401, "invalid_credentials", "VTOP rejected the saved password.");
+        }
+        return error(503, "server_login_failed", current.error ?? "The server could not sign in.");
+      default:
+        return error(504, "vtop_timeout", "The server is still signing in.");
+    }
   }
 
   async appSessionClear(body: Record<string, unknown>): Promise<Response> {

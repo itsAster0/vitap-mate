@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/backend/server_json.dart';
 import 'package:vitapmate/vtop/backend/server_vtop.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart' show EdgeIdentity;
 import 'package:vitapmate/vtop/backend/vtop_backend.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
@@ -53,6 +54,8 @@ Map<String, dynamic> _fixture(String name) =>
         as Map<String, dynamic>;
 
 void main() {
+  // The UDP backoff is shared by every api.
+  tearDown(() => ServerVtopApi.wireOffUntil.value = null);
   group("the engine's JSON reads as the app's types", () {
     // vtop-core's parser snapshots are its serde output, as the engine
     // sends it.
@@ -367,6 +370,9 @@ void main() {
             semester,
             required args,
             dictionary,
+            account,
+            secret = false,
+            timeout,
           }) {
             asked.add('udp $name');
             expect(jsonDecode(sessionJson)['cookies'], 'JSESSIONID=a');
@@ -415,6 +421,27 @@ void main() {
       },
     );
 
+    test(
+      'a gateway that cannot read the request is skipped for a while',
+      () async {
+        final asked = <String>[];
+        final server = api(
+          asked,
+          () async => page(400, {
+            'code': 'bad_request',
+            'error': 'The request does not decode.',
+          }),
+        );
+        expect(await server.fetch(session: _session, name: 'marks'), {
+          'via': 'https',
+        });
+        expect(await server.fetch(session: _session, name: 'marks'), {
+          'via': 'https',
+        });
+        expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
+      },
+    );
+
     test('a page too large for UDP comes over HTTPS', () async {
       final asked = <String>[];
       final data = await api(
@@ -448,5 +475,206 @@ void main() {
       );
       expect(asked, ['udp attendance']);
     });
+  });
+
+  group('sign-in over UDP', () {
+    WirePage answer(int status, Object json) => WirePage(
+      status: status,
+      packed: false,
+      body: Uint8List.fromList(utf8.encode(jsonEncode(json))),
+      elapsedMs: 12,
+      handshake: true,
+      wireBytes: 300,
+    );
+
+    /// Requests sent over UDP: (name, secret, JSON body).
+    ServerVtopApi api(
+      List<(String, bool, Object?)> sent,
+      Future<WirePage> Function() wire, {
+      EdgeIdentity? identity = (
+        appSecret: 'vta_x',
+        registrationNumber: '23BCE7000',
+      ),
+    }) => ServerVtopApi(
+      client: MockClient((_) async => fail('no HTTPS')),
+      baseUrl: 'https://edge.example',
+      useWire: () async => true,
+      useServerSignIn: () async => true,
+      identity: () async => identity,
+      wire:
+          ({
+            required sessionJson,
+            required name,
+            semester,
+            required args,
+            dictionary,
+            account,
+            secret = false,
+            timeout,
+          }) {
+            expect(sessionJson, isEmpty);
+            sent.add((name, secret, jsonDecode(args['body']!)));
+            return wire();
+          },
+    );
+
+    test("the phone's own sign-in goes on a forward-secret session", () async {
+      final sent = <(String, bool, Object?)>[];
+      final outcome = await api(
+        sent,
+        () async => answer(200, {
+          'status': 'ok',
+          'session': {'cookies': 'JSESSIONID=s'},
+        }),
+      ).login('23BCE7000', 'pw');
+      expect(outcome, isA<ServerSignedIn>());
+      expect(outcome.session.cookies, 'JSESSIONID=s');
+      final (name, secret, body) = sent.single;
+      expect((name, secret), ('/v1/vtop/login', true));
+      expect(body, {'username': '23BCE7000', 'password': 'pw'});
+    });
+
+    test('the server signs in with its saved password', () async {
+      final sent = <(String, bool, Object?)>[];
+      final session = await api(
+        sent,
+        () async => answer(200, {
+          'status': 'ok',
+          'session': {'cookies': 'JSESSIONID=s'},
+        }),
+      ).loginOnServer();
+      expect(session?.cookies, 'JSESSIONID=s');
+      final (name, secret, body) = sent.single;
+      expect((name, secret), ('/v1/app/login', true));
+      expect(body, {'registrationNumber': '23BCE7000', 'appSecret': 'vta_x'});
+    });
+
+    test('without a saved password the phone signs in as usual', () async {
+      final session = await api(
+        [],
+        () async => answer(409, {'code': 'no_saved_credentials'}),
+      ).loginOnServer();
+      expect(session, isNull);
+    });
+
+    test('an unlinked phone does not ask', () async {
+      final sent = <(String, bool, Object?)>[];
+      expect(
+        await api(
+          sent,
+          () async => fail('no UDP'),
+          identity: null,
+        ).loginOnServer(),
+        isNull,
+      );
+      expect(sent, isEmpty);
+    });
+
+    test('a rejected password is not tried again', () async {
+      await expectLater(
+        api(
+          [],
+          () async => answer(401, {'code': 'invalid_credentials'}),
+        ).loginOnServer(),
+        throwsA(const VtopError.invalidCredentials()),
+      );
+    });
+
+    test('a sign-in that timed out is not tried over HTTPS', () async {
+      await expectLater(
+        api(
+          [],
+          () async => throw const WireFetchError.timeout(),
+        ).login('U', 'pw'),
+        throwsA(isA<VtopError_VtopUnavailable>()),
+      );
+    });
+  });
+
+  group('server sign-in in the fetch', () {
+    ServerVtopApi api({
+      required bool serverSignIn,
+      required List<String?> sent,
+      required List<SessionState> adopted,
+    }) => ServerVtopApi(
+      client: MockClient((_) async => fail('no HTTPS')),
+      baseUrl: 'https://edge.example',
+      useWire: () async => true,
+      useServerSignIn: () async => serverSignIn,
+      identity: () async =>
+          (appSecret: 'vta_x', registrationNumber: '23BCE7000'),
+      onSession: (session) async => adopted.add(session),
+      wire:
+          ({
+            required sessionJson,
+            required name,
+            semester,
+            required args,
+            dictionary,
+            account,
+            secret = false,
+            timeout,
+          }) async {
+            sent.add(account);
+            return WirePage(
+              status: 200,
+              packed: false,
+              body: Uint8List.fromList(utf8.encode('{"data":{"ok":true}}')),
+              elapsedMs: 1,
+              handshake: false,
+              wireBytes: 1,
+              session: account == null ? null : '{"cookies":"JSESSIONID=new"}',
+            );
+          },
+    );
+
+    test(
+      'the account goes with the page; a renewed session is taken',
+      () async {
+        final sent = <String?>[];
+        final adopted = <SessionState>[];
+        final data = await api(
+          serverSignIn: true,
+          sent: sent,
+          adopted: adopted,
+        ).fetch(session: _session, name: 'marks');
+        expect(data, {'ok': true});
+        expect(jsonDecode(sent.single!), {
+          'registrationNumber': '23BCE7000',
+          'appSecret': 'vta_x',
+        });
+        expect(adopted.single.cookies, 'JSESSIONID=new');
+      },
+    );
+
+    test('with server sign-in off nothing of the account goes', () async {
+      final sent = <String?>[];
+      final adopted = <SessionState>[];
+      final server = api(serverSignIn: false, sent: sent, adopted: adopted);
+      await server.fetch(session: _session, name: 'marks');
+      expect(sent, [null]);
+      expect(adopted, isEmpty);
+      expect(await server.loginOnServer(), isNull);
+      expect(sent, [null], reason: 'no sign-in by the server was asked');
+    });
+  });
+
+  test('server sign-in goes over HTTPS when UDP mode is off', () async {
+    final asked = <String>[];
+    final api = ServerVtopApi(
+      client: MockClient((request) async {
+        asked.add(request.url.path);
+        return http.Response(
+          '{"status":"ok","session":{"cookies":"JSESSIONID=s"}}',
+          200,
+        );
+      }),
+      baseUrl: 'https://edge.example',
+      useServerSignIn: () async => true,
+      identity: () async =>
+          (appSecret: 'vta_x', registrationNumber: '23BCE7000'),
+    );
+    expect((await api.loginOnServer())?.cookies, 'JSESSIONID=s');
+    expect(asked, ['/v1/app/login']);
   });
 }

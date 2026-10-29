@@ -5,7 +5,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/app/settings.dart';
-import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/edge/server_status.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
@@ -13,8 +12,6 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/server/widgets/icon_box.dart';
 import 'package:vitapmate/features/server/widgets/server_format.dart';
 import 'package:vitapmate/features/server/widgets/status_card.dart';
-import 'package:vitapmate/features/server/widgets/udp_mode_tile.dart';
-import 'package:vitapmate/features/server/widgets/vtop_mode_picker.dart';
 
 /// Where the Server page lives; Connected apps' old route goes here too.
 const serverPagePath = '/settings/server';
@@ -59,7 +56,6 @@ class ServerPage extends ConsumerWidget {
     final status = ref.watch(serverStatusProvider).value;
     final url = ref.watch(serverUrlProvider);
     final isDefault = ref.read(serverUrlProvider.notifier).isDefault;
-    final mode = ref.watch(vtopModeProvider);
 
     FTile row(
       String title,
@@ -80,16 +76,6 @@ class ServerPage extends ConsumerWidget {
       children: [
         const SizedBox(height: Space.md),
         ServerStatusCard(linked: linked),
-        const SectionHeader(title: 'VTOP'),
-        const VtopModePicker(),
-        ServerNote(switch (mode) {
-          .off => 'Nothing about VTOP goes through the server.',
-          .compress =>
-            'VTOP\'s pages reach the phone compressed through the server.',
-          .server =>
-            'Your password goes to the server for each sign-in and is not kept; nor is the session. Outing requests and file downloads still go from the phone. If the server is down, the phone fetches itself.',
-        }),
-        if (mode == .server) const UdpModeTile(),
         const SectionHeader(title: 'Apps and phones'),
         FTileGroup(
           divider: .indented,

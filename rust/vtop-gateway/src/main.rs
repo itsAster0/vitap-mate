@@ -4,7 +4,7 @@
 //! next to an engine elsewhere.
 //!
 //! Environment: `ENGINE_URL` (the engine's base URL), `BRIDGE_SECRET` (the
-//! engine's relay secret, as the edge holds it), and `GATEWAY_KEY`, `BIND`
+//! engine's relay secret, as the edge holds it), `EDGE_URL`, and `GATEWAY_KEY`, `BIND`
 //! and `PORTS` as [`vtop_gateway::bind_from_env`] reads them. The key's
 //! public half goes into the app build (`VTOP_UDP_KEY`) and is logged at
 //! start.
@@ -29,11 +29,11 @@ async fn main() {
         .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .init();
     let var = |name: &str| std::env::var(name).map_err(|_| format!("{name} is not set"));
-    let bound = match (var("ENGINE_URL"), var("BRIDGE_SECRET")) {
-        (Ok(url), Ok(secret)) => bind_from_env(url, secret)
+    let bound = match (var("ENGINE_URL"), var("BRIDGE_SECRET"), var("EDGE_URL")) {
+        (Ok(url), Ok(secret), Ok(edge)) => bind_from_env(url, secret, edge)
             .await
             .unwrap_or_else(|| Err("GATEWAY_KEY is not set".into())),
-        (Err(e), _) | (_, Err(e)) => Err(e),
+        (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
     };
     match bound {
         Ok((config, sockets)) => run(config, sockets).await,

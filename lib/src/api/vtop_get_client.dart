@@ -24,44 +24,61 @@ Future<VtopClient> getVtopClient({
   baseUrl: baseUrl,
 );
 
-Future<void> vtopClientLogin({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientVtopClientLogin(client: client);
+Future<void> vtopClientLogin({required VtopClient client, String? flow}) =>
+    RustLib.instance.api.crateApiVtopGetClientVtopClientLogin(
+      client: client,
+      flow: flow,
+    );
 
 Future<void> vtopClientSubmitSecurityOtp({
   required VtopClient client,
   required String otpCode,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientVtopClientSubmitSecurityOtp(
   client: client,
   otpCode: otpCode,
+  flow: flow,
 );
 
-Future<void> vtopClientResendSecurityOtp({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientVtopClientResendSecurityOtp(
-      client: client,
-    );
+Future<void> vtopClientResendSecurityOtp({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientVtopClientResendSecurityOtp(
+  client: client,
+  flow: flow,
+);
 
 String vtopClientRegistrationNumber({required VtopClient client}) => RustLib
     .instance
     .api
     .crateApiVtopGetClientVtopClientRegistrationNumber(client: client);
 
-Future<SemesterData> fetchSemesters({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchSemesters(client: client);
+Future<SemesterData> fetchSemesters({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchSemesters(
+  client: client,
+  flow: flow,
+);
 
 Future<AttendanceData> fetchAttendance({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchAttendance(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<BiometricData> fetchBiometricHistory({
   required VtopClient client,
   required String date,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchBiometricHistory(
   client: client,
   date: date,
+  flow: flow,
 );
 
 Future<FullAttendanceData> fetchFullAttendance({
@@ -69,81 +86,114 @@ Future<FullAttendanceData> fetchFullAttendance({
   required String semesterId,
   required String courseId,
   required String courseType,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchFullAttendance(
   client: client,
   semesterId: semesterId,
   courseId: courseId,
   courseType: courseType,
+  flow: flow,
 );
 
 Future<TimetableData> fetchTimetable({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchTimetable(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<MarksData> fetchMarks({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchMarks(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<ExamScheduleData> fetchExamSchedule({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchExamSchedule(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<AcademicCalendarData> fetchAcademicCalendar({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchAcademicCalendar(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<GradeViewData> fetchGradeView({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchGradeView(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 Future<GradeDetailsData> fetchGradeViewDetails({
   required VtopClient client,
   required String semesterId,
   required String courseId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchGradeViewDetails(
   client: client,
   semesterId: semesterId,
   courseId: courseId,
+  flow: flow,
 );
 
-Future<GradeHistoryData> fetchGradeHistory({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchGradeHistory(client: client);
+Future<GradeHistoryData> fetchGradeHistory({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchGradeHistory(
+  client: client,
+  flow: flow,
+);
 
-Future<StudentProfile> fetchProfile({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchProfile(client: client);
+Future<StudentProfile> fetchProfile({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchProfile(
+  client: client,
+  flow: flow,
+);
 
-Future<MentorData> fetchMentor({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchMentor(client: client);
-
-Future<GeneralOutingData> fetchGeneralOuting({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchGeneralOuting(
+Future<MentorData> fetchMentor({required VtopClient client, String? flow}) =>
+    RustLib.instance.api.crateApiVtopGetClientFetchMentor(
       client: client,
+      flow: flow,
     );
 
-Future<WeekendOutingData> fetchWeekendOuting({required VtopClient client}) =>
-    RustLib.instance.api.crateApiVtopGetClientFetchWeekendOuting(
-      client: client,
-    );
+Future<GeneralOutingData> fetchGeneralOuting({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchGeneralOuting(
+  client: client,
+  flow: flow,
+);
+
+Future<WeekendOutingData> fetchWeekendOuting({
+  required VtopClient client,
+  String? flow,
+}) => RustLib.instance.api.crateApiVtopGetClientFetchWeekendOuting(
+  client: client,
+  flow: flow,
+);
 
 /// Dates are `DD-Mon-YYYY` (`11-Oct-2026`); times are 24-hour.
 Future<OutingApplyResult> applyGeneralOuting({
@@ -156,6 +206,7 @@ Future<OutingApplyResult> applyGeneralOuting({
   required String inDate,
   required int inHour,
   required int inMinute,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientApplyGeneralOuting(
   client: client,
   place: place,
@@ -166,6 +217,7 @@ Future<OutingApplyResult> applyGeneralOuting({
   inDate: inDate,
   inHour: inHour,
   inMinute: inMinute,
+  flow: flow,
 );
 
 /// `place` and `time_slot` are option values from [`WeekendOutingData`].
@@ -176,6 +228,7 @@ Future<OutingApplyResult> applyWeekendOuting({
   required String date,
   required String timeSlot,
   required String contactNumber,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientApplyWeekendOuting(
   client: client,
   place: place,
@@ -183,24 +236,29 @@ Future<OutingApplyResult> applyWeekendOuting({
   date: date,
   timeSlot: timeSlot,
   contactNumber: contactNumber,
+  flow: flow,
 );
 
 /// Cancels a general outing request while VTOP still allows it.
 Future<OutingCancelResult> cancelGeneralOuting({
   required VtopClient client,
   required String leaveId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientCancelGeneralOuting(
   client: client,
   leaveId: leaveId,
+  flow: flow,
 );
 
 /// Cancels a weekend outing request while VTOP still allows it.
 Future<OutingCancelResult> cancelWeekendOuting({
   required VtopClient client,
   required String bookingId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientCancelWeekendOuting(
   client: client,
   bookingId: bookingId,
+  flow: flow,
 );
 
 /// The PDF pass of an accepted outing.
@@ -208,19 +266,23 @@ Future<Uint8List> fetchOutingPass({
   required VtopClient client,
   required bool weekend,
   required String passId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchOutingPass(
   client: client,
   weekend: weekend,
   passId: passId,
+  flow: flow,
 );
 
 /// The courses the student is registered for in [semester_id].
 Future<CoursePageCourses> fetchCoursePageCourses({
   required VtopClient client,
   required String semesterId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageCourses(
   client: client,
   semesterId: semesterId,
+  flow: flow,
 );
 
 /// Every class (section) of a course, with its slot and faculty.
@@ -228,10 +290,12 @@ Future<CoursePageClasses> fetchCoursePageClasses({
   required VtopClient client,
   required String semesterId,
   required String courseId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageClasses(
   client: client,
   semesterId: semesterId,
   courseId: courseId,
+  flow: flow,
 );
 
 /// A class's lecture plan and downloads.
@@ -240,11 +304,13 @@ Future<CoursePageDetail> fetchCoursePageDetail({
   required String semesterId,
   required String erpId,
   required String classId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePageDetail(
   client: client,
   semesterId: semesterId,
   erpId: erpId,
   classId: classId,
+  flow: flow,
 );
 
 /// The name and type of a course page download (lecture material,
@@ -252,9 +318,11 @@ Future<CoursePageDetail> fetchCoursePageDetail({
 Future<CourseFileInfo> fetchCourseFileInfo({
   required VtopClient client,
   required String path,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchCourseFileInfo(
   client: client,
   path: path,
+  flow: flow,
 );
 
 /// The name and type of a class's course plan (Excel).
@@ -262,10 +330,12 @@ Future<CourseFileInfo> fetchCoursePlanInfo({
   required VtopClient client,
   required String semesterId,
   required String classId,
+  String? flow,
 }) => RustLib.instance.api.crateApiVtopGetClientFetchCoursePlanInfo(
   client: client,
   semesterId: semesterId,
   classId: classId,
+  flow: flow,
 );
 
 Future<Uint8List> fetchCookies({required VtopClient client}) =>

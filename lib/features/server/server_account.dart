@@ -258,6 +258,20 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
   Future<void> updateSettings(BridgeSettings settings) =>
       _apply(() => _api.updateSettings(settings));
 
+  /// Saves [choice]: the password is sealed first when the server is to
+  /// sign in (needs OTP forwarding or Gmail), and forgotten for
+  /// [SignInChoice.phone].
+  Future<void> setSignIn(SignInChoice choice) async {
+    if (choice == .phone) return setServerSignIn(false);
+    if (!(state.value?.savedCredentials ?? false)) await setServerSignIn(true);
+    await updateSettings(
+      BridgeSettings(
+        alwaysUseVault: choice == .server,
+        phoneWaitSecs: choice == .wait10 ? 10 : 20,
+      ),
+    );
+  }
+
   Future<void> deleteData() => _kept(() async {
     await _api.deleteAccount();
     final prefs = await ref.read(settingsProvider.future);
@@ -267,6 +281,19 @@ class ServerAccount extends AsyncNotifier<BridgeAccount> {
     ref.invalidate(settingsProvider);
     await _reload();
   });
+}
+
+/// Who signs in to VTOP when connected apps need a session, and whether
+/// the server signs in for this phone when it fetches on the server: one
+/// choice, kept on the server with the sealed password.
+enum SignInChoice { phone, wait10, wait20, server }
+
+/// [account]'s choice: [SignInChoice.phone] when it keeps no password.
+SignInChoice signInChoice(BridgeAccount? account) {
+  if (!(account?.savedCredentials ?? false)) return .phone;
+  final settings = account!.settings;
+  if (settings.alwaysUseVault) return .server;
+  return settings.phoneWaitSecs <= 10 ? .wait10 : .wait20;
 }
 
 final serverAccountProvider =

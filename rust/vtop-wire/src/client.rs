@@ -43,6 +43,10 @@ pub struct ClientConfig {
     pub ports: Vec<u16>,
     pub server_key: [u8; 32],
     pub state_dir: PathBuf,
+    /// Whether a new session's request may ride in handshake message 1,
+    /// saving a round trip. Message 1 is not forward-secret (a leaked
+    /// gateway key would open recorded ones), so a secret goes after it.
+    pub request_in_handshake: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -129,10 +133,14 @@ pub async fn fetch(
         .as_mut()
         .and_then(Slot::read)
         .filter(|s| now_ms().saturating_sub(s.created_ms) < REKEY.as_millis() as u64);
-    let mut result = run.exchange(body, saved, slot.as_mut()).await;
+    let in_handshake = cfg.request_in_handshake;
+    let mut result = match saved {
+        Some(saved) => run.exchange(body, Some(saved), slot.as_mut()).await,
+        None => run.fresh(body, in_handshake, slot.as_mut()).await,
+    };
     if matches!(result, Err(Outcome::Reset)) {
         // The gateway forgot the session (it restarted): handshake now.
-        result = run.exchange(body, None, slot.as_mut()).await;
+        result = run.fresh(body, in_handshake, slot.as_mut()).await;
     }
     let _ = write_atomic(&profile, run.link.format().as_bytes());
     match result {
@@ -569,6 +577,33 @@ impl Run<'_> {
         self.link.observe(lost_events, sent_events);
         saved.next_ctr = reserved_end.max(ctr);
         Ok((response, saved, new_session))
+    }
+
+    /// [`Self::exchange`] on a new session, the request in message 1 or,
+    /// unless `in_handshake`, after the handshake.
+    async fn fresh(
+        &mut self,
+        body: &[u8],
+        in_handshake: bool,
+        slot: Option<&mut Slot>,
+    ) -> Result<(Vec<u8>, Saved, bool), Outcome> {
+        if in_handshake {
+            return self.exchange(body, None, slot).await;
+        }
+        // An empty request: the gateway sets up the session and runs nothing.
+        let (mut early, mut hs2_at, mut lost, mut sent) = (Vec::new(), None, 0, 0);
+        let (_, saved) = self
+            .handshake(
+                &[],
+                crate::rand::u16(),
+                &mut early,
+                &mut hs2_at,
+                &mut lost,
+                &mut sent,
+            )
+            .await?;
+        let (response, saved, _) = self.exchange(body, Some(saved), slot).await?;
+        Ok((response, saved, true))
     }
 
     /// Noise IK; message 1 carries a timestamp and the request. Tries the

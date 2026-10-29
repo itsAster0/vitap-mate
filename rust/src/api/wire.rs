@@ -36,6 +36,8 @@ pub struct WirePage {
     pub handshake: bool,
     /// Bytes on the wire, both ways, IP headers included.
     pub wire_bytes: u32,
+    /// The session the gateway renewed for this page; use it from now on.
+    pub session: Option<String>,
 }
 
 pub enum WireFetchError {
@@ -48,6 +50,12 @@ pub enum WireFetchError {
     Failed(String),
 }
 
+/// One request to the gateway: a page on `session_json`'s session, or with
+/// `session_json` empty a request that needs none (a server sign-in). A
+/// `secret` request goes only on a forward-secret session, after the
+/// handshake rather than in it. `account_json` (`/v1/app/login`'s body)
+/// goes with the session, so the gateway can renew it in the fetch; it is
+/// secret too.
 #[allow(clippy::too_many_arguments)]
 pub async fn wire_fetch_page(
     config: WireConfig,
@@ -56,6 +64,8 @@ pub async fn wire_fetch_page(
     semester: Option<String>,
     args: Vec<(String, String)>,
     dictionary: Option<String>,
+    account_json: Option<String>,
+    secret: bool,
     timeout_ms: u32,
 ) -> Result<WirePage, WireFetchError> {
     let server_key: [u8; 32] = vtop_wire::unhex(&config.server_key)
@@ -69,6 +79,7 @@ pub async fn wire_fetch_page(
         ports: config.ports,
         server_key,
         state_dir: state_dir.clone(),
+        request_in_handshake: !secret && account_json.is_none(),
     };
     let hash = session_hash(&session_json);
     let mut request = WirePageRequest {
@@ -77,12 +88,18 @@ pub async fn wire_fetch_page(
         args: args.into_iter().collect(),
         dictionary,
         session_hash: hash,
-        session: (!gateway_has(&state_dir, hash)).then(|| session_json.clone()),
+        session: (!session_json.is_empty() && !gateway_has(&state_dir, hash))
+            .then(|| session_json.clone()),
+        account: None,
     };
+    if request.session.is_some() {
+        request.account = account_json.clone();
+    }
     let deadline = std::time::Instant::now() + Duration::from_millis(timeout_ms as u64);
     let (mut page, mut stats) = send(&cfg, &request, deadline).await?;
-    if page.status == NEED_SESSION && request.session.is_none() {
+    if page.status == NEED_SESSION && request.session.is_none() && !session_json.is_empty() {
         request.session = Some(session_json);
+        request.account = account_json;
         let (again, more) = send(&cfg, &request, deadline).await?;
         page = again;
         stats.0 += more.0;
@@ -91,6 +108,9 @@ pub async fn wire_fetch_page(
     if request.session.is_some() && page.status < 500 && page.status != NEED_SESSION {
         remember_sent(&state_dir, hash);
     }
+    if let Some(renewed) = &page.session {
+        remember_sent(&state_dir, session_hash(renewed));
+    }
     Ok(WirePage {
         status: page.status,
         packed: page.packed,
@@ -98,6 +118,7 @@ pub async fn wire_fetch_page(
         elapsed_ms: stats.0,
         handshake: stats.1,
         wire_bytes: stats.2,
+        session: page.session,
     })
 }
 

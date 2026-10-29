@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:vitapmate/observability/app_log.dart';
 import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/vtop/users/saved_credentials.dart';
 import 'package:vitapmate/vtop/edge/credentials_rejected.dart';
@@ -43,7 +44,9 @@ Future<void> main() async {
     ..on(credentialsRejectedType, handleCredentialsRejectedEvent)
     ..start();
 
-  runApp(const ProviderScope(child: MyApp()));
+  runApp(
+    const ProviderScope(observers: [LogProviderFailures()], child: MyApp()),
+  );
 }
 
 class MyApp extends HookConsumerWidget {
@@ -89,6 +92,8 @@ class MyApp extends HookConsumerWidget {
       });
       return null;
     }, []);
+
+    useEffect(() => logAppEvents(goRouter), [goRouter]);
 
     final themeMode = ref.watch(themeProvider);
 

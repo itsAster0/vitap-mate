@@ -188,7 +188,10 @@ class Step2 extends HookConsumerWidget {
     Future<void> getSemData() async {
       fetching.value = true;
       try {
-        data.value = await fetchSemesters(client: _globalClient);
+        data.value = await flow(
+          'onboarding semesters',
+          () => fetchSemesters(client: _globalClient, flow: currentFlow),
+        );
       } catch (e) {
         if (context.mounted) disOnboardingCommonToast(context, e);
       } finally {

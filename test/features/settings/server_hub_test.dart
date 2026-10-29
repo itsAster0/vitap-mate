@@ -92,17 +92,8 @@ void main() {
 
     testWidgets('every area has a row', (tester) async {
       await pump(tester, prefs: linked);
-      // The VTOP mode is one row until opened, then every mode.
-      expect(find.text('Phone only'), findsOneWidget);
-      expect(find.text('Fetch on the server'), findsNothing);
-      await tester.tap(find.text('Phone only'));
-      await tester.pumpAndSettle();
-      for (final mode in [
-        'Compress through the server',
-        'Fetch on the server',
-      ]) {
-        expect(find.text(mode), findsOneWidget, reason: mode);
-      }
+      // The VTOP route moved to Settings → Connection → Advanced.
+      expect(find.text('Phone only'), findsNothing);
       for (final title in [
         'Connected apps',
         'Linked phones',

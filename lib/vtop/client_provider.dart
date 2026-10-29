@@ -74,6 +74,14 @@ class VClient extends _$VClient {
     );
   }
 
+  /// A session the server made for this phone (renewed in a fetch): used
+  /// from now on and saved like a sign-in's.
+  Future<void> adoptSession(SessionState session) async {
+    final client = await future;
+    vtopClientResumeSession(client: client, session: session);
+    await _persistCurrentSession(client, 'server renewal');
+  }
+
   Future<void> _persistCurrentSession(
     VtopClient client,
     String flowLabel,

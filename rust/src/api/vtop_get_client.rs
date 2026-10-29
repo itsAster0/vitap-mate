@@ -10,6 +10,7 @@ use vtop_core::inputs::{
     OutingTime, Password, SemesterId, Username,
 };
 
+use crate::api::native_logs::in_flow;
 use crate::api::vtop::{
     types::{
         AcademicCalendarData, AttendanceData, BiometricData, CourseFileInfo, CoursePageClasses,
@@ -59,21 +60,31 @@ fn build_vtop_client(
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn vtop_client_login(client: &mut VtopClient) -> Result<(), VtopError> {
-    client.inner.login().await
+pub async fn vtop_client_login(
+    client: &mut VtopClient,
+    flow: Option<String>,
+) -> Result<(), VtopError> {
+    in_flow(flow, async { client.inner.login().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn vtop_client_submit_security_otp(
     client: &mut VtopClient,
     otp_code: String,
+    flow: Option<String>,
 ) -> Result<(), VtopError> {
-    client.inner.submit_security_otp(&otp_code).await
+    in_flow(flow, async {
+        client.inner.submit_security_otp(&otp_code).await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn vtop_client_resend_security_otp(client: &mut VtopClient) -> Result<(), VtopError> {
-    client.inner.resend_security_otp().await
+pub async fn vtop_client_resend_security_otp(
+    client: &mut VtopClient,
+    flow: Option<String>,
+) -> Result<(), VtopError> {
+    in_flow(flow, async { client.inner.resend_security_otp().await }).await
 }
 
 #[flutter_rust_bridge::frb(sync)]
@@ -82,30 +93,41 @@ pub fn vtop_client_registration_number(client: &VtopClient) -> Result<String, Vt
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_semesters(client: &VtopClient) -> Result<SemesterData, VtopError> {
-    client.inner.semesters().await
+pub async fn fetch_semesters(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<SemesterData, VtopError> {
+    in_flow(flow, async { client.inner.semesters().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_attendance(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<AttendanceData, VtopError> {
-    client
-        .inner
-        .attendance(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .attendance(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_biometric_history(
     client: &VtopClient,
     date: String,
+    flow: Option<String>,
 ) -> Result<BiometricData, VtopError> {
-    client
-        .inner
-        .biometric_history(&BiometricDate::parse(&date)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .biometric_history(&BiometricDate::parse(&date)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
@@ -114,64 +136,91 @@ pub async fn fetch_full_attendance(
     semester_id: String,
     course_id: String,
     course_type: String,
+    flow: Option<String>,
 ) -> Result<FullAttendanceData, VtopError> {
-    client
-        .inner
-        .full_attendance(
-            &SemesterId::parse(&semester_id)?,
-            &CourseId::parse(&course_id)?,
-            &CourseType::parse(&course_type)?,
-        )
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .full_attendance(
+                &SemesterId::parse(&semester_id)?,
+                &CourseId::parse(&course_id)?,
+                &CourseType::parse(&course_type)?,
+            )
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_timetable(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<TimetableData, VtopError> {
-    client
-        .inner
-        .timetable(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .timetable(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_marks(client: &VtopClient, semester_id: String) -> Result<MarksData, VtopError> {
-    client.inner.marks(&SemesterId::parse(&semester_id)?).await
+pub async fn fetch_marks(
+    client: &VtopClient,
+    semester_id: String,
+    flow: Option<String>,
+) -> Result<MarksData, VtopError> {
+    in_flow(flow, async {
+        client.inner.marks(&SemesterId::parse(&semester_id)?).await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_exam_schedule(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<ExamScheduleData, VtopError> {
-    client
-        .inner
-        .exam_schedule(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .exam_schedule(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_academic_calendar(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<AcademicCalendarData, VtopError> {
-    client
-        .inner
-        .academic_calendar(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .academic_calendar(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
 pub async fn fetch_grade_view(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<GradeViewData, VtopError> {
-    client
-        .inner
-        .grade_view(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .grade_view(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
@@ -179,39 +228,58 @@ pub async fn fetch_grade_view_details(
     client: &VtopClient,
     semester_id: String,
     course_id: String,
+    flow: Option<String>,
 ) -> Result<GradeDetailsData, VtopError> {
-    client
-        .inner
-        .grade_view_details(
-            &SemesterId::parse(&semester_id)?,
-            &CourseId::parse(&course_id)?,
-        )
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .grade_view_details(
+                &SemesterId::parse(&semester_id)?,
+                &CourseId::parse(&course_id)?,
+            )
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_grade_history(client: &VtopClient) -> Result<GradeHistoryData, VtopError> {
-    client.inner.grade_history().await
+pub async fn fetch_grade_history(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<GradeHistoryData, VtopError> {
+    in_flow(flow, async { client.inner.grade_history().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_profile(client: &VtopClient) -> Result<StudentProfile, VtopError> {
-    client.inner.profile().await
+pub async fn fetch_profile(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<StudentProfile, VtopError> {
+    in_flow(flow, async { client.inner.profile().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_mentor(client: &VtopClient) -> Result<MentorData, VtopError> {
-    client.inner.mentor().await
+pub async fn fetch_mentor(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<MentorData, VtopError> {
+    in_flow(flow, async { client.inner.mentor().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_general_outing(client: &VtopClient) -> Result<GeneralOutingData, VtopError> {
-    client.inner.general_outing().await
+pub async fn fetch_general_outing(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<GeneralOutingData, VtopError> {
+    in_flow(flow, async { client.inner.general_outing().await }).await
 }
 
 #[flutter_rust_bridge::frb()]
-pub async fn fetch_weekend_outing(client: &VtopClient) -> Result<WeekendOutingData, VtopError> {
-    client.inner.weekend_outing().await
+pub async fn fetch_weekend_outing(
+    client: &VtopClient,
+    flow: Option<String>,
+) -> Result<WeekendOutingData, VtopError> {
+    in_flow(flow, async { client.inner.weekend_outing().await }).await
 }
 
 /// Dates are `DD-Mon-YYYY` (`11-Oct-2026`); times are 24-hour.
@@ -227,16 +295,20 @@ pub async fn apply_general_outing(
     in_date: String,
     in_hour: u8,
     in_minute: u8,
+    flow: Option<String>,
 ) -> Result<OutingApplyResult, VtopError> {
-    let application = GeneralOutingApplication {
-        place,
-        purpose,
-        out_date: OutingDate::parse(&out_date)?,
-        out_time: OutingTime::new(out_hour, out_minute)?,
-        in_date: OutingDate::parse(&in_date)?,
-        in_time: OutingTime::new(in_hour, in_minute)?,
-    };
-    client.inner.apply_general_outing(&application).await
+    in_flow(flow, async {
+        let application = GeneralOutingApplication {
+            place,
+            purpose,
+            out_date: OutingDate::parse(&out_date)?,
+            out_time: OutingTime::new(out_hour, out_minute)?,
+            in_date: OutingDate::parse(&in_date)?,
+            in_time: OutingTime::new(in_hour, in_minute)?,
+        };
+        client.inner.apply_general_outing(&application).await
+    })
+    .await
 }
 
 /// `place` and `time_slot` are option values from [`WeekendOutingData`].
@@ -248,15 +320,19 @@ pub async fn apply_weekend_outing(
     date: String,
     time_slot: String,
     contact_number: String,
+    flow: Option<String>,
 ) -> Result<OutingApplyResult, VtopError> {
-    let application = WeekendOutingApplication {
-        place,
-        purpose,
-        date: OutingDate::parse(&date)?,
-        time_slot,
-        contact_number: ContactNumber::parse(&contact_number)?,
-    };
-    client.inner.apply_weekend_outing(&application).await
+    in_flow(flow, async {
+        let application = WeekendOutingApplication {
+            place,
+            purpose,
+            date: OutingDate::parse(&date)?,
+            time_slot,
+            contact_number: ContactNumber::parse(&contact_number)?,
+        };
+        client.inner.apply_weekend_outing(&application).await
+    })
+    .await
 }
 
 /// Cancels a general outing request while VTOP still allows it.
@@ -264,11 +340,15 @@ pub async fn apply_weekend_outing(
 pub async fn cancel_general_outing(
     client: &VtopClient,
     leave_id: String,
+    flow: Option<String>,
 ) -> Result<OutingCancelResult, VtopError> {
-    client
-        .inner
-        .cancel_general_outing(&OutingPassId::parse(&leave_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .cancel_general_outing(&OutingPassId::parse(&leave_id)?)
+            .await
+    })
+    .await
 }
 
 /// Cancels a weekend outing request while VTOP still allows it.
@@ -276,11 +356,15 @@ pub async fn cancel_general_outing(
 pub async fn cancel_weekend_outing(
     client: &VtopClient,
     booking_id: String,
+    flow: Option<String>,
 ) -> Result<OutingCancelResult, VtopError> {
-    client
-        .inner
-        .cancel_weekend_outing(&OutingPassId::parse(&booking_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .cancel_weekend_outing(&OutingPassId::parse(&booking_id)?)
+            .await
+    })
+    .await
 }
 
 /// The PDF pass of an accepted outing.
@@ -289,16 +373,20 @@ pub async fn fetch_outing_pass(
     client: &VtopClient,
     weekend: bool,
     pass_id: String,
+    flow: Option<String>,
 ) -> Result<Vec<u8>, VtopError> {
-    let kind = if weekend {
-        OutingKind::Weekend
-    } else {
-        OutingKind::General
-    };
-    client
-        .inner
-        .outing_pass(kind, &OutingPassId::parse(&pass_id)?)
-        .await
+    in_flow(flow, async {
+        let kind = if weekend {
+            OutingKind::Weekend
+        } else {
+            OutingKind::General
+        };
+        client
+            .inner
+            .outing_pass(kind, &OutingPassId::parse(&pass_id)?)
+            .await
+    })
+    .await
 }
 
 /// The courses the student is registered for in [semester_id].
@@ -306,11 +394,15 @@ pub async fn fetch_outing_pass(
 pub async fn fetch_course_page_courses(
     client: &VtopClient,
     semester_id: String,
+    flow: Option<String>,
 ) -> Result<CoursePageCourses, VtopError> {
-    client
-        .inner
-        .course_page_courses(&SemesterId::parse(&semester_id)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .course_page_courses(&SemesterId::parse(&semester_id)?)
+            .await
+    })
+    .await
 }
 
 /// Every class (section) of a course, with its slot and faculty.
@@ -319,11 +411,15 @@ pub async fn fetch_course_page_classes(
     client: &VtopClient,
     semester_id: String,
     course_id: String,
+    flow: Option<String>,
 ) -> Result<CoursePageClasses, VtopError> {
-    client
-        .inner
-        .course_page_classes(&SemesterId::parse(&semester_id)?, &course_id)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .course_page_classes(&SemesterId::parse(&semester_id)?, &course_id)
+            .await
+    })
+    .await
 }
 
 /// A class's lecture plan and downloads.
@@ -333,11 +429,15 @@ pub async fn fetch_course_page_detail(
     semester_id: String,
     erp_id: String,
     class_id: String,
+    flow: Option<String>,
 ) -> Result<CoursePageDetail, VtopError> {
-    client
-        .inner
-        .course_page_detail(&SemesterId::parse(&semester_id)?, &erp_id, &class_id)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .course_page_detail(&SemesterId::parse(&semester_id)?, &erp_id, &class_id)
+            .await
+    })
+    .await
 }
 
 /// The name and type of a course page download (lecture material,
@@ -346,11 +446,15 @@ pub async fn fetch_course_page_detail(
 pub async fn fetch_course_file_info(
     client: &VtopClient,
     path: String,
+    flow: Option<String>,
 ) -> Result<CourseFileInfo, VtopError> {
-    client
-        .inner
-        .course_page_file_info(&CourseFilePath::parse(&path)?)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .course_page_file_info(&CourseFilePath::parse(&path)?)
+            .await
+    })
+    .await
 }
 
 /// The name and type of a class's course plan (Excel).
@@ -359,11 +463,15 @@ pub async fn fetch_course_plan_info(
     client: &VtopClient,
     semester_id: String,
     class_id: String,
+    flow: Option<String>,
 ) -> Result<CourseFileInfo, VtopError> {
-    client
-        .inner
-        .course_plan_info(&SemesterId::parse(&semester_id)?, &class_id)
-        .await
+    in_flow(flow, async {
+        client
+            .inner
+            .course_plan_info(&SemesterId::parse(&semester_id)?, &class_id)
+            .await
+    })
+    .await
 }
 
 #[flutter_rust_bridge::frb()]

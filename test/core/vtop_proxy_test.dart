@@ -35,6 +35,8 @@ void main() {
       vtopModeFrom(saved: 'server', oldProxy: true),
       VtopServerMode.server,
     );
-    expect(vtopModeFrom(saved: 'nonsense'), VtopServerMode.off);
+    // Nothing chosen yet: compressed through the server.
+    expect(vtopModeFrom(saved: 'nonsense'), VtopServerMode.compress);
+    expect(vtopModeFrom(), VtopServerMode.compress);
   });
 }

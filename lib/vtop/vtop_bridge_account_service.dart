@@ -4,12 +4,29 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/vtop/edge/edge_device.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 
 const bridgeLinkedSettingKey = 'settings_bridge_linked';
+
+/// The server keeps this phone's password and signs in with it: for
+/// connected apps, and for this phone itself when it fetches on the server.
 const bridgeServerSignInSettingKey = 'settings_bridge_server_sign_in';
+
+/// [bridgeServerSignInSettingKey] where there is no Ref.
+Future<bool> currentServerSignIn() async {
+  try {
+    return await SharedPreferencesAsync().getBool(
+          bridgeServerSignInSettingKey,
+        ) ??
+        false;
+  } catch (_) {
+    return false;
+  }
+}
+
 const bridgeLastFcmTokenSettingKey = 'settings_bridge_last_fcm_token';
 const bridgeLastSemesterSettingKey = 'settings_bridge_last_semester';
 

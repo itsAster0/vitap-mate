@@ -1,8 +1,9 @@
-/// The app's one log: JSON lines in `logs/app.log` on the phone, rolled over
-/// to `app.log.1` past [Log.maxBytes], next to Rust's `logs/rust.log` (same
-/// format, see `rust/src/api/native_logs.rs`). Every line carries the
-/// [flow] it belongs to and the student's [Log.regno]. Nothing leaves the
-/// phone unless the student copies or saves it.
+/// The app's one log: JSON lines in `logs/app.log` in the app's cache, rolled
+/// over to `app.log.1` past [Log.maxBytes], next to Rust's `logs/rust.log`
+/// (same format, see `rust/src/api/native_logs.rs`). Every line carries the
+/// [flow] it belongs to and the student's [Log.regno]; anything that looks
+/// like a password, OTP, cookie or token is blanked first. Nothing leaves
+/// the phone unless the student copies or saves it.
 library;
 
 import 'dart:async';
@@ -10,6 +11,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 
 enum LogLevel {
   debug(500),
@@ -31,6 +34,10 @@ typedef LogLine = ({
   String message,
   String? flow,
   String? regno,
+
+  /// `step`, `ev` (start, done, failed) and `ms` on a [flow] step's lines;
+  /// `stack` on errors.
+  Map<String, Object?> data,
 });
 
 abstract final class Log {
@@ -39,6 +46,10 @@ abstract final class Log {
 
   static Directory? _dir;
   static RandomAccessFile? _file;
+
+  /// Whether debug lines are written too. Set in Developer → Logs; kept as a
+  /// file beside the log so every isolate sees it.
+  static bool verbose = false;
 
   /// The signed-in student's registration number, once known.
   static String? regno;
@@ -49,6 +60,31 @@ abstract final class Log {
     await dir.create(recursive: true);
     _dir = dir;
     _file = await File('${dir.path}/app.log').open(mode: FileMode.append);
+    verbose = File('${dir.path}/verbose').existsSync();
+  }
+
+  static Future<void> setVerbose(bool on) async {
+    verbose = on;
+    final marker = File('${_dir?.path}/verbose');
+    if (on) {
+      await marker.create();
+    } else if (marker.existsSync()) {
+      await marker.delete();
+    }
+  }
+
+  /// Logs uncaught errors (Flutter's and the isolate's) with their stacks.
+  static void catchUncaught() {
+    final flutter = FlutterError.onError;
+    FlutterError.onError = (details) {
+      error('flutter', details.exceptionAsString(), details.stack);
+      flutter?.call(details);
+    };
+    final platform = PlatformDispatcher.instance.onError;
+    PlatformDispatcher.instance.onError = (exception, stack) {
+      error('uncaught', '$exception', stack);
+      return platform?.call(exception, stack) ?? false;
+    };
   }
 
   static void debug(String source, String message) =>
@@ -57,10 +93,17 @@ abstract final class Log {
       write(.info, source, message);
   static void warn(String source, String message) =>
       write(.warn, source, message);
-  static void error(String source, String message) =>
-      write(.error, source, message);
+  static void error(String source, String message, [StackTrace? stack]) =>
+      write(.error, source, message, {'stack': ?stack?.toString()});
 
-  static void write(LogLevel level, String source, String message) {
+  static void write(
+    LogLevel level,
+    String source,
+    String message, [
+    Map<String, Object?> data = const {},
+  ]) {
+    if (level == .debug && !verbose) return;
+    message = scrub(message);
     developer.log(message, name: source, level: level.value);
     final line = jsonEncode({
       't': DateTime.now().millisecondsSinceEpoch,
@@ -69,6 +112,7 @@ abstract final class Log {
       'msg': message,
       'flow': ?currentFlow,
       'regno': ?regno,
+      if (data.isNotEmpty) 'd': data,
     });
     // Logging never breaks the app: a full disk only loses lines.
     try {
@@ -86,16 +130,30 @@ abstract final class Log {
     _file = File('${dir.path}/app.log').openSync(mode: FileMode.append);
   }
 
+  /// The size of every log file, in bytes.
+  static int get size => [
+    for (final name in _files)
+      if (File('${_dir?.path}/$name') case final file when file.existsSync())
+        file.lengthSync(),
+  ].fold(0, (sum, bytes) => sum + bytes);
+
   /// Every line on the phone, Dart's and Rust's, oldest first.
   static Future<List<LogLine>> read() async {
     final dir = _dir;
     if (dir == null) return const [];
-    final lines = <LogLine>[
+    final lines = [
       for (final name in _files)
         if (File('${dir.path}/$name') case final file when file.existsSync())
           for (final raw in await file.readAsLines()) ?_parse(raw),
-    ]..sort((a, b) => a.time.compareTo(b.time));
-    return lines;
+    ].indexed.toList();
+    // Lines of the same millisecond keep their order in the file.
+    lines.sort(
+      (a, b) => switch (a.$2.time.compareTo(b.$2.time)) {
+        0 => a.$1.compareTo(b.$1),
+        final order => order,
+      },
+    );
+    return [for (final (_, line) in lines) line];
   }
 
   static LogLine? _parse(String raw) {
@@ -112,9 +170,10 @@ abstract final class Log {
           time: DateTime.fromMillisecondsSinceEpoch(t),
           level: level,
           source: source,
-          message: message,
+          message: scrub(message),
           flow: json['flow'] as String?,
           regno: json['regno'] as String?,
+          data: (json['d'] as Map?)?.cast<String, Object?>() ?? const {},
         );
       }
     } on FormatException {
@@ -135,6 +194,15 @@ abstract final class Log {
   }
 }
 
+final _secret = RegExp(
+  r'''((?<![a-z])(?:password|passwd|otp|csrf|cookie|token|secret|authorization|jsessionid|serverid)["']?\s*[:=]\s*["']?)[^\s,;&"'}]+''',
+  caseSensitive: false,
+);
+
+/// [text] with the value after anything like `password=` or `otp:` blanked.
+String scrub(String text) =>
+    text.replaceAllMapped(_secret, (match) => '${match[1]}…');
+
 /// A [Log] with its source fixed, for files that log a lot.
 class SourceLogger {
   const SourceLogger(this.source);
@@ -144,7 +212,8 @@ class SourceLogger {
   void debug(String message) => Log.debug(source, message);
   void info(String message) => Log.info(source, message);
   void warn(String message) => Log.warn(source, message);
-  void error(String message) => Log.error(source, message);
+  void error(String message, [StackTrace? stack]) =>
+      Log.error(source, message, stack);
 }
 
 final _flowKey = Object();
@@ -176,13 +245,23 @@ Future<T> _timed<T>(
   Future<T> Function() body,
 ) async {
   final watch = Stopwatch()..start();
-  Log.info(source, '$name start');
+  Log.write(.info, source, '$name start', {'step': name, 'ev': 'start'});
   try {
     final result = await body();
-    Log.info(source, '$name done ${watch.elapsedMilliseconds}ms');
+    final ms = watch.elapsedMilliseconds;
+    Log.write(.info, source, '$name done ${ms}ms', {
+      'step': name,
+      'ev': 'done',
+      'ms': ms,
+    });
     return result;
   } catch (error) {
-    Log.warn(source, '$name failed ${watch.elapsedMilliseconds}ms: $error');
+    final ms = watch.elapsedMilliseconds;
+    Log.write(.warn, source, '$name failed ${ms}ms: $error', {
+      'step': name,
+      'ev': 'failed',
+      'ms': ms,
+    });
     rethrow;
   }
 }

@@ -6,7 +6,6 @@ import 'package:forui/forui.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
 import 'package:vitapmate/ui/ui.dart';
-import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -22,11 +21,13 @@ import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/features/marks/marks.dart';
 import 'package:vitapmate/features/account/account.dart';
+import 'package:vitapmate/features/settings/connection_page.dart';
+import 'package:vitapmate/vtop/route/connection_profile.dart';
+import 'package:vitapmate/vtop/route/on_device_mode.dart';
+import 'package:vitapmate/features/settings/widgets/icon_tile.dart';
 import 'package:vitapmate/features/settings/widgets/mess_timings_sheet.dart';
 import 'package:vitapmate/features/docs/docs.dart';
 import 'package:vitapmate/vtop/semesters.dart';
-import 'package:vitapmate/vtop/route/on_device_mode.dart';
-import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/platform/update/update_check.dart';
 
 class SettingsPage extends HookConsumerWidget {
@@ -129,7 +130,7 @@ class SettingsPage extends HookConsumerWidget {
             divider: .indented,
             children: [
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.cloudDownload,
                   tone: colors.app.accentTone,
                 ),
@@ -150,7 +151,7 @@ class SettingsPage extends HookConsumerWidget {
               ),
               if (showEmailOtp.value) ...[
                 FTile(
-                  prefix: _IconTile(
+                  prefix: IconTile(
                     icon: FLucideIcons.mail,
                     tone: colors.app.warning,
                   ),
@@ -174,7 +175,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
                 if (isGmailOtpReady.value)
                   FTile(
-                    prefix: _IconTile(
+                    prefix: IconTile(
                       icon: FLucideIcons.trash2,
                       tone: colors.app.warning,
                     ),
@@ -191,29 +192,33 @@ class SettingsPage extends HookConsumerWidget {
               ],
             ],
           ),
-          SectionHeader(title: 'Privacy'),
+          SectionHeader(title: 'Connection'),
           FTileGroup(
             divider: .indented,
             children: [
               FTile(
-                prefix: _IconTile(
-                  icon: FLucideIcons.shieldCheck,
+                prefix: IconTile(
+                  icon: FLucideIcons.radioTower,
                   tone: colors.app.success,
                 ),
-                title: const Text('On-device Mode'),
-                subtitle: const Text('Only talk to VTOP; no server features'),
-                suffix: FSwitch(
-                  value: ref.watch(onDeviceModeProvider),
-                  onChange: (value) => _setOnDeviceMode(context, ref, value),
+                title: const Text('Connection'),
+                subtitle: Text(
+                  ref.watch(onDeviceModeProvider)
+                      ? 'On-device mode'
+                      : connectionProfileTitle(
+                          ref.watch(connectionProfileProvider),
+                        ),
                 ),
+                suffix: const Icon(FLucideIcons.chevronRight),
+                onPress: () => context.pushNamed(Paths.connection),
               ),
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.server,
                   tone: colors.app.accentTone,
                 ),
                 title: const Text('Server'),
-                subtitle: const Text('VTOP data, sign-in and connected apps'),
+                subtitle: const Text('Account, connected apps and phones'),
                 suffix: const Icon(FLucideIcons.chevronRight),
                 onPress: () => context.pushNamed(Paths.server),
               ),
@@ -233,7 +238,7 @@ class SettingsPage extends HookConsumerWidget {
             divider: .indented,
             children: [
               FSelectMenuTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.calendarClock,
                   tone: colors.app.lab,
                 ),
@@ -264,7 +269,7 @@ class SettingsPage extends HookConsumerWidget {
                 ],
               ),
               FTile(
-                prefix: _IconTile(icon: FLucideIcons.eye, tone: colors.app.lab),
+                prefix: IconTile(icon: FLucideIcons.eye, tone: colors.app.lab),
                 title: const Text('Show Skip Counts'),
                 subtitle: const Text('How many classes you can skip or need'),
                 suffix: FSwitch(
@@ -273,7 +278,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.utensils,
                   tone: colors.app.lab,
                 ),
@@ -287,7 +292,7 @@ class SettingsPage extends HookConsumerWidget {
                 onPress: () => showMessTimingsSheet(context),
               ),
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.refreshCw,
                   tone: colors.app.lab,
                 ),
@@ -305,7 +310,7 @@ class SettingsPage extends HookConsumerWidget {
             divider: .indented,
             children: [
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.refreshCcw,
                   tone: colors.app.success,
                 ),
@@ -316,7 +321,7 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ),
               FSelectMenuTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.folderSync,
                   tone: colors.app.success,
                 ),
@@ -345,7 +350,7 @@ class SettingsPage extends HookConsumerWidget {
                 ],
               ),
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.calendarPlus,
                   tone: colors.app.success,
                 ),
@@ -355,7 +360,7 @@ class SettingsPage extends HookConsumerWidget {
                 onPress: () => context.pushNamed(Paths.calendarSync),
               ),
               FTile(
-                prefix: _IconTile(
+                prefix: IconTile(
                   icon: FLucideIcons.bell,
                   tone: colors.app.success,
                 ),
@@ -445,7 +450,7 @@ class SettingsPage extends HookConsumerWidget {
             FTileGroup(
               children: [
                 FTile(
-                  prefix: _IconTile(
+                  prefix: IconTile(
                     icon: FLucideIcons.download,
                     tone: colors.app.accentTone,
                   ),
@@ -489,24 +494,6 @@ class SettingsPage extends HookConsumerWidget {
 }
 
 /// A row icon in a small tinted square; the tint groups related settings.
-class _IconTile extends StatelessWidget {
-  const _IconTile({required this.icon, required this.tone});
-
-  final IconData icon;
-  final Tone tone;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 30,
-    height: 30,
-    decoration: BoxDecoration(
-      color: tone.subtle,
-      borderRadius: .circular(Radii.sm + 1),
-    ),
-    child: Icon(icon, size: 16, color: tone.onSubtle),
-  );
-}
-
 /// Theme choice as three small previews of the app in light, dark and
 /// system (half and half).
 class _AppearancePicker extends StatelessWidget {
@@ -544,7 +531,7 @@ class _AppearancePicker extends StatelessWidget {
             onLongPress: onLongPress,
             child: Row(
               children: [
-                _IconTile(icon: FLucideIcons.sunMoon, tone: colors.app.lab),
+                IconTile(icon: FLucideIcons.sunMoon, tone: colors.app.lab),
                 const SizedBox(width: Space.md),
                 Text(
                   'Appearance',
@@ -669,42 +656,6 @@ class _MiniApp extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Turning on-device mode on asks first: it lists what stops working, and
-/// what stays on the server until removed there.
-Future<void> _setOnDeviceMode(
-  BuildContext context,
-  WidgetRef ref,
-  bool value,
-) async {
-  if (!value) return setOnDeviceMode(ref, false);
-  final prefs = await ref.read(settingsProvider.future);
-  final linked = prefs.getBool(bridgeLinkedSettingKey) ?? false;
-  if (!context.mounted) return;
-  final confirmed = await confirm(
-    context,
-    title: 'Turn On On-device Mode?',
-    action: 'Turn On',
-    actionFirst: true,
-    body:
-        ('The app will only talk to VTOP (and Google, if you read OTPs from '
-        'Gmail). These stop working until you turn it off: the browser '
-        'extension, AI agents (MCP), OTP mail forwarding, server sign-in '
-        'and a server data source.'
-        '${linked ? '\n\nYour account on the VITAP Mate server, with any '
-                  'saved password and access keys, stays there. To remove '
-                  'it, delete it in Connected apps first.' : ''}'),
-  );
-  if (!confirmed) return;
-  await setOnDeviceMode(ref, true);
-  if (context.mounted) {
-    dispToast(
-      context,
-      'On-device mode is on',
-      'Vitap Mate now only talks to VTOP.',
     );
   }
 }

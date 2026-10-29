@@ -75,7 +75,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1354942896;
+  int get rustContentHash => 338559046;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -97,6 +97,7 @@ abstract class RustLibApi extends BaseApi {
     required String inDate,
     required int inHour,
     required int inMinute,
+    String? flow,
   });
 
   Future<OutingApplyResult> crateApiVtopGetClientApplyWeekendOuting({
@@ -106,16 +107,19 @@ abstract class RustLibApi extends BaseApi {
     required String date,
     required String timeSlot,
     required String contactNumber,
+    String? flow,
   });
 
   Future<OutingCancelResult> crateApiVtopGetClientCancelGeneralOuting({
     required VtopClient client,
     required String leaveId,
+    String? flow,
   });
 
   Future<OutingCancelResult> crateApiVtopGetClientCancelWeekendOuting({
     required VtopClient client,
     required String bookingId,
+    String? flow,
   });
 
   PersistedVtopSession crateApiVtopGetClientExportSessionSnapshot({
@@ -130,16 +134,19 @@ abstract class RustLibApi extends BaseApi {
   Future<AcademicCalendarData> crateApiVtopGetClientFetchAcademicCalendar({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<AttendanceData> crateApiVtopGetClientFetchAttendance({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<BiometricData> crateApiVtopGetClientFetchBiometricHistory({
     required VtopClient client,
     required String date,
+    String? flow,
   });
 
   Future<Uint8List> crateApiVtopGetClientFetchCookies({
@@ -149,17 +156,20 @@ abstract class RustLibApi extends BaseApi {
   Future<CourseFileInfo> crateApiVtopGetClientFetchCourseFileInfo({
     required VtopClient client,
     required String path,
+    String? flow,
   });
 
   Future<CoursePageClasses> crateApiVtopGetClientFetchCoursePageClasses({
     required VtopClient client,
     required String semesterId,
     required String courseId,
+    String? flow,
   });
 
   Future<CoursePageCourses> crateApiVtopGetClientFetchCoursePageCourses({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<CoursePageDetail> crateApiVtopGetClientFetchCoursePageDetail({
@@ -167,17 +177,20 @@ abstract class RustLibApi extends BaseApi {
     required String semesterId,
     required String erpId,
     required String classId,
+    String? flow,
   });
 
   Future<CourseFileInfo> crateApiVtopGetClientFetchCoursePlanInfo({
     required VtopClient client,
     required String semesterId,
     required String classId,
+    String? flow,
   });
 
   Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<FullAttendanceData> crateApiVtopGetClientFetchFullAttendance({
@@ -185,25 +198,30 @@ abstract class RustLibApi extends BaseApi {
     required String semesterId,
     required String courseId,
     required String courseType,
+    String? flow,
   });
 
   Future<GeneralOutingData> crateApiVtopGetClientFetchGeneralOuting({
     required VtopClient client,
+    String? flow,
   });
 
   Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
     required VtopClient client,
+    String? flow,
   });
 
   Future<GradeViewData> crateApiVtopGetClientFetchGradeView({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<GradeDetailsData> crateApiVtopGetClientFetchGradeViewDetails({
     required VtopClient client,
     required String semesterId,
     required String courseId,
+    String? flow,
   });
 
   Future<bool> crateApiVtopGetClientFetchIsAuth({required VtopClient client});
@@ -211,33 +229,40 @@ abstract class RustLibApi extends BaseApi {
   Future<MarksData> crateApiVtopGetClientFetchMarks({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<MentorData> crateApiVtopGetClientFetchMentor({
     required VtopClient client,
+    String? flow,
   });
 
   Future<Uint8List> crateApiVtopGetClientFetchOutingPass({
     required VtopClient client,
     required bool weekend,
     required String passId,
+    String? flow,
   });
 
   Future<StudentProfile> crateApiVtopGetClientFetchProfile({
     required VtopClient client,
+    String? flow,
   });
 
   Future<SemesterData> crateApiVtopGetClientFetchSemesters({
     required VtopClient client,
+    String? flow,
   });
 
   Future<TimetableData> crateApiVtopGetClientFetchTimetable({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   });
 
   Future<WeekendOutingData> crateApiVtopGetClientFetchWeekendOuting({
     required VtopClient client,
+    String? flow,
   });
 
   Future<VtopClient> crateApiVtopGetClientGetVtopClient({
@@ -272,6 +297,8 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiNativeLogsNativeLogsOpen({required String dir});
 
+  void crateApiNativeLogsNativeLogsRegno({String? regno});
+
   String crateApiServerPageServerPageDictionary();
 
   String crateApiServerPageServerPageUnpack({
@@ -281,6 +308,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiVtopGetClientVtopClientLogin({
     required VtopClient client,
+    String? flow,
   });
 
   String crateApiVtopGetClientVtopClientRegistrationNumber({
@@ -289,6 +317,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiVtopGetClientVtopClientResendSecurityOtp({
     required VtopClient client,
+    String? flow,
   });
 
   void crateApiVtopGetClientVtopClientResumeSession({
@@ -299,6 +328,7 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiVtopGetClientVtopClientSubmitSecurityOtp({
     required VtopClient client,
     required String otpCode,
+    String? flow,
   });
 
   Future<WirePage> crateApiWireWireFetchPage({
@@ -308,6 +338,8 @@ abstract class RustLibApi extends BaseApi {
     String? semester,
     required List<(String, String)> args,
     String? dictionary,
+    String? accountJson,
+    required bool secret,
     required int timeoutMs,
   });
 
@@ -339,6 +371,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String inDate,
     required int inHour,
     required int inMinute,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -356,6 +389,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(inDate, serializer);
           sse_encode_u_8(inHour, serializer);
           sse_encode_u_8(inMinute, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -378,6 +412,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           inDate,
           inHour,
           inMinute,
+          flow,
         ],
         apiImpl: this,
       ),
@@ -397,6 +432,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "inDate",
           "inHour",
           "inMinute",
+          "flow",
         ],
       );
 
@@ -408,6 +444,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String date,
     required String timeSlot,
     required String contactNumber,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -422,6 +459,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(date, serializer);
           sse_encode_String(timeSlot, serializer);
           sse_encode_String(contactNumber, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -434,7 +472,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientApplyWeekendOutingConstMeta,
-        argValues: [client, place, purpose, date, timeSlot, contactNumber],
+        argValues: [
+          client,
+          place,
+          purpose,
+          date,
+          timeSlot,
+          contactNumber,
+          flow,
+        ],
         apiImpl: this,
       ),
     );
@@ -450,6 +496,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "date",
           "timeSlot",
           "contactNumber",
+          "flow",
         ],
       );
 
@@ -457,6 +504,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<OutingCancelResult> crateApiVtopGetClientCancelGeneralOuting({
     required VtopClient client,
     required String leaveId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -467,6 +515,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(leaveId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -479,7 +528,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientCancelGeneralOutingConstMeta,
-        argValues: [client, leaveId],
+        argValues: [client, leaveId, flow],
         apiImpl: this,
       ),
     );
@@ -488,13 +537,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientCancelGeneralOutingConstMeta =>
       const TaskConstMeta(
         debugName: "cancel_general_outing",
-        argNames: ["client", "leaveId"],
+        argNames: ["client", "leaveId", "flow"],
       );
 
   @override
   Future<OutingCancelResult> crateApiVtopGetClientCancelWeekendOuting({
     required VtopClient client,
     required String bookingId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -505,6 +555,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(bookingId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -517,7 +568,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientCancelWeekendOutingConstMeta,
-        argValues: [client, bookingId],
+        argValues: [client, bookingId, flow],
         apiImpl: this,
       ),
     );
@@ -526,7 +577,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientCancelWeekendOutingConstMeta =>
       const TaskConstMeta(
         debugName: "cancel_weekend_outing",
-        argNames: ["client", "bookingId"],
+        argNames: ["client", "bookingId", "flow"],
       );
 
   @override
@@ -597,6 +648,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<AcademicCalendarData> crateApiVtopGetClientFetchAcademicCalendar({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -607,6 +659,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -619,7 +672,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchAcademicCalendarConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -628,13 +681,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchAcademicCalendarConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_academic_calendar",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
   Future<AttendanceData> crateApiVtopGetClientFetchAttendance({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -645,6 +699,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -657,7 +712,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchAttendanceConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -666,13 +721,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchAttendanceConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_attendance",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
   Future<BiometricData> crateApiVtopGetClientFetchBiometricHistory({
     required VtopClient client,
     required String date,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -683,6 +739,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(date, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -695,7 +752,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchBiometricHistoryConstMeta,
-        argValues: [client, date],
+        argValues: [client, date, flow],
         apiImpl: this,
       ),
     );
@@ -704,7 +761,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchBiometricHistoryConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_biometric_history",
-        argNames: ["client", "date"],
+        argNames: ["client", "date", "flow"],
       );
 
   @override
@@ -744,6 +801,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<CourseFileInfo> crateApiVtopGetClientFetchCourseFileInfo({
     required VtopClient client,
     required String path,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -754,6 +812,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(path, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -766,7 +825,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchCourseFileInfoConstMeta,
-        argValues: [client, path],
+        argValues: [client, path, flow],
         apiImpl: this,
       ),
     );
@@ -775,7 +834,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchCourseFileInfoConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_course_file_info",
-        argNames: ["client", "path"],
+        argNames: ["client", "path", "flow"],
       );
 
   @override
@@ -783,6 +842,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required VtopClient client,
     required String semesterId,
     required String courseId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -794,6 +854,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(semesterId, serializer);
           sse_encode_String(courseId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -806,7 +867,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchCoursePageClassesConstMeta,
-        argValues: [client, semesterId, courseId],
+        argValues: [client, semesterId, courseId, flow],
         apiImpl: this,
       ),
     );
@@ -815,13 +876,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageClassesConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_course_page_classes",
-        argNames: ["client", "semesterId", "courseId"],
+        argNames: ["client", "semesterId", "courseId", "flow"],
       );
 
   @override
   Future<CoursePageCourses> crateApiVtopGetClientFetchCoursePageCourses({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -832,6 +894,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -844,7 +907,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchCoursePageCoursesConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -853,7 +916,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageCoursesConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_course_page_courses",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
@@ -862,6 +925,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String semesterId,
     required String erpId,
     required String classId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -874,6 +938,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(semesterId, serializer);
           sse_encode_String(erpId, serializer);
           sse_encode_String(classId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -886,7 +951,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchCoursePageDetailConstMeta,
-        argValues: [client, semesterId, erpId, classId],
+        argValues: [client, semesterId, erpId, classId, flow],
         apiImpl: this,
       ),
     );
@@ -895,7 +960,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchCoursePageDetailConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_course_page_detail",
-        argNames: ["client", "semesterId", "erpId", "classId"],
+        argNames: ["client", "semesterId", "erpId", "classId", "flow"],
       );
 
   @override
@@ -903,6 +968,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required VtopClient client,
     required String semesterId,
     required String classId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -914,6 +980,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(semesterId, serializer);
           sse_encode_String(classId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -926,7 +993,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchCoursePlanInfoConstMeta,
-        argValues: [client, semesterId, classId],
+        argValues: [client, semesterId, classId, flow],
         apiImpl: this,
       ),
     );
@@ -935,13 +1002,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchCoursePlanInfoConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_course_plan_info",
-        argNames: ["client", "semesterId", "classId"],
+        argNames: ["client", "semesterId", "classId", "flow"],
       );
 
   @override
   Future<ExamScheduleData> crateApiVtopGetClientFetchExamSchedule({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -952,6 +1020,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -964,7 +1033,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchExamScheduleConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -973,7 +1042,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchExamScheduleConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_exam_schedule",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
@@ -982,6 +1051,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String semesterId,
     required String courseId,
     required String courseType,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -994,6 +1064,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(semesterId, serializer);
           sse_encode_String(courseId, serializer);
           sse_encode_String(courseType, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1006,7 +1077,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchFullAttendanceConstMeta,
-        argValues: [client, semesterId, courseId, courseType],
+        argValues: [client, semesterId, courseId, courseType, flow],
         apiImpl: this,
       ),
     );
@@ -1015,12 +1086,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchFullAttendanceConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_full_attendance",
-        argNames: ["client", "semesterId", "courseId", "courseType"],
+        argNames: ["client", "semesterId", "courseId", "courseType", "flow"],
       );
 
   @override
   Future<GeneralOutingData> crateApiVtopGetClientFetchGeneralOuting({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1030,6 +1102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1042,7 +1115,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchGeneralOutingConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
@@ -1051,12 +1124,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchGeneralOutingConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_general_outing",
-        argNames: ["client"],
+        argNames: ["client", "flow"],
       );
 
   @override
   Future<GradeHistoryData> crateApiVtopGetClientFetchGradeHistory({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1066,6 +1140,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1078,7 +1153,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchGradeHistoryConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
@@ -1087,13 +1162,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchGradeHistoryConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_grade_history",
-        argNames: ["client"],
+        argNames: ["client", "flow"],
       );
 
   @override
   Future<GradeViewData> crateApiVtopGetClientFetchGradeView({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1104,6 +1180,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1116,7 +1193,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchGradeViewConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -1125,7 +1202,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchGradeViewConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_grade_view",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
@@ -1133,6 +1210,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required VtopClient client,
     required String semesterId,
     required String courseId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1144,6 +1222,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_String(semesterId, serializer);
           sse_encode_String(courseId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1156,7 +1235,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchGradeViewDetailsConstMeta,
-        argValues: [client, semesterId, courseId],
+        argValues: [client, semesterId, courseId, flow],
         apiImpl: this,
       ),
     );
@@ -1165,7 +1244,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchGradeViewDetailsConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_grade_view_details",
-        argNames: ["client", "semesterId", "courseId"],
+        argNames: ["client", "semesterId", "courseId", "flow"],
       );
 
   @override
@@ -1203,6 +1282,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<MarksData> crateApiVtopGetClientFetchMarks({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1213,6 +1293,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1225,7 +1306,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchMarksConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -1234,12 +1315,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchMarksConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_marks",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
   Future<MentorData> crateApiVtopGetClientFetchMentor({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1249,6 +1331,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1261,20 +1344,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchMentorConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiVtopGetClientFetchMentorConstMeta =>
-      const TaskConstMeta(debugName: "fetch_mentor", argNames: ["client"]);
+      const TaskConstMeta(
+        debugName: "fetch_mentor",
+        argNames: ["client", "flow"],
+      );
 
   @override
   Future<Uint8List> crateApiVtopGetClientFetchOutingPass({
     required VtopClient client,
     required bool weekend,
     required String passId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1286,6 +1373,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
           sse_encode_bool(weekend, serializer);
           sse_encode_String(passId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1298,7 +1386,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchOutingPassConstMeta,
-        argValues: [client, weekend, passId],
+        argValues: [client, weekend, passId, flow],
         apiImpl: this,
       ),
     );
@@ -1307,12 +1395,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchOutingPassConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_outing_pass",
-        argNames: ["client", "weekend", "passId"],
+        argNames: ["client", "weekend", "passId", "flow"],
       );
 
   @override
   Future<StudentProfile> crateApiVtopGetClientFetchProfile({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1322,6 +1411,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1334,18 +1424,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchProfileConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiVtopGetClientFetchProfileConstMeta =>
-      const TaskConstMeta(debugName: "fetch_profile", argNames: ["client"]);
+      const TaskConstMeta(
+        debugName: "fetch_profile",
+        argNames: ["client", "flow"],
+      );
 
   @override
   Future<SemesterData> crateApiVtopGetClientFetchSemesters({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1355,6 +1449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1367,19 +1462,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchSemestersConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiVtopGetClientFetchSemestersConstMeta =>
-      const TaskConstMeta(debugName: "fetch_semesters", argNames: ["client"]);
+      const TaskConstMeta(
+        debugName: "fetch_semesters",
+        argNames: ["client", "flow"],
+      );
 
   @override
   Future<TimetableData> crateApiVtopGetClientFetchTimetable({
     required VtopClient client,
     required String semesterId,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1390,6 +1489,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(semesterId, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1402,7 +1502,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchTimetableConstMeta,
-        argValues: [client, semesterId],
+        argValues: [client, semesterId, flow],
         apiImpl: this,
       ),
     );
@@ -1411,12 +1511,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchTimetableConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_timetable",
-        argNames: ["client", "semesterId"],
+        argNames: ["client", "semesterId", "flow"],
       );
 
   @override
   Future<WeekendOutingData> crateApiVtopGetClientFetchWeekendOuting({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1426,6 +1527,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1438,7 +1540,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientFetchWeekendOutingConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
@@ -1447,7 +1549,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiVtopGetClientFetchWeekendOutingConstMeta =>
       const TaskConstMeta(
         debugName: "fetch_weekend_outing",
-        argNames: ["client"],
+        argNames: ["client", "flow"],
       );
 
   @override
@@ -1683,12 +1785,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "native_logs_open", argNames: ["dir"]);
 
   @override
+  void crateApiNativeLogsNativeLogsRegno({String? regno}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(regno, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiNativeLogsNativeLogsRegnoConstMeta,
+        argValues: [regno],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiNativeLogsNativeLogsRegnoConstMeta =>
+      const TaskConstMeta(debugName: "native_logs_regno", argNames: ["regno"]);
+
+  @override
   String crateApiServerPageServerPageDictionary() {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1715,7 +1840,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
           sse_encode_list_prim_u_8_loose(packed, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1737,6 +1862,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<void> crateApiVtopGetClientVtopClientLogin({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1746,10 +1872,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 39,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1758,14 +1885,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientVtopClientLoginConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiVtopGetClientVtopClientLoginConstMeta =>
-      const TaskConstMeta(debugName: "vtop_client_login", argNames: ["client"]);
+      const TaskConstMeta(
+        debugName: "vtop_client_login",
+        argNames: ["client", "flow"],
+      );
 
   @override
   String crateApiVtopGetClientVtopClientRegistrationNumber({
@@ -1779,7 +1909,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -1802,6 +1932,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<void> crateApiVtopGetClientVtopClientResendSecurityOtp({
     required VtopClient client,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1811,10 +1942,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             client,
             serializer,
           );
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 41,
+            funcId: 42,
             port: port_,
           );
         },
@@ -1823,7 +1955,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientVtopClientResendSecurityOtpConstMeta,
-        argValues: [client],
+        argValues: [client, flow],
         apiImpl: this,
       ),
     );
@@ -1833,7 +1965,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiVtopGetClientVtopClientResendSecurityOtpConstMeta =>
       const TaskConstMeta(
         debugName: "vtop_client_resend_security_otp",
-        argNames: ["client"],
+        argNames: ["client", "flow"],
       );
 
   @override
@@ -1850,7 +1982,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_box_autoadd_session_state(session, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 43)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
@@ -1873,6 +2005,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<void> crateApiVtopGetClientVtopClientSubmitSecurityOtp({
     required VtopClient client,
     required String otpCode,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1883,10 +2016,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_String(otpCode, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 43,
+            funcId: 44,
             port: port_,
           );
         },
@@ -1895,7 +2029,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiVtopGetClientVtopClientSubmitSecurityOtpConstMeta,
-        argValues: [client, otpCode],
+        argValues: [client, otpCode, flow],
         apiImpl: this,
       ),
     );
@@ -1905,7 +2039,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   get kCrateApiVtopGetClientVtopClientSubmitSecurityOtpConstMeta =>
       const TaskConstMeta(
         debugName: "vtop_client_submit_security_otp",
-        argNames: ["client", "otpCode"],
+        argNames: ["client", "otpCode", "flow"],
       );
 
   @override
@@ -1916,6 +2050,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     String? semester,
     required List<(String, String)> args,
     String? dictionary,
+    String? accountJson,
+    required bool secret,
     required int timeoutMs,
   }) {
     return handler.executeNormal(
@@ -1928,11 +2064,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_String(semester, serializer);
           sse_encode_list_record_string_string(args, serializer);
           sse_encode_opt_String(dictionary, serializer);
+          sse_encode_opt_String(accountJson, serializer);
+          sse_encode_bool(secret, serializer);
           sse_encode_u_32(timeoutMs, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 44,
+            funcId: 45,
             port: port_,
           );
         },
@@ -1948,6 +2086,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           semester,
           args,
           dictionary,
+          accountJson,
+          secret,
           timeoutMs,
         ],
         apiImpl: this,
@@ -1964,6 +2104,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       "semester",
       "args",
       "dictionary",
+      "accountJson",
+      "secret",
       "timeoutMs",
     ],
   );
@@ -3274,8 +3416,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WirePage dco_decode_wire_page(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return WirePage(
       status: dco_decode_u_16(arr[0]),
       packed: dco_decode_bool(arr[1]),
@@ -3283,6 +3425,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       elapsedMs: dco_decode_u_32(arr[3]),
       handshake: dco_decode_bool(arr[4]),
       wireBytes: dco_decode_u_32(arr[5]),
+      session: dco_decode_opt_String(arr[6]),
     );
   }
 
@@ -4988,6 +5131,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_elapsedMs = sse_decode_u_32(deserializer);
     var var_handshake = sse_decode_bool(deserializer);
     var var_wireBytes = sse_decode_u_32(deserializer);
+    var var_session = sse_decode_opt_String(deserializer);
     return WirePage(
       status: var_status,
       packed: var_packed,
@@ -4995,6 +5139,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       elapsedMs: var_elapsedMs,
       handshake: var_handshake,
       wireBytes: var_wireBytes,
+      session: var_session,
     );
   }
 
@@ -6363,6 +6508,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_32(self.elapsedMs, serializer);
     sse_encode_bool(self.handshake, serializer);
     sse_encode_u_32(self.wireBytes, serializer);
+    sse_encode_opt_String(self.session, serializer);
   }
 }
 

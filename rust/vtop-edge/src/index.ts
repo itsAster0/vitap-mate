@@ -439,6 +439,7 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (method === "POST" && path === "/v1/devices/update") return deviceUpdate(req, env);
   if (method === "POST" && path === "/v1/app/status") return account.appCall(req, env, "status");
   if (method === "POST" && path === "/v1/app/session/clear") return account.appCall(req, env, "session-clear");
+  if (method === "POST" && path === "/v1/app/login") return account.appCall(req, env, "login");
   const mailRoute = MAIL_ROUTES[path];
   if (method === "POST" && mailRoute) {
     const body = await jsonBody(req);

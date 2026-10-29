@@ -3,7 +3,9 @@ use std::time::Duration;
 use tokio::net::UdpSocket;
 use vtop_gateway::{public_key, run, Config};
 use vtop_shared::page_dictionary;
-use vtop_shared::wire_page::{session_hash, WirePageRequest, WirePageResponse, NEED_SESSION};
+use vtop_shared::wire_page::{
+    session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY,
+};
 use vtop_wire::client::{fetch, ClientConfig};
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -16,6 +18,7 @@ async fn gateway(engine: &MockServer) -> (u16, [u8; 32]) {
     let port = sock.local_addr().unwrap().port();
     let config = Config {
         engine_url: engine.uri(),
+        edge_url: engine.uri(),
         engine_secret: "relay-secret".into(),
         private_key: private,
     };
@@ -31,6 +34,7 @@ fn request(session: Option<&str>, hash_of: &str) -> Vec<u8> {
         dictionary: Some("dict".into()),
         session_hash: session_hash(hash_of),
         session: session.map(str::to_string),
+        account: None,
     }
     .encode()
     .unwrap()
@@ -64,6 +68,7 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
         ports: vec![port],
         server_key: key,
         state_dir: dir,
+        request_in_handshake: true,
     };
 
     // First fetch carries the session.
@@ -98,4 +103,157 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
         WirePageResponse::decode(&got.body).unwrap().status,
         NEED_SESSION
     );
+}
+
+/// A sign-in request named by its edge path, after the handshake.
+async fn sign_in(port: u16, key: [u8; 32], path: &str, body: &str) -> WirePageResponse {
+    let dir = std::env::temp_dir().join(format!(
+        "vtop-gateway-sign-in-{}-{}",
+        std::process::id(),
+        path.replace('/', "-")
+    ));
+    let cfg = ClientConfig {
+        host: "127.0.0.1".into(),
+        ports: vec![port],
+        server_key: key,
+        state_dir: dir,
+        request_in_handshake: false,
+    };
+    let request = WirePageRequest {
+        name: path.into(),
+        semester: None,
+        args: [(SIGN_IN_BODY.to_string(), body.to_string())]
+            .into_iter()
+            .collect(),
+        dictionary: None,
+        session_hash: 0,
+        session: None,
+        account: None,
+    }
+    .encode()
+    .unwrap();
+    let got = fetch(&cfg, &request, Duration::from_secs(20))
+        .await
+        .unwrap();
+    assert!(got.handshake);
+    WirePageResponse::decode(&got.body).unwrap()
+}
+
+#[tokio::test]
+async fn sign_ins_go_where_the_edge_would_send_them() {
+    // One mock is both the engine and the edge.
+    let server = MockServer::start().await;
+    let ok = r#"{"status":"ok","session":{"cookies":"JSESSIONID=s"}}"#;
+    Mock::given(method("POST"))
+        .and(path("/engine/vtop-login"))
+        .and(header("authorization", "Bearer relay-secret"))
+        .and(body_partial_json(
+            serde_json::json!({ "username": "U", "password": "P" }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_string(ok))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/app/login"))
+        .and(body_partial_json(
+            serde_json::json!({ "appSecret": "secret" }),
+        ))
+        .respond_with(
+            ResponseTemplate::new(401).set_body_string(r#"{"code":"invalid_credentials"}"#),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let (port, key) = gateway(&server).await;
+
+    let phone = sign_in(
+        port,
+        key,
+        "/v1/vtop/login",
+        r#"{"username":"U","password":"P"}"#,
+    )
+    .await;
+    assert_eq!((phone.status, phone.body), (200, ok.as_bytes().to_vec()));
+
+    let by_server = sign_in(
+        port,
+        key,
+        "/v1/app/login",
+        r#"{"registrationNumber":"24MIC7076","appSecret":"secret"}"#,
+    )
+    .await;
+    assert_eq!(by_server.status, 401);
+}
+
+#[tokio::test]
+async fn an_expired_session_is_renewed_in_the_fetch() {
+    // One mock is the engine and the edge.
+    let server = MockServer::start().await;
+    let page = r#"{"data":{"ok":true}}"#;
+    Mock::given(method("POST"))
+        .and(path("/engine/fetch"))
+        .and(body_partial_json(
+            serde_json::json!({ "session": { "cookies": "JSESSIONID=old" } }),
+        ))
+        .respond_with(ResponseTemplate::new(401).set_body_string(r#"{"code":"session_expired"}"#))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/engine/fetch"))
+        .and(body_partial_json(
+            serde_json::json!({ "session": { "cookies": "JSESSIONID=new" } }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_string(page))
+        .expect(2)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/app/login"))
+        .and(body_partial_json(serde_json::json!({ "appSecret": "s" })))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"status":"ok","session":{"cookies":"JSESSIONID=new","registration_number":"R"}}"#,
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let (port, key) = gateway(&server).await;
+    let cfg = ClientConfig {
+        host: "127.0.0.1".into(),
+        ports: vec![port],
+        server_key: key,
+        state_dir: std::env::temp_dir().join(format!("vtop-gateway-renew-{}", std::process::id())),
+        request_in_handshake: true,
+    };
+    let old = r#"{"cookies":"JSESSIONID=old"}"#;
+    let mut request = WirePageRequest {
+        name: "attendance".into(),
+        semester: None,
+        args: Default::default(),
+        dictionary: None,
+        session_hash: session_hash(old),
+        session: Some(old.into()),
+        account: Some(r#"{"registrationNumber":"R","appSecret":"s"}"#.into()),
+    };
+
+    let got = fetch(&cfg, &request.encode().unwrap(), Duration::from_secs(20))
+        .await
+        .unwrap();
+    let answer = WirePageResponse::decode(&got.body).unwrap();
+    assert_eq!(
+        (answer.status, answer.body),
+        (200, page.as_bytes().to_vec())
+    );
+    let renewed = answer.session.expect("the new session comes back");
+    assert!(renewed.contains("JSESSIONID=new"));
+
+    // The phone's next fetch names the new session by its hash only.
+    request.session_hash = session_hash(r#"{"cookies":"JSESSIONID=new","csrf_token":null}"#);
+    request.session = None;
+    request.account = None;
+    let got = fetch(&cfg, &request.encode().unwrap(), Duration::from_secs(20))
+        .await
+        .unwrap();
+    assert_eq!(WirePageResponse::decode(&got.body).unwrap().status, 200);
 }

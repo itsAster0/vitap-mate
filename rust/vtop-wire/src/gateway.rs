@@ -36,6 +36,9 @@ pub const CLIENT_REPEAT: Duration = Duration::from_millis(1500);
 pub const BREAKER: Duration = Duration::from_secs(30);
 /// Idle sessions are forgotten after this; the client re-handshakes daily.
 pub const SESSION_IDLE: Duration = Duration::from_secs(48 * 3600);
+/// An answer still being made is waited for this long: over a server
+/// sign-in that waits for the OTP mail.
+pub const PENDING_KEEP: Duration = Duration::from_secs(150);
 /// A finished response is kept this long for late requests for more.
 pub const RESPONSE_KEEP: Duration = Duration::from_secs(120);
 /// Tell the client "working" if the answer is not ready by half its wait
@@ -263,9 +266,7 @@ impl Gateway {
             .retain(|_, s| now.saturating_duration_since(s.heard) < SESSION_IDLE);
         for s in self.sessions.values_mut() {
             s.responses.retain(|_, r| match r {
-                Resp::Pending { since, .. } => {
-                    now.saturating_duration_since(*since) < Duration::from_secs(90)
-                }
+                Resp::Pending { since, .. } => now.saturating_duration_since(*since) < PENDING_KEEP,
                 Resp::Ready { at, .. } => now.saturating_duration_since(*at) < RESPONSE_KEEP,
             });
         }

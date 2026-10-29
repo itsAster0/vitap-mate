@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/app/router/paths.dart';
 import 'package:vitapmate/vtop/edge/server_status.dart';
+import 'package:vitapmate/vtop/route/on_device_mode.dart';
+import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
@@ -15,8 +17,6 @@ import 'package:vitapmate/features/server/widgets/expandable_picker.dart';
 import 'package:vitapmate/features/server/widgets/icon_box.dart';
 import 'package:vitapmate/features/server/widgets/key_dialogs.dart';
 import 'package:vitapmate/features/server/widgets/server_format.dart';
-
-enum _Offline { phone, wait10, wait20, server }
 
 const _maxKeys = 10;
 
@@ -38,7 +38,12 @@ class ServerAppsPage extends HookConsumerWidget {
     final creating = useState(false);
     final revoking = useState<String?>(null);
     final changingOutings = useState<String?>(null);
-    final pendingOffline = useState<_Offline?>(null);
+    final pendingOffline = useState<SignInChoice?>(null);
+    // Fetching on the server, this phone signs in through it too: asking
+    // the phone first only waits.
+    final phoneFetchesOnServer =
+        !ref.watch(onDeviceModeProvider) &&
+        ref.watch(vtopModeProvider) == .server;
 
     Future<void> create() async {
       final current = account.value;
@@ -131,34 +136,12 @@ class ServerAppsPage extends HookConsumerWidget {
         if (key.id == id) ...key.uses,
     ];
 
-    // How offline access behaves, from the saved password and its settings.
-    final saved = account.value?.savedCredentials ?? false;
-    final settings = account.value?.settings ?? const BridgeSettings();
-    final offline = !saved
-        ? _Offline.phone
-        : settings.alwaysUseVault
-        ? _Offline.server
-        : settings.phoneWaitSecs <= 10
-        ? _Offline.wait10
-        : _Offline.wait20;
+    final offline = signInChoice(account.value);
 
-    Future<void> chooseOffline(_Offline mode) async {
-      pendingOffline.value = mode;
+    Future<void> chooseOffline(SignInChoice choice) async {
+      pendingOffline.value = choice;
       try {
-        await run('Could not change', () async {
-          if (mode == .phone) return actions.setServerSignIn(false);
-          // Seal the password first if it is not already (needs OTP
-          // forwarding or Gmail).
-          if (!(account.value?.savedCredentials ?? false)) {
-            await actions.setServerSignIn(true);
-          }
-          await actions.updateSettings(
-            BridgeSettings(
-              alwaysUseVault: mode == .server,
-              phoneWaitSecs: mode == .wait10 ? 10 : 20,
-            ),
-          );
-        });
+        await run('Could not change', () => actions.setSignIn(choice));
       } finally {
         if (context.mounted) pendingOffline.value = null;
       }
@@ -201,7 +184,7 @@ class ServerAppsPage extends HookConsumerWidget {
             ),
             const SizedBox(height: Space.sm),
           ],
-          ExpandablePicker<_Offline>(
+          ExpandablePicker<SignInChoice>(
             label: 'When the phone is offline',
             value: offline,
             pending: pendingOffline.value,
@@ -216,22 +199,28 @@ class ServerAppsPage extends HookConsumerWidget {
                 icon: FLucideIcons.smartphone,
                 tone: colors.app.accentTone,
               ),
-              PickerOption(
-                value: .wait10,
-                title: 'Wait 10s, then the server',
-                summary: 'This phone first',
-                detail: 'Give this phone 10 seconds, then the server signs in.',
-                icon: FLucideIcons.timer,
-                tone: colors.app.lab,
-              ),
-              PickerOption(
-                value: .wait20,
-                title: 'Wait 20s, then the server',
-                summary: 'This phone first, longer',
-                detail: 'Give this phone 20 seconds, then the server signs in.',
-                icon: FLucideIcons.hourglass,
-                tone: colors.app.lab,
-              ),
+              // Still shown when chosen (on another phone, say).
+              if (!phoneFetchesOnServer ||
+                  offline != .server && offline != .phone) ...[
+                PickerOption(
+                  value: .wait10,
+                  title: 'Wait 10s, then the server',
+                  summary: 'This phone first',
+                  detail:
+                      'Give this phone 10 seconds, then the server signs in.',
+                  icon: FLucideIcons.timer,
+                  tone: colors.app.lab,
+                ),
+                PickerOption(
+                  value: .wait20,
+                  title: 'Wait 20s, then the server',
+                  summary: 'This phone first, longer',
+                  detail:
+                      'Give this phone 20 seconds, then the server signs in.',
+                  icon: FLucideIcons.hourglass,
+                  tone: colors.app.lab,
+                ),
+              ],
               PickerOption(
                 value: .server,
                 title: 'Server signs in right away',

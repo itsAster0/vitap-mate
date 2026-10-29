@@ -12,7 +12,6 @@ library;
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hooks_riverpod/misc.dart' show ProviderListenable;
-import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
@@ -86,9 +85,7 @@ Future<T> loadPage<T>(Ref ref, VtopQuery<T> query) async =>
 
 /// Fetches [query] from VTOP (one request at a time per page) and saves it.
 Future<T> fetchPage<T>(Ref ref, VtopQuery<T> query) async {
-  final data = await _onQueue(ref, 'fetch', savedPageKey(query), (
-    backend,
-  ) async {
+  final data = await _onQueue(ref, savedPageKey(query), (backend) async {
     await ref.read(vClientProvider.notifier).ensureLogin();
     return backend.fetch(query);
   });
@@ -98,36 +95,30 @@ Future<T> fetchPage<T>(Ref ref, VtopQuery<T> query) async {
 
 /// [query] from VTOP without a saved copy (course page, outings,
 /// downloads), queued like [fetchPage] so the status line names it.
-Future<T> fetchUnsaved<T>(Ref ref, VtopQuery<T> query) => _onQueue(
-  ref,
-  'fetch',
-  savedPageKey(query),
-  (backend) => backend.fetch(query),
-);
+Future<T> fetchUnsaved<T>(Ref ref, VtopQuery<T> query) =>
+    _onQueue(ref, savedPageKey(query), (backend) => backend.fetch(query));
 
 /// Sends [action] to VTOP once, queued so the status line names it.
 Future<T> sendAction<T>(Ref ref, VtopAction<T> action) => _onQueue(
   ref,
-  'send',
   // Never joined with another: two cancels are two requests.
   '${action.name}_${DateTime.now().microsecondsSinceEpoch}',
   (backend) => backend.run(action),
 );
 
-/// [body] in its own flow, as queue task `vtop_<key>`.
+/// [body] as queue task `vtop_<key>` (a flow of its own).
 Future<T> _onQueue<T>(
   Ref ref,
-  String verb,
   String key,
   Future<T> Function(VtopBackend backend) body,
-) => flow('$verb $key', source: 'vtop.page', () async {
+) async {
   // A provider may call this while it builds, when the queue may not
   // change yet.
   await Future<void>.microtask(() {});
   return ref
       .read(globalAsyncQueueProvider.notifier)
       .run('vtop_$key', () => body(ref.read(vtopBackendProvider)));
-});
+}
 
 /// Where a page is saved: name, semester and argument values.
 String savedPageKey(VtopQuery<Object?> query) =>

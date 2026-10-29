@@ -28,6 +28,7 @@ async fn main() {
     };
     let listen = config.listen;
     let relay_secret = config.mail_relay_secret.clone();
+    let edge_url = config.edge_url.clone();
     let edge = Arc::new(HttpEdge {
         http: reqwest::Client::new(),
         base_url: config.edge_url.clone(),
@@ -81,8 +82,12 @@ async fn main() {
     };
     // UDP mode's gateway, where GATEWAY_KEY is set (on Fly): it answers
     // phones over UDP and asks this engine for pages over loopback.
-    match vtop_gateway::bind_from_env(format!("http://127.0.0.1:{}", listen.port()), relay_secret)
-        .await
+    match vtop_gateway::bind_from_env(
+        format!("http://127.0.0.1:{}", listen.port()),
+        relay_secret,
+        edge_url,
+    )
+    .await
     {
         None => {}
         Some(Ok((gateway, sockets))) => {

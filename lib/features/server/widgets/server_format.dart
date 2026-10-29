@@ -53,3 +53,41 @@ class ServerNote extends StatelessWidget {
     ),
   );
 }
+
+/// Label and value lines under a group of tiles, for technical detail.
+class ServerFacts extends StatelessWidget {
+  const ServerFacts(this.facts, {super.key});
+
+  final List<(String, String)> facts;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final small = context.theme.typography.body.sm;
+    return Padding(
+      padding: const .fromLTRB(4, Space.sm, 4, 0),
+      child: Column(
+        crossAxisAlignment: .start,
+        children: [
+          for (final (label, value) in facts)
+            Padding(
+              padding: const .symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: .start,
+                children: [
+                  SizedBox(
+                    width: 104,
+                    child: Text(
+                      label,
+                      style: small.copyWith(color: colors.mutedForeground),
+                    ),
+                  ),
+                  Expanded(child: Text(value, style: small)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}

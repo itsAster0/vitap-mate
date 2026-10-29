@@ -261,29 +261,36 @@ Future<void> submitPendingBridgeOtp(String otp) async {
     return;
   }
   await startRustRuntime();
-  final container = ProviderContainer(
-    overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
-  );
-  try {
-    final client = await container.read(vClientProvider.future);
-    vtopClientResumeSession(client: client, session: pending.state);
-    try {
-      await vtopClientSubmitSecurityOtp(client: client, otpCode: otp);
-    } catch (error) {
-      Log.error('fcm.cookie', 'Bridge OTP rejected: $error');
-      await showBridgeOtpNotification(problem: 'That OTP did not work');
-      return;
-    }
-    await _answerPending(container, client, pending);
-  } catch (error, stackTrace) {
-    Log.error(
-      'fcm.cookie',
-      'Finishing the bridge OTP login failed: $error\n$stackTrace',
+  await flow('bridge OTP sign-in', source: 'fcm.cookie', () async {
+    final container = ProviderContainer(
+      overrides: [vtopLoginPromptAllowedProvider.overrideWithValue(false)],
     );
-    await showBridgeOtpNotification(problem: 'Sign-in failed, try again');
-  } finally {
-    container.dispose();
-  }
+    try {
+      final client = await container.read(vClientProvider.future);
+      vtopClientResumeSession(client: client, session: pending.state);
+      try {
+        await vtopClientSubmitSecurityOtp(
+          client: client,
+          otpCode: otp,
+          flow: currentFlow,
+        );
+      } catch (error) {
+        Log.error('fcm.cookie', 'Bridge OTP rejected: $error');
+        await showBridgeOtpNotification(problem: 'That OTP did not work');
+        return;
+      }
+      await _answerPending(container, client, pending);
+    } catch (error, stackTrace) {
+      Log.error(
+        'fcm.cookie',
+        'Finishing the bridge OTP login failed: $error',
+        stackTrace,
+      );
+      await showBridgeOtpNotification(problem: 'Sign-in failed, try again');
+    } finally {
+      container.dispose();
+    }
+  });
 }
 
 /// Answers a tap: resumes the saved login in the app and shows the app's

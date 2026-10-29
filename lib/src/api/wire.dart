@@ -10,6 +10,12 @@ part 'wire.freezed.dart';
 
 // These functions are ignored because they are not marked as `pub`: `gateway_has`, `now_ms`, `remember_sent`, `send`
 
+/// One request to the gateway: a page on `session_json`'s session, or with
+/// `session_json` empty a request that needs none (a server sign-in). A
+/// `secret` request goes only on a forward-secret session, after the
+/// handshake rather than in it. `account_json` (`/v1/app/login`'s body)
+/// goes with the session, so the gateway can renew it in the fetch; it is
+/// secret too.
 Future<WirePage> wireFetchPage({
   required WireConfig config,
   required String sessionJson,
@@ -17,6 +23,8 @@ Future<WirePage> wireFetchPage({
   String? semester,
   required List<(String, String)> args,
   String? dictionary,
+  String? accountJson,
+  required bool secret,
   required int timeoutMs,
 }) => RustLib.instance.api.crateApiWireWireFetchPage(
   config: config,
@@ -25,6 +33,8 @@ Future<WirePage> wireFetchPage({
   semester: semester,
   args: args,
   dictionary: dictionary,
+  accountJson: accountJson,
+  secret: secret,
   timeoutMs: timeoutMs,
 );
 
@@ -89,6 +99,9 @@ class WirePage {
   /// Bytes on the wire, both ways, IP headers included.
   final int wireBytes;
 
+  /// The session the gateway renewed for this page; use it from now on.
+  final String? session;
+
   const WirePage({
     required this.status,
     required this.packed,
@@ -96,6 +109,7 @@ class WirePage {
     required this.elapsedMs,
     required this.handshake,
     required this.wireBytes,
+    this.session,
   });
 
   @override
@@ -105,7 +119,8 @@ class WirePage {
       body.hashCode ^
       elapsedMs.hashCode ^
       handshake.hashCode ^
-      wireBytes.hashCode;
+      wireBytes.hashCode ^
+      session.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -117,5 +132,6 @@ class WirePage {
           body == other.body &&
           elapsedMs == other.elapsedMs &&
           handshake == other.handshake &&
-          wireBytes == other.wireBytes;
+          wireBytes == other.wireBytes &&
+          session == other.session;
 }

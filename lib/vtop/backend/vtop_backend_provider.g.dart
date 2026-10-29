@@ -111,14 +111,18 @@ final class VtopBackendProvider
   }
 }
 
-String _$vtopBackendHash() => r'7c4d0493af048fb47f0400e85709d8149995f41f';
+String _$vtopBackendHash() => r'ed07c334b2482aaac18af7f3ef44a5ee5b1731f4';
 
-/// Logs in on the device, or on the server in "Fetch on the server" mode.
+/// Logs in on the device, or on the server in "Fetch on the server" mode
+/// (over UDP in UDP mode, where a linked phone has the server sign in with
+/// the password it keeps).
 
 @ProviderFor(vtopAuthenticator)
 final vtopAuthenticatorProvider = VtopAuthenticatorProvider._();
 
-/// Logs in on the device, or on the server in "Fetch on the server" mode.
+/// Logs in on the device, or on the server in "Fetch on the server" mode
+/// (over UDP in UDP mode, where a linked phone has the server sign in with
+/// the password it keeps).
 
 final class VtopAuthenticatorProvider
     extends
@@ -128,7 +132,9 @@ final class VtopAuthenticatorProvider
           VtopAuthenticator
         >
     with $Provider<VtopAuthenticator> {
-  /// Logs in on the device, or on the server in "Fetch on the server" mode.
+  /// Logs in on the device, or on the server in "Fetch on the server" mode
+  /// (over UDP in UDP mode, where a linked phone has the server sign in with
+  /// the password it keeps).
   VtopAuthenticatorProvider._()
     : super(
         from: null,
@@ -163,4 +169,4 @@ final class VtopAuthenticatorProvider
   }
 }
 
-String _$vtopAuthenticatorHash() => r'f1fd6d1721d01653f3ee624f85e0502a717c05e7';
+String _$vtopAuthenticatorHash() => r'044260487a6361ad7996e7df9730c8b33fa350f1';

@@ -162,6 +162,7 @@ Widget _buildHeader(
       'grade_history' => 'Grade History',
       'calendar-sync' => 'Calendar Sync',
       'notification-management' => 'Notifications',
+      'connection' => 'Connection',
       'debug' => switch (path.split('/').last) {
         'activity' => 'Activity',
         'diagnostics' => 'Diagnostics',

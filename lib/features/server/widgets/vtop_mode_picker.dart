@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
+import 'package:vitapmate/features/server/server_account.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/server/widgets/expandable_picker.dart';
 
@@ -16,32 +17,40 @@ class VtopModePicker extends ConsumerWidget {
     final colors = context.theme.colors;
     return ExpandablePicker<VtopServerMode>(
       value: ref.watch(vtopModeProvider),
-      onSelect: (mode) => setVtopMode(ref, mode),
+      onSelect: (mode) async {
+        await setVtopMode(ref, mode);
+        // This phone now signs in through the server: apps need not wait
+        // for it first.
+        final choice = signInChoice(ref.read(serverAccountProvider).value);
+        if (mode == .server && (choice == .wait10 || choice == .wait20)) {
+          await ref.read(serverAccountProvider.notifier).setSignIn(.server);
+        }
+      },
       options: [
         PickerOption(
           value: .off,
-          title: 'Phone only',
-          summary: 'Most data',
+          title: 'Direct (HTTPS to VTOP)',
+          summary: '~730 KB per refresh',
           detail:
-              'The phone signs in and fetches full pages, straight from VTOP.',
+              'reqwest on the phone signs in and fetches full HTML from vtop.vitap.ac.in.',
           icon: FLucideIcons.smartphone,
           tone: colors.app.accentTone,
         ),
         PickerOption(
           value: .compress,
-          title: 'Compress through the server',
-          summary: 'About 6× less data',
+          title: 'Compressing proxy (/vtop/)',
+          summary: '~120 KB · Brotli',
           detail:
-              'The phone still signs in and fetches; VTOP\'s pages reach it compressed.',
+              'Same requests from the phone, through the edge\'s /vtop/ proxy; responses Brotli-compressed.',
           icon: FLucideIcons.zap,
           tone: colors.app.lab,
         ),
         PickerOption(
           value: .server,
-          title: 'Fetch on the server',
-          summary: 'About 25× less data',
+          title: 'Server-side fetch (engine)',
+          summary: '~30 KB · packed JSON',
           detail:
-              'The server signs in and sends only what the app shows. The OTP is still asked on the phone.',
+              'The engine signs in and parses; the phone gets dictionary-packed JSON only.',
           icon: FLucideIcons.server,
           tone: colors.app.success,
         ),
