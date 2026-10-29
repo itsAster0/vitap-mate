@@ -73,7 +73,7 @@ cd extension && pnpm test && pnpm build
 ```
 
 Deploys only when asked: `pnpm exec wrangler deploy` in `rust/vtop-edge/`;
-`~/.fly/bin/flyctl deploy --config fly.node.toml --ha=false` in `rust/`.
+`~/.fly/bin/flyctl deploy --ha=false` in `rust/` (config `rust/fly.toml`).
 
 Never print or commit `.env*` files, keystores, or secrets.
 

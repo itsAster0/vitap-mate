@@ -21,8 +21,7 @@ use tokio::sync::mpsc;
 use vtop_shared::engine::{PageFetch, FETCH};
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
-    session_hash, WirePageRequest, WirePageResponse, BENCH_MAX, BENCH_PAGE, BUSY, NEED_SESSION,
-    TOO_LARGE,
+    session_hash, WirePageRequest, WirePageResponse, BUSY, NEED_SESSION, TOO_LARGE,
 };
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
@@ -218,20 +217,6 @@ impl Engine {
         let Some(page) = WirePageRequest::decode(&request.body) else {
             return error(400, "bad_request", "The request does not decode.");
         };
-        if page.name == BENCH_PAGE {
-            let size = page
-                .args
-                .get("size")
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0);
-            return WirePageResponse {
-                status: 200,
-                packed: false,
-                body: (0..size.min(BENCH_MAX))
-                    .map(|i| (i * 7 % 251) as u8)
-                    .collect(),
-            };
-        }
         let Some(session) = self.session(&request.device, &page) else {
             return error(NEED_SESSION, "need_session", "Send the session again.");
         };

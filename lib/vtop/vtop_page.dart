@@ -14,6 +14,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:hooks_riverpod/misc.dart' show ProviderListenable;
 import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
+import 'package:vitapmate/vtop/backend/vtop_backend.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
 import 'package:vitapmate/vtop/client_provider.dart';
@@ -85,19 +86,48 @@ Future<T> loadPage<T>(Ref ref, VtopQuery<T> query) async =>
 
 /// Fetches [query] from VTOP (one request at a time per page) and saves it.
 Future<T> fetchPage<T>(Ref ref, VtopQuery<T> query) async {
-  final key = savedPageKey(query);
-  final data = await flow(
-    'fetch $key',
-    source: 'vtop.page',
-    () =>
-        ref.read(globalAsyncQueueProvider.notifier).run('vtop_$key', () async {
-          await ref.read(vClientProvider.notifier).ensureLogin();
-          return ref.read(vtopBackendProvider).fetch(query);
-        }),
-  );
+  final data = await _onQueue(ref, 'fetch', savedPageKey(query), (
+    backend,
+  ) async {
+    await ref.read(vClientProvider.notifier).ensureLogin();
+    return backend.fetch(query);
+  });
   await writeSavedPage(ref.read, query, data);
   return data;
 }
+
+/// [query] from VTOP without a saved copy (course page, outings,
+/// downloads), queued like [fetchPage] so the status line names it.
+Future<T> fetchUnsaved<T>(Ref ref, VtopQuery<T> query) => _onQueue(
+  ref,
+  'fetch',
+  savedPageKey(query),
+  (backend) => backend.fetch(query),
+);
+
+/// Sends [action] to VTOP once, queued so the status line names it.
+Future<T> sendAction<T>(Ref ref, VtopAction<T> action) => _onQueue(
+  ref,
+  'send',
+  // Never joined with another: two cancels are two requests.
+  '${action.name}_${DateTime.now().microsecondsSinceEpoch}',
+  (backend) => backend.run(action),
+);
+
+/// [body] in its own flow, as queue task `vtop_<key>`.
+Future<T> _onQueue<T>(
+  Ref ref,
+  String verb,
+  String key,
+  Future<T> Function(VtopBackend backend) body,
+) => flow('$verb $key', source: 'vtop.page', () async {
+  // A provider may call this while it builds, when the queue may not
+  // change yet.
+  await Future<void>.microtask(() {});
+  return ref
+      .read(globalAsyncQueueProvider.notifier)
+      .run('vtop_$key', () => body(ref.read(vtopBackendProvider)));
+});
 
 /// Where a page is saved: name, semester and argument values.
 String savedPageKey(VtopQuery<Object?> query) =>
@@ -131,9 +161,13 @@ Future<void> writeSavedPage<T>(Read read, VtopQuery<T> query, T data) async {
 }
 
 /// What the app is doing while queue task [id] runs, for the status line.
-/// Page fetches are queued as `vtop_<savedPageKey>` by [fetchPage].
+/// Page fetches are queued as `vtop_<savedPageKey>` by [fetchPage] and
+/// [fetchUnsaved], actions as `vtop_<name>_<time>` by [sendAction].
 String vtopTaskLabel(String id) {
   if (id.startsWith('vtop_login')) return 'Logging in to VTOP...';
+  if (id.startsWith('vtop_apply_')) return 'Sending outing request...';
+  if (id.startsWith('vtop_cancel_')) return 'Cancelling outing...';
+  if (id.startsWith('vtop_vtop_session')) return 'Preparing download...';
   for (final (name, label) in _pageLabels) {
     if (id.startsWith('vtop_$name')) return 'Fetching $label...';
   }
@@ -163,4 +197,12 @@ const _pageLabels = [
   ('profile', 'profile'),
   ('mentor', 'mentor'),
   ('semesters', 'semesters'),
+  ('course_page_courses', 'courses'),
+  ('course_page_classes', 'course sections'),
+  ('course_page_detail', 'lecture plan'),
+  ('course_file_info', 'course file'),
+  ('course_plan_info', 'course plan'),
+  ('general_outing', 'outings'),
+  ('weekend_outing', 'weekend outings'),
+  ('outing_pass', 'outing pass'),
 ];

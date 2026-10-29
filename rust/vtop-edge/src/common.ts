@@ -47,16 +47,6 @@ export function healthBody(cf: { colo?: unknown } | undefined): {
   return { service: "vtop-edge", status: "ok", version: EDGE_VERSION, colo: typeof colo === "string" ? colo : null };
 }
 
-/** `GET /v1/bench?size=N`: N random bytes (at most 20 000), which nothing
- * on the way can compress, for the app's network bench to time HTTPS
- * against the UDP gateway's synthetic page. */
-export function benchResponse(url: URL): Response {
-  const asked = Number.parseInt(url.searchParams.get("size") ?? "0", 10);
-  const body = new Uint8Array(Math.min(Math.max(Number.isFinite(asked) ? asked : 0, 0), 20_000));
-  crypto.getRandomValues(body);
-  return new Response(body, { headers: { "content-type": "application/octet-stream", "cache-control": "no-store" } });
-}
-
 /** The install named in a call is not registered here (the edge lost it,
  * or it was registered with another server); the app registers again. */
 export function unknownDevice(): Response {

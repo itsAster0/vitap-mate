@@ -1,7 +1,7 @@
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/backend/vtop_query.dart';
-import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
+import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/docs/docs.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
@@ -15,17 +15,17 @@ class OutingService {
   final Ref _ref;
 
   Future<GeneralOutingData> general() =>
-      _ref.read(vtopBackendProvider).fetch(VtopQueries.generalOuting());
+      fetchUnsaved(_ref, VtopQueries.generalOuting());
 
   Future<WeekendOutingData> weekend() =>
-      _ref.read(vtopBackendProvider).fetch(VtopQueries.weekendOuting());
+      fetchUnsaved(_ref, VtopQueries.weekendOuting());
 
   /// Sends [action] once. It may have reached VTOP even when it fails (a
   /// dropped connection, a timeout), so the list it changes is reloaded to
   /// show what VTOP has.
   Future<T> _act<T>(VtopAction<T> action, {required bool weekend}) async {
     try {
-      return await _ref.read(vtopBackendProvider).run(action);
+      return await sendAction(_ref, action);
     } catch (_) {
       _ref.invalidate(weekend ? weekendOutingProvider : generalOutingProvider);
       rethrow;
@@ -91,9 +91,10 @@ class OutingService {
     repository: await _ref.read(docsRepositoryProvider.future),
     docId: 'outing-pass-$passId',
     download: () async => (
-      bytes: await _ref
-          .read(vtopBackendProvider)
-          .fetch(VtopQueries.outingPass(weekend: weekend, passId: passId)),
+      bytes: await fetchUnsaved(
+        _ref,
+        VtopQueries.outingPass(weekend: weekend, passId: passId),
+      ),
       fileName: '$name.pdf',
     ),
   );

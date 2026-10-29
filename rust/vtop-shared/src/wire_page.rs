@@ -15,10 +15,6 @@ pub const NEED_SESSION: u16 = 428;
 pub const TOO_LARGE: u16 = 413;
 /// The gateway has as many engine calls running as it allows: use HTTPS.
 pub const BUSY: u16 = 429;
-/// A page the gateway answers itself with `args["size"]` bytes, for the
-/// app's network bench: it measures the link, not VTOP.
-pub const BENCH_PAGE: &str = "__bench";
-pub const BENCH_MAX: usize = 20_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WirePageRequest {

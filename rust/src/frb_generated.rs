@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1951208430;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1354942896;
 
 // Section: executor
 
@@ -2452,51 +2452,6 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
         },
     )
 }
-fn wire__crate__api__wire__wire_bench_impl(
-    port_: flutter_rust_bridge::for_generated::MessagePort,
-    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
-    rust_vec_len_: i32,
-    data_len_: i32,
-) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
-        flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "wire_bench",
-            port: Some(port_),
-            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
-        },
-        move || {
-            let message = unsafe {
-                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
-                    ptr_,
-                    rust_vec_len_,
-                    data_len_,
-                )
-            };
-            let mut deserializer =
-                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_config = <crate::api::wire::WireConfig>::sse_decode(&mut deserializer);
-            let api_size = <u32>::sse_decode(&mut deserializer);
-            let api_new_session = <bool>::sse_decode(&mut deserializer);
-            let api_timeout_ms = <u32>::sse_decode(&mut deserializer);
-            deserializer.end();
-            move |context| async move {
-                transform_result_sse::<_, crate::api::wire::WireFetchError>(
-                    (move || async move {
-                        let output_ok = crate::api::wire::wire_bench(
-                            api_config,
-                            api_size,
-                            api_new_session,
-                            api_timeout_ms,
-                        )
-                        .await?;
-                        Ok(output_ok)
-                    })()
-                    .await,
-                )
-            }
-        },
-    )
-}
 fn wire__crate__api__wire__wire_fetch_page_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -4742,30 +4697,6 @@ impl SseDecode for crate::api::vtop::types::WeekendOutingRecord {
     }
 }
 
-impl SseDecode for crate::api::wire::WireBench {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_elapsedMs = <u32>::sse_decode(deserializer);
-        let mut var_bytesUp = <u32>::sse_decode(deserializer);
-        let mut var_bytesDown = <u32>::sse_decode(deserializer);
-        let mut var_retries = <u32>::sse_decode(deserializer);
-        let mut var_handshake = <bool>::sse_decode(deserializer);
-        let mut var_rate = <u32>::sse_decode(deserializer);
-        let mut var_rttMs = <u32>::sse_decode(deserializer);
-        let mut var_lossPct = <u32>::sse_decode(deserializer);
-        return crate::api::wire::WireBench {
-            elapsed_ms: var_elapsedMs,
-            bytes_up: var_bytesUp,
-            bytes_down: var_bytesDown,
-            retries: var_retries,
-            handshake: var_handshake,
-            rate: var_rate,
-            rtt_ms: var_rttMs,
-            loss_pct: var_lossPct,
-        };
-    }
-}
-
 impl SseDecode for crate::api::wire::WireConfig {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -5014,8 +4945,7 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__api__wire__wire_bench_impl(port, ptr, rust_vec_len, data_len),
-        45 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -6494,30 +6424,6 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<crate::api::vtop::types::Weeke
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
-impl flutter_rust_bridge::IntoDart for crate::api::wire::WireBench {
-    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.elapsed_ms.into_into_dart().into_dart(),
-            self.bytes_up.into_into_dart().into_dart(),
-            self.bytes_down.into_into_dart().into_dart(),
-            self.retries.into_into_dart().into_dart(),
-            self.handshake.into_into_dart().into_dart(),
-            self.rate.into_into_dart().into_dart(),
-            self.rtt_ms.into_into_dart().into_dart(),
-            self.loss_pct.into_into_dart().into_dart(),
-        ]
-        .into_dart()
-    }
-}
-impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::wire::WireBench {}
-impl flutter_rust_bridge::IntoIntoDart<crate::api::wire::WireBench>
-    for crate::api::wire::WireBench
-{
-    fn into_into_dart(self) -> crate::api::wire::WireBench {
-        self
-    }
-}
-// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::wire::WireConfig {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -7732,20 +7638,6 @@ impl SseEncode for crate::api::vtop::types::WeekendOutingRecord {
     }
 }
 
-impl SseEncode for crate::api::wire::WireBench {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <u32>::sse_encode(self.elapsed_ms, serializer);
-        <u32>::sse_encode(self.bytes_up, serializer);
-        <u32>::sse_encode(self.bytes_down, serializer);
-        <u32>::sse_encode(self.retries, serializer);
-        <bool>::sse_encode(self.handshake, serializer);
-        <u32>::sse_encode(self.rate, serializer);
-        <u32>::sse_encode(self.rtt_ms, serializer);
-        <u32>::sse_encode(self.loss_pct, serializer);
-    }
-}
-
 impl SseEncode for crate::api::wire::WireConfig {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -7828,42 +7720,3 @@ mod io {
 }
 #[cfg(not(target_family = "wasm"))]
 pub use io::*;
-
-/// cbindgen:ignore
-#[cfg(target_family = "wasm")]
-mod web {
-    // This file is automatically generated, so please do not edit it.
-    // @generated by `flutter_rust_bridge`@ 2.12.0.
-
-    // Section: imports
-
-    use super::*;
-    use crate::api::vtop::vtop_client::*;
-    use flutter_rust_bridge::for_generated::byteorder::{
-        NativeEndian, ReadBytesExt, WriteBytesExt,
-    };
-    use flutter_rust_bridge::for_generated::wasm_bindgen;
-    use flutter_rust_bridge::for_generated::wasm_bindgen::prelude::*;
-    use flutter_rust_bridge::for_generated::{transform_result_dco, Lifetimeable, Lockable};
-    use flutter_rust_bridge::{Handler, IntoIntoDart};
-
-    // Section: boilerplate
-
-    flutter_rust_bridge::frb_generated_boilerplate_web!();
-
-    #[wasm_bindgen]
-    pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>::increment_strong_count(ptr as _);
-    }
-
-    #[wasm_bindgen]
-    pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerVtopClient(
-        ptr: *const std::ffi::c_void,
-    ) {
-        MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>>::decrement_strong_count(ptr as _);
-    }
-}
-#[cfg(target_family = "wasm")]
-pub use web::*;
