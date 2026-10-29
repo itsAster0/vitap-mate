@@ -75,7 +75,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1951208430;
+  int get rustContentHash => -1354942896;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -299,13 +299,6 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiVtopGetClientVtopClientSubmitSecurityOtp({
     required VtopClient client,
     required String otpCode,
-  });
-
-  Future<WireBench> crateApiWireWireBench({
-    required WireConfig config,
-    required int size,
-    required bool newSession,
-    required int timeoutMs,
   });
 
   Future<WirePage> crateApiWireWireFetchPage({
@@ -1916,44 +1909,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<WireBench> crateApiWireWireBench({
-    required WireConfig config,
-    required int size,
-    required bool newSession,
-    required int timeoutMs,
-  }) {
-    return handler.executeNormal(
-      NormalTask(
-        callFfi: (port_) {
-          final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_box_autoadd_wire_config(config, serializer);
-          sse_encode_u_32(size, serializer);
-          sse_encode_bool(newSession, serializer);
-          sse_encode_u_32(timeoutMs, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 44,
-            port: port_,
-          );
-        },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_wire_bench,
-          decodeErrorData: sse_decode_wire_fetch_error,
-        ),
-        constMeta: kCrateApiWireWireBenchConstMeta,
-        argValues: [config, size, newSession, timeoutMs],
-        apiImpl: this,
-      ),
-    );
-  }
-
-  TaskConstMeta get kCrateApiWireWireBenchConstMeta => const TaskConstMeta(
-    debugName: "wire_bench",
-    argNames: ["config", "size", "newSession", "timeoutMs"],
-  );
-
-  @override
   Future<WirePage> crateApiWireWireFetchPage({
     required WireConfig config,
     required String sessionJson,
@@ -1977,7 +1932,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 45,
+            funcId: 44,
             port: port_,
           );
         },
@@ -3281,24 +3236,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       status: dco_decode_String(arr[7]),
       passId: dco_decode_String(arr[8]),
       cancelId: dco_decode_String(arr[9]),
-    );
-  }
-
-  @protected
-  WireBench dco_decode_wire_bench(dynamic raw) {
-    // Codec=Dco (DartCObject based), see doc to use other codecs
-    final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
-    return WireBench(
-      elapsedMs: dco_decode_u_32(arr[0]),
-      bytesUp: dco_decode_u_32(arr[1]),
-      bytesDown: dco_decode_u_32(arr[2]),
-      retries: dco_decode_u_32(arr[3]),
-      handshake: dco_decode_bool(arr[4]),
-      rate: dco_decode_u_32(arr[5]),
-      rttMs: dco_decode_u_32(arr[6]),
-      lossPct: dco_decode_u_32(arr[7]),
     );
   }
 
@@ -5007,29 +4944,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WireBench sse_decode_wire_bench(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_elapsedMs = sse_decode_u_32(deserializer);
-    var var_bytesUp = sse_decode_u_32(deserializer);
-    var var_bytesDown = sse_decode_u_32(deserializer);
-    var var_retries = sse_decode_u_32(deserializer);
-    var var_handshake = sse_decode_bool(deserializer);
-    var var_rate = sse_decode_u_32(deserializer);
-    var var_rttMs = sse_decode_u_32(deserializer);
-    var var_lossPct = sse_decode_u_32(deserializer);
-    return WireBench(
-      elapsedMs: var_elapsedMs,
-      bytesUp: var_bytesUp,
-      bytesDown: var_bytesDown,
-      retries: var_retries,
-      handshake: var_handshake,
-      rate: var_rate,
-      rttMs: var_rttMs,
-      lossPct: var_lossPct,
-    );
-  }
-
-  @protected
   WireConfig sse_decode_wire_config(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_host = sse_decode_String(deserializer);
@@ -6409,19 +6323,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.status, serializer);
     sse_encode_String(self.passId, serializer);
     sse_encode_String(self.cancelId, serializer);
-  }
-
-  @protected
-  void sse_encode_wire_bench(WireBench self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_u_32(self.elapsedMs, serializer);
-    sse_encode_u_32(self.bytesUp, serializer);
-    sse_encode_u_32(self.bytesDown, serializer);
-    sse_encode_u_32(self.retries, serializer);
-    sse_encode_bool(self.handshake, serializer);
-    sse_encode_u_32(self.rate, serializer);
-    sse_encode_u_32(self.rttMs, serializer);
-    sse_encode_u_32(self.lossPct, serializer);
   }
 
   @protected

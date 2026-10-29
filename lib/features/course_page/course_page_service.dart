@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
-import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
@@ -30,9 +29,7 @@ final coursePageServiceProvider = Provider<CoursePageService>(
 final coursePageCoursesProvider = FutureProvider.autoDispose<CoursePageCourses>(
   (ref) async {
     final semester = await ref.watch(selectedSemesterProvider.future);
-    return ref
-        .read(vtopBackendProvider)
-        .fetch(VtopQueries.coursePageCourses(semester));
+    return fetchUnsaved(ref, VtopQueries.coursePageCourses(semester));
   },
 );
 
@@ -40,24 +37,20 @@ final coursePageCoursesProvider = FutureProvider.autoDispose<CoursePageCourses>(
 final coursePageClassesProvider = FutureProvider.autoDispose
     .family<CoursePageClasses, String>((ref, courseId) async {
       final semester = await ref.watch(selectedSemesterProvider.future);
-      return ref
-          .read(vtopBackendProvider)
-          .fetch(VtopQueries.coursePageClasses(semester, courseId: courseId));
+      return fetchUnsaved(
+        ref,
+        VtopQueries.coursePageClasses(semester, courseId: courseId),
+      );
     });
 
 /// A class's lecture plan, by (faculty erp id, class id).
 final coursePageDetailProvider = FutureProvider.autoDispose
     .family<CoursePageDetail, (String, String)>((ref, key) async {
       final semester = await ref.watch(selectedSemesterProvider.future);
-      return ref
-          .read(vtopBackendProvider)
-          .fetch(
-            VtopQueries.coursePageDetail(
-              semester,
-              erpId: key.$1,
-              classId: key.$2,
-            ),
-          );
+      return fetchUnsaved(
+        ref,
+        VtopQueries.coursePageDetail(semester, erpId: key.$1, classId: key.$2),
+      );
     });
 
 class CoursePageService {
@@ -70,9 +63,7 @@ class CoursePageService {
   /// URL, cookie and those headers to [downloadFile], so the system download
   /// manager saves it to Downloads under VTOP's own file name.
   Future<void> file(String path) async {
-    final info = await _ref
-        .read(vtopBackendProvider)
-        .fetch(VtopQueries.courseFileInfo(path));
+    final info = await fetchUnsaved(_ref, VtopQueries.courseFileInfo(path));
     await _download('$_vtopBase/$path', info, withCsrf: true);
   }
 
@@ -81,9 +72,10 @@ class CoursePageService {
     required String semesterId,
     required String classId,
   }) async {
-    final info = await _ref
-        .read(vtopBackendProvider)
-        .fetch(VtopQueries.coursePlanInfo(semesterId, classId: classId));
+    final info = await fetchUnsaved(
+      _ref,
+      VtopQueries.coursePlanInfo(semesterId, classId: classId),
+    );
     await _download(
       '$_vtopBase/academics/common/CoursePlanExcelDownload',
       info,
@@ -99,9 +91,7 @@ class CoursePageService {
   }) async {
     // The file streams from VTOP to the system downloader, with the
     // session the mode says: the server's, so the phone need not sign in.
-    final session = await _ref
-        .read(vtopBackendProvider)
-        .fetch(VtopQueries.vtopSession());
+    final session = await fetchUnsaved(_ref, VtopQueries.vtopSession());
     final params = Uri(
       queryParameters: {
         ...query,

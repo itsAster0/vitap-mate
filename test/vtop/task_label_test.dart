@@ -29,6 +29,26 @@ void main() {
     );
     expect(label(savedPageKey(VtopQueries.profile())), 'Fetching profile...');
     expect(vtopTaskLabel('vtop_login_X'), 'Logging in to VTOP...');
+    expect(
+      label(savedPageKey(VtopQueries.coursePageCourses('S'))),
+      'Fetching courses...',
+    );
+    expect(
+      label(savedPageKey(VtopQueries.coursePageClasses('S', courseId: 'C'))),
+      'Fetching course sections...',
+    );
+    expect(
+      label(savedPageKey(VtopQueries.generalOuting())),
+      'Fetching outings...',
+    );
+    expect(
+      label(savedPageKey(VtopQueries.vtopSession())),
+      'Preparing download...',
+    );
+    expect(
+      vtopTaskLabel('vtop_cancel_general_outing_1'),
+      'Cancelling outing...',
+    );
   });
 
   test('an unknown task still says what it is', () {

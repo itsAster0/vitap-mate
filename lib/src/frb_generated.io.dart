@@ -394,9 +394,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeekendOutingRecord dco_decode_weekend_outing_record(dynamic raw);
 
   @protected
-  WireBench dco_decode_wire_bench(dynamic raw);
-
-  @protected
   WireConfig dco_decode_wire_config(dynamic raw);
 
   @protected
@@ -862,9 +859,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeekendOutingRecord sse_decode_weekend_outing_record(
     SseDeserializer deserializer,
   );
-
-  @protected
-  WireBench sse_decode_wire_bench(SseDeserializer deserializer);
 
   @protected
   WireConfig sse_decode_wire_config(SseDeserializer deserializer);
@@ -1457,9 +1451,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     WeekendOutingRecord self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_wire_bench(WireBench self, SseSerializer serializer);
 
   @protected
   void sse_encode_wire_config(WireConfig self, SseSerializer serializer);
