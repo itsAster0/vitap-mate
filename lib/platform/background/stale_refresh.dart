@@ -47,10 +47,6 @@ class StaleRefresher {
   /// The user's requests go first; wait this long after the last one.
   static const _quietPeriod = Duration(seconds: 2);
 
-  /// A page slower than this means the network got worse: stop, so the
-  /// refresh never competes with the user on a slow connection.
-  static const _slowPage = Duration(seconds: 5);
-
   /// Stop this long before the session would need a new login.
   static const _sessionMargin = Duration(minutes: 5);
 
@@ -69,11 +65,16 @@ class StaleRefresher {
     if (!_ref.read(autoRefreshProvider)) return;
     _running = true;
     _lastRun = DateTime.now();
+    final failures = _ref.read(backgroundFailuresProvider.notifier);
     try {
       await refresh();
+      failures.clear();
+    } on _Stop catch (stop) {
+      Log.info('sync.stale', 'refresh stopped: ${stop.reason}');
     } catch (error) {
       // Saved data stays as it was; the next quick fetch tries again.
-      Log.info('sync.stale', 'refresh stopped: $error');
+      failures.add();
+      Log.warn('sync.stale', 'refresh failed: $error');
     } finally {
       _running = false;
     }
@@ -88,12 +89,15 @@ class StaleRefresher {
       if (updatedAt != null && isVtopDataFresh(updatedAt, maxAge)) return;
       await _waitForIdle();
       if (!await _sessionLive()) {
-        throw StateError('session needs a new login');
+        throw const _Stop('session needs a new login');
       }
       final watch = Stopwatch()..start();
       await update();
-      if (watch.elapsed > _slowPage) {
-        throw StateError('network is slow (${watch.elapsed.inSeconds}s page)');
+      // A slow page means the network got worse: stop, so the refresh
+      // never competes with the user (see [backgroundPageTimeout]).
+      if (watch.elapsed.inSeconds >
+          _ref.read(tunableProvider(backgroundPageTimeout))) {
+        throw _Stop('network is slow (${watch.elapsed.inSeconds}s page)');
       }
     }
 
@@ -182,4 +186,25 @@ class StaleRefresher {
     final limit = reuse < _vtopSessionLength ? reuse : _vtopSessionLength;
     return age < limit - _sessionMargin;
   }
+}
+
+/// A deliberate stop (slow network, session about to expire), not a failure.
+class _Stop implements Exception {
+  const _Stop(this.reason);
+
+  final String reason;
+}
+
+/// Background refreshes that failed in a row; the header says so past
+/// [failureHintAfter]. Deliberate stops do not count.
+final backgroundFailuresProvider = NotifierProvider<BackgroundFailures, int>(
+  BackgroundFailures.new,
+);
+
+class BackgroundFailures extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void add() => state++;
+  void clear() => state = 0;
 }

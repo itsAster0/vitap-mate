@@ -90,6 +90,26 @@ class DebugPage extends HookConsumerWidget {
               ],
             ),
           ],
+          const SectionHeader(title: 'Timeouts'),
+          FTileGroup(
+            divider: .indented,
+            children: [
+              for (final tunable in tunables)
+                tile(
+                  tunable.title,
+                  FLucideIcons.hourglass,
+                  () => _editNumber(
+                    context,
+                    title: tunable.title,
+                    prompt: 'Default: ${tunable.fallback}${tunable.unit}',
+                    current: ref.read(tunableProvider(tunable)),
+                    onSave: (value) => setTunable(ref, tunable, value),
+                  ),
+                  subtitle:
+                      '${ref.watch(tunableProvider(tunable))}${tunable.unit}',
+                ),
+            ],
+          ),
           const SectionHeader(title: 'Session'),
           FTileGroup(
             divider: .indented,
@@ -97,7 +117,14 @@ class DebugPage extends HookConsumerWidget {
               tile(
                 'VTOP Session Reuse',
                 FLucideIcons.timer,
-                () => _openVtopSessionReuseTtlDialog(context, ref),
+                () => _editNumber(
+                  context,
+                  title: 'VTOP Session Reuse',
+                  prompt: 'Minutes saved cookies can be reused.',
+                  current: reuseTtl.inMinutes,
+                  onSave: (minutes) =>
+                      setVtopSessionReuseTtl(ref, Duration(minutes: minutes)),
+                ),
                 subtitle:
                     'Reuse saved cookies for ${reuseTtl.inMinutes} minutes',
               ),
@@ -394,79 +421,70 @@ Future<void> _clearSavedCookies(BuildContext context, WidgetRef ref) async {
   }
 }
 
-Future<void> _openVtopSessionReuseTtlDialog(
-  BuildContext context,
-  WidgetRef ref,
-) async {
-  final currentTtl = ref.read(vtopSessionReuseTtlProvider);
-
-  await showAdaptiveDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    builder: (_) => HookBuilder(
-      builder: (dialogContext) {
-        final controller = useTextEditingController(
-          text: currentTtl.inMinutes.toString(),
-        );
-        final errorText = useState<String?>(null);
-
-        return AppDialog(
-          title: const Text('VTOP Session Reuse'),
-          body: Column(
-            mainAxisSize: .min,
-            crossAxisAlignment: .start,
-            children: [
-              const Text('Enter how long saved cookies can be reused.'),
+/// Asks for a whole number above 0 and saves it with [onSave].
+Future<void> _editNumber(
+  BuildContext context, {
+  required String title,
+  required String prompt,
+  required int current,
+  required Future<void> Function(int value) onSave,
+}) => showAdaptiveDialog<void>(
+  context: context,
+  barrierDismissible: true,
+  builder: (_) => HookBuilder(
+    builder: (dialogContext) {
+      final controller = useTextEditingController(text: '$current');
+      final errorText = useState<String?>(null);
+      return AppDialog(
+        title: Text(title),
+        body: Column(
+          mainAxisSize: .min,
+          crossAxisAlignment: .start,
+          children: [
+            Text(prompt),
+            const SizedBox(height: 8),
+            FTextField(
+              control: FTextFieldControl.managed(controller: controller),
+              keyboardType: .number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            ),
+            if (errorText.value case final error?) ...[
               const SizedBox(height: 8),
-              FTextField(
-                control: FTextFieldControl.managed(controller: controller),
-                keyboardType: .number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              if (errorText.value case final error?) ...[
-                const SizedBox(height: 8),
-                Text(
-                  error,
-                  style: dialogContext.theme.typography.body.sm.copyWith(
-                    color: dialogContext.theme.colors.destructive,
-                  ),
+              Text(
+                error,
+                style: dialogContext.theme.typography.body.sm.copyWith(
+                  color: dialogContext.theme.colors.destructive,
                 ),
-              ],
+              ),
             ],
-          ),
-          actions: [
-            FButton(
-              variant: .outline,
-              onPress: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FButton(
-              onPress: () async {
-                final minutes = int.tryParse(controller.text.trim());
-                if (minutes == null || minutes <= 0) {
-                  errorText.value = 'Enter minutes greater than 0.';
-                  return;
-                }
-
-                await setVtopSessionReuseTtl(ref, Duration(minutes: minutes));
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop();
-                if (context.mounted) {
-                  dispToast(
-                    context,
-                    'Saved',
-                    'VTOP sessions will be reused for $minutes minutes.',
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
           ],
-        );
-      },
-    ),
-  );
-}
+        ),
+        actions: [
+          FButton(
+            variant: .outline,
+            onPress: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FButton(
+            onPress: () async {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null || value <= 0) {
+                errorText.value = 'Enter a number greater than 0.';
+                return;
+              }
+              await onSave(value);
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              if (context.mounted) {
+                dispToast(context, 'Saved', '$title: $value');
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      );
+    },
+  ),
+);
 
 Future<void> _testLatestInfoEmail(BuildContext context, WidgetRef ref) async {
   try {

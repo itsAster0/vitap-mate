@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
@@ -131,7 +132,7 @@ Future<WirePage> rustWirePage({
   semester: semester,
   args: [for (final e in args.entries) (e.key, e.value)],
   dictionary: dictionary,
-  timeoutMs: ServerVtopApi.wireTimeout.inMilliseconds,
+  timeoutMs: await currentTunable(udpTimeout) * 1000,
 );
 
 Future<bool> _never() async => false;
@@ -158,12 +159,6 @@ class ServerVtopApi {
 
   /// Fixed for tests; otherwise the server URL in use at each call.
   final String? _baseUrl;
-
-  /// Over the edge's own 32 s, which is over the engine's VTOP limits.
-  static const timeout = Duration(seconds: 35);
-
-  /// A page over UDP at 1 kbit/s can take this long.
-  static const wireTimeout = Duration(seconds: 45);
 
   /// After the gateway does not answer, pages use HTTPS for this long.
   static const wireRetryAfter = Duration(minutes: 10);
@@ -306,7 +301,7 @@ class ServerVtopApi {
             headers: {'content-type': 'application/json'},
             body: jsonEncode(body),
           )
-          .timeout(timeout);
+          .timeout(Duration(seconds: await currentTunable(serverTimeout)));
     } on TimeoutException {
       throw const VtopError.vtopUnavailable(
         'The server took too long to answer.',

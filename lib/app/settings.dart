@@ -49,6 +49,7 @@ final settingsProvider = FutureProvider<SharedPreferencesWithCache>(
         _changeAlertsKey,
         for (final type in ChangeAlertTypeSetting.values) type.prefKey,
         vtopSessionReuseTtlSettingKey,
+        for (final tunable in tunables) tunable.key,
         'settings_student_projects_pinned_ids',
         'settings_student_projects_json',
         'settings_student_projects_rotation_seed',
@@ -109,6 +110,69 @@ Future<void> _set(
   await _write(ref.read(settingsProvider.future), key, value, legacy: legacy);
   if (whenMounted && !ref.context.mounted) return;
   ref.invalidate(provider);
+}
+
+/// A number tuned in Developer settings, in [unit]s.
+typedef Tunable = ({String key, String title, String unit, int fallback});
+
+/// A background page slower than this stops the refresh (the network got
+/// worse), so it never competes with the user.
+const backgroundPageTimeout = (
+  key: 'settings_background_page_timeout_s',
+  title: 'Background page timeout',
+  unit: 's',
+  fallback: 5,
+);
+
+/// Over the edge's own 32 s, which is over the engine's VTOP limits.
+const serverTimeout = (
+  key: 'settings_server_timeout_s',
+  title: 'Server request timeout',
+  unit: 's',
+  fallback: 35,
+);
+
+/// A page over UDP at 1 kbit/s can take this long.
+const udpTimeout = (
+  key: 'settings_udp_timeout_s',
+  title: 'UDP request timeout',
+  unit: 's',
+  fallback: 45,
+);
+
+/// Background refreshes that fail in a row before the header says so.
+const failureHintAfter = (
+  key: 'settings_failure_hint_after',
+  title: 'Hint after failed refreshes',
+  unit: '',
+  fallback: 3,
+);
+
+const tunables = [
+  backgroundPageTimeout,
+  serverTimeout,
+  udpTimeout,
+  failureHintAfter,
+];
+
+final tunableProvider = Provider.autoDispose.family<int, Tunable>(
+  (ref, tunable) =>
+      ref.watch(settingsProvider).value?.getInt(tunable.key) ??
+      tunable.fallback,
+);
+
+Future<void> setTunable(WidgetRef ref, Tunable tunable, int value) =>
+    _set(ref, tunableProvider(tunable), tunable.key, value);
+
+/// [tunable] where there is no Ref (services, background isolates). Its
+/// default when the setting cannot be read: a setting never breaks a call.
+Future<int> currentTunable(Tunable tunable) async {
+  try {
+    return await SharedPreferencesAsync().getInt(tunable.key) ??
+        tunable.fallback;
+  } catch (_) {
+    return tunable.fallback;
+  }
 }
 
 Provider<bool> _boolSetting(String key, bool fallback) => Provider.autoDispose(

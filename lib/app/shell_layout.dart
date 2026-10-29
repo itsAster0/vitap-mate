@@ -8,6 +8,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/timetable/widgets/timetable_view_toggle_button.dart';
 import 'package:vitapmate/features/attendance/attendance_guide_page.dart';
@@ -55,9 +56,14 @@ class ShellLayout extends HookConsumerWidget {
         configuration.lastOrNull?.matchedLocation ?? configuration.uri.path;
     final queueStatus = _queueStatusText(runningTasks);
     final isNestedRoute = location.split('/').length - 1 > 1;
-    final headerSubtitle = isNestedRoute
-        ? queueStatus
-        : queueStatus ?? (newSemExist ? "New semester data available!" : null);
+    // Quiet: only when nothing runs, after several failures in a row.
+    final failing =
+        ref.watch(backgroundFailuresProvider) >=
+        ref.watch(tunableProvider(failureHintAfter));
+    final headerSubtitle =
+        queueStatus ??
+        (failing ? 'Background refresh keeps failing' : null) ??
+        (!isNestedRoute && newSemExist ? 'New semester data available!' : null);
     final selected = useState(0);
     useEffect(() {
       if (_tabs.indexWhere((tab) => tab.prefixes.any(location.startsWith))
