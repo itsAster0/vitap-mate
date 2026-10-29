@@ -77,7 +77,8 @@ class SettingsPage extends HookConsumerWidget {
     final showDebugFeatures = useState(false);
     final isEmailOtpReady = useState<bool?>(null);
     final isGmailOtpReady = useState(false);
-    final showEmailOtp = useState(false);
+    // Shown at once (its status fills in later); hidden if loading fails.
+    final showEmailOtp = useState(true);
     final isVtopSyncing = useState(false);
     final packageInfo = useFuture(
       useMemoized(PackageInfo.fromPlatform, const []),
@@ -86,7 +87,6 @@ class SettingsPage extends HookConsumerWidget {
 
     Future<void> refreshEmailOtpReady() async {
       try {
-        showEmailOtp.value = true;
         ref
           ..invalidate(emailOtpReadyProvider)
           ..invalidate(anyEmailOtpReadyProvider);
@@ -103,7 +103,9 @@ class SettingsPage extends HookConsumerWidget {
     }
 
     useEffect(() {
-      unawaited(refreshEmailOtpReady());
+      // After the first build: refreshing invalidates providers, which a
+      // widget may not do while it is first being built.
+      unawaited(Future.microtask(refreshEmailOtpReady));
       return null;
     }, const []);
     final syncFreq =
