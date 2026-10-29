@@ -4826,10 +4826,13 @@ impl SseDecode for crate::api::wire::WireFetchError {
                 return crate::api::wire::WireFetchError::Timeout;
             }
             2 => {
+                return crate::api::wire::WireFetchError::WrongKey;
+            }
+            3 => {
                 let mut var_field0 = <String>::sse_decode(deserializer);
                 return crate::api::wire::WireFetchError::Unsupported(var_field0);
             }
-            3 => {
+            4 => {
                 let mut var_field0 = <String>::sse_decode(deserializer);
                 return crate::api::wire::WireFetchError::Failed(var_field0);
             }
@@ -6553,11 +6556,12 @@ impl flutter_rust_bridge::IntoDart for crate::api::wire::WireFetchError {
         match self {
             crate::api::wire::WireFetchError::Unreachable => [0.into_dart()].into_dart(),
             crate::api::wire::WireFetchError::Timeout => [1.into_dart()].into_dart(),
+            crate::api::wire::WireFetchError::WrongKey => [2.into_dart()].into_dart(),
             crate::api::wire::WireFetchError::Unsupported(field0) => {
-                [2.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+                [3.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
             crate::api::wire::WireFetchError::Failed(field0) => {
-                [3.into_dart(), field0.into_into_dart().into_dart()].into_dart()
+                [4.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
             _ => {
                 unimplemented!("");
@@ -7763,12 +7767,15 @@ impl SseEncode for crate::api::wire::WireFetchError {
             crate::api::wire::WireFetchError::Timeout => {
                 <i32>::sse_encode(1, serializer);
             }
-            crate::api::wire::WireFetchError::Unsupported(field0) => {
+            crate::api::wire::WireFetchError::WrongKey => {
                 <i32>::sse_encode(2, serializer);
+            }
+            crate::api::wire::WireFetchError::Unsupported(field0) => {
+                <i32>::sse_encode(3, serializer);
                 <String>::sse_encode(field0, serializer);
             }
             crate::api::wire::WireFetchError::Failed(field0) => {
-                <i32>::sse_encode(3, serializer);
+                <i32>::sse_encode(4, serializer);
                 <String>::sse_encode(field0, serializer);
             }
             _ => {

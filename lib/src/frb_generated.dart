@@ -3409,8 +3409,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 1:
         return WireFetchError_Timeout();
       case 2:
-        return WireFetchError_Unsupported(dco_decode_String(raw[1]));
+        return WireFetchError_WrongKey();
       case 3:
+        return WireFetchError_Unsupported(dco_decode_String(raw[1]));
+      case 4:
         return WireFetchError_Failed(dco_decode_String(raw[1]));
       default:
         throw Exception("unreachable");
@@ -5117,9 +5119,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case 1:
         return WireFetchError_Timeout();
       case 2:
+        return WireFetchError_WrongKey();
+      case 3:
         var var_field0 = sse_decode_String(deserializer);
         return WireFetchError_Unsupported(var_field0);
-      case 3:
+      case 4:
         var var_field0 = sse_decode_String(deserializer);
         return WireFetchError_Failed(var_field0);
       default:
@@ -6495,11 +6499,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_i_32(0, serializer);
       case WireFetchError_Timeout():
         sse_encode_i_32(1, serializer);
-      case WireFetchError_Unsupported(field0: final field0):
+      case WireFetchError_WrongKey():
         sse_encode_i_32(2, serializer);
+      case WireFetchError_Unsupported(field0: final field0):
+        sse_encode_i_32(3, serializer);
         sse_encode_String(field0, serializer);
       case WireFetchError_Failed(field0: final field0):
-        sse_encode_i_32(3, serializer);
+        sse_encode_i_32(4, serializer);
         sse_encode_String(field0, serializer);
     }
   }

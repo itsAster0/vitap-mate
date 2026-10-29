@@ -1,5 +1,6 @@
-# The UDP gateway alone (vtop-gateway), for running it next to an engine
-# elsewhere. On Fly the engine runs the gateway itself: see fly.toml.
+# The UDP gateway alone (vtop-gateway), for the VPS (see vps/compose.yml),
+# with this folder as context. The engine runs elsewhere (Railway); the
+# gateway reaches it at ENGINE_URL.
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
 COPY . .

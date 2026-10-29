@@ -28,7 +28,7 @@ use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
     GmailGrant, LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
-    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
+    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT, UDP_KEYS_INTERNAL,
 };
 use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
@@ -47,6 +47,11 @@ pub trait EdgeLink: Send + Sync {
     /// `request.public_key`; `None` when nothing came in time.
     async fn await_otp(&self, request: &OtpAwait) -> Result<Option<String>, EdgeError>;
     async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError>;
+    /// The UDP gateway's keys, sealed to the gateway: this engine cannot
+    /// open them.
+    async fn udp_keys(&self) -> Result<String, EdgeError> {
+        Err(EdgeError::Unavailable("no UDP keys here".into()))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -107,6 +112,29 @@ impl EdgeLink for HttpEdge {
                 response.status()
             )))
         }
+    }
+
+    async fn udp_keys(&self) -> Result<String, EdgeError> {
+        let unavailable = |error: String| EdgeError::Unavailable(error);
+        let response = self
+            .http
+            .get(format!("{}{UDP_KEYS_INTERNAL}", self.base_url))
+            .bearer_auth(&self.secret)
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await
+            .map_err(|error| unavailable(error.without_url().to_string()))?;
+        if !response.status().is_success() {
+            return Err(unavailable(format!("edge answered {}", response.status())));
+        }
+        let body: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|error| unavailable(error.to_string()))?;
+        body["sealed"]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| unavailable("no sealed keys in the answer".into()))
     }
 }
 
@@ -322,6 +350,26 @@ pub async fn session(
         }
     };
     Ok(Json(outcome).into_response())
+}
+
+/// The UDP gateway's keys for the gateway, which holds the engine secret:
+/// sealed by the edge to the gateway's own key, so passed on unopened.
+pub async fn udp_keys(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<Response, ApiError> {
+    require_secret(&state, &headers)?;
+    match state.edge.udp_keys().await {
+        Ok(sealed) => Ok(Json(json!({ "sealed": sealed })).into_response()),
+        Err(error) => {
+            tracing::warn!("engine: no UDP keys from the edge: {error:?}");
+            Err(ApiError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "edge_unavailable",
+                "The edge did not hand out the UDP keys.",
+            ))
+        }
+    }
 }
 
 /// Seals saved credentials for an account; the edge stores the result.
@@ -566,6 +614,7 @@ mod tests {
         no_mailbox: bool,
         done: Mutex<Vec<LoginDone>>,
         awaited: Mutex<Vec<OtpAwait>>,
+        udp_keys: Option<&'static str>,
     }
 
     #[async_trait]
@@ -589,6 +638,12 @@ mod tests {
         async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError> {
             self.done.lock().unwrap().push(done.clone());
             Ok(())
+        }
+
+        async fn udp_keys(&self) -> Result<String, EdgeError> {
+            self.udp_keys
+                .map(str::to_owned)
+                .ok_or_else(|| EdgeError::Unavailable("down".into()))
         }
     }
 
@@ -648,6 +703,32 @@ mod tests {
             status,
             serde_json::from_slice(&bytes).unwrap_or(Value::Null),
         )
+    }
+
+    #[tokio::test]
+    async fn udp_keys_pass_through_unopened() {
+        let edge = Arc::new(FakeEdge {
+            udp_keys: Some("sealed-box"),
+            ..FakeEdge::default()
+        });
+        let (app, _) = engine_app(edge, FakeLogin::default());
+        let get = |auth: &'static str| {
+            let request = Request::builder()
+                .uri(vtop_shared::engine::UDP_KEYS)
+                .header("authorization", format!("Bearer {auth}"))
+                .body(Body::empty())
+                .unwrap();
+            app.clone().oneshot(request)
+        };
+        let response = get(RELAY).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body, json!({ "sealed": "sealed-box" }));
+        assert_eq!(
+            get("wrong").await.unwrap().status(),
+            StatusCode::UNAUTHORIZED
+        );
     }
 
     async fn wait_for_done(edge: &FakeEdge) -> LoginDone {

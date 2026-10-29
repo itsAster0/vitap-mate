@@ -45,6 +45,9 @@ pub enum WireFetchError {
     Unreachable,
     /// The gateway answered but the page did not complete in time.
     Timeout,
+    /// The gateway cannot read the handshake: the app's key for it is wrong
+    /// or old, and should be fetched again.
+    WrongKey,
     /// The request is too large for UDP, or the configuration is invalid.
     Unsupported(String),
     Failed(String),
@@ -138,6 +141,7 @@ async fn send(
         WireError::Unreachable => WireFetchError::Unreachable,
         WireError::Timeout => WireFetchError::Timeout,
         WireError::TooLarge => WireFetchError::Unsupported(e.to_string()),
+        WireError::WrongKey => WireFetchError::WrongKey,
         WireError::Io(_) => WireFetchError::Failed(e.to_string()),
     })?;
     let page = WirePageResponse::decode(&fetched.body)

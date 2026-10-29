@@ -166,13 +166,23 @@ async fn spawn_gateway(
     port: u16,
     delay: Duration,
 ) -> TestGateway {
+    spawn_rotated_gateway(keys, vec![], port, delay).await
+}
+
+/// [spawn_gateway] that also takes `older` keys, as after a rotation.
+async fn spawn_rotated_gateway(
+    keys: Option<([u8; 32], [u8; 32])>,
+    older: Vec<[u8; 32]>,
+    port: u16,
+    delay: Duration,
+) -> TestGateway {
     let (private, public) = keys.unwrap_or_else(crate::generate_keypair);
     let sock = Arc::new(UdpSocket::bind(("127.0.0.1", port)).await.unwrap());
     let port = sock.local_addr().unwrap().port();
     let seen: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
     let seen2 = seen.clone();
     let task = tokio::spawn(async move {
-        let mut gw = Gateway::new(private);
+        let mut gw = Gateway::new([vec![private], older].concat());
         let (tx, mut rx) = mpsc::unbounded_channel::<(Token, Vec<u8>)>();
         let mut buf = [0u8; 1500];
         loop {
@@ -334,6 +344,49 @@ async fn nothing_listening_is_unreachable() {
 }
 
 #[tokio::test]
+async fn a_wrong_key_is_told_at_once() {
+    let gw = spawn_gateway(None, 0, Duration::ZERO).await;
+    let (_, other) = crate::generate_keypair();
+    let dir = state_dir("wrong-key");
+    let started = std::time::Instant::now();
+    let got = fetch(
+        &config(gw.port, other, &dir),
+        &ask(10),
+        Duration::from_secs(20),
+    )
+    .await;
+    assert_eq!(got.map(|g| g.body), Err(WireError::WrongKey));
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "not after a timeout"
+    );
+    gw.task.abort();
+}
+
+#[tokio::test]
+async fn last_weeks_key_still_works_after_a_rotation() {
+    let (old_private, old_public) = crate::generate_keypair();
+    let gw = spawn_rotated_gateway(None, vec![old_private], 0, Duration::ZERO).await;
+    let dir = state_dir("rotated");
+    let got = fetch(
+        &config(gw.port, old_public, &dir),
+        &ask(100),
+        Duration::from_secs(20),
+    )
+    .await;
+    assert_eq!(got.map(|g| g.body), Ok(answer(100)));
+    let dir = state_dir("rotated-new");
+    let got = fetch(
+        &config(gw.port, gw.public, &dir),
+        &ask(100),
+        Duration::from_secs(20),
+    )
+    .await;
+    assert_eq!(got.map(|g| g.body), Ok(answer(100)));
+    gw.task.abort();
+}
+
+#[tokio::test]
 async fn a_restarted_gateway_gets_a_new_handshake() {
     let gw = spawn_gateway(None, 0, Duration::ZERO).await;
     let dir = state_dir("restart");
@@ -351,6 +404,36 @@ async fn a_restarted_gateway_gets_a_new_handshake() {
     assert_eq!(got.body, answer(100));
     assert!(got.handshake);
     again.task.abort();
+}
+
+#[tokio::test]
+async fn a_new_gateway_key_starts_a_new_session() {
+    let gw = spawn_gateway(None, 0, Duration::ZERO).await;
+    let dir = state_dir("new-key");
+    fetch(
+        &config(gw.port, gw.public, &dir),
+        &ask(100),
+        Duration::from_secs(20),
+    )
+    .await
+    .unwrap();
+    gw.task.abort();
+    let _ = gw.task.await;
+    // Another gateway (another key) on the same port: the saved session is
+    // not offered to it, so no resets it cannot prove are waited out.
+    let other = spawn_gateway(None, gw.port, Duration::ZERO).await;
+    let started = std::time::Instant::now();
+    let got = fetch(
+        &config(other.port, other.public, &dir),
+        &ask(100),
+        Duration::from_secs(20),
+    )
+    .await
+    .unwrap();
+    assert_eq!(got.body, answer(100));
+    assert!(got.handshake);
+    assert!(started.elapsed() < Duration::from_secs(5));
+    other.task.abort();
 }
 
 #[tokio::test]
@@ -421,13 +504,13 @@ async fn a_replayed_message_1_runs_nothing() {
     // A fresh gateway with the same key has no record of the ephemeral key,
     // so only the timestamp check stands between it and running the request
     // again: same device, same timestamp, so it must refuse after the first.
-    let mut fresh = Gateway::new(gw.private);
+    let mut fresh = Gateway::new(vec![gw.private]);
     let from: SocketAddr = "127.0.0.1:9".parse().unwrap();
     assert!(
         fresh.receive(&hs1, 0, from, Instant::now()).is_some(),
         "first sight is accepted (within 120 s)"
     );
-    let mut gw2 = Gateway::new(gw.private);
+    let mut gw2 = Gateway::new(vec![gw.private]);
     let now = Instant::now();
     let first = gw2.receive(&hs1, 0, from, now).unwrap();
     gw2.respond(first.token, answer(100), now);
@@ -443,10 +526,10 @@ async fn a_replayed_message_1_runs_nothing() {
         .iter()
         .all(|o| o.packet[0] == crate::frame::T_HS2 && o.packet.len() < hs1.len()));
     // A gateway that forgot the ephemeral key still refuses the repeated timestamp.
-    let mut gw3 = Gateway::new(gw.private);
+    let mut gw3 = Gateway::new(vec![gw.private]);
     gw3.receive(&hs1, 0, from, now);
     gw3.sweep(now); // keeps the timestamp: the session is live
-    let mut forgetful = Gateway::new(gw.private);
+    let mut forgetful = Gateway::new(vec![gw.private]);
     assert!(forgetful.receive(&hs1, 0, from, now).is_some());
 }
 

@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use tokio::net::UdpSocket;
-use vtop_gateway::{public_key, run, Config};
+use vtop_gateway::{run, Config};
+use vtop_shared::engine::{UDP_KEYS, UDP_KEYS_SEALED_FOR};
+use vtop_shared::mail_seal;
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
     session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY, UNSUPPORTED,
@@ -14,17 +16,29 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 const SESSION: &str = r#"{"cookies":"JSESSIONID=abc","csrf":"t"}"#;
 
 async fn gateway(engine: &MockServer) -> (u16, [u8; 32]) {
-    let (private, _) = vtop_wire::generate_keypair();
+    let (private, public) = vtop_wire::generate_keypair();
+    // The engine passes on the key, sealed by the edge to the gateway.
+    let (identity, identity_public) = mail_seal::generate_keypair();
+    let keys = serde_json::json!({ "keys": [vtop_wire::hex(&private)] }).to_string();
+    let sealed = mail_seal::seal(&identity_public, UDP_KEYS_SEALED_FOR, keys.as_bytes()).unwrap();
+    Mock::given(method("GET"))
+        .and(path(UDP_KEYS))
+        .and(header("authorization", "Bearer relay-secret"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({ "sealed": sealed })),
+        )
+        .mount(engine)
+        .await;
     let sock = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let port = sock.local_addr().unwrap().port();
     let config = Config {
         engine_url: engine.uri(),
         edge_url: engine.uri(),
         engine_secret: "relay-secret".into(),
-        private_key: private,
+        identity,
     };
     tokio::spawn(run(config, vec![sock]));
-    (port, public_key(&private))
+    (port, public)
 }
 
 fn request(session: Option<&str>, hash_of: &str) -> Vec<u8> {
@@ -126,7 +140,8 @@ async fn a_request_newer_than_the_gateway_is_told_to_use_https() {
         WirePageResponse::decode(&got.body).unwrap().status,
         UNSUPPORTED
     );
-    assert!(engine.received_requests().await.unwrap().is_empty());
+    let asked = engine.received_requests().await.unwrap();
+    assert!(asked.iter().all(|r| r.url.path() == UDP_KEYS));
 }
 
 /// A sign-in request named by its edge path, after the handshake.

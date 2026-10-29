@@ -31,6 +31,11 @@ pub const T_HS2: u8 = 0x16;
 /// the right token, so nothing unencrypted or unauthenticated is acted on.
 pub const T_RESET: u8 = 0x17;
 pub const RESET_TOKEN: usize = 16;
+/// Gateway → client: "Noise message 1 does not decrypt", as `[0x18][the
+/// first 4 bytes of its ephemeral key]`: the client holds a wrong or old
+/// public key for this gateway. Unauthenticated, so the client only stops
+/// trying and fetches the key again over HTTPS.
+pub const T_WRONG_KEY: u8 = 0x18;
 
 pub const HEADER: usize = 9;
 pub const TAG: usize = 16;

@@ -439,6 +439,21 @@ void main() {
       expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
     });
 
+    test('a gateway with another key is skipped for a while', () async {
+      final asked = <String>[];
+      final server = api(
+        asked,
+        () async => throw const WireFetchError.wrongKey(),
+      );
+      expect(await server.fetch(session: _session, name: 'marks'), {
+        'via': 'https',
+      });
+      expect(await server.fetch(session: _session, name: 'marks'), {
+        'via': 'https',
+      });
+      expect(asked, ['udp marks', '/v1/vtop/fetch', '/v1/vtop/fetch']);
+    });
+
     test('a page too large for UDP comes over HTTPS', () async {
       final asked = <String>[];
       final data = await api(

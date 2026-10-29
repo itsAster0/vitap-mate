@@ -27,6 +27,14 @@ pub const VTOP_LOGIN_RESEND: &str = "/engine/vtop-login/resend";
 pub const LOGIN_DONE: &str = "/internal/accounts/login-done";
 /// Edge: waits for the next forwarded OTP of a student, sealed to a key.
 pub const OTP_AWAIT: &str = "/internal/mail-otp/await";
+/// Edge: the UDP gateway's private keys, sealed to the gateway's identity
+/// key ([`UDP_KEYS_SEALED_FOR`]), as `{sealed}`.
+pub const UDP_KEYS_INTERNAL: &str = "/internal/udp-keys";
+/// Engine: [`UDP_KEYS_INTERNAL`]'s answer, passed on to the gateway unopened.
+pub const UDP_KEYS: &str = "/engine/udp-keys";
+/// What the UDP keys' box is bound to (`mail_seal`'s associated data), so it
+/// cannot pass for any other sealed box.
+pub const UDP_KEYS_SEALED_FOR: &str = "udp-keys";
 
 /// Either fresh cookies from a client, or an account's cached session.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]

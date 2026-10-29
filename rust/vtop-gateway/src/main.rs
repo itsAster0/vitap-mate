@@ -1,24 +1,23 @@
-//! `vtop-gateway`: the UDP gateway alone, or `vtop-gateway keygen` for a
-//! new key pair. On Fly the engine runs the gateway in its own process
-//! instead (see `vtop-bridge/src/main.rs`); this binary is for running it
-//! next to an engine elsewhere.
+//! `vtop-gateway`: UDP mode's gateway, on its own host next to an engine
+//! elsewhere.
 //!
 //! Environment: `ENGINE_URL` (the engine's base URL), `BRIDGE_SECRET` (the
-//! engine's relay secret, as the edge holds it), `EDGE_URL`, and `GATEWAY_KEY`, `BIND`
-//! and `PORTS` as [`vtop_gateway::bind_from_env`] reads them. The key's
-//! public half goes into the app build (`VTOP_UDP_KEY`) and is logged at
-//! start.
+//! engine's relay secret, as the edge holds it), `EDGE_URL`,
+//! `GATEWAY_IDENTITY` (opens the Noise keys the edge seals to this gateway),
+//! and `BIND` and `PORTS` as [`vtop_gateway::bind_from_env`] reads them.
+//! `vtop-gateway identity` makes a new identity: the secret for
+//! `GATEWAY_IDENTITY`, and its public half for the edge's
+//! `GATEWAY_IDENTITY_KEY`.
 
 use tracing_subscriber::EnvFilter;
-use vtop_gateway::{bind_from_env, run};
-use vtop_wire::hex;
+use vtop_gateway::{bind_from_env, run, Config};
 
 #[tokio::main]
 async fn main() {
-    if std::env::args().nth(1).as_deref() == Some("keygen") {
-        let (private, public) = vtop_wire::generate_keypair();
-        println!("GATEWAY_KEY={}", hex(&private));
-        println!("VTOP_UDP_KEY={}", hex(&public));
+    if std::env::args().nth(1).as_deref() == Some("identity") {
+        let (secret, public) = vtop_shared::mail_seal::generate_keypair();
+        println!("GATEWAY_IDENTITY={secret}");
+        println!("GATEWAY_IDENTITY_KEY={public}");
         return;
     }
     tracing_subscriber::fmt()
@@ -29,13 +28,16 @@ async fn main() {
         .with_ansi(std::io::IsTerminal::is_terminal(&std::io::stdout()))
         .init();
     let var = |name: &str| std::env::var(name).map_err(|_| format!("{name} is not set"));
-    let bound = match (var("ENGINE_URL"), var("BRIDGE_SECRET"), var("EDGE_URL")) {
-        (Ok(url), Ok(secret), Ok(edge)) => bind_from_env(url, secret, edge)
-            .await
-            .unwrap_or_else(|| Err("GATEWAY_KEY is not set".into())),
-        (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
+    let bound = async {
+        let config = Config {
+            engine_url: var("ENGINE_URL")?,
+            engine_secret: var("BRIDGE_SECRET")?,
+            edge_url: var("EDGE_URL")?,
+            identity: var("GATEWAY_IDENTITY")?,
+        };
+        Ok::<_, String>((config, bind_from_env().await?))
     };
-    match bound {
+    match bound.await {
         Ok((config, sockets)) => run(config, sockets).await,
         Err(e) => {
             eprintln!("vtop-gateway: {e}");

@@ -1,0 +1,22 @@
+# The UDP gateway on the VPS (Rocky Linux, Oracle `x86`): `docker compose
+# up -d` in ~/vitapmate-gateway, next to its .env (see .env.example). Oracle's
+# Security List must allow the UDP ports; the host firewall is off. CI
+# pulls a new image and restarts it on every change
+# (.github/workflows/gateway-deploy.yml).
+services:
+  gateway:
+    image: ghcr.io/itskryxen/vitapmate-gateway:latest
+    # Host networking: the gateway sees each phone's real address, which
+    # its Noise sessions are keyed by, and no Docker NAT sits in the UDP path.
+    network_mode: host
+    # Its own resolvers: the host's DNS can be taken over by a VPN that stops
+    # answering, and the gateway must still reach the engine.
+    volumes:
+      - ./resolv.conf:/etc/resolv.conf:ro
+    env_file: .env
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

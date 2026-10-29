@@ -13,7 +13,6 @@ class UdpModeTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!udpModeAvailable) return const SizedBox.shrink();
     final on = ref.watch(vtopUdpProvider);
     return Column(
       crossAxisAlignment: .stretch,

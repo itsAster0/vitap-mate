@@ -7,6 +7,7 @@ import type { Account } from "./account";
 import type { Device } from "./device";
 import type { FcmToken } from "./fcm";
 import type { Index, Mailbox } from "./store";
+import type { UdpKeys } from "./udp-gateway";
 import { DEVICE_SECRET_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
 
 export interface Env {
@@ -21,8 +22,15 @@ export interface Env {
   PUBLIC_URL: string;
   ALLOWED_ORIGINS: string;
   FALLBACK_FORWARD: string;
+  UDP_KEYS: DurableObjectNamespace<UdpKeys>;
+  /** UDP mode's gateway (`GET /v1/udp`): host and comma-separated ports. */
+  UDP_HOST: string;
+  UDP_PORTS: string;
   FIREBASE_CREDENTIALS_JSON: string;
   BRIDGE_SECRET: string;
+  /** The UDP gateway's identity public key (base64url): its keys are sealed
+   * to it. */
+  GATEWAY_IDENTITY_KEY: string;
 }
 
 /** Unix seconds. */

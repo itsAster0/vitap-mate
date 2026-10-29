@@ -5,8 +5,8 @@
 #   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
 #   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
 #                              /internal/*
-# The engine (vtop-bridge, with UDP mode's gateway) runs on Fly from
-# ../Dockerfile.engine (see ../fly.toml), at ENGINE_URL below.
+# The engine (vtop-bridge) runs on Railway from ../Dockerfile.engine, at
+# ENGINE_URL below; UDP mode's gateway runs on the VPS (../vps).
 name = "vitapmate-edge"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
@@ -17,7 +17,7 @@ routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
 # Every address the edge uses; nothing is hard-coded. ENGINE_URL serves the
 # engine routes and /mcp.
 MAIL_DOMAIN = "aster0.dev"
-ENGINE_URL = "https://vmate-node.aster0.dev"
+ENGINE_URL = "https://engine-production-96d4.up.railway.app"
 FCM_URL = "https://fcm.googleapis.com"
 # This Worker's own address, for links it hands out; MCP clients get its /mcp.
 PUBLIC_URL = "https://vmate-api.aster0.dev"
@@ -25,6 +25,14 @@ PUBLIC_URL = "https://vmate-api.aster0.dev"
 ALLOWED_ORIGINS = ""
 # Where other @MAIL_DOMAIN mail goes; empty rejects it.
 FALLBACK_FORWARD = ""
+# UDP mode's gateway, handed to the app by GET /v1/udp with its current
+# public key (the UdpKeys object makes a new key pair every Monday). A new
+# host or ports reach every phone by its next weekly refresh.
+UDP_HOST = "140.245.225.49"
+UDP_PORTS = "3478,51820,8443"
+# The gateway's identity public key (`vtop-gateway identity`): its keys
+# are sealed to it, so the engine passes them on without reading them.
+GATEWAY_IDENTITY_KEY = "dq7b9VnJ-k6pJcv7YNtj5rVVJFvGAHaG_Bj7TfvpMQ0"
 
 [observability.logs]
 enabled = true
@@ -57,6 +65,10 @@ class_name = "FcmToken"
 name = "ACCOUNT"
 class_name = "Account"
 
+[[durable_objects.bindings]]
+name = "UDP_KEYS"
+class_name = "UdpKeys"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken"]
@@ -83,3 +95,7 @@ new_sqlite_classes = ["Engine"]
 [[migrations]]
 tag = "v6"
 deleted_classes = ["Engine"]
+
+[[migrations]]
+tag = "v7"
+new_sqlite_classes = ["UdpKeys"]

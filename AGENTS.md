@@ -17,8 +17,8 @@ rust/                 Cargo workspace
   vtop-core/          VTOP client, session, parsers, inputs, types, errors
   vtop-shared/        formats shared by app, node and edge (wire_page, page dictionary, ...)
   vtop-wire/          vm1: Noise IK over UDP for slow, lossy links
-  vtop-gateway/       UDP gateway; runs inside the engine process on Fly
-  vtop-bridge/        the engine: sign-in, CAPTCHA, fetch+parse; Fly app vitapmate-node
+  vtop-gateway/       UDP gateway; runs on the Oracle VPS (rust/vps)
+  vtop-bridge/        the engine: sign-in, CAPTCHA, fetch+parse; Railway service engine
   vtop-mcp/           MCP tools served by the engine behind the edge's /mcp
   vtop-edge/          Cloudflare Worker + Durable Objects (TypeScript): all server state
   ARCHITECTURE.md
@@ -37,7 +37,7 @@ docs/plans/           plans
 | Shared widget | `lib/ui/`, one widget per file |
 | Phone API (notifications, storage, background...) | `lib/platform/` |
 | Logging | Dart: `lib/observability/` (`Log`, `flow()`); Rust: `tracing` |
-| Server-side state | `rust/vtop-edge` Durable Objects; never on the Fly node |
+| Server-side state | `rust/vtop-edge` Durable Objects; never on the engine or gateway |
 
 ## Rules
 
@@ -73,7 +73,9 @@ cd extension && pnpm test && pnpm build
 ```
 
 Deploys only when asked: `pnpm exec wrangler deploy` in `rust/vtop-edge/`;
-`~/.fly/bin/flyctl deploy --ha=false` in `rust/` (config `rust/fly.toml`).
+`railway up --service engine` in `rust/` (the engine, `Dockerfile.engine`).
+The UDP gateway deploys from CI on push (`.github/workflows/gateway-deploy.yml`,
+`rust/vps/`).
 
 Never print or commit `.env*` files, keystores, or secrets.
 
