@@ -94,7 +94,7 @@ class AttendanceDetailSheet extends HookConsumerWidget {
 
     return ScreenRefresh(
       onRefresh: refresh,
-      tasks: const ['vtop_fullattendance'],
+      tasks: const ['vtop_full_attendance'],
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: colors.background,

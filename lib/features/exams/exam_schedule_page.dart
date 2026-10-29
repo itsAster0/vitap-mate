@@ -50,7 +50,7 @@ class ExamSchedulePage extends HookConsumerWidget {
         skipLoadingOnReload: true,
         data: (data) => ScreenRefresh(
           onRefresh: update,
-          tasks: const ['vtop_fetchSchedule'],
+          tasks: const ['vtop_exam_schedule'],
           child: RefreshIndicator(
             key: const ValueKey('data'),
             onRefresh: update,

@@ -47,7 +47,7 @@ class AcademicCalendarPage extends HookConsumerWidget {
     final calendar = ref.watch(academicCalendarProvider);
     return ScreenRefresh(
       onRefresh: refresh,
-      tasks: const ['vtop_fetchAcademicCalendar'],
+      tasks: const ['vtop_academic_calendar'],
       child: AnimatedSwitcher(
         duration: Motion.medium,
         child: calendar.when(

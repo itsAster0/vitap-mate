@@ -59,7 +59,7 @@ class ProfilePage extends HookConsumerWidget {
 
     return ScreenRefresh(
       onRefresh: refresh,
-      tasks: const ['vtop_student_profile', 'vtop_mentor'],
+      tasks: const ['vtop_profile', 'vtop_mentor'],
       child: RefreshIndicator(
         onRefresh: refresh,
         backgroundColor: colors.background,
