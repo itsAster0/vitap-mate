@@ -25,6 +25,7 @@
 import * as account from "./account";
 import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
+import { udpGateway, udpKeys } from "./udp-gateway";
 import { PHONE_ROUTES, phoneVtop } from "./vtop-phone";
 import {
   type Env,
@@ -73,6 +74,7 @@ export { Account } from "./account";
 export { Device } from "./device";
 export { FcmToken } from "./fcm";
 export { Index, Mailbox } from "./store";
+export { UdpKeys } from "./udp-gateway";
 
 function unknownMailbox(): Response {
   return error(404, "mailbox_not_found", "No such forwarding address.");
@@ -435,6 +437,8 @@ async function route(req: Request, env: Env): Promise<Response> {
   if (isVtopPath(path)) return proxyVtop(req);
   if (path in PHONE_ROUTES) return phoneVtop(req, env);
   if (method === "GET" && path === "/v1/events") return events(req, env);
+  if (method === "GET" && path === "/v1/udp") return udpGateway(env);
+  if (method === "GET" && path === "/internal/udp-keys") return udpKeys(req, env);
   if (method === "POST" && path === "/v1/devices/register") return deviceRegister(req, env);
   if (method === "POST" && path === "/v1/devices/update") return deviceUpdate(req, env);
   if (method === "POST" && path === "/v1/app/status") return account.appCall(req, env, "status");

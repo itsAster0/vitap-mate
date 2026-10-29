@@ -124,7 +124,9 @@ typedef WirePageFetch =
       Duration? timeout,
     });
 
-/// [WirePageFetch] through Rust, to the build's gateway (`vtop_udp.dart`).
+/// [WirePageFetch] through Rust, to the gateway the server names
+/// (`vtop_udp.dart`). When the gateway has another key, the key is asked
+/// for again and the page tried once more with a new one.
 Future<WirePage> rustWirePage({
   required String sessionJson,
   required String name,
@@ -134,19 +136,33 @@ Future<WirePage> rustWirePage({
   String? account,
   bool secret = false,
   Duration? timeout,
-}) async => wireFetchPage(
-  config: await udpWireConfig(),
-  sessionJson: sessionJson,
-  name: name,
-  semester: semester,
-  args: [for (final e in args.entries) (e.key, e.value)],
-  dictionary: dictionary,
-  accountJson: account,
-  secret: secret,
-  timeoutMs: (timeout ?? Duration(seconds: await currentTunable(udpTimeout)))
-      .inMilliseconds,
-  flow: currentFlow,
-);
+}) async {
+  Future<WirePage> send(UdpGateway gateway) async => wireFetchPage(
+    config: await udpWireConfig(gateway),
+    sessionJson: sessionJson,
+    name: name,
+    semester: semester,
+    args: [for (final e in args.entries) (e.key, e.value)],
+    dictionary: dictionary,
+    accountJson: account,
+    secret: secret,
+    timeoutMs: (timeout ?? Duration(seconds: await currentTunable(udpTimeout)))
+        .inMilliseconds,
+    flow: currentFlow,
+  );
+  final gateway = await currentUdpGateway();
+  if (gateway == null) {
+    throw const WireFetchError.unsupported('no UDP gateway from the server');
+  }
+  try {
+    return await send(gateway);
+  } on WireFetchError_WrongKey {
+    final fresh = await currentUdpGateway(refresh: true);
+    if (fresh == null || fresh.publicKey == gateway.publicKey) rethrow;
+    Log.info('vtop.udp', 'the gateway has a new key; trying it');
+    return send(fresh);
+  }
+}
 
 Future<bool> _never() async => false;
 
@@ -380,6 +396,9 @@ class ServerVtopApi {
         case WireFetchError_Unreachable():
           wireOffUntil.value = DateTime.now().add(wireRetryAfter);
           _log.warn('$name: the UDP gateway did not answer; using HTTPS');
+        case WireFetchError_WrongKey():
+          wireOffUntil.value = DateTime.now().add(wireRetryAfter);
+          _log.warn('$name: the UDP gateway has another key; using HTTPS');
         case WireFetchError_Unsupported(:final field0) ||
             WireFetchError_Failed(:final field0):
           _log.warn('$name over UDP: $field0; using HTTPS');

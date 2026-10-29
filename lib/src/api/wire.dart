@@ -82,6 +82,10 @@ sealed class WireFetchError with _$WireFetchError implements FrbException {
   /// The gateway answered but the page did not complete in time.
   const factory WireFetchError.timeout() = WireFetchError_Timeout;
 
+  /// The gateway cannot read the handshake: the app's key for it is wrong
+  /// or old, and should be fetched again.
+  const factory WireFetchError.wrongKey() = WireFetchError_WrongKey;
+
   /// The request is too large for UDP, or the configuration is invalid.
   const factory WireFetchError.unsupported(String field0) =
       WireFetchError_Unsupported;

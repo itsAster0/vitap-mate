@@ -55,12 +55,13 @@ extension WireFetchErrorPatterns on WireFetchError {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( WireFetchError_Unreachable value)?  unreachable,TResult Function( WireFetchError_Timeout value)?  timeout,TResult Function( WireFetchError_Unsupported value)?  unsupported,TResult Function( WireFetchError_Failed value)?  failed,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( WireFetchError_Unreachable value)?  unreachable,TResult Function( WireFetchError_Timeout value)?  timeout,TResult Function( WireFetchError_WrongKey value)?  wrongKey,TResult Function( WireFetchError_Unsupported value)?  unsupported,TResult Function( WireFetchError_Failed value)?  failed,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable() when unreachable != null:
 return unreachable(_that);case WireFetchError_Timeout() when timeout != null:
-return timeout(_that);case WireFetchError_Unsupported() when unsupported != null:
+return timeout(_that);case WireFetchError_WrongKey() when wrongKey != null:
+return wrongKey(_that);case WireFetchError_Unsupported() when unsupported != null:
 return unsupported(_that);case WireFetchError_Failed() when failed != null:
 return failed(_that);case _:
   return orElse();
@@ -80,12 +81,13 @@ return failed(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( WireFetchError_Unreachable value)  unreachable,required TResult Function( WireFetchError_Timeout value)  timeout,required TResult Function( WireFetchError_Unsupported value)  unsupported,required TResult Function( WireFetchError_Failed value)  failed,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( WireFetchError_Unreachable value)  unreachable,required TResult Function( WireFetchError_Timeout value)  timeout,required TResult Function( WireFetchError_WrongKey value)  wrongKey,required TResult Function( WireFetchError_Unsupported value)  unsupported,required TResult Function( WireFetchError_Failed value)  failed,}){
 final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable():
 return unreachable(_that);case WireFetchError_Timeout():
-return timeout(_that);case WireFetchError_Unsupported():
+return timeout(_that);case WireFetchError_WrongKey():
+return wrongKey(_that);case WireFetchError_Unsupported():
 return unsupported(_that);case WireFetchError_Failed():
 return failed(_that);}
 }
@@ -101,12 +103,13 @@ return failed(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( WireFetchError_Unreachable value)?  unreachable,TResult? Function( WireFetchError_Timeout value)?  timeout,TResult? Function( WireFetchError_Unsupported value)?  unsupported,TResult? Function( WireFetchError_Failed value)?  failed,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( WireFetchError_Unreachable value)?  unreachable,TResult? Function( WireFetchError_Timeout value)?  timeout,TResult? Function( WireFetchError_WrongKey value)?  wrongKey,TResult? Function( WireFetchError_Unsupported value)?  unsupported,TResult? Function( WireFetchError_Failed value)?  failed,}){
 final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable() when unreachable != null:
 return unreachable(_that);case WireFetchError_Timeout() when timeout != null:
-return timeout(_that);case WireFetchError_Unsupported() when unsupported != null:
+return timeout(_that);case WireFetchError_WrongKey() when wrongKey != null:
+return wrongKey(_that);case WireFetchError_Unsupported() when unsupported != null:
 return unsupported(_that);case WireFetchError_Failed() when failed != null:
 return failed(_that);case _:
   return null;
@@ -125,11 +128,12 @@ return failed(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  unreachable,TResult Function()?  timeout,TResult Function( String field0)?  unsupported,TResult Function( String field0)?  failed,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  unreachable,TResult Function()?  timeout,TResult Function()?  wrongKey,TResult Function( String field0)?  unsupported,TResult Function( String field0)?  failed,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable() when unreachable != null:
 return unreachable();case WireFetchError_Timeout() when timeout != null:
-return timeout();case WireFetchError_Unsupported() when unsupported != null:
+return timeout();case WireFetchError_WrongKey() when wrongKey != null:
+return wrongKey();case WireFetchError_Unsupported() when unsupported != null:
 return unsupported(_that.field0);case WireFetchError_Failed() when failed != null:
 return failed(_that.field0);case _:
   return orElse();
@@ -149,11 +153,12 @@ return failed(_that.field0);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  unreachable,required TResult Function()  timeout,required TResult Function( String field0)  unsupported,required TResult Function( String field0)  failed,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  unreachable,required TResult Function()  timeout,required TResult Function()  wrongKey,required TResult Function( String field0)  unsupported,required TResult Function( String field0)  failed,}) {final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable():
 return unreachable();case WireFetchError_Timeout():
-return timeout();case WireFetchError_Unsupported():
+return timeout();case WireFetchError_WrongKey():
+return wrongKey();case WireFetchError_Unsupported():
 return unsupported(_that.field0);case WireFetchError_Failed():
 return failed(_that.field0);}
 }
@@ -169,11 +174,12 @@ return failed(_that.field0);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  unreachable,TResult? Function()?  timeout,TResult? Function( String field0)?  unsupported,TResult? Function( String field0)?  failed,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  unreachable,TResult? Function()?  timeout,TResult? Function()?  wrongKey,TResult? Function( String field0)?  unsupported,TResult? Function( String field0)?  failed,}) {final _that = this;
 switch (_that) {
 case WireFetchError_Unreachable() when unreachable != null:
 return unreachable();case WireFetchError_Timeout() when timeout != null:
-return timeout();case WireFetchError_Unsupported() when unsupported != null:
+return timeout();case WireFetchError_WrongKey() when wrongKey != null:
+return wrongKey();case WireFetchError_Unsupported() when unsupported != null:
 return unsupported(_that.field0);case WireFetchError_Failed() when failed != null:
 return failed(_that.field0);case _:
   return null;
@@ -239,6 +245,38 @@ int get hashCode => runtimeType.hashCode;
 @override
 String toString() {
   return 'WireFetchError.timeout()';
+}
+
+
+}
+
+
+
+
+/// @nodoc
+
+
+class WireFetchError_WrongKey extends WireFetchError {
+  const WireFetchError_WrongKey(): super._();
+  
+
+
+
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WireFetchError_WrongKey);
+}
+
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString() {
+  return 'WireFetchError.wrongKey()';
 }
 
 

@@ -2964,7 +2964,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "vtop-core",
- "vtop-gateway",
  "vtop-mcp",
  "vtop-shared",
  "wiremock",

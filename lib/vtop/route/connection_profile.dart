@@ -33,7 +33,7 @@ Future<void> applyConnectionProfile(
 ) async {
   final (_, mode) = _presets.firstWhere((p) => p.$1 == profile);
   await setVtopMode(ref, mode);
-  if (mode == .server) await setVtopUdp(ref, udpModeAvailable);
+  if (mode == .server) await setVtopUdp(ref, true);
   for (final tunable in tunables) {
     await setTunable(ref, tunable, tunable.fallback);
   }

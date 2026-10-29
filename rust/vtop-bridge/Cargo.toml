@@ -8,7 +8,6 @@ description = "The engine: VTOP sessions, sign-in and the MCP tools for the Clou
 vtop-core = { path = "../vtop-core" }
 vtop-shared = { path = "../vtop-shared" }
 vtop-mcp = { path = "../vtop-mcp" }
-vtop-gateway = { path = "../vtop-gateway" }
 axum = "0.8"
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync"] }
 reqwest = { workspace = true }

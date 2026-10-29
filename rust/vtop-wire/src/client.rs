@@ -25,6 +25,7 @@ use tokio::net::UdpSocket;
 use crate::fec::{self, DATA_WIRE};
 use crate::frame::{
     same_token, Keys, IP_UDP, RESET_TOKEN, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET, T_WORKING,
+    T_WRONG_KEY,
 };
 use crate::link::Link;
 use crate::msg::{now_ms, now_us, Data, Req, MAX_REQUEST};
@@ -58,6 +59,9 @@ pub enum WireError {
     Timeout,
     /// The request does not fit one datagram.
     TooLarge,
+    /// The gateway cannot read the handshake: the public key held for it is
+    /// wrong or old. The caller should fetch it again.
+    WrongKey,
     Io(String),
 }
 
@@ -67,6 +71,7 @@ impl std::fmt::Display for WireError {
             Self::Unreachable => write!(f, "the UDP gateway did not answer"),
             Self::Timeout => write!(f, "the UDP response did not complete in time"),
             Self::TooLarge => write!(f, "the request is too large for UDP"),
+            Self::WrongKey => write!(f, "the UDP gateway has another key"),
             Self::Io(e) => write!(f, "UDP transport: {e}"),
         }
     }
@@ -132,6 +137,7 @@ pub async fn fetch(
     let saved = slot
         .as_mut()
         .and_then(Slot::read)
+        .filter(|s| s.gateway == cfg.server_key)
         .filter(|s| now_ms().saturating_sub(s.created_ms) < REKEY.as_millis() as u64);
     let in_handshake = cfg.request_in_handshake;
     let mut result = match saved {
@@ -178,13 +184,16 @@ struct Saved {
     created_ms: u64,
     /// The gateway's proof for a reset of this session.
     reset: [u8; RESET_TOKEN],
+    /// The gateway key the session was made with: a session for another
+    /// gateway, or from before its key changed, is not used.
+    gateway: [u8; 32],
 }
 
 impl Saved {
     fn parse(text: &str) -> Option<Self> {
         let f: Vec<&str> = text.split_whitespace().collect();
-        let [sid, send, recv, next, port, created, reset] = f[..] else {
-            return None; // also a session saved before reset tokens: hand-shake again
+        let [sid, send, recv, next, port, created, reset, gateway] = f[..] else {
+            return None; // also a session saved by an older version: hand-shake again
         };
         Some(Self {
             sid: sid.parse().ok()?,
@@ -194,19 +203,21 @@ impl Saved {
             port: port.parse().ok()?,
             created_ms: created.parse().ok()?,
             reset: unhex(reset)?.try_into().ok()?,
+            gateway: unhex(gateway)?.try_into().ok()?,
         })
     }
 
     fn format(&self) -> String {
         format!(
-            "{} {} {} {} {} {} {}\n",
+            "{} {} {} {} {} {} {} {}\n",
             self.sid,
             hex(&self.send),
             hex(&self.recv),
             self.next_ctr,
             self.port,
             self.created_ms,
-            hex(&self.reset)
+            hex(&self.reset),
+            hex(&self.gateway)
         )
     }
 }
@@ -685,9 +696,13 @@ impl Run<'_> {
                                     port,
                                     created_ms: now_ms(),
                                     reset: p[4..4 + RESET_TOKEN].try_into().expect("16 bytes"),
+                                    gateway: self.server_key,
                                 },
                             ));
                         }
+                    }
+                    T_WRONG_KEY if n == 5 && buf[1..5] == hs1[1..5] => {
+                        return Err(Outcome::Failed(WireError::WrongKey));
                     }
                     T_DATA | T_WORKING => early.push((Instant::now(), buf[..n].to_vec())),
                     _ => {}

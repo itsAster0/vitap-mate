@@ -23,7 +23,7 @@ use std::time::{Duration, Instant};
 use crate::fec::{self, DATA_WIRE};
 use crate::frame::{
     header, reset_token, Keys, ReplayWindow, IP_UDP, T_DATA, T_DONE, T_HS1, T_HS2, T_REQ, T_RESET,
-    T_WORKING,
+    T_WORKING, T_WRONG_KEY,
 };
 use crate::link::RATE_FLOOR;
 use crate::msg::{now_us, Data, Req, LOSS_UNKNOWN};
@@ -118,7 +118,9 @@ struct Out {
 }
 
 pub struct Gateway {
-    private: [u8; 32],
+    /// Static private keys, the current one first: a phone may still hold
+    /// the public half of the one before (see [`Gateway::set_keys`]).
+    keys: Vec<[u8; 32]>,
     sessions: HashMap<u32, Session>,
     /// Message 1 by the client's ephemeral key: when, which session, HS2.
     handshakes: HashMap<[u8; 32], (Instant, u32, Vec<u8>)>,
@@ -133,9 +135,9 @@ pub struct Gateway {
 }
 
 impl Gateway {
-    pub fn new(private: [u8; 32]) -> Self {
+    pub fn new(keys: Vec<[u8; 32]>) -> Self {
         Self {
-            private,
+            keys,
             sessions: HashMap::new(),
             handshakes: HashMap::new(),
             seen_ts: HashMap::new(),
@@ -143,6 +145,14 @@ impl Gateway {
             queue: VecDeque::new(),
             direct: VecDeque::new(),
             working: Vec::new(),
+        }
+    }
+
+    /// Replaces the keys (after a rotation). Sessions made under an old key
+    /// go on: their keys come from the handshake.
+    pub fn set_keys(&mut self, keys: Vec<[u8; 32]>) {
+        if !keys.is_empty() {
+            self.keys = keys;
         }
     }
 
@@ -305,16 +315,29 @@ impl Gateway {
             }
             return None;
         }
-        let mut hs = snow::Builder::new(NOISE.parse().ok()?)
-            .local_private_key(&self.private)
-            .ok()?
-            .build_responder()
-            .ok()?;
         let mut payload = [0u8; 1500];
-        let len = match hs.read_message(msg1, &mut payload) {
-            Ok(len) => len,
-            Err(e) => {
-                log::debug!("message 1 from {from} does not decrypt: {e}");
+        // Under the first key that opens it: the phone's copy may be a week old.
+        let opened = self.keys.iter().find_map(|key| {
+            let mut hs = snow::Builder::new(NOISE.parse().ok()?)
+                .local_private_key(key)
+                .ok()?
+                .build_responder()
+                .ok()?;
+            let len = hs.read_message(msg1, &mut payload).ok()?;
+            Some((hs, len, *key))
+        });
+        let (mut hs, len, key) = match opened {
+            Some(opened) => opened,
+            None => {
+                log::debug!("message 1 from {from} opens under no key");
+                // Far smaller than message 1, so nothing is amplified.
+                let mut wrong_key = vec![T_WRONG_KEY];
+                wrong_key.extend_from_slice(&ephemeral[..4]);
+                self.direct.push_back(Outgoing {
+                    socket,
+                    to: from,
+                    packet: wrong_key,
+                });
                 return None;
             }
         };
@@ -333,7 +356,7 @@ impl Gateway {
         let sid = crate::rand::u32();
         let mut msg2 = [0u8; 128];
         let mut hs2_payload = sid.to_be_bytes().to_vec();
-        hs2_payload.extend_from_slice(&reset_token(&self.private, sid));
+        hs2_payload.extend_from_slice(&reset_token(&key, sid));
         let m2 = hs.write_message(&hs2_payload, &mut msg2).ok()?;
         let (k_ir, k_ri) = hs.dangerously_get_raw_split();
         let mut hs2 = vec![T_HS2];
@@ -389,11 +412,17 @@ impl Gateway {
     ) -> Option<NewRequest> {
         let (_, sid, ctr) = header(packet)?;
         let Some(sess) = self.sessions.get_mut(&sid) else {
-            let mut reset = vec![T_RESET];
-            reset.extend_from_slice(&sid.to_be_bytes());
-            reset.extend_from_slice(&reset_token(&self.private, sid));
-            // Only when smaller than the packet that asked: no amplification.
-            if reset.len() < packet.len() {
+            // One per key, since which one made the session is gone with it;
+            // together smaller than the packet that asked: no amplification.
+            let mut budget = packet.len();
+            for key in &self.keys {
+                let mut reset = vec![T_RESET];
+                reset.extend_from_slice(&sid.to_be_bytes());
+                reset.extend_from_slice(&reset_token(key, sid));
+                if reset.len() >= budget {
+                    break;
+                }
+                budget -= reset.len();
                 self.direct.push_back(Outgoing {
                     socket,
                     to: from,

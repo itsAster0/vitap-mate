@@ -4,9 +4,9 @@
 rust/                    Cargo workspace; the root package is the app's FFI crate
 ├── src/                 rust_lib_vitapmate: flutter_rust_bridge wrapper (cdylib/staticlib)
 ├── vtop-core/           all VTOP logic, no FRB and no server code
-├── vtop-bridge/         the Engine: axum service over vtop-core, run on Fly (vmate-node.aster0.dev)
+├── vtop-bridge/         the Engine: axum service over vtop-core, run on Railway
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
-├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out (run inside the Engine on Fly)
+├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out (on the VPS, rust/vps)
 └── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
 lib/vtop/backend/        Dart: VtopBackend interface, local (FRB) and edge (HTTP, NDJSON)
 ```
@@ -77,32 +77,40 @@ session. `/healthz` reports `version` and `colo`.
 ## UDP mode (experimental)
 
 ```
-phone ──UDP (vtop-wire)──► gateway ─loopback─► Engine /engine/fetch ──► VTOP
-               (one process on Fly: vmate-node.aster0.dev, sin)
+phone ──UDP (vtop-wire)──► gateway ──HTTPS──► Engine /engine/fetch ──► VTOP
+             (Oracle VPS, Hyderabad)        (Railway, Singapore)
 ```
 
 A switch under "Fetch on the server" (`lib/vtop/route/vtop_udp.dart`)
-sends page fetches over UDP, for slow, lossy networks. Sign-in, OTP and
-changes to VTOP stay on HTTPS, and `ServerVtopApi.fetch` falls back to
-HTTPS for ten minutes when the gateway does not answer, and for any page
-too large for UDP.
+sends page fetches and sign-ins over UDP, for slow, lossy networks.
+Changes to VTOP stay on HTTPS, and `ServerVtopApi.fetch` falls back to
+HTTPS for five minutes when the gateway does not answer, has another key or
+cannot read the request, and for any page too large for UDP. Where the
+gateway is and its key come from the edge (`GET /v1/udp`), kept by the app
+until the next Monday 00:00 IST.
 
 - **Why not QUIC or TLS.** At 1 kbit/s a TLS handshake (~5 KB of
   certificates) takes about 40 s, and QUIC pads its first packets to 1200
   bytes. Measured on netem (100 ms each way): a 300-byte page at 1 kbit/s
   took 40 s over TLS/TCP and about 4 s on a saved UDP session; a 2 KB page
   at 8 kbit/s with 30% loss took 18 s against about 3 s.
-- **Transport** (`vtop-wire`): Noise IK with the gateway's key built into
-  the app, the request inside message 1 (one round trip). Later packets use
+- **Transport** (`vtop-wire`): Noise IK with the gateway's key from the
+  edge, the request inside message 1 (one round trip). Later packets use
   the split keys with an explicit counter, so sessions survive restarts; the
   client saves the end of a 1024-counter block before using it, and each
   process locks its own session file. Responses go out as Reed-Solomon
   symbols, paced at the client's measured rate; the client spots losses from
   expected arrival times and asks for fresh symbols. Rate, round trip and
   loss are kept per network.
-- **Gateway** (`vtop-gateway`): no VTOP logic. The engine starts it when
-  `GATEWAY_KEY` is set and it calls `/engine/fetch` over loopback, with the
-  engine's own relay secret, returning the answer byte for byte.
+- **Gateway** (`vtop-gateway`): no VTOP logic. It calls `/engine/fetch`
+  with the engine's relay secret, returning the answer byte for byte.
+- **Keys**: the edge's `UdpKeys` object makes a random key pair every Monday
+  00:00 IST and keeps the one before for a week; older ones are deleted. The
+  gateway asks for them every 10 minutes through the engine
+  (`/engine/udp-keys`); the edge seals them to the gateway's identity key
+  (`GATEWAY_IDENTITY_KEY`), so the engine passes them on unopened. A
+  handshake under an unknown key gets a 5-byte "wrong key" answer, and the
+  app asks the edge again.
   It keeps each device's VTOP session for six hours so requests carry an
   8-byte hash instead of the cookies (`vtop_shared::wire_page`).
 - **Abuse limits** (no rate limits: a campus shares one IP): message 1
@@ -112,8 +120,8 @@ too large for UDP.
   50,000 sessions (the longest idle makes room) and 256 engine calls at once
   (more get "busy" and use HTTPS); sending stops after 30 s of silence.
 
-Deploy: `flyctl deploy --ha=false` from `rust/` (config `rust/fly.toml`,
-which describes the secrets, ports and the dedicated IPv4).
+Deploy: the gateway from CI (`.github/workflows/gateway-deploy.yml`) to the
+VPS (`rust/vps`: compose file, its own resolvers, `.env` kept on the box).
 
 ## Tests
 

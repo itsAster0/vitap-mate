@@ -86,6 +86,7 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/internal/mail-otp/owner", post(engine::owner_check))
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
+        .route(vtop_shared::engine::UDP_KEYS, get(engine::udp_keys))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))
@@ -118,11 +119,21 @@ async fn access_log(request: Request, next: Next) -> Response {
         .get::<MatchedPath>()
         .map(|path| path.as_str().to_string())
         .unwrap_or_else(|| "-".into());
+    // How the phone's request came: the UDP gateway marks its calls; the
+    // rest come from the edge over HTTPS. The phone's flow id, if sent.
+    let [via, request_id] = [("x-via", "https"), ("x-request-id", "-")].map(|(name, none)| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or(none)
+            .to_owned()
+    });
     let started = Instant::now();
     let response = next.run(request).await;
     tracing::info!(
         target: "vtop_bridge::access",
-        "{method} {route} {} {}ms",
+        "{method} {route} {} {}ms via={via} request_id={request_id}",
         response.status().as_u16(),
         started.elapsed().as_millis()
     );

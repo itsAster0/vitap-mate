@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/vtop/backend/server_vtop.dart';
+import 'package:vitapmate/vtop/route/vtop_udp.dart';
 import 'package:vitapmate/vtop/backend/vtop_queries.dart';
 import 'package:vitapmate/vtop/vtop_page.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
@@ -34,6 +36,10 @@ class DebugPage extends HookConsumerWidget {
     final colors = context.theme.colors;
     final reuseTtl = ref.watch(vtopSessionReuseTtlProvider);
     final wireOffUntil = useValueListenable(ServerVtopApi.wireOffUntil);
+    final gatewayRead = useState(0);
+    final gateway = useFuture(
+      useMemoized(currentUdpGateway, [gatewayRead.value]),
+    ).data;
     final gmailReady = ref.watch(emailOtpReadyProvider).value ?? false;
     final otpTestBusy = useState(false);
 
@@ -125,6 +131,54 @@ class DebugPage extends HookConsumerWidget {
                   final off? when DateTime.now().isBefore(off) =>
                     'Fallback on: HTTPS until ${TimeOfDay.fromDateTime(off).format(context)}',
                   _ => 'Fallback off: UDP in use',
+                },
+              ),
+              tile(
+                'UDP Gateway',
+                FLucideIcons.server,
+                () async {
+                  final fresh = await currentUdpGateway(refresh: true);
+                  gatewayRead.value++;
+                  if (context.mounted) {
+                    dispToast(
+                      context,
+                      fresh == null ? 'Not reachable' : 'Fetched',
+                      fresh == null
+                          ? 'The server did not answer; keeping the saved one.'
+                          : '${fresh.host} · ${fresh.ports.join(', ')}',
+                    );
+                  }
+                },
+                subtitle: switch (gateway) {
+                  final gateway? =>
+                    '${gateway.host} · ports ${gateway.ports.join(', ')}',
+                  null => 'Not fetched from the server yet',
+                },
+              ),
+              tile(
+                'UDP Gateway Key',
+                FLucideIcons.keyRound,
+                () async {
+                  if (gateway == null) return;
+                  await editText(
+                    context,
+                    title: 'UDP Gateway Key',
+                    prompt:
+                        'The gateway\'s public key, 64 hex digits. A wrong one '
+                        'is fetched again on the next UDP fetch.',
+                    current: gateway.publicKey,
+                    check: (text) => isUdpKey(text)
+                        ? null
+                        : 'Enter 64 hex digits (0-9, a-f).',
+                    onSave: saveUdpKey,
+                  );
+                  gatewayRead.value++;
+                },
+                subtitle: switch (gateway) {
+                  final gateway? =>
+                    '${gateway.publicKey.substring(0, 16)}… · until '
+                        '${DateFormat('d MMM, h:mm a').format(DateTime.fromMillisecondsSinceEpoch(gateway.expiresAt * 1000))}',
+                  null => 'Not fetched from the server yet',
                 },
               ),
               tile(

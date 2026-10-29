@@ -19,7 +19,7 @@ class VtopRouteSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(vtopModeProvider);
-    final udp = udpModeAvailable && ref.watch(vtopUdpProvider);
+    final udp = ref.watch(vtopUdpProvider);
     final serverSignIn =
         ref
             .watch(settingsProvider)
