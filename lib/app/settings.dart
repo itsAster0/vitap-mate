@@ -21,6 +21,7 @@ const forwardingGuideDoneSettingKey = 'settings_forwarding_guide_done';
 const vtopCompactModeSettingKey = 'settings_vtop_compact_mode';
 const vtopDesktopModeSettingKey = 'settings_vtop_desktop_mode';
 const vtopRecentPagesSettingKey = 'settings_vtop_recent_pages';
+const alwaysShowDebugSettingKey = 'settings_always_show_debug';
 const _autoRefreshKey = 'settings_auto_refresh';
 const _classEnabledKey = 'settings_class_notifications_enabled';
 const _classBeforeKey = 'settings_class_notify_before_minutes';
@@ -56,6 +57,7 @@ final settingsProvider = FutureProvider<SharedPreferencesWithCache>(
         timetableViewModeSettingKey,
         emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
+        alwaysShowDebugSettingKey,
         vtopDesktopModeSettingKey,
         'settings_server_url',
         'settings_vtop_proxy',
@@ -413,4 +415,9 @@ final vtopCompactModeProvider = NotifierProvider<VtopViewPreference, bool>(
 );
 final vtopDesktopModeProvider = NotifierProvider<VtopViewPreference, bool>(
   () => VtopViewPreference(vtopDesktopModeSettingKey, false),
+);
+
+/// Whether Settings shows Debug without the long press on Appearance.
+final alwaysShowDebugProvider = NotifierProvider<VtopViewPreference, bool>(
+  () => VtopViewPreference(alwaysShowDebugSettingKey, false),
 );

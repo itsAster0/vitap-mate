@@ -66,6 +66,20 @@ class DebugPage extends HookConsumerWidget {
                 () => context.pushNamed(Paths.debugLogs),
                 subtitle: 'The app\'s recent log lines',
               ),
+              tile(
+                'Always Show Debug',
+                FLucideIcons.pin,
+                () => ref
+                    .read(alwaysShowDebugProvider.notifier)
+                    .setValue(!ref.read(alwaysShowDebugProvider)),
+                subtitle: 'In Settings, without the long press',
+                suffix: FSwitch(
+                  value: ref.watch(alwaysShowDebugProvider),
+                  onChange: (value) => ref
+                      .read(alwaysShowDebugProvider.notifier)
+                      .setValue(value),
+                ),
+              ),
             ],
           ),
           const SectionHeader(title: 'Session'),

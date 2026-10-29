@@ -294,7 +294,7 @@ class EdgeEventChannel {
     final handler = _handlers[event.kind];
     if (handler == null) return;
     try {
-      await handler(event);
+      await flow('event ${event.kind}', source: 'edge', () => handler(event));
     } catch (error) {
       _log.info('Event ${event.kind} failed: $error');
     }

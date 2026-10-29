@@ -193,7 +193,14 @@ Future<void> _syncMailForwardingFcmToken(String? token) async {
   }
 }
 
-Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) async {
+/// A push message, as its own flow.
+Future<void> handleVtopCookieBridgeMessage(Map<String, dynamic> data) => flow(
+  'push ${data['type'] ?? ''}',
+  source: 'fcm.cookie',
+  () => _handleMessage(data),
+);
+
+Future<void> _handleMessage(Map<String, dynamic> data) async {
   // A push sent before on-device mode was turned on.
   if (await isOnDeviceMode()) return;
   final type = '${data['type'] ?? ''}';

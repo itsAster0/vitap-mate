@@ -371,11 +371,16 @@ class SettingsPage extends HookConsumerWidget {
               ),
             ],
           ),
-          if (showDebugFeatures.value)
+          if (showDebugFeatures.value ||
+              ref.watch(alwaysShowDebugProvider)) ...[
+            const SectionHeader(title: 'Developer'),
             FTileGroup(
               children: [
                 FTile(
-                  prefix: const Icon(FLucideIcons.bug),
+                  prefix: IconTile(
+                    icon: FLucideIcons.bug,
+                    tone: colors.app.warning,
+                  ),
                   title: const Text('Debug'),
                   subtitle: const Text('Activity, diagnostics, logs and tools'),
                   suffix: const Icon(FLucideIcons.chevronRight),
@@ -383,20 +388,9 @@ class SettingsPage extends HookConsumerWidget {
                 ),
               ],
             ),
+          ],
           Padding(
-            padding: const .fromLTRB(24, 16, 24, 0),
-            child: Text(
-              'Classes left and skip counts are a best-effort estimate from '
-              'the VTOP academic calendar and your timetable. Holidays '
-              'announced later, cancelled or extra classes can change them.',
-              textAlign: .center,
-              style: context.theme.typography.body.xs.copyWith(
-                color: context.theme.colors.mutedForeground,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const .only(top: 8),
+            padding: const .only(top: Space.lg),
             child: Row(
               mainAxisAlignment: .center,
               children: [

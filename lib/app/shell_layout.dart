@@ -222,8 +222,9 @@ TextStyle _headerTitleStyle(BuildContext context, String? subtitle) =>
         .copyWith(fontWeight: FontWeight.w600);
 
 /// The page title, with the status line under it while VTOP work runs.
-/// Holding the status line lists every running task, with how long it has
-/// run, until it is let go. Tasks waiting on a sign-in are dimmed.
+/// Tapping the status line lists every running task, with how long it has
+/// run, until it or anywhere else is tapped. Tasks waiting on a sign-in are
+/// dimmed.
 class _HeaderTitle extends HookConsumerWidget {
   const _HeaderTitle({
     required this.title,
@@ -250,9 +251,7 @@ class _HeaderTitle extends HookConsumerWidget {
       widthFactor: 1,
       child: GestureDetector(
         behavior: .opaque,
-        onLongPressStart: (_) => list.show(),
-        onLongPressEnd: (_) => list.hide(),
-        onLongPressCancel: list.hide,
+        onTap: list.toggle,
         child: CompositedTransformTarget(
           link: link,
           child: OverlayPortal(
@@ -265,32 +264,40 @@ class _HeaderTitle extends HookConsumerWidget {
                 followerAnchor: .topCenter,
                 offset: const Offset(0, 8),
                 // The overlay sits outside the app's theme: style it here.
-                child: _RunningTasks(
-                  queue: ref.read(globalAsyncQueueProvider.notifier),
-                  tasks: tasks,
-                  theme: theme,
+                child: TapRegion(
+                  groupId: link,
+                  onTapOutside: (_) => list.hide(),
+                  child: _RunningTasks(
+                    queue: ref.read(globalAsyncQueueProvider.notifier),
+                    tasks: tasks,
+                    theme: theme,
+                  ),
                 ),
               ),
             ),
-            child: Column(
-              mainAxisSize: .min,
-              children: [
-                Text(
-                  title,
-                  style: titleStyle,
-                  textAlign: .center,
-                  maxLines: 1,
-                  overflow: .ellipsis,
-                ),
-                if (subtitle case final subtitle?)
+            // Part of the list's tap region, so a tap here only toggles it.
+            child: TapRegion(
+              groupId: link,
+              child: Column(
+                mainAxisSize: .min,
+                children: [
                   Text(
-                    subtitle,
-                    style: muted,
+                    title,
+                    style: titleStyle,
                     textAlign: .center,
                     maxLines: 1,
                     overflow: .ellipsis,
                   ),
-              ],
+                  if (subtitle case final subtitle?)
+                    Text(
+                      subtitle,
+                      style: muted,
+                      textAlign: .center,
+                      maxLines: 1,
+                      overflow: .ellipsis,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

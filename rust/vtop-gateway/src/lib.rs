@@ -23,6 +23,7 @@ use vtop_shared::engine::{PageFetch, FETCH, VTOP_LOGIN, VTOP_LOGIN_OTP, VTOP_LOG
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
     session_hash, WirePageRequest, WirePageResponse, BUSY, NEED_SESSION, SIGN_IN_BODY, TOO_LARGE,
+    UNSUPPORTED, VERSION,
 };
 use vtop_wire::fec::MAX_RESPONSE;
 use vtop_wire::gateway::{Gateway, NewRequest, Token};
@@ -215,10 +216,26 @@ impl Engine {
     }
 
     /// The encoded [`WirePageResponse`] for a request.
+    /// Logged with the phone's flow id (`request_id`), which also goes to
+    /// the engine and the edge as `x-request-id`.
     async fn answer(&self, request: NewRequest) -> Vec<u8> {
         let started = Instant::now();
-        let response = self.page(&request).await;
+        let page = WirePageRequest::decode(&request.body);
+        let response = match &page {
+            Some(page) => self.page(&request.device, page).await,
+            None if WirePageRequest::version(&request.body) > VERSION => error(
+                UNSUPPORTED,
+                "unsupported_version",
+                "The gateway is older than the app.",
+            ),
+            None => error(400, "bad_request", "The request does not decode."),
+        };
+        let (request_id, name) = page.as_ref().map_or(("", ""), |page| {
+            (page.request_id.as_deref().unwrap_or(""), page.name.as_str())
+        });
         tracing::info!(
+            request_id,
+            name,
             status = response.status,
             packed = response.packed,
             bytes = response.body.len(),
@@ -237,25 +254,20 @@ impl Engine {
         encoded
     }
 
-    async fn page(&self, request: &NewRequest) -> WirePageResponse {
-        let Some(page) = WirePageRequest::decode(&request.body) else {
-            return error(400, "bad_request", "The request does not decode.");
-        };
+    async fn page(&self, device: &[u8; 32], page: &WirePageRequest) -> WirePageResponse {
         if let Some(body) = page
             .args
             .get(SIGN_IN_BODY)
             .filter(|_| page.name.starts_with('/'))
         {
-            return self.sign_in(&page.name, body.clone()).await;
+            return self.sign_in(page, &page.name, body.clone()).await;
         }
-        let Some((session, account)) = self.session(&request.device, &page) else {
+        let Some((session, account)) = self.session(device, page) else {
             return error(NEED_SESSION, "need_session", "Send the session again.");
         };
-        let answer = self.fetch(session, &page).await;
+        let answer = self.fetch(session, page).await;
         match account {
-            Some(account) if expired(&answer) => {
-                self.renewed(&request.device, &page, account, answer).await
-            }
+            Some(account) if expired(&answer) => self.renewed(device, page, account, answer).await,
             _ => answer,
         }
     }
@@ -270,8 +282,7 @@ impl Engine {
             dictionary: page.dictionary.clone(),
         };
         let sent = self
-            .http
-            .post(format!("{}{FETCH}", self.url))
+            .post(page, format!("{}{FETCH}", self.url))
             .bearer_auth(&self.secret)
             .json(&body)
             .send()
@@ -318,7 +329,7 @@ impl Engine {
         account: String,
         expired: WirePageResponse,
     ) -> WirePageResponse {
-        let login = self.sign_in("/v1/app/login", account.clone()).await;
+        let login = self.sign_in(page, "/v1/app/login", account.clone()).await;
         if login.status == 401 {
             return login;
         }
@@ -342,10 +353,9 @@ impl Engine {
     /// to the engine as the edge sends it, a sign-in by the server with its
     /// saved password to the edge (the phone proves it is linked with its
     /// app secret, and the server reads the OTP itself).
-    async fn sign_in(&self, path: &str, body: String) -> WirePageResponse {
+    async fn sign_in(&self, page: &WirePageRequest, path: &str, body: String) -> WirePageResponse {
         let to_engine = |route: &str| {
-            self.http
-                .post(format!("{}{route}", self.url))
+            self.post(page, format!("{}{route}", self.url))
                 .bearer_auth(&self.secret)
         };
         let request = match path {
@@ -353,8 +363,7 @@ impl Engine {
             "/v1/vtop/login/otp" => to_engine(VTOP_LOGIN_OTP),
             "/v1/vtop/login/resend" => to_engine(VTOP_LOGIN_RESEND),
             "/v1/app/login" => self
-                .http
-                .post(format!("{}{path}", self.edge_url))
+                .post(page, format!("{}{path}", self.edge_url))
                 .timeout(LOGIN_TIMEOUT),
             _ => return error(404, "not_found", "No such sign-in."),
         };
@@ -386,6 +395,15 @@ impl Engine {
                 session: None,
             },
             Err(_) => error(503, "engine_unavailable", "The answer broke off."),
+        }
+    }
+
+    /// A POST to [url] for [page], with its flow id.
+    fn post(&self, page: &WirePageRequest, url: String) -> reqwest::RequestBuilder {
+        let request = self.http.post(url);
+        match &page.request_id {
+            Some(id) => request.header("x-request-id", id),
+            None => request,
         }
     }
 

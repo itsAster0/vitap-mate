@@ -550,6 +550,8 @@ export class RequestRecord {
   status: RequestStatus = "pending";
   /** The `Cookie` header, once answered. */
   cookies: string | null = null;
+  /** Its CSRF token, when the server signed in (the app needs it). */
+  csrfToken: string | null = null;
   error: string | null = null;
   createdAt: number;
   expiresAt: number;
@@ -579,9 +581,10 @@ export class RequestRecord {
   }
 
   /** Answers the request; `source` is who made the session. */
-  succeed(cookies: string, source: string): void {
+  succeed(cookies: string, source: string, csrfToken: string | null = null): void {
     this.status = "success";
     this.cookies = cookies;
+    this.csrfToken = csrfToken;
     this.error = null;
     this.source = source;
   }

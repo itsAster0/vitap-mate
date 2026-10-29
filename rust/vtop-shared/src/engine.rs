@@ -63,6 +63,10 @@ pub struct SessionChecked {
     /// The `Cookie` header, when `Valid`, or `Unknown` for a cached one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cookies: Option<String>,
+    /// The CSRF token that goes with [Self::cookies], when the session has
+    /// one (a cached session does; bare cookies do not).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub csrf_token: Option<String>,
     /// The session sealed for caching, when `Valid`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sealed_session: Option<String>,
@@ -149,6 +153,9 @@ pub enum LoginOutcome {
     Ok {
         cookies: String,
         sealed_session: String,
+        /// The session's CSRF token, which the app needs to use it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        csrf_token: Option<String>,
     },
     /// VTOP rejected the saved username or password.
     InvalidCredentials,
@@ -218,10 +225,11 @@ mod tests {
         let ok = LoginOutcome::Ok {
             cookies: "A=1".into(),
             sealed_session: "s".into(),
+            csrf_token: Some("t".into()),
         };
         assert_eq!(
             serde_json::to_value(&ok).unwrap(),
-            serde_json::json!({"status": "ok", "cookies": "A=1", "sealedSession": "s"})
+            serde_json::json!({"status": "ok", "cookies": "A=1", "sealedSession": "s", "csrfToken": "t"})
         );
         let failed: LoginOutcome =
             serde_json::from_value(serde_json::json!({"status": "failed", "reason": "x"})).unwrap();

@@ -158,7 +158,9 @@ abstract final class Log {
 
   static LogLine? _parse(String raw) {
     try {
-      if (jsonDecode(raw)
+      // Another isolate still writing where the file ended before a clear
+      // leaves zero bytes ahead of its line.
+      if (jsonDecode(raw.replaceAll('\x00', ''))
           case {
                 't': final int t,
                 'l': final String level,
@@ -187,7 +189,10 @@ abstract final class Log {
     final dir = _dir;
     if (dir == null) return;
     await _file?.truncate(0);
-    for (final name in _files.where((name) => name != 'app.log')) {
+    await _file?.setPosition(0);
+    // Rust keeps rust.log open, so it is emptied rather than deleted.
+    await File('${dir.path}/rust.log').writeAsBytes(const []);
+    for (final name in ['app.log.1', 'rust.log.1']) {
       final file = File('${dir.path}/$name');
       if (file.existsSync()) await file.delete();
     }
