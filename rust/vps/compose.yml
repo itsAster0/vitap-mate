@@ -5,7 +5,7 @@
 # (.github/workflows/gateway-deploy.yml).
 services:
   gateway:
-    image: ghcr.io/itskryxen/vitapmate-gateway:latest
+    image: ghcr.io/itsaster0/vitapmate-gateway:latest
     # Host networking: the gateway sees each phone's real address, which
     # its Noise sessions are keyed by, and no Docker NAT sits in the UDP path.
     network_mode: host
