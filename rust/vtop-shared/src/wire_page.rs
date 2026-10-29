@@ -15,6 +15,10 @@ pub const NEED_SESSION: u16 = 428;
 pub const TOO_LARGE: u16 = 413;
 /// The gateway has as many engine calls running as it allows: use HTTPS.
 pub const BUSY: u16 = 429;
+/// Sign-in requests are named by the edge path the phone uses over HTTPS
+/// (`/v1/vtop/login`, its `/otp` and `/resend`, and `/v1/app/login`), with
+/// that request's JSON body in `args[SIGN_IN_BODY]`. They carry no session.
+pub const SIGN_IN_BODY: &str = "body";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WirePageRequest {
@@ -27,6 +31,10 @@ pub struct WirePageRequest {
     /// The session as JSON (`vtop_core::SessionState`), when the gateway may
     /// not hold it.
     pub session: Option<String>,
+    /// With [Self::session], when the phone has the server sign in for it:
+    /// `/v1/app/login`'s body, so the gateway can renew an expired session
+    /// in the fetch (from the account's store, which connected apps share).
+    pub account: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,14 +45,26 @@ pub struct WirePageResponse {
     /// `{"data": …}`, or an error as `{"code", "error"}`).
     pub packed: bool,
     pub body: Vec<u8>,
+    /// The session the gateway renewed for this answer, as JSON; the phone
+    /// uses it from now on.
+    pub session: Option<String>,
 }
 
-/// FNV-1a over the session JSON: tells sessions apart, nothing more. The
-/// channel is authenticated per device, so nobody else can pick a hash.
+/// FNV-1a over the session's cookies (the whole JSON if it has none):
+/// they are what tells VTOP sessions apart, so the phone and the gateway
+/// agree on a renewed session however each writes its JSON. The channel is
+/// authenticated per device, so nobody else can pick a hash.
 pub fn session_hash(session_json: &str) -> u64 {
-    session_json.bytes().fold(0xcbf2_9ce4_8422_2325, |h, b| {
-        (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
-    })
+    let cookies = serde_json::from_str::<serde_json::Value>(session_json)
+        .ok()
+        .and_then(|v| v.get("cookies")?.as_str().map(str::to_owned));
+    cookies
+        .as_deref()
+        .unwrap_or(session_json)
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325, |h, b| {
+            (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
+        })
 }
 
 impl WirePageRequest {
@@ -59,9 +79,11 @@ impl WirePageRequest {
         }
         short(&mut v, self.dictionary.as_deref().unwrap_or(""))?;
         v.extend_from_slice(&self.session_hash.to_be_bytes());
-        let session = self.session.as_deref().unwrap_or("");
-        v.extend_from_slice(&u16::try_from(session.len()).ok()?.to_be_bytes());
-        v.extend_from_slice(session.as_bytes());
+        long(&mut v, self.session.as_deref().unwrap_or(""))?;
+        // Only when set, so requests without it are as before.
+        if let Some(account) = &self.account {
+            long(&mut v, account)?;
+        }
         Some(v)
     }
 
@@ -76,9 +98,12 @@ impl WirePageRequest {
         }
         let dictionary = Some(r.short()?).filter(|s| !s.is_empty());
         let session_hash = u64::from_be_bytes(r.take(8)?.try_into().ok()?);
-        let len = u16::from_be_bytes(r.take(2)?.try_into().ok()?) as usize;
-        let session =
-            Some(String::from_utf8(r.take(len)?.to_vec()).ok()?).filter(|s| !s.is_empty());
+        let session = Some(r.long()?).filter(|s| !s.is_empty());
+        let account = if r.0.is_empty() {
+            None
+        } else {
+            Some(r.long()?)
+        };
         r.0.is_empty().then_some(Self {
             name,
             semester,
@@ -86,29 +111,49 @@ impl WirePageRequest {
             dictionary,
             session_hash,
             session,
+            account,
         })
     }
 }
 
 impl WirePageResponse {
+    /// Status, a flags byte (1: packed, 2: a renewed session follows), the
+    /// session if any, then the body.
     pub fn encode(&self) -> Vec<u8> {
         let mut v = Vec::with_capacity(3 + self.body.len());
         v.extend_from_slice(&self.status.to_be_bytes());
-        v.push(self.packed as u8);
+        v.push(self.packed as u8 | (self.session.is_some() as u8) << 1);
+        if let Some(session) = &self.session {
+            // A session is far under 64 KB.
+            let _ = long(&mut v, session);
+        }
         v.extend_from_slice(&self.body);
         v
     }
 
     pub fn decode(b: &[u8]) -> Option<Self> {
-        if b.len() < 3 {
-            return None;
-        }
+        let mut r = Reader(b);
+        let status = u16::from_be_bytes(r.take(2)?.try_into().ok()?);
+        let flags = r.byte()?;
+        let session = if flags & 2 != 0 {
+            Some(r.long()?)
+        } else {
+            None
+        };
         Some(Self {
-            status: u16::from_be_bytes([b[0], b[1]]),
-            packed: b[2] == 1,
-            body: b[3..].to_vec(),
+            status,
+            packed: flags & 1 != 0,
+            body: r.0.to_vec(),
+            session,
         })
     }
+}
+
+/// A string of up to 64 KB, its length in two bytes.
+fn long(v: &mut Vec<u8>, s: &str) -> Option<()> {
+    v.extend_from_slice(&u16::try_from(s.len()).ok()?.to_be_bytes());
+    v.extend_from_slice(s.as_bytes());
+    Some(())
 }
 
 fn short(v: &mut Vec<u8>, s: &str) -> Option<()> {
@@ -131,6 +176,11 @@ impl<'a> Reader<'a> {
     fn byte(&mut self) -> Option<u8> {
         Some(self.take(1)?[0])
     }
+    fn long(&mut self) -> Option<String> {
+        let n = u16::from_be_bytes(self.take(2)?.try_into().ok()?) as usize;
+        String::from_utf8(self.take(n)?.to_vec()).ok()
+    }
+
     fn short(&mut self) -> Option<String> {
         let n = self.byte()? as usize;
         String::from_utf8(self.take(n)?.to_vec()).ok()
@@ -150,6 +200,7 @@ mod tests {
             dictionary: Some("a1b2c3d4".into()),
             session_hash: session_hash("{}"),
             session: None,
+            account: None,
         };
         let small = req.encode().unwrap();
         assert!(small.len() <= 48, "{} bytes", small.len());
@@ -161,15 +212,35 @@ mod tests {
             req
         );
         assert!(WirePageRequest::decode(&small[..small.len() - 1]).is_none());
+        req.account = Some(r#"{"appSecret":"s"}"#.into());
+        assert_eq!(
+            WirePageRequest::decode(&req.encode().unwrap()).unwrap(),
+            req
+        );
+    }
+
+    #[test]
+    fn a_session_is_known_by_its_cookies() {
+        assert_eq!(
+            session_hash(r#"{"cookies":"JSESSIONID=x","csrf_token":"t"}"#),
+            session_hash(r#"{"registration_number":"R","cookies":"JSESSIONID=x"}"#),
+        );
+        assert_ne!(
+            session_hash(r#"{"cookies":"JSESSIONID=x"}"#),
+            session_hash(r#"{"cookies":"JSESSIONID=y"}"#),
+        );
     }
 
     #[test]
     fn responses_round_trip() {
-        let r = WirePageResponse {
+        let mut r = WirePageResponse {
             status: 200,
             packed: true,
             body: vec![1, 2, 3],
+            session: None,
         };
+        assert_eq!(WirePageResponse::decode(&r.encode()).unwrap(), r);
+        r.session = Some(r#"{"cookies":"JSESSIONID=n"}"#.into());
         assert_eq!(WirePageResponse::decode(&r.encode()).unwrap(), r);
     }
 }

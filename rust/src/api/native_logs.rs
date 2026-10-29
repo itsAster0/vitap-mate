@@ -1,9 +1,11 @@
 //! vtop-core's `log` records as JSON lines in `rust.log`, beside the app's
 //! `app.log` and in the same format (see `lib/observability/log.dart`),
 //! rolled over to `rust.log.1` past [`MAX_BYTES`]. Lines before
-//! [`native_logs_open`] are dropped.
+//! [`native_logs_open`] are dropped. Lines carry the student's registration
+//! number ([`native_logs_regno`]) and, inside [`in_flow`], the Dart flow id.
 
 use std::fs::{self, File, OpenOptions};
+use std::future::Future;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
@@ -14,6 +16,27 @@ const MAX_BYTES: u64 = 1024 * 1024;
 struct LogFile {
     path: PathBuf,
     file: File,
+}
+
+tokio::task_local! {
+    /// The Dart flow id of the call running.
+    static FLOW: Option<String>;
+}
+
+static REGNO: Mutex<Option<String>> = Mutex::new(None);
+
+/// Runs `work` with `flow` on every line it logs.
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) async fn in_flow<T>(flow: Option<String>, work: impl Future<Output = T>) -> T {
+    FLOW.scope(flow, work).await
+}
+
+/// The signed-in student's registration number, for every line.
+#[flutter_rust_bridge::frb(sync)]
+pub fn native_logs_regno(regno: Option<String>) {
+    *REGNO
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = regno;
 }
 
 static LOG_FILE: Mutex<Option<LogFile>> = Mutex::new(None);
@@ -48,12 +71,22 @@ impl log::Log for NativeLogger {
         let millis = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |since| since.as_millis());
-        let line = serde_json::json!({
+        let mut line = serde_json::json!({
             "t": millis as u64,
             "l": record.level().as_str().to_lowercase(),
             "src": record.target(),
             "msg": record.args().to_string(),
         });
+        let flow = FLOW.try_with(Clone::clone).ok().flatten();
+        let regno = REGNO
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        for (key, value) in [("flow", flow), ("regno", regno)] {
+            if let Some(value) = value {
+                line[key] = value.into();
+            }
+        }
         let mut guard = log_file();
         let Some(log) = guard.as_mut() else { return };
         // Logging never breaks the app: a full disk only loses lines.

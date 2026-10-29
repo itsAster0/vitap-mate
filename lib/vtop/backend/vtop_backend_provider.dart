@@ -74,6 +74,10 @@ VtopBackend vtopBackend(Ref ref) {
         pages: rustPageDictionary,
         wire: rustWirePage,
         useWire: currentVtopUdp,
+        identity: () => _savedIdentity(ref),
+        useServerSignIn: currentServerSignIn,
+        onSession: (session) =>
+            ref.read(vClientProvider.notifier).adoptSession(session),
       ),
     ),
     relogin: () => ref
@@ -95,7 +99,9 @@ VtopBackend vtopBackend(Ref ref) {
   );
 }
 
-/// Logs in on the device, or on the server in "Fetch on the server" mode.
+/// Logs in on the device, or on the server in "Fetch on the server" mode
+/// (over UDP in UDP mode, where a linked phone has the server sign in with
+/// the password it keeps).
 @Riverpod(keepAlive: true)
 VtopAuthenticator vtopAuthenticator(Ref ref) => ServerVtopAuthenticator(
   const LocalVtopAuthenticator(),
@@ -104,5 +110,23 @@ VtopAuthenticator vtopAuthenticator(Ref ref) => ServerVtopAuthenticator(
     if (user is! StoredVtopUser) return null;
     return (username: user.username.toUpperCase(), password: user.password);
   },
-  api: ServerVtopApi(client: sharedAppHttpClient),
+  api: ServerVtopApi(
+    client: sharedAppHttpClient,
+    wire: rustWirePage,
+    useWire: currentVtopUdp,
+    identity: () => _savedIdentity(ref),
+    useServerSignIn: currentServerSignIn,
+  ),
 );
+
+/// [edgeIdentity] from what is saved only, never signing in: it is asked
+/// for while signing in.
+Future<EdgeIdentity?> _savedIdentity(Ref ref) async {
+  final secret = await const SecureBridgeAppSecretStore().read();
+  final user = await ref.read(vtopUserProvider.future);
+  final number = user.registrationNumber?.trim();
+  if (secret == null || secret.isEmpty || number == null || number.isEmpty) {
+    return null;
+  }
+  return (appSecret: secret, registrationNumber: number.toUpperCase());
+}

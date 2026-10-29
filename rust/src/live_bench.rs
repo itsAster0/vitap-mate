@@ -61,13 +61,13 @@ fn env(name: &str) -> Option<String> {
 }
 
 async fn login_with_otp_prompt(client: &mut VtopClient) -> Result<(), VtopError> {
-    match api::vtop_client_login(client).await {
+    match api::vtop_client_login(client, None).await {
         Err(VtopError::OTPRequired(..)) => {
             print!("VTOP sent a security OTP to your email. Enter it: ");
             std::io::stdout().flush().ok();
             let mut otp = String::new();
             std::io::stdin().read_line(&mut otp).ok();
-            api::vtop_client_submit_security_otp(client, otp.trim().to_string()).await
+            api::vtop_client_submit_security_otp(client, otp.trim().to_string(), None).await
         }
         other => other,
     }
@@ -165,62 +165,70 @@ async fn live_bench() {
         runs: vec![started.elapsed()],
     });
 
-    let semesters = api::fetch_semesters(&client).await.expect("semesters");
+    let semesters = api::fetch_semesters(&client, None)
+        .await
+        .expect("semesters");
     let semester = env("VTOP_SEMESTER")
         .or_else(|| semesters.semesters.first().map(|s| s.id.clone()))
         .expect("no semester available");
-    let attendance = api::fetch_attendance(&client, semester.clone())
+    let attendance = api::fetch_attendance(&client, semester.clone(), None)
         .await
         .expect("attendance");
     let first_course = attendance.records.first().cloned();
-    let grades = api::fetch_grade_view(&client, semester.clone()).await.ok();
+    let grades = api::fetch_grade_view(&client, semester.clone(), None)
+        .await
+        .ok();
     let first_grade_course = grades
         .as_ref()
         .and_then(|g| g.courses.first().map(|c| c.course_id.clone()));
 
-    time_rounds!(samples, "fetch.semesters", api::fetch_semesters(&client));
+    time_rounds!(
+        samples,
+        "fetch.semesters",
+        api::fetch_semesters(&client, None)
+    );
     time_rounds!(
         samples,
         "fetch.attendance",
-        api::fetch_attendance(&client, semester.clone())
+        api::fetch_attendance(&client, semester.clone(), None)
     );
     time_rounds!(
         samples,
         "fetch.timetable",
-        api::fetch_timetable(&client, semester.clone())
+        api::fetch_timetable(&client, semester.clone(), None)
     );
     time_rounds!(
         samples,
         "fetch.marks",
-        api::fetch_marks(&client, semester.clone())
+        api::fetch_marks(&client, semester.clone(), None)
     );
     time_rounds!(
         samples,
         "fetch.exam_schedule",
-        api::fetch_exam_schedule(&client, semester.clone())
+        api::fetch_exam_schedule(&client, semester.clone(), None)
     );
     time_rounds!(
         samples,
         "fetch.grade_view",
-        api::fetch_grade_view(&client, semester.clone())
+        api::fetch_grade_view(&client, semester.clone(), None)
     );
     if let Some(course_id) = first_grade_course.clone() {
         time_rounds!(
             samples,
             "fetch.grade_details",
-            api::fetch_grade_view_details(&client, semester.clone(), course_id.clone())
+            api::fetch_grade_view_details(&client, semester.clone(), course_id.clone(), None)
         );
     }
     time_rounds!(
         samples,
         "fetch.grade_history",
-        api::fetch_grade_history(&client)
+        api::fetch_grade_history(&client, None)
     );
     let today = env("VTOP_BIOMETRIC_DATE").unwrap_or_else(today_ddmmyyyy);
     time_rounds!(
         samples,
         "fetch.biometric",
-        api::fetch_biometric_history(&client, today.clone())
+        api::fetch_biometric_history(&client, today.clone(), None)
     );
     if let Some(course) = first_course.clone() {
         time_rounds!(
@@ -230,7 +238,8 @@ async fn live_bench() {
                 &client,
                 semester.clone(),
                 course.course_id.clone(),
-                course.course_type.clone()
+                course.course_type.clone(),
+                None
             )
         );
     }
@@ -250,11 +259,11 @@ async fn live_bench() {
     // What a pull-to-refresh of the main screens costs: the semester-scoped
     // fetches back to back on one client.
     let started = Instant::now();
-    let _ = api::fetch_attendance(&client, semester.clone()).await;
-    let _ = api::fetch_timetable(&client, semester.clone()).await;
-    let _ = api::fetch_marks(&client, semester.clone()).await;
-    let _ = api::fetch_exam_schedule(&client, semester.clone()).await;
-    let _ = api::fetch_grade_view(&client, semester.clone()).await;
+    let _ = api::fetch_attendance(&client, semester.clone(), None).await;
+    let _ = api::fetch_timetable(&client, semester.clone(), None).await;
+    let _ = api::fetch_marks(&client, semester.clone(), None).await;
+    let _ = api::fetch_exam_schedule(&client, semester.clone(), None).await;
+    let _ = api::fetch_grade_view(&client, semester.clone(), None).await;
     samples.push(Sample {
         name: "refresh.five_endpoints".into(),
         runs: vec![started.elapsed()],
@@ -264,11 +273,11 @@ async fn live_bench() {
     // so they no longer queue behind each other.
     let started = Instant::now();
     let _ = tokio::join!(
-        api::fetch_attendance(&client, semester.clone()),
-        api::fetch_timetable(&client, semester.clone()),
-        api::fetch_marks(&client, semester.clone()),
-        api::fetch_exam_schedule(&client, semester.clone()),
-        api::fetch_grade_view(&client, semester.clone()),
+        api::fetch_attendance(&client, semester.clone(), None),
+        api::fetch_timetable(&client, semester.clone(), None),
+        api::fetch_marks(&client, semester.clone(), None),
+        api::fetch_exam_schedule(&client, semester.clone(), None),
+        api::fetch_grade_view(&client, semester.clone(), None),
     );
     samples.push(Sample {
         name: "refresh.five_endpoints_concurrent".into(),
@@ -281,7 +290,7 @@ async fn live_bench() {
     let restored = api::get_vtop_client(username, password, Some(snapshot), None)
         .await
         .expect("restored client");
-    let restored_result = api::fetch_attendance(&restored, semester.clone()).await;
+    let restored_result = api::fetch_attendance(&restored, semester.clone(), None).await;
     samples.push(Sample {
         name: "restore.first_fetch".into(),
         runs: vec![started.elapsed()],
@@ -447,7 +456,9 @@ async fn live_course_page_dump() {
     };
     let core = &client.inner;
     save("course_menu", &core.course_page_menu().await.expect("menu"));
-    let semesters = api::fetch_semesters(&client).await.expect("semesters");
+    let semesters = api::fetch_semesters(&client, None)
+        .await
+        .expect("semesters");
     let semester = env("VTOP_SEMESTER")
         .or_else(|| semesters.semesters.first().map(|s| s.id.clone()))
         .expect("semester");

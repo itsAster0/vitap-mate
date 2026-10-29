@@ -7,16 +7,35 @@ import 'package:vitapmate/observability/log.dart';
 final http.Client sharedAppHttpClient = _FlowIdClient(http.Client());
 
 /// Sends the current [flow] id as `x-request-id`, so the server's log lines
-/// for a request can be found from the phone's.
+/// for a request can be found from the phone's, and logs each request:
+/// method, host and path (never the query), status, size and time to the
+/// answer.
 class _FlowIdClient extends http.BaseClient {
   _FlowIdClient(this._inner);
 
   final http.Client _inner;
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (currentFlow case final id?) request.headers['x-request-id'] = id;
-    return _inner.send(request);
+    final what = '${request.method} ${request.url.host}${request.url.path}';
+    final watch = Stopwatch()..start();
+    try {
+      final response = await _inner.send(request);
+      final size = switch (response.contentLength) {
+        final bytes? => ' ${bytes}B',
+        null => '',
+      };
+      Log.write(
+        response.statusCode < 400 ? .info : .warn,
+        'http',
+        '$what ${response.statusCode}$size ${watch.elapsedMilliseconds}ms',
+      );
+      return response;
+    } catch (error) {
+      Log.warn('http', '$what failed ${watch.elapsedMilliseconds}ms: $error');
+      rethrow;
+    }
   }
 
   @override

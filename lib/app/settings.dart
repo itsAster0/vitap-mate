@@ -112,7 +112,7 @@ Future<void> _set(
   ref.invalidate(provider);
 }
 
-/// A number tuned in Developer settings, in [unit]s.
+/// A number tuned in Settings → Connection → Advanced, in [unit]s.
 typedef Tunable = ({String key, String title, String unit, int fallback});
 
 /// A background page slower than this stops the refresh (the network got

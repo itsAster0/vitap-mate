@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { accountObject } from "../test/account-harness";
 import { AccountRecord } from "./account-state";
@@ -61,5 +61,67 @@ describe("app status", () => {
     const status = (await (await rig.account.appStatus(body())).json()) as Record<string, unknown>;
     expect(status.sessionSavedAt).toBeNull();
     expect(status.forwarding).toBeNull();
+  });
+});
+
+describe("app login", () => {
+  /** A linked account whose saved password is still usable. */
+  const withVault = () => {
+    const a = linked();
+    a.saveVault("sealed", now());
+    return a;
+  };
+
+  /** An engine that takes sign-ins, keeping each request id. */
+  function engine() {
+    const started: string[] = [];
+    const fake = (path: string, body: unknown) => {
+      if (path !== "/engine/login") return new Response(null, { status: 503 });
+      started.push((body as { requestId: string }).requestId);
+      return new Response(null, { status: 202 });
+    };
+    return { started, fake };
+  }
+
+  it("needs a saved password", async () => {
+    const rig = accountObject();
+    rig.seed(linked()); // its password is past the chosen lifetime
+    const response = await rig.account.appLogin(body());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "no_saved_credentials" });
+  });
+
+  it("signs in on the server and answers with the session", async () => {
+    const { started, fake } = engine();
+    const rig = accountObject(fake);
+    rig.seed(withVault());
+    const answer = rig.account.appLogin(body());
+    await vi.waitFor(() => expect(started).toHaveLength(1));
+    await rig.account.loginDone({
+      account: "22BCE0001",
+      requestId: started[0],
+      outcome: { status: "ok", cookies: "JSESSIONID=s", sealedSession: "sealed-s" },
+    });
+    const response = await answer;
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      status: "ok",
+      session: { cookies: "JSESSIONID=s", registration_number: "22BCE0001" },
+    });
+  });
+
+  it("drops a rejected password and does not try it again", async () => {
+    const { started, fake } = engine();
+    const rig = accountObject(fake);
+    rig.seed(withVault());
+    const answer = rig.account.appLogin(body());
+    await vi.waitFor(() => expect(started).toHaveLength(1));
+    await rig.account.loginDone({ account: "22BCE0001", requestId: started[0], outcome: { status: "invalid_credentials" } });
+    const response = await answer;
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: "invalid_credentials" });
+    // The next ask finds no password and starts nothing.
+    expect((await rig.account.appLogin(body())).status).toBe(409);
+    expect(started).toHaveLength(1);
   });
 });

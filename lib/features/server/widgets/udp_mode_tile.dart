@@ -6,7 +6,7 @@ import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/server/widgets/icon_box.dart';
 import 'package:vitapmate/features/server/widgets/server_format.dart';
 
-/// The experimental UDP mode switch, under "Fetch on the server". Hidden in
+/// The UDP transport switch, under the server-side fetch route. Hidden in
 /// builds that know no gateway.
 class UdpModeTile extends ConsumerWidget {
   const UdpModeTile({super.key});
@@ -25,8 +25,8 @@ class UdpModeTile extends ConsumerWidget {
                 icon: FLucideIcons.radioTower,
                 tone: context.theme.colors.app.lab,
               ),
-              title: const Text('UDP mode'),
-              subtitle: const Text('Experimental, for slow networks'),
+              title: const Text('UDP transport'),
+              subtitle: const Text('Noise IK + FEC over UDP'),
               suffix: FSwitch(
                 value: on,
                 onChange: (value) => setVtopUdp(ref, value),
@@ -34,10 +34,7 @@ class UdpModeTile extends ConsumerWidget {
             ),
           ],
         ),
-        if (on)
-          const ServerNote(
-            'Pages come over UDP through a separate gateway, which keeps your session for six hours. Sign-in still uses HTTPS, and so does everything on networks that block UDP.',
-          ),
+        if (on) const ServerFacts([('Built for', '1–8 kbit/s, 10–20% loss')]),
       ],
     );
   }

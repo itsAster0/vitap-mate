@@ -38,6 +38,7 @@ import 'package:vitapmate/features/server/server_page.dart';
 import 'package:vitapmate/features/account/mail_forwarding_page.dart';
 import 'package:vitapmate/features/account/gmail_otp_setup_page.dart';
 import 'package:vitapmate/features/account/gmail_oauth_guide_page.dart';
+import 'package:vitapmate/features/settings/connection_page.dart';
 import 'package:vitapmate/features/settings/notification_management_page.dart';
 import 'package:vitapmate/features/developer/logs_page.dart';
 import 'package:vitapmate/app/widgets/server_feature_gate.dart';
@@ -286,6 +287,11 @@ final routerProvider = Provider<GoRouter>(
                   Paths.debug,
                   (_) => const DebugPage(),
                   routes: [_slide('logs', Paths.debugLogs, (_) => LogsPage())],
+                ),
+                _slide(
+                  'connection',
+                  Paths.connection,
+                  (_) => const ConnectionPage(),
                 ),
                 _slide(
                   'calendar-sync',

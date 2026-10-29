@@ -8,11 +8,12 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/vtop/edge/server_status.dart' show EdgeIdentity;
 import 'package:vitapmate/vtop/route/server_url.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/route/vtop_udp.dart';
@@ -108,7 +109,9 @@ final rustPageDictionary = PageDictionary(
       server_page.serverPageUnpack(name: name, packed: packed),
 );
 
-/// One page over the experimental UDP transport (`rust/src/api/wire.rs`).
+/// One request over the experimental UDP transport (`rust/src/api/wire.rs`):
+/// a page on `sessionJson`'s session, or a sign-in (empty `sessionJson`). A
+/// [secret] one goes only on a forward-secret session.
 typedef WirePageFetch =
     Future<WirePage> Function({
       required String sessionJson,
@@ -116,6 +119,9 @@ typedef WirePageFetch =
       String? semester,
       required Map<String, String> args,
       String? dictionary,
+      String? account,
+      bool secret,
+      Duration? timeout,
     });
 
 /// [WirePageFetch] through Rust, to the build's gateway (`vtop_udp.dart`).
@@ -125,6 +131,9 @@ Future<WirePage> rustWirePage({
   String? semester,
   required Map<String, String> args,
   String? dictionary,
+  String? account,
+  bool secret = false,
+  Duration? timeout,
 }) async => wireFetchPage(
   config: await udpWireConfig(),
   sessionJson: sessionJson,
@@ -132,13 +141,24 @@ Future<WirePage> rustWirePage({
   semester: semester,
   args: [for (final e in args.entries) (e.key, e.value)],
   dictionary: dictionary,
-  timeoutMs: await currentTunable(udpTimeout) * 1000,
+  accountJson: account,
+  secret: secret,
+  timeoutMs: (timeout ?? Duration(seconds: await currentTunable(udpTimeout)))
+      .inMilliseconds,
 );
 
 Future<bool> _never() async => false;
 
-/// The edge's `/v1/vtop/*` routes; page fetches over the UDP gateway
-/// instead when [useWire] says so (see `vtop_udp.dart`).
+Future<EdgeIdentity?> _unlinked() async => null;
+
+Future<void> _ignore(SessionState _) async {}
+
+/// The header a renewed session comes back in, from [ServerVtopApi._sendWire]
+/// to [ServerVtopApi.fetch].
+const _renewedSessionHeader = 'x-renewed-session';
+
+/// The edge's `/v1/vtop/*` routes; page fetches and sign-ins over the UDP
+/// gateway instead when [useWire] says so (see `vtop_udp.dart`).
 class ServerVtopApi {
   ServerVtopApi({
     required http.Client client,
@@ -146,11 +166,17 @@ class ServerVtopApi {
     PageDictionary? pages,
     WirePageFetch? wire,
     Future<bool> Function() useWire = _never,
+    Future<EdgeIdentity?> Function() identity = _unlinked,
+    Future<bool> Function() useServerSignIn = _never,
+    Future<void> Function(SessionState session) onSession = _ignore,
   }) : _client = client,
        _baseUrl = baseUrl,
        _pages = pages,
        _wire = wire,
-       _useWire = useWire;
+       _useWire = useWire,
+       _identity = identity,
+       _useServerSignIn = useServerSignIn,
+       _onSession = onSession;
 
   final http.Client _client;
 
@@ -161,11 +187,40 @@ class ServerVtopApi {
   final String? _baseUrl;
 
   /// After the gateway does not answer, pages use HTTPS for this long.
-  static const wireRetryAfter = Duration(minutes: 10);
+  static const wireRetryAfter = Duration(minutes: 5);
+
+  /// Until when UDP is skipped, after the gateway did not answer. One
+  /// gateway, so shared; shown and cleared in Developer → Debug.
+  static final wireOffUntil = ValueNotifier<DateTime?>(null);
 
   final WirePageFetch? _wire;
   final Future<bool> Function() _useWire;
-  DateTime? _wireOffUntil;
+
+  /// This phone's link to its account, for a sign-in by the server.
+  final Future<EdgeIdentity?> Function() _identity;
+
+  /// Whether the server signs in for this phone with the password it keeps
+  /// (`bridgeServerSignInSettingKey`).
+  final Future<bool> Function() _useServerSignIn;
+
+  /// Takes a session the gateway renewed in a fetch.
+  final Future<void> Function(SessionState session) _onSession;
+
+  /// `/v1/app/login`'s body when the server signs in for this phone, else
+  /// null.
+  Future<String?> _account() async {
+    if (!await _useServerSignIn()) return null;
+    final identity = await _identity();
+    if (identity == null) return null;
+    return jsonEncode({
+      'registrationNumber': identity.registrationNumber,
+      'appSecret': identity.appSecret,
+    });
+  }
+
+  /// Over the edge's wait for a sign-in by the server, which waits for the
+  /// OTP mail.
+  static const serverLoginTimeout = Duration(seconds: 110);
 
   Future<Map<String, dynamic>> fetch({
     required SessionState session,
@@ -175,7 +230,14 @@ class ServerVtopApi {
   }) async {
     final pages = _pages;
     final response =
-        await _sendWire(session, name, semester, args, pages?.id()) ??
+        await _sendWire(
+          sessionJson: jsonEncode(sessionToServerJson(session)),
+          name: name,
+          semester: semester,
+          args: args,
+          dictionary: pages?.id(),
+          account: await _account(),
+        ) ??
         await _send('/v1/vtop/fetch', {
           'session': sessionToServerJson(session),
           'name': name,
@@ -183,6 +245,9 @@ class ServerVtopApi {
           'args': args,
           'dictionary': ?pages?.id(),
         });
+    if (response.headers[_renewedSessionHeader] case final renewed?) {
+      await _onSession(sessionFromServerJson(jsonObject(renewed)));
+    }
     final Object? page;
     if (pages != null && response.headers['content-type'] == packedPageType) {
       try {
@@ -213,8 +278,48 @@ class ServerVtopApi {
     {'session': sessionToServerJson(pending)},
   );
 
+  /// A sign-in by the server with the password it keeps, the OTP read
+  /// from forwarded mail or Gmail, so the phone sends no password; over UDP
+  /// in UDP mode, else HTTPS. Null to sign in the usual way: server
+  /// sign-in is off, the phone is not linked, or the server cannot sign in.
+  /// A rejected password or a timeout is thrown as it is: no other try.
+  Future<SessionState?> loginOnServer() async {
+    final account = await _account();
+    if (account == null) return null;
+    try {
+      final response =
+          await _sendWire(
+            name: '/v1/app/login',
+            args: {'body': account},
+            secret: true,
+            timeout: serverLoginTimeout,
+          ) ??
+          await _send(
+            '/v1/app/login',
+            jsonObject(account),
+            timeout: serverLoginTimeout,
+          );
+      return switch (_json(response)['session']) {
+        final Map<String, dynamic> session => sessionFromServerJson(session),
+        _ => null,
+      };
+    } on ServerVtopUnavailable catch (error) {
+      _log.info('no sign-in by the server ($error); signing in as usual');
+      return null;
+    }
+  }
+
+  /// A sign-in step over UDP (on a forward-secret session) when the mode
+  /// is on, else HTTPS.
   Future<ServerLogin> _login(String path, Map<String, Object?> request) async {
-    final body = _json(await _send(path, request));
+    final body = _json(
+      await _sendWire(
+            name: path,
+            args: {'body': jsonEncode(request)},
+            secret: true,
+          ) ??
+          await _send(path, request),
+    );
     final state = switch (body['session']) {
       final Map<String, dynamic> session => sessionFromServerJson(session),
       _ => throw const ServerVtopUnavailable('the server sent no session'),
@@ -230,30 +335,37 @@ class ServerVtopApi {
     );
   }
 
-  /// The page over UDP, shaped as the edge's answer; null to use HTTPS:
-  /// the mode is off, the gateway did not answer lately, or the page does
-  /// not suit UDP. A page that started arriving but did not finish is a
-  /// timeout, as over HTTPS (another try over HTTPS would only be slower).
-  Future<http.Response?> _sendWire(
-    SessionState session,
-    String name,
+  /// The request over UDP, shaped as the edge's answer; null to use
+  /// HTTPS: the mode is off, the gateway did not answer lately, or the
+  /// request does not suit UDP. One that started but did not finish is a
+  /// timeout, as over HTTPS: another try over HTTPS would only be slower,
+  /// and a sign-in tried again would mail a second OTP.
+  Future<http.Response?> _sendWire({
+    String sessionJson = '',
+    required String name,
     String? semester,
-    Map<String, String> args,
+    Map<String, String> args = const {},
     String? dictionary,
-  ) async {
+    String? account,
+    bool secret = false,
+    Duration? timeout,
+  }) async {
     final wire = _wire;
     if (wire == null || !await _useWire()) return null;
-    if (_wireOffUntil case final off? when DateTime.now().isBefore(off)) {
+    if (wireOffUntil.value case final off? when DateTime.now().isBefore(off)) {
       return null;
     }
     final WirePage page;
     try {
       page = await wire(
-        sessionJson: jsonEncode(sessionToServerJson(session)),
+        sessionJson: sessionJson,
         name: name,
         semester: semester,
         args: args,
         dictionary: dictionary,
+        account: account,
+        secret: secret,
+        timeout: timeout,
       );
     } on WireFetchError catch (error) {
       switch (error) {
@@ -262,7 +374,7 @@ class ServerVtopApi {
             'The server took too long to answer.',
           );
         case WireFetchError_Unreachable():
-          _wireOffUntil = DateTime.now().add(wireRetryAfter);
+          wireOffUntil.value = DateTime.now().add(wireRetryAfter);
           _log.warn('$name: the UDP gateway did not answer; using HTTPS');
         case WireFetchError_Unsupported(:final field0) ||
             WireFetchError_Failed(:final field0):
@@ -280,16 +392,27 @@ class ServerVtopApi {
     // Too large for UDP, or the gateway is busy: it said so without
     // fetching the page.
     if (page.status case 413 || 429) return null;
+    // An older gateway cannot read this request: HTTPS for a while.
+    if (page.status == 400 && utf8.decode(page.body).contains('bad_request')) {
+      wireOffUntil.value = DateTime.now().add(wireRetryAfter);
+      _log.warn('$name: the UDP gateway cannot read the request; using HTTPS');
+      return null;
+    }
     return http.Response.bytes(
       page.body,
       page.status,
       headers: {
         'content-type': page.packed ? packedPageType : 'application/json',
+        _renewedSessionHeader: ?page.session,
       },
     );
   }
 
-  Future<http.Response> _send(String path, Map<String, Object?> body) async {
+  Future<http.Response> _send(
+    String path,
+    Map<String, Object?> body, {
+    Duration? timeout,
+  }) async {
     final base = (_baseUrl ?? await currentServerUrl()).replaceFirst(
       RegExp(r'/+$'),
       '',
@@ -302,7 +425,9 @@ class ServerVtopApi {
             headers: {'content-type': 'application/json'},
             body: jsonEncode(body),
           )
-          .timeout(Duration(seconds: await currentTunable(serverTimeout)));
+          .timeout(
+            timeout ?? Duration(seconds: await currentTunable(serverTimeout)),
+          );
     } on TimeoutException {
       throw const VtopError.vtopUnavailable(
         'The server took too long to answer.',
@@ -424,6 +549,10 @@ class ServerVtopAuthenticator implements VtopAuthenticator {
       return _local.login(client);
     }
     _pendingOnServer = false;
+    // UDP mode: the server signs in with the password it keeps.
+    if (await _api.loginOnServer() case final session?) {
+      return _apply(client, ServerSignedIn(session));
+    }
     final ServerLogin outcome;
     try {
       outcome = await _api.login(credentials.username, credentials.password);

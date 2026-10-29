@@ -53,24 +53,29 @@ class GlobalAsyncQueue extends _$GlobalAsyncQueue implements AsyncQueue {
 
     unawaited(() async {
       try {
-        if (id.startsWith('vtop')) {
-          // Every VTOP call waits for a sign-in already under way.
-          final mainFutures = [
-            for (final MapEntry(:key, :value) in current.entries)
-              if (key.startsWith('vtop_login') && key != id) value,
-          ];
-          if (mainFutures.isNotEmpty) {
-            Log.info('vtop.queue', '$id waiting for sign-in');
-            await Future.wait(mainFutures);
+        // Each task is a flow: its log lines, server requests and Rust
+        // calls carry one id.
+        final result = await flow(id, source: 'vtop.queue', () async {
+          if (id.startsWith('vtop')) {
+            // Every VTOP call waits for a sign-in already under way.
+            final mainFutures = [
+              for (final MapEntry(:key, :value) in current.entries)
+                if (key.startsWith('vtop_login') && key != id) value,
+            ];
+            if (mainFutures.isNotEmpty) {
+              Log.info('vtop.queue', '$id waiting for sign-in');
+              await Future.wait(mainFutures);
+            }
           }
-        }
-        final watch = Stopwatch()..start();
-        final result = await task();
-        if (id.startsWith('vtop_') &&
-            !id.startsWith('vtop_login') &&
-            watch.elapsed <= quickFetchLimit) {
-          _quickFetches.add(null);
-        }
+          final watch = Stopwatch()..start();
+          final result = await task();
+          if (id.startsWith('vtop_') &&
+              !id.startsWith('vtop_login') &&
+              watch.elapsed <= quickFetchLimit) {
+            _quickFetches.add(null);
+          }
+          return result;
+        });
         completer.complete(result);
       } catch (e, st) {
         completer.completeError(e, st);

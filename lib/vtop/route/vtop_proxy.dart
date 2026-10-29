@@ -32,9 +32,12 @@ const vtopModeSettingKey = 'settings_vtop_mode';
 /// [VtopServerMode.compress].
 const vtopProxySettingKey = 'settings_vtop_proxy';
 
-/// The setting before it is chosen. Off, except on test builds made with
-/// `--dart-define=VTOP_PROXY_DEFAULT=true`.
-const _proxyByDefault = bool.fromEnvironment('VTOP_PROXY_DEFAULT');
+/// The setting before it is chosen: compressed through the server, unless
+/// the build says `--dart-define=VTOP_PROXY_DEFAULT=false`.
+const _proxyByDefault = bool.fromEnvironment(
+  'VTOP_PROXY_DEFAULT',
+  defaultValue: true,
+);
 
 /// The saved mode, from the new key or else the old switch.
 VtopServerMode vtopModeFrom({String? saved, bool? oldProxy}) =>

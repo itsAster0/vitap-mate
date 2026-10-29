@@ -1,3 +1,4 @@
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/src/api/vtop/vtop_client.dart';
 import 'package:vitapmate/src/api/vtop_get_client.dart' as vtop_api;
 
@@ -20,13 +21,17 @@ class LocalVtopAuthenticator implements VtopAuthenticator {
 
   @override
   Future<void> login(VtopClient client) =>
-      vtop_api.vtopClientLogin(client: client);
+      vtop_api.vtopClientLogin(flow: currentFlow, client: client);
 
   @override
   Future<void> submitOtp(VtopClient client, String otp) =>
-      vtop_api.vtopClientSubmitSecurityOtp(client: client, otpCode: otp);
+      vtop_api.vtopClientSubmitSecurityOtp(
+        flow: currentFlow,
+        client: client,
+        otpCode: otp,
+      );
 
   @override
   Future<void> resendOtp(VtopClient client) =>
-      vtop_api.vtopClientResendSecurityOtp(client: client);
+      vtop_api.vtopClientResendSecurityOtp(flow: currentFlow, client: client);
 }

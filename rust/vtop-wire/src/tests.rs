@@ -257,6 +257,7 @@ fn state_dir(name: &str) -> PathBuf {
 
 fn config(port: u16, key: [u8; 32], dir: &std::path::Path) -> ClientConfig {
     ClientConfig {
+        request_in_handshake: true,
         host: "127.0.0.1".into(),
         ports: vec![port],
         server_key: key,
@@ -504,4 +505,27 @@ async fn a_forged_reset_is_ignored() {
     );
     let saved = std::fs::read_to_string(dir.join("session.0")).unwrap();
     assert!(!saved.is_empty(), "the session was kept");
+}
+
+#[tokio::test]
+async fn a_secret_request_waits_for_the_handshake() {
+    let gw = spawn_gateway(None, 0, Duration::ZERO).await;
+    let dir = state_dir("secret");
+    let cfg = ClientConfig {
+        request_in_handshake: false,
+        ..config(gw.port, gw.public, &dir)
+    };
+    let mut body = ask(300);
+    body.resize(400, 0xcd);
+
+    let got = fetch(&cfg, &body, Duration::from_secs(20)).await.unwrap();
+
+    assert_eq!(got.body, answer(300));
+    assert!(got.handshake);
+    // Message 1 is smaller than the request, so the request was not in it.
+    let seen = gw.seen.lock().unwrap();
+    let hs1 = seen.iter().find(|p| p[0] == crate::frame::T_HS1).unwrap();
+    assert!(hs1.len() < body.len(), "message 1 is {} bytes", hs1.len());
+    drop(seen);
+    gw.task.abort();
 }

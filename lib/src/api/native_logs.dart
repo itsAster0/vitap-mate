@@ -6,9 +6,13 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `install_native_logger`, `log_file`
+// These functions are ignored because they are not marked as `pub`: `in_flow`, `install_native_logger`, `log_file`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `LogFile`, `NativeLogger`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `enabled`, `flush`, `log`
+
+/// The signed-in student's registration number, for every line.
+void nativeLogsRegno({String? regno}) =>
+    RustLib.instance.api.crateApiNativeLogsNativeLogsRegno(regno: regno);
 
 /// Starts writing Rust's log to `dir/rust.log`.
 Future<void> nativeLogsOpen({required String dir}) =>

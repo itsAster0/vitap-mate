@@ -34,6 +34,7 @@ abstract final class Paths {
   static const notificationManagement = "notificationManagement";
   static const calendarSync = "calendarSync";
   static const debug = "debug";
+  static const connection = "connection";
   static const debugLogs = "debugLogs";
   static const gpaCalculator = "gpaCalculator";
   static const docs = "docs";

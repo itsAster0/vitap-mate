@@ -3,6 +3,7 @@
 /// (`rust/vtop-bridge/src/pages.rs`).
 library;
 
+import 'package:vitapmate/observability/log.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -18,15 +19,19 @@ abstract final class VtopQueries {
     name: 'semesters',
     semester: semester,
     fromJson: SemesterData.fromJson,
-    local: (client) => vtop_api.fetchSemesters(client: client),
+    local: (client) =>
+        vtop_api.fetchSemesters(flow: currentFlow, client: client),
   );
 
   static VtopQuery<AttendanceData> attendance(String semester) => VtopQuery(
     name: 'attendance',
     semester: semester,
     fromJson: AttendanceData.fromJson,
-    local: (client) =>
-        vtop_api.fetchAttendance(client: client, semesterId: semester),
+    local: (client) => vtop_api.fetchAttendance(
+      flow: currentFlow,
+      client: client,
+      semesterId: semester,
+    ),
   );
 
   static VtopQuery<FullAttendanceData> fullAttendance(
@@ -39,6 +44,7 @@ abstract final class VtopQueries {
     args: {'course_id': courseId, 'course_type': courseType},
     fromJson: FullAttendanceData.fromJson,
     local: (client) => vtop_api.fetchFullAttendance(
+      flow: currentFlow,
       client: client,
       semesterId: semester,
       courseId: courseId,
@@ -50,32 +56,44 @@ abstract final class VtopQueries {
     name: 'timetable',
     semester: semester,
     fromJson: TimetableData.fromJson,
-    local: (client) =>
-        vtop_api.fetchTimetable(client: client, semesterId: semester),
+    local: (client) => vtop_api.fetchTimetable(
+      flow: currentFlow,
+      client: client,
+      semesterId: semester,
+    ),
   );
 
   static VtopQuery<MarksData> marks(String semester) => VtopQuery(
     name: 'marks',
     semester: semester,
     fromJson: MarksData.fromJson,
-    local: (client) =>
-        vtop_api.fetchMarks(client: client, semesterId: semester),
+    local: (client) => vtop_api.fetchMarks(
+      flow: currentFlow,
+      client: client,
+      semesterId: semester,
+    ),
   );
 
   static VtopQuery<ExamScheduleData> examSchedule(String semester) => VtopQuery(
     name: 'exam_schedule',
     semester: semester,
     fromJson: ExamScheduleData.fromJson,
-    local: (client) =>
-        vtop_api.fetchExamSchedule(client: client, semesterId: semester),
+    local: (client) => vtop_api.fetchExamSchedule(
+      flow: currentFlow,
+      client: client,
+      semesterId: semester,
+    ),
   );
 
   static VtopQuery<GradeViewData> grades(String semester) => VtopQuery(
     name: 'grades',
     semester: semester,
     fromJson: GradeViewData.fromJson,
-    local: (client) =>
-        vtop_api.fetchGradeView(client: client, semesterId: semester),
+    local: (client) => vtop_api.fetchGradeView(
+      flow: currentFlow,
+      client: client,
+      semesterId: semester,
+    ),
   );
 
   static VtopQuery<AcademicCalendarData> academicCalendar(String semester) =>
@@ -84,6 +102,7 @@ abstract final class VtopQueries {
         semester: semester,
         fromJson: AcademicCalendarData.fromJson,
         local: (client) => vtop_api.fetchAcademicCalendar(
+          flow: currentFlow,
           client: client,
           semesterId: semester,
         ),
@@ -98,6 +117,7 @@ abstract final class VtopQueries {
     args: {'course_id': courseId},
     fromJson: GradeDetailsData.fromJson,
     local: (client) => vtop_api.fetchGradeViewDetails(
+      flow: currentFlow,
       client: client,
       semesterId: semester,
       courseId: courseId,
@@ -107,7 +127,8 @@ abstract final class VtopQueries {
   static VtopQuery<GradeHistoryData> gradeHistory() => VtopQuery(
     name: 'grade_history',
     fromJson: GradeHistoryData.fromJson,
-    local: (client) => vtop_api.fetchGradeHistory(client: client),
+    local: (client) =>
+        vtop_api.fetchGradeHistory(flow: currentFlow, client: client),
   );
 
   /// [date] is `DD/MM/YYYY`.
@@ -115,21 +136,24 @@ abstract final class VtopQueries {
     name: 'biometric',
     args: {'date': date},
     fromJson: BiometricData.fromJson,
-    local: (client) =>
-        vtop_api.fetchBiometricHistory(client: client, date: date),
+    local: (client) => vtop_api.fetchBiometricHistory(
+      flow: currentFlow,
+      client: client,
+      date: date,
+    ),
   );
 
   static VtopQuery<StudentProfile> profile() => VtopQuery(
     name: 'profile',
     fromJson: StudentProfile.fromJson,
-    local: (client) => vtop_api.fetchProfile(client: client),
+    local: (client) => vtop_api.fetchProfile(flow: currentFlow, client: client),
   );
 
   /// The mentor's details and the messages they sent.
   static VtopQuery<MentorData> mentor() => VtopQuery(
     name: 'mentor',
     fromJson: MentorData.fromJson,
-    local: (client) => vtop_api.fetchMentor(client: client),
+    local: (client) => vtop_api.fetchMentor(flow: currentFlow, client: client),
   );
 
   // Pages not saved on the phone: fetched in full every time.
@@ -137,13 +161,15 @@ abstract final class VtopQueries {
   static VtopQuery<GeneralOutingData> generalOuting() => VtopQuery(
     name: 'general_outing',
     fromJson: _generalOuting,
-    local: (client) => vtop_api.fetchGeneralOuting(client: client),
+    local: (client) =>
+        vtop_api.fetchGeneralOuting(flow: currentFlow, client: client),
   );
 
   static VtopQuery<WeekendOutingData> weekendOuting() => VtopQuery(
     name: 'weekend_outing',
     fromJson: _weekendOuting,
-    local: (client) => vtop_api.fetchWeekendOuting(client: client),
+    local: (client) =>
+        vtop_api.fetchWeekendOuting(flow: currentFlow, client: client),
   );
 
   /// An accepted outing's PDF pass.
@@ -155,6 +181,7 @@ abstract final class VtopQueries {
     args: {'kind': weekend ? 'weekend' : 'general', 'pass_id': passId},
     fromJson: (json) => base64.decode(json['pdf'] as String),
     local: (client) => vtop_api.fetchOutingPass(
+      flow: currentFlow,
       client: client,
       weekend: weekend,
       passId: passId,
@@ -167,6 +194,7 @@ abstract final class VtopQueries {
         semester: semester,
         fromJson: CoursePageCourses.fromJson,
         local: (client) => vtop_api.fetchCoursePageCourses(
+          flow: currentFlow,
           client: client,
           semesterId: semester,
         ),
@@ -181,6 +209,7 @@ abstract final class VtopQueries {
     args: {'course_id': courseId},
     fromJson: CoursePageClasses.fromJson,
     local: (client) => vtop_api.fetchCoursePageClasses(
+      flow: currentFlow,
       client: client,
       semesterId: semester,
       courseId: courseId,
@@ -197,6 +226,7 @@ abstract final class VtopQueries {
     args: {'erp_id': erpId, 'class_id': classId},
     fromJson: CoursePageDetail.fromJson,
     local: (client) => vtop_api.fetchCoursePageDetail(
+      flow: currentFlow,
       client: client,
       semesterId: semester,
       erpId: erpId,
@@ -208,7 +238,11 @@ abstract final class VtopQueries {
     name: 'course_file_info',
     args: {'path': path},
     fromJson: CourseFileInfo.fromJson,
-    local: (client) => vtop_api.fetchCourseFileInfo(client: client, path: path),
+    local: (client) => vtop_api.fetchCourseFileInfo(
+      flow: currentFlow,
+      client: client,
+      path: path,
+    ),
   );
 
   /// A live VTOP session (cookies, CSRF token, registration number) for
@@ -240,6 +274,7 @@ abstract final class VtopQueries {
     args: {'class_id': classId},
     fromJson: CourseFileInfo.fromJson,
     local: (client) => vtop_api.fetchCoursePlanInfo(
+      flow: currentFlow,
       client: client,
       semesterId: semester,
       classId: classId,
@@ -271,6 +306,7 @@ abstract final class VtopActions {
     },
     fromJson: OutingApplyResult.fromJson,
     local: (client) => vtop_api.applyGeneralOuting(
+      flow: currentFlow,
       client: client,
       place: place,
       purpose: purpose,
@@ -301,6 +337,7 @@ abstract final class VtopActions {
     },
     fromJson: OutingApplyResult.fromJson,
     local: (client) => vtop_api.applyWeekendOuting(
+      flow: currentFlow,
       client: client,
       place: place,
       purpose: purpose,
@@ -315,8 +352,11 @@ abstract final class VtopActions {
         name: 'cancel_general_outing',
         args: {'leave_id': leaveId},
         fromJson: OutingCancelResult.fromJson,
-        local: (client) =>
-            vtop_api.cancelGeneralOuting(client: client, leaveId: leaveId),
+        local: (client) => vtop_api.cancelGeneralOuting(
+          flow: currentFlow,
+          client: client,
+          leaveId: leaveId,
+        ),
       );
 
   static VtopAction<OutingCancelResult> cancelWeekendOuting(String bookingId) =>
@@ -324,8 +364,11 @@ abstract final class VtopActions {
         name: 'cancel_weekend_outing',
         args: {'booking_id': bookingId},
         fromJson: OutingCancelResult.fromJson,
-        local: (client) =>
-            vtop_api.cancelWeekendOuting(client: client, bookingId: bookingId),
+        local: (client) => vtop_api.cancelWeekendOuting(
+          flow: currentFlow,
+          client: client,
+          bookingId: bookingId,
+        ),
       );
 }
 

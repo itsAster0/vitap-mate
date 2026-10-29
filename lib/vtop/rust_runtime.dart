@@ -13,9 +13,14 @@ Future<void> startRustRuntime() async {
   if (_started) return;
   _started = true;
   await RustLib.init();
-  final dir = Directory(
+  // Logs live in the cache: the phone may clear them, and they are not
+  // backed up. Older versions kept them in app support.
+  final old = Directory(
     '${(await getApplicationSupportDirectory()).path}/logs',
   );
+  if (old.existsSync()) await old.delete(recursive: true);
+  final dir = Directory('${(await getApplicationCacheDirectory()).path}/logs');
   await Log.open(dir);
   await nativeLogsOpen(dir: dir.path);
+  Log.catchUncaught();
 }

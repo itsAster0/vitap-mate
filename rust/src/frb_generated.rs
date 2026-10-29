@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1354942896;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 338559046;
 
 // Section: executor
 
@@ -80,6 +80,7 @@ fn wire__crate__api__vtop_get_client__apply_general_outing_impl(
             let api_in_date = <String>::sse_decode(&mut deserializer);
             let api_in_hour = <u8>::sse_decode(&mut deserializer);
             let api_in_minute = <u8>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -113,6 +114,7 @@ fn wire__crate__api__vtop_get_client__apply_general_outing_impl(
                             api_in_date,
                             api_in_hour,
                             api_in_minute,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -153,6 +155,7 @@ fn wire__crate__api__vtop_get_client__apply_weekend_outing_impl(
             let api_date = <String>::sse_decode(&mut deserializer);
             let api_time_slot = <String>::sse_decode(&mut deserializer);
             let api_contact_number = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -183,6 +186,7 @@ fn wire__crate__api__vtop_get_client__apply_weekend_outing_impl(
                             api_date,
                             api_time_slot,
                             api_contact_number,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -219,6 +223,7 @@ fn wire__crate__api__vtop_get_client__cancel_general_outing_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_leave_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -245,6 +250,7 @@ fn wire__crate__api__vtop_get_client__cancel_general_outing_impl(
                         let output_ok = crate::api::vtop_get_client::cancel_general_outing(
                             &*api_client_guard,
                             api_leave_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -281,6 +287,7 @@ fn wire__crate__api__vtop_get_client__cancel_weekend_outing_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_booking_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -307,6 +314,7 @@ fn wire__crate__api__vtop_get_client__cancel_weekend_outing_impl(
                         let output_ok = crate::api::vtop_get_client::cancel_weekend_outing(
                             &*api_client_guard,
                             api_booking_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -446,6 +454,7 @@ fn wire__crate__api__vtop_get_client__fetch_academic_calendar_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -472,6 +481,7 @@ fn wire__crate__api__vtop_get_client__fetch_academic_calendar_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_academic_calendar(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -508,6 +518,7 @@ fn wire__crate__api__vtop_get_client__fetch_attendance_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -534,6 +545,7 @@ fn wire__crate__api__vtop_get_client__fetch_attendance_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_attendance(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -570,6 +582,7 @@ fn wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_date = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -596,6 +609,7 @@ fn wire__crate__api__vtop_get_client__fetch_biometric_history_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_biometric_history(
                             &*api_client_guard,
                             api_date,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -690,6 +704,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_file_info_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_path = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -716,6 +731,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_file_info_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_course_file_info(
                             &*api_client_guard,
                             api_path,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -753,6 +769,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_classes_impl(
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
             let api_course_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -780,6 +797,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_classes_impl(
                             &*api_client_guard,
                             api_semester_id,
                             api_course_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -816,6 +834,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_courses_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -842,6 +861,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_courses_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_course_page_courses(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -880,6 +900,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_detail_impl(
             let api_semester_id = <String>::sse_decode(&mut deserializer);
             let api_erp_id = <String>::sse_decode(&mut deserializer);
             let api_class_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -908,6 +929,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_page_detail_impl(
                             api_semester_id,
                             api_erp_id,
                             api_class_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -945,6 +967,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_plan_info_impl(
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
             let api_class_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -972,6 +995,7 @@ fn wire__crate__api__vtop_get_client__fetch_course_plan_info_impl(
                             &*api_client_guard,
                             api_semester_id,
                             api_class_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1008,6 +1032,7 @@ fn wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1034,6 +1059,7 @@ fn wire__crate__api__vtop_get_client__fetch_exam_schedule_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_exam_schedule(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1072,6 +1098,7 @@ fn wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
             let api_semester_id = <String>::sse_decode(&mut deserializer);
             let api_course_id = <String>::sse_decode(&mut deserializer);
             let api_course_type = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1100,6 +1127,7 @@ fn wire__crate__api__vtop_get_client__fetch_full_attendance_impl(
                             api_semester_id,
                             api_course_id,
                             api_course_type,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1135,6 +1163,7 @@ fn wire__crate__api__vtop_get_client__fetch_general_outing_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1158,9 +1187,11 @@ fn wire__crate__api__vtop_get_client__fetch_general_outing_impl(
                             }
                         }
                         let api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::fetch_general_outing(&*api_client_guard)
-                                .await?;
+                        let output_ok = crate::api::vtop_get_client::fetch_general_outing(
+                            &*api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1194,6 +1225,7 @@ fn wire__crate__api__vtop_get_client__fetch_grade_history_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1217,9 +1249,11 @@ fn wire__crate__api__vtop_get_client__fetch_grade_history_impl(
                             }
                         }
                         let api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::fetch_grade_history(&*api_client_guard)
-                                .await?;
+                        let output_ok = crate::api::vtop_get_client::fetch_grade_history(
+                            &*api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1254,6 +1288,7 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1280,6 +1315,7 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_grade_view(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1317,6 +1353,7 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
             let api_course_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1344,6 +1381,7 @@ fn wire__crate__api__vtop_get_client__fetch_grade_view_details_impl(
                             &*api_client_guard,
                             api_semester_id,
                             api_course_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1439,6 +1477,7 @@ fn wire__crate__api__vtop_get_client__fetch_marks_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1465,6 +1504,7 @@ fn wire__crate__api__vtop_get_client__fetch_marks_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_marks(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1500,6 +1540,7 @@ fn wire__crate__api__vtop_get_client__fetch_mentor_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1524,7 +1565,8 @@ fn wire__crate__api__vtop_get_client__fetch_mentor_impl(
                         }
                         let api_client_guard = api_client_guard.unwrap();
                         let output_ok =
-                            crate::api::vtop_get_client::fetch_mentor(&*api_client_guard).await?;
+                            crate::api::vtop_get_client::fetch_mentor(&*api_client_guard, api_flow)
+                                .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1560,6 +1602,7 @@ fn wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
             >>::sse_decode(&mut deserializer);
             let api_weekend = <bool>::sse_decode(&mut deserializer);
             let api_pass_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1587,6 +1630,7 @@ fn wire__crate__api__vtop_get_client__fetch_outing_pass_impl(
                             &*api_client_guard,
                             api_weekend,
                             api_pass_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1622,6 +1666,7 @@ fn wire__crate__api__vtop_get_client__fetch_profile_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1645,8 +1690,11 @@ fn wire__crate__api__vtop_get_client__fetch_profile_impl(
                             }
                         }
                         let api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::fetch_profile(&*api_client_guard).await?;
+                        let output_ok = crate::api::vtop_get_client::fetch_profile(
+                            &*api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1680,6 +1728,7 @@ fn wire__crate__api__vtop_get_client__fetch_semesters_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1703,9 +1752,11 @@ fn wire__crate__api__vtop_get_client__fetch_semesters_impl(
                             }
                         }
                         let api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::fetch_semesters(&*api_client_guard)
-                                .await?;
+                        let output_ok = crate::api::vtop_get_client::fetch_semesters(
+                            &*api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1740,6 +1791,7 @@ fn wire__crate__api__vtop_get_client__fetch_timetable_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_semester_id = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1766,6 +1818,7 @@ fn wire__crate__api__vtop_get_client__fetch_timetable_impl(
                         let output_ok = crate::api::vtop_get_client::fetch_timetable(
                             &*api_client_guard,
                             api_semester_id,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -1801,6 +1854,7 @@ fn wire__crate__api__vtop_get_client__fetch_weekend_outing_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1824,9 +1878,11 @@ fn wire__crate__api__vtop_get_client__fetch_weekend_outing_impl(
                             }
                         }
                         let api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::fetch_weekend_outing(&*api_client_guard)
-                                .await?;
+                        let output_ok = crate::api::vtop_get_client::fetch_weekend_outing(
+                            &*api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2105,6 +2161,38 @@ fn wire__crate__api__native_logs__native_logs_open_impl(
         },
     )
 }
+fn wire__crate__api__native_logs__native_logs_regno_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "native_logs_regno",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_regno = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::native_logs::native_logs_regno(api_regno);
+                })?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__server_page__server_page_dictionary_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -2191,6 +2279,7 @@ fn wire__crate__api__vtop_get_client__vtop_client_login_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -2214,9 +2303,11 @@ fn wire__crate__api__vtop_get_client__vtop_client_login_impl(
                             }
                         }
                         let mut api_client_guard = api_client_guard.unwrap();
-                        let output_ok =
-                            crate::api::vtop_get_client::vtop_client_login(&mut *api_client_guard)
-                                .await?;
+                        let output_ok = crate::api::vtop_get_client::vtop_client_login(
+                            &mut *api_client_guard,
+                            api_flow,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2300,6 +2391,7 @@ fn wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             let api_client = <RustOpaqueMoi<
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -2326,6 +2418,7 @@ fn wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
                         let output_ok =
                             crate::api::vtop_get_client::vtop_client_resend_security_otp(
                                 &mut *api_client_guard,
+                                api_flow,
                             )
                             .await?;
                         Ok(output_ok)
@@ -2415,6 +2508,7 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
                 flutter_rust_bridge::for_generated::RustAutoOpaqueInner<VtopClient>,
             >>::sse_decode(&mut deserializer);
             let api_otp_code = <String>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -2442,6 +2536,7 @@ fn wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
                             crate::api::vtop_get_client::vtop_client_submit_security_otp(
                                 &mut *api_client_guard,
                                 api_otp_code,
+                                api_flow,
                             )
                             .await?;
                         Ok(output_ok)
@@ -2480,6 +2575,8 @@ fn wire__crate__api__wire__wire_fetch_page_impl(
             let api_semester = <Option<String>>::sse_decode(&mut deserializer);
             let api_args = <Vec<(String, String)>>::sse_decode(&mut deserializer);
             let api_dictionary = <Option<String>>::sse_decode(&mut deserializer);
+            let api_account_json = <Option<String>>::sse_decode(&mut deserializer);
+            let api_secret = <bool>::sse_decode(&mut deserializer);
             let api_timeout_ms = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
@@ -2492,6 +2589,8 @@ fn wire__crate__api__wire__wire_fetch_page_impl(
                             api_semester,
                             api_args,
                             api_dictionary,
+                            api_account_json,
+                            api_secret,
                             api_timeout_ms,
                         )
                         .await?;
@@ -4748,6 +4847,7 @@ impl SseDecode for crate::api::wire::WirePage {
         let mut var_elapsedMs = <u32>::sse_decode(deserializer);
         let mut var_handshake = <bool>::sse_decode(deserializer);
         let mut var_wireBytes = <u32>::sse_decode(deserializer);
+        let mut var_session = <Option<String>>::sse_decode(deserializer);
         return crate::api::wire::WirePage {
             status: var_status,
             packed: var_packed,
@@ -4755,6 +4855,7 @@ impl SseDecode for crate::api::wire::WirePage {
             elapsed_ms: var_elapsedMs,
             handshake: var_handshake,
             wire_bytes: var_wireBytes,
+            session: var_session,
         };
     }
 }
@@ -4927,25 +5028,25 @@ fn pde_ffi_dispatcher_primary_impl(
         36 => {
             wire__crate__api__native_logs__native_logs_open_impl(port, ptr, rust_vec_len, data_len)
         }
-        39 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
+        40 => wire__crate__api__vtop_get_client__vtop_client_login_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        41 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
+        42 => wire__crate__api__vtop_get_client__vtop_client_resend_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        43 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
+        44 => wire__crate__api__vtop_get_client__vtop_client_submit_security_otp_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        44 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
+        45 => wire__crate__api__wire__wire_fetch_page_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -4972,16 +5073,17 @@ fn pde_ffi_dispatcher_sync_impl(
             wire__crate__api__mail_otp__mail_otp_generate_keypair_impl(ptr, rust_vec_len, data_len)
         }
         35 => wire__crate__api__mail_otp__mail_otp_open_impl(ptr, rust_vec_len, data_len),
-        37 => {
+        37 => wire__crate__api__native_logs__native_logs_regno_impl(ptr, rust_vec_len, data_len),
+        38 => {
             wire__crate__api__server_page__server_page_dictionary_impl(ptr, rust_vec_len, data_len)
         }
-        38 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
+        39 => wire__crate__api__server_page__server_page_unpack_impl(ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__vtop_get_client__vtop_client_registration_number_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        42 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
+        43 => wire__crate__api__vtop_get_client__vtop_client_resume_session_impl(
             ptr,
             rust_vec_len,
             data_len,
@@ -6482,6 +6584,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::wire::WirePage {
             self.elapsed_ms.into_into_dart().into_dart(),
             self.handshake.into_into_dart().into_dart(),
             self.wire_bytes.into_into_dart().into_dart(),
+            self.session.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -7682,6 +7785,7 @@ impl SseEncode for crate::api::wire::WirePage {
         <u32>::sse_encode(self.elapsed_ms, serializer);
         <bool>::sse_encode(self.handshake, serializer);
         <u32>::sse_encode(self.wire_bytes, serializer);
+        <Option<String>>::sse_encode(self.session, serializer);
     }
 }
 
