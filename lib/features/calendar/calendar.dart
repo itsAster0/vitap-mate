@@ -3,7 +3,7 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/features/calendar/logic/semester_calendar.dart';
 import 'package:vitapmate/features/timetable/timetable.dart';
 import 'package:vitapmate/observability/log.dart';

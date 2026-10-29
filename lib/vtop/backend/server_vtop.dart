@@ -277,8 +277,9 @@ class ServerVtopApi {
       '$name over UDP: ${page.status} in ${page.elapsedMs} ms, '
       '${page.wireBytes} B${page.handshake ? ', new session' : ''}',
     );
-    // Too large for UDP: the gateway said so without sending the page.
-    if (page.status == 413) return null;
+    // Too large for UDP, or the gateway is busy: it said so without
+    // fetching the page.
+    if (page.status case 413 || 429) return null;
     return http.Response.bytes(
       page.body,
       page.status,

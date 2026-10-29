@@ -46,9 +46,9 @@ pub const WORKING_MAX: Duration = Duration::from_secs(2);
 /// Pacing before the client reports a measured rate (bytes/s).
 pub const PACE_UNKNOWN: u16 = 250;
 const MAX_PENDING: usize = 4;
-/// Requests per device per minute, and handshakes / resets per IP per minute.
-const REQUESTS_PER_MIN: u32 = 60;
-const HANDSHAKES_PER_MIN: u32 = 30;
+/// Sessions kept at most, so memory stays bounded (device keys cost
+/// nothing); when full, the one heard from longest ago makes room.
+const MAX_SESSIONS: usize = 50_000;
 
 /// Which request an answer is for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -127,8 +127,6 @@ pub struct Gateway {
     direct: VecDeque<Outgoing>,
     /// "Working" notices due: (when, token).
     working: Vec<(Instant, Token)>,
-    per_device: HashMap<[u8; 32], (Instant, u32)>,
-    per_ip: HashMap<IpAddr, (Instant, u32)>,
 }
 
 impl Gateway {
@@ -142,8 +140,6 @@ impl Gateway {
             queue: VecDeque::new(),
             direct: VecDeque::new(),
             working: Vec::new(),
-            per_device: HashMap::new(),
-            per_ip: HashMap::new(),
         }
     }
 
@@ -261,7 +257,7 @@ impl Gateway {
         queued.chain(working).chain(direct).min()
     }
 
-    /// Forgets idle sessions, old responses and stale rate-limit windows.
+    /// Forgets idle sessions and old responses.
     pub fn sweep(&mut self, now: Instant) {
         self.sessions
             .retain(|_, s| now.saturating_duration_since(s.heard) < SESSION_IDLE);
@@ -284,12 +280,6 @@ impl Gateway {
         }
         self.seen_ts
             .retain(|d, list| live.contains(d) || !list.is_empty());
-        self.per_device.retain(|_, (start, _)| {
-            now.saturating_duration_since(*start) < Duration::from_secs(60)
-        });
-        self.per_ip.retain(|_, (start, _)| {
-            now.saturating_duration_since(*start) < Duration::from_secs(60)
-        });
     }
 
     fn handshake(
@@ -312,9 +302,6 @@ impl Gateway {
                     packet: hs2,
                 });
             }
-            return None;
-        }
-        if !limit(&mut self.per_ip, from.ip(), HANDSHAKES_PER_MIN, now) {
             return None;
         }
         let mut hs = snow::Builder::new(NOISE.parse().ok()?)
@@ -376,6 +363,17 @@ impl Gateway {
             rate: req.rate,
             responses: HashMap::new(),
         };
+        if self.sessions.len() >= MAX_SESSIONS {
+            // Full: the session heard from longest ago makes room.
+            if let Some(oldest) = self
+                .sessions
+                .iter()
+                .min_by_key(|(_, s)| s.heard)
+                .map(|(id, _)| *id)
+            {
+                self.sessions.remove(&oldest);
+            }
+        }
         self.handshakes.insert(ephemeral, (now, sid, hs2));
         self.sessions.insert(sid, session);
         self.request(sid, req, now)
@@ -390,10 +388,11 @@ impl Gateway {
     ) -> Option<NewRequest> {
         let (_, sid, ctr) = header(packet)?;
         let Some(sess) = self.sessions.get_mut(&sid) else {
-            if limit(&mut self.per_ip, from.ip(), HANDSHAKES_PER_MIN, now) {
-                let mut reset = vec![T_RESET];
-                reset.extend_from_slice(&sid.to_be_bytes());
-                reset.extend_from_slice(&reset_token(&self.private, sid));
+            let mut reset = vec![T_RESET];
+            reset.extend_from_slice(&sid.to_be_bytes());
+            reset.extend_from_slice(&reset_token(&self.private, sid));
+            // Only when smaller than the packet that asked: no amplification.
+            if reset.len() < packet.len() {
                 self.direct.push_back(Outgoing {
                     socket,
                     to: from,
@@ -470,7 +469,7 @@ impl Gateway {
             .values()
             .filter(|r| matches!(r, Resp::Pending { .. }))
             .count();
-        if pending >= MAX_PENDING || !limit(&mut self.per_device, device, REQUESTS_PER_MIN, now) {
+        if pending >= MAX_PENDING {
             return None;
         }
         // A new request from this device: whatever is still queued for its
@@ -615,19 +614,4 @@ fn next(k: usize, repair: &[Vec<u8>], next_repair: &mut usize) -> (u8, Vec<u8>) 
 fn pace(wire: usize, rate: u16) -> Duration {
     let rate = if rate == 0 { PACE_UNKNOWN } else { rate };
     Duration::from_secs_f64(wire as f64 / (2.0 * rate as f64))
-}
-
-/// Fixed one-minute windows; false once `max` is used up.
-fn limit<K: std::hash::Hash + Eq>(
-    map: &mut HashMap<K, (Instant, u32)>,
-    key: K,
-    max: u32,
-    now: Instant,
-) -> bool {
-    let entry = map.entry(key).or_insert((now, 0));
-    if now.saturating_duration_since(entry.0) >= Duration::from_secs(60) {
-        *entry = (now, 0);
-    }
-    entry.1 += 1;
-    entry.1 <= max
 }

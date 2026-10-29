@@ -2975,8 +2975,6 @@ name = "vtop-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "http",
- "http-body-util",
  "httpdate",
  "image",
  "log",

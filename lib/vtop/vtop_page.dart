@@ -10,8 +10,8 @@
 /// screen with its own state calls [loadPage] and [fetchPage] directly.
 library;
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
+import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:hooks_riverpod/misc.dart' show ProviderListenable;
 import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/platform/storage/json_file_storage_provider.dart';
 import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';

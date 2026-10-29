@@ -41,7 +41,7 @@ final class GlobalAsyncQueueProvider
   }
 }
 
-String _$globalAsyncQueueHash() => r'f8d4e731549912b9fba71d95c5f8a7d8a6e4a48e';
+String _$globalAsyncQueueHash() => r'15df772cf54f621724d9c02634abed15b738ff9e';
 
 abstract class _$GlobalAsyncQueue extends $Notifier<GlobalAsyncQueueEntity> {
   GlobalAsyncQueueEntity build();

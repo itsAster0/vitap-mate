@@ -11,7 +11,7 @@ import 'package:vitapmate/vtop/backend/vtop_backend_provider.dart';
 import 'package:vitapmate/vtop/entity/vtop_user_entity.dart';
 import 'package:vitapmate/vtop/global_async_queue_provider.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
-import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
+import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/users/vtop_users.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_login_with_otp.dart';
@@ -23,6 +23,19 @@ part 'client_provider.g.dart';
 
 const _auth = SourceLogger('client.auth');
 const _session = SourceLogger('client.session');
+
+/// A VTOP client for the saved proxy setting: straight to VTOP, or through
+/// the server's compressing proxy.
+Future<VtopClient> createVtopClient({
+  required String username,
+  required String password,
+  PersistedVtopSession? persistedSession,
+}) async => getVtopClient(
+  username: username,
+  password: password,
+  persistedSession: persistedSession,
+  baseUrl: await currentVtopBaseUrl(),
+);
 
 @Riverpod(keepAlive: true)
 class VClient extends _$VClient {

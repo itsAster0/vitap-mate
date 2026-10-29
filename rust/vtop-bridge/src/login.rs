@@ -42,9 +42,9 @@ pub fn map_outcome(result: VtopResult<()>) -> Result<(), LoginError> {
         Ok(()) => Ok(()),
         Err(VtopError::InvalidCredentials) => Err(LoginError::InvalidCredentials),
         // No usable code came, so the sign-in is stuck at the OTP.
-        Err(VtopError::OTPRequired(..)) => {
-            Err(LoginError::Failed("otp_not_found: the OTP mail did not arrive".into()))
-        }
+        Err(VtopError::OTPRequired(..)) => Err(LoginError::Failed(
+            "otp_not_found: the OTP mail did not arrive".into(),
+        )),
         Err(error) => Err(LoginError::Failed(error.to_string())),
     }
 }
@@ -93,7 +93,9 @@ mod tests {
         );
         assert_eq!(
             map_outcome(Err(VtopError::OTPRequired("enter OTP".into(), 5))),
-            Err(LoginError::Failed("otp_not_found: the OTP mail did not arrive".into()))
+            Err(LoginError::Failed(
+                "otp_not_found: the OTP mail did not arrive".into()
+            ))
         );
         assert_eq!(
             map_outcome(Err(VtopError::NetworkError)),

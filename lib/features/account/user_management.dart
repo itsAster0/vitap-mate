@@ -18,7 +18,6 @@ import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/features/exams/exams.dart';
 import 'package:vitapmate/vtop/semesters.dart';
 import 'package:vitapmate/features/account/widgets/user_card.dart';
-import 'package:vitapmate/vtop/http/vtop_platform_http.dart';
 
 class UserBox extends HookConsumerWidget {
   const UserBox({super.key});
