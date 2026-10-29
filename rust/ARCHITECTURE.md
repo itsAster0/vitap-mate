@@ -106,7 +106,7 @@ until the next Monday 00:00 IST.
   with the engine's relay secret, returning the answer byte for byte.
 - **Keys**: the edge's `UdpKeys` object makes a random key pair every Monday
   00:00 IST and keeps the one before for a week; older ones are deleted. The
-  gateway asks for them every 10 minutes through the engine
+  gateway keeps them and asks every 6 hours, and just after each rotation, through the engine
   (`/engine/udp-keys`); the edge seals them to the gateway's identity key
   (`GATEWAY_IDENTITY_KEY`), so the engine passes them on unopened. A
   handshake under an unknown key gets a 5-byte "wrong key" answer, and the
