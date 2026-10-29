@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use tokio::net::UdpSocket;
-use vtop_gateway::{run, Config};
+use vtop_gateway::{next_key_check, run, Config};
 use vtop_shared::engine::{UDP_KEYS, UDP_KEYS_SEALED_FOR};
 use vtop_shared::mail_seal;
 use vtop_shared::page_dictionary;
@@ -297,4 +297,18 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         .await
         .unwrap();
     assert_eq!(WirePageResponse::decode(&got.body).unwrap().status, 200);
+}
+
+#[test]
+fn keys_are_asked_for_rarely_and_right_after_a_rotation() {
+    let monday = 1_793_557_800; // Mon 2 Nov 2026 00:00 IST
+                                // Mid-week: every six hours.
+    assert_eq!(
+        next_key_check(monday - 3 * 86_400),
+        Duration::from_secs(6 * 3600)
+    );
+    // An hour before the rotation: 30 s after it.
+    assert_eq!(next_key_check(monday - 3600), Duration::from_secs(3630));
+    // Just after it: a week (capped at six hours) to the next.
+    assert_eq!(next_key_check(monday + 60), Duration::from_secs(6 * 3600));
 }

@@ -11,7 +11,8 @@
 //! logic. Its Noise keys come from the edge, which makes a new one every
 //! week: the edge seals them to the gateway's own identity key and the
 //! engine passes them on ([`UDP_KEYS`]) without being able to open them.
-//! It asks again every [`KEYS_EVERY`]. What it keeps, in memory only: Noise sessions, and
+//! It keeps them and asks again only every [`KEYS_EVERY`] and just after
+//! each rotation ([`next_key_check`]), so an idle engine can sleep. What it keeps, in memory only: Noise sessions, and
 //! each device's VTOP session for six hours, so a fetch can carry an 8-byte
 //! hash instead of ~700 bytes of cookies (see `vtop_shared::wire_page`).
 
@@ -46,8 +47,22 @@ const MAX_SESSIONS: usize = 20_000;
 /// and VTOP.
 const MAX_ENGINE_CALLS: usize = 256;
 const SWEEP_EVERY: Duration = Duration::from_secs(30);
-/// How often the keys are asked for: a new week's key is in use within this.
-const KEYS_EVERY: Duration = Duration::from_secs(600);
+/// How often the keys are asked for between rotations.
+const KEYS_EVERY: Duration = Duration::from_secs(6 * 3600);
+/// After a failed ask, the next one.
+const KEYS_RETRY: Duration = Duration::from_secs(60);
+const WEEK_SECS: u64 = 7 * 24 * 3600;
+/// A Monday 00:00 IST (Sunday 18:30 UTC): the edge's `UdpKeys` makes a new
+/// key every week from it (`vtop-edge/src/udp-gateway.ts`).
+const MONDAY_IST: u64 = 1_704_652_200;
+
+/// How long until the keys are asked for again at unix time `now`: in
+/// [`KEYS_EVERY`], or 30 s after the next rotation if that comes first.
+pub fn next_key_check(now: u64) -> Duration {
+    let since = now.saturating_sub(MONDAY_IST) % WEEK_SECS;
+    let rotation = Duration::from_secs(WEEK_SECS - since + 30);
+    rotation.min(KEYS_EVERY)
+}
 
 pub struct Config {
     pub engine_url: String,
@@ -107,16 +122,26 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
     let (keys_tx, mut keys_rx) = mpsc::channel::<Vec<[u8; 32]>>(1);
     let asker = engine.clone();
     tokio::spawn(async move {
+        let unix = || {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs())
+        };
+        let mut wait = next_key_check(unix());
         loop {
-            tokio::time::sleep(KEYS_EVERY).await;
-            match asker.keys().await {
+            tokio::time::sleep(wait).await;
+            wait = match asker.keys().await {
                 Ok(keys) => {
                     if keys_tx.send(keys).await.is_err() {
                         return;
                     }
+                    next_key_check(unix())
                 }
-                Err(e) => tracing::warn!("keys: {e}"),
-            }
+                Err(e) => {
+                    tracing::warn!("keys: {e}");
+                    KEYS_RETRY
+                }
+            };
         }
     });
     let sockets: Vec<Arc<UdpSocket>> = sockets.into_iter().map(Arc::new).collect();
