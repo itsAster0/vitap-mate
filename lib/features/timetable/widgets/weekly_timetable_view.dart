@@ -12,8 +12,10 @@ import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 
-/// The whole week on one screen: a compact grid with a column per class day.
-/// Blocks show course code and room; tap one for the full details.
+/// The week as a grid with a column per class day, scrolling both ways: the
+/// day header stays on top and the hours stay on the left. It opens on today
+/// at the current time. Blocks show code, room, time and as much of the
+/// course name as fits; tap one for the full details.
 class WeeklyTimetableView extends HookWidget {
   const WeeklyTimetableView({
     super.key,
@@ -28,7 +30,9 @@ class WeeklyTimetableView extends HookWidget {
 
   static const _gutter = 30.0;
   static const _headerHeight = 52.0;
-  static const _hourHeight = 58.0;
+  static const _hourHeight = 80.0;
+  static const _minDayWidth = 108.0;
+  static const _gridTop = 8.0;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,18 @@ class WeeklyTimetableView extends HookWidget {
     }, const []);
 
     final dates = getCurrentWeekDates();
+    final vertical = useScrollController();
+    final horizontal = useScrollController();
+    // The header follows the grid sideways; it doesn't scroll on its own.
+    final headerScroll = useScrollController();
+    useEffect(() {
+      void follow() {
+        if (headerScroll.hasClients) headerScroll.jumpTo(horizontal.offset);
+      }
+
+      horizontal.addListener(follow);
+      return () => horizontal.removeListener(follow);
+    }, [horizontal, headerScroll]);
     final daySlots = {for (final day in days) day: slotsForDay(day)};
     final allSlots = daySlots.values.expand((slots) => slots).toList();
 
@@ -62,20 +78,54 @@ class WeeklyTimetableView extends HookWidget {
         60;
     final gridHeight = math.max(60, end - start) / 60 * _hourHeight;
     final today = now.value.weekday;
+    final todayIndex = days.indexOf(today);
     final minuteNow = now.value.hour * 60 + now.value.minute;
-    final showNow =
-        days.contains(today) && minuteNow >= start && minuteNow <= end;
+    final showNow = todayIndex >= 0 && minuteNow >= start && minuteNow <= end;
 
     double yOf(int minute) => (minute - start) / 60 * _hourHeight;
+
+    // Open on today, centred, at the current time with an hour above it.
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (todayIndex >= 0 && horizontal.hasClients) {
+          final position = horizontal.position;
+          final dayWidth =
+              (position.maxScrollExtent + position.viewportDimension) /
+              days.length;
+          horizontal.jumpTo(
+            (todayIndex * dayWidth -
+                    (position.viewportDimension - dayWidth) / 2)
+                .clamp(0, position.maxScrollExtent),
+          );
+        }
+        if (showNow && vertical.hasClients) {
+          vertical.jumpTo(
+            (yOf(minuteNow) - _hourHeight).clamp(
+              0,
+              vertical.position.maxScrollExtent,
+            ),
+          );
+        }
+      });
+      return null;
+    }, const []);
+
+    final line = Container(
+      height: 0.5,
+      color: colors.border.withValues(alpha: 0.7),
+    );
 
     return Padding(
       padding: const .fromLTRB(Space.sm, Space.md, Space.sm, 0),
       child: Surface(
-        padding: const .fromLTRB(0, 0, Space.xs, Space.sm),
+        padding: const .fromLTRB(0, 0, Space.xs, 0),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final dayWidth = (constraints.maxWidth - _gutter) / days.length;
-            final todayIndex = days.indexOf(today);
+            final dayWidth = math.max(
+              _minDayWidth,
+              (constraints.maxWidth - _gutter) / days.length,
+            );
+            final gridWidth = dayWidth * days.length;
 
             return Column(
               children: [
@@ -85,133 +135,182 @@ class WeeklyTimetableView extends HookWidget {
                   child: Row(
                     children: [
                       const SizedBox(width: _gutter),
-                      for (final day in days)
-                        SizedBox(
-                          width: dayWidth,
-                          child: _DayHeader(
-                            name: slotDays[day - 1],
-                            date: dates[day - 1],
-                            isToday: day == today,
-                            count: daySlots[day]!.length,
+                      Expanded(
+                        child: SingleChildScrollView(
+                          controller: headerScroll,
+                          scrollDirection: .horizontal,
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (final day in days)
+                                SizedBox(
+                                  width: dayWidth,
+                                  child: _DayHeader(
+                                    name: slotDays[day - 1],
+                                    date: dates[day - 1],
+                                    isToday: day == today,
+                                    count: daySlots[day]!.length,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
-                SizedBox(
-                  height: gridHeight + 8,
-                  child: Stack(
-                    clipBehavior: .none,
-                    children: [
-                      // Today's column tint
-                      if (todayIndex >= 0)
-                        Positioned(
-                          left: _gutter + todayIndex * dayWidth,
-                          top: 0,
-                          width: dayWidth,
-                          height: gridHeight,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: colors.app.accentTone.subtle.withValues(
-                                alpha: 0.45,
-                              ),
-                              borderRadius: .circular(Radii.sm),
-                            ),
-                          ),
-                        ),
-                      // Hour lines and labels
-                      for (var m = start; m <= end; m += 60) ...[
-                        Positioned(
-                          left: _gutter,
-                          right: 0,
-                          top: yOf(m),
-                          child: Container(
-                            height: 0.5,
-                            color: colors.border.withValues(alpha: 0.7),
-                          ),
-                        ),
-                        Positioned(
-                          left: 0,
-                          width: _gutter - 6,
-                          top: yOf(m) - 6,
-                          child: Text(
-                            _hourLabel(m),
-                            textAlign: .right,
-                            style: numStyle(
-                              fontSize: 10,
-                              height: 1,
-                              fontWeight: .w500,
-                              color: colors.mutedForeground,
-                            ),
-                          ),
-                        ),
-                      ],
-                      // Class blocks
-                      for (final (i, day) in days.indexed)
-                        for (final slot in daySlots[day]!)
-                          Positioned(
-                            left: _gutter + i * dayWidth + 2,
-                            width: dayWidth - 4,
-                            top: yOf(minutesOf(slot.startTime)) + 1.5,
-                            height: math.max(
-                              30,
-                              yOf(minutesOf(slot.endTime)) -
-                                  yOf(minutesOf(slot.startTime)) -
-                                  3,
-                            ),
-                            child: _Block(
-                              slot: slot,
-                              past:
-                                  day < today ||
-                                  (day == today &&
-                                      minutesOf(slot.endTime) <= minuteNow),
-                              live:
-                                  day == today &&
-                                  minutesOf(slot.startTime) <= minuteNow &&
-                                  minutesOf(slot.endTime) > minuteNow,
-                              onPress: () => showFSheet(
-                                context: context,
-                                side: .btt,
-                                useRootNavigator: true,
-                                builder: (context) => _ClassSheet(
-                                  slot: slot,
-                                  record: attendanceForSlot(attendance, slot),
-                                ),
-                              ),
-                            ),
-                          ),
-                      // Now line: faint across the week, solid on today.
-                      if (showNow) ...[
-                        Positioned(
-                          left: _gutter,
-                          right: 0,
-                          top: yOf(minuteNow),
-                          child: Container(
-                            height: 1,
-                            color: colors.app.accent.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        Positioned(
-                          left: _gutter + todayIndex * dayWidth - 3,
-                          width: dayWidth + 3,
-                          top: yOf(minuteNow) - 3,
-                          height: 7,
-                          child: IgnorePointer(
-                            child: Row(
-                              children: [
-                                Dot(size: 7, color: colors.app.accent),
-                                Expanded(
-                                  child: Container(
-                                    height: 2,
-                                    color: colors.app.accent,
+                line,
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: vertical,
+                    padding: const .only(top: _gridTop, bottom: Space.sm),
+                    child: Row(
+                      crossAxisAlignment: .start,
+                      children: [
+                        // Hour labels
+                        SizedBox(
+                          width: _gutter,
+                          height: gridHeight + 8,
+                          child: Stack(
+                            clipBehavior: .none,
+                            children: [
+                              for (var m = start; m <= end; m += 60)
+                                Positioned(
+                                  left: 0,
+                                  width: _gutter - 6,
+                                  top: yOf(m) - 6,
+                                  child: Text(
+                                    _hourLabel(m),
+                                    textAlign: .right,
+                                    style: numStyle(
+                                      fontSize: 10,
+                                      height: 1,
+                                      fontWeight: .w500,
+                                      color: colors.mutedForeground,
+                                    ),
                                   ),
                                 ),
-                              ],
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: horizontal,
+                            scrollDirection: .horizontal,
+                            child: SizedBox(
+                              width: gridWidth,
+                              height: gridHeight + 8,
+                              child: Stack(
+                                children: [
+                                  // Today's column tint
+                                  if (todayIndex >= 0)
+                                    Positioned(
+                                      left: todayIndex * dayWidth,
+                                      top: 0,
+                                      width: dayWidth,
+                                      height: gridHeight,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: colors.app.accentTone.subtle
+                                              .withValues(alpha: 0.45),
+                                          borderRadius: .circular(Radii.sm),
+                                        ),
+                                      ),
+                                    ),
+                                  // Hour lines
+                                  for (var m = start; m <= end; m += 60)
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      top: yOf(m),
+                                      child: line,
+                                    ),
+                                  // Class blocks
+                                  for (final (i, day) in days.indexed)
+                                    for (final slot in daySlots[day]!)
+                                      Positioned(
+                                        left: i * dayWidth + 2,
+                                        width: dayWidth - 4,
+                                        top:
+                                            yOf(minutesOf(slot.startTime)) +
+                                            1.5,
+                                        height: math.max(
+                                          30,
+                                          yOf(minutesOf(slot.endTime)) -
+                                              yOf(minutesOf(slot.startTime)) -
+                                              3,
+                                        ),
+                                        child: _Block(
+                                          slot: slot,
+                                          past:
+                                              day < today ||
+                                              (day == today &&
+                                                  minutesOf(slot.endTime) <=
+                                                      minuteNow),
+                                          live:
+                                              day == today &&
+                                              minutesOf(slot.startTime) <=
+                                                  minuteNow &&
+                                              minutesOf(slot.endTime) >
+                                                  minuteNow,
+                                          onPress: () => showFSheet(
+                                            context: context,
+                                            side: .btt,
+                                            useRootNavigator: true,
+                                            builder: (context) => _ClassSheet(
+                                              slot: slot,
+                                              record: attendanceForSlot(
+                                                attendance,
+                                                slot,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  // Now line: faint across the week, solid
+                                  // on today.
+                                  if (showNow) ...[
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      top: yOf(minuteNow),
+                                      child: Container(
+                                        height: 1,
+                                        color: colors.app.accent.withValues(
+                                          alpha: 0.3,
+                                        ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: todayIndex * dayWidth,
+                                      width: dayWidth,
+                                      top: yOf(minuteNow) - 3,
+                                      height: 7,
+                                      child: IgnorePointer(
+                                        child: Row(
+                                          children: [
+                                            Dot(
+                                              size: 7,
+                                              color: colors.app.accent,
+                                            ),
+                                            Expanded(
+                                              child: Container(
+                                                height: 2,
+                                                color: colors.app.accent,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ],
@@ -326,46 +425,89 @@ class _Block extends StatelessWidget {
                 : Border(left: BorderSide(color: tone.base, width: 2.5)),
           ),
           child: LayoutBuilder(
-            builder: (context, c) => Column(
-              crossAxisAlignment: .start,
-              children: [
-                FittedBox(
-                  fit: .scaleDown,
-                  alignment: .centerLeft,
-                  child: Text(
-                    slot.courseCode,
-                    maxLines: 1,
-                    style: numStyle(
-                      fontSize: 10,
-                      height: 1.15,
-                      fontWeight: .w700,
-                      color: colors.foreground,
+            builder: (context, c) {
+              final small = numStyle(
+                fontSize: 9,
+                height: 1.25,
+                fontWeight: .w500,
+                color: colors.mutedForeground,
+              );
+              // Lines of course name that fit under code, room and time.
+              final nameLines = ((c.maxHeight - 38) / 11.5).floor();
+              return Column(
+                crossAxisAlignment: .start,
+                children: [
+                  FittedBox(
+                    fit: .scaleDown,
+                    alignment: .centerLeft,
+                    child: Text(
+                      slot.courseCode,
+                      maxLines: 1,
+                      style: numStyle(
+                        fontSize: 10.5,
+                        height: 1.2,
+                        fontWeight: .w700,
+                        color: colors.foreground,
+                      ),
                     ),
                   ),
-                ),
-                if (c.maxHeight >= 24)
                   Text(
                     slot.roomNo,
                     maxLines: 1,
                     overflow: .clip,
                     style: numStyle(
                       fontSize: 9.5,
-                      height: 1.2,
-                      fontWeight: .w500,
+                      height: 1.25,
+                      fontWeight: .w600,
                       color: tone.onSubtle,
                     ),
                   ),
-                if (isLab && c.maxHeight >= 44) ...[
-                  const Spacer(),
-                  Icon(FLucideIcons.flaskConical, size: 10, color: tone.base),
+                  FittedBox(
+                    fit: .scaleDown,
+                    alignment: .centerLeft,
+                    child: Row(
+                      children: [
+                        if (isLab) ...[
+                          Icon(
+                            FLucideIcons.flaskConical,
+                            size: 9,
+                            color: tone.base,
+                          ),
+                          const SizedBox(width: 2),
+                        ],
+                        Text(
+                          '${_clock(slot.startTime, context)}–${_clock(slot.endTime, context)}',
+                          style: small,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (nameLines > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      slot.name,
+                      maxLines: nameLines,
+                      overflow: .ellipsis,
+                      style: TextStyle(
+                        fontSize: 9,
+                        height: 1.25,
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
     );
   }
+
+  /// "9:50" from "09:50" or "2:00" from "14:00"; the grid already says
+  /// morning or afternoon.
+  static String _clock(String time, BuildContext context) =>
+      to12H(time, context).split(' ').first;
 }
 
 class _ClassSheet extends ConsumerWidget {

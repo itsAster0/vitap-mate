@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:vitapmate/observability/log.dart';
 import 'package:flutter/material.dart' show RefreshIndicator;
 import 'package:flutter/widgets.dart';
@@ -114,92 +116,109 @@ class TimetablePage extends HookConsumerWidget {
         backgroundColor: context.theme.colors.background,
         color: context.theme.colors.foreground,
         strokeWidth: 2.5,
+        // The weekly grid scrolls inside the page, one level down.
+        notificationPredicate: (n) => n.depth <= 1,
         onRefresh: update,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          // Swipe left/right to move between days in the agenda.
-          child: GestureDetector(
-            onHorizontalDragStart: isAgenda
-                ? (details) => dragStartX.value = details.globalPosition.dx
-                : null,
-            onHorizontalDragUpdate: isAgenda
-                ? (details) {
-                    if (classDays.isEmpty) return;
-                    final x = details.globalPosition.dx;
-                    final deltaX = x - (dragStartX.value ?? x);
-                    if (deltaX > 80 && classDays.first < selectedDay.value) {
-                      selectedDay.value -= 1;
-                      dragStartX.value = x;
-                    } else if (deltaX < -80 &&
-                        classDays.last > selectedDay.value) {
-                      selectedDay.value += 1;
-                      dragStartX.value = x;
+        child: LayoutBuilder(
+          builder: (context, viewport) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            // Swipe left/right to move between days in the agenda.
+            child: GestureDetector(
+              onHorizontalDragStart: isAgenda
+                  ? (details) => dragStartX.value = details.globalPosition.dx
+                  : null,
+              onHorizontalDragUpdate: isAgenda
+                  ? (details) {
+                      if (classDays.isEmpty) return;
+                      final x = details.globalPosition.dx;
+                      final deltaX = x - (dragStartX.value ?? x);
+                      if (deltaX > 80 && classDays.first < selectedDay.value) {
+                        selectedDay.value -= 1;
+                        dragStartX.value = x;
+                      } else if (deltaX < -80 &&
+                          classDays.last > selectedDay.value) {
+                        selectedDay.value += 1;
+                        dragStartX.value = x;
+                      }
                     }
-                  }
-                : null,
-            onHorizontalDragEnd: isAgenda
-                ? (_) => dragStartX.value = null
-                : null,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: MediaQuery.sizeOf(context).height * 0.8,
-              ),
-              child: AnimatedSwitcher(
-                duration: Motion.medium,
-                // Keep content pinned to the top even when a day is short.
-                layoutBuilder: (current, previous) => Stack(
-                  alignment: .topCenter,
-                  children: [...previous, ?current],
-                ),
-                child: timetableData.when(
-                  skipLoadingOnRefresh: true,
-                  skipLoadingOnReload: true,
-                  data: (data) {
-                    List<TimetableSlot> slotsForDay(int day) =>
-                        mergeLabsSloths([
-                          for (final slot in data.slots)
-                            if (slot.day == slotDays[day - 1]) slot,
-                        ]);
-
-                    return Column(
-                      key: const ValueKey('data'),
-                      crossAxisAlignment: .stretch,
-                      children: [
-                        const EmailOtpBanner(),
-                        if (viewMode == .weekly)
-                          WeeklyTimetableView(
-                            days: classDays,
-                            slotsForDay: slotsForDay,
-                            attendance: attendance,
-                          )
-                        else
-                          AgendaTimetableView(
-                            selectedDay: selectedDay,
-                            classDays: classDays.toSet(),
-                            slotsForDay: slotsForDay,
-                            attendance: attendance,
-                            calendar: calendar,
-                            exams: exams,
-                            history: history,
-                          ),
-                        DataUpdatedFooter(updateTime: data.updateTime.toInt()),
-                      ],
-                    );
-                  },
-                  error: (e, _) => EmptyState(
-                    key: const ValueKey('error'),
-                    icon: FLucideIcons.cloudAlert,
-                    title: "Couldn't load your timetable",
-                    message: commonErrorMessage(e),
-                    action: FButton(
-                      variant: .outline,
-                      mainAxisSize: .min,
-                      onPress: update,
-                      child: const Text('Try again'),
-                    ),
+                  : null,
+              onHorizontalDragEnd: isAgenda
+                  ? (_) => dragStartX.value = null
+                  : null,
+              // The weekly grid takes the screen and scrolls its hours under a
+              // fixed day header; the agenda scrolls as a whole.
+              child: ConstrainedBox(
+                constraints: isAgenda
+                    ? BoxConstraints(
+                        minHeight: MediaQuery.sizeOf(context).height * 0.8,
+                      )
+                    : BoxConstraints.tightFor(
+                        height: math.max(viewport.maxHeight, 480),
+                      ),
+                child: AnimatedSwitcher(
+                  duration: Motion.medium,
+                  // Keep content pinned to the top even when a day is short.
+                  layoutBuilder: (current, previous) => Stack(
+                    alignment: .topCenter,
+                    children: [...previous, ?current],
                   ),
-                  loading: () =>
-                      const _TimetableSkeleton(key: ValueKey('loading')),
+                  child: timetableData.when(
+                    skipLoadingOnRefresh: true,
+                    skipLoadingOnReload: true,
+                    data: (data) {
+                      List<TimetableSlot> slotsForDay(int day) =>
+                          mergeLabsSloths([
+                            for (final slot in data.slots)
+                              if (slot.day == slotDays[day - 1]) slot,
+                          ]);
+
+                      return Column(
+                        key: const ValueKey('data'),
+                        crossAxisAlignment: .stretch,
+                        children: [
+                          const EmailOtpBanner(),
+                          if (viewMode == .weekly)
+                            Expanded(
+                              child: WeeklyTimetableView(
+                                days: classDays,
+                                slotsForDay: slotsForDay,
+                                attendance: attendance,
+                              ),
+                            )
+                          else
+                            AgendaTimetableView(
+                              selectedDay: selectedDay,
+                              classDays: classDays.toSet(),
+                              slotsForDay: slotsForDay,
+                              attendance: attendance,
+                              calendar: calendar,
+                              exams: exams,
+                              history: history,
+                            ),
+                          DataUpdatedFooter(
+                            updateTime: data.updateTime.toInt(),
+                            padding: isAgenda
+                                ? const .only(top: 16, bottom: 20)
+                                : const .symmetric(vertical: Space.sm),
+                          ),
+                        ],
+                      );
+                    },
+                    error: (e, _) => EmptyState(
+                      key: const ValueKey('error'),
+                      icon: FLucideIcons.cloudAlert,
+                      title: "Couldn't load your timetable",
+                      message: commonErrorMessage(e),
+                      action: FButton(
+                        variant: .outline,
+                        mainAxisSize: .min,
+                        onPress: update,
+                        child: const Text('Try again'),
+                      ),
+                    ),
+                    loading: () =>
+                        const _TimetableSkeleton(key: ValueKey('loading')),
+                  ),
                 ),
               ),
             ),
