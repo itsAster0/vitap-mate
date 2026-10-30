@@ -53,13 +53,16 @@ Future<bool> ensureFirebaseReady() async {
   if (Firebase.apps.isNotEmpty) return true;
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+    await loggedNetCall(
+      'Firebase init',
+      () => Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ),
     );
     return true;
   } on UnsupportedError {
     try {
-      await Firebase.initializeApp();
+      await loggedNetCall('Firebase init', Firebase.initializeApp);
       return true;
     } catch (error, stackTrace) {
       Log.error(
@@ -115,12 +118,17 @@ Future<void> _startVtopCookieBridgeListener() async {
     unawaited(_syncMailForwardingFcmToken(token));
   });
 
-  await _syncFcmTokens();
+  // Lazy: the token goes out when Firebase changes it (above).
+  if (LaunchNetwork.atLaunch) await _syncFcmTokens();
 }
 
-Future<void> _syncFcmTokens() async {
+Future<void>
+_syncFcmTokens() => flow('push token sync', source: 'fcm.cookie', () async {
   try {
-    final token = await FirebaseMessaging.instance.getToken();
+    final token = await loggedNetCall(
+      'Firebase getToken',
+      FirebaseMessaging.instance.getToken,
+    );
     unawaited(_syncMailForwardingFcmToken(token));
     await syncBridgeFcmToken(token);
   } catch (error, stackTrace) {
@@ -129,7 +137,7 @@ Future<void> _syncFcmTokens() async {
       'Failed to sync the FCM token with the vtop-bridge: $error\n$stackTrace',
     );
   }
-}
+});
 
 /// Whether the edge event stream should stay open while the app is in
 /// front: for a linked account (connected apps ask for cookies through it),
@@ -151,7 +159,10 @@ Future<void> pauseServerFeatures() async {
   if (Firebase.apps.isEmpty) return;
   try {
     await FirebaseMessaging.instance.setAutoInitEnabled(false);
-    await FirebaseMessaging.instance.deleteToken();
+    await loggedNetCall(
+      'Firebase deleteToken',
+      FirebaseMessaging.instance.deleteToken,
+    );
   } catch (error) {
     Log.info('fcm.cookie', 'Failed to drop the FCM token: $error');
   }
@@ -298,7 +309,10 @@ Future<void> answerVtopCookieRequest(Map<String, dynamic> data) async {
 
   if (callbackError == null) {
     try {
-      fcmToken = await FirebaseMessaging.instance.getToken();
+      fcmToken = await loggedNetCall(
+        'Firebase getToken',
+        FirebaseMessaging.instance.getToken,
+      );
     } catch (_) {
       fcmToken = null;
     }

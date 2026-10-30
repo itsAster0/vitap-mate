@@ -277,12 +277,14 @@ abstract class RustLibApi extends BaseApi {
     BigInt? expiresAtUnix,
     required BigInt issuedAtUnix,
     required List<String> skipMessageIds,
+    String? flow,
   });
 
   Future<void> crateApiEmailOtpGmailTidyUp({
     required String accessToken,
     required String messageId,
     required bool deleteAfterReading,
+    String? flow,
   });
 
   Future<void> crateApiSimpleInitApp();
@@ -1602,6 +1604,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     BigInt? expiresAtUnix,
     required BigInt issuedAtUnix,
     required List<String> skipMessageIds,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1611,6 +1614,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_box_autoadd_u_64(expiresAtUnix, serializer);
           sse_encode_u_64(issuedAtUnix, serializer);
           sse_encode_list_String(skipMessageIds, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1623,7 +1627,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_vtop_error,
         ),
         constMeta: kCrateApiEmailOtpGmailFindOtpConstMeta,
-        argValues: [accessToken, expiresAtUnix, issuedAtUnix, skipMessageIds],
+        argValues: [
+          accessToken,
+          expiresAtUnix,
+          issuedAtUnix,
+          skipMessageIds,
+          flow,
+        ],
         apiImpl: this,
       ),
     );
@@ -1637,6 +1647,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "expiresAtUnix",
           "issuedAtUnix",
           "skipMessageIds",
+          "flow",
         ],
       );
 
@@ -1645,6 +1656,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required String accessToken,
     required String messageId,
     required bool deleteAfterReading,
+    String? flow,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -1653,6 +1665,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(accessToken, serializer);
           sse_encode_String(messageId, serializer);
           sse_encode_bool(deleteAfterReading, serializer);
+          sse_encode_opt_String(flow, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -1665,7 +1678,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiEmailOtpGmailTidyUpConstMeta,
-        argValues: [accessToken, messageId, deleteAfterReading],
+        argValues: [accessToken, messageId, deleteAfterReading, flow],
         apiImpl: this,
       ),
     );
@@ -1674,7 +1687,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiEmailOtpGmailTidyUpConstMeta =>
       const TaskConstMeta(
         debugName: "gmail_tidy_up",
-        argNames: ["accessToken", "messageId", "deleteAfterReading"],
+        argNames: ["accessToken", "messageId", "deleteAfterReading", "flow"],
       );
 
   @override

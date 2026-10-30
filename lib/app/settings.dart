@@ -7,6 +7,7 @@ import 'package:vitapmate/platform/notifications/exam_reminder_notification_serv
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
@@ -58,6 +59,7 @@ final settingsProvider = FutureProvider<SharedPreferencesWithCache>(
         emailOtpBannerDismissedSettingKey,
         vtopCompactModeSettingKey,
         alwaysShowDebugSettingKey,
+        LaunchNetwork.settingKey,
         vtopDesktopModeSettingKey,
         'settings_server_url',
         'settings_vtop_proxy',
@@ -420,4 +422,9 @@ final vtopDesktopModeProvider = NotifierProvider<VtopViewPreference, bool>(
 /// Whether Settings shows Debug without the long press on Appearance.
 final alwaysShowDebugProvider = NotifierProvider<VtopViewPreference, bool>(
   () => VtopViewPreference(alwaysShowDebugSettingKey, false),
+);
+
+/// Read once per launch by [LaunchNetwork].
+final connectAtLaunchProvider = NotifierProvider<VtopViewPreference, bool>(
+  () => VtopViewPreference(LaunchNetwork.settingKey, true),
 );

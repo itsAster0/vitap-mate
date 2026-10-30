@@ -359,7 +359,8 @@ impl VtopClient {
     /// between sessions (one warm connection pool), so cookies are handled
     /// here rather than by reqwest. An explicit `Cookie` header on the
     /// request wins over the jar for the first hop. Logs the answer: host,
-    /// path, status, size when known and time, redirects included.
+    /// path, status, size when known and time, redirects included; or the
+    /// failure.
     pub(super) async fn send_request(
         &self,
         builder: reqwest::RequestBuilder,
@@ -390,7 +391,19 @@ impl VtopClient {
                     request.headers_mut().insert(COOKIE, cookies);
                 }
             }
-            let response = self.http.execute(request).await?;
+            let response = match self.http.execute(request).await {
+                Ok(response) => response,
+                Err(error) => {
+                    warn!(
+                        target: NETWORK,
+                        "failed {}{} {}ms: {error}",
+                        url.host_str().unwrap_or(""),
+                        url.path(),
+                        started.elapsed().as_millis()
+                    );
+                    return Err(error);
+                }
+            };
             self.jar
                 .set_cookies(&mut response.headers().get_all(SET_COOKIE).iter(), &url);
 

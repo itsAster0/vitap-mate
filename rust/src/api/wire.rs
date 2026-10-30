@@ -14,6 +14,8 @@ use std::time::Duration;
 use vtop_shared::wire_page::{session_hash, WirePageRequest, WirePageResponse, NEED_SESSION};
 use vtop_wire::client::{fetch, ClientConfig, WireError};
 
+use crate::api::native_logs::in_flow;
+
 /// Resend the session after this, a little inside the gateway's six hours.
 const SESSION_RESEND_MS: u64 = 5 * 3600 * 1000;
 
@@ -61,6 +63,37 @@ pub enum WireFetchError {
 /// secret too. `flow` is the Dart flow id, which the gateway logs.
 #[allow(clippy::too_many_arguments)]
 pub async fn wire_fetch_page(
+    config: WireConfig,
+    session_json: String,
+    name: String,
+    semester: Option<String>,
+    args: Vec<(String, String)>,
+    dictionary: Option<String>,
+    account_json: Option<String>,
+    secret: bool,
+    timeout_ms: u32,
+    flow: Option<String>,
+) -> Result<WirePage, WireFetchError> {
+    in_flow(flow.clone(), async move {
+        fetch_page(
+            config,
+            session_json,
+            name,
+            semester,
+            args,
+            dictionary,
+            account_json,
+            secret,
+            timeout_ms,
+            flow,
+        )
+        .await
+    })
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn fetch_page(
     config: WireConfig,
     session_json: String,
     name: String,
@@ -127,7 +160,8 @@ pub async fn wire_fetch_page(
     })
 }
 
-/// One exchange: the answer and (ms, handshake, wire bytes).
+/// One exchange: the answer and (ms, handshake, wire bytes). Logs the
+/// page, the gateway, and the outcome.
 async fn send(
     cfg: &ClientConfig,
     request: &WirePageRequest,
@@ -137,7 +171,34 @@ async fn send(
         WireFetchError::Unsupported("the request does not fit the wire format".into())
     })?;
     let left = deadline.saturating_duration_since(std::time::Instant::now());
-    let fetched = fetch(cfg, &body, left).await.map_err(|e| match e {
+    let what = format!(
+        "udp {} {}:{:?}{}",
+        request.name,
+        cfg.host,
+        cfg.ports,
+        if request.session.is_some() {
+            " with session"
+        } else {
+            ""
+        }
+    );
+    let started = std::time::Instant::now();
+    let fetched = fetch(cfg, &body, left).await;
+    match &fetched {
+        Ok(fetched) => log::info!(
+            target: "rust.network",
+            "{what} answered {}ms {}B{}",
+            fetched.elapsed.as_millis(),
+            fetched.bytes_up + fetched.bytes_down,
+            if fetched.handshake { " (handshake)" } else { "" }
+        ),
+        Err(error) => log::warn!(
+            target: "rust.network",
+            "{what} failed {}ms: {error}",
+            started.elapsed().as_millis()
+        ),
+    }
+    let fetched = fetched.map_err(|e| match e {
         WireError::Unreachable => WireFetchError::Unreachable,
         WireError::Timeout => WireFetchError::Timeout,
         WireError::TooLarge => WireFetchError::Unsupported(e.to_string()),

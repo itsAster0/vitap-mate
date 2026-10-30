@@ -87,6 +87,7 @@ Future<void> watchDocsDownload(int id) async {
       await Future<void>.delayed(const Duration(seconds: 2));
       copy = await _copyCompletedDownload(id);
     }
+    Log.info('net', 'download #$id ${copy.status}');
     switch (copy) {
       case (status: 'failed', path: _):
         break;

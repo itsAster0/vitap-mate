@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -285,7 +286,10 @@ class GmailOAuthGuidePage extends HookConsumerWidget {
         final result = await oauth.setupByok(
           credentials: selected,
           expectedUsername: account,
-          openBrowser: (uri) => launchUrl(uri, mode: .externalApplication),
+          openBrowser: (uri) => loggedNetCall(
+            'open ${urlForLog(uri)} in the browser',
+            () => launchUrl(uri, mode: .externalApplication),
+          ),
           beforeTokenExchange: waitUntilForeground,
           onProgress: (message) {
             if (context.mounted) status.value = message;

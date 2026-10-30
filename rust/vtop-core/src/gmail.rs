@@ -136,13 +136,24 @@ async fn get_json(
     url: &str,
     query: &[(&str, String)],
 ) -> Result<Value, GmailOtpError> {
+    let started = std::time::Instant::now();
     let response = http
         .get(url)
         .bearer_auth(access.access_token.trim())
         .query(query)
         .send()
         .await
-        .map_err(|_| GmailOtpError::Unavailable)?;
+        .map_err(|error| {
+            log::warn!(target: "rust.network", "gmail GET failed: {error}");
+            GmailOtpError::Unavailable
+        })?;
+    log::info!(
+        target: "rust.network",
+        "gmail GET {} {} {}ms for the sign-in OTP",
+        response.url().path(),
+        response.status().as_u16(),
+        started.elapsed().as_millis()
+    );
     match response.status().as_u16() {
         200 => response
             .json::<Value>()
@@ -219,7 +230,12 @@ pub async fn tidy_up(access: &GmailAccess, id: &str) {
         http.post(format!("{API}/{id}/modify"))
             .json(&serde_json::json!({ "removeLabelIds": ["UNREAD"] }))
     };
-    let _ = request.bearer_auth(access.access_token.trim()).send().await;
+    let result = request.bearer_auth(access.access_token.trim()).send().await;
+    log::info!(
+        target: "rust.network",
+        "gmail POST tidy up OTP email: {}",
+        result.map_or_else(|error| error.to_string(), |r| r.status().to_string())
+    );
 }
 
 fn from_vtop(message: &Value) -> bool {

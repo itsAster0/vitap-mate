@@ -86,6 +86,22 @@ class DebugPage extends HookConsumerWidget {
                       .setValue(value),
                 ),
               ),
+              tile(
+                'Connect At Launch',
+                FLucideIcons.plug,
+                () => ref
+                    .read(connectAtLaunchProvider.notifier)
+                    .setValue(!ref.read(connectAtLaunchProvider)),
+                subtitle: ref.watch(connectAtLaunchProvider)
+                    ? 'Event stream, push token and update check at launch'
+                    : 'Each only when needed (from next launch)',
+                suffix: FSwitch(
+                  value: ref.watch(connectAtLaunchProvider),
+                  onChange: (value) => ref
+                      .read(connectAtLaunchProvider.notifier)
+                      .setValue(value),
+                ),
+              ),
             ],
           ),
           const SectionHeader(title: 'Session'),

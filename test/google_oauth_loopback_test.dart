@@ -48,6 +48,7 @@ void main() {
               expiresAtUnix,
               required issuedAtUnix,
               required skipMessageIds,
+              required flow,
             }) async {
               expect(
                 issuedAtUnix,
@@ -64,6 +65,7 @@ void main() {
               required accessToken,
               required messageId,
               required deleteAfterReading,
+              required flow,
             }) async => tidied.add(messageId),
       );
 
@@ -101,6 +103,7 @@ void main() {
             expiresAtUnix,
             required issuedAtUnix,
             required skipMessageIds,
+            required flow,
           }) async {
             tokensSeen.add(accessToken);
             if (accessToken != 'fresh') {
@@ -113,6 +116,7 @@ void main() {
             required accessToken,
             required messageId,
             required deleteAfterReading,
+            required flow,
           }) async {},
     );
 

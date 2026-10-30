@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -338,7 +339,10 @@ Future<void> _answerPending(
   String? fcmToken;
   try {
     if (await ensureFirebaseReady()) {
-      fcmToken = await FirebaseMessaging.instance.getToken();
+      fcmToken = await loggedNetCall(
+        'Firebase getToken',
+        FirebaseMessaging.instance.getToken,
+      );
     }
   } catch (_) {}
   await postCookieCallbackWithRetry(

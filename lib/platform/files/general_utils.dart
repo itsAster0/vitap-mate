@@ -7,6 +7,7 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:vitapmate/vtop/app_errors.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_store.dart';
 import 'package:vitapmate/platform/storage/json_file_storage.dart';
 import 'package:vitapmate/features/docs/docs_repository.dart';
@@ -94,7 +95,14 @@ Future<void> downloadFile(
     baseDirectory: BaseDirectory.root,
     allowPause: true,
   );
-  final result = await FileDownloader().download(task);
+  final result = await loggedNetCall(
+    'download ${urlForLog(Uri.tryParse(url))}',
+    () => FileDownloader().download(task),
+  );
+  Log.info(
+    'net',
+    'download ${urlForLog(Uri.tryParse(url))} ${result.status.name}',
+  );
   if (result.status != TaskStatus.complete) {
     throw StateError('Download did not complete: ${result.status.name}');
   }
@@ -131,18 +139,22 @@ Future<int?> _downloadWithAndroidDownloadManager(
   String? docsAccount,
 }) async {
   try {
-    final downloadId = await _downloadManagerChannel
-        .invokeMethod<int>('enqueueDownload', {
-          'url': url,
-          'cookie': cookie,
-          'contentDisposition': contentDisposition,
-          'mimeType': mimeType,
-          'suggestedFilename': _normalizeDownloadFilename(suggestedFilename),
-          'userAgent': userAgent,
-          'referer': referer,
-          'saveToDocs': saveToDocs,
-          'docsAccount': docsAccount,
-        });
+    // Android's download manager fetches it; only the hand-off is seen here.
+    final downloadId = await loggedNetCall(
+      'download ${urlForLog(Uri.tryParse(url))} handed to Android',
+      () => _downloadManagerChannel.invokeMethod<int>('enqueueDownload', {
+        'url': url,
+        'cookie': cookie,
+        'contentDisposition': contentDisposition,
+        'mimeType': mimeType,
+        'suggestedFilename': _normalizeDownloadFilename(suggestedFilename),
+        'userAgent': userAgent,
+        'referer': referer,
+        'saveToDocs': saveToDocs,
+        'docsAccount': docsAccount,
+      }),
+    );
+    Log.info('net', 'download ${urlForLog(Uri.tryParse(url))} is #$downloadId');
     return downloadId != null && downloadId > 0 ? downloadId : null;
   } on MissingPluginException {
     return null;

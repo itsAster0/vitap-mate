@@ -44,7 +44,10 @@ class AppUpdateStatus {
 Future<AppUpdateStatus> checkForAppUpdate() async {
   final info = await PackageInfo.fromPlatform();
   if (Platform.isAndroid && info.installerStore == 'com.android.vending') {
-    final update = await InAppUpdate.checkForUpdate();
+    final update = await loggedNetCall(
+      'Play update checkForUpdate',
+      InAppUpdate.checkForUpdate,
+    );
     return AppUpdateStatus(
       source: UpdateSource.playStore,
       available:
@@ -74,17 +77,32 @@ Future<AppUpdateStatus> checkForAppUpdate() async {
 Future<void> installAppUpdate(AppUpdateStatus status) async {
   switch (status.source) {
     case UpdateSource.playStore:
-      final update = await InAppUpdate.checkForUpdate();
+      final update = await loggedNetCall(
+        'Play update checkForUpdate',
+        InAppUpdate.checkForUpdate,
+      );
       if (update.immediateUpdateAllowed) {
-        await InAppUpdate.performImmediateUpdate();
+        await loggedNetCall(
+          'Play update performImmediateUpdate',
+          InAppUpdate.performImmediateUpdate,
+        );
       } else if (update.flexibleUpdateAllowed) {
-        await InAppUpdate.startFlexibleUpdate();
-        await InAppUpdate.completeFlexibleUpdate();
+        await loggedNetCall(
+          'Play update startFlexibleUpdate',
+          InAppUpdate.startFlexibleUpdate,
+        );
+        await loggedNetCall(
+          'Play update completeFlexibleUpdate',
+          InAppUpdate.completeFlexibleUpdate,
+        );
       }
     case UpdateSource.github:
       final url = status.url;
       if (url != null) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
+        await loggedNetCall(
+          'open ${urlForLog(url)} in the browser',
+          () => launchUrl(url, mode: LaunchMode.externalApplication),
+        );
       }
   }
 }
