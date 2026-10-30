@@ -9,6 +9,7 @@ import 'package:vitapmate/features/server/server.dart';
 import 'package:vitapmate/features/settings/widgets/icon_tile.dart';
 import 'package:vitapmate/ui/app_dialog.dart';
 import 'package:vitapmate/ui/ui.dart';
+import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/route/connection_profile.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
@@ -35,6 +36,9 @@ class ConnectionPage extends HookConsumerWidget {
     final profile = ref.watch(connectionProfileProvider);
     final onDevice = ref.watch(onDeviceModeProvider);
     final advanced = useState(false);
+    // Live while here: the stream opens (catching up on what it missed) and
+    // closes again when the page does.
+    useEffect(EdgeEventChannel.instance.hold, const []);
 
     FTile choice(
       ConnectionProfile value,

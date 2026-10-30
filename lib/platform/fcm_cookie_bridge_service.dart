@@ -140,13 +140,16 @@ _syncFcmTokens() => flow('push token sync', source: 'fcm.cookie', () async {
 });
 
 /// Whether the edge event stream should stay open while the app is in
-/// front: for a linked account (connected apps ask for cookies through it),
-/// or where there is no FCM to carry events. See [EdgeEventChannel.alwaysOn].
+/// front: only where FCM cannot carry events, i.e. no Firebase, or a
+/// linked account whose push token never reached the edge. Otherwise it
+/// opens while held and FCM carries the rest, the edge sending every event
+/// both ways. See [EdgeEventChannel.alwaysOn].
 Future<bool> edgeStreamAlwaysOn() async {
   if (Firebase.apps.isEmpty) return true;
   try {
-    return await SharedPreferencesAsync().getBool(bridgeLinkedSettingKey) ??
-        false;
+    final prefs = SharedPreferencesAsync();
+    return await prefs.getBool(bridgeLinkedSettingKey) == true &&
+        (await prefs.getString(bridgeLastFcmTokenSettingKey) ?? '').isEmpty;
   } catch (_) {
     return true;
   }

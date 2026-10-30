@@ -70,6 +70,10 @@ class EdgeEventChannel {
   /// ends it) keeps backing off instead of reconnecting every second.
   static const _stableAfter = Duration(minutes: 1);
 
+  /// How long the app stays in front before the stream opens unheld: a
+  /// quick look costs no connection, a longer stay gets events at once.
+  static const _openAfter = Duration(minutes: 1);
+
   /// Whether a stream is open and beating. While it is, nothing
   /// needs to poll.
   final connected = ValueNotifier<bool>(false);
@@ -81,6 +85,8 @@ class EdgeEventChannel {
   String? _deviceId;
   Timer? _watchdog;
   Timer? _retry;
+  Timer? _settle;
+  var _settled = false;
   AppLifecycleListener? _lifecycle;
   DateTime _lastBeat = DateTime.now();
   DateTime? _openedAt;
@@ -90,11 +96,11 @@ class EdgeEventChannel {
   var _connecting = false;
 
   /// Whether the stream stays open in front with no one [hold]ing it. Set
-  /// at launch: on for a linked account (the extension and agents ask for
-  /// cookies through it) and where FCM is missing. Otherwise the stream
-  /// opens only while held, and FCM carries the rest; that saves a TLS
-  /// handshake and a held-open connection on every launch, which on a slow
-  /// network is most of what the launch refresh has to share the link with.
+  /// at launch: on only where FCM cannot carry events. Otherwise the stream
+  /// opens only while held or after [_openAfter] in front, and FCM carries
+  /// the rest; that saves a TLS handshake and a held-open connection on
+  /// every launch, which on a slow network is most of what the launch
+  /// refresh has to share the link with.
   Future<bool> Function() alwaysOn = () async => true;
   var _holds = 0;
 
@@ -112,7 +118,7 @@ class EdgeEventChannel {
     };
   }
 
-  Future<bool> _wanted() async => _holds > 0 || await alwaysOn();
+  Future<bool> _wanted() async => _holds > 0 || _settled || await alwaysOn();
 
   Future<void> _closeIfUnwanted() async {
     if (!await _wanted()) _close();
@@ -125,13 +131,17 @@ class EdgeEventChannel {
     _lifecycle ??= AppLifecycleListener(
       onResume: () {
         _foreground = true;
+        _settleSoon();
         unawaited(connect());
       },
       onPause: () {
         _foreground = false;
+        _settle?.cancel();
+        _settled = false;
         _close();
       },
     );
+    _settleSoon();
     unawaited(connect());
   }
 
@@ -173,6 +183,9 @@ class EdgeEventChannel {
       _openedAt = _lastBeat = DateTime.now();
       _data.clear();
       connected.value = true;
+      // Open already, so staying open costs little: it does until the app
+      // goes back, unless Developer → Connect At Launch is off.
+      if (LaunchNetwork.atLaunch) _settled = true;
       _stream = response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())
@@ -230,6 +243,17 @@ class EdgeEventChannel {
 
   /// Closes the stream and stays closed until [connect].
   void stop() => _close();
+
+  /// Opens the stream once the app has been in front for [_openAfter],
+  /// unless Developer → Connect At Launch is off.
+  void _settleSoon() {
+    _settle?.cancel();
+    if (!LaunchNetwork.atLaunch) return;
+    _settle = Timer(_openAfter, () {
+      _settled = true;
+      unawaited(connect());
+    });
+  }
 
   void _onDropped() {
     final openedAt = _openedAt;

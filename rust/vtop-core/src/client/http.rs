@@ -3,13 +3,51 @@ use std::time::Duration;
 
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, USER_AGENT};
 use reqwest::redirect::Policy;
-use reqwest::{Certificate, Client};
+use reqwest::{Certificate, Client, ClientBuilder, Proxy};
 
 use crate::config::VtopConfig;
 use crate::error::{VtopError, VtopResult};
 
 /// Intermediate CA VTOP sometimes fails to send in its chain.
 const VITAP_INTERMEDIATE_CA_PEM: &str = include_str!("../../assets/sectigo_dv_r36.pem");
+
+/// A proxy and the CAs it signs with, so a debugging proxy (Proxyman,
+/// mitmproxy) can read the phone's traffic: the app's Developer → Inspect
+/// Traffic. Never set on the engine.
+#[derive(Debug, Default)]
+pub struct Inspection {
+    /// `host:port`.
+    pub proxy: Option<String>,
+    pub ca_pems: Vec<String>,
+}
+
+static INSPECTION: OnceLock<Inspection> = OnceLock::new();
+
+/// Sends every HTTP client built after this through `inspection`. Set once,
+/// before the first request; later calls are ignored.
+pub fn set_inspection(inspection: Inspection) {
+    let _ = INSPECTION.set(inspection);
+}
+
+/// `builder` with the [`Inspection`] proxy and CAs, when one is set.
+pub(crate) fn inspected(mut builder: ClientBuilder) -> ClientBuilder {
+    let Some(inspection) = INSPECTION.get() else {
+        return builder;
+    };
+    if let Some(proxy) = inspection
+        .proxy
+        .as_ref()
+        .and_then(|proxy| Proxy::all(format!("http://{proxy}")).ok())
+    {
+        builder = builder.proxy(proxy);
+    }
+    for pem in &inspection.ca_pems {
+        if let Ok(certificate) = Certificate::from_pem(pem.as_bytes()) {
+            builder = builder.add_root_certificate(certificate);
+        }
+    }
+    builder
+}
 
 /// Headers every VTOP request carries, built once.
 pub(super) fn default_headers() -> &'static HeaderMap {
@@ -86,7 +124,7 @@ fn build_client(config: &VtopConfig) -> VtopResult<Client> {
         builder = builder.add_root_certificate(certificate);
     }
 
-    builder.build().map_err(|error| {
+    inspected(builder).build().map_err(|error| {
         VtopError::ConfigurationError(format!("HTTP client setup failed: {error}"))
     })
 }

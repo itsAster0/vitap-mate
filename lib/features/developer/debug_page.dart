@@ -93,13 +93,26 @@ class DebugPage extends HookConsumerWidget {
                     .read(connectAtLaunchProvider.notifier)
                     .setValue(!ref.read(connectAtLaunchProvider)),
                 subtitle: ref.watch(connectAtLaunchProvider)
-                    ? 'Event stream, push token and update check at launch'
+                    ? 'Push token and update check at launch, events after 1 min'
                     : 'Each only when needed (from next launch)',
                 suffix: FSwitch(
                   value: ref.watch(connectAtLaunchProvider),
                   onChange: (value) => ref
                       .read(connectAtLaunchProvider.notifier)
                       .setValue(value),
+                ),
+              ),
+              tile(
+                'Inspect Traffic',
+                FLucideIcons.scanSearch,
+                () => ref
+                    .read(inspectTrafficProvider.notifier)
+                    .setValue(!ref.read(inspectTrafficProvider)),
+                subtitle: 'Wi-Fi proxy and user CAs, from next launch',
+                suffix: FSwitch(
+                  value: ref.watch(inspectTrafficProvider),
+                  onChange: (value) =>
+                      ref.read(inspectTrafficProvider.notifier).setValue(value),
                 ),
               ),
             ],
