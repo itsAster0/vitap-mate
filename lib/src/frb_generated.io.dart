@@ -7,6 +7,7 @@ import 'api/email_otp.dart';
 import 'api/mail_otp.dart';
 import 'api/native_logs.dart';
 import 'api/server_page.dart';
+import 'api/simple.dart';
 import 'api/vtop/types.dart';
 import 'api/vtop/vtop_client.dart';
 import 'api/vtop/vtop_errors.dart';

@@ -22,6 +22,7 @@ import 'package:vitapmate/app/widgets/screen_refresh.dart';
 import 'package:vitapmate/app/vtop_otp_overlay.dart';
 import 'package:vitapmate/platform/background/controller.dart';
 import 'package:vitapmate/platform/background/sync.dart';
+import 'package:vitapmate/vtop/http/traffic_inspection.dart';
 import 'package:vitapmate/platform/update/update_service.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:workmanager/workmanager.dart';
@@ -31,7 +32,7 @@ Future<void> main() async {
   // Independent, so start all rather than waiting on one then the next.
   final (firebaseReady, _, _) = await (
     ensureFirebaseReady(),
-    startRustRuntime(),
+    startRustRuntime().then((_) => TrafficInspection.init()),
     LaunchNetwork.init(),
   ).wait;
   if (firebaseReady) {

@@ -6,6 +6,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/features/settings/connection_page.dart';
+import 'package:vitapmate/vtop/edge/edge_events.dart';
 import 'package:vitapmate/vtop/route/connection_profile.dart';
 import 'package:vitapmate/vtop/route/vtop_proxy.dart';
 import 'package:vitapmate/vtop/route/vtop_udp.dart';
@@ -45,6 +46,8 @@ void main() {
     tester,
   ) async {
     final container = await settings({});
+    // As at launch with FCM: the page holds the stream only while open.
+    EdgeEventChannel.instance.alwaysOn = () async => false;
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,

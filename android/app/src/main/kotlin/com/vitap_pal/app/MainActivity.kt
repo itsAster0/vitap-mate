@@ -7,10 +7,12 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
 import android.provider.CalendarContract
+import android.util.Base64
 import android.webkit.URLUtil
 import android.webkit.CookieManager
 import androidx.core.content.ContextCompat
@@ -20,6 +22,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
 import java.io.File
+import java.security.KeyStore
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -27,6 +30,7 @@ class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val CALENDAR_CHANNEL = "vitapmate/google_calendar_sync"
         private const val DOWNLOAD_CHANNEL = "vitapmate/download_manager"
+        private const val NETWORK_CHANNEL = "vitapmate/network"
         private const val SYNC_TAG = "[VitapMateTimetable]"
         private const val TAG_PREFIX = "vitapmate-"
         // Preserve pending jobs saved by earlier app versions.
@@ -56,6 +60,30 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NETWORK_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "trafficInspection" -> result.success(trafficInspection())
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /** The Wi-Fi proxy (`host:port`) and the user-installed CAs as PEM. */
+    private fun trafficInspection(): Map<String, Any?> {
+        val proxy = getSystemService(ConnectivityManager::class.java)?.defaultProxy
+        val store = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
+        val cas = store.aliases().toList().filter { it.startsWith("user:") }.mapNotNull { alias ->
+            store.getCertificate(alias)?.encoded?.let {
+                "-----BEGIN CERTIFICATE-----\n" +
+                    Base64.encodeToString(it, Base64.DEFAULT) +
+                    "-----END CERTIFICATE-----\n"
+            }
+        }
+        return mapOf(
+            "proxy" to proxy?.host?.takeIf { it.isNotEmpty() }?.let { "$it:${proxy.port}" },
+            "cas" to cas,
+        )
     }
 
     private fun enqueueDownload(call: MethodCall, result: MethodChannel.Result) {

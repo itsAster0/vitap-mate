@@ -35,6 +35,8 @@ pub use hostel::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
     WeekendOutingApplication,
 };
+pub(crate) use http::inspected;
+pub use http::{set_inspection, Inspection};
 use reqwest::cookie::CookieStore;
 
 const AUTH: &str = "rust.auth";

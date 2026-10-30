@@ -1,11 +1,31 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/vtop/http/traffic_inspection.dart';
 
 /// One client per isolate, never closed, so connections are reused. Code
 /// without a Ref (background isolates, ad hoc services) uses this too.
-final http.Client sharedAppHttpClient = _FlowIdClient(http.Client());
+/// Built on first use, after [TrafficInspection.init].
+final http.Client sharedAppHttpClient = _FlowIdClient(_innerClient());
+
+http.Client _innerClient() {
+  final inspection = TrafficInspection.current;
+  if (inspection == null) return http.Client();
+  final context = SecurityContext(withTrustedRoots: true);
+  for (final pem in inspection.caPems) {
+    context.setTrustedCertificatesBytes(utf8.encode(pem));
+  }
+  final client = HttpClient(context: context);
+  if (inspection.proxy case final proxy?) {
+    client.findProxy = (_) => 'PROXY $proxy';
+  }
+  return IOClient(client);
+}
 
 /// Sends the current [flow] id as `x-request-id`, so the server's log lines
 /// for a request can be found from the phone's, and logs each request:
@@ -112,11 +132,11 @@ final appHttpClientProvider = Provider<http.Client>(
   (ref) => sharedAppHttpClient,
 );
 
-/// Developer → Connect At Launch. On (the default), launch opens the edge
-/// event stream, syncs the push token and checks for an update. Off, each
-/// opens only when needed: the stream while something holds it (e.g. a
-/// sign-in waiting for its forwarded OTP), the push token when Firebase
-/// changes it, the update check from Settings.
+/// Developer → Connect At Launch. On (the default), launch syncs the push
+/// token and checks for an update, and the edge event stream opens after a
+/// minute in front. Off, each happens only when needed: the stream while
+/// something holds it (e.g. a sign-in waiting for its forwarded OTP), the
+/// push token when Firebase changes it, the update check from Settings.
 abstract final class LaunchNetwork {
   static const settingKey = 'settings_connect_at_launch';
   static var atLaunch = true;

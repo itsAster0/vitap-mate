@@ -8,6 +8,7 @@ import 'package:vitapmate/vtop/vtop_bridge_account_service.dart';
 import 'package:vitapmate/vtop/vtop_session_store.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 import 'package:vitapmate/vtop/http/app_http_client.dart';
+import 'package:vitapmate/vtop/http/traffic_inspection.dart';
 
 const emailOtpDeleteAfterReadingSettingKey =
     'settings_email_otp_delete_after_reading';
@@ -60,6 +61,7 @@ final settingsProvider = FutureProvider<SharedPreferencesWithCache>(
         vtopCompactModeSettingKey,
         alwaysShowDebugSettingKey,
         LaunchNetwork.settingKey,
+        TrafficInspection.settingKey,
         vtopDesktopModeSettingKey,
         'settings_server_url',
         'settings_vtop_proxy',
@@ -427,4 +429,9 @@ final alwaysShowDebugProvider = NotifierProvider<VtopViewPreference, bool>(
 /// Read once per launch by [LaunchNetwork].
 final connectAtLaunchProvider = NotifierProvider<VtopViewPreference, bool>(
   () => VtopViewPreference(LaunchNetwork.settingKey, true),
+);
+
+/// Read once per launch by [TrafficInspection].
+final inspectTrafficProvider = NotifierProvider<VtopViewPreference, bool>(
+  () => VtopViewPreference(TrafficInspection.settingKey, false),
 );
