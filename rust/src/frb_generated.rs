@@ -1965,6 +1965,7 @@ fn wire__crate__api__email_otp__gmail_find_otp_impl(
             let api_expires_at_unix = <Option<u64>>::sse_decode(&mut deserializer);
             let api_issued_at_unix = <u64>::sse_decode(&mut deserializer);
             let api_skip_message_ids = <Vec<String>>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::vtop::vtop_errors::VtopError>(
@@ -1974,6 +1975,7 @@ fn wire__crate__api__email_otp__gmail_find_otp_impl(
                             api_expires_at_unix,
                             api_issued_at_unix,
                             api_skip_message_ids,
+                            api_flow,
                         )
                         .await?;
                         Ok(output_ok)
@@ -2009,6 +2011,7 @@ fn wire__crate__api__email_otp__gmail_tidy_up_impl(
             let api_access_token = <String>::sse_decode(&mut deserializer);
             let api_message_id = <String>::sse_decode(&mut deserializer);
             let api_delete_after_reading = <bool>::sse_decode(&mut deserializer);
+            let api_flow = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, ()>(
@@ -2018,6 +2021,7 @@ fn wire__crate__api__email_otp__gmail_tidy_up_impl(
                                 api_access_token,
                                 api_message_id,
                                 api_delete_after_reading,
+                                api_flow,
                             )
                             .await;
                         })?;

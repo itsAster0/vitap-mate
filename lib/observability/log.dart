@@ -222,10 +222,14 @@ class SourceLogger {
 }
 
 final _flowKey = Object();
+final _flowNameKey = Object();
 final _random = Random();
 
 /// The id of the flow the current code runs in, if any.
 String? get currentFlow => Zone.current[_flowKey] as String?;
+
+/// The name of the flow the current code runs in, e.g. `vtop_marks`.
+String? get currentFlowName => Zone.current[_flowNameKey] as String?;
 
 /// Runs [body] as one user action or background run named [name]: makes a
 /// flow id that every log line inside carries (and that server requests send
@@ -241,7 +245,10 @@ Future<T> flow<T>(
     8,
     (_) => _random.nextInt(16).toRadixString(16),
   ).join();
-  return runZoned(() => _timed(name, source, body), zoneValues: {_flowKey: id});
+  return runZoned(
+    () => _timed(name, source, body),
+    zoneValues: {_flowKey: id, _flowNameKey: name},
+  );
 }
 
 Future<T> _timed<T>(

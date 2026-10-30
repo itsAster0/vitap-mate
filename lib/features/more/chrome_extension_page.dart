@@ -1,4 +1,5 @@
 import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
@@ -44,9 +45,12 @@ class ChromeExtensionPage extends HookConsumerWidget {
       opening.value = true;
       var opened = false;
       try {
-        opened = await launchUrl(
-          Uri.parse(extensionDownloadUrl),
-          mode: .externalApplication,
+        opened = await loggedNetCall(
+          'open the extension download in the browser',
+          () => launchUrl(
+            Uri.parse(extensionDownloadUrl),
+            mode: .externalApplication,
+          ),
         );
       } catch (error, stackTrace) {
         Log.error(

@@ -8,7 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:freezed_annotation/freezed_annotation.dart' hide protected;
 part 'wire.freezed.dart';
 
-// These functions are ignored because they are not marked as `pub`: `gateway_has`, `now_ms`, `remember_sent`, `send`
+// These functions are ignored because they are not marked as `pub`: `fetch_page`, `gateway_has`, `now_ms`, `remember_sent`, `send`
 
 /// One request to the gateway: a page on `session_json`'s session, or with
 /// `session_json` empty a request that needs none (a server sign-in). A

@@ -75,6 +75,7 @@ String flowTitle(String step) =>
 String? lineVia(LogLine line) => switch (line.message) {
   _ when line.source != 'http' && line.source != 'rust.network' =>
     line.message.contains('UDP') ? 'UDP' : null,
+  final text when text.startsWith('udp ') => 'UDP',
   final text when text.contains('vtop.vitap.ac.in') => 'HTTPS direct',
   final text when text.contains('/vtop/') => 'HTTPS proxy',
   final text when text.contains('/v1/') => 'HTTPS server',

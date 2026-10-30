@@ -12,17 +12,19 @@ import 'vtop/vtop_errors.dart';
 /// One look at the mailbox for VTOP's OTP email sent after
 /// `issued_at_unix`. Errors are `ConfigurationError` with a stable code:
 /// `gmail_unauthorized` (refresh the token and retry), `gmail_forbidden`,
-/// `gmail_unavailable`.
+/// `gmail_unavailable`. `flow` is the Dart flow id, for the log.
 Future<GmailOtpCode?> gmailFindOtp({
   required String accessToken,
   BigInt? expiresAtUnix,
   required BigInt issuedAtUnix,
   required List<String> skipMessageIds,
+  String? flow,
 }) => RustLib.instance.api.crateApiEmailOtpGmailFindOtp(
   accessToken: accessToken,
   expiresAtUnix: expiresAtUnix,
   issuedAtUnix: issuedAtUnix,
   skipMessageIds: skipMessageIds,
+  flow: flow,
 );
 
 /// Trashes the OTP email (or only marks it read). Best effort.
@@ -30,10 +32,12 @@ Future<void> gmailTidyUp({
   required String accessToken,
   required String messageId,
   required bool deleteAfterReading,
+  String? flow,
 }) => RustLib.instance.api.crateApiEmailOtpGmailTidyUp(
   accessToken: accessToken,
   messageId: messageId,
   deleteAfterReading: deleteAfterReading,
+  flow: flow,
 );
 
 /// An OTP found in Gmail.

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:vitapmate/observability/app_log.dart';
+import 'package:vitapmate/observability/log.dart';
 import 'package:vitapmate/vtop/rust_runtime.dart';
 import 'package:vitapmate/vtop/users/saved_credentials.dart';
 import 'package:vitapmate/vtop/edge/credentials_rejected.dart';
@@ -22,14 +23,16 @@ import 'package:vitapmate/app/vtop_otp_overlay.dart';
 import 'package:vitapmate/platform/background/controller.dart';
 import 'package:vitapmate/platform/background/sync.dart';
 import 'package:vitapmate/platform/update/update_service.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:workmanager/workmanager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Independent, so start both rather than waiting on one then the other.
-  final (firebaseReady, _) = await (
+  // Independent, so start all rather than waiting on one then the next.
+  final (firebaseReady, _, _) = await (
     ensureFirebaseReady(),
     startRustRuntime(),
+    LaunchNetwork.init(),
   ).wait;
   if (firebaseReady) {
     FirebaseMessaging.onBackgroundMessage(vtopCookieBridgeBackgroundHandler);
@@ -38,7 +41,8 @@ Future<void> main() async {
 
   fileDownloaderConfig();
   EdgeEventChannel.instance
-    ..alwaysOn = edgeStreamAlwaysOn
+    // Lazy: open only while something holds it.
+    ..alwaysOn = (LaunchNetwork.atLaunch ? edgeStreamAlwaysOn : _never)
     ..on(mailOtpMessageType, handleMailOtpEvent)
     ..on(vtopCookieRequestType, handleVtopCookieRequestEvent)
     ..on(credentialsRejectedType, handleCredentialsRejectedEvent)
@@ -59,7 +63,10 @@ class MyApp extends HookConsumerWidget {
       _,
       semid,
     ) {
-      if (semid != null) unawaited(syncBridgeSemester(semid));
+      // Sends only when it differs from the semester last sent.
+      if (semid != null) {
+        unawaited(flow('semester sync', () => syncBridgeSemester(semid)));
+      }
     });
     useEffect(() {
       // A tap on the OTP notification, or a login left waiting for its OTP:
@@ -88,7 +95,9 @@ class MyApp extends HookConsumerWidget {
           // A pending local copy can be retried on the next launch.
         }
         await Future.delayed(Duration(milliseconds: 500));
-        UpdateService.checkForFlexibleUpdate();
+        if (LaunchNetwork.atLaunch) {
+          await flow('update check', UpdateService.checkForFlexibleUpdate);
+        }
       });
       return null;
     }, []);
@@ -119,6 +128,8 @@ class MyApp extends HookConsumerWidget {
     );
   }
 }
+
+Future<bool> _never() async => false;
 
 final _materialLight = appLightTheme.toApproximateMaterialTheme();
 final _materialDark = appDarkTheme.toApproximateMaterialTheme();

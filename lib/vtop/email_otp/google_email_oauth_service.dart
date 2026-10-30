@@ -13,6 +13,7 @@ import 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
 import 'package:vitapmate/vtop/email_otp/gmail_message.dart';
 import 'package:vitapmate/vtop/email_otp/google_oauth_loopback.dart';
 import 'package:vitapmate/vtop/email_otp/mail_forwarding_service.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/vtop/route/on_device_mode.dart';
 
 export 'package:vitapmate/vtop/email_otp/email_otp_oauth_session.dart';
@@ -52,6 +53,7 @@ typedef GmailOtpFinder =
       BigInt? expiresAtUnix,
       required BigInt issuedAtUnix,
       required List<String> skipMessageIds,
+      required String? flow,
     });
 
 typedef GmailOtpTidier =
@@ -59,11 +61,13 @@ typedef GmailOtpTidier =
       required String accessToken,
       required String messageId,
       required bool deleteAfterReading,
+      required String? flow,
     });
 
 @Riverpod(keepAlive: true)
 GoogleEmailOtpAuthService googleEmailOtpAuthService(Ref ref) {
-  final httpClient = http.Client();
+  // The app's client, so these requests are logged like the rest.
+  final httpClient = sharedAppHttpClient;
   return GoogleEmailOtpAuthService(
     appAuth: const FlutterAppAuth(),
     storage: const FlutterSecureStorage(),
@@ -303,14 +307,17 @@ class GoogleEmailOtpAuthService {
         'email_otp.oauth',
         'Starting identity OAuth request with scopes: ${googleEmailScopes.join(', ')}',
       );
-      final identityTokens = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          googleOauthClientId,
-          googleOauthRedirectUrl,
-          serviceConfiguration: _googleServiceConfiguration,
-          scopes: googleEmailScopes,
-          promptValues: const ['consent'],
-          additionalParameters: const {'access_type': 'offline'},
+      final identityTokens = await loggedNetCall(
+        'Google sign-in (identity)',
+        () => _appAuth.authorizeAndExchangeCode(
+          AuthorizationTokenRequest(
+            googleOauthClientId,
+            googleOauthRedirectUrl,
+            serviceConfiguration: _googleServiceConfiguration,
+            scopes: googleEmailScopes,
+            promptValues: const ['consent'],
+            additionalParameters: const {'access_type': 'offline'},
+          ),
         ),
       );
       if (identityTokens.accessToken == null) {
@@ -358,18 +365,21 @@ class GoogleEmailOtpAuthService {
         'email_otp.oauth',
         'Starting shared Gmail token OAuth request with scopes: ${gmailOauthScopes.join(', ')}',
       );
-      final gmailTokens = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          googleOauthClientId,
-          googleOauthRedirectUrl,
-          serviceConfiguration: _googleServiceConfiguration,
-          scopes: gmailOauthScopes,
-          loginHint: email,
-          promptValues: const ['consent'],
-          additionalParameters: const {
-            'access_type': 'offline',
-            'include_granted_scopes': 'true',
-          },
+      final gmailTokens = await loggedNetCall(
+        'Google sign-in (Gmail access)',
+        () => _appAuth.authorizeAndExchangeCode(
+          AuthorizationTokenRequest(
+            googleOauthClientId,
+            googleOauthRedirectUrl,
+            serviceConfiguration: _googleServiceConfiguration,
+            scopes: gmailOauthScopes,
+            loginHint: email,
+            promptValues: const ['consent'],
+            additionalParameters: const {
+              'access_type': 'offline',
+              'include_granted_scopes': 'true',
+            },
+          ),
         ),
       );
       if (gmailTokens.accessToken == null) {
@@ -436,13 +446,16 @@ class GoogleEmailOtpAuthService {
       await clearSession();
       return null;
     }
-    final token = await _appAuth.token(
-      TokenRequest(
-        googleOauthClientId,
-        googleOauthRedirectUrl,
-        serviceConfiguration: _googleServiceConfiguration,
-        refreshToken: session.refreshToken,
-        scopes: gmailOauthScopes,
+    final token = await loggedNetCall(
+      'Google token refresh',
+      () => _appAuth.token(
+        TokenRequest(
+          googleOauthClientId,
+          googleOauthRedirectUrl,
+          serviceConfiguration: _googleServiceConfiguration,
+          refreshToken: session.refreshToken,
+          scopes: gmailOauthScopes,
+        ),
       ),
     );
     if (token.accessToken == null) {
@@ -532,6 +545,7 @@ class GoogleEmailOtpAuthService {
       expiresAtUnix: BigInt.from(session.accessTokenExpiryEpochMs ~/ 1000),
       issuedAtUnix: BigInt.from(sinceUtc.millisecondsSinceEpoch ~/ 1000),
       skipMessageIds: _consumedOtpMessageIds.toList(),
+      flow: currentFlow,
     );
 
     GmailOtpCode? found;
@@ -560,6 +574,7 @@ class GoogleEmailOtpAuthService {
       accessToken: session.accessToken,
       messageId: found.messageId,
       deleteAfterReading: deleteAfterReading,
+      flow: currentFlow,
     );
     return found.code;
   }
@@ -620,6 +635,7 @@ class GoogleEmailOtpAuthService {
         accessToken: session.accessToken,
         messageId: id,
         deleteAfterReading: deleteAfterReading,
+        flow: currentFlow,
       );
     }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:flutter/services.dart';
 import 'package:forui/forui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,7 +9,11 @@ import 'package:vitapmate/ui/text_nums.dart';
 
 /// Opens [url] outside the app; toasts when nothing can open it.
 Future<void> openExternalLink(BuildContext context, String url) async {
-  final opened = await launchUrl(Uri.parse(url), mode: .externalApplication);
+  final uri = Uri.parse(url);
+  final opened = await loggedNetCall(
+    'open ${urlForLog(uri)} in the browser',
+    () => launchUrl(uri, mode: .externalApplication),
+  );
   if (!opened && context.mounted) {
     dispToast(context, 'Could not open link', 'Try again in your browser.');
   }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:forui/forui.dart';
 import 'package:vitapmate/observability/log.dart';
+import 'package:vitapmate/vtop/http/app_http_client.dart';
 import 'package:vitapmate/platform/files/general_utils.dart';
 import 'package:vitapmate/app/widgets/common_toast.dart';
 import 'package:vitapmate/platform/webview/vtop_webview_pages.dart';
@@ -541,9 +542,11 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
             },
             shouldOverrideUrlLoading: (controller, action) async {
               final uri = action.request.url;
-              return uri?.scheme == 'https' && uri?.host == 'vtop.vitap.ac.in'
-                  ? NavigationActionPolicy.ALLOW
-                  : NavigationActionPolicy.CANCEL;
+              if (uri?.scheme == 'https' && uri?.host == 'vtop.vitap.ac.in') {
+                return NavigationActionPolicy.ALLOW;
+              }
+              Log.info('vtop.webview', 'blocked ${urlForLog(uri)}');
+              return NavigationActionPolicy.CANCEL;
             },
             onDownloadStartRequest: (controller, request) async {
               if (!_valid) return;
@@ -672,6 +675,11 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
               }
             },
             onReceivedError: (controller, request, error) {
+              Log.warn(
+                'vtop.webview',
+                '${request.method ?? 'GET'} ${urlForLog(request.url)} failed: '
+                    '${error.type.toNativeValue()} ${error.description}',
+              );
               if (request.isForMainFrame != true || !_valid) return;
               if (_navigationUrl != null && request.url != _navigationUrl) {
                 return;
@@ -683,6 +691,11 @@ class VtopWebviewBodyState extends State<VtopWebviewBody> {
               );
             },
             onReceivedHttpError: (controller, request, response) {
+              Log.warn(
+                'vtop.webview',
+                '${request.method ?? 'GET'} ${urlForLog(request.url)} '
+                    '${response.statusCode}',
+              );
               if (request.isForMainFrame == true &&
                   (_navigationUrl == null || request.url == _navigationUrl)) {
                 _fail('VTOP returned an error. Try Home again.');
