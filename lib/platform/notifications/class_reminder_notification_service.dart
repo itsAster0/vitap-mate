@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:vitapmate/features/calendar/calendar.dart';
+import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 
 class ClassReminderNotificationService {
@@ -101,8 +102,8 @@ class ClassReminderNotificationService {
 
   /// Schedules a reminder before every class. With a [calendar], reminders
   /// are set for the actual class days of the next two weeks, so holidays,
-  /// exam days and labs after the LAB FAT get none; without one they repeat
-  /// weekly.
+  /// exam days and labs after the Lab FAT get none and a Lab FAT says so;
+  /// without one they repeat weekly.
   static Future<void> syncFromTimetable(
     TimetableData data, {
     SemesterCalendar? calendar,
@@ -168,10 +169,13 @@ class ClassReminderNotificationService {
     required DateTime at,
     required int beforeMinutes,
     DateTimeComponents? repeat,
+    bool labFat = false,
   }) => _notifications.zonedSchedule(
     id: id & 0x7fffffff,
-    title: "Class Reminder",
-    body: "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
+    title: labFat ? "Lab FAT" : "Class Reminder",
+    body: labFat
+        ? "${slot.courseCode} · Room ${slot.roomNo} in $beforeMinutes min (${slot.startTime})"
+        : "${slot.courseCode} in $beforeMinutes min (${slot.startTime})",
     scheduledDate: tz.TZDateTime.from(at, tz.local),
     notificationDetails: _details,
     payload: jsonEncode({
@@ -214,9 +218,8 @@ class ClassReminderNotificationService {
       for (final slot in data.slots) {
         if (slot.serial == "-1") continue;
         if (_weekdays[slot.day.trim().toUpperCase()] != day.weekday) continue;
-        if (!calendar.holdsClasses(day, lab: slot.kind == ClassKind.lab)) {
-          continue;
-        }
+        final kind = classDayOf(slot, day, calendar, data.slots);
+        if (kind == ClassDay.off) continue;
         final classTime = _parseTime(slot.startTime);
         if (classTime == null) continue;
         final remindAt = DateTime(
@@ -240,6 +243,7 @@ class ClassReminderNotificationService {
           ),
           at: remindAt,
           beforeMinutes: beforeMinutes,
+          labFat: kind == ClassDay.labFat,
         );
       }
     }

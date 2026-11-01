@@ -13,7 +13,9 @@ class SemesterCalendar {
     required List<({DateTime date, String name})> holidays,
     required Map<DateTime, CalendarEntry> dayEntries,
     required List<({DateTime start, String name})> exams,
+    required Set<DateTime> labFatDays,
   }) : _instructionalDays = instructionalDays,
+       _labFatDays = labFatDays,
        _exams = exams,
        _holidays = holidays,
        _dayEntries = dayEntries,
@@ -35,6 +37,7 @@ class SemesterCalendar {
     final holidays = <({DateTime date, String name})>[];
     final dayEntries = <DateTime, CalendarEntry>{};
     final examStarts = <String, DateTime>{};
+    final labFatDays = <DateTime>{};
     DateTime? labFatStart;
     for (final entry in entries) {
       final date = DateTime.tryParse(entry.date);
@@ -52,9 +55,11 @@ class SemesterCalendar {
       }
       if (kind == _instructionalDay) {
         instructional.add(day);
-        if (entry.note.toLowerCase().contains(_labFat) &&
-            (labFatStart == null || day.isBefore(labFatStart))) {
-          labFatStart = day;
+        if (entry.note.toLowerCase().contains(_labFat)) {
+          labFatDays.add(day);
+          if (labFatStart == null || day.isBefore(labFatStart)) {
+            labFatStart = day;
+          }
         }
       } else if (kind == _holiday && day.weekday != DateTime.sunday) {
         holidays.add((date: day, name: entry.note));
@@ -70,10 +75,14 @@ class SemesterCalendar {
         for (final MapEntry(key: kind, value: start) in examStarts.entries)
           (start: start, name: examName(kind)),
       ]..sort((a, b) => a.start.compareTo(b.start)),
+      labFatDays: labFatDays,
     );
   }
 
   final Set<DateTime> _instructionalDays;
+
+  /// Class days marked Lab FAT: labs on them are the lab exam.
+  final Set<DateTime> _labFatDays;
   final List<({DateTime date, String name})> _holidays;
 
   /// Each exam (CAT - I, CAT - II, FAT) by its first day, in date order.
@@ -136,6 +145,26 @@ class SemesterCalendar {
     return !lab || stop == null || date.isBefore(stop);
   }
 
+  /// How a class of this kind goes on [day] in the timetable. On Lab FAT
+  /// days a course's lab is its Lab FAT on the first such day it has a lab
+  /// ([labWeekdays], ISO); its other labs that week don't meet. Attendance
+  /// uses [holdsClasses], which never counts a Lab FAT.
+  ClassDay classDay(
+    DateTime day, {
+    required bool lab,
+    Set<int> labWeekdays = const {},
+  }) {
+    if (!covers(day)) return ClassDay.held;
+    final date = _dateOnly(day);
+    if (lab && _labFatDays.contains(date)) {
+      final first = _labFatDays
+          .where((d) => labWeekdays.contains(d.weekday))
+          .fold<DateTime?>(null, (a, b) => a == null || b.isBefore(a) ? b : a);
+      return first == date ? ClassDay.labFat : ClassDay.off;
+    }
+    return holdsClasses(date, lab: lab) ? ClassDay.held : ClassDay.off;
+  }
+
   /// Instructional days after today.
   int instructionalDaysLeft(DateTime now) {
     final today = _dateOnly(now);
@@ -183,6 +212,9 @@ List<CalendarEntry> generalEntries(AcademicCalendarData data) {
       .toList();
   return general.isEmpty ? data.entries : general;
 }
+
+/// How one class goes on a date: held, its Lab FAT, or not meeting.
+enum ClassDay { held, labFat, off }
 
 /// How a calendar day is marked, most notable first.
 enum CalendarMark { exam, labFat, holiday, noClasses, special, classes }

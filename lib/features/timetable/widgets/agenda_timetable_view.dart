@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:forui/forui.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:vitapmate/app/settings.dart';
+import 'package:vitapmate/ui/extensions.dart';
 import 'package:vitapmate/ui/text_nums.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
@@ -74,35 +76,58 @@ class AgendaTimetableView extends HookWidget {
     }, const []);
 
     final weekDates = _weekDates(now.value);
-    List<TimetableSlot> slotsOn(DateTime date) =>
-        classesOnDate(slotsForDay(date.weekday), date, calendar);
+    final week = [for (var d = 1; d <= 7; d++) ...slotsForDay(d)];
+    ClassDay dayOf(TimetableSlot slot, DateTime date) =>
+        classDayOf(slot, date, calendar, week);
+    List<TimetableSlot> slotsOn(DateTime date) => [
+      for (final slot in slotsForDay(date.weekday))
+        if (dayOf(slot, date) != ClassDay.off) slot,
+    ];
+    final today = DateTime(now.value.year, now.value.month, now.value.day);
     // The day's regular schedule is always listed; [slots] are the classes
-    // that actually meet, which drive the hero card, day bar and statuses.
+    // that actually meet, which drive the focus card, day bar and statuses.
     final schedule = slotsForDay(selectedDay.value);
     final selectedDate = weekDates[selectedDay.value - 1];
-    final slots = slotsOn(selectedDate);
-    final nextDay = _nextClassDay(selectedDate);
+    final kinds = {for (final s in schedule) s: dayOf(s, selectedDate)};
+    final slots = [
+      for (final s in schedule)
+        if (kinds[s] != ClassDay.off) s,
+    ];
+    final labFats = {
+      for (final s in schedule)
+        if (kinds[s] == ClassDay.labFat) s,
+    };
+    final nextDay = _nextClassDay(selectedDate, slotsOn);
     // What the calendar says about the day: a holiday or exam that cancels
     // it, or a note (Lab FAT, an event) on a day that still has classes.
     final dayEntry = calendar?.entryOn(selectedDate);
     final dayMark = dayEntry == null ? null : markOf(dayEntry);
-    final dayOff = dayEntry != null && slots.isEmpty && schedule.isNotEmpty
+    // A class day where only labs are off (after the Lab FAT) is no day off.
+    final dayOff =
+        dayEntry != null &&
+            slots.isEmpty &&
+            schedule.isNotEmpty &&
+            !(calendar?.holdsClasses(selectedDate, lab: false) ?? false)
         ? dayEntry
         : null;
+    final lastClassDay = calendar?.lastClassDay(lab: false);
     // Plain "Holiday" Sundays and "No instructional day" Mondays say
-    // nothing new, so only named days get a note.
-    final dayNote =
-        dayEntry == null ||
-            dayOff != null ||
-            dayMark == CalendarMark.classes ||
-            const {
-              'Holiday',
-              'No instructional day',
-            }.contains(titleOf(dayEntry))
+    // nothing new, so only named days get a note. Lab FAT only when you
+    // write one.
+    final dayNote = slots.isNotEmpty && selectedDate == lastClassDay
+        ? 'Last class day'
+        : dayEntry == null ||
+              dayOff != null ||
+              dayMark == CalendarMark.classes ||
+              (dayMark == CalendarMark.labFat && labFats.isEmpty) ||
+              const {
+                'Holiday',
+                'No instructional day',
+              }.contains(titleOf(dayEntry))
         ? null
         : titleOf(dayEntry);
-    final isToday = selectedDay.value == now.value.weekday;
-    final today = DateTime(now.value.year, now.value.month, now.value.day);
+    final isToday = selectedDate == today;
+    final past = selectedDate.isBefore(today);
     final minuteNow = _timeOfDay(now.value);
 
     final current = isToday
@@ -114,12 +139,24 @@ class AgendaTimetableView extends HookWidget {
               )
               .firstOrNull
         : null;
-    final next = slots
-        .where((s) => !isToday || minutesOf(s.startTime) > minuteNow)
-        .firstOrNull;
+    final next = past
+        ? null
+        : slots
+              .where((s) => !isToday || minutesOf(s.startTime) > minuteNow)
+              .firstOrNull;
     final remaining = isToday
         ? slots.where((s) => minutesOf(s.endTime) > minuteNow).length
         : slots.length;
+    // Today after the last class, or an earlier day: the card recaps it.
+    final dayDone = slots.isNotEmpty && current == null && next == null;
+
+    // The date each course meets for the last time this semester.
+    final lastDates = calendar == null
+        ? const <(String, bool), DateTime>{}
+        : _lastClassDates(week, calendar!, dayOf);
+    bool isLastClass(TimetableSlot s) =>
+        kinds[s] == ClassDay.held &&
+        lastDates[(s.courseCode, s.kind == ClassKind.lab)] == selectedDate;
 
     // Real breaks (VIT leaves 10 minutes between classes); the longest one is
     // tagged when the day has more than one.
@@ -132,24 +169,40 @@ class AgendaTimetableView extends HookWidget {
         ? realGaps.reduce((a, b) => a > b ? a : b)
         : null;
 
+    // Once the day is over, each class's posted attendance, in order.
+    final statuses = dayDone
+        ? _dayStatuses(slots, selectedDate, labFats)
+        : null;
+    final posted = {for (final c in statuses ?? const []) c.slot: c.status};
+
     Widget classRow(int i) {
       final slot = schedule[i];
-      // Called off by the calendar (a holiday, or a lab after the LAB FAT):
-      // shown dimmed, with no live state.
-      final off = !slots.contains(slot);
+      final kind = kinds[slot]!;
+      // Not meeting (a holiday, or a lab after the Lab FAT): listed as
+      // usual, with no live state.
+      final off = kind == ClassDay.off;
       final live = isToday && !off;
       return EnterFade(
         index: i,
-        child: Opacity(
-          opacity: off ? 0.45 : 1,
-          child: _ClassRow(
-            slot: slot,
-            status: _statusFor(slot, current, next, minuteNow, live),
-            record: attendanceForSlot(attendance, slot),
-            minuteNow: live ? minuteNow : null,
-            isFirst: i == 0,
-            isLast: i == schedule.length - 1,
-          ),
+        child: _ClassRow(
+          slot: slot,
+          status: _statusFor(slot, current, next, minuteNow, live),
+          // A Lab FAT doesn't count towards attendance.
+          record: kind == ClassDay.labFat
+              ? null
+              : attendanceForSlot(attendance, slot),
+          minuteNow: live ? minuteNow : null,
+          isFirst: i == 0,
+          isLast: i == schedule.length - 1,
+          labFat: kind == ClassDay.labFat,
+          lastClass: isLastClass(slot),
+          // On a class day, a lab that doesn't meet says so; a day off
+          // says it once, in the card.
+          note: off && dayOff == null && slot.kind == ClassKind.lab
+              ? 'No lab'
+              : null,
+          showPosted: posted.containsKey(slot) && kind != ClassDay.labFat,
+          posted: posted[slot],
         ),
       );
     }
@@ -222,6 +275,9 @@ class AgendaTimetableView extends HookWidget {
                   isToday: isToday,
                   slots: slots,
                   attendance: attendance,
+                  labFats: labFats,
+                  isLastClass: isLastClass,
+                  done: statuses,
                   // A day without your classes says what the calendar calls
                   // it (holiday, exam, no classes), even if it never has any.
                   dayOff:
@@ -229,7 +285,8 @@ class AgendaTimetableView extends HookWidget {
                       (slots.isEmpty &&
                               dayMark != null &&
                               dayMark != CalendarMark.classes &&
-                              dayMark != CalendarMark.special
+                              dayMark != CalendarMark.special &&
+                              dayMark != CalendarMark.labFat
                           ? dayEntry
                           : null),
                   calendarListed: dayEntry != null,
@@ -248,63 +305,39 @@ class AgendaTimetableView extends HookWidget {
                     now: now.value,
                     before: nextDay?.date,
                   ).firstOrNull,
-                  upcomingDay: slots.isEmpty || (isToday && next == null)
-                      ? nextDay
+                  upcomingDay: slots.isEmpty ? nextDay : null,
+                  countdown: slots.isEmpty
+                      ? _countdown(selectedDate, lastClassDay, slotsOn)
                       : null,
                 ),
-                // A day without classes: fill it with what comes next.
-                if (slots.isEmpty && !selectedDate.isBefore(today))
-                  _ComingUp(
-                    from: selectedDate,
-                    now: now.value,
-                    nextDay: nextDay,
-                    slotsOn: slotsOn,
-                    exams: exams,
-                    attendance: attendance,
-                    calendar: calendar,
-                  ),
-                // A day your timetable has no classes on at all recaps
-                // attendance: a Sunday the week it ends, any other day last
-                // week. A class day called off (a holiday) shows its dimmed
-                // schedule instead.
-                if (schedule.isEmpty)
-                  _WeekRecap(
-                    thisWeek: selectedDate.weekday == DateTime.sunday,
-                    dates: [
-                      for (final d in weekDates)
-                        selectedDate.weekday == DateTime.sunday
-                            ? d
-                            : DateTime(d.year, d.month, d.day - 7),
-                    ],
-                    now: now.value,
-                    classesOn: slotsOn,
-                    history: history,
-                  ),
-                // Sundays look ahead at exams and holidays.
-                if (calendar case final calendar?
-                    when selectedDate.weekday == DateTime.sunday)
-                  _Lookahead(
+                // A day your timetable has no classes on looks at the week
+                // ahead and the courses to watch.
+                if (schedule.isEmpty) ...[
+                  _WeekAhead(
                     from: selectedDate,
                     calendar: calendar,
                     papers: exams,
-                    // Exams whose papers "Coming up" already lists.
-                    hide: {
-                      if (!selectedDate.isBefore(today))
-                        for (final p in _papersBetween(
-                          exams,
-                          from: selectedDate,
-                          now: now.value,
-                          before: nextDay?.date,
-                        ))
-                          p.name,
-                    },
+                    slotsOn: slotsOn,
+                    labFatsOn: (date) => [
+                      for (final s in slotsForDay(date.weekday))
+                        if (dayOf(s, date) == ClassDay.labFat) s,
+                    ],
+                    onOpen: (date) => weekDates.contains(date)
+                        ? () => selectedDay.value = date.weekday
+                        : null,
                   ),
+                  _AttendanceWatch(records: attendance),
+                ],
                 if (schedule.isNotEmpty)
                   SectionHeader(
                     title: isToday ? 'Today' : 'Schedule',
                     trailing: Text(
                       slots.isEmpty
-                          ? 'No classes'
+                          ? switch (dayMark) {
+                              CalendarMark.holiday => 'Holiday',
+                              CalendarMark.exam => 'Exam day',
+                              _ => 'No classes',
+                            }
                           : isToday && remaining < slots.length
                           ? '$remaining of ${slots.length} left'
                           : '${slots.length} ${slots.length == 1 ? 'class' : 'classes'}',
@@ -312,19 +345,16 @@ class AgendaTimetableView extends HookWidget {
                   ),
                 for (var i = 0; i < schedule.length; i++) ...[
                   if (i > 0)
-                    _dimmedIf(
-                      dayOff != null,
-                      _BreakRow(
-                        previousEnd: schedule[i - 1].endTime,
-                        nextStart: schedule[i].startTime,
-                        isNow:
-                            isToday &&
-                            dayOff == null &&
-                            minutesOf(schedule[i - 1].endTime) <= minuteNow &&
-                            minutesOf(schedule[i].startTime) > minuteNow,
-                        minuteNow: minuteNow,
-                        isLongest: gaps[i - 1] == longestGap,
-                      ),
+                    _BreakRow(
+                      previousEnd: schedule[i - 1].endTime,
+                      nextStart: schedule[i].startTime,
+                      isNow:
+                          isToday &&
+                          dayOff == null &&
+                          minutesOf(schedule[i - 1].endTime) <= minuteNow &&
+                          minutesOf(schedule[i].startTime) > minuteNow,
+                      minuteNow: minuteNow,
+                      isLongest: gaps[i - 1] == longestGap,
                     ),
                   classRow(i),
                 ],
@@ -336,17 +366,103 @@ class AgendaTimetableView extends HookWidget {
     );
   }
 
+  /// Each class of [slots] on [date], in order, with its posted status from
+  /// the saved history: null when not posted yet or a Lab FAT.
+  List<({TimetableSlot slot, ClassStatus? status})> _dayStatuses(
+    List<TimetableSlot> slots,
+    DateTime date,
+    Set<TimetableSlot> labFats,
+  ) {
+    final taken = <(String, bool), int>{};
+    return [
+      for (final slot in slots)
+        if (labFats.contains(slot))
+          (slot: slot, status: null)
+        else
+          () {
+            final key = (slot.courseCode, slot.kind == ClassKind.lab);
+            final rows = [
+              for (final row in history[key]?.records ?? const [])
+                if (parseHistoryDate(row.date) == date)
+                  classStatusOf(row.status),
+            ];
+            final i = taken[key] = (taken[key] ?? -1) + 1;
+            return (slot: slot, status: i < rows.length ? rows[i] : null);
+          }(),
+    ];
+  }
+
+  /// "12 class days left · FAT starts Mon 16 Nov", counting your days with
+  /// classes after [from]; null without a calendar or anything to say.
+  String? _countdown(
+    DateTime from,
+    DateTime? lastClassDay,
+    List<TimetableSlot> Function(DateTime date) slotsOn,
+  ) {
+    final exam = calendar?.upcomingExam(from);
+    var left = 0;
+    if (lastClassDay != null) {
+      for (
+        var d = DateTime(from.year, from.month, from.day + 1);
+        !d.isAfter(lastClassDay);
+        d = DateTime(d.year, d.month, d.day + 1)
+      ) {
+        if (slotsOn(d).isNotEmpty) left++;
+      }
+    }
+    final line = [
+      if (left > 0) '$left class ${left == 1 ? 'day' : 'days'} left',
+      if (exam != null)
+        '${exam.name} starts ${DateFormat('EEE d MMM').format(exam.start)}',
+    ].join(' · ');
+    return line.isEmpty ? null : line;
+  }
+
   /// The next day after [from] that has classes, with its first class. With
   /// a calendar it looks further ahead, past exam weeks and breaks.
-  ({DateTime date, TimetableSlot first})? _nextClassDay(DateTime from) {
+  ({DateTime date, TimetableSlot first})? _nextClassDay(
+    DateTime from,
+    List<TimetableSlot> Function(DateTime date) slotsOn,
+  ) {
     final horizon = calendar == null ? 7 : 28;
     for (var offset = 1; offset <= horizon; offset++) {
       final date = DateTime(from.year, from.month, from.day + offset);
-      final slots = classesOnDate(slotsForDay(date.weekday), date, calendar);
+      final slots = slotsOn(date);
       if (slots.isNotEmpty) return (date: date, first: slots.first);
     }
     return null;
   }
+}
+
+/// The last date each course (code, lab) meets this semester, looking back
+/// from the last class day.
+Map<(String, bool), DateTime> _lastClassDates(
+  List<TimetableSlot> week,
+  SemesterCalendar calendar,
+  ClassDay Function(TimetableSlot slot, DateTime date) dayOf,
+) {
+  final last = calendar.lastClassDay(lab: false);
+  final first = calendar.firstClassDay;
+  if (last == null || first == null) return const {};
+  final courses = {
+    for (final s in week) (s.courseCode, s.kind == ClassKind.lab),
+  };
+  final found = <(String, bool), DateTime>{};
+  for (
+    var d = last;
+    !d.isBefore(first) && found.length < courses.length;
+    d = DateTime(d.year, d.month, d.day - 1)
+  ) {
+    for (final s in week) {
+      if (slotDays.indexOf(s.day.trim().toUpperCase()) + 1 != d.weekday) {
+        continue;
+      }
+      if (dayOf(s, d) == ClassDay.held) {
+        found.putIfAbsent((s.courseCode, s.kind == ClassKind.lab), () => d);
+      }
+    }
+  }
+  return found;
 }
 
 AgendaClassStatus _statusFor(
@@ -400,17 +516,10 @@ DateTime _at(DateTime day, String time) {
   return DateTime(day.year, day.month, day.day, minutes ~/ 60, minutes % 60);
 }
 
-List<DateTime> _weekDates(DateTime now) {
-  final monday = DateTime(
-    now.year,
-    now.month,
-    now.day,
-  ).subtract(Duration(days: now.weekday - DateTime.monday));
-  return List.generate(7, (index) => monday.add(Duration(days: index)));
-}
+/// The date of each weekday this week, Monday first.
+List<DateTime> _weekDates(DateTime now) => List.generate(
+  7,
+  (i) => DateTime(now.year, now.month, now.day + 1 - now.weekday + i),
+);
 
 int _timeOfDay(DateTime value) => value.hour * 60 + value.minute;
-
-/// [child] at reduced opacity when [dimmed], for classes called off.
-Widget _dimmedIf(bool dimmed, Widget child) =>
-    dimmed ? Opacity(opacity: 0.45, child: child) : child;

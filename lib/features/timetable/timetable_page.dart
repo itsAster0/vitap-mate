@@ -38,6 +38,8 @@ class TimetablePage extends HookConsumerWidget {
           slotDays.indexOf(s.day) + 1,
       },
     ]..sort();
+    // Swipes reach from the first to the last class day, or today.
+    final reachable = ({...classDays, DateTime.now().weekday}.toList()..sort());
     final attendance = ref.watch(attendanceProvider).value?.records ?? const [];
     final viewMode = ref.watch(timetableViewModeProvider);
     final dragStartX = useState<double?>(null);
@@ -129,14 +131,13 @@ class TimetablePage extends HookConsumerWidget {
                   : null,
               onHorizontalDragUpdate: isAgenda
                   ? (details) {
-                      if (classDays.isEmpty) return;
                       final x = details.globalPosition.dx;
                       final deltaX = x - (dragStartX.value ?? x);
-                      if (deltaX > 80 && classDays.first < selectedDay.value) {
+                      if (deltaX > 80 && reachable.first < selectedDay.value) {
                         selectedDay.value -= 1;
                         dragStartX.value = x;
                       } else if (deltaX < -80 &&
-                          classDays.last > selectedDay.value) {
+                          reachable.last > selectedDay.value) {
                         selectedDay.value += 1;
                         dragStartX.value = x;
                       }
@@ -183,6 +184,7 @@ class TimetablePage extends HookConsumerWidget {
                                 days: classDays,
                                 slotsForDay: slotsForDay,
                                 attendance: attendance,
+                                calendar: calendar,
                               ),
                             )
                           else

@@ -13,9 +13,13 @@ class _FocusPanel extends StatelessWidget {
     required this.attendance,
     required this.upcomingDay,
     required this.calendarListed,
+    required this.labFats,
+    required this.isLastClass,
+    this.done,
     this.papers = const [],
     this.nextPaper,
     this.dayOff,
+    this.countdown,
   });
 
   final TimetableSlot? current;
@@ -25,6 +29,13 @@ class _FocusPanel extends StatelessWidget {
   final List<TimetableSlot> slots;
   final List<AttendanceRecord> attendance;
   final ({DateTime date, TimetableSlot first})? upcomingDay;
+
+  /// The day's Lab FATs: no attendance, an amber chip.
+  final Set<TimetableSlot> labFats;
+  final bool Function(TimetableSlot slot) isLastClass;
+
+  /// The day's classes with their posted attendance, once they are over.
+  final List<({TimetableSlot slot, ClassStatus? status})>? done;
 
   /// The calendar entry that makes this a day without classes.
   final CalendarEntry? dayOff;
@@ -40,17 +51,26 @@ class _FocusPanel extends StatelessWidget {
   /// Your next paper after the day, when it comes before the next class.
   final ExamPaper? nextPaper;
 
+  /// Where the semester stands on a free day: "12 class days left · FAT
+  /// starts Mon 16 Nov".
+  final String? countdown;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     final (current, next) = (this.current, this.next);
 
-    // Day is over, or there's nothing today: point at the next class day.
+    // Classes are over: how the day went.
+    if (done case final done?) {
+      return _DaySummary(classes: done, labFats: labFats, isToday: isToday);
+    }
+
+    // No classes today: say why, and point at the next class day.
     if (current == null && next == null) {
       final upcoming = upcomingDay;
       final off = dayOff;
-      final unlisted = off == null && slots.isEmpty && !calendarListed;
-      final exam = slots.isEmpty ? papers.firstOrNull : null;
+      final unlisted = off == null && !calendarListed;
+      final exam = papers.firstOrNull;
       final offMark = exam != null
           ? CalendarMark.exam
           : off == null
@@ -60,11 +80,7 @@ class _FocusPanel extends StatelessWidget {
         CalendarMark.exam => (FLucideIcons.penLine, colors.app.warning),
         CalendarMark.holiday => (FLucideIcons.partyPopper, colors.app.success),
         CalendarMark() => (FLucideIcons.calendarOff, colors.app.accentTone),
-        null when slots.isEmpty => (
-          FLucideIcons.sunMedium,
-          colors.app.accentTone,
-        ),
-        null => (FLucideIcons.circleCheckBig, colors.app.success),
+        null => (FLucideIcons.sunMedium, colors.app.accentTone),
       };
       final typography = context.theme.typography;
       final title = exam != null
@@ -74,10 +90,8 @@ class _FocusPanel extends StatelessWidget {
           ? titleOf(off)
           : unlisted
           ? 'Holiday'
-          : slots.isEmpty
           // The calendar holds classes, you just have none today.
-          ? 'Free day'
-          : "You're done for today";
+          : 'Free day';
       final eyebrow = switch (offMark) {
         // A plain "Holiday" needs no badge repeating it.
         CalendarMark.holiday when title == 'Holiday' => null,
@@ -147,6 +161,17 @@ class _FocusPanel extends StatelessWidget {
                       '${to12H(upcoming.first.startTime, context)}',
                       upcoming.first.name,
                     ),
+                  if (countdown case final countdown?) ...[
+                    const SizedBox(height: Space.sm),
+                    Text(
+                      countdown,
+                      maxLines: 1,
+                      overflow: .ellipsis,
+                      style: typography.body.xs.nums(
+                        color: colors.mutedForeground,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -175,10 +200,14 @@ class _FocusPanel extends StatelessWidget {
                 target: _at(now, current.endTime),
                 prefix: 'Ends in',
               ),
+              labFat: labFats.contains(current),
+              lastClass: isLastClass(current),
               progress:
                   (_timeOfDay(now) - minutesOf(current.startTime)) /
                   (minutesOf(current.endTime) - minutesOf(current.startTime)),
-              record: attendanceForSlot(attendance, current),
+              record: labFats.contains(current)
+                  ? null
+                  : attendanceForSlot(attendance, current),
             ),
           if (current != null && next != null) ...[
             Container(height: 1, color: colors.border),
@@ -197,7 +226,11 @@ class _FocusPanel extends StatelessWidget {
                       prefix: 'Starts in',
                     )
                   : null,
-              record: attendanceForSlot(attendance, next),
+              labFat: labFats.contains(next),
+              lastClass: isLastClass(next),
+              record: labFats.contains(next)
+                  ? null
+                  : attendanceForSlot(attendance, next),
             ),
         ],
       ),
@@ -212,10 +245,14 @@ class _FocusClass extends StatelessWidget {
     required this.record,
     this.countdown,
     this.progress,
+    this.labFat = false,
+    this.lastClass = false,
   });
 
   final TimetableSlot slot;
   final Widget badge;
+  final bool labFat;
+  final bool lastClass;
   final Widget? countdown;
   final double? progress;
   final AttendanceRecord? record;
@@ -279,9 +316,9 @@ class _FocusClass extends StatelessWidget {
                     ],
                     Row(
                       children: [
-                        CourseKindBadge(isLab: slot.kind == ClassKind.lab),
+                        _KindBadge(slot: slot, labFat: labFat),
                         const SizedBox(width: Space.sm),
-                        Expanded(
+                        Flexible(
                           child: Text(
                             slot.courseCode,
                             maxLines: 1,
@@ -291,6 +328,10 @@ class _FocusClass extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (lastClass) ...[
+                          const SizedBox(width: Space.sm),
+                          const _LastClassBadge(),
+                        ],
                       ],
                     ),
                     if (record != null) ...[
@@ -491,4 +532,210 @@ class _Countdown extends HookWidget {
       ),
     );
   }
+}
+
+/// The class kind chip, or an amber LAB FAT for a lab exam.
+class _KindBadge extends StatelessWidget {
+  const _KindBadge({required this.slot, required this.labFat});
+
+  final TimetableSlot slot;
+  final bool labFat;
+
+  @override
+  Widget build(BuildContext context) => labFat
+      ? ToneBadge(
+          label: 'LAB FAT',
+          icon: FLucideIcons.flaskConical,
+          tone: context.theme.colors.app.warning,
+        )
+      : CourseKindBadge(isLab: slot.kind == ClassKind.lab);
+}
+
+/// Marks a course's last class of the semester.
+class _LastClassBadge extends StatelessWidget {
+  const _LastClassBadge();
+
+  @override
+  Widget build(BuildContext context) =>
+      ToneBadge.neutral(context, 'LAST CLASS');
+}
+
+/// The card once the day's classes are over: a ring with one arc per class,
+/// clockwise from the top in class order, coloured by its posted attendance
+/// (dim until VTOP posts it, amber for a Lab FAT), beside the counts.
+class _DaySummary extends StatelessWidget {
+  const _DaySummary({
+    required this.classes,
+    required this.labFats,
+    required this.isToday,
+  });
+
+  final List<({TimetableSlot slot, ClassStatus? status})> classes;
+  final Set<TimetableSlot> labFats;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.theme.colors;
+    final typography = context.theme.typography;
+    final palette = colors.app;
+    final pending = colors.mutedForeground.withValues(alpha: 0.3);
+    Color colorOf(({TimetableSlot slot, ClassStatus? status}) c) =>
+        labFats.contains(c.slot)
+        ? palette.warning.base
+        : switch (c.status) {
+            null => pending,
+            ClassStatus.present => palette.success.base,
+            ClassStatus.onDuty => palette.accent,
+            ClassStatus.absent => palette.danger.base,
+            ClassStatus.other => colors.mutedForeground,
+          };
+    final graded = [
+      for (final c in classes)
+        if (!labFats.contains(c.slot)) c.status,
+    ];
+    int count(ClassStatus? s) => graded.where((x) => x == s).length;
+    final legend = [
+      (count(ClassStatus.present), 'present', palette.success.base),
+      (count(ClassStatus.onDuty), 'on duty', palette.accent),
+      (count(ClassStatus.absent), 'absent', palette.danger.base),
+      (
+        labFats.length,
+        labFats.length == 1 ? 'Lab FAT' : 'Lab FATs',
+        palette.warning.base,
+      ),
+      (count(null), 'not posted yet', pending),
+    ].where((e) => e.$1 > 0);
+
+    return Surface(
+      child: Row(
+        children: [
+          Semantics(
+            label: [
+              for (final c in classes)
+                '${c.slot.name}, ${labFats.contains(c.slot) ? 'Lab FAT' : c.status?.name ?? 'not posted'}',
+            ].join('; '),
+            excludeSemantics: true,
+            child: SizedBox.square(
+              dimension: 68,
+              child: CustomPaint(
+                painter: _ArcsPainter([
+                  for (final c in classes) colorOf(c),
+                ], stroke: 6),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: .min,
+                    children: [
+                      Text(
+                        '${classes.length}',
+                        style: numStyle(
+                          fontSize: 20,
+                          height: 1,
+                          fontWeight: .w800,
+                          color: colors.foreground,
+                        ),
+                      ),
+                      Text(
+                        classes.length == 1 ? 'class' : 'classes',
+                        style: typography.body.xs.copyWith(
+                          fontSize: 9.5,
+                          color: colors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: Space.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: .start,
+              children: [
+                Text(
+                  isToday ? 'Done for today' : 'Classes done',
+                  style: typography.body.md.copyWith(
+                    height: 1.25,
+                    fontWeight: .w700,
+                    color: colors.foreground,
+                  ),
+                ),
+                const SizedBox(height: Space.sm),
+                Wrap(
+                  spacing: Space.md,
+                  runSpacing: Space.xs,
+                  children: [
+                    for (final (n, label, color) in legend)
+                      Row(
+                        mainAxisSize: .min,
+                        children: [
+                          Dot(size: 8, color: color),
+                          const SizedBox(width: Space.xs + 2),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$n',
+                                  style: TextStyle(
+                                    fontWeight: .w700,
+                                    color: colors.foreground,
+                                  ),
+                                ),
+                                TextSpan(text: ' $label'),
+                              ],
+                            ),
+                            style: typography.body.xs.nums(
+                              color: colors.mutedForeground,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A ring cut into one arc per colour, clockwise from the top.
+class _ArcsPainter extends CustomPainter {
+  _ArcsPainter(this.arcs, {required this.stroke});
+
+  final List<Color> arcs;
+  final double stroke;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (arcs.isEmpty) return;
+    final radius = (size.shortestSide - stroke) / 2;
+    final rect = Rect.fromCircle(
+      center: size.center(Offset.zero),
+      radius: radius,
+    );
+    // Round caps reach past each arc's end; the gap leaves room for both.
+    final gap = arcs.length == 1 ? 0.0 : stroke / radius + 0.14;
+    final sweep = (2 * math.pi - gap * arcs.length) / arcs.length;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = arcs.length == 1 ? StrokeCap.butt : StrokeCap.round;
+    for (final (i, color) in arcs.indexed) {
+      canvas.drawArc(
+        rect,
+        -math.pi / 2 + gap / 2 + i * (sweep + gap),
+        sweep,
+        false,
+        paint..color = color,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ArcsPainter old) =>
+      old.stroke != stroke || !listEquals(old.arcs, arcs);
 }

@@ -8,6 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:vitapmate/app/settings.dart';
 import 'package:vitapmate/ui/ui.dart';
 import 'package:vitapmate/features/attendance/attendance.dart';
+import 'package:vitapmate/features/calendar/calendar.dart';
 import 'package:vitapmate/features/timetable/logic/time_format.dart';
 import 'package:vitapmate/src/api/vtop/types.dart';
 import 'package:vitapmate/ui/text_nums.dart';
@@ -15,21 +16,25 @@ import 'package:vitapmate/ui/text_nums.dart';
 /// The week as a grid with a column per class day, scrolling both ways: the
 /// day header stays on top and the hours stay on the left. It opens on today
 /// at the current time. Blocks show code, room, time and as much of the
-/// course name as fits; tap one for the full details.
+/// course name as fits; tap one for the full details. Holidays are named
+/// under their date and Lab FATs tagged on their block.
 class WeeklyTimetableView extends HookWidget {
   const WeeklyTimetableView({
     super.key,
     required this.days,
     required this.slotsForDay,
     this.attendance = const [],
+    this.calendar,
   });
 
   final List<int> days;
   final List<TimetableSlot> Function(int day) slotsForDay;
   final List<AttendanceRecord> attendance;
+  final SemesterCalendar? calendar;
 
   static const _gutter = 30.0;
   static const _headerHeight = 52.0;
+  static const _noteHeight = 12.0;
   static const _hourHeight = 80.0;
   static const _minDayWidth = 108.0;
   static const _gridTop = 8.0;
@@ -61,6 +66,18 @@ class WeeklyTimetableView extends HookWidget {
     }, [horizontal, headerScroll]);
     final daySlots = {for (final day in days) day: slotsForDay(day)};
     final allSlots = daySlots.values.expand((slots) => slots).toList();
+    // What the calendar calls a class day without classes.
+    final notes = <int, String>{
+      for (final day in days)
+        if (calendar?.entryOn(dates[day - 1]) case final entry?)
+          day: ?switch (markOf(entry)) {
+            CalendarMark.holiday => 'Holiday',
+            CalendarMark.noClasses => 'No class',
+            CalendarMark.exam => titleOf(entry),
+            _ => null,
+          },
+    };
+    final headerHeight = _headerHeight + (notes.isEmpty ? 0 : _noteHeight);
 
     if (allSlots.isEmpty) {
       return const EmptyState(
@@ -131,7 +148,7 @@ class WeeklyTimetableView extends HookWidget {
               children: [
                 // Day header
                 SizedBox(
-                  height: _headerHeight,
+                  height: headerHeight,
                   child: Row(
                     children: [
                       const SizedBox(width: _gutter),
@@ -150,6 +167,11 @@ class WeeklyTimetableView extends HookWidget {
                                     date: dates[day - 1],
                                     isToday: day == today,
                                     count: daySlots[day]!.length,
+                                    // An empty note keeps every header
+                                    // aligned when one day has a note.
+                                    note: notes.isEmpty
+                                        ? null
+                                        : notes[day] ?? '',
                                   ),
                                 ),
                             ],
@@ -242,11 +264,14 @@ class WeeklyTimetableView extends HookWidget {
                                         ),
                                         child: _Block(
                                           slot: slot,
-                                          past:
-                                              day < today ||
-                                              (day == today &&
-                                                  minutesOf(slot.endTime) <=
-                                                      minuteNow),
+                                          labFat:
+                                              classDayOf(
+                                                slot,
+                                                dates[day - 1],
+                                                calendar,
+                                                allSlots,
+                                              ) ==
+                                              ClassDay.labFat,
                                           live:
                                               day == today &&
                                               minutesOf(slot.startTime) <=
@@ -334,6 +359,7 @@ class _DayHeader extends StatelessWidget {
     required this.date,
     required this.isToday,
     required this.count,
+    this.note,
   });
 
   final String name;
@@ -341,47 +367,68 @@ class _DayHeader extends StatelessWidget {
   final bool isToday;
   final int count;
 
+  /// "Holiday", "CAT-II": the calendar's word on the day.
+  final String? note;
+
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
     return Semantics(
-      label: '$name ${date.day}, $count classes',
+      label:
+          '$name ${date.day}, ${note == null || note!.isEmpty ? '$count classes' : note}',
       excludeSemantics: true,
-      child: Center(
-        child: Container(
-          width: 40,
-          padding: const .symmetric(vertical: 5),
-          decoration: BoxDecoration(
-            color: isToday ? colors.primary : null,
-            borderRadius: .circular(Radii.md),
-          ),
-          child: Column(
-            mainAxisSize: .min,
-            children: [
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  letterSpacing: 0.6,
-                  fontWeight: .w600,
-                  color: isToday
-                      ? colors.primaryForeground.withValues(alpha: 0.7)
-                      : colors.mutedForeground,
+      child: Column(
+        mainAxisAlignment: .center,
+        children: [
+          Container(
+            width: 40,
+            padding: const .symmetric(vertical: 5),
+            decoration: BoxDecoration(
+              color: isToday ? colors.primary : null,
+              borderRadius: .circular(Radii.md),
+            ),
+            child: Column(
+              mainAxisSize: .min,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    letterSpacing: 0.6,
+                    fontWeight: .w600,
+                    color: isToday
+                        ? colors.primaryForeground.withValues(alpha: 0.7)
+                        : colors.mutedForeground,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                '${date.day}',
-                style: numStyle(
-                  fontSize: 15,
-                  height: 1.2,
-                  fontWeight: .w700,
-                  color: isToday ? colors.primaryForeground : colors.foreground,
+                const SizedBox(height: 1),
+                Text(
+                  '${date.day}',
+                  style: numStyle(
+                    fontSize: 15,
+                    height: 1.2,
+                    fontWeight: .w700,
+                    color: isToday
+                        ? colors.primaryForeground
+                        : colors.foreground,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          if (note case final note?)
+            Text(
+              note,
+              maxLines: 1,
+              overflow: .ellipsis,
+              style: TextStyle(
+                fontSize: 9,
+                height: 1.3,
+                fontWeight: .w600,
+                color: colors.app.success.onSubtle,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -390,13 +437,13 @@ class _DayHeader extends StatelessWidget {
 class _Block extends StatelessWidget {
   const _Block({
     required this.slot,
-    required this.past,
+    required this.labFat,
     required this.live,
     required this.onPress,
   });
 
   final TimetableSlot slot;
-  final bool past;
+  final bool labFat;
   final bool live;
   final VoidCallback onPress;
 
@@ -411,94 +458,98 @@ class _Block extends StatelessWidget {
       semanticsLabel:
           '${slot.name}, ${to12H(slot.startTime, context)}, room ${slot.roomNo}',
       onPress: onPress,
-      child: AnimatedOpacity(
-        duration: Motion.medium,
-        opacity: past ? 0.45 : 1,
-        child: Container(
-          padding: const .fromLTRB(5, 4, 3, 3),
-          decoration: BoxDecoration(
-            // Opaque so grid lines don't show through.
-            color: Color.alphaBlend(tone.subtle, colors.card),
-            borderRadius: .circular(6),
-            border: live
-                ? Border.all(color: tone.base, width: 1.5)
-                : Border(left: BorderSide(color: tone.base, width: 2.5)),
-          ),
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final small = numStyle(
-                fontSize: 9,
-                height: 1.25,
-                fontWeight: .w500,
-                color: colors.mutedForeground,
-              );
-              // Lines of course name that fit under code, room and time.
-              final nameLines = ((c.maxHeight - 38) / 11.5).floor();
-              return Column(
-                crossAxisAlignment: .start,
-                children: [
-                  FittedBox(
-                    fit: .scaleDown,
-                    alignment: .centerLeft,
-                    child: Text(
-                      slot.courseCode,
-                      maxLines: 1,
-                      style: numStyle(
-                        fontSize: 10.5,
-                        height: 1.2,
-                        fontWeight: .w700,
-                        color: colors.foreground,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    slot.roomNo,
+      child: Container(
+        padding: const .fromLTRB(5, 4, 3, 3),
+        decoration: BoxDecoration(
+          // Opaque so grid lines don't show through.
+          color: Color.alphaBlend(tone.subtle, colors.card),
+          borderRadius: .circular(6),
+          border: live
+              ? Border.all(color: tone.base, width: 1.5)
+              : Border(left: BorderSide(color: tone.base, width: 2.5)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final small = numStyle(
+              fontSize: 9,
+              height: 1.25,
+              fontWeight: .w500,
+              color: colors.mutedForeground,
+            );
+            // Lines of course name that fit under code, room and time.
+            final nameLines = ((c.maxHeight - 38) / 11.5).floor();
+            return Column(
+              crossAxisAlignment: .start,
+              children: [
+                FittedBox(
+                  fit: .scaleDown,
+                  alignment: .centerLeft,
+                  child: Text(
+                    slot.courseCode,
                     maxLines: 1,
-                    overflow: .clip,
                     style: numStyle(
-                      fontSize: 9.5,
-                      height: 1.25,
-                      fontWeight: .w600,
-                      color: tone.onSubtle,
+                      fontSize: 10.5,
+                      height: 1.2,
+                      fontWeight: .w700,
+                      color: colors.foreground,
                     ),
                   ),
-                  FittedBox(
-                    fit: .scaleDown,
-                    alignment: .centerLeft,
-                    child: Row(
-                      children: [
-                        if (isLab) ...[
-                          Icon(
-                            FLucideIcons.flaskConical,
-                            size: 9,
-                            color: tone.base,
-                          ),
-                          const SizedBox(width: 2),
-                        ],
+                ),
+                Text(
+                  slot.roomNo,
+                  maxLines: 1,
+                  overflow: .clip,
+                  style: numStyle(
+                    fontSize: 9.5,
+                    height: 1.25,
+                    fontWeight: .w600,
+                    color: tone.onSubtle,
+                  ),
+                ),
+                FittedBox(
+                  fit: .scaleDown,
+                  alignment: .centerLeft,
+                  child: Row(
+                    children: [
+                      if (labFat)
                         Text(
-                          '${_clock(slot.startTime, context)}–${_clock(slot.endTime, context)}',
-                          style: small,
+                          'LAB FAT ',
+                          style: small.copyWith(
+                            fontWeight: .w700,
+                            color: colors.app.warning.onSubtle,
+                          ),
+                        )
+                      else if (isLab) ...[
+                        Icon(
+                          FLucideIcons.flaskConical,
+                          size: 9,
+                          color: tone.base,
                         ),
+                        const SizedBox(width: 2),
                       ],
+                      Text(
+                        '${_clock(slot.startTime, context)}–${_clock(slot.endTime, context)}',
+                        style: small,
+                      ),
+                    ],
+                  ),
+                ),
+                if (nameLines > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    slot.name,
+                    maxLines: nameLines,
+                    overflow: .ellipsis,
+                    style: TextStyle(
+                      fontSize: 9,
+                      height: 1.25,
+                      color: colors.mutedForeground,
                     ),
                   ),
-                  if (nameLines > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      slot.name,
-                      maxLines: nameLines,
-                      overflow: .ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        height: 1.25,
-                        color: colors.mutedForeground,
-                      ),
-                    ),
-                  ],
                 ],
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
