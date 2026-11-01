@@ -9,6 +9,11 @@ class _ClassRow extends HookWidget {
     required this.minuteNow,
     required this.isFirst,
     required this.isLast,
+    this.labFat = false,
+    this.lastClass = false,
+    this.note,
+    this.showPosted = false,
+    this.posted,
   });
 
   final TimetableSlot slot;
@@ -19,6 +24,16 @@ class _ClassRow extends HookWidget {
   final int? minuteNow;
   final bool isFirst;
   final bool isLast;
+  final bool labFat;
+  final bool lastClass;
+
+  /// Replaces the time hint ("No lab").
+  final String? note;
+
+  /// Once the day is over, the hint says what VTOP posted for the class
+  /// ([posted]; null is not posted yet).
+  final bool showPosted;
+  final ClassStatus? posted;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +46,23 @@ class _ClassRow extends HookWidget {
     // Right side of the room line: when it starts, how long is left, or done.
     // Other days just show the length.
     final nowMin = minuteNow;
-    final timeHint = nowMin == null
+    final postedTone = switch (posted) {
+      ClassStatus.present => colors.app.success,
+      ClassStatus.onDuty => colors.app.accentTone,
+      ClassStatus.absent => colors.app.danger,
+      _ => null,
+    };
+    final timeHint = note != null
+        ? note!
+        : showPosted
+        ? switch (posted) {
+            null => 'not posted',
+            ClassStatus.present => 'present',
+            ClassStatus.onDuty => 'on duty',
+            ClassStatus.absent => 'absent',
+            ClassStatus.other => 'marked',
+          }
+        : nowMin == null
         ? _compactMinutes(minutes)
         : done
         ? 'done'
@@ -45,212 +76,212 @@ class _ClassRow extends HookWidget {
         ? creditValue.toStringAsFixed(0)
         : creditValue.toString();
 
-    return AnimatedOpacity(
-      duration: Motion.slow,
-      opacity: done ? 0.55 : 1,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: .stretch,
-          children: [
-            SizedBox(
-              width: 62,
-              child: Padding(
-                padding: const .only(top: 14),
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: .stretch,
+        children: [
+          SizedBox(
+            width: 62,
+            child: Padding(
+              padding: const .only(top: 14),
+              child: Column(
+                crossAxisAlignment: .end,
+                children: [
+                  FittedBox(
+                    fit: .scaleDown,
+                    alignment: .topRight,
+                    child: Column(
+                      crossAxisAlignment: .end,
+                      children: [
+                        Text(
+                          to12H(slot.startTime, context),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: typography.body.xs.nums(
+                            fontWeight: .w600,
+                            color: live ? colors.app.accent : colors.foreground,
+                          ),
+                        ),
+                        Text(
+                          to12H(slot.endTime, context),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: typography.body.xs.nums(
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Time status sits with the times: countdown, left, or done.
+                  const SizedBox(height: Space.sm),
+                  FittedBox(
+                    fit: .scaleDown,
+                    alignment: .topRight,
+                    child: Text(
+                      timeHint,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: typography.body.xs.nums(
+                        fontSize: 11,
+                        fontWeight: done && postedTone == null ? .w500 : .w600,
+                        color: showPosted && postedTone != null
+                            ? postedTone.onSubtle
+                            : live || status == AgendaClassStatus.next
+                            ? colors.app.accentTone.onSubtle
+                            : colors.mutedForeground,
+                      ),
+                    ),
+                  ),
+                  if (record != null) ...[
+                    const SizedBox(height: Space.md),
+                    _Attendance(record: record!, stacked: true),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          _Rail(status: status, isFirst: isFirst, isLast: isLast),
+          Expanded(
+            child: Padding(
+              padding: const .symmetric(vertical: Space.xs),
+              child: Surface(
+                onPress: () => expanded.value = !expanded.value,
+                semanticsLabel:
+                    '${slot.name}, ${expanded.value ? 'collapse' : 'show details'}',
+                padding: const .fromLTRB(
+                  Space.md + 2,
+                  Space.md,
+                  Space.md,
+                  Space.md,
+                ),
+                borderColor: live
+                    ? colors.app.accent.withValues(alpha: 0.45)
+                    : null,
+                color: live ? colors.app.accentTone.subtle : null,
                 child: Column(
-                  crossAxisAlignment: .end,
+                  crossAxisAlignment: .start,
                   children: [
-                    FittedBox(
-                      fit: .scaleDown,
-                      alignment: .topRight,
-                      child: Column(
-                        crossAxisAlignment: .end,
-                        children: [
-                          Text(
-                            to12H(slot.startTime, context),
-                            maxLines: 1,
-                            softWrap: false,
-                            style: typography.body.xs.nums(
+                    // Line 1: name + status
+                    Row(
+                      crossAxisAlignment: .start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            slot.name,
+                            maxLines: 2,
+                            overflow: .ellipsis,
+                            style: typography.body.md.copyWith(
+                              height: 1.25,
                               fontWeight: .w600,
-                              color: live
-                                  ? colors.app.accent
-                                  : colors.foreground,
+                              color: colors.foreground,
                             ),
                           ),
-                          Text(
-                            to12H(slot.endTime, context),
+                        ),
+                        if (live || status == AgendaClassStatus.next) ...[
+                          const SizedBox(width: Space.sm),
+                          ToneBadge(
+                            label: live ? 'NOW' : 'NEXT',
+                            tone: colors.app.accentTone,
+                            solid: live,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: Space.sm),
+                    // Line 2: block and room
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${slot.block} · Room ${slot.roomNo}',
                             maxLines: 1,
-                            softWrap: false,
-                            style: typography.body.xs.nums(
+                            overflow: .ellipsis,
+                            style: typography.body.xs.copyWith(
                               color: colors.mutedForeground,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    // Time status sits with the times: countdown, left, or done.
-                    const SizedBox(height: Space.sm),
-                    FittedBox(
-                      fit: .scaleDown,
-                      alignment: .topRight,
-                      child: Text(
-                        timeHint,
-                        maxLines: 1,
-                        softWrap: false,
-                        style: typography.body.xs.nums(
-                          fontSize: 11,
-                          fontWeight: done ? .w500 : .w600,
-                          color: live || status == AgendaClassStatus.next
-                              ? colors.app.accentTone.onSubtle
-                              : colors.mutedForeground,
                         ),
-                      ),
+                        AnimatedRotation(
+                          turns: expanded.value ? 0.5 : 0,
+                          duration: Motion.medium,
+                          child: Icon(
+                            FLucideIcons.chevronDown,
+                            size: 16,
+                            color: colors.mutedForeground,
+                          ),
+                        ),
+                      ],
                     ),
-                    if (record != null) ...[
-                      const SizedBox(height: Space.md),
-                      _Attendance(record: record!, stacked: true),
-                    ],
+                    const SizedBox(height: Space.sm),
+                    // Line 3: class kind and course code
+                    Row(
+                      children: [
+                        _KindBadge(slot: slot, labFat: labFat),
+                        const SizedBox(width: Space.sm),
+                        Expanded(
+                          child: Text(
+                            slot.courseCode,
+                            maxLines: 1,
+                            overflow: .ellipsis,
+                            style: typography.body.xs.copyWith(
+                              color: colors.mutedForeground,
+                            ),
+                          ),
+                        ),
+                        if (lastClass) ...[
+                          const SizedBox(width: Space.sm),
+                          const _LastClassBadge(),
+                        ],
+                      ],
+                    ),
+                    AnimatedSize(
+                      duration: Motion.medium,
+                      curve: Curves.easeOutCubic,
+                      alignment: .topCenter,
+                      child: expanded.value
+                          ? Padding(
+                              padding: const .only(top: Space.md),
+                              child: Column(
+                                crossAxisAlignment: .start,
+                                children: [
+                                  Container(height: 1, color: colors.border),
+                                  const SizedBox(height: Space.md),
+                                  if (slot.faculty.trim().isNotEmpty) ...[
+                                    _MetaLine(
+                                      icon: FLucideIcons.user,
+                                      text: facultyName(slot.faculty),
+                                    ),
+                                    const SizedBox(height: Space.xs + 2),
+                                  ],
+                                  _MetaLine(
+                                    icon: FLucideIcons.hash,
+                                    text: 'Slot ${slot.slot}',
+                                  ),
+                                  const SizedBox(height: Space.xs + 2),
+                                  _MetaLine(
+                                    icon: FLucideIcons.clock,
+                                    text: formatMinutes(minutes),
+                                  ),
+                                  if (credits.isNotEmpty) ...[
+                                    const SizedBox(height: Space.xs + 2),
+                                    _MetaLine(
+                                      icon: FLucideIcons.award,
+                                      text:
+                                          '$credits ${credits == '1' ? 'credit' : 'credits'}',
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : const SizedBox(width: double.infinity),
+                    ),
                   ],
                 ),
               ),
             ),
-            _Rail(status: status, isFirst: isFirst, isLast: isLast),
-            Expanded(
-              child: Padding(
-                padding: const .symmetric(vertical: Space.xs),
-                child: Surface(
-                  onPress: () => expanded.value = !expanded.value,
-                  semanticsLabel:
-                      '${slot.name}, ${expanded.value ? 'collapse' : 'show details'}',
-                  padding: const .fromLTRB(
-                    Space.md + 2,
-                    Space.md,
-                    Space.md,
-                    Space.md,
-                  ),
-                  borderColor: live
-                      ? colors.app.accent.withValues(alpha: 0.45)
-                      : null,
-                  color: live ? colors.app.accentTone.subtle : null,
-                  child: Column(
-                    crossAxisAlignment: .start,
-                    children: [
-                      // Line 1: name + status
-                      Row(
-                        crossAxisAlignment: .start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              slot.name,
-                              maxLines: 2,
-                              overflow: .ellipsis,
-                              style: typography.body.md.copyWith(
-                                height: 1.25,
-                                fontWeight: .w600,
-                                color: colors.foreground,
-                              ),
-                            ),
-                          ),
-                          if (live || status == AgendaClassStatus.next) ...[
-                            const SizedBox(width: Space.sm),
-                            ToneBadge(
-                              label: live ? 'NOW' : 'NEXT',
-                              tone: colors.app.accentTone,
-                              solid: live,
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: Space.sm),
-                      // Line 2: block and room
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${slot.block} · Room ${slot.roomNo}',
-                              maxLines: 1,
-                              overflow: .ellipsis,
-                              style: typography.body.xs.copyWith(
-                                color: colors.mutedForeground,
-                              ),
-                            ),
-                          ),
-                          AnimatedRotation(
-                            turns: expanded.value ? 0.5 : 0,
-                            duration: Motion.medium,
-                            child: Icon(
-                              FLucideIcons.chevronDown,
-                              size: 16,
-                              color: colors.mutedForeground,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: Space.sm),
-                      // Line 3: class kind and course code
-                      Row(
-                        children: [
-                          CourseKindBadge(isLab: slot.kind == ClassKind.lab),
-                          const SizedBox(width: Space.sm),
-                          Expanded(
-                            child: Text(
-                              slot.courseCode,
-                              maxLines: 1,
-                              overflow: .ellipsis,
-                              style: typography.body.xs.copyWith(
-                                color: colors.mutedForeground,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      AnimatedSize(
-                        duration: Motion.medium,
-                        curve: Curves.easeOutCubic,
-                        alignment: .topCenter,
-                        child: expanded.value
-                            ? Padding(
-                                padding: const .only(top: Space.md),
-                                child: Column(
-                                  crossAxisAlignment: .start,
-                                  children: [
-                                    Container(height: 1, color: colors.border),
-                                    const SizedBox(height: Space.md),
-                                    if (slot.faculty.trim().isNotEmpty) ...[
-                                      _MetaLine(
-                                        icon: FLucideIcons.user,
-                                        text: facultyName(slot.faculty),
-                                      ),
-                                      const SizedBox(height: Space.xs + 2),
-                                    ],
-                                    _MetaLine(
-                                      icon: FLucideIcons.hash,
-                                      text: 'Slot ${slot.slot}',
-                                    ),
-                                    const SizedBox(height: Space.xs + 2),
-                                    _MetaLine(
-                                      icon: FLucideIcons.clock,
-                                      text: formatMinutes(minutes),
-                                    ),
-                                    if (credits.isNotEmpty) ...[
-                                      const SizedBox(height: Space.xs + 2),
-                                      _MetaLine(
-                                        icon: FLucideIcons.award,
-                                        text:
-                                            '$credits ${credits == '1' ? 'credit' : 'credits'}',
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              )
-                            : const SizedBox(width: double.infinity),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

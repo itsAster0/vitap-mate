@@ -63,15 +63,26 @@ List<DateTime> getCurrentWeekDates() {
   return List.generate(7, (i) => monday.add(Duration(days: i)));
 }
 
-/// [slots] (one weekday's classes) that actually meet on [date] per the
-/// academic calendar: none on holidays and exam days, and no labs from the
-/// LAB FAT on. Without a calendar every slot meets.
-List<TimetableSlot> classesOnDate(
-  List<TimetableSlot> slots,
+/// How [slot] goes on [date] per the academic calendar: off on holidays and
+/// exam days, its Lab FAT, or no lab after it. [week] is the whole
+/// timetable, for the weekdays the course has labs. Without a calendar every
+/// class is held.
+ClassDay classDayOf(
+  TimetableSlot slot,
   DateTime date,
   SemesterCalendar? calendar,
-) => [
-  for (final slot in slots)
-    if (calendar?.classesOn(date, lab: slot.kind == ClassKind.lab) ?? true)
-      slot,
-];
+  Iterable<TimetableSlot> week,
+) {
+  if (calendar == null) return ClassDay.held;
+  final lab = slot.kind == ClassKind.lab;
+  return calendar.classDay(
+    date,
+    lab: lab,
+    labWeekdays: {
+      if (lab)
+        for (final s in week)
+          if (s.kind == ClassKind.lab && s.courseCode == slot.courseCode)
+            slotDays.indexOf(s.day.trim().toUpperCase()) + 1,
+    },
+  );
+}

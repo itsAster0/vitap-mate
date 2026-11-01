@@ -79,9 +79,12 @@ class _DateHeading extends StatelessWidget {
 /// The day's shape on one thin line: a segment per class along the span from
 /// first class to last, filled up to now, with a marker at the current time.
 class _DayBar extends StatelessWidget {
-  const _DayBar({required this.slots, required this.minuteNow});
+  const _DayBar({required this.slots, required this.minuteNow, this.span});
 
   final List<TimetableSlot> slots;
+
+  /// The minutes the bar runs between; the day's own classes by default.
+  final (int, int)? span;
 
   /// Minutes since midnight when this is today, else null (nothing elapsed).
   final int? minuteNow;
@@ -89,8 +92,8 @@ class _DayBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.theme.colors;
-    final start = minutesOf(slots.first.startTime);
-    final end = minutesOf(slots.last.endTime);
+    final start = this.span?.$1 ?? minutesOf(slots.first.startTime);
+    final end = this.span?.$2 ?? minutesOf(slots.last.endTime);
     final span = (end - start).clamp(1, 24 * 60);
     final now = minuteNow;
 
