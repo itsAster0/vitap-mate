@@ -1,3 +1,5 @@
+Archived: the Flutter app was removed on 2026-11-09.
+
 # Plan: refactor the Flutter app
 
 Status: draft. Replaces the Compose rewrite, which was dropped.

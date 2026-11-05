@@ -1,0 +1,25 @@
+# Theme and shared components. Depends on core only for error texts.
+product:
+  type: lib
+  platforms: [android]
+
+dependencies:
+  - //core: exported
+  - $compose.foundation: exported
+  - $compose.material3: exported
+  - $compose.components.resources
+  - androidx.core:core-ktx:1.19.0: exported
+  - com.composables:icons-lucide-cmp:2.2.1: exported
+  # The Photo Picker for the avatar (already the app's; no storage permission).
+  - androidx.activity:activity-compose:1.13.0
+  # Material colour schemes and tonal palettes from seed colours (HCT).
+  - com.materialkolor:material-kolor:5.0.1
+
+settings:
+  android:
+    namespace: vitapmate.ui
+    minSdk: 24
+  compose: enabled
+  jvm:
+    jdk:
+      version: 26

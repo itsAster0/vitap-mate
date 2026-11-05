@@ -3,21 +3,42 @@ on:
   push:
     branches: [main]
     # Parts of the repo the app is not built from: the edge Worker, the
-    # engine's crates, the browser extension and docs.
+    # engine's crates, the gateway, the browser extension and docs.
     paths-ignore:
       - "rust/vtop-edge/**"
       - "rust/vtop-bridge/**"
       - "rust/vtop-mcp/**"
-      - "rust/Dockerfile.engine"
+      - "rust/vtop-gateway/**"
+      - "rust/vps/**"
+      - "rust/Dockerfile.*"
       - "extension/**"
+      - "fastlane/**"
       - ".github/workflows/extension-build.yml"
+      - ".github/workflows/gateway-deploy.yml"
+      - "**/*.md"
+  pull_request:
+    paths-ignore:
+      - "rust/vtop-edge/**"
+      - "rust/vtop-bridge/**"
+      - "rust/vtop-mcp/**"
+      - "rust/vtop-gateway/**"
+      - "rust/vps/**"
+      - "rust/Dockerfile.*"
+      - "extension/**"
+      - "fastlane/**"
+      - ".github/workflows/extension-build.yml"
+      - ".github/workflows/gateway-deploy.yml"
       - "**/*.md"
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
+env:
+  # Only the tools the build needs; mise.toml also lists firebase and the
+  # Kotlin compiler for local use.
+  MISE_AUTO_INSTALL: "false"
 jobs:
   build-apk:
     name: Build APK
@@ -25,212 +46,80 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      # Java and the Kotlin Toolchain at the versions pinned in mise.toml.
+      - name: Set up mise
+        uses: jdx/mise-action@v2
         with:
-          distribution: temurin
-          java-version: "17"
-      # Caches ~/.gradle and drops files the build no longer uses before
-      # saving, so the cache does not grow with every dependency bump.
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          install_args: java kotlin-toolchain
+          cache: true
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # ARM only: x86_64 served just emulators and ChromeOS.
-          targets: aarch64-linux-android,armv7-linux-androideabi
-      # Cargokit builds the Rust library into the Flutter build directory,
-      # not rust/target, so point the cache there.
+          # arm64 for phones, x86_64 for emulators (as `mise run rust-android`).
+          targets: aarch64-linux-android,x86_64-linux-android
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+      - name: Set up Android NDK
+        id: ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28c
+          add-to-path: false
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: rust -> ../build/rust_lib_vitapmate/build
-          cache-directories: build/rust_lib_vitapmate/build_tool
+          workspaces: rust
           cache-on-failure: true
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Configure app environment
+      # libvtop_ffi.so into app/jniLibs and the Kotlin bindings into core/src.
+      - name: Build Rust library
         env:
-          ENV_JSON: ${{ secrets.ENV_JSON }}
-        run: |
-          if [ -z "$ENV_JSON" ]; then
-            echo "ENV_JSON secret is not configured."
-            exit 1
-          fi
-
-          printf '%s' "$ENV_JSON" > .env.json
-          # Prints only the names of missing keys, never values.
-          missing=$(jq -r '
-            . as $env |
-            [
-              "FIREBASE_ANDROID_API_KEY",
-              "FIREBASE_ANDROID_APP_ID",
-              "FIREBASE_MESSAGING_SENDER_ID",
-              "FIREBASE_PROJECT_ID",
-              "FIREBASE_STORAGE_BUCKET"
-            ][] | select(($env[.] // "") == "")
-          ' .env.json)
-          if [ -n "$missing" ]; then
-            echo "ENV_JSON is missing:"
-            echo "$missing"
-            exit 1
-          fi
-      - name: Configure Android signing
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+        run: mise run rust-android
+      - name: Build app
+        run: ./kotlin build
+      - name: Test core
+        run: ./kotlin test -m core
+      # Signed release only when the repository has the keystore secrets
+      # (forks and pull requests from forks do not).
+      - name: Configure release signing
+        id: signing
         env:
           KEYSTORE_PROPERTIES_BASE64: ${{ secrets.KEY_STORE }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.UPLOAD_RELEASE }}
         run: |
-          if [ -z "$KEYSTORE_PROPERTIES_BASE64" ] || \
-             [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "KEY_STORE and UPLOAD_RELEASE secrets are not configured."
-            exit 1
+          if [ -z "$KEYSTORE_PROPERTIES_BASE64" ] || [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "KEY_STORE and UPLOAD_RELEASE secrets are not configured; skipping the signed release."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
-          printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > android/keystore.properties
-      - name: Build universal release APK
-        run: |
-          flutter build apk --release --flavor prod \
-            --target-platform android-arm,android-arm64 \
-            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }}
-          mkdir -p build/artifacts
-          cp build/app/outputs/flutter-apk/app-prod-release.apk \
-            build/artifacts/vitapmate-universal.apk
-      - name: Build release APKs for each architecture
-        run: |
-          flutter build apk --release --flavor prod --split-per-abi \
-            --target-platform android-arm,android-arm64 \
-            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }}
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-prod-release.apk \
-            build/artifacts/vitapmate-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-prod-release.apk \
-            build/artifacts/vitapmate-armeabi-v7a.apk
+          # `mise run signing` reads keystore/keystore.properties and expects
+          # the keystore next to it under its storeFile name.
+          mkdir -p keystore
+          printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > keystore/keystore.properties
+          store=$(awk -F= '$1 == "storeFile" { sub(/^[^=]*=/, ""); sub(/\r$/, ""); print; exit }' keystore/keystore.properties)
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "keystore/$(basename "$store")"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Build signed release APK
+        if: steps.signing.outputs.signed == 'true'
+        run: mise run release
       - name: Remove secrets
         if: always()
-        run: |
-          rm -f .env.json android/keystore.properties \
-            android/upload-keystore.jks
-      - name: Upload universal APK
+        run: rm -rf keystore app/keystore.properties
+      - name: Upload release APK
+        if: steps.signing.outputs.signed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: vitapmate-universal-apk
-          path: build/artifacts/vitapmate-universal.apk
+          name: vitapmate-release-apk
+          path: build/vitapmate-release.apk
           if-no-files-found: error
           retention-days: 30
-      - name: Upload ARM 64-bit APK
+      - name: Upload debug APK
+        if: steps.signing.outputs.signed != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: vitapmate-arm64-v8a-apk
-          path: build/artifacts/vitapmate-arm64-v8a.apk
+          name: vitapmate-debug-apk
+          path: build/tasks/_app_buildAndroidDebug/gradle-project-debug.apk
           if-no-files-found: error
           retention-days: 30
-      - name: Upload ARM 32-bit APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitapmate-armeabi-v7a-apk
-          path: build/artifacts/vitapmate-armeabi-v7a.apk
-          if-no-files-found: error
-          retention-days: 30
-  build-ipa:
-    name: Build IPA
-    runs-on: macos-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios
-      # On iOS, Cargokit builds the Rust library in the pod's Xcode temp
-      # directory, which a directory cache did not restore usefully.
-      # sccache caches each compiler call instead, wherever Cargo builds.
-      - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.11
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Configure app environment
-        env:
-          ENV_JSON: ${{ secrets.ENV_JSON }}
-        run: |
-          if [ -z "$ENV_JSON" ]; then
-            echo "ENV_JSON secret is not configured."
-            exit 1
-          fi
-          printf '%s' "$ENV_JSON" > .env.json
-      # Unsigned: AltStore and SideStore sign the app with the user's own
-      # Apple ID when they install it.
-      - name: Build unsigned IPA
-        env:
-          # Xcode passes these on to Cargokit's build phase.
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: sccache
-        run: |
-          # Flutter hides Xcode's errors behind a generic signing message,
-          # so keep the verbose log and print Xcode's own lines on failure.
-          if ! flutter build ios --release --no-codesign -v \
-            --dart-define-from-file=.env.json --dart-define=GIT_SHA=${{ github.sha }} > ios-build.log 2>&1; then
-            grep -nE "error:|Command .* failed|The following build commands failed|Permission denied" \
-              -A4 ios-build.log | tail -120
-            exit 1
-          fi
-          mkdir -p build/artifacts/Payload
-          cp -R build/ios/iphoneos/Runner.app build/artifacts/Payload/
-          (cd build/artifacts && zip -qry vitapmate.ipa Payload)
-      # Cache hits show whether Cargokit's build went through sccache.
-      - name: Show sccache stats
-        if: always()
-        run: sccache --show-stats
-      - name: Remove secrets
-        if: always()
-        run: rm -f .env.json
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitapmate-ipa
-          path: build/artifacts/vitapmate.ipa
-          if-no-files-found: error
-          retention-days: 30
-  publish-nightly:
-    name: Publish nightly release
-    needs: [build-apk, build-ipa]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Download builds
-        uses: actions/download-artifact@v4
-        with:
-          pattern: vitapmate-*
-          path: build/artifacts
-          merge-multiple: true
-      - name: Publish nightly release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          short_sha="${GITHUB_SHA::7}"
-          {
-            echo "Automated build of \`${short_sha}\` from main on $(date -u '+%Y-%m-%d %H:%M UTC')."
-            echo
-            echo "Latest change: $(git log -1 --format=%s)"
-            echo
-            cat .github/nightly-notes.md
-          } > nightly-notes.md
-
-          gh release delete nightly --yes --cleanup-tag || true
-          gh release create nightly build/artifacts/*.apk \
-            build/artifacts/vitapmate.ipa \
-            --prerelease \
-            --target "$GITHUB_SHA" \
-            --title "Nightly ${short_sha}" \
-            --notes-file nightly-notes.md

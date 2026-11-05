@@ -1,0 +1,18 @@
+# A feature: depends on design (and through it core), never on another feature.
+product:
+  type: lib
+  platforms: [android]
+
+dependencies:
+  - //design
+  # Already the app's: the back callback (web history first) and the file chooser.
+  - androidx.activity:activity-compose:1.13.0
+
+settings:
+  android:
+    namespace: vitapmate.features.vtop
+    minSdk: 24
+  compose: enabled
+  jvm:
+    jdk:
+      version: 26

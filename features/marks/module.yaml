@@ -1,0 +1,16 @@
+# A feature: depends on design (and through it core), never on another feature.
+product:
+  type: lib
+  platforms: [android]
+
+dependencies:
+  - //design
+
+settings:
+  android:
+    namespace: vitapmate.features.marks
+    minSdk: 24
+  compose: enabled
+  jvm:
+    jdk:
+      version: 26

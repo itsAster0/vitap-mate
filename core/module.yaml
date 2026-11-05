@@ -1,0 +1,24 @@
+# Rust bindings (generated), the Core holder, cache-first pages, settings and
+# observability (Log, flow). Android only until the iOS bindings exist.
+product:
+  type: lib
+  platforms: [android]
+
+dependencies:
+  - $compose.runtime: exported
+  - org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0: exported
+  # The generated UniFFI bindings load libvtop_ffi.so through JNA.
+  - net.java.dev.jna:jna:5.19.1@aar
+  - androidx.annotation:annotation:1.10.0
+  # flow() sections in Perfect, next to the Rust spans.
+  - androidx.tracing:tracing:2.0.5
+  - androidx.core:core-ktx:1.19.0
+
+settings:
+  android:
+    namespace: vitapmate.core
+    minSdk: 24
+  compose: enabled
+  jvm:
+    jdk:
+      version: 26

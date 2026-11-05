@@ -1,0 +1,35 @@
+product: android/app
+dependencies:
+  - //design
+  - //features/login
+  - //features/attendance
+  - //features/timetable
+  - //features/calendar
+  - //features/marks
+  - //features/exams
+  - //features/coursepage
+  - //features/docs
+  - //features/grades
+  - //features/outing
+  - //features/profile
+  - //features/biometric
+  - //features/vtop
+  - androidx.activity:activity-compose:1.13.0
+  # Typed back stack and predictive back for the shell (Compose Multiplatform build).
+  - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
+settings:
+  android:
+    # Release is signed from keystore.properties (gitignored; `mise run signing`).
+    signing: enabled
+    # Installs next to the Flutter app (com.vitap_pal.app).
+    applicationId: com.vitapmate.kmp
+    versionCode: 1
+    versionName: "1.0.0"
+    namespace: vitapmate
+    minSdk: 24
+    abiFilters: [arm64-v8a]
+  compose: enabled
+  # Builds with mise's JDK 26 (JAVA_HOME).
+  jvm:
+    jdk:
+      version: 26

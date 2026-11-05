@@ -29,7 +29,7 @@ use crate::inputs::{Password, RegistrationNumber, Username};
 use crate::session::{parse_cookie_pairs, ResettableJar, SessionManager, SessionState};
 use crate::types::PersistedVtopSession;
 
-pub use course_page::{CourseFile, CourseFileInfo};
+pub use course_page::{CourseFile, CourseFileDownload, CourseFileInfo};
 pub use email_otp::EmailOtpLogin;
 pub use hostel::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,

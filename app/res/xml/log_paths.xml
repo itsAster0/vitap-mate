@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the ".logs" FileProvider may share: the log files and exports made from them, and
+     Docs files opened in another app (course page files). -->
+<paths>
+  <files-path name="logs" path="logs/" />
+  <cache-path name="share" path="share/" />
+  <files-path name="docs" path="docs/" />
+</paths>

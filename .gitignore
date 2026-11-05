@@ -4,13 +4,8 @@
 *.pyc
 *.swp
 .DS_Store
-.atom/
-.build/
-.buildlog/
 .history
 .svn/
-.swiftpm/
-migrate_working_dir/
 
 # IntelliJ related
 *.iml
@@ -23,33 +18,22 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
+# Build outputs (Kotlin toolchain)
 /build/
+*.apk
+*.idsig
 
-# Symbolication related
-app.*.symbols
+# Release signing and Firebase config: kept in keystore/ on this machine only.
+/keystore/
+app/keystore.properties
+*.jks
+*.keystore
+google-services.json
 
-# Obfuscation related
-app.*.map.json
+# Fastlane secrets and reports
+/fastlane/key.json
+/fastlane/report.xml
 
-upload-keystore.jks
-keystore.properties
-
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
-/android/fastlane/key.json
-/android/fastlane/report.xml
-/android/app/google-services.json
 .env.json
 .env
 
@@ -58,3 +42,7 @@ keystore.properties
 
 # direnv, per machine
 .envrc
+
+# Built Rust libraries and Perfetto captures
+app/jniLibs/
+traces/

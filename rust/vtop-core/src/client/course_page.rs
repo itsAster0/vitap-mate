@@ -95,9 +95,30 @@ impl VtopClient {
     /// Downloads what one of the course page's `vtopDownload('…')` links
     /// points at: a lecture's material, the syllabus or a material bundle.
     pub async fn course_page_file(&self, path: &CourseFilePath) -> VtopResult<CourseFile> {
+        self.open_course_page_file(path).await?.collect().await
+    }
+
+    /// The class's course plan, an Excel sheet.
+    pub async fn course_plan(
+        &self,
+        semester: &SemesterId,
+        class_id: &str,
+    ) -> VtopResult<CourseFile> {
+        self.open_course_plan(semester, class_id)
+            .await?
+            .collect()
+            .await
+    }
+
+    /// [`Self::course_page_file`] as a stream, for saving big files to disk
+    /// without holding them in memory.
+    pub async fn open_course_page_file(
+        &self,
+        path: &CourseFilePath,
+    ) -> VtopResult<CourseFileDownload> {
         let auth = self.authorize("get_course_page_file").await?;
         let url = self.config.url(&format!("/vtop/{}", path.as_str()));
-        self.download_course_file(
+        self.open_course_file(
             &url,
             &[
                 ("authorizedID", auth.registration_number.to_string()),
@@ -108,18 +129,18 @@ impl VtopClient {
         .await
     }
 
-    /// The class's course plan, an Excel sheet.
-    pub async fn course_plan(
+    /// [`Self::course_plan`] as a stream.
+    pub async fn open_course_plan(
         &self,
         semester: &SemesterId,
         class_id: &str,
-    ) -> VtopResult<CourseFile> {
+    ) -> VtopResult<CourseFileDownload> {
         let class_id = plain_id(class_id, "class id")?;
         let auth = self.authorize("get_course_plan").await?;
         let url = self
             .config
             .url("/vtop/academics/common/CoursePlanExcelDownload");
-        self.download_course_file(
+        self.open_course_file(
             &url,
             &[
                 ("semesterSubId", semester.as_str().to_string()),
@@ -131,11 +152,13 @@ impl VtopClient {
         .await
     }
 
-    async fn download_course_file(
+    /// Sends the request and checks the answer is the file; the body is
+    /// left to read.
+    async fn open_course_file(
         &self,
         url: &str,
         query: &[(&str, String)],
-    ) -> VtopResult<CourseFile> {
+    ) -> VtopResult<CourseFileDownload> {
         let context = "get_course_page_file";
         Self::log_request(context, "GET", url);
         let response = self
@@ -151,6 +174,13 @@ impl VtopClient {
             return Err(VtopError::SessionExpired);
         }
         let status = response.status();
+        if !status.is_success() {
+            return Err(status_error(
+                context,
+                status,
+                format!("VTOP returned HTTP {status}"),
+            ));
+        }
         let header = |name: reqwest::header::HeaderName| {
             response
                 .headers()
@@ -160,27 +190,52 @@ impl VtopClient {
                 .to_string()
         };
         let content_type = header(reqwest::header::CONTENT_TYPE);
-        let file_name = file_name_from_disposition(&header(reqwest::header::CONTENT_DISPOSITION));
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|error| network_error(&format!("{context}.bytes"), error))?;
-        if !status.is_success() {
-            return Err(status_error(
-                context,
-                status,
-                format!("VTOP returned HTTP {status}"),
-            ));
-        }
         // An HTML answer is VTOP's error page, not the file.
         if content_type.starts_with("text/html") {
             return Err(VtopError::VtopServerError(
                 "VTOP did not send the file".to_string(),
             ));
         }
-        Ok(CourseFile {
-            file_name,
+        Ok(CourseFileDownload {
+            file_name: file_name_from_disposition(&header(reqwest::header::CONTENT_DISPOSITION)),
             content_type,
+            length: response.content_length(),
+            response,
+        })
+    }
+}
+
+/// A course page file on its way: VTOP's name and type, then the body in
+/// chunks.
+#[derive(Debug)]
+pub struct CourseFileDownload {
+    pub file_name: String,
+    pub content_type: String,
+    /// `Content-Length`, when VTOP sends one.
+    pub length: Option<u64>,
+    response: reqwest::Response,
+}
+
+impl CourseFileDownload {
+    /// The next part of the body; `None` at the end.
+    pub async fn chunk(&mut self) -> VtopResult<Option<Vec<u8>>> {
+        self.response
+            .chunk()
+            .await
+            .map(|chunk| chunk.map(|bytes| bytes.to_vec()))
+            .map_err(|error| network_error("get_course_page_file.chunk", error))
+    }
+
+    /// The whole body in memory.
+    pub async fn collect(self) -> VtopResult<CourseFile> {
+        let bytes = self
+            .response
+            .bytes()
+            .await
+            .map_err(|error| network_error("get_course_page_file.bytes", error))?;
+        Ok(CourseFile {
+            file_name: self.file_name,
+            content_type: self.content_type,
             bytes: bytes.to_vec(),
         })
     }

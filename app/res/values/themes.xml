@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- The window shows the page background until Compose draws, so a cold start doesn't flash. -->
+  <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+    <item name="android:windowBackground">#FFF5F5F6</item>
+  </style>
+</resources>

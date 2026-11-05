@@ -1,0 +1,36 @@
+[package]
+name = "vtop-ffi"
+version = "0.1.0"
+edition = "2024"
+description = "UniFFI core for the Compose prototype: sign-in, cache and ready-to-draw records"
+
+[lib]
+name = "vtop_ffi"
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+required-features = ["cli"]
+
+[features]
+# Only the host bindgen needs uniffi's CLI; the Android library builds without it.
+cli = ["uniffi/cli"]
+
+[dependencies]
+vtop-core = { path = "../vtop-core" }
+vtop-shared = { path = "../vtop-shared" }
+# Already in the tree through vtop-core; talks to the edge for mail forwarding.
+reqwest = { workspace = true }
+uniffi = { version = "0.32.2", features = ["tokio"] }
+tokio = { workspace = true, features = ["sync"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std", "tracing-log"] }
+tracing-log = { version = "0.2", default-features = false, features = ["log-tracer", "std"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_log-sys = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util"] }

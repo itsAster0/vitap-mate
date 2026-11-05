@@ -1,14 +1,15 @@
 # VTOP code architecture
 
 ```
-rust/                    Cargo workspace; the root package is the app's FFI crate
-├── src/                 rust_lib_vitapmate: flutter_rust_bridge wrapper (cdylib/staticlib)
-├── vtop-core/           all VTOP logic, no FRB and no server code
+rust/                    Cargo workspace
+├── vtop-ffi/            the app's crate: UniFFI `Core`, cache, session, records, logs (obs.rs)
+├── vtop-core/           all VTOP logic, no FFI and no server code
+├── vtop-shared/         formats shared by app, engine and edge (wire_page, mail_seal, ...)
 ├── vtop-bridge/         the Engine: axum service over vtop-core, run on Railway
-├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
+├── vtop-mcp/            MCP tools served by the Engine behind the edge's /mcp
+├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the gateway
 ├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out (on the VPS, rust/vps)
 └── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
-lib/vtop/backend/        Dart: VtopBackend interface, local (FRB) and edge (HTTP, NDJSON)
 ```
 
 ## vtop-core
@@ -24,7 +25,7 @@ lib/vtop/backend/        Dart: VtopBackend interface, local (FRB) and edge (HTTP
 | `session.rs` | auth state, CSRF, registration number, resettable cookie jar, `SessionState` |
 | `parser/` | one parser per page; `page.rs` for login/landing pages |
 | `inputs.rs` | validated inputs (semester id, OTP, date, password...) |
-| `types.rs`, `error.rs` | the data types and `VtopError` that Dart and the server both expose |
+| `types.rs`, `error.rs` | the data types and `VtopError` that the app and the server both use |
 
 A few design points:
 
@@ -42,32 +43,29 @@ A few design points:
   Cookie values, passwords, OTPs, CSRF tokens and API keys are never logged,
   only cookie names and URLs.
 
-## Dart API stays the same
+## The app's crate (vtop-ffi)
 
-`rust_lib_vitapmate` re-exports the core types and declares flutter_rust_bridge
-**mirrors** (`#[frb(mirror(X))] struct _X`) with the same `freezed` and
-`json_serializable` metadata as before. The generated `types.dart` and
-`vtop_errors.dart` are unchanged. Keep a mirror's fields in sync when a core
-type changes (the compiler does not check mirrors), then run
-`flutter_rust_bridge_codegen generate`.
-
-The Dart-visible changes: `fetchExamShedule` was renamed `fetchExamSchedule`,
-and the unused parser bindings and `nowUnix()` were removed.
+`vtop-ffi` wraps `vtop-core` for the Compose app with UniFFI proc macros.
+Each feature has its own file (sign-in, attendance and timetable in
+`lib.rs`; `marks.rs`, `exams.rs`, `outing.rs`, ...) with its own
+`#[uniffi::export] impl Core` block and ready-to-draw records. Every call
+takes the caller's flow id first. `mise run rust-android` builds
+`libvtop_ffi.so` into `app/jniLibs/` and generates the Kotlin bindings
+(`core/src/vitapmate/core/vtop_ffi.kt`).
 
 ## VTOP from the phone
 
 ```
-repository → data source → VtopBackend → LocalVtopBackend → FRB → vtop-core → VTOP
+feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → VTOP
 ```
 
-The phone always signs in and fetches itself. Settings → Server can route
-those requests through the Worker's `/vtop/` proxy (`settings_vtop_proxy`,
-off by default, never in On-device Mode): the same requests, but VTOP's pages
-arrive compressed, and VTOP sees Cloudflare's address instead of the phone's.
-The server URL has a built-in default (`VTOP_SERVER_URL` at build time) and
-can be changed on the Server page after a `/healthz` check.
+The phone always signs in and fetches itself, straight to VTOP. The removed
+Flutter app could also route those requests through the Worker's `/vtop/`
+proxy (VTOP's pages arrive compressed, and VTOP sees Cloudflare's address
+instead of the phone's) or over UDP mode; the Compose app does not use
+either yet.
 
-The Server page reads `POST /v1/app/status` (app secret + registration number, no
+The edge also serves `POST /v1/app/status` (app secret + registration number, no
 VTOP cookies): the sealed session's and password's ages, when VTOP last
 rejected the password, the forwarding address, the phone count, the last 10
 sign-ins and each key's last 10 uses (extension or MCP, from the
@@ -81,9 +79,9 @@ phone ──UDP (vtop-wire)──► gateway ──HTTPS──► Engine /engine
              (Oracle VPS, Hyderabad)        (Railway, Singapore)
 ```
 
-A switch under "Fetch on the server" (`lib/vtop/route/vtop_udp.dart`)
-sends page fetches and sign-ins over UDP, for slow, lossy networks.
-Changes to VTOP stay on HTTPS, and `ServerVtopApi.fetch` falls back to
+The Flutter app had a switch under "Fetch on the server" that sent page
+fetches and sign-ins over UDP, for slow, lossy networks; the Compose app has
+no client for it yet. Changes to VTOP stayed on HTTPS, and the app fell back to
 HTTPS for five minutes when the gateway does not answer, has another key or
 cannot read the request, and for any page too large for UDP. Where the
 gateway is and its key come from the edge (`GET /v1/udp`), kept by the app
@@ -134,5 +132,5 @@ VPS (`rust/vps`: compose file, its own resolvers, `.env` kept on the box).
   gateway over localhost UDP (30% loss, restarts, replays, two processes).
 - `vtop-gateway`: the client through the gateway to a mock engine.
 - `vtop-edge` (`pnpm test`): accounts, devices, mail OTP, the `/vtop/` proxy.
-- `src/live_bench.rs` (ignored): live timings; `VTOP_DUMP_DIR` saves raw pages.
+- `vtop-ffi/src/tests.rs` and `outing/tests.rs`: the app's crate.
 - `vtop-core/examples/parse_bench.rs`: parser timings on fixtures or raw pages.

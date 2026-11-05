@@ -1,0 +1,19 @@
+# One module per layer; features never depend on each other (the build
+# enforces it). See docs/plans/kmp-prototype.md "Modules".
+modules:
+  - app
+  - core
+  - design
+  - features/attendance
+  - features/biometric
+  - features/calendar
+  - features/coursepage
+  - features/docs
+  - features/exams
+  - features/grades
+  - features/login
+  - features/marks
+  - features/outing
+  - features/profile
+  - features/timetable
+  - features/vtop

@@ -13,10 +13,13 @@ New features are welcomed.
 
 ## Development Setup
 
-1. Install Flutter (stable) and Rust toolchains.
-2. Run `flutter pub get`.
-3. Run `flutter analyze`.
-4. Run `flutter test`.
+1. Install [mise](https://mise.jdx.dev), Rust (stable) with `cargo-ndk`, and the Android SDK and NDK.
+2. Run `mise install`.
+3. Run `mise run rust-android`.
+4. Run `./kotlin build`.
+5. Run `./kotlin test -m core`.
+
+See the Development section of the [README](README.md) for running the app and release builds.
 
 ## Pull Request Guidelines
 
