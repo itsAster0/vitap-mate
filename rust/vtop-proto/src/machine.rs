@@ -56,23 +56,32 @@ impl std::fmt::Debug for Signed {
     }
 }
 
-/// One signed-in request whose page is the result, after [`signed_page`].
-pub struct OnePost {
+/// One signed-in request whose answer, read by `read` (by default
+/// [`signed_page`]), is the result.
+pub struct OnePost<T = String> {
     request: Option<Request>,
+    read: fn(&Response) -> VtopResult<T>,
 }
 
 impl OnePost {
     pub fn new(request: Request) -> Self {
+        Self::reading(request, signed_page)
+    }
+}
+
+impl<T> OnePost<T> {
+    pub fn reading(request: Request, read: fn(&Response) -> VtopResult<T>) -> Self {
         Self {
             request: Some(request),
+            read,
         }
     }
 }
 
-impl Machine for OnePost {
-    type Output = String;
+impl<T> Machine for OnePost<T> {
+    type Output = T;
 
-    fn start(&mut self) -> Step<String> {
+    fn start(&mut self) -> Step<T> {
         match self.request.take() {
             Some(request) => Step::Send(request),
             None => Step::Done(Err(VtopError::ConfigurationError(
@@ -81,8 +90,8 @@ impl Machine for OnePost {
         }
     }
 
-    fn feed(&mut self, response: Response) -> Step<String> {
-        Step::Done(signed_page(&response))
+    fn feed(&mut self, response: Response) -> Step<T> {
+        Step::Done((self.read)(&response))
     }
 }
 

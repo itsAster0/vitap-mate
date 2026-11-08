@@ -15,14 +15,18 @@ pub enum Method {
     Post,
 }
 
-/// One request. `Debug` shows only the method and URL: the body can carry a
-/// password or OTP and the headers a CSRF token.
+/// One request. `Debug` shows only the method and the URL without its
+/// query: the body can carry a password or OTP, and the headers or a
+/// download's query a CSRF token.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Request {
     pub method: Method,
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+    /// Whether the transport may send it again after a failed attempt.
+    /// False for actions (an outing applied twice is two outings).
+    pub retry: bool,
 }
 
 impl Request {
@@ -32,6 +36,7 @@ impl Request {
             url: url.into(),
             headers: Vec::new(),
             body: Vec::new(),
+            retry: true,
         }
     }
 
@@ -46,6 +51,7 @@ impl Request {
                 "application/x-www-form-urlencoded".into(),
             )],
             body: body.into().into_bytes(),
+            retry: true,
         }
     }
 
@@ -71,7 +77,14 @@ impl Request {
                 format!("multipart/form-data; boundary={BOUNDARY}"),
             )],
             body: body.into_bytes(),
+            retry: true,
         }
+    }
+
+    /// Sent at most once: see [`Request::retry`].
+    pub fn once(mut self) -> Self {
+        self.retry = false;
+        self
     }
 
     pub fn header(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
@@ -82,7 +95,11 @@ impl Request {
 
 impl fmt::Debug for Request {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {}", self.method, self.url)
+        let url = self
+            .url
+            .split_once('?')
+            .map_or(self.url.as_str(), |(url, _)| url);
+        write!(f, "{:?} {url}", self.method)
     }
 }
 
@@ -147,13 +164,53 @@ pub fn url_encode(text: &str) -> String {
     out
 }
 
-/// `name=value&...` with both sides [`url_encode`]d.
+/// `name=value&...` as browsers encode a form (and reqwest's `.form()`):
+/// `A-Z a-z 0-9 * - . _` kept, space as `+`, everything else `%XX`.
 pub fn form_encode(pairs: &[(&str, &str)]) -> String {
+    fn encode(text: &str) -> String {
+        let mut out = String::with_capacity(text.len());
+        for byte in text.bytes() {
+            match byte {
+                b' ' => out.push('+'),
+                b'*' | b'-' | b'.' | b'_' => out.push(byte as char),
+                byte if byte.is_ascii_alphanumeric() => out.push(byte as char),
+                byte => out.push_str(&format!("%{byte:02X}")),
+            }
+        }
+        out
+    }
     pairs
         .iter()
-        .map(|(name, value)| format!("{}={}", url_encode(name), url_encode(value)))
+        .map(|(name, value)| format!("{}={}", encode(name), encode(value)))
         .collect::<Vec<_>>()
         .join("&")
+}
+
+/// `unix` seconds as an HTTP date, `Sun, 06 Nov 1994 08:49:37 GMT`.
+pub fn http_date(unix: u64) -> String {
+    const DAYS: [&str; 7] = ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"];
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let (days, secs) = ((unix / 86_400) as i64, unix % 86_400);
+    // Civil from days (Howard Hinnant), days since 1970-01-01.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{}, {day:02} {} {year} {:02}:{:02}:{:02} GMT",
+        DAYS[(days % 7) as usize],
+        MONTHS[(month - 1) as usize],
+        secs / 3600,
+        secs / 60 % 60,
+        secs % 60
+    )
 }
 
 fn is_cookie_attribute_name(name: &str) -> bool {
@@ -216,6 +273,24 @@ mod tests {
     }
 
     #[test]
+    fn form_encode_is_the_browser_form_encoding() {
+        assert_eq!(
+            form_encode(&[("x", "Mon, 09 Nov 2026 01:02:03 GMT"), ("a*-._~", "ü/+")]),
+            "x=Mon%2C+09+Nov+2026+01%3A02%3A03+GMT&a*-._%7E=%C3%BC%2F%2B"
+        );
+    }
+
+    #[test]
+    fn http_dates_match_the_httpdate_crate() {
+        for unix in [0, 784_111_777, 951_782_400, 1_794_165_073, 4_102_444_799] {
+            let expected = httpdate::fmt_http_date(
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(unix),
+            );
+            assert_eq!(http_date(unix), expected, "{unix}");
+        }
+    }
+
+    #[test]
     fn multipart_request_has_each_field_and_the_boundary() {
         let request = Request::multipart("https://vtop.example/m", &[("a", "1"), ("_csrf", "c")]);
         let body = String::from_utf8(request.body).unwrap();
@@ -238,7 +313,7 @@ mod tests {
             &[("uname", "a b"), ("x", "1&2")],
         );
         assert_eq!(request.method, Method::Post);
-        assert_eq!(request.body, b"uname=a%20b&x=1%262");
+        assert_eq!(request.body, b"uname=a+b&x=1%262");
         assert_eq!(request.headers[0].1, "application/x-www-form-urlencoded");
     }
 

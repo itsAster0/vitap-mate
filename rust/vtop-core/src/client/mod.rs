@@ -186,7 +186,10 @@ impl VtopClient {
         );
     }
 
+    /// Logs a request's method and URL without its query: download URLs
+    /// carry the CSRF token there.
     fn log_request(context: &str, method: &str, url: &str) {
+        let url = url.split_once('?').map_or(url, |(path, _)| path);
         info!(target: NETWORK, "request {context} {method} {url}");
     }
 
@@ -244,50 +247,6 @@ impl VtopClient {
             .map_err(|error| VtopError::ConfigurationError(error.to_string()))
     }
 
-    /// Reads a response to a signed-in request, treating a bounce to the
-    /// login page or an HTTP error as an expired session.
-    async fn read_authenticated_response_text(
-        &self,
-        context: &str,
-        response: Response,
-    ) -> VtopResult<String> {
-        let final_url = response.url().to_string();
-        let status = response.status();
-        // VTOP is down or slow: the session is fine.
-        if is_unavailable_status(status) {
-            return Err(status_error(context, status, String::new()));
-        }
-
-        if Self::is_login_url(&final_url) {
-            self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
-            return Err(VtopError::SessionExpired);
-        }
-
-        let text = response
-            .text()
-            .await
-            .map_err(|error| network_error(&format!("{context}.text"), error))?;
-
-        if !status.is_success() {
-            self.mark_session_expired(
-                context,
-                &format!("VTOP returned HTTP {status} at {final_url}"),
-            );
-            // A 4xx here is how VTOP answers some dead sessions (a 404
-            // rather than the login page): say so, so the caller signs in
-            // again or tries another session instead of giving up.
-            if status.is_client_error() {
-                return Err(VtopError::SessionExpired);
-            }
-            return Err(server_error(
-                context,
-                format!("VTOP returned HTTP {status}"),
-            ));
-        }
-
-        Ok(text)
-    }
-
     /// Makes sure the session is signed in and returns what an
     /// authenticated form post needs.
     async fn authorize(&self, context: &str) -> VtopResult<AuthorizedRequest> {
@@ -310,24 +269,11 @@ impl VtopClient {
         })
     }
 
-    /// Sends a signed-in request built by `build`, retrying once after a
-    /// short pause when the connection fails or VTOP answers with a 5xx.
-    /// A timeout, or a 504 from the proxy giving up on VTOP, is not
-    /// retried: VTOP is slow, and a second request only adds to its load.
-    /// `build` is called again for the retry because multipart bodies
-    /// cannot be cloned.
-    async fn send_authenticated(
-        &self,
-        context: &str,
-        build: impl Fn() -> reqwest::RequestBuilder,
-    ) -> VtopResult<String> {
-        let response = self.send_retrying(context, build).await?;
-        self.read_authenticated_response_text(context, response)
-            .await
-    }
-
-    /// [`Self::send_authenticated`]'s sending half: the response as it
-    /// came, after at most one retry.
+    /// Sends a request built by `build` and returns the response as it
+    /// came, retrying once after a short pause when the connection fails or
+    /// VTOP answers with a 5xx. A timeout, or a 504 from the proxy giving
+    /// up on VTOP, is not retried: VTOP is slow, and a second request only
+    /// adds to its load.
     async fn send_retrying(
         &self,
         context: &str,
@@ -390,40 +336,50 @@ impl VtopClient {
     }
 
     /// Runs a `vtop-proto` machine over reqwest. Each request goes through
-    /// [`Self::send_retrying`] (redirects followed, cookies kept); a dead
-    /// session, or a VTOP error on a signed-in page, resets the session as
-    /// [`Self::read_authenticated_response_text`] does.
+    /// [`Self::send_retrying`] (redirects followed, cookies kept), or once
+    /// when the request says so; a dead session resets the session.
     async fn run<M: Machine>(&self, context: &str, mut machine: M) -> VtopResult<M::Output> {
         let mut step = machine.start();
+        // The last answer's status: a VTOP error after a 5xx resets the
+        // session, as it always has; one the machine found in a page does
+        // not.
+        let mut last_status = 0;
         loop {
             let request = match step {
                 Step::Send(request) => request,
+                Step::Done(Ok(output)) => return Ok(output),
                 Step::Done(Err(error)) => {
-                    match &error {
-                        VtopError::SessionExpired | VtopError::VtopServerError(_) => {
-                            self.mark_session_expired(context, &format!("VTOP answered: {error}"))
-                        }
-                        _ => warn!(target: NETWORK, "{context}: {error}"),
+                    let expired = matches!(error, VtopError::SessionExpired)
+                        || (matches!(error, VtopError::VtopServerError(_)) && last_status >= 500);
+                    if expired {
+                        self.mark_session_expired(context, &format!("VTOP answered: {error}"));
+                    } else {
+                        warn!(target: NETWORK, "{context}: {error}");
                     }
                     return Err(error);
                 }
-                Step::Done(Ok(output)) => return Ok(output),
             };
             let method = match request.method {
                 Method::Get => reqwest::Method::GET,
                 Method::Post => reqwest::Method::POST,
             };
             Self::log_request(&format!("{context}.send"), method.as_str(), &request.url);
-            let response = self
-                .send_retrying(context, || {
-                    let mut builder = self.http.request(method.clone(), &request.url);
-                    for (name, value) in &request.headers {
-                        builder = builder.header(name, value);
-                    }
-                    builder.body(request.body.clone())
-                })
-                .await?;
-            let status = response.status().as_u16();
+            let build = || {
+                let mut builder = self.http.request(method.clone(), &request.url);
+                for (name, value) in &request.headers {
+                    builder = builder.header(name, value);
+                }
+                builder.body(request.body.clone())
+            };
+            let response = if request.retry {
+                self.send_retrying(context, build).await?
+            } else {
+                build()
+                    .send_with(self)
+                    .await
+                    .map_err(|error| send_error(&format!("{context}.send"), error))?
+            };
+            last_status = response.status().as_u16();
             let url = response.url().to_string();
             let headers = response
                 .headers()
@@ -436,10 +392,10 @@ impl VtopClient {
             let body = response
                 .bytes()
                 .await
-                .map_err(|error| network_error(&format!("{context}.body"), error))?
+                .map_err(|error| network_error(&format!("{context}.body"), error.without_url()))?
                 .to_vec();
             step = machine.feed(ProtoResponse {
-                status,
+                status: last_status,
                 headers,
                 url,
                 body,
@@ -706,6 +662,9 @@ fn unavailable(context: &str, reason: &str) -> VtopError {
 /// A request that got no answer. A timeout is VTOP being slow; anything
 /// else may be the phone's own connection.
 fn send_error(context: &str, error: reqwest::Error) -> VtopError {
+    // The URL can carry the CSRF token in its query; the context says
+    // which request it was.
+    let error = error.without_url();
     if error.is_timeout() {
         warn!(target: NETWORK, "{context}: {error}");
         return slow_vtop_error(context);

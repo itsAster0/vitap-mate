@@ -3272,6 +3272,7 @@ dependencies = [
 name = "vtop-proto"
 version = "0.1.0"
 dependencies = [
+ "httpdate",
  "scraper",
  "serde",
  "serde_json",

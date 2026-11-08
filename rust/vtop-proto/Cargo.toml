@@ -12,3 +12,4 @@ thiserror = "2"
 [dev-dependencies]
 serde_json = { workspace = true }
 urlencoding = "2"
+httpdate = "1"

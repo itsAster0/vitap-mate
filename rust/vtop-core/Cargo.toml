@@ -13,8 +13,8 @@ serde_json = { workspace = true }
 tokio = { workspace = true, features = ["rt", "time", "sync"] }
 log = { workspace = true }
 base64 = "0.22.1"
-httpdate = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 [dev-dependencies]
+httpdate = "1"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util"] }

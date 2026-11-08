@@ -20,7 +20,9 @@ pub fn solve_captcha(data_url: &str) -> Result<String, String> {
 pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use session::SessionState;
-pub use vtop_proto::{error, http, inputs, machine, now_unix, pages, parser, types};
+pub use vtop_proto::{
+    course_pages, error, http, inputs, machine, now_unix, outing, pages, parser, types,
+};
 pub use vtop_proto::{VtopError, VtopResult};
 pub use vtop_shared::mail_seal;
 pub use vtop_shared::page_dictionary;

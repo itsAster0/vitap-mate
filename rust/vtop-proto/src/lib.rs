@@ -6,10 +6,12 @@
 //! Nothing here logs. Cookies, passwords, OTPs and CSRF tokens never appear
 //! in a `Debug` output.
 
+pub mod course_pages;
 pub mod error;
 pub mod http;
 pub mod inputs;
 pub mod machine;
+pub mod outing;
 pub mod pages;
 pub mod parser;
 pub mod types;

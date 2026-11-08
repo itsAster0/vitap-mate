@@ -1,40 +1,29 @@
 //! The course page: every class of a course this semester, and each
 //! class's lecture plan with its reference material.
 
-use super::{network_error, send_error, status_error, SendWith, VtopClient};
+use log::warn;
+use vtop_proto::course_pages::{self, file_head, plain_id};
+use vtop_proto::http::{Request, Response as ProtoResponse};
+
+use super::{network_error, send_error, SendWith, VtopClient, NETWORK};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{CourseFilePath, SemesterId};
 use crate::parser::course_page;
 
+pub use vtop_proto::course_pages::{CourseFile, CourseFileInfo};
+
 impl VtopClient {
     /// The menu page, which lists the semesters.
     pub async fn course_page_menu(&self) -> VtopResult<String> {
-        let context = "get_course_page";
-        let auth = self.authorize(context).await?;
-        let url = self.config.url("/vtop/academics/common/StudentCoursePage");
-        let body = format!(
-            "verifyMenu=true&authorizedID={}&_csrf={}&nocache=@(new Date().getTime())",
-            auth.registration_number, auth.csrf,
-        );
-        Self::log_request(&format!("{context}.send"), "POST", &url);
-        self.send_authenticated(context, || self.http.post(&url).body(body.clone()))
-            .await
+        self.page("get_course_page", course_pages::menu).await
     }
 
     /// The courses offered in [semester], as a `<select>` fragment.
     pub async fn course_page_courses_page(&self, semester: &SemesterId) -> VtopResult<String> {
-        let context = "get_course_page_courses";
-        let auth = self.authorize(context).await?;
-        let url = self.config.url("/vtop/getCourseForCoursePage");
-        let form = [
-            ("_csrf", auth.csrf.as_str()),
-            ("paramReturnId", "getCourseForCoursePage"),
-            ("semSubId", semester.as_str()),
-            ("authorizedID", auth.registration_number.as_str()),
-        ];
-        Self::log_request(&format!("{context}.send"), "POST", &url);
-        self.send_authenticated(context, || self.http.post(&url).form(&form))
-            .await
+        self.page("get_course_page_courses", |s| {
+            course_pages::courses(s, semester)
+        })
+        .await
     }
 
     /// Every class of the course [course_id] (the value of a course
@@ -44,20 +33,10 @@ impl VtopClient {
         semester: &SemesterId,
         course_id: &str,
     ) -> VtopResult<String> {
-        let context = "get_course_page_classes";
-        let auth = self.authorize(context).await?;
-        let url = self.config.url("/vtop/getSlotIdForCoursePage");
-        let form = [
-            ("_csrf", auth.csrf.as_str()),
-            ("classId", course_id),
-            ("praType", "source"),
-            ("paramReturnId", "getSlotIdForCoursePage"),
-            ("semSubId", semester.as_str()),
-            ("authorizedID", auth.registration_number.as_str()),
-        ];
-        Self::log_request(&format!("{context}.send"), "POST", &url);
-        self.send_authenticated(context, || self.http.post(&url).form(&form))
-            .await
+        self.page("get_course_page_classes", |s| {
+            course_pages::classes(s, semester, course_id)
+        })
+        .await
     }
 
     /// One class's lecture plan and materials.
@@ -67,31 +46,12 @@ impl VtopClient {
         erp_id: &str,
         class_id: &str,
     ) -> VtopResult<String> {
-        let context = "get_course_page_detail";
-        let auth = self.authorize(context).await?;
-        let url = self.config.url("/vtop/processViewStudentCourseDetail");
-        let form = [
-            ("_csrf", auth.csrf.as_str()),
-            ("semSubId", semester.as_str()),
-            ("erpId", erp_id),
-            ("classId", class_id),
-            ("authorizedID", auth.registration_number.as_str()),
-        ];
-        Self::log_request(&format!("{context}.send"), "POST", &url);
-        self.send_authenticated(context, || self.http.post(&url).form(&form))
-            .await
+        self.page("get_course_page_detail", |s| {
+            course_pages::detail(s, semester, erp_id, class_id)
+        })
+        .await
     }
-}
 
-/// A file from the course page: its name as VTOP sends it, and the bytes.
-#[derive(Debug, Clone)]
-pub struct CourseFile {
-    pub file_name: String,
-    pub content_type: String,
-    pub bytes: Vec<u8>,
-}
-
-impl VtopClient {
     /// Downloads what one of the course page's `vtopDownload('…')` links
     /// points at: a lecture's material, the syllabus or a material bundle.
     pub async fn course_page_file(&self, path: &CourseFilePath) -> VtopResult<CourseFile> {
@@ -116,17 +76,9 @@ impl VtopClient {
         &self,
         path: &CourseFilePath,
     ) -> VtopResult<CourseFileDownload> {
-        let auth = self.authorize("get_course_page_file").await?;
-        let url = self.config.url(&format!("/vtop/{}", path.as_str()));
-        self.open_course_file(
-            &url,
-            &[
-                ("authorizedID", auth.registration_number.to_string()),
-                ("_csrf", auth.csrf.clone()),
-                ("x", httpdate::fmt_http_date(std::time::SystemTime::now())),
-            ],
-        )
-        .await
+        let signed = self.signed("get_course_page_file").await?;
+        let request = course_pages::file(&signed, path, vtop_proto::now_unix());
+        self.open_course_file("get_course_page_file", request).await
     }
 
     /// [`Self::course_plan`] as a stream.
@@ -136,72 +88,97 @@ impl VtopClient {
         class_id: &str,
     ) -> VtopResult<CourseFileDownload> {
         let class_id = plain_id(class_id, "class id")?;
-        let auth = self.authorize("get_course_plan").await?;
-        let url = self
-            .config
-            .url("/vtop/academics/common/CoursePlanExcelDownload");
-        self.open_course_file(
-            &url,
-            &[
-                ("semesterSubId", semester.as_str().to_string()),
-                ("classId", class_id.to_string()),
-                ("authorizedID", auth.registration_number.to_string()),
-                ("x", httpdate::fmt_http_date(std::time::SystemTime::now())),
-            ],
-        )
-        .await
+        let signed = self.signed("get_course_plan").await?;
+        let request =
+            course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
+        self.open_course_file("get_course_page_file", request).await
+    }
+
+    /// The name and type of what a course page link points at, without
+    /// downloading it: the body is dropped once the headers arrive. Lets
+    /// the system download manager save it under a proper name.
+    pub async fn course_page_file_info(&self, path: &CourseFilePath) -> VtopResult<CourseFileInfo> {
+        let signed = self.signed("get_course_page_file_info").await?;
+        let request = course_pages::file(&signed, path, vtop_proto::now_unix());
+        let (_, info) = self
+            .send_course_file("get_course_page_file_info", request)
+            .await?;
+        Ok(info)
+        // The response drops with its body unread, closing the stream.
+    }
+
+    /// [`Self::course_page_file_info`] for the class's course plan.
+    pub async fn course_plan_info(
+        &self,
+        semester: &SemesterId,
+        class_id: &str,
+    ) -> VtopResult<CourseFileInfo> {
+        let class_id = plain_id(class_id, "class id")?;
+        let signed = self.signed("get_course_plan_info").await?;
+        let request =
+            course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
+        let (_, info) = self
+            .send_course_file("get_course_page_file_info", request)
+            .await?;
+        Ok(info)
     }
 
     /// Sends the request and checks the answer is the file; the body is
     /// left to read.
     async fn open_course_file(
         &self,
-        url: &str,
-        query: &[(&str, String)],
+        context: &str,
+        request: Request,
     ) -> VtopResult<CourseFileDownload> {
-        let context = "get_course_page_file";
-        Self::log_request(context, "GET", url);
-        let response = self
-            .http
-            .get(url)
-            .query(query)
-            .send_with(self)
-            .await
-            .map_err(|error| send_error(&format!("{context}.send"), error))?;
-        let final_url = response.url().to_string();
-        if Self::is_login_url(&final_url) {
-            self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
-            return Err(VtopError::SessionExpired);
-        }
-        let status = response.status();
-        if !status.is_success() {
-            return Err(status_error(
-                context,
-                status,
-                format!("VTOP returned HTTP {status}"),
-            ));
-        }
-        let header = |name: reqwest::header::HeaderName| {
-            response
-                .headers()
-                .get(name)
-                .and_then(|value| value.to_str().ok())
-                .unwrap_or_default()
-                .to_string()
-        };
-        let content_type = header(reqwest::header::CONTENT_TYPE);
-        // An HTML answer is VTOP's error page, not the file.
-        if content_type.starts_with("text/html") {
-            return Err(VtopError::VtopServerError(
-                "VTOP did not send the file".to_string(),
-            ));
-        }
+        let (response, info) = self.send_course_file(context, request).await?;
         Ok(CourseFileDownload {
-            file_name: file_name_from_disposition(&header(reqwest::header::CONTENT_DISPOSITION)),
-            content_type,
+            file_name: info.file_name(),
+            content_type: info.content_type,
             length: response.content_length(),
             response,
         })
+    }
+
+    /// Sends a download `GET` (redirects followed, no retry) and checks its
+    /// status and headers with [`file_head`]; the body is not read. The
+    /// query carries the CSRF token, so it is never logged.
+    async fn send_course_file(
+        &self,
+        context: &str,
+        request: Request,
+    ) -> VtopResult<(reqwest::Response, CourseFileInfo)> {
+        let path = request.url.split('?').next().unwrap_or_default();
+        Self::log_request(context, "GET", path);
+        let response = self
+            .http
+            .get(&request.url)
+            .send_with(self)
+            .await
+            .map_err(|error| send_error(&format!("{context}.send"), error.without_url()))?;
+        let head = ProtoResponse {
+            status: response.status().as_u16(),
+            headers: response
+                .headers()
+                .iter()
+                .map(|(name, value)| {
+                    let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
+                    (name.as_str().to_string(), value)
+                })
+                .collect(),
+            url: response.url().to_string(),
+            body: Vec::new(),
+        };
+        match file_head(&head) {
+            Ok(info) => Ok((response, info)),
+            Err(VtopError::SessionExpired) => {
+                self.mark_session_expired(context, &format!("VTOP redirected to {}", head.url));
+                Err(VtopError::SessionExpired)
+            }
+            Err(error) => {
+                warn!(target: NETWORK, "{context}: {error}");
+                Err(error)
+            }
+        }
     }
 }
 
@@ -223,138 +200,21 @@ impl CourseFileDownload {
             .chunk()
             .await
             .map(|chunk| chunk.map(|bytes| bytes.to_vec()))
-            .map_err(|error| network_error("get_course_page_file.chunk", error))
+            .map_err(|error| network_error("get_course_page_file.chunk", error.without_url()))
     }
 
     /// The whole body in memory.
     pub async fn collect(self) -> VtopResult<CourseFile> {
-        let bytes = self
-            .response
-            .bytes()
-            .await
-            .map_err(|error| network_error("get_course_page_file.bytes", error))?;
+        let bytes =
+            self.response.bytes().await.map_err(|error| {
+                network_error("get_course_page_file.bytes", error.without_url())
+            })?;
         Ok(CourseFile {
             file_name: self.file_name,
             content_type: self.content_type,
             bytes: bytes.to_vec(),
         })
     }
-}
-
-/// VTOP's response headers for a course page download: what a browser
-/// knows when it hands a download to the system download manager.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct CourseFileInfo {
-    /// Raw `Content-Disposition`, which carries the file name and extension
-    /// the link itself does not show.
-    pub content_disposition: String,
-    pub content_type: String,
-}
-
-impl VtopClient {
-    /// The name and type of what a course page link points at, without
-    /// downloading it: the body is dropped once the headers arrive. Lets
-    /// the system download manager save it under a proper name.
-    pub async fn course_page_file_info(&self, path: &CourseFilePath) -> VtopResult<CourseFileInfo> {
-        let auth = self.authorize("get_course_page_file_info").await?;
-        let url = self.config.url(&format!("/vtop/{}", path.as_str()));
-        self.course_file_info(
-            &url,
-            &[
-                ("authorizedID", auth.registration_number.to_string()),
-                ("_csrf", auth.csrf.clone()),
-                ("x", httpdate::fmt_http_date(std::time::SystemTime::now())),
-            ],
-        )
-        .await
-    }
-
-    /// [`Self::course_page_file_info`] for the class's course plan.
-    pub async fn course_plan_info(
-        &self,
-        semester: &SemesterId,
-        class_id: &str,
-    ) -> VtopResult<CourseFileInfo> {
-        let class_id = plain_id(class_id, "class id")?;
-        let auth = self.authorize("get_course_plan_info").await?;
-        let url = self
-            .config
-            .url("/vtop/academics/common/CoursePlanExcelDownload");
-        self.course_file_info(
-            &url,
-            &[
-                ("semesterSubId", semester.as_str().to_string()),
-                ("classId", class_id.to_string()),
-                ("authorizedID", auth.registration_number.to_string()),
-                ("x", httpdate::fmt_http_date(std::time::SystemTime::now())),
-            ],
-        )
-        .await
-    }
-
-    async fn course_file_info(
-        &self,
-        url: &str,
-        query: &[(&str, String)],
-    ) -> VtopResult<CourseFileInfo> {
-        let context = "get_course_page_file_info";
-        Self::log_request(context, "GET", url);
-        let response = self
-            .http
-            .get(url)
-            .query(query)
-            .send_with(self)
-            .await
-            .map_err(|error| send_error(&format!("{context}.send"), error))?;
-        let final_url = response.url().to_string();
-        if Self::is_login_url(&final_url) {
-            self.mark_session_expired(context, &format!("VTOP redirected to {final_url}"));
-            return Err(VtopError::SessionExpired);
-        }
-        let status = response.status();
-        if !status.is_success() {
-            return Err(status_error(
-                context,
-                status,
-                format!("VTOP returned HTTP {status}"),
-            ));
-        }
-        let header = |name: reqwest::header::HeaderName| {
-            response
-                .headers()
-                .get(name)
-                .and_then(|value| value.to_str().ok())
-                .unwrap_or_default()
-                .to_string()
-        };
-        let content_type = header(reqwest::header::CONTENT_TYPE);
-        if content_type.starts_with("text/html") {
-            return Err(VtopError::VtopServerError(
-                "VTOP did not send the file".to_string(),
-            ));
-        }
-        Ok(CourseFileInfo {
-            content_disposition: header(reqwest::header::CONTENT_DISPOSITION),
-            content_type,
-        })
-        // `response` drops here with its body unread, closing the stream.
-    }
-}
-
-/// `attachment; filename="Unit 1.pdf"` → `Unit 1.pdf`; empty when absent.
-fn file_name_from_disposition(header: &str) -> String {
-    header
-        .split(';')
-        .map(str::trim)
-        .find_map(|part| part.strip_prefix("filename="))
-        .map(|name| name.trim_matches('"').trim().to_string())
-        .map(|name| {
-            name.rsplit(['/', '\\'])
-                .next()
-                .unwrap_or_default()
-                .to_string()
-        })
-        .unwrap_or_default()
 }
 
 impl VtopClient {
@@ -395,13 +255,109 @@ impl VtopClient {
     }
 }
 
-/// Ids from the course page go back into form posts: letters and digits only.
-fn plain_id<'a>(value: &'a str, label: &str) -> VtopResult<&'a str> {
-    let value = value.trim();
-    if value.is_empty() || value.len() > 40 || !value.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err(VtopError::ConfigurationError(format!(
-            "{label} is not valid"
-        )));
+#[cfg(test)]
+mod tests {
+    use vtop_proto::machine::Signed;
+
+    use super::*;
+
+    /// The download URLs are what reqwest's `.query()` built before.
+    #[test]
+    fn download_urls_match_reqwest_query() {
+        let signed = Signed {
+            base_url: "https://vtop.example".into(),
+            csrf: "1f0c-9a5b+/=".into(),
+            registration_number: "22BCE0001".into(),
+        };
+        let now = 1_794_218_405;
+        let x =
+            httpdate::fmt_http_date(std::time::UNIX_EPOCH + std::time::Duration::from_secs(now));
+        let old = |url: &str, query: &[(&str, &str)]| {
+            reqwest::Client::new()
+                .get(url)
+                .query(query)
+                .build()
+                .unwrap()
+                .url()
+                .to_string()
+        };
+        let path =
+            CourseFilePath::parse("downloadPdf/AP2026272/AP2026272000046/19/17-07-2026").unwrap();
+        assert_eq!(
+            course_pages::file(&signed, &path, now).url,
+            old(
+                "https://vtop.example/vtop/downloadPdf/AP2026272/AP2026272000046/19/17-07-2026",
+                &[
+                    ("authorizedID", "22BCE0001"),
+                    ("_csrf", "1f0c-9a5b+/="),
+                    ("x", &x)
+                ]
+            )
+        );
+        let semester = SemesterId::parse("AP2026272").unwrap();
+        assert_eq!(
+            course_pages::course_plan(&signed, &semester, "AP2026272000046", now).url,
+            old(
+                "https://vtop.example/vtop/academics/common/CoursePlanExcelDownload",
+                &[
+                    ("semesterSubId", "AP2026272"),
+                    ("classId", "AP2026272000046"),
+                    ("authorizedID", "22BCE0001"),
+                    ("x", &x)
+                ]
+            )
+        );
     }
-    Ok(value)
+
+    /// The form posts are what reqwest's `.form()` sent before.
+    #[test]
+    fn form_bodies_match_reqwest_form() {
+        let signed = Signed {
+            base_url: "https://vtop.example".into(),
+            csrf: "1f0c-9a5b+/=".into(),
+            registration_number: "22BCE0001".into(),
+        };
+        let semester = SemesterId::parse("AP2026272").unwrap();
+        let old = |form: &[(&str, &str)]| {
+            reqwest::Client::new()
+                .post("https://vtop.example/")
+                .form(form)
+                .build()
+                .unwrap()
+                .body()
+                .and_then(|body| body.as_bytes())
+                .unwrap()
+                .to_vec()
+        };
+        assert_eq!(
+            course_pages::detail(&signed, &semester, "70435", "AP1").body,
+            old(&[
+                ("_csrf", "1f0c-9a5b+/="),
+                ("semSubId", "AP2026272"),
+                ("erpId", "70435"),
+                ("classId", "AP1"),
+                ("authorizedID", "22BCE0001"),
+            ])
+        );
+        assert_eq!(
+            course_pages::classes(&signed, &semester, "AP1").body,
+            old(&[
+                ("_csrf", "1f0c-9a5b+/="),
+                ("classId", "AP1"),
+                ("praType", "source"),
+                ("paramReturnId", "getSlotIdForCoursePage"),
+                ("semSubId", "AP2026272"),
+                ("authorizedID", "22BCE0001"),
+            ])
+        );
+        assert_eq!(
+            course_pages::courses(&signed, &semester).body,
+            old(&[
+                ("_csrf", "1f0c-9a5b+/="),
+                ("paramReturnId", "getCourseForCoursePage"),
+                ("semSubId", "AP2026272"),
+                ("authorizedID", "22BCE0001"),
+            ])
+        );
+    }
 }
