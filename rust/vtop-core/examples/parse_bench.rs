@@ -17,7 +17,9 @@ fn main() {
     let dir = std::env::args()
         .nth(1)
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures"));
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../vtop-proto/tests/fixtures")
+        });
     let read = |name: &str| std::fs::read_to_string(dir.join(format!("{name}.html"))).ok();
 
     type Parse = fn(&str);

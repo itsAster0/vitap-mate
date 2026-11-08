@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 
 use scraper::{Html, Selector};
 
-use super::{selector, word_text, TD};
+use super::{TD, selector, word_text};
 use crate::types::CalendarEntry;
 
 static MONTH_BUTTON: LazyLock<Selector> = LazyLock::new(|| selector("a[onclick]"));

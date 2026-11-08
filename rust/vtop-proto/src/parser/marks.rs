@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{compact_cell, selector, TD};
+use super::{TD, compact_cell, selector};
 use crate::now_unix;
 use crate::types::{MarksData, MarksRecord, MarksRecordEach};
 

@@ -2,7 +2,7 @@
 
 use scraper::Html;
 
-use super::{word_text, TD, TR};
+use super::{TD, TR, word_text};
 use crate::now_unix;
 use crate::types::{BiometricData, BiometricRecord};
 

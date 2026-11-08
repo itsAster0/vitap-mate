@@ -8,47 +8,7 @@ use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
 use crate::inputs::RegistrationNumber;
-
-fn is_cookie_attribute_name(name: &str) -> bool {
-    matches!(
-        name.to_ascii_lowercase().as_str(),
-        "path"
-            | "domain"
-            | "expires"
-            | "max-age"
-            | "secure"
-            | "httponly"
-            | "samesite"
-            | "priority"
-            | "partitioned"
-    )
-}
-
-/// Splits a `Cookie`/`Set-Cookie`-ish header into `name=value` pairs, dropping
-/// attributes and keeping the last value for a repeated name.
-pub(crate) fn parse_cookie_pairs(cookie_header: &str) -> Vec<(String, String)> {
-    let mut pairs: Vec<(String, String)> = Vec::new();
-    for part in cookie_header.split(';') {
-        let Some((raw_name, raw_value)) = part.trim().split_once('=') else {
-            continue;
-        };
-        let name = raw_name.trim();
-        let value = raw_value.trim();
-        if name.is_empty() || value.is_empty() || is_cookie_attribute_name(name) {
-            continue;
-        }
-
-        if let Some(existing) = pairs
-            .iter_mut()
-            .find(|(existing_name, _)| existing_name.eq_ignore_ascii_case(name))
-        {
-            *existing = (name.to_string(), value.to_string());
-        } else {
-            pairs.push((name.to_string(), value.to_string()));
-        }
-    }
-    pairs
-}
+pub(crate) use vtop_proto::http::cookie_pairs as parse_cookie_pairs;
 
 /// A cookie jar that can be emptied in place.
 ///
@@ -288,19 +248,6 @@ mod tests {
         session.set_authenticated(true);
         session.set_cookie_external(false);
         assert!(session.is_authenticated());
-    }
-
-    #[test]
-    fn cookie_pairs_drop_attributes_and_keep_last_value() {
-        let pairs =
-            parse_cookie_pairs("JSESSIONID=a; Path=/vtop; SERVERID=x; jsessionid=b; HttpOnly");
-        assert_eq!(
-            pairs,
-            vec![
-                ("jsessionid".to_string(), "b".to_string()),
-                ("SERVERID".to_string(), "x".to_string()),
-            ]
-        );
     }
 
     #[test]

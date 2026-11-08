@@ -140,7 +140,7 @@ impl VtopClient {
         let body = format!(
             "_csrf={}&calDate={}&semSubId={}&classGroupId={}&authorizedID={}",
             auth.csrf,
-            urlencoding::encode(cal_date),
+            crate::http::url_encode(cal_date),
             semester.as_str(),
             CALENDAR_CLASS_GROUP,
             auth.registration_number

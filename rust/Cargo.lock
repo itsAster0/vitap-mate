@@ -3209,12 +3209,10 @@ dependencies = [
  "image",
  "log",
  "reqwest",
- "scraper",
  "serde",
  "serde_json",
- "thiserror",
  "tokio",
- "urlencoding",
+ "vtop-proto",
  "vtop-shared",
 ]
 
@@ -3268,6 +3266,17 @@ dependencies = [
  "tracing",
  "vtop-core",
  "wiremock",
+]
+
+[[package]]
+name = "vtop-proto"
+version = "0.1.0"
+dependencies = [
+ "scraper",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "urlencoding",
 ]
 
 [[package]]

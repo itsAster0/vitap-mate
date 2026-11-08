@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{selector, word_cell, TD, TR};
+use super::{TD, TR, selector, word_cell};
 use crate::now_unix;
 use crate::types::{
     GradeHistoryAttempt, GradeHistoryCgpa, GradeHistoryData, GradeHistoryRecord,

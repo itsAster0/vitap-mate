@@ -5,7 +5,7 @@
 //! intended parser change with:
 //!
 //! ```sh
-//! UPDATE_SNAPSHOTS=1 cargo test -p vtop-core --test parsers
+//! UPDATE_SNAPSHOTS=1 cargo test -p vtop-proto --test parsers
 //! ```
 //!
 //! Fixtures are synthetic or redacted. Never commit a real student's page.
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 use serde_json::Value;
-use vtop_core::parser::{
+use vtop_proto::parser::{
     attendance, biometric, calendar, exam_schedule, grade_history, grades, marks, mentor, profile,
     timetable,
 };
@@ -29,10 +29,10 @@ fn fixture(name: &str) -> String {
 }
 
 fn zero_update_time(value: &mut Value) {
-    if let Value::Object(map) = value {
-        if map.contains_key("update_time") {
-            map.insert("update_time".into(), Value::from(0));
-        }
+    if let Value::Object(map) = value
+        && map.contains_key("update_time")
+    {
+        map.insert("update_time".into(), Value::from(0));
     }
 }
 
@@ -269,12 +269,16 @@ fn calendar_month_fixture() {
     assert_eq!(entries[0].kind, "CAT - II");
     assert_eq!(entries[1].kind, "Holiday");
     assert_eq!(entries[1].note, "Mahatma Gandhi Jayanti");
-    assert!(entries
-        .iter()
-        .any(|entry| entry.kind == "Instructional Day" && entry.note == "LAB FAT"));
-    assert!(entries
-        .iter()
-        .all(|entry| entry.group == "General (Semester)"));
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.kind == "Instructional Day" && entry.note == "LAB FAT")
+    );
+    assert!(
+        entries
+            .iter()
+            .all(|entry| entry.group == "General (Semester)")
+    );
     assert_snapshot("calendar_month", &entries);
 }
 

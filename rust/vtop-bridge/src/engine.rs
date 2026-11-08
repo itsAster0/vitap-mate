@@ -1266,7 +1266,7 @@ mod tests {
         let vtop = wiremock::MockServer::start().await;
         let html = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../vtop-core/tests/fixtures/semesters.html"),
+                .join("../vtop-proto/tests/fixtures/semesters.html"),
         )
         .unwrap();
         wiremock::Mock::given(wiremock::matchers::any())

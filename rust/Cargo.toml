@@ -1,5 +1,5 @@
 [workspace]
-members = ["vtop-shared", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-ffi"]
+members = ["vtop-shared", "vtop-proto", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-ffi"]
 
 [workspace.dependencies]
 reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls-webpki-roots", "http2", "json", "multipart", "cookies", "gzip", "brotli"] }

@@ -2,7 +2,7 @@
 
 use scraper::Html;
 
-use super::{compact_text, TD, TR};
+use super::{TD, TR, compact_text};
 use crate::now_unix;
 use crate::types::{ExamScheduleData, ExamScheduleRecord, PerExamScheduleRecord};
 

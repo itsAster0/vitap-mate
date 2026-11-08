@@ -9,7 +9,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{selector, word_text, TD, TR};
+use super::{TD, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{ProfileField, ProfileGroup, ProfileSection, StudentProfile};
 

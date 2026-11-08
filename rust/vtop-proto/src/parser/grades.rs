@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{selector, word_cell, word_text, TD, TH, TR};
+use super::{TD, TH, TR, selector, word_cell, word_text};
 use crate::now_unix;
 use crate::types::{
     GradeCourseRecord, GradeDetailMark, GradeDetailsData, GradeRange, GradeViewData, SemesterInfo,
@@ -31,16 +31,15 @@ fn looks_like_grade_range(input: &str) -> bool {
 }
 
 fn extract_course_id(button_cell: &ElementRef) -> String {
-    if let Some(button) = button_cell.select(&DETAILS_BUTTON).next() {
-        if let Some(onclick) = button.value().attr("onclick") {
-            if let Some(start_idx) = onclick.find("getGradeViewDetails(") {
-                let sliced = &onclick[start_idx..];
-                if let Some(first_quote) = sliced.find('\'') {
-                    let right = &sliced[first_quote + 1..];
-                    if let Some(second_quote) = right.find('\'') {
-                        return right[..second_quote].to_string();
-                    }
-                }
+    if let Some(button) = button_cell.select(&DETAILS_BUTTON).next()
+        && let Some(onclick) = button.value().attr("onclick")
+        && let Some(start_idx) = onclick.find("getGradeViewDetails(")
+    {
+        let sliced = &onclick[start_idx..];
+        if let Some(first_quote) = sliced.find('\'') {
+            let right = &sliced[first_quote + 1..];
+            if let Some(second_quote) = right.find('\'') {
+                return right[..second_quote].to_string();
             }
         }
     }
@@ -223,10 +222,10 @@ pub fn parse_grade_view_details(html: &str, sem: &str, course_id: &str) -> Grade
                     .map(|e| extract_text(Some(&e)))
                     .collect::<Vec<_>>()
                     .join(" ");
-                if th_text.contains("Total") {
-                    if let Some(last_th) = row.select(&TH).last() {
-                        parsed_grand_total = extract_text(Some(&last_th));
-                    }
+                if th_text.contains("Total")
+                    && let Some(last_th) = row.select(&TH).last()
+                {
+                    parsed_grand_total = extract_text(Some(&last_th));
                 }
             }
         }

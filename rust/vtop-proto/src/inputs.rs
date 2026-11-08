@@ -400,10 +400,12 @@ mod tests {
             CourseFilePath::parse("downloadPdf/AP2026272/AP2026272000046/19/14-07-2026").is_ok()
         );
         assert!(CourseFilePath::parse("courseSyllabusDownload/AM_CSE4007_00100/ETH").is_ok());
-        assert!(CourseFilePath::parse(
-            "academics/common/allCourseMeterialDownload/1/1/AP2026272/AP2026272000046"
-        )
-        .is_ok());
+        assert!(
+            CourseFilePath::parse(
+                "academics/common/allCourseMeterialDownload/1/1/AP2026272/AP2026272000046"
+            )
+            .is_ok()
+        );
         assert!(CourseFilePath::parse("downloadPdf/../logout").is_err());
         assert!(CourseFilePath::parse("hostel/saveOutingForm").is_err());
         assert!(CourseFilePath::parse("downloadPdf/a?x=1").is_err());

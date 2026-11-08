@@ -105,5 +105,5 @@ Conventional Commits, subject under 72 characters.
 ## Testing
 
 Run on the emulator or a connected phone, not only a build. Rust parser and
-client tests live in `rust/vtop-core/tests` and `src/client/tests.rs`, the
+client tests live in `rust/vtop-proto/tests` and `rust/vtop-core/src/client/tests.rs`, the
 app's crate in `rust/vtop-ffi/src/tests.rs`; Kotlin tests in `core/test/`.

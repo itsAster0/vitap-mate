@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 use scraper::{ElementRef, Html, Selector};
 
 use super::profile::groups;
-use super::{selector, word_text, TD, TH, TR};
+use super::{TD, TH, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{MentorData, MentorMessage, ProfileField};
 

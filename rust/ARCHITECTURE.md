@@ -123,7 +123,7 @@ VPS (`rust/vps`: compose file, its own resolvers, `.env` kept on the box).
 
 ## Tests
 
-- `vtop-core/tests/parsers.rs`: fixture HTML → JSON snapshots, plus truncated
+- `vtop-proto/tests/parsers.rs`: fixture HTML → JSON snapshots, plus truncated
   pages that must not panic. Fixtures are synthetic or redacted.
 - `vtop-core/src/client/tests.rs`: session reuse against an in-process mock VTOP.
 - `vtop-bridge`: the engine routes (session, seal, sign-in with a forwarded

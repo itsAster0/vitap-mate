@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{compact_text, selector, TD, TR};
+use super::{TD, TR, compact_text, selector};
 use crate::now_unix;
 use crate::types::{
     ClassKind, SemesterData, SemesterInfo, TimetableCourse, TimetableData, TimetableSlot,

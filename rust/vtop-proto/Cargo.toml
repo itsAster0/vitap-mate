@@ -1,0 +1,14 @@
+[package]
+name = "vtop-proto"
+version = "0.1.0"
+edition = "2024"
+description = "VTOP without I/O: parsers, types, inputs and the request/response shapes a transport carries"
+
+[dependencies]
+serde = { workspace = true }
+scraper = "0.23.1"
+thiserror = "2"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+urlencoding = "2"

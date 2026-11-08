@@ -2,7 +2,7 @@
 
 use scraper::{ElementRef, Html};
 
-use super::{compact_cell, compact_text, TD, TR};
+use super::{TD, TR, compact_cell, compact_text};
 use crate::now_unix;
 use crate::types::{AttendanceData, AttendanceRecord, FullAttendanceData, FullAttendanceRecord};
 
@@ -101,8 +101,7 @@ mod tests {
 
     #[test]
     fn rows_without_a_detail_link_are_skipped() {
-        let html =
-            "<table><tr><th>h</th></tr><tr><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td>\
+        let html = "<table><tr><th>h</th></tr><tr><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td>\
                     <td>6</td><td>7</td><td>8</td><td>9</td><td>no link</td></tr></table>";
         assert!(parse_attendance(html, "S").records.is_empty());
     }

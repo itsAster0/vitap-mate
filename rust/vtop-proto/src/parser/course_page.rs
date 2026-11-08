@@ -6,7 +6,7 @@ use std::sync::LazyLock;
 
 use scraper::{ElementRef, Html, Selector};
 
-use super::{selector, word_text, TD, TR};
+use super::{TD, TR, selector, word_text};
 use crate::now_unix;
 use crate::types::{
     CourseLecture, CourseMaterial, CoursePageClass, CoursePageClasses, CoursePageCourse,
@@ -358,12 +358,14 @@ mod tests {
         assert_eq!(data.class.faculty, "Sucharitha M");
         assert_eq!(data.class.slot, "A2+TA2");
         assert_eq!(data.course_id, "AM_CSE4007_00100");
-        assert!(data
-            .all_materials_path
-            .ends_with("/1/1/AP2026272/AP2026272000046"));
-        assert!(data
-            .general_materials_path
-            .ends_with("/2/1/AP2026272/AP2026272000046"));
+        assert!(
+            data.all_materials_path
+                .ends_with("/1/1/AP2026272/AP2026272000046")
+        );
+        assert!(
+            data.general_materials_path
+                .ends_with("/2/1/AP2026272/AP2026272000046")
+        );
         assert_eq!(
             data.syllabus_path,
             "courseSyllabusDownload/AM_CSE4007_00100/ETH"

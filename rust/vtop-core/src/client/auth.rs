@@ -121,8 +121,8 @@ impl VtopClient {
         let login_data = format!(
             "_csrf={}&username={}&password={}&captchaStr={}",
             csrf,
-            urlencoding::encode(credentials.username.as_str()),
-            urlencoding::encode(credentials.password.as_str()),
+            crate::http::url_encode(credentials.username.as_str()),
+            crate::http::url_encode(credentials.password.as_str()),
             captcha_answer
         );
         let url = self.config.url("/vtop/login");

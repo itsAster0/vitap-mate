@@ -72,7 +72,7 @@ mod tests {
 
     fn fixture(name: &str) -> Value {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../vtop-core/tests/fixtures")
+            .join("../vtop-proto/tests/fixtures")
             .join(format!("{name}.expected.json"));
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap()
     }
