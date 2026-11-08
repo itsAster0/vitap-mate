@@ -1,5 +1,5 @@
 //! The VTOP client. Login lives in [`auth`], the security OTP in [`otp`],
-//! CAPTCHA solving in [`captcha`], and one module per group of endpoints
+//! CAPTCHA solving in `vtop_proto::captcha`, and one module per group of endpoints
 //! holds the fetchers.
 //!
 //! Fetchers take `&self`, so one signed-in client can serve several requests
@@ -9,7 +9,6 @@
 mod academics;
 mod auth;
 mod biometric;
-mod captcha;
 mod course_page;
 mod email_otp;
 mod exams;

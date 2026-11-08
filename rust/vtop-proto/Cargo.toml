@@ -13,3 +13,5 @@ thiserror = "2"
 serde_json = { workspace = true }
 urlencoding = "2"
 httpdate = "1"
+# Only for the CAPTCHA decoder's pixel-parity test against today's decoder.
+image = { version = "0.25", default-features = false, features = ["jpeg"] }

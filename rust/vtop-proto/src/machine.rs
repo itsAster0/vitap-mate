@@ -34,6 +34,20 @@ pub trait Machine {
     fn feed(&mut self, response: Response) -> Step<Self::Output>;
 }
 
+/// A borrowed machine runs the same, so the caller can read its state
+/// afterwards.
+impl<M: Machine> Machine for &mut M {
+    type Output = M::Output;
+
+    fn start(&mut self) -> Step<M::Output> {
+        (**self).start()
+    }
+
+    fn feed(&mut self, response: Response) -> Step<M::Output> {
+        (**self).feed(response)
+    }
+}
+
 /// What a signed-in request needs from the session. `Debug` hides the CSRF
 /// token and the registration number.
 #[derive(Clone, PartialEq, Eq)]

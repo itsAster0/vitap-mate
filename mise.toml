@@ -15,6 +15,9 @@ run = [
   # The host library is .dylib on macOS, .so on Linux (CI).
   "cargo build -q -p vtop-ffi --lib",
   'cargo run -q -p vtop-ffi --features cli --bin uniffi-bindgen -- generate "target/debug/libvtop_ffi.$([ "$(uname)" = Darwin ] && echo dylib || echo so)" --language kotlin --out-dir ../core/src --no-format',
+  # The Kotlin toolchain doesn't see changes in app/jniLibs, so an APK built
+  # earlier would keep the old library: drop the cached Android builds.
+  "rm -rf ../build/tasks/_app_buildAndroidDebug ../build/tasks/_app_buildAndroidRelease",
 ]
 
 [tasks.signing]
