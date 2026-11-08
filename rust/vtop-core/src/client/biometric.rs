@@ -3,20 +3,13 @@
 use super::VtopClient;
 use crate::error::VtopResult;
 use crate::inputs::BiometricDate;
+use crate::pages;
 use crate::parser::biometric;
 use crate::types::BiometricData;
 
 impl VtopClient {
     pub async fn biometric_page(&self, date: &BiometricDate) -> VtopResult<String> {
-        let auth = self.authorize("get_biometric_history").await?;
-        let url = self.config.url("/vtop/getStudBioHistory");
-        let form = [
-            ("_csrf", auth.csrf.as_str()),
-            ("fromDate", date.as_str()),
-            ("authorizedID", auth.registration_number.as_str()),
-        ];
-        Self::log_request("get_biometric_history.send", "POST", &url);
-        self.send_authenticated("get_biometric_history", || self.http.post(&url).form(&form))
+        self.page("get_biometric_history", |s| pages::biometric(s, date))
             .await
     }
 

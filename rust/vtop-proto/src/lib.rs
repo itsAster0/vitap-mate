@@ -9,6 +9,8 @@
 pub mod error;
 pub mod http;
 pub mod inputs;
+pub mod machine;
+pub mod pages;
 pub mod parser;
 pub mod types;
 

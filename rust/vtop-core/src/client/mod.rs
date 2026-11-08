@@ -28,6 +28,8 @@ use crate::error::{VtopError, VtopResult};
 use crate::inputs::{Password, RegistrationNumber, Username};
 use crate::session::{parse_cookie_pairs, ResettableJar, SessionManager, SessionState};
 use crate::types::PersistedVtopSession;
+use vtop_proto::http::{Method, Request, Response as ProtoResponse};
+use vtop_proto::machine::{Machine, OnePost, Signed, Step};
 
 pub use course_page::{CourseFile, CourseFileDownload, CourseFileInfo};
 pub use email_otp::EmailOtpLogin;
@@ -319,7 +321,19 @@ impl VtopClient {
         context: &str,
         build: impl Fn() -> reqwest::RequestBuilder,
     ) -> VtopResult<String> {
-        let response = match build().send_with(self).await {
+        let response = self.send_retrying(context, build).await?;
+        self.read_authenticated_response_text(context, response)
+            .await
+    }
+
+    /// [`Self::send_authenticated`]'s sending half: the response as it
+    /// came, after at most one retry.
+    async fn send_retrying(
+        &self,
+        context: &str,
+        build: impl Fn() -> reqwest::RequestBuilder,
+    ) -> VtopResult<Response> {
+        Ok(match build().send_with(self).await {
             Ok(response)
                 if !response.status().is_server_error()
                     || response.status() == StatusCode::GATEWAY_TIMEOUT =>
@@ -351,9 +365,86 @@ impl VtopClient {
                     .map_err(|error| send_error(&format!("{context}.retry"), error))?
             }
             Err(error) => return Err(send_error(&format!("{context}.send"), error)),
-        };
-        self.read_authenticated_response_text(context, response)
-            .await
+        })
+    }
+
+    /// What a signed-in request needs, signing in first when the session
+    /// is not.
+    async fn signed(&self, context: &str) -> VtopResult<Signed> {
+        let auth = self.authorize(context).await?;
+        Ok(Signed {
+            base_url: self.config.base_url.trim_end_matches('/').to_string(),
+            csrf: auth.csrf,
+            registration_number: auth.registration_number.to_string(),
+        })
+    }
+
+    /// Signs in if needed, then runs the one page request `request` builds.
+    pub(super) async fn page(
+        &self,
+        context: &str,
+        request: impl FnOnce(&Signed) -> Request,
+    ) -> VtopResult<String> {
+        let signed = self.signed(context).await?;
+        self.run(context, OnePost::new(request(&signed))).await
+    }
+
+    /// Runs a `vtop-proto` machine over reqwest. Each request goes through
+    /// [`Self::send_retrying`] (redirects followed, cookies kept); a dead
+    /// session, or a VTOP error on a signed-in page, resets the session as
+    /// [`Self::read_authenticated_response_text`] does.
+    async fn run<M: Machine>(&self, context: &str, mut machine: M) -> VtopResult<M::Output> {
+        let mut step = machine.start();
+        loop {
+            let request = match step {
+                Step::Send(request) => request,
+                Step::Done(Err(error)) => {
+                    match &error {
+                        VtopError::SessionExpired | VtopError::VtopServerError(_) => {
+                            self.mark_session_expired(context, &format!("VTOP answered: {error}"))
+                        }
+                        _ => warn!(target: NETWORK, "{context}: {error}"),
+                    }
+                    return Err(error);
+                }
+                Step::Done(Ok(output)) => return Ok(output),
+            };
+            let method = match request.method {
+                Method::Get => reqwest::Method::GET,
+                Method::Post => reqwest::Method::POST,
+            };
+            Self::log_request(&format!("{context}.send"), method.as_str(), &request.url);
+            let response = self
+                .send_retrying(context, || {
+                    let mut builder = self.http.request(method.clone(), &request.url);
+                    for (name, value) in &request.headers {
+                        builder = builder.header(name, value);
+                    }
+                    builder.body(request.body.clone())
+                })
+                .await?;
+            let status = response.status().as_u16();
+            let url = response.url().to_string();
+            let headers = response
+                .headers()
+                .iter()
+                .map(|(name, value)| {
+                    let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
+                    (name.as_str().to_string(), value)
+                })
+                .collect();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|error| network_error(&format!("{context}.body"), error))?
+                .to_vec();
+            step = machine.feed(ProtoResponse {
+                status,
+                headers,
+                url,
+                body,
+            });
+        }
     }
 
     /// Sends a request with this session's cookies and follows redirects,

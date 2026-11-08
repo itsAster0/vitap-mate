@@ -4,6 +4,10 @@
 
 use std::fmt;
 
+/// The multipart boundary. The fields VTOP takes (registration numbers,
+/// semester ids, CSRF tokens) never contain it.
+const BOUNDARY: &str = "vitapmate-7d1f0c9a5b3e";
+
 /// The two methods VTOP uses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Method {
@@ -31,8 +35,9 @@ impl Request {
         }
     }
 
-    /// A `POST` with an `application/x-www-form-urlencoded` body.
-    pub fn form(url: impl Into<String>, pairs: &[(&str, &str)]) -> Self {
+    /// A `POST` of an already encoded `application/x-www-form-urlencoded`
+    /// body, sent byte for byte.
+    pub fn post(url: impl Into<String>, body: impl Into<String>) -> Self {
         Self {
             method: Method::Post,
             url: url.into(),
@@ -40,7 +45,32 @@ impl Request {
                 "Content-Type".into(),
                 "application/x-www-form-urlencoded".into(),
             )],
-            body: form_encode(pairs).into_bytes(),
+            body: body.into().into_bytes(),
+        }
+    }
+
+    /// A `POST` with an `application/x-www-form-urlencoded` body.
+    pub fn form(url: impl Into<String>, pairs: &[(&str, &str)]) -> Self {
+        Self::post(url, form_encode(pairs))
+    }
+
+    /// A `POST` with a `multipart/form-data` body of text fields.
+    pub fn multipart(url: impl Into<String>, fields: &[(&str, &str)]) -> Self {
+        let mut body = String::new();
+        for (name, value) in fields {
+            body.push_str(&format!(
+                "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+            ));
+        }
+        body.push_str(&format!("--{BOUNDARY}--\r\n"));
+        Self {
+            method: Method::Post,
+            url: url.into(),
+            headers: vec![(
+                "Content-Type".into(),
+                format!("multipart/form-data; boundary={BOUNDARY}"),
+            )],
+            body: body.into_bytes(),
         }
     }
 
@@ -183,6 +213,22 @@ mod tests {
         ] {
             assert_eq!(url_encode(text), urlencoding::encode(text), "{text}");
         }
+    }
+
+    #[test]
+    fn multipart_request_has_each_field_and_the_boundary() {
+        let request = Request::multipart("https://vtop.example/m", &[("a", "1"), ("_csrf", "c")]);
+        let body = String::from_utf8(request.body).unwrap();
+        assert_eq!(
+            body,
+            format!(
+                "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\n1\r\n--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"_csrf\"\r\n\r\nc\r\n--{BOUNDARY}--\r\n"
+            )
+        );
+        assert_eq!(
+            request.headers[0].1,
+            format!("multipart/form-data; boundary={BOUNDARY}")
+        );
     }
 
     #[test]

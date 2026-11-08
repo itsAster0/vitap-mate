@@ -1,6 +1,6 @@
 # Rust core without I/O (vtop-proto) + Kotlin transport
 
-Status: planned 2026-11-08, not started. Goal: faster cold start and a much
+Status: planned 2026-11-08; phase 1 done 2026-11-09 (`rust/vtop-proto`). Goal: faster cold start and a much
 smaller native library in the KMP app. Rust thinks (state machines, parsing,
 session rules); Kotlin moves bytes (OkHttp) and runs the loop.
 
@@ -90,5 +90,12 @@ recorded responses with no server. JNA stays (UniFFI).
 ## Still open (my defaults)
 
 5. Gmail OTP reading becomes its own glue crate on the transport.
-6. Errors: thiserror (default) or hand-written.
+6. Errors: thiserror (decided in phase 1).
 7. Work on its own jj branch, separate from the KMP UI work (default yes).
+
+## Transport for the proxy route (decided 2026-11-09)
+
+The proxy route uses okhttp-httpengine on Android 14+ (plain OkHttp below).
+It must work for any HTTPS server: HTTP/3 when offered, falling back to
+HTTP/2 and HTTP/1.1 on its own (campus Wi-Fi blocks QUIC). Direct VTOP
+requests stay on plain OkHttp, since VTOP speaks only HTTP/1.1.
