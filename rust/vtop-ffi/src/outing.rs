@@ -239,7 +239,7 @@ pub struct OutingResult {
     pub message: String,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     pub fn cached_general_outing(&self, flow: String) -> Option<GeneralOuting> {
         traced_sync("cached_general_outing", &flow, || {
@@ -397,12 +397,19 @@ impl Core {
                 OutingKind::General => VtopOutingKind::General,
                 OutingKind::Weekend => VtopOutingKind::Weekend,
             };
-            let bytes = signed_in!(self, |client| client.outing_pass(vtop_kind, &id))?;
             fs::create_dir_all(&dir)?;
+            // The transport writes it to a temporary file, renamed once it proved a PDF.
             let temp = path.with_extension("tmp");
-            fs::write(&temp, &bytes)?;
+            let size = async {
+                signed_in!(self, |client| client
+                    .save_outing_pass(vtop_kind, &id, &temp))
+            }
+            .await
+            .inspect_err(|_| {
+                let _ = fs::remove_file(&temp);
+            })?;
             fs::rename(&temp, &path)?;
-            info!(?kind, bytes = bytes.len(), "outing pass downloaded");
+            info!(?kind, bytes = size, "outing pass downloaded");
             Ok(path.to_string_lossy().into_owned())
         })
         .await

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The system CAs plus the intermediate VTOP has left out of its chain (a copy of
+     rust/vtop-core/assets/sectigo_dv_r36.pem), for HttpEngine (Developer → HttpEngine), which
+     verifies with the platform's trust and honours this file. OkHttp brings its own. -->
+<network-security-config>
+  <base-config>
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="@raw/vtop_intermediate_ca" />
+    </trust-anchors>
+  </base-config>
+</network-security-config>

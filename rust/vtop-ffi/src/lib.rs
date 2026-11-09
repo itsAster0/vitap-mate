@@ -2,11 +2,13 @@
 //! a JSON cache in the app's data directory, and ready-to-draw records.
 
 mod calendar;
+mod cookies;
 mod dev;
 mod exams;
 mod marks;
 mod obs;
 mod records;
+mod transport;
 
 use std::collections::HashMap;
 use std::fs;
@@ -17,10 +19,11 @@ use std::time::SystemTime;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 use tracing::field::Empty;
 use tracing::{Instrument, Span, info, info_span, warn};
 use vtop_core::inputs::{CourseId, CourseType, Password, SemesterId, Username};
+use vtop_core::session::CookieStore;
+use vtop_core::sync::RwLock;
 use vtop_core::types::{
     AcademicCalendarData, AttendanceData, FullAttendanceData, PersistedVtopSession, SemesterData,
     TimetableData,
@@ -31,6 +34,7 @@ pub use biometric::{BiometricDay, Punch, PunchKind};
 pub use calendar::{
     AcademicCalendar, CalendarDay, CalendarEvent, CalendarEventPart, CalendarKind, CalendarMonth,
 };
+pub use cookies::{SharedCookies, set_shared_cookies};
 pub use course_page::{
     CourseGroup, CoursePage, CoursePart, CoursePlan, CourseSection, CourseView, Lecture, Material,
     SavedFile,
@@ -61,7 +65,11 @@ pub use records::{
     ClassDay, ClassKind, ClassSlot, ClassStatus, Course, CourseOutlook, DayClass, Debar, ExamPaper,
     ExamStart, NextClass, Semester, Semesters, Timetable, TimetableDay,
 };
-pub use web::{WebCookie, WebSession};
+pub use transport::{
+    Header, HttpRequest, HttpResponse, HttpTransport, TransportError, set_http_transport,
+    vtop_intermediate_ca,
+};
+pub use web::WebSession;
 
 uniffi::setup_scaffolding!();
 
@@ -186,6 +194,8 @@ pub struct SavedAccount {
 
 struct Session {
     client: VtopClient,
+    /// The client's cookies: the shared store's (the web view's) once this session is installed.
+    cookies: Arc<cookies::SessionCookies>,
     account: Account,
     /// Bumped on every sign-in, so concurrent fetches re-login once.
     logins: u64,
@@ -199,14 +209,27 @@ impl Session {
             Username::parse(&account.username).map_err(|_| CoreError::InvalidCredentials)?;
         let password =
             Password::parse(&account.password).map_err(|_| CoreError::InvalidCredentials)?;
+        let cookies = cookies::SessionCookies::new();
+        let client = VtopClient::builder()
+            .config(dev::vtop_config())
+            .transport(transport::current()?)
+            .cookie_store(cookies.clone());
         Ok(Self {
-            client: VtopClient::builder()
-                .config(dev::vtop_config())
-                .with_credentials(username, password)?,
+            client: client.with_credentials(username, password)?,
+            cookies,
             account,
             logins: 0,
             otp: None,
         })
+    }
+
+    /// Starts over on a fresh client with no cookies (the shared store's go too): no
+    /// half-finished login, cookies, CSRF token or OTP wait.
+    fn restart(&mut self) -> Result<(), CoreError> {
+        let fresh = Self::new(self.account.clone())?;
+        fresh.cookies.activate(true);
+        (self.client, self.cookies, self.otp) = (fresh.client, fresh.cookies, None);
+        Ok(())
     }
 }
 
@@ -285,7 +308,7 @@ pub struct Core {
 
 /// Every call takes the caller's flow id first; its span logs `ms` and
 /// `outcome` on close.
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// Opens the cache in `data_dir` and restores the saved session.
     #[uniffi::constructor]
@@ -301,16 +324,10 @@ impl Core {
                 return Ok(());
             };
             let session = Session::new(account)?;
-            if let Some(saved) = core
+            let saved = core
                 .read::<PersistedVtopSession>(SESSION)
-                .filter(dev::reusable)
-            {
-                obs::set_regno(saved.registration_number.clone());
-                match session.client.restore_persisted_session(&saved) {
-                    Ok(()) => info!("session restored"),
-                    Err(error) => warn!(%error, "saved session not restored"),
-                }
-            }
+                .filter(dev::reusable);
+            core.restore(&session, saved);
             core.install(Some(Arc::new(RwLock::new(session))));
             Ok(())
         })?;
@@ -370,6 +387,8 @@ impl Core {
             if outcome != SignIn::Done {
                 self.keep_accepted_password(&session.account);
             }
+            // Accepted: its cookies become the app's (and the web view's).
+            session.cookies.activate(true);
             let slot = Arc::new(RwLock::new(session));
             self.install(Some(slot.clone()));
             if outcome == SignIn::Done {
@@ -419,9 +438,8 @@ impl Core {
         traced("cancel_otp", &flow, async {
             let slot = self.current()?;
             let mut session = slot.write().await;
-            if session.otp.take().is_some() {
-                // A fresh client: no half-finished login (its cookies, CSRF token, OTP wait).
-                session.client = Session::new(session.account.clone())?.client;
+            if session.otp.is_some() {
+                session.restart()?;
                 info!("pending otp dropped");
             }
             Ok(())
@@ -434,6 +452,7 @@ impl Core {
     pub fn sign_out(&self, flow: String) {
         let _ = traced_sync("sign_out", &flow, || {
             self.install(None);
+            cookies::sign_out();
             self.forget(&[ACCOUNT, SESSION, SEMESTERS, SELECTED, forwarding::FILE]);
             obs::set_regno(None);
             Ok(())
@@ -540,7 +559,7 @@ impl Core {
             // timetable both sync histories); a caller that waited, or one
             // right after, gets the history just fetched.
             let lock = detail_lock(&course_key);
-            let _one = lock.lock().await;
+            let _one = lock.write().await;
             if let Some(course) = self.cached_course(&course_key)
                 && let Some(data) = self.read_page::<FullAttendanceData>(&detail_file(&course))
                 && unix_now() - data.update_time as i64 <= DETAIL_FRESH_S
@@ -908,6 +927,10 @@ impl Core {
         if session.logins != seen {
             return Ok(()); // Another call already signed in again.
         }
+        if !self.is_current(slot) {
+            // Replaced or signed out meanwhile: its cookies are gone; never sign it in.
+            return Err(CoreError::NotSignedIn);
+        }
         if let Some(message) = &session.otp {
             return Err(CoreError::OtpRequired {
                 reason: message.clone(),
@@ -923,6 +946,7 @@ impl Core {
                 VtopError::OTPRequired(message, _) => session.otp = Some(message.clone()),
                 VtopError::InvalidCredentials => {
                     warn!("VTOP rejected the saved password; no more sign-ins with it");
+                    CookieStore::clear(session.cookies.as_ref());
                     session.account.rejected = true;
                     if self.is_current(slot) {
                         self.write(ACCOUNT, &session.account);
@@ -954,10 +978,40 @@ impl Core {
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_millis() as u64);
         self.write(ACCOUNT, &session.account);
-        self.write(
-            SESSION,
-            &session.client.export_persisted_session(saved_at_ms),
-        );
+        let mut saved = session.client.export_persisted_session(saved_at_ms);
+        if session.cookies.is_shared() {
+            // The shared store keeps (and saves) them.
+            saved.cookies = None;
+            session.cookies.flush();
+        }
+        self.write(SESSION, &saved);
+    }
+
+    /// Restores `saved` into `session` (not installed yet) and makes it the shared store's
+    /// session. Without cookies in `saved`, the store's are this session's and stay; a
+    /// `session.json` from before the shared store (cookies in it) moves them there once and is
+    /// saved again without; no `saved`: the store starts empty.
+    fn restore(&self, session: &Session, saved: Option<PersistedVtopSession>) {
+        let carry = saved.as_ref().is_none_or(|saved| saved.cookies.is_some());
+        if let Some(saved) = &saved {
+            obs::set_regno(saved.registration_number.clone());
+            match session.client.restore_persisted_session(saved) {
+                Ok(()) => info!(
+                    cookies_in_file = saved.cookies.is_some(),
+                    "session restored"
+                ),
+                Err(error) => warn!(%error, "saved session not restored"),
+            }
+        }
+        session.cookies.activate(carry);
+        if let Some(mut saved) = saved
+            && saved.cookies.is_some()
+            && session.cookies.is_shared()
+        {
+            saved.cookies = None;
+            self.write(SESSION, &saved);
+            info!("saved cookies moved to the shared store");
+        }
     }
 
     /// Saves `account`'s password over the saved account's when it's the same username
@@ -1020,8 +1074,8 @@ impl Core {
 const DETAIL_FRESH_S: i64 = 20;
 
 /// The lock that keeps one history fetch per course key at a time.
-fn detail_lock(key: &str) -> Arc<tokio::sync::Mutex<()>> {
-    static LOCKS: std::sync::LazyLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> =
+fn detail_lock(key: &str) -> Arc<RwLock<()>> {
+    static LOCKS: std::sync::LazyLock<Mutex<HashMap<String, Arc<RwLock<()>>>>> =
         std::sync::LazyLock::new(Mutex::default);
     LOCKS
         .lock()
@@ -1078,7 +1132,7 @@ async fn traced<T>(
     work: impl Future<Output = Result<T, CoreError>>,
 ) -> Result<T, CoreError> {
     let span = span(call, flow);
-    let result = work.instrument(span.clone()).await;
+    let result = transport::with_flow(flow.to_string(), work.instrument(span.clone())).await;
     close(&span, &result);
     result
 }

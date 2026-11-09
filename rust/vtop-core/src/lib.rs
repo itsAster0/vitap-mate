@@ -9,8 +9,10 @@
 
 pub mod client;
 pub mod config;
+#[cfg(feature = "reqwest")]
 pub mod gmail;
 pub mod session;
+pub mod sync;
 
 #[doc(hidden)]
 pub fn solve_captcha(data_url: &str) -> Result<String, String> {
@@ -20,7 +22,7 @@ pub use client::VtopClient;
 pub use config::VtopConfig;
 pub use session::SessionState;
 pub use vtop_proto::{
-    course_pages, error, http, inputs, login, machine, now_unix, outing, pages, parser, types,
+    course_pages, error, http, inputs, login, machine, now_unix, otp, outing, pages, parser, types,
 };
 pub use vtop_proto::{VtopError, VtopResult};
 pub use vtop_shared::mail_seal;

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET" />
+  <!-- HttpEngine (Developer → HttpEngine) watches the network; without it, it crashes on start. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <!-- Downloads/vitapmate below API 29 (MediaStore takes over from 29). -->
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <!-- Device auth before the Account page (platform BiometricPrompt). -->
@@ -9,7 +11,8 @@
       android:label="vitapmate (Compose)"
       android:icon="@mipmap/launcher_icon"
       android:enableOnBackInvokedCallback="true"
-      android:theme="@style/AppTheme">
+      android:theme="@style/AppTheme"
+      android:networkSecurityConfig="@xml/network_security_config">
     <activity
         android:name="vitapmate.MainActivity"
         android:exported="true"

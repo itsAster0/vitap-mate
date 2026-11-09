@@ -29,8 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlin.coroutines.resume
-import kotlinx.coroutines.suspendCancellableCoroutine
 import org.json.JSONArray
 import vitapmate.core.WebSession
 import vitapmate.data.Docs
@@ -443,17 +441,4 @@ internal class VtopBrowser(
         fun pathOf(url: String): String = Uri.parse(url).path.orEmpty()
         fun pathOf(uri: Uri): String = uri.path.orEmpty()
     }
-}
-
-/** Starts the jar over with [session]'s cookies, as the Flutter app does: VTOP's own host-only JSESSIONID would shadow them. */
-internal suspend fun setCookies(session: WebSession) {
-    val jar = CookieManager.getInstance()
-    suspendCancellableCoroutine { done -> jar.removeAllCookies { done.resume(Unit) } }
-    val url = session.baseUrl + "/vtop/"
-    for (cookie in session.cookies) {
-        val value = "${cookie.name}=${cookie.value}; Domain=${cookie.domain}; Path=${cookie.path}" + if (cookie.secure) "; Secure" else ""
-        val set = suspendCancellableCoroutine { done -> jar.setCookie(url, value) { done.resume(it) } }
-        check(set) { "Could not set VTOP cookies" }
-    }
-    jar.flush()
 }

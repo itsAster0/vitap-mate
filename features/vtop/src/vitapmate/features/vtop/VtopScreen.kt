@@ -113,7 +113,7 @@ internal fun VtopScreen() {
 
     lateinit var browser: VtopBrowser
 
-    /** Asks Rust for a confirmed session, sets its cookies and opens VTOP's start page. */
+    /** Asks Rust for a confirmed session and opens VTOP's start page. */
     suspend fun prepare(name: String, force: Boolean) {
         var id = ""
         problem = null
@@ -122,9 +122,9 @@ internal fun VtopScreen() {
             flow(name) { flowId ->
                 id = flowId
                 browser.flow = flowId
+                // The web view shares the app's cookie store: a confirmed session is all it needs.
                 val fresh = withContext(Dispatchers.IO) { AppCore.await().webSession(flowId, force) }
-                setCookies(fresh)
-                Log.info(SRC, "cookies set", flowId, mapOf("count" to fresh.cookies.size.toString(), "force" to force.toString()))
+                Log.info(SRC, "session ready", flowId, mapOf("force" to force.toString()))
                 session = fresh
                 browser.open(fresh)
             }

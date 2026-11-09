@@ -213,6 +213,54 @@ pub fn http_date(unix: u64) -> String {
     )
 }
 
+/// An absolute URL's scheme, host (no port, lower case) and path (no query
+/// or fragment, `/` when empty). `None` for anything without `scheme://`.
+pub fn url_parts(url: &str) -> Option<(&str, String, &str)> {
+    let (scheme, rest) = url.split_once("://")?;
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    let authority = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or_default(),
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    let rest = &rest[end..];
+    let path = &rest[..rest.find(['?', '#']).unwrap_or(rest.len())];
+    Some((
+        scheme,
+        host.to_ascii_lowercase(),
+        if path.is_empty() { "/" } else { path },
+    ))
+}
+
+/// Where a `Location` points from `base`: absolute, scheme-relative,
+/// path-absolute, query-only or relative to `base`'s directory. Dot
+/// segments are kept as they are (VTOP sends none).
+pub fn join_url(base: &str, location: &str) -> Option<String> {
+    let location = location.trim();
+    if location.contains("://") {
+        return Some(location.to_string());
+    }
+    let (scheme, rest) = base.split_once("://")?;
+    let origin_end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let origin = format!("{scheme}://{}", &rest[..origin_end]);
+    let path = &rest[origin_end..];
+    let path = &path[..path.find(['?', '#']).unwrap_or(path.len())];
+    Some(if let Some(after) = location.strip_prefix("//") {
+        format!("{scheme}://{after}")
+    } else if location.starts_with('/') {
+        format!("{origin}{location}")
+    } else if location.starts_with('?') {
+        format!("{origin}{path}{location}")
+    } else {
+        let dir = &path[..path.rfind('/').map_or(0, |at| at + 1)];
+        let dir = if dir.is_empty() { "/" } else { dir };
+        format!("{origin}{dir}{location}")
+    })
+}
+
 fn is_cookie_attribute_name(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
@@ -359,6 +407,34 @@ mod tests {
             .redirect(),
             None
         );
+    }
+
+    #[test]
+    fn urls_split_and_join_like_the_url_crate() {
+        assert_eq!(
+            url_parts("https://VTOP.example:8443/vtop/content?x=1#f"),
+            Some(("https", "vtop.example".to_string(), "/vtop/content"))
+        );
+        assert_eq!(
+            url_parts("http://127.0.0.1:9?a"),
+            Some(("http", "127.0.0.1".to_string(), "/"))
+        );
+        assert_eq!(url_parts("/vtop"), None);
+        let base = "https://v.example/vtop/login/x?q=1";
+        for (location, joined) in [
+            ("/vtop/open", "https://v.example/vtop/open"),
+            ("https://o.example/a", "https://o.example/a"),
+            ("//o.example/a", "https://o.example/a"),
+            ("page?a=b", "https://v.example/vtop/login/page?a=b"),
+            ("?z=2", "https://v.example/vtop/login/x?z=2"),
+        ] {
+            assert_eq!(
+                join_url(base, location).as_deref(),
+                Some(joined),
+                "{location}"
+            );
+        }
+        assert_eq!(join_url("http://h:1", "a").as_deref(), Some("http://h:1/a"));
     }
 
     #[test]

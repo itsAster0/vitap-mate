@@ -1,4 +1,7 @@
 [workspace]
+# 2: dev-dependency features (vtop-ffi's tests turn on vtop-core/reqwest)
+# stay out of the app build.
+resolver = "2"
 members = ["vtop-shared", "vtop-proto", "vtop-core", "vtop-bridge", "vtop-mcp", "vtop-wire", "vtop-gateway", "vtop-ffi"]
 
 [workspace.dependencies]

@@ -226,7 +226,7 @@ pub struct GpaPlan {
     pub letter: String,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// `semester_id`'s cached grades. With an empty id the picked semester's,
     /// or, while it has none (grades come once a semester ends), the one

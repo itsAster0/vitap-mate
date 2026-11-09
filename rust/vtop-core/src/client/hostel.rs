@@ -77,4 +77,31 @@ impl VtopClient {
         let machine = OnePost::reading(outing::pass(&signed, kind, id), outing::read_pass);
         self.run("get_outing_pass", machine).await
     }
+
+    /// [`Self::outing_pass`] written to the file `to` (the app's transport
+    /// writes it there itself); checked as [`outing::read_pass`] does, from
+    /// the head and the first bytes (`%PDF`). Returns its size; nothing stays
+    /// at `to` when VTOP did not send the pass.
+    pub async fn save_outing_pass(
+        &self,
+        kind: OutingKind,
+        id: &OutingPassId,
+        to: &std::path::Path,
+    ) -> VtopResult<u64> {
+        let context = "get_outing_pass";
+        let signed = self.signed(context).await?;
+        let (head, size) = self
+            .download(context, outing::pass(&signed, kind, id), to)
+            .await?;
+        if let Err(error) = outing::read_pass(&head) {
+            let _ = std::fs::remove_file(to);
+            if matches!(error, crate::error::VtopError::SessionExpired) {
+                self.mark_session_expired(context, &format!("VTOP answered: {error}"));
+            } else {
+                log::warn!(target: super::NETWORK, "{context}: {error}");
+            }
+            return Err(error);
+        }
+        Ok(size)
+    }
 }

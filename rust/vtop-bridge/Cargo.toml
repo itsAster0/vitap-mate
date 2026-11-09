@@ -5,7 +5,7 @@ edition = "2021"
 description = "The engine: VTOP sessions, sign-in and the MCP tools for the Cloudflare edge"
 
 [dependencies]
-vtop-core = { path = "../vtop-core" }
+vtop-core = { path = "../vtop-core", features = ["reqwest"] }
 vtop-shared = { path = "../vtop-shared" }
 vtop-mcp = { path = "../vtop-mcp" }
 axum = "0.8"

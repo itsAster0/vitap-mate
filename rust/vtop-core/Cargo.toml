@@ -7,13 +7,24 @@ description = "VTOP client, session handling and HTML parsers, with no FFI depen
 [dependencies]
 vtop-shared = { path = "../vtop-shared" }
 vtop-proto = { path = "../vtop-proto" }
-reqwest = { workspace = true }
+# The server's transport and the Gmail OTP reader. The app (vtop-ffi) leaves
+# it off and passes its own transport.
+reqwest = { workspace = true, optional = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true, features = ["rt", "time", "sync"] }
+serde_json = { workspace = true, optional = true }
+# The server's timers (Gmail polling, retry pauses); the app has none (see `sync`).
+tokio = { workspace = true, features = ["time"], optional = true }
 log = { workspace = true }
-base64 = "0.22.1"
+base64 = { version = "0.22.1", optional = true }
+
+[features]
+reqwest = ["dep:reqwest", "dep:base64", "dep:serde_json", "dep:tokio"]
+
+[[example]]
+name = "captcha_samples"
+required-features = ["reqwest"]
 
 [dev-dependencies]
+serde_json = { workspace = true }
 httpdate = "1"
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "net", "io-util", "time"] }

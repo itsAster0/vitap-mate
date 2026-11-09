@@ -51,6 +51,7 @@ import com.composables.icons.lucide.SquareActivity
 import com.composables.icons.lucide.Timer
 import com.composables.icons.lucide.Trash
 import com.composables.icons.lucide.Unplug
+import com.composables.icons.lucide.Zap
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -144,6 +145,14 @@ fun DeveloperScreen() {
                         "Wi-Fi proxy and user CAs, from the next launch",
                         onClick = { Settings.inspectTraffic = !Settings.inspectTraffic; haptics.toggle(Settings.inspectTraffic) },
                         trailing = { Switch(Settings.inspectTraffic, { Settings.inspectTraffic = it; haptics.toggle(it) }) },
+                    )
+                    if (android.os.Build.VERSION.SDK_INT >= 34) GroupItem(
+                        "HttpEngine",
+                        "dev.http_engine",
+                        Lucide.Zap,
+                        "Android 14+, HTTP/3; from the next launch",
+                        onClick = { Settings.httpEngine = !Settings.httpEngine; haptics.toggle(Settings.httpEngine) },
+                        trailing = { Switch(Settings.httpEngine, { Settings.httpEngine = it; haptics.toggle(it) }) },
                     )
                 }
             }

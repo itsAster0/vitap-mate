@@ -1,15 +1,20 @@
-use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+//! What every VTOP request carries, and (feature `reqwest`) the server's
+//! shared HTTP clients.
 
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, CONTENT_TYPE, USER_AGENT};
-use reqwest::redirect::Policy;
+use std::sync::OnceLock;
+#[cfg(feature = "reqwest")]
+use std::{sync::Mutex, time::Duration};
+
+#[cfg(feature = "reqwest")]
 use reqwest::{Certificate, Client, ClientBuilder, Proxy};
 
+#[cfg(feature = "reqwest")]
 use crate::config::VtopConfig;
+#[cfg(feature = "reqwest")]
 use crate::error::{VtopError, VtopResult};
 
 /// Intermediate CA VTOP sometimes fails to send in its chain.
-const VITAP_INTERMEDIATE_CA_PEM: &str = include_str!("../../assets/sectigo_dv_r36.pem");
+pub const VITAP_INTERMEDIATE_CA_PEM: &str = include_str!("../../assets/sectigo_dv_r36.pem");
 
 /// A proxy and the CAs it signs with, so a debugging proxy (Proxyman,
 /// mitmproxy) can read the phone's traffic: the app's Developer → Inspect
@@ -30,6 +35,7 @@ pub fn set_inspection(inspection: Inspection) {
 }
 
 /// `builder` with the [`Inspection`] proxy and CAs, when one is set.
+#[cfg(feature = "reqwest")]
 pub(crate) fn inspected(mut builder: ClientBuilder) -> ClientBuilder {
     let Some(inspection) = INSPECTION.get() else {
         return builder;
@@ -49,50 +55,41 @@ pub(crate) fn inspected(mut builder: ClientBuilder) -> ClientBuilder {
     builder
 }
 
-/// Headers every VTOP request carries, built once.
-pub(super) fn default_headers() -> &'static HeaderMap {
-    static HEADERS: OnceLock<HeaderMap> = OnceLock::new();
-    HEADERS.get_or_init(build_default_headers)
-}
-
-fn build_default_headers() -> HeaderMap {
-    let mut headers = HeaderMap::new();
-    // Desktop Firefox on Linux, matching the Firefox headers below. Desktop
-    // so VTOP serves the layout the parser expects; bump with Firefox.
-    headers.insert(
-        USER_AGENT,
-        HeaderValue::from_static(
-            "Mozilla/5.0 (X11; Linux x86_64; rv:157.0) Gecko/20100101 Firefox/157.0",
-        ),
-    );
-    headers.insert(
-        ACCEPT,
-        HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"),
-    );
-    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.5"));
-    headers.insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("application/x-www-form-urlencoded"),
-    );
-    headers.insert("Upgrade-Insecure-Requests", HeaderValue::from_static("1"));
-    headers.insert("Sec-Fetch-Dest", HeaderValue::from_static("document"));
-    headers.insert("Sec-Fetch-Mode", HeaderValue::from_static("navigate"));
-    headers.insert("Sec-Fetch-Site", HeaderValue::from_static("same-origin"));
-    headers.insert("Sec-Fetch-User", HeaderValue::from_static("?1"));
-    headers.insert("Priority", HeaderValue::from_static("u=0, i"));
-    headers
-}
+/// Headers every VTOP request carries, names in lower case. Desktop
+/// Firefox on Linux, so VTOP serves the layout the parser expects; bump
+/// with Firefox.
+pub(super) const DEFAULT_HEADERS: &[(&str, &str)] = &[
+    (
+        "user-agent",
+        "Mozilla/5.0 (X11; Linux x86_64; rv:157.0) Gecko/20100101 Firefox/157.0",
+    ),
+    (
+        "accept",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    ),
+    ("accept-language", "en-US,en;q=0.5"),
+    ("content-type", "application/x-www-form-urlencoded"),
+    ("upgrade-insecure-requests", "1"),
+    ("sec-fetch-dest", "document"),
+    ("sec-fetch-mode", "navigate"),
+    ("sec-fetch-site", "same-origin"),
+    ("sec-fetch-user", "?1"),
+    ("priority", "u=0, i"),
+];
 
 /// Clients that share a connection pool, one per timeout setting. Cookies
 /// are never stored here: each [`super::VtopClient`] adds its own to every
 /// request (see [`super::VtopClient::send_request`]), so many sessions can
 /// reuse the same warm TLS connections to VTOP without seeing each other's
 /// cookies.
+#[cfg(feature = "reqwest")]
 static SHARED: OnceLock<Mutex<Vec<(TimeoutKey, Client)>>> = OnceLock::new();
 
+#[cfg(feature = "reqwest")]
 type TimeoutKey = (Duration, Duration);
 
 /// The shared client for `config`'s timeouts, built on first use.
+#[cfg(feature = "reqwest")]
 pub(super) fn shared_client(config: &VtopConfig) -> VtopResult<Client> {
     let key = (config.request_timeout, config.connect_timeout);
     let clients = SHARED.get_or_init(|| Mutex::new(Vec::new()));
@@ -107,12 +104,12 @@ pub(super) fn shared_client(config: &VtopConfig) -> VtopResult<Client> {
     Ok(client)
 }
 
+#[cfg(feature = "reqwest")]
 fn build_client(config: &VtopConfig) -> VtopResult<Client> {
     let mut builder = Client::builder()
-        .default_headers(default_headers().clone())
         // Redirects are followed by VtopClient so it can collect the
         // Set-Cookie headers of every hop into its own jar.
-        .redirect(Policy::none())
+        .redirect(reqwest::redirect::Policy::none())
         .pool_max_idle_per_host(32)
         .pool_idle_timeout(Duration::from_secs(90))
         .tcp_keepalive(Duration::from_secs(60))

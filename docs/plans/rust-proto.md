@@ -1,6 +1,6 @@
 # Rust core without I/O (vtop-proto) + Kotlin transport
 
-Status: planned 2026-11-08; phase 1 done 2026-11-09 (`rust/vtop-proto`). Goal: faster cold start and a much
+Status (2026-11-09): phases 1–3 and 5 done, phase 4 done except HttpEngine; see Linear KRY-24…KRY-30. Goal: faster cold start and a much
 smaller native library in the KMP app. Rust thinks (state machines, parsing,
 session rules); Kotlin moves bytes (OkHttp) and runs the loop.
 
@@ -99,3 +99,27 @@ The proxy route uses okhttp-httpengine on Android 14+ (plain OkHttp below).
 It must work for any HTTPS server: HTTP/3 when offered, falling back to
 HTTP/2 and HTTP/1.1 on its own (campus Wi-Fi blocks QUIC). Direct VTOP
 requests stay on plain OkHttp, since VTOP speaks only HTTP/1.1.
+
+## As built (2026-11-09)
+
+- Machines live in `rust/vtop-proto` (pages, outing, course pages, login, OTP, CAPTCHA).
+  vtop-core still drives them for the app over async (no tokio since KRY-29), with the hop going to Kotlin:
+  the Kotlin driver loop described above was not needed for the size and TLS goals.
+- Transport: vtop-core `Transport` (one hop; Rust follows redirects and decides retries).
+  App: OkHttp via the UniFFI foreign trait `HttpTransport` (`VtopHttp.kt`); server: reqwest
+  behind vtop-core's `reqwest` feature. Downloads go straight to a file (`download_to`).
+- Cookies: not an OkHttp CookieJar (it would overwrite the explicit Cookie header the session
+  check sends, and Rust needs cookies for forwarding and dev tools). Rust's `CookieStore` trait
+  reads/writes android CookieManager through the foreign trait `SharedCookies`
+  (`VtopCookies.kt`); only the installed session uses it. The web view cookie copy is gone.
+  Old session.json cookies migrate once into CookieManager.
+- libvtop_ffi.so arm64: 5,102,312 B (phase 0) → 2,652,144 B → 2,610,592 B without tokio (KRY-29).
+- No tokio in the app build: UniFFI async exports run on Kotlin's polling; `vtop_core::sync`
+  has the async `RwLock` (session slot, validation, per-course history lock) and `sleep` (a
+  timer thread; reqwest's transport overrides `Transport::pause` with tokio's). The flow id
+  for `x-request-id` is a thread-local set around each poll (`transport::with_flow`).
+- HttpEngine (KRY-30): `VtopHttpEngine.kt`, the same `HttpTransport` on `android.net.http.HttpEngine`
+  with no dependency, behind Developer → HttpEngine (off by default; Android 14+, and OkHttp while
+  Inspect Traffic is on). Needs `ACCESS_NETWORK_STATE`. It honours `network_security_config.xml`,
+  which adds VTOP's intermediate to the system CAs. VTOP negotiates HTTP/1.1 (no ALPN) on both
+  stacks with the same timings; the edge goes h2, then h3 after Alt-Svc.

@@ -54,7 +54,7 @@ pub enum PunchKind {
     Other,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// `day`'s cached punches (days since 1970-01-01, in India).
     pub fn cached_biometric(&self, flow: String, day: i32) -> Option<BiometricDay> {

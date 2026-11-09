@@ -97,7 +97,7 @@ pub struct Assessment {
     pub posted_at: Option<i64>,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// The selected semester's cached marks.
     pub fn cached_marks(&self, flow: String) -> Option<Marks> {

@@ -6,12 +6,12 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tracing::info;
 use vtop_core::VtopError;
-use vtop_core::client::CourseFileDownload;
+use vtop_core::client::SavedCourseFile;
 use vtop_core::inputs::{CourseFilePath, SemesterId};
 use vtop_core::types::{
     CoursePageClass, CoursePageClasses, CoursePageCourse, CoursePageCourses, CoursePageDetail,
@@ -121,7 +121,7 @@ pub struct SavedFile {
     pub size: u64,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// The selected semester's cached course list.
     pub fn cached_course_page(&self, flow: String) -> Option<CoursePage> {
@@ -217,7 +217,8 @@ impl Core {
 
     /// Downloads a course page file (a lecture's material, the syllabus, a
     /// material bundle; a `path` from [`CoursePlan`]) into the app's
-    /// `files/downloads/` under VTOP's name, streamed to disk.
+    /// `files/downloads/` under VTOP's name, written there by the transport (never whole in
+    /// memory).
     pub async fn download_course_file(
         &self,
         flow: String,
@@ -225,14 +226,12 @@ impl Core {
     ) -> Result<SavedFile, CoreError> {
         traced("download_course_file", &flow, async {
             let path = CourseFilePath::parse(&path)?;
-            let download = signed_in!(self, |client| client.open_course_page_file(&path))?;
-            let fallback = path
-                .as_str()
-                .rsplit('/')
-                .next()
-                .unwrap_or("file")
-                .to_string();
-            self.save_download(download, &fallback).await
+            let fallback = path.as_str().rsplit('/').next().unwrap_or("file");
+            let part = self.part_file()?;
+            let saved =
+                async { signed_in!(self, |client| client.save_course_page_file(&path, &part)) }
+                    .await;
+            self.keep_download(saved, &part, fallback)
         })
         .await
     }
@@ -251,9 +250,13 @@ impl Core {
                 .and_then(|list| self.pick(&list))
                 .ok_or(CoreError::SemesterNeeded)?;
             let semester = SemesterId::parse(&semester)?;
-            let download =
-                signed_in!(self, |client| client.open_course_plan(&semester, &class_id))?;
-            self.save_download(download, "course-plan").await
+            let part = self.part_file()?;
+            let saved = async {
+                signed_in!(self, |client| client
+                    .save_course_plan(&semester, &class_id, &part))
+            }
+            .await;
+            self.keep_download(saved, &part, "course-plan")
         })
         .await
     }
@@ -311,45 +314,39 @@ impl Core {
         }
     }
 
-    /// Streams `download` to `files/downloads/<VTOP's name>` (through a
-    /// `.part` file, so a failed download leaves nothing).
-    async fn save_download(
+    /// A new temporary file in `files/downloads/` for a download to go to.
+    fn part_file(&self) -> Result<PathBuf, CoreError> {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let dir = self.dir.join(DOWNLOADS);
+        fs::create_dir_all(&dir)?;
+        Ok(dir.join(format!(".{}.part", NEXT.fetch_add(1, Ordering::Relaxed))))
+    }
+
+    /// Names the file `saved` wrote at `part` `files/downloads/<VTOP's name>`; on a failure the
+    /// part file goes, so a failed download leaves nothing.
+    fn keep_download(
         &self,
-        mut download: CourseFileDownload,
+        saved: Result<SavedCourseFile, CoreError>,
+        part: &Path,
         fallback: &str,
     ) -> Result<SavedFile, CoreError> {
-        let mime = download
+        let saved = saved.inspect_err(|_| {
+            let _ = fs::remove_file(part);
+        })?;
+        let mime = saved
             .content_type
             .split(';')
             .next()
             .unwrap_or_default()
             .trim()
             .to_ascii_lowercase();
-        let name = file_name(&download.file_name, fallback, &mime);
-        let dir = self.dir.join(DOWNLOADS);
-        fs::create_dir_all(&dir)?;
-        let part = dir.join(format!(".{name}.part"));
-        let result = async {
-            let mut file = fs::File::create(&part)?;
-            let mut size = 0u64;
-            while let Some(chunk) = download.chunk().await? {
-                file.write_all(&chunk)?;
-                size += chunk.len() as u64;
-            }
-            file.sync_all()?;
-            Ok::<_, CoreError>(size)
-        }
-        .await;
-        let size = match result {
-            Ok(size) => size,
-            Err(error) => {
-                let _ = fs::remove_file(&part);
-                return Err(error);
-            }
-        };
-        let path = dir.join(&name);
-        fs::rename(&part, &path)?;
-        info!(size, expected = download.length, %mime, "course file saved");
+        let name = file_name(&saved.file_name, fallback, &mime);
+        let path = self.dir.join(DOWNLOADS).join(&name);
+        fs::rename(part, &path).inspect_err(|_| {
+            let _ = fs::remove_file(part);
+        })?;
+        let size = saved.size;
+        info!(size, %mime, "course file saved");
         Ok(SavedFile {
             path: path_string(&path),
             name,
@@ -846,7 +843,7 @@ mod tests {
 
     fn signed_in_core(base: String, name: &str) -> (Core, PathBuf) {
         use std::sync::{Arc, Mutex};
-        use tokio::sync::RwLock;
+        use vtop_core::sync::RwLock;
         use vtop_core::{SessionState, VtopClient, VtopConfig};
         let dir = std::env::temp_dir().join(format!("vtop-ffi-file-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
@@ -866,6 +863,7 @@ mod tests {
             .unwrap();
         let session = crate::Session {
             client,
+            cookies: crate::cookies::SessionCookies::new(),
             account: crate::Account {
                 username: "22BCE0001".into(),
                 password: "pw".into(),
@@ -926,7 +924,8 @@ mod tests {
         fs::write(dir.join(crate::SELECTED), r#""AP1""#).unwrap();
         let result = core.download_course_plan("f".into(), "C2".into()).await;
         assert!(matches!(result, Err(CoreError::Other { .. })), "{result:?}");
-        assert!(!dir.join(DOWNLOADS).exists());
+        let left = fs::read_dir(dir.join(DOWNLOADS)).map_or(0, |entries| entries.count());
+        assert_eq!(left, 0, "nothing saved, no .part file left");
         let _ = fs::remove_dir_all(&dir);
     }
 

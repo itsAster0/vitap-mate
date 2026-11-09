@@ -1,5 +1,7 @@
-//! Login that answers VTOP's security OTP from Gmail by itself.
+//! Login that answers VTOP's security OTP by itself: from a code source,
+//! or (feature `reqwest`) from Gmail.
 
+#[cfg(feature = "reqwest")]
 use std::collections::HashSet;
 use std::future::Future;
 use std::time::{Duration, Instant};
@@ -8,9 +10,11 @@ use log::Level;
 
 use super::VtopClient;
 use crate::error::{VtopError, VtopResult};
+#[cfg(feature = "reqwest")]
 use crate::gmail::{self, GmailAccess, GmailOtpError};
 
 /// What [`VtopClient::login_with_gmail_otp`] did.
+#[cfg(feature = "reqwest")]
 #[derive(Debug)]
 pub struct EmailOtpLogin {
     /// `Ok` when signed in. `Err(OTPRequired)` when the OTP still has to be
@@ -21,6 +25,7 @@ pub struct EmailOtpLogin {
     pub gmail_error: Option<GmailOtpError>,
 }
 
+#[cfg(feature = "reqwest")]
 impl VtopClient {
     /// Logs in, and if VTOP asks for the emailed security OTP, reads it from
     /// Gmail with `gmail` (waiting up to `wait` for the email) and submits
@@ -88,7 +93,9 @@ impl VtopClient {
             }
         }
     }
+}
 
+impl VtopClient {
     /// Logs in, and if VTOP asks for the emailed security OTP, asks
     /// `next_code` for one (with when the OTP was issued, how long is left,
     /// and the codes VTOP already rejected) and submits it, until VTOP takes

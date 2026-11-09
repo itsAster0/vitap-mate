@@ -479,3 +479,107 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
         Err(CoreError::NotSignedIn)
     );
 }
+
+#[tokio::test]
+async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
+    let memory = cookies::tests::with_shared();
+    let vtop = format!("{}/vtop", vtop_core::config::DEFAULT_BASE_URL);
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-jar-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    // As an install before the shared store saved it: the cookies in the file.
+    let before = r#"{"username":"22BCE0001","saved_at_epoch_ms":0,"cookies":"JSESSIONID=old; SERVERID=s1","csrf_token":"csrf-1","registration_number":"22BCE0001"}"#;
+    fs::write(dir.join(SESSION), before).unwrap();
+    // The web view's cookies from the old copying go.
+    memory.set_cookies(
+        vtop.clone(),
+        vec!["JSESSIONID=web; Domain=.vitap.ac.in".into()],
+    );
+    let account = Account {
+        username: "22BCE0001".into(),
+        password: "pw".into(),
+        rejected: false,
+    };
+    let core = Core {
+        dir: dir.clone(),
+        slot: Mutex::new(None),
+    };
+    let launch = || {
+        let session = Session::new(account.clone()).unwrap();
+        core.restore(&session, core.read(SESSION));
+        session
+    };
+
+    let first = launch();
+    assert!(first.client.is_authenticated() && first.cookies.is_shared());
+    assert_eq!(
+        memory.cookie(vtop.clone()).as_deref(),
+        Some("JSESSIONID=old; SERVERID=s1")
+    );
+    let saved: PersistedVtopSession = core.read(SESSION).unwrap();
+    assert_eq!(saved.cookies, None, "rewritten without cookies");
+    assert_eq!(saved.csrf_token.as_deref(), Some("csrf-1"));
+    let clears = *memory.clears.lock().unwrap();
+
+    // The next launch: the store's cookies (VTOP's latest) are the session's, untouched.
+    memory.set_cookies(vtop.clone(), vec!["SERVERID=s2; Path=/".into()]);
+    let second = launch();
+    assert!(second.client.is_authenticated() && second.cookies.is_shared());
+    assert!(!first.cookies.is_shared(), "the session before lets go");
+    assert_eq!(*memory.clears.lock().unwrap(), clears);
+    assert_eq!(
+        second.client.cookie_header().as_deref(),
+        Some("JSESSIONID=old; SERVERID=s2")
+    );
+
+    // A sign-in saves without cookies; signing out empties the store.
+    let slot = Arc::new(RwLock::new(second));
+    core.install(Some(slot.clone()));
+    core.save(&slot, &*slot.read().await);
+    assert_eq!(
+        core.read::<PersistedVtopSession>(SESSION).unwrap().cookies,
+        None
+    );
+    core.sign_out("f".into());
+    assert_eq!(memory.cookie(vtop), None);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn clearing_the_session_empties_the_shared_store() {
+    let memory = cookies::tests::with_shared();
+    let vtop = format!("{}/vtop", vtop_core::config::DEFAULT_BASE_URL);
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-jar-clear-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let account = Account {
+        username: "22BCE0001".into(),
+        password: "pw".into(),
+        rejected: false,
+    };
+    let session = Session::new(account).unwrap();
+    session.cookies.activate(false);
+    memory.set_cookies(vtop.clone(), vec!["JSESSIONID=live; Path=/vtop".into()]);
+    let core = Core {
+        dir: dir.clone(),
+        slot: Mutex::new(Some(Arc::new(RwLock::new(session)))),
+    };
+    assert_eq!(
+        core.dev_cookie_editor_json("f".into())
+            .await
+            .unwrap()
+            .map(|json| json.contains("live")),
+        Some(true),
+        "Copy saved cookies reads the shared store"
+    );
+
+    core.dev_clear_session("f".into()).await.unwrap();
+
+    assert_eq!(memory.cookie(vtop), None);
+    let session = core.current().unwrap();
+    assert!(
+        session.read().await.cookies.is_shared(),
+        "the fresh client uses the store"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}

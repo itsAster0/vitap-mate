@@ -21,6 +21,7 @@ object Settings {
     private val backgroundErrors = mutableStateOf(false)
     private val devAlways = mutableStateOf(false)
     private val inspect = mutableStateOf(false)
+    private val engine = mutableStateOf(false)
     private val tuned = mutableStateMapOf<Tunable, Int>()
 
     /** Whether attendance shows how many classes can be skipped. */
@@ -131,6 +132,18 @@ object Settings {
             prefs?.edit()?.putBoolean("dev_inspect_traffic", value)?.apply()
         }
 
+    /**
+     * Developer → HttpEngine, on by default: from the next launch, on Android 14+ (where the
+     * phone has HttpEngine) and with Inspect Traffic off, requests go through [VtopHttpEngine]
+     * (HTTP/3 where the server offers it); otherwise plain OkHttp.
+     */
+    var httpEngine: Boolean
+        get() = engine.value
+        set(value) {
+            engine.value = value
+            prefs?.edit()?.putBoolean("dev_http_engine", value)?.apply()
+        }
+
     /** [t]'s value, in its unit. */
     fun tunable(t: Tunable): Int = tuned[t] ?: t.default
 
@@ -157,13 +170,14 @@ object Settings {
         avatar.value = p.getString("settings_avatar_path", null)
         devAlways.value = p.getBoolean("dev_always_show", false)
         inspect.value = p.getBoolean("dev_inspect_traffic", false)
+        engine.value = p.getBoolean("dev_http_engine", true)
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
     }
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic) + Tunable.entries.associate { it.key to tunable(it) }
+            mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 
 /**

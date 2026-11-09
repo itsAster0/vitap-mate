@@ -474,11 +474,11 @@ async fn sessions_on_the_shared_pool_keep_their_own_cookies() {
 
     for _ in 0..3 {
         let (a, b) = tokio::join!(
-            alice.send_request(alice.http.get(&url)),
-            bob.send_request(bob.http.get(&url)),
+            alice.send_request(Request::get(&url)),
+            bob.send_request(Request::get(&url)),
         );
-        assert_eq!(a.unwrap().text().await.unwrap(), "JSESSIONID=alice");
-        assert_eq!(b.unwrap().text().await.unwrap(), "JSESSIONID=bob");
+        assert_eq!(a.unwrap().bytes().await.unwrap(), b"JSESSIONID=alice");
+        assert_eq!(b.unwrap().bytes().await.unwrap(), b"JSESSIONID=bob");
     }
 }
 
@@ -489,12 +489,12 @@ async fn cookies_set_during_a_redirect_are_kept() {
     let client = cookie_client(&base, "JSESSIONID=abc");
 
     let response = client
-        .send_request(client.http.get(format!("{base}/set-then-redirect")))
+        .send_request(Request::get(format!("{base}/set-then-redirect")))
         .await
         .unwrap();
 
-    assert!(response.url().path().ends_with("/echo-cookie"));
-    let sent = response.text().await.unwrap();
+    assert!(response.url.ends_with("/echo-cookie"));
+    let sent = response.read().await.unwrap().text();
     assert!(
         sent.contains("JSESSIONID=abc") && sent.contains("SERVERID=s9"),
         "{sent}"
@@ -594,4 +594,252 @@ async fn outing_actions_are_sent_once() {
     assert!(result.is_err());
     assert_eq!(mock.hits("/vtop/hostel/StudentGeneralOuting"), 1);
     assert_eq!(mock.hits("/vtop/hostel/deleteGeneralOutingInfo"), 1);
+}
+
+/// A hop's method, path under `/vtop` and headers.
+type SentHop = (String, String, Vec<(String, String)>);
+
+/// Answers each hop from a script and records what it was sent.
+#[derive(Debug, Default)]
+struct ScriptedTransport {
+    sent: Mutex<Vec<SentHop>>,
+}
+
+impl Transport for ScriptedTransport {
+    fn send(&self, hop: Hop) -> HopFuture<'_> {
+        Box::pin(async move {
+            let path = hop
+                .url
+                .split_once("/vtop")
+                .map_or("", |(_, p)| p)
+                .to_string();
+            self.sent
+                .lock()
+                .unwrap()
+                .push((hop.method.clone(), path.clone(), hop.headers.clone()));
+            match path.as_str() {
+                "/start" => Ok(HopResponse::whole(
+                    302,
+                    vec![
+                        ("Location".into(), "/vtop/end".into()),
+                        ("Set-Cookie".into(), "SERVERID=s9; Path=/".into()),
+                    ],
+                    hop.url,
+                    Vec::new(),
+                )),
+                "/end" => Ok(HopResponse::whole(
+                    200,
+                    Vec::new(),
+                    hop.url,
+                    b"done".to_vec(),
+                )),
+                _ => Err(TransportError::Connect("refused".into())),
+            }
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_custom_transport_sends_each_hop_with_cookies_and_default_headers() {
+    let transport = Arc::new(ScriptedTransport::default());
+    let client = VtopClient::builder()
+        .config(config("https://portal.example".into()))
+        .transport(transport.clone())
+        .with_session(&cookie_session("JSESSIONID=abc"))
+        .unwrap();
+
+    let response = client
+        .send_request(Request::post("https://portal.example/vtop/start", "a=1"))
+        .await
+        .unwrap();
+
+    assert_eq!(response.url, "https://portal.example/vtop/end");
+    assert_eq!(response.bytes().await.unwrap(), b"done");
+    let sent = transport.sent.lock().unwrap().clone();
+    let header = |hop: usize, name: &str| {
+        sent[hop]
+            .2
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.clone())
+    };
+    assert_eq!((sent[0].0.as_str(), sent[0].1.as_str()), ("POST", "/start"));
+    assert_eq!((sent[1].0.as_str(), sent[1].1.as_str()), ("GET", "/end"));
+    assert_eq!(header(0, "cookie").as_deref(), Some("JSESSIONID=abc"));
+    assert!(header(1, "cookie").unwrap().contains("SERVERID=s9"));
+    assert!(header(0, "user-agent").unwrap().contains("Firefox"));
+
+    let error = client
+        .send_request(Request::get("https://portal.example/vtop/gone"))
+        .await
+        .unwrap_err();
+    assert!(error.is_connect());
+}
+
+/// A `session.json` as the reqwest jar wrote it restores, sends its cookies
+/// and saves again byte for byte.
+#[tokio::test]
+async fn a_session_saved_by_the_old_jar_restores_byte_for_byte() {
+    let saved = r#"{"username":"22BCE0001","saved_at_epoch_ms":1794186123000,"cookies":"JSESSIONID=7F3A9C0E1B2D4F6A8C0E2B4D6F8A0C2E; SERVERID=vtop2","csrf_token":"2b6f0c1e-8d4a-4c3b-9e7f-1a2b3c4d5e6f","registration_number":"22BCE0001","logged_in_at":1794180000}"#;
+    let session: PersistedVtopSession = serde_json::from_str(saved).unwrap();
+    let transport = Arc::new(ScriptedTransport::default());
+    let client = VtopClient::builder()
+        .config(config("https://portal.example".into()))
+        .transport(transport.clone())
+        .with_credentials(
+            Username::parse("22bce0001").unwrap(),
+            Password::parse("secret").unwrap(),
+        )
+        .unwrap();
+    client.restore_persisted_session(&session).unwrap();
+    assert!(client.is_authenticated());
+
+    let again = client.export_persisted_session(1_794_186_123_000);
+    assert_eq!(serde_json::to_string(&again).unwrap(), saved);
+
+    client
+        .send_request(Request::get("https://portal.example/vtop/end"))
+        .await
+        .unwrap();
+    let sent = transport.sent.lock().unwrap().clone();
+    let cookie = sent[0].2.iter().find(|(name, _)| name == "cookie");
+    assert_eq!(
+        cookie.map(|(_, value)| value.as_str()),
+        session.cookies.as_deref()
+    );
+}
+
+#[tokio::test]
+async fn a_given_cookie_store_gets_each_hops_cookies_before_the_next() {
+    let store = Arc::new(ResettableJar::default());
+    store.add_cookie_str("JSESSIONID=live; Path=/vtop", "https://portal.example/vtop");
+    let transport = Arc::new(ScriptedTransport::default());
+    let client = VtopClient::builder()
+        .config(config("https://portal.example".into()))
+        .transport(transport.clone())
+        .cookie_store(store.clone())
+        .with_credentials(
+            Username::parse("22bce0001").unwrap(),
+            Password::parse("secret").unwrap(),
+        )
+        .unwrap();
+    // A session saved without cookies: they are the store's, and stay.
+    client
+        .restore_persisted_session(&PersistedVtopSession {
+            username: "22BCE0001".into(),
+            saved_at_epoch_ms: 0,
+            cookies: None,
+            csrf_token: Some("csrf-1".into()),
+            registration_number: Some("22BCE0001".into()),
+            logged_in_at: None,
+        })
+        .unwrap();
+    assert!(client.is_authenticated());
+
+    client
+        .send_request(Request::post("https://portal.example/vtop/start", "a=1"))
+        .await
+        .unwrap();
+
+    let sent = transport.sent.lock().unwrap().clone();
+    let cookie = |hop: usize| {
+        sent[hop]
+            .2
+            .iter()
+            .find(|(name, _)| name == "cookie")
+            .map(|(_, value)| value.clone())
+    };
+    assert_eq!(cookie(0).as_deref(), Some("JSESSIONID=live"));
+    // The redirect's Set-Cookie went into the store before the next hop.
+    assert_eq!(cookie(1).as_deref(), Some("JSESSIONID=live; SERVERID=s9"));
+    assert_eq!(
+        store.header_for("https://portal.example/vtop/x").as_deref(),
+        Some("JSESSIONID=live; SERVERID=s9")
+    );
+    assert_eq!(
+        client.cookie_header(),
+        store.header_for("https://portal.example/vtop")
+    );
+    assert_eq!(
+        client.export_persisted_session(0).cookies,
+        client.cookie_header()
+    );
+
+    // A dead session empties the store.
+    client.mark_session_expired("test", "test");
+    assert_eq!(store.header_for("https://portal.example/vtop/x"), None);
+}
+
+/// Answers a pass download (a redirect, then the body), writing the body to the hop's file
+/// when `saves`, as the app's transport does.
+#[derive(Debug)]
+struct DiskTransport {
+    saves: bool,
+    body: &'static [u8],
+    /// Each hop's `download_to`.
+    sent: Mutex<Vec<Option<std::path::PathBuf>>>,
+}
+
+impl Transport for DiskTransport {
+    fn send(&self, hop: Hop) -> HopFuture<'_> {
+        Box::pin(async move {
+            self.sent.lock().unwrap().push(hop.download_to.clone());
+            if !hop.url.contains("/vtop/file") {
+                let location = vec![("Location".into(), "/vtop/file".into())];
+                return Ok(HopResponse::whole(302, location, hop.url, Vec::new()));
+            }
+            let headers = vec![("Content-Type".into(), "application/pdf".into())];
+            match (&hop.download_to, self.saves) {
+                (Some(path), true) => {
+                    std::fs::write(path, self.body).unwrap();
+                    let size = self.body.len() as u64;
+                    Ok(HopResponse::saved(200, headers, hop.url, size))
+                }
+                _ => Ok(HopResponse::whole(
+                    200,
+                    headers,
+                    hop.url,
+                    self.body.to_vec(),
+                )),
+            }
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_pass_goes_to_its_file_whichever_transport_writes_it() {
+    let dir = std::env::temp_dir().join(format!("vtop-core-pass-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let id = OutingPassId::parse("W9").unwrap();
+    for (saves, body, ok) in [
+        (true, &b"%PDF-1.4 pass"[..], true),
+        (false, &b"%PDF-1.4 pass"[..], true),
+        (true, &b"<html>error</html>"[..], false),
+        (false, &b"<html>error</html>"[..], false),
+    ] {
+        let transport = Arc::new(DiskTransport {
+            saves,
+            body,
+            sent: Mutex::default(),
+        });
+        let client = VtopClient::builder()
+            .config(config("https://portal.example".into()))
+            .transport(transport.clone())
+            .with_session(&full_state(None))
+            .unwrap();
+        let to = dir.join(format!("{saves}-{ok}.pdf"));
+
+        let result = client.save_outing_pass(OutingKind::Weekend, &id, &to).await;
+
+        let sent = transport.sent.lock().unwrap().clone();
+        assert_eq!(sent, vec![Some(to.clone()), Some(to.clone())], "every hop");
+        if ok {
+            assert_eq!(result, Ok(body.len() as u64));
+            assert_eq!(std::fs::read(&to).unwrap(), body);
+        } else {
+            assert!(matches!(result, Err(VtopError::VtopServerError(_))));
+            assert!(!to.exists(), "an error page is not kept");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }

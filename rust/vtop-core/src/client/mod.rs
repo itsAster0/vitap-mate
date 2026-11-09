@@ -16,29 +16,33 @@ mod hostel;
 mod http;
 mod otp;
 mod profile;
+mod transport;
 
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use log::{error, info, warn};
-use reqwest::{Client, Response, StatusCode, Url};
 
 use crate::config::VtopConfig;
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{Password, RegistrationNumber, Username};
-use crate::session::{parse_cookie_pairs, ResettableJar, SessionManager, SessionState};
+use crate::session::{
+    parse_cookie_pairs, CookieStore, ResettableJar, SessionManager, SessionState,
+};
 use crate::types::PersistedVtopSession;
-use vtop_proto::http::{Method, Request, Response as ProtoResponse};
+use vtop_proto::http::{join_url, url_parts, Method, Request};
 use vtop_proto::machine::{Machine, OnePost, Signed, Step};
 
-pub use course_page::{CourseFile, CourseFileDownload, CourseFileInfo};
+pub use course_page::{CourseFile, CourseFileInfo, SavedCourseFile};
+#[cfg(feature = "reqwest")]
 pub use email_otp::EmailOtpLogin;
 pub use hostel::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
     WeekendOutingApplication,
 };
+#[cfg(feature = "reqwest")]
 pub(crate) use http::inspected;
-pub use http::{set_inspection, Inspection};
-use reqwest::cookie::CookieStore;
+pub use http::{set_inspection, Inspection, VITAP_INTERMEDIATE_CA_PEM};
+pub use transport::{Hop, HopFuture, HopResponse, Transport, TransportError};
 
 const AUTH: &str = "rust.auth";
 const NETWORK: &str = "rust.network";
@@ -80,14 +84,14 @@ struct AuthorizedRequest {
 }
 
 pub struct VtopClient {
-    http: Client,
+    transport: Arc<dyn Transport>,
     config: Arc<VtopConfig>,
-    jar: Arc<ResettableJar>,
+    jar: Arc<dyn CookieStore>,
     credentials: Option<Credentials>,
     state: Mutex<ClientState>,
     /// Serialises session validation so concurrent fetches on a restored
     /// session hit `/vtop/content` once, not once each.
-    validation: tokio::sync::Mutex<()>,
+    validation: crate::sync::RwLock<()>,
     auth_flow_id: u64,
 }
 
@@ -105,6 +109,8 @@ impl std::fmt::Debug for VtopClient {
 #[derive(Debug, Default)]
 pub struct VtopClientBuilder {
     config: VtopConfig,
+    transport: Option<Arc<dyn Transport>>,
+    cookies: Option<Arc<dyn CookieStore>>,
 }
 
 impl VtopClientBuilder {
@@ -113,11 +119,28 @@ impl VtopClientBuilder {
         self
     }
 
+    /// Sends every hop through `transport` instead of the default one.
+    pub fn transport(mut self, transport: Arc<dyn Transport>) -> Self {
+        self.transport = Some(transport);
+        self
+    }
+
+    /// Keeps the session's cookies in `store` instead of a jar of its own.
+    pub fn cookie_store(mut self, store: Arc<dyn CookieStore>) -> Self {
+        self.cookies = Some(store);
+        self
+    }
+
     fn build(self, credentials: Option<Credentials>) -> VtopResult<VtopClient> {
-        let jar = Arc::new(ResettableJar::default());
-        let http = http::shared_client(&self.config)?;
+        let jar = self
+            .cookies
+            .unwrap_or_else(|| Arc::new(ResettableJar::default()));
+        let transport = match self.transport {
+            Some(transport) => transport,
+            None => default_transport(&self.config)?,
+        };
         Ok(VtopClient {
-            http,
+            transport,
             config: Arc::new(self.config),
             jar,
             credentials,
@@ -126,7 +149,7 @@ impl VtopClientBuilder {
                 auth_stage: AuthStage::Idle,
                 logged_in_at: None,
             }),
-            validation: tokio::sync::Mutex::new(()),
+            validation: crate::sync::RwLock::default(),
             auth_flow_id: 0,
         })
     }
@@ -169,9 +192,11 @@ impl VtopClient {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
-    fn vtop_url(&self) -> VtopResult<Url> {
-        Url::parse(&self.config.url("/vtop"))
-            .map_err(|error| VtopError::ConfigurationError(format!("invalid base URL: {error}")))
+    fn vtop_url(&self) -> VtopResult<String> {
+        let url = self.config.url("/vtop");
+        url_parts(&url)
+            .map(|_| url.clone())
+            .ok_or_else(|| VtopError::ConfigurationError(format!("invalid base URL: {url}")))
     }
 
     fn auth_log(&self, level: log::Level, stage: &str, message: impl AsRef<str>) {
@@ -213,12 +238,16 @@ impl VtopClient {
     }
 
     fn reset_session_state(&self) {
+        self.reset_auth_state();
+        self.jar.clear();
+    }
+
+    /// [`Self::reset_session_state`] without touching the cookies.
+    fn reset_auth_state(&self) {
         let mut state = self.state();
         state.session.clear();
         state.auth_stage = AuthStage::Idle;
         state.logged_in_at = None;
-        drop(state);
-        self.jar.clear();
     }
 
     fn mark_session_expired(&self, context: &str, reason: &str) {
@@ -228,22 +257,6 @@ impl VtopClient {
             context,
             format!("session marked expired because {reason}"),
         );
-    }
-
-    fn is_login_url(url: &str) -> bool {
-        Url::parse(url)
-            .map(|parsed| parsed.path().starts_with("/vtop/login"))
-            .unwrap_or_else(|_| url.to_lowercase().contains("/vtop/login"))
-    }
-
-    fn resolve_vtop_url(&self, path_or_url: &str) -> VtopResult<String> {
-        if Url::parse(path_or_url).is_ok() {
-            return Ok(path_or_url.to_string());
-        }
-        Url::parse(&self.config.base_url)
-            .and_then(|base| base.join(path_or_url))
-            .map(|url| url.to_string())
-            .map_err(|error| VtopError::ConfigurationError(error.to_string()))
     }
 
     /// Makes sure the session is signed in and returns what an
@@ -268,49 +281,36 @@ impl VtopClient {
         })
     }
 
-    /// Sends a request built by `build` and returns the response as it
-    /// came, retrying once after a short pause when the connection fails or
-    /// VTOP answers with a 5xx. A timeout, or a 504 from the proxy giving
-    /// up on VTOP, is not retried: VTOP is slow, and a second request only
-    /// adds to its load.
-    async fn send_retrying(
-        &self,
-        context: &str,
-        build: impl Fn() -> reqwest::RequestBuilder,
-    ) -> VtopResult<Response> {
-        Ok(match build().send_with(self).await {
-            Ok(response)
-                if !response.status().is_server_error()
-                    || response.status() == StatusCode::GATEWAY_TIMEOUT =>
-            {
-                response
-            }
+    /// Sends `request` and returns the response as it came, retrying once
+    /// after a short pause when the connection fails or VTOP answers with a
+    /// 5xx. A timeout, or a 504 from the proxy giving up on VTOP, is not
+    /// retried: VTOP is slow, and a second request only adds to its load.
+    async fn send_retrying(&self, context: &str, request: &Request) -> VtopResult<HopResponse> {
+        let retry = || async {
+            self.transport.pause(RETRY_DELAY).await;
+            self.send_request(request.clone())
+                .await
+                .map_err(|error| send_error(&format!("{context}.retry"), error))
+        };
+        match self.send_request(request.clone()).await {
+            Ok(response) if response.status < 500 || response.status == 504 => Ok(response),
             Ok(response) => {
                 warn!(
                     target: NETWORK,
-                    "{context}: VTOP returned HTTP {}, retrying once",
-                    response.status()
+                    "{context}: VTOP returned HTTP {}, retrying once", response.status
                 );
-                tokio::time::sleep(RETRY_DELAY).await;
-                build()
-                    .send_with(self)
-                    .await
-                    .map_err(|error| send_error(&format!("{context}.retry"), error))?
+                retry().await
             }
             Err(error) if error.is_timeout() => {
                 warn!(target: NETWORK, "{context}: {error}");
-                return Err(slow_vtop_error(context));
+                Err(slow_vtop_error(context))
             }
             Err(error) if error.is_connect() => {
                 warn!(target: NETWORK, "{context}: {error}, retrying once");
-                tokio::time::sleep(RETRY_DELAY).await;
-                build()
-                    .send_with(self)
-                    .await
-                    .map_err(|error| send_error(&format!("{context}.retry"), error))?
+                retry().await
             }
-            Err(error) => return Err(send_error(&format!("{context}.send"), error)),
-        })
+            Err(error) => Err(send_error(&format!("{context}.send"), error)),
+        }
     }
 
     /// What a signed-in request needs, signing in first when the session
@@ -334,7 +334,7 @@ impl VtopClient {
         self.run(context, OnePost::new(request(&signed))).await
     }
 
-    /// Runs a `vtop-proto` machine over reqwest. Each request goes through
+    /// Runs a `vtop-proto` machine over the transport. Each request goes through
     /// [`Self::send_retrying`] (redirects followed, cookies kept), or once
     /// when the request says so; a dead session resets the session.
     async fn run<M: Machine>(&self, context: &str, mut machine: M) -> VtopResult<M::Output> {
@@ -359,119 +359,183 @@ impl VtopClient {
                 }
             };
             let method = match request.method {
-                Method::Get => reqwest::Method::GET,
-                Method::Post => reqwest::Method::POST,
+                Method::Get => "GET",
+                Method::Post => "POST",
             };
-            Self::log_request(&format!("{context}.send"), method.as_str(), &request.url);
-            let build = || {
-                let mut builder = self.http.request(method.clone(), &request.url);
-                for (name, value) in &request.headers {
-                    builder = builder.header(name, value);
-                }
-                builder.body(request.body.clone())
-            };
+            Self::log_request(&format!("{context}.send"), method, &request.url);
             let response = if request.retry {
-                self.send_retrying(context, build).await?
+                self.send_retrying(context, &request).await?
             } else {
-                build()
-                    .send_with(self)
+                self.send_request(request)
                     .await
                     .map_err(|error| send_error(&format!("{context}.send"), error))?
             };
-            last_status = response.status().as_u16();
-            let url = response.url().to_string();
-            let headers = response
-                .headers()
-                .iter()
-                .map(|(name, value)| {
-                    let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
-                    (name.as_str().to_string(), value)
-                })
-                .collect();
-            let body = response
-                .bytes()
+            last_status = response.status;
+            let response = response
+                .read()
                 .await
-                .map_err(|error| network_error(&format!("{context}.body"), error.without_url()))?
-                .to_vec();
-            step = machine.feed(ProtoResponse {
-                status: last_status,
-                headers,
-                url,
-                body,
-            });
+                .map_err(|error| network_error(&format!("{context}.body"), error))?;
+            step = machine.feed(response);
         }
     }
 
     /// Sends a request with this session's cookies and follows redirects,
-    /// storing every `Set-Cookie` along the way. The HTTP client is shared
-    /// between sessions (one warm connection pool), so cookies are handled
-    /// here rather than by reqwest. An explicit `Cookie` header on the
-    /// request wins over the jar for the first hop. Logs the answer: host,
-    /// path, status, size when known and time, redirects included; or the
-    /// failure.
+    /// storing every `Set-Cookie` along the way. Each hop goes through the
+    /// [`Transport`] (shared between sessions, one warm connection pool), so
+    /// cookies and the default headers are added here. An explicit `Cookie`
+    /// header on the request wins over the jar for the first hop. Logs the
+    /// answer: host, path, status, size when known and time, redirects
+    /// included; or the failure.
     pub(super) async fn send_request(
         &self,
-        builder: reqwest::RequestBuilder,
-    ) -> Result<Response, reqwest::Error> {
-        use reqwest::header::{COOKIE, LOCATION, SET_COOKIE};
+        request: Request,
+    ) -> Result<HopResponse, TransportError> {
+        self.send_to(request, None).await
+    }
 
-        let mut request = builder.build()?;
+    /// [`Self::send_request`], each hop's body going to the file
+    /// `download_to` when the transport can write it there.
+    async fn send_to(
+        &self,
+        request: Request,
+        download_to: Option<&std::path::Path>,
+    ) -> Result<HopResponse, TransportError> {
         let started = std::time::Instant::now();
-        let mut hops = 0;
-        let answered = |response: Response| {
-            let size = response
-                .content_length()
-                .map_or(String::new(), |bytes| format!(" {bytes}B"));
-            info!(
-                target: NETWORK,
-                "response {}{} {}{size} {}ms",
-                response.url().host_str().unwrap_or(""),
-                response.url().path(),
-                response.status().as_u16(),
-                started.elapsed().as_millis()
-            );
-            response
+        let place = |url: &str| {
+            url_parts(url).map_or_else(String::new, |(_, host, path)| format!("{host}{path}"))
         };
+        let mut method = match request.method {
+            Method::Get => "GET",
+            Method::Post => "POST",
+        };
+        let (mut url, mut headers, mut body) = (request.url, request.headers, request.body);
+        let mut hops = 0;
         loop {
-            let url = request.url().clone();
-            if !request.headers().contains_key(COOKIE) {
-                if let Some(cookies) = self.jar.cookies(&url) {
-                    request.headers_mut().insert(COOKIE, cookies);
+            if !headers
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("cookie"))
+            {
+                if let Some(cookies) = self.jar.header_for(&url) {
+                    headers.push(("cookie".to_string(), cookies));
                 }
             }
-            let response = match self.http.execute(request).await {
+            let mut hop = self.hop(method, url.clone(), headers, body);
+            hop.download_to = download_to.map(std::path::Path::to_path_buf);
+            let response = match self.transport.send(hop).await {
                 Ok(response) => response,
                 Err(error) => {
                     warn!(
                         target: NETWORK,
-                        "failed {}{} {}ms: {error}",
-                        url.host_str().unwrap_or(""),
-                        url.path(),
+                        "failed {} {}ms: {error}",
+                        place(&url),
                         started.elapsed().as_millis()
                     );
                     return Err(error);
                 }
             };
-            self.jar
-                .set_cookies(&mut response.headers().get_all(SET_COOKIE).iter(), &url);
+            let set_cookies: Vec<&str> = response
+                .headers
+                .iter()
+                .filter(|(name, _)| name.eq_ignore_ascii_case("set-cookie"))
+                .map(|(_, value)| value.as_str())
+                .collect();
+            if !set_cookies.is_empty() {
+                self.jar.set_cookies(&url, &set_cookies);
+            }
 
-            let status = response.status();
             // 307/308 would need the original body again; VTOP only uses
             // 301/302/303, which continue as a GET.
-            if !matches!(status.as_u16(), 301..=303) || hops >= MAX_REDIRECTS {
-                return Ok(answered(response));
-            }
-            let Some(next) = response
-                .headers()
-                .get(LOCATION)
-                .and_then(|location| location.to_str().ok())
-                .and_then(|location| url.join(location).ok())
-            else {
-                return Ok(answered(response));
+            let next = (matches!(response.status, 301..=303) && hops < MAX_REDIRECTS)
+                .then(|| response.header("location"))
+                .flatten()
+                .and_then(|location| join_url(&url, location));
+            let Some(next) = next else {
+                let size = response
+                    .content_length()
+                    .map_or(String::new(), |bytes| format!(" {bytes}B"));
+                info!(
+                    target: NETWORK,
+                    "response {} {}{size} {}ms",
+                    place(&response.url),
+                    response.status,
+                    started.elapsed().as_millis()
+                );
+                return Ok(response);
             };
             hops += 1;
-            request = self.http.get(next).build()?;
+            (method, url, headers, body) = ("GET", next, Vec::new(), Vec::new());
         }
+    }
+
+    /// One [`Hop`]: `headers` (names in lower case), then the default
+    /// headers they lack.
+    fn hop(&self, method: &str, url: String, headers: Vec<(String, String)>, body: Vec<u8>) -> Hop {
+        let mut headers: Vec<(String, String)> = headers
+            .into_iter()
+            .map(|(name, value)| (name.to_ascii_lowercase(), value))
+            .collect();
+        for (name, value) in http::DEFAULT_HEADERS {
+            if !headers.iter().any(|(present, _)| present == name) {
+                headers.push((name.to_string(), value.to_string()));
+            }
+        }
+        Hop {
+            method: method.to_string(),
+            url,
+            headers,
+            body,
+            timeout: self.config.request_timeout,
+            connect_timeout: self.config.connect_timeout,
+            download_to: None,
+        }
+    }
+
+    /// Sends `request` (redirects followed, no retry) with its body going
+    /// to the file `to`: the transport writes it there when it can (the
+    /// app's), else it streams here. Returns the head, the body's first
+    /// bytes and its size; the caller checks them and removes `to` when the
+    /// answer is not the file. Nothing stays at `to` when sending fails.
+    pub(super) async fn download(
+        &self,
+        context: &str,
+        request: Request,
+        to: &std::path::Path,
+    ) -> VtopResult<(vtop_proto::http::Response, u64)> {
+        Self::log_request(context, "GET", &request.url);
+        let result = async {
+            let mut response = self
+                .send_to(request, Some(to))
+                .await
+                .map_err(|error| send_error(&format!("{context}.send"), error))?;
+            let mut head = response.head();
+            let size = match response.saved_size() {
+                Some(size) => size,
+                None => {
+                    use std::io::Write;
+                    let io =
+                        |error: std::io::Error| network_error(&format!("{context}.file"), error);
+                    let mut file = std::fs::File::create(to).map_err(io)?;
+                    let mut size = 0u64;
+                    while let Some(chunk) = response
+                        .chunk()
+                        .await
+                        .map_err(|error| network_error(&format!("{context}.chunk"), error))?
+                    {
+                        file.write_all(&chunk).map_err(io)?;
+                        size += chunk.len() as u64;
+                    }
+                    file.sync_all().map_err(io)?;
+                    size
+                }
+            };
+            head.body = first_bytes(to, 8);
+            Ok((head, size))
+        }
+        .await;
+        if result.is_err() {
+            let _ = std::fs::remove_file(to);
+        }
+        result
     }
 
     // ---- session import / export ----------------------------------------
@@ -485,11 +549,14 @@ impl VtopClient {
         let url = self.vtop_url()?;
         let pairs = parse_cookie_pairs(cookie);
         if pairs.is_empty() {
-            self.jar.add_cookie_str(cookie, &url);
+            self.jar.set_cookies(&url, &[cookie]);
         } else {
-            for (name, value) in pairs {
-                self.jar.add_cookie_str(&format!("{name}={value}"), &url);
-            }
+            let lines: Vec<String> = pairs
+                .into_iter()
+                .map(|(name, value)| format!("{name}={value}"))
+                .collect();
+            self.jar
+                .set_cookies(&url, &lines.iter().map(String::as_str).collect::<Vec<_>>());
         }
         self.state()
             .session
@@ -510,22 +577,22 @@ impl VtopClient {
     /// session is trusted as signed in straight away (no `/vtop/content`
     /// round trip); if VTOP has dropped it, the first fetch fails with
     /// [`VtopError::SessionExpired`]. Older snapshots with only cookies are
-    /// validated on first use.
+    /// validated on first use. A snapshot without cookies keeps the ones in
+    /// the cookie store (one that outlives the client, as the app's).
     pub fn restore_persisted_session(&self, session: &PersistedVtopSession) -> VtopResult<()> {
         self.auth_log(
             log::Level::Info,
             "session.restore",
             "restoring persisted session",
         );
-        if let Some(cookies) = &session.cookies {
-            self.resume_session(&SessionState {
-                cookies: cookies.clone(),
-                csrf_token: session.csrf_token.clone(),
-                registration_number: session.registration_number.clone(),
-                otp_issued_at: None,
-                logged_in_at: session.logged_in_at,
-            })?;
-        }
+        let snapshot = SessionState {
+            cookies: session.cookies.clone().unwrap_or_default(),
+            csrf_token: session.csrf_token.clone(),
+            registration_number: session.registration_number.clone(),
+            otp_issued_at: None,
+            logged_in_at: session.logged_in_at,
+        };
+        self.resume(&snapshot, session.cookies.is_none())?;
         self.log_cookie_names("restore_session_snapshot");
         Ok(())
     }
@@ -573,13 +640,23 @@ impl VtopClient {
     /// [`Self::submit_security_otp`]; with only cookies it is validated on
     /// first use.
     pub fn resume_session(&self, snapshot: &SessionState) -> VtopResult<()> {
+        self.resume(snapshot, false)
+    }
+
+    /// [`Self::resume_session`]; with `keep_cookies`, the store's cookies
+    /// stay and `snapshot.cookies` is not read.
+    fn resume(&self, snapshot: &SessionState, keep_cookies: bool) -> VtopResult<()> {
         let registration_number = snapshot
             .registration_number
             .as_deref()
             .map(RegistrationNumber::parse)
             .transpose()?;
-        self.reset_session_state();
-        self.import_cookie_header(&snapshot.cookies)?;
+        if keep_cookies {
+            self.reset_auth_state();
+        } else {
+            self.reset_session_state();
+            self.import_cookie_header(&snapshot.cookies)?;
+        }
         let mut state = self.state();
         state.logged_in_at = snapshot.logged_in_at;
         if let Some(csrf) = snapshot.csrf_token.clone() {
@@ -629,7 +706,7 @@ impl VtopClient {
             .unwrap_or_default())
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "reqwest"))]
     fn set_registration_number_for_test(&self, value: &str) {
         if let Ok(number) = RegistrationNumber::parse(value) {
             self.state().session.set_registration_number(number);
@@ -643,12 +720,6 @@ fn network_error(context: &str, error: impl std::fmt::Display) -> VtopError {
     VtopError::NetworkError
 }
 
-fn server_error(context: &str, detail: impl AsRef<str>) -> VtopError {
-    let message = format!("{context}: {}", detail.as_ref());
-    error!(target: NETWORK, "returning VtopServerError: {message}");
-    VtopError::VtopServerError(message)
-}
-
 fn slow_vtop_error(context: &str) -> VtopError {
     unavailable(context, "VTOP took too long to answer")
 }
@@ -660,10 +731,9 @@ fn unavailable(context: &str, reason: &str) -> VtopError {
 
 /// A request that got no answer. A timeout is VTOP being slow; anything
 /// else may be the phone's own connection.
-fn send_error(context: &str, error: reqwest::Error) -> VtopError {
-    // The URL can carry the CSRF token in its query; the context says
-    // which request it was.
-    let error = error.without_url();
+fn send_error(context: &str, error: TransportError) -> VtopError {
+    // The error never carries the URL (its query can hold the CSRF token);
+    // the context says which request it was.
     if error.is_timeout() {
         warn!(target: NETWORK, "{context}: {error}");
         return slow_vtop_error(context);
@@ -671,23 +741,14 @@ fn send_error(context: &str, error: reqwest::Error) -> VtopError {
     network_error(context, error)
 }
 
-/// Whether `status` says VTOP, or the proxy in front of it, is down or slow
-/// rather than refusing this request.
-fn is_unavailable_status(status: StatusCode) -> bool {
-    matches!(
-        status,
-        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT
-    )
-}
-
-/// The error for a non-success `status`: VTOP being down or slow when the
-/// status says so, otherwise a server error with `detail`.
-fn status_error(context: &str, status: StatusCode, detail: String) -> VtopError {
-    match status {
-        StatusCode::GATEWAY_TIMEOUT => slow_vtop_error(context),
-        status if is_unavailable_status(status) => unavailable(context, "VTOP is down right now"),
-        _ => server_error(context, detail),
+/// Up to `count` bytes from the start of the file at `path`.
+fn first_bytes(path: &std::path::Path, count: u64) -> Vec<u8> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    if let Ok(file) = std::fs::File::open(path) {
+        let _ = file.take(count).read_to_end(&mut bytes);
     }
+    bytes
 }
 
 fn missing_csrf_error(context: &str) -> VtopError {
@@ -695,23 +756,21 @@ fn missing_csrf_error(context: &str) -> VtopError {
     VtopError::SessionExpired
 }
 
-#[cfg(test)]
+/// Against a mock VTOP over reqwest, so with the `reqwest` feature (on in
+/// `cargo test --workspace`).
+#[cfg(all(test, feature = "reqwest"))]
 mod tests;
 
-/// `.send_with(client)` in place of `.send()`: routes a request through the
-/// session's cookie jar and redirect handling on the shared HTTP client.
-pub(super) trait SendWith {
-    fn send_with<'a>(
-        self,
-        client: &'a VtopClient,
-    ) -> impl std::future::Future<Output = Result<Response, reqwest::Error>> + Send + 'a;
-}
-
-impl SendWith for reqwest::RequestBuilder {
-    fn send_with<'a>(
-        self,
-        client: &'a VtopClient,
-    ) -> impl std::future::Future<Output = Result<Response, reqwest::Error>> + Send + 'a {
-        client.send_request(self)
+/// The transport a client gets when none is given: reqwest on a shared
+/// pool, with the `reqwest` feature.
+pub fn default_transport(config: &VtopConfig) -> VtopResult<Arc<dyn Transport>> {
+    #[cfg(feature = "reqwest")]
+    return Ok(Arc::new(transport::Reqwest(http::shared_client(config)?)));
+    #[cfg(not(feature = "reqwest"))]
+    {
+        let _ = config;
+        Err(VtopError::ConfigurationError(
+            "no HTTP transport: set one, or build vtop-core with `reqwest`".into(),
+        ))
     }
 }

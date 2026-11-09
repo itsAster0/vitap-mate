@@ -2,11 +2,9 @@
 
 use log::Level;
 
-use super::{network_error, send_error, status_error, AuthStage, SendWith, VtopClient};
+use super::{network_error, send_error, AuthStage, VtopClient};
 use crate::error::{VtopError, VtopResult};
-use crate::inputs::RegistrationNumber;
-use crate::login::{Login, SignIn};
-use crate::parser::page;
+use crate::login::{self, Login, SignIn};
 
 impl VtopClient {
     fn begin_auth_flow(&mut self, reason: &str) {
@@ -107,7 +105,7 @@ impl VtopClient {
     }
 
     pub async fn verify_session(&self) -> VtopResult<String> {
-        let _validation = self.validation.lock().await;
+        let _validation = self.validation.write().await;
         if !self.check_authenticated_session(true).await? {
             return Err(VtopError::SessionExpired);
         }
@@ -127,49 +125,31 @@ impl VtopClient {
     /// an expired session, so callers can tell an outage from a dead login.
     async fn check_authenticated_session(&self, server_error_is_error: bool) -> VtopResult<bool> {
         self.log_cookie_names("validate_authenticated_session.before_request");
-        let url = self.config.url("/vtop/content");
-        Self::log_request("validate_authenticated_session.send", "GET", &url);
-        let mut request = self.http.get(&url);
         let external_header = self
             .state()
             .session
             .external_cookie_header()
             .map(str::to_owned);
-        if let Some(raw_cookie_header) = external_header {
-            request = request.header(reqwest::header::COOKIE, raw_cookie_header);
-        }
-        let response = request
-            .send_with(self)
+        let request = login::content(&self.config.base_url, external_header.as_deref());
+        Self::log_request("validate_authenticated_session.send", "GET", &request.url);
+        let response = self
+            .send_request(request)
             .await
-            .map_err(|error| send_error("validate_authenticated_session.send", error))?;
-        let final_url = response.url().to_string();
-        let status = response.status();
-        if server_error_is_error && status.is_server_error() && !Self::is_login_url(&final_url) {
-            return Err(status_error(
-                "validate_authenticated_session",
-                status,
-                format!("HTTP {status}"),
-            ));
-        }
-        if Self::is_login_url(&final_url) || !status.is_success() {
-            self.mark_session_expired(
-                "validate_authenticated_session",
-                &format!("VTOP returned HTTP {status} at {final_url}"),
-            );
-            return Ok(false);
-        }
-        let content = response
-            .text()
+            .map_err(|error| send_error("validate_authenticated_session.send", error))?
+            .read()
             .await
             .map_err(|error| network_error("validate_authenticated_session.text", error))?;
-
-        let (csrf, registration_number) = page::extract_session_fields(&content);
-        let csrf = csrf.ok_or_else(|| {
-            VtopError::ParseError("VTOP's session page was missing its token".into())
-        })?;
-        let registration_number = RegistrationNumber::parse(
-            &registration_number.ok_or(VtopError::RegistrationParsingError)?,
-        )?;
+        let checked =
+            login::read_content(&response, server_error_is_error).inspect_err(|error| {
+                log::warn!(target: super::NETWORK, "validate_authenticated_session: {error}");
+            })?;
+        let Some((csrf, registration_number)) = checked else {
+            self.mark_session_expired(
+                "validate_authenticated_session",
+                &format!("VTOP returned HTTP {} at {}", response.status, response.url),
+            );
+            return Ok(false);
+        };
         let mut state = self.state();
         state.session.set_csrf_token(csrf);
         state.session.set_registration_number(registration_number);
@@ -183,7 +163,7 @@ impl VtopClient {
         if self.has_usable_session() {
             return Ok(true);
         }
-        let _validation = self.validation.lock().await;
+        let _validation = self.validation.write().await;
         // Another request may have validated while this one waited.
         if self.has_usable_session() {
             return Ok(true);

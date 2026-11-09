@@ -9,16 +9,17 @@
 //! address works.
 
 use std::fs;
-use std::sync::{Mutex, OnceLock, PoisonError};
+use std::sync::{Mutex, PoisonError};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tracing::{debug, info, warn};
+use vtop_core::client::Hop;
 use vtop_core::{VtopClient, VtopError};
 use vtop_shared::mail_seal;
 
-use crate::{Core, CoreError, traced, traced_sync};
+use crate::{Core, CoreError, traced, traced_sync, transport};
 
 pub(crate) const FILE: &str = "forwarding.json";
 /// Optional one-line server URL (e.g. `http://127.0.0.1:8787` for `wrangler dev` behind
@@ -177,45 +178,44 @@ impl From<EdgeError> for CoreError {
     }
 }
 
-fn http() -> &'static reqwest::Client {
-    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(TIMEOUT)
-            .build()
-            .expect("a client with default TLS")
-    })
-}
-
-/// POSTs JSON to the edge with the flow as `x-request-id`; errors carry the edge's `code`.
+/// POSTs JSON to the edge through the app's transport, with the flow as `x-request-id`; errors
+/// carry the edge's `code`.
 async fn post(server: &str, path: &str, flow: &str, body: &Value) -> Result<Value, EdgeError> {
-    let response = http()
-        .post(format!("{}{path}", server.trim_end_matches('/')))
-        .header("x-request-id", flow)
-        .json(body)
-        .send()
-        .await
-        .map_err(|error| {
-            warn!(path, error = %error.without_url(), "edge unreachable");
-            EdgeError::Offline
-        })?;
-    let status = response.status();
+    let offline = |error: &dyn std::fmt::Display| {
+        warn!(path, error = %error, "edge unreachable");
+        EdgeError::Offline
+    };
+    let transport = transport::current().map_err(|error| offline(&error))?;
+    let hop = Hop {
+        method: "POST".into(),
+        url: format!("{}{path}", server.trim_end_matches('/')),
+        headers: vec![
+            ("content-type".into(), "application/json".into()),
+            ("x-request-id".into(), flow.into()),
+        ],
+        body: serde_json::to_vec(body).unwrap_or_default(),
+        timeout: TIMEOUT,
+        connect_timeout: TIMEOUT,
+        download_to: None,
+    };
+    let response = transport.send(hop).await.map_err(|error| offline(&error))?;
+    let status = response.status;
     // 204 has no body.
-    let body: Value = response.json().await.unwrap_or(Value::Null);
-    if status.is_success() {
+    let body: Value = response
+        .bytes()
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or(Value::Null);
+    if (200..300).contains(&status) {
         return Ok(body);
     }
     let text = |key: &str| body[key].as_str().map(str::to_string);
     let error = EdgeError::Status {
-        code: text("code").unwrap_or_else(|| format!("http_{}", status.as_u16())),
+        code: text("code").unwrap_or_else(|| format!("http_{status}")),
         message: text("error").unwrap_or_else(|| format!("The server answered HTTP {status}.")),
     };
-    info!(
-        path,
-        status = status.as_u16(),
-        code = error.code(),
-        "edge refused"
-    );
+    info!(path, status, code = error.code(), "edge refused");
     Err(error)
 }
 
@@ -232,7 +232,7 @@ fn string(body: &Value, key: &str) -> Result<String, CoreError> {
 const GONE: &str = "mailbox_not_found";
 
 /// Mail forwarding calls; each takes the caller's flow id first.
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// This phone's forwarding address and how far its setup got. No network.
     pub fn forwarding_status(&self, flow: String) -> Forwarding {

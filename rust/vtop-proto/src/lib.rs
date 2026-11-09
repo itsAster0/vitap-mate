@@ -13,6 +13,7 @@ pub mod http;
 pub mod inputs;
 pub mod login;
 pub mod machine;
+pub mod otp;
 pub mod outing;
 pub mod pages;
 pub mod parser;

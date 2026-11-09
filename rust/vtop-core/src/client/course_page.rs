@@ -1,11 +1,13 @@
 //! The course page: every class of a course this semester, and each
 //! class's lecture plan with its reference material.
 
+use std::path::Path;
+
 use log::warn;
 use vtop_proto::course_pages::{self, file_head, plain_id};
-use vtop_proto::http::{Request, Response as ProtoResponse};
+use vtop_proto::http::Request;
 
-use super::{network_error, send_error, SendWith, VtopClient, NETWORK};
+use super::{network_error, send_error, HopResponse, VtopClient, NETWORK};
 use crate::error::{VtopError, VtopResult};
 use crate::inputs::{CourseFilePath, SemesterId};
 use crate::parser::course_page;
@@ -70,19 +72,13 @@ impl VtopClient {
             .await
     }
 
-    /// [`Self::course_page_file`] as a stream, for saving big files to disk
-    /// without holding them in memory.
-    pub async fn open_course_page_file(
-        &self,
-        path: &CourseFilePath,
-    ) -> VtopResult<CourseFileDownload> {
+    async fn open_course_page_file(&self, path: &CourseFilePath) -> VtopResult<CourseFileDownload> {
         let signed = self.signed("get_course_page_file").await?;
         let request = course_pages::file(&signed, path, vtop_proto::now_unix());
         self.open_course_file("get_course_page_file", request).await
     }
 
-    /// [`Self::course_plan`] as a stream.
-    pub async fn open_course_plan(
+    async fn open_course_plan(
         &self,
         semester: &SemesterId,
         class_id: &str,
@@ -92,6 +88,53 @@ impl VtopClient {
         let request =
             course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
         self.open_course_file("get_course_page_file", request).await
+    }
+
+    /// [`Self::course_page_file`] written to the file `to`, for big files:
+    /// never whole in memory (the app's transport writes it there itself).
+    /// Nothing stays at `to` when VTOP did not send the file.
+    pub async fn save_course_page_file(
+        &self,
+        path: &CourseFilePath,
+        to: &Path,
+    ) -> VtopResult<SavedCourseFile> {
+        let signed = self.signed("get_course_page_file").await?;
+        let request = course_pages::file(&signed, path, vtop_proto::now_unix());
+        self.save_course_file("get_course_page_file", request, to)
+            .await
+    }
+
+    /// [`Self::course_plan`] written to the file `to`, as
+    /// [`Self::save_course_page_file`].
+    pub async fn save_course_plan(
+        &self,
+        semester: &SemesterId,
+        class_id: &str,
+        to: &Path,
+    ) -> VtopResult<SavedCourseFile> {
+        let class_id = plain_id(class_id, "class id")?;
+        let signed = self.signed("get_course_plan").await?;
+        let request =
+            course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
+        self.save_course_file("get_course_page_file", request, to)
+            .await
+    }
+
+    async fn save_course_file(
+        &self,
+        context: &str,
+        request: Request,
+        to: &Path,
+    ) -> VtopResult<SavedCourseFile> {
+        let (head, size) = self.download(context, request, to).await?;
+        let info = self.check_file_head(context, &head).inspect_err(|_| {
+            let _ = std::fs::remove_file(to);
+        })?;
+        Ok(SavedCourseFile {
+            file_name: info.file_name(),
+            content_type: info.content_type,
+            size,
+        })
     }
 
     /// The name and type of what a course page link points at, without
@@ -134,7 +177,6 @@ impl VtopClient {
         Ok(CourseFileDownload {
             file_name: info.file_name(),
             content_type: info.content_type,
-            length: response.content_length(),
             response,
         })
     }
@@ -146,30 +188,25 @@ impl VtopClient {
         &self,
         context: &str,
         request: Request,
-    ) -> VtopResult<(reqwest::Response, CourseFileInfo)> {
+    ) -> VtopResult<(HopResponse, CourseFileInfo)> {
         let path = request.url.split('?').next().unwrap_or_default();
         Self::log_request(context, "GET", path);
         let response = self
-            .http
-            .get(&request.url)
-            .send_with(self)
+            .send_request(request)
             .await
-            .map_err(|error| send_error(&format!("{context}.send"), error.without_url()))?;
-        let head = ProtoResponse {
-            status: response.status().as_u16(),
-            headers: response
-                .headers()
-                .iter()
-                .map(|(name, value)| {
-                    let value = String::from_utf8_lossy(value.as_bytes()).into_owned();
-                    (name.as_str().to_string(), value)
-                })
-                .collect(),
-            url: response.url().to_string(),
-            body: Vec::new(),
-        };
-        match file_head(&head) {
-            Ok(info) => Ok((response, info)),
+            .map_err(|error| send_error(&format!("{context}.send"), error))?;
+        let info = self.check_file_head(context, &response.head())?;
+        Ok((response, info))
+    }
+
+    /// [`file_head`]; a bounce to the login page ends the session.
+    fn check_file_head(
+        &self,
+        context: &str,
+        head: &vtop_proto::http::Response,
+    ) -> VtopResult<CourseFileInfo> {
+        match file_head(head) {
+            Ok(info) => Ok(info),
             Err(VtopError::SessionExpired) => {
                 self.mark_session_expired(context, &format!("VTOP redirected to {}", head.url));
                 Err(VtopError::SessionExpired)
@@ -182,37 +219,34 @@ impl VtopClient {
     }
 }
 
-/// A course page file on its way: VTOP's name and type, then the body in
-/// chunks.
-#[derive(Debug)]
-pub struct CourseFileDownload {
+/// A course page file saved to disk: VTOP's name and type, and its size.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SavedCourseFile {
     pub file_name: String,
     pub content_type: String,
-    /// `Content-Length`, when VTOP sends one.
-    pub length: Option<u64>,
-    response: reqwest::Response,
+    pub size: u64,
+}
+
+/// A course page file on its way: VTOP's name and type, then the body.
+#[derive(Debug)]
+struct CourseFileDownload {
+    file_name: String,
+    content_type: String,
+    response: HopResponse,
 }
 
 impl CourseFileDownload {
-    /// The next part of the body; `None` at the end.
-    pub async fn chunk(&mut self) -> VtopResult<Option<Vec<u8>>> {
-        self.response
-            .chunk()
-            .await
-            .map(|chunk| chunk.map(|bytes| bytes.to_vec()))
-            .map_err(|error| network_error("get_course_page_file.chunk", error.without_url()))
-    }
-
     /// The whole body in memory.
-    pub async fn collect(self) -> VtopResult<CourseFile> {
-        let bytes =
-            self.response.bytes().await.map_err(|error| {
-                network_error("get_course_page_file.bytes", error.without_url())
-            })?;
+    async fn collect(self) -> VtopResult<CourseFile> {
+        let bytes = self
+            .response
+            .bytes()
+            .await
+            .map_err(|error| network_error("get_course_page_file.bytes", error))?;
         Ok(CourseFile {
             file_name: self.file_name,
             content_type: self.content_type,
-            bytes: bytes.to_vec(),
+            bytes,
         })
     }
 }
@@ -255,7 +289,7 @@ impl VtopClient {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "reqwest"))]
 mod tests {
     use vtop_proto::machine::Signed;
 

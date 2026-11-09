@@ -19,10 +19,10 @@ cli = ["uniffi/cli"]
 [dependencies]
 vtop-core = { path = "../vtop-core" }
 vtop-shared = { path = "../vtop-shared" }
-# Already in the tree through vtop-core; talks to the edge for mail forwarding.
-reqwest = { workspace = true }
-uniffi = { version = "0.32.2", features = ["tokio"] }
-tokio = { workspace = true, features = ["sync"] }
+# No tokio: async exports run on the futures Kotlin polls (see vtop_core::sync).
+uniffi = "0.32.2"
+# UniFFI's foreign async traits (HttpTransport) need it; already in the tree via vtop-mcp.
+async-trait = "0.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = "0.1"
@@ -33,4 +33,7 @@ tracing-log = { version = "0.2", default-features = false, features = ["log-trac
 android_log-sys = "0.3"
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt", "net", "io-util"] }
+# Host tests have no app transport: vtop-core's reqwest one stands in (resolver 2 keeps this
+# feature out of the app build).
+vtop-core = { path = "../vtop-core", features = ["reqwest"] }
+tokio = { workspace = true, features = ["macros", "rt", "net", "io-util", "time"] }

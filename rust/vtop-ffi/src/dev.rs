@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use vtop_core::VtopConfig;
 use vtop_core::types::{AttendanceData, FullAttendanceData, PersistedVtopSession, SemesterData};
 
-use tokio::sync::RwLock;
+use vtop_core::sync::RwLock;
 
 use crate::{
     ACCOUNT, ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS,
@@ -108,16 +108,16 @@ pub enum CacheScope {
     All,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
-    /// Drops the VTOP session (`session.json` and the client's cookies) but keeps the account:
-    /// the next fetch signs in again with the saved password. A pending OTP prompt goes too.
+    /// Drops the VTOP session (`session.json` and the cookies, the web view's too) but keeps
+    /// the account: the next fetch signs in again with the saved password. A pending OTP prompt
+    /// goes too.
     pub async fn dev_clear_session(&self, flow: String) -> Result<(), CoreError> {
         traced("dev_clear_session", &flow, async {
             let slot = self.current()?;
             let mut session = slot.write().await;
-            session.client = Session::new(session.account.clone())?.client;
-            session.otp = None;
+            session.restart()?;
             remove(&self.dir.join(SESSION));
             info!("session dropped; the next fetch signs in again");
             Ok(())
@@ -145,17 +145,18 @@ impl Core {
             match self.current() {
                 Ok(slot) => {
                     let mut session = slot.write().await;
-                    // The cookies move to a client holding the new credentials.
-                    fresh
-                        .client
-                        .restore_persisted_session(&session.client.export_persisted_session(0))?;
-                    session.client = fresh.client;
+                    // The session moves to a client holding the new credentials; cookies in
+                    // the shared store stay there.
+                    let mut saved = session.client.export_persisted_session(0);
+                    if session.cookies.is_shared() {
+                        saved.cookies = None;
+                    }
+                    self.restore(&fresh, Some(saved));
+                    (session.client, session.cookies) = (fresh.client, fresh.cookies);
                     session.account = account.clone();
                 }
                 Err(_) => {
-                    if let Some(saved) = self.read::<PersistedVtopSession>(SESSION) {
-                        fresh.client.restore_persisted_session(&saved)?;
-                    }
+                    self.restore(&fresh, self.read::<PersistedVtopSession>(SESSION));
                     self.install(Some(Arc::new(RwLock::new(fresh))));
                 }
             }

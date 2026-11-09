@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
-use tokio::sync::RwLock;
+use vtop_core::sync::RwLock;
 use vtop_core::{SessionState, VtopClient, VtopConfig};
 
 use super::*;
@@ -523,6 +523,7 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
         .unwrap();
     let session = Session {
         client,
+        cookies: crate::cookies::SessionCookies::new(),
         account: Account {
             username: "22BCE0001".into(),
             password: "pw".into(),

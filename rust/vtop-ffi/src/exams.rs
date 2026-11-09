@@ -60,7 +60,7 @@ pub struct ScheduledPaper {
     pub seat_no: String,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// The selected semester's cached exam schedule.
     pub fn cached_exams(&self, flow: String) -> Option<Exams> {

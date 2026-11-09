@@ -2,6 +2,7 @@ package vitapmate.data
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.os.Build
 import android.util.Base64
 import java.security.KeyStore
 import kotlin.concurrent.thread
@@ -11,12 +12,14 @@ import vitapmate.core.Core
 import vitapmate.core.DevConfig
 import vitapmate.core.devConfigure
 import vitapmate.core.obsInit
+import vitapmate.core.setHttpTransport
+import vitapmate.core.setSharedCookies
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
 import vitapmate.observability.StateDump
 import vitapmate.observability.flow
 
-/** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio). */
+/** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio, hands Rust OkHttp and the cookie store). */
 object AppCore {
     private val core = CompletableDeferred<Core>()
 
@@ -38,7 +41,12 @@ object AppCore {
         thread(name = "core-init") {
             runCatching {
                 obsInit(dir)
-                devConfigure(devConfig(app))
+                val dev = devConfig(app)
+                devConfigure(dev)
+                val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
+                setHttpTransport(if (engine) VtopHttpEngine(app) else VtopHttp(dev.inspectProxy, dev.inspectCas))
+                Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "okhttp"))
+                setSharedCookies(VtopCookies)
                 runBlocking { flow("core_init") { Core(it, dir) } }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")

@@ -127,7 +127,7 @@ pub struct MentorMessage {
     pub meta: Vec<String>,
 }
 
-#[uniffi::export(async_runtime = "tokio")]
+#[uniffi::export]
 impl Core {
     /// The signed-in account's cached profile and mentor.
     pub fn cached_profile(&self, flow: String) -> Option<Profile> {
