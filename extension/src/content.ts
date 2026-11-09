@@ -98,12 +98,11 @@ async function maybeAutoLogin() {
 
   const result = await chrome.storage.local.get([
     "token",
-    "fmcToken",
     "autoLogin",
     "lastAutoLoginAt",
   ]);
 
-  const token = String(result.token ?? result.fmcToken ?? "").trim();
+  const token = String(result.token ?? "").trim();
   const autoLogin = Boolean(result.autoLogin);
   const lastAutoLoginAt = Number(result.lastAutoLoginAt ?? 0);
 
@@ -175,8 +174,8 @@ function addStudentCardButton() {
       sendToBackground({});
       return;
     }
-    const stored = await chrome.storage.local.get(["token", "fmcToken"]);
-    if (!String(stored.token ?? stored.fmcToken ?? "").trim()) {
+    const stored = await chrome.storage.local.get("token");
+    if (!String(stored.token ?? "").trim()) {
       sendToBackground({ type: "OPEN_EXTENSION_PANEL" });
       return;
     }

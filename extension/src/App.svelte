@@ -1,6 +1,14 @@
 <script lang="ts">
+  import { encode } from "uqr";
   import { onDestroy } from "svelte";
-  import { DEFAULT_BRIDGE_URL, isAccessKey, normalizeBridgeUrl } from "./bridge";
+  import {
+    DEFAULT_BRIDGE_URL,
+    PAIR_TTL_MS,
+    interpretPairResponse,
+    isAccessKey,
+    newPairCode,
+    normalizeBridgeUrl,
+  } from "./bridge";
   import type { LastLogin, LoginPhase, LoginState, StateMessage } from "./background";
   import type { SessionSource } from "./bridge";
 
@@ -53,18 +61,13 @@
   }
 
   async function loadSettings() {
-    const stored = await chrome.storage.local.get(["token", "fmcToken", "autoLogin", "bridgeUrl", "lastLogin"]);
-    token = String(stored.token ?? stored.fmcToken ?? "");
+    const stored = await chrome.storage.local.get(["token", "autoLogin", "bridgeUrl", "lastLogin"]);
+    token = String(stored.token ?? "");
     autoLogin = Boolean(stored.autoLogin);
     savedBridgeUrl = normalizeBridgeUrl(String(stored.bridgeUrl ?? "")) ?? DEFAULT_BRIDGE_URL;
     bridgeUrl = savedBridgeUrl;
     lastLogin = stored.lastLogin as LastLogin | undefined;
     editingKey = !isAccessKey(token);
-    // Migrate older installations without making the implementation name visible.
-    if (!stored.token && stored.fmcToken) {
-      await chrome.storage.local.set({ token });
-      await chrome.storage.local.remove("fmcToken");
-    }
     // A sign-in started before the popup was opened keeps going in the background.
     login = (await chrome.runtime.sendMessage({ type: "GET_LOGIN_STATE" })) ?? login;
     const check = await chrome.runtime.sendMessage({ type: "CHECK_VTOP_SESSION" });
@@ -136,6 +139,68 @@
     checkedKey = "";
   }
 
+  // ---- pairing: the app makes a key for the code shown here -----------------
+
+  let pairing = "";
+  let pairError = "";
+  // The code as QR modules for the app's scanner: one path, dark on white.
+  $: pairQr = pairing ? encode(pairing, { border: 2 }) : null;
+  $: pairQrPath = pairQr
+    ? pairQr.data.flatMap((row, y) => row.map((on, x) => (on ? `M${x} ${y}h1v1h-1z` : ""))).join("")
+    : "";
+  let pairTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function stopPairing() {
+    clearTimeout(pairTimer);
+    pairing = "";
+  }
+  onDestroy(stopPairing);
+
+  /** Shows a new code and asks the server for its key until the app has
+   * made one or the code runs out. */
+  function startPairing() {
+    stopPairing();
+    pairError = "";
+    const code = newPairCode();
+    const server = savedBridgeUrl;
+    const until = Date.now() + PAIR_TTL_MS;
+    pairing = code;
+    const poll = async () => {
+      if (pairing !== code) return;
+      if (Date.now() > until) {
+        pairing = "";
+        pairError = "The code ran out. Get a new one.";
+        return;
+      }
+      let next = 2000;
+      try {
+        const response = await fetch(`${server}/v1/pair`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        const outcome = interpretPairResponse(response.status, await response.json().catch(() => null));
+        if (pairing !== code) return;
+        if (outcome.kind === "ready") {
+          pairing = "";
+          token = outcome.key;
+          await saveSettings();
+          return;
+        }
+        if (outcome.kind === "error") {
+          pairing = "";
+          pairError = outcome.message;
+          return;
+        }
+        next = outcome.pollAfterMs;
+      } catch {
+        // Offline for a moment: keep trying until the code runs out.
+      }
+      pairTimer = setTimeout(poll, next);
+    };
+    poll();
+  }
+
   async function signIn() {
     if (!token.trim()) return;
     notice = "";
@@ -156,7 +221,6 @@
   async function resetState() {
     await chrome.storage.local.remove([
       "token",
-      "fmcToken",
       "autoLogin",
       "lastAutoLoginAt",
       "bridgeUrl",
@@ -420,19 +484,46 @@
     <!-- access key -->
     {#if editingKey}
       <div class="space-y-1.5">
-        {#if !token.trim()}
-          <ol class="space-y-1 text-xs text-slate-400">
-            <li><span class="step-dot">1</span>Open the VITAP Mate app</li>
-            <li><span class="step-dot">2</span>More → Connected apps → Create key</li>
-            <li><span class="step-dot">3</span>Paste the key here</li>
-          </ol>
+        {#if pairing}
+          <div class="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-3 py-2 text-center">
+            {#if pairQr}
+              <svg
+                class="mx-auto my-1 h-36 w-36 rounded bg-white"
+                viewBox="0 0 {pairQr.size} {pairQr.size}"
+                shape-rendering="crispEdges"
+                role="img"
+                aria-label="Pairing QR code"
+              ><path d={pairQrPath} fill="#000" /></svg>
+            {/if}
+            <p class="font-mono text-lg tracking-widest text-indigo-100" aria-label="Pairing code">{pairing}</p>
+            <p class="mt-1 text-[11px] text-slate-400">
+              In VITAP Mate: Connected apps → Pair a browser, then scan this or enter the code.
+            </p>
+            <button type="button" class="link mt-1" on:click={stopPairing}>Cancel</button>
+          </div>
+        {:else}
+          {#if !token.trim()}
+            <ol class="space-y-1 text-xs text-slate-400">
+              <li><span class="step-dot">1</span>Open the VITAP Mate app</li>
+              <li><span class="step-dot">2</span>Connected apps → Pair a browser</li>
+              <li><span class="step-dot">3</span>Scan the QR code or enter the code shown here</li>
+            </ol>
+          {/if}
+          <button
+            type="button"
+            on:click={startPairing}
+            class="btn bg-indigo-500 text-white hover:bg-indigo-400"
+          >
+            Pair with the app
+          </button>
+          {#if pairError}<p class="text-[11px] text-rose-300">{pairError}</p>{/if}
         {/if}
         <input
           id="token"
           type="password"
           bind:value={token}
           on:input={saveSettings}
-          placeholder="Access key  vtm_…"
+          placeholder="or paste an access key  vtm_…"
           autocomplete="off"
           spellcheck="false"
           aria-label="Access key"

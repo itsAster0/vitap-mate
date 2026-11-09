@@ -295,19 +295,13 @@ async function expireSession(base: string, key: string) {
 async function performLogin(signal: AbortSignal) {
   const tabId = await getActiveTabId();
 
-  const stored = await chrome.storage.local.get(["token", "fmcToken", "bridgeUrl"]);
-  const key = String(stored.token ?? stored.fmcToken ?? "").trim();
+  const stored = await chrome.storage.local.get(["token", "bridgeUrl"]);
+  const key = String(stored.token ?? "").trim();
   // A server set in the popup, else the built-in one.
   const base = normalizeBridgeUrl(String(stored.bridgeUrl ?? "")) ?? DEFAULT_BRIDGE_URL;
 
-  if (!key) {
-    throw new Error("Add the access key from VITAP Mate → Connected apps first.");
-  }
-
   if (!isAccessKey(key)) {
-    throw new Error(
-      "This looks like an old phone token. Create an access key in VITAP Mate → Connected apps and paste it here.",
-    );
+    throw new Error("Pair the extension with VITAP Mate first.");
   }
 
   // Still signed in from last time: no need to ask the phone or the server.

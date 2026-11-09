@@ -5,7 +5,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * Writes the bridge origin from VITE_BRIDGE_URL into the built manifest. The
+ * Writes the server origin from VITE_BRIDGE_URL into the built manifest. The
  * Firefox build swaps the service worker for an event page: Chrome rejects
  * `background.scripts` under MV3, and Firefox doesn't run service workers.
  */
@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
       finishManifest(
         outDir,
         loadEnv(mode, import.meta.dirname, "VITE_").VITE_BRIDGE_URL ??
-          "https://vmate-api.aster0.dev",
+          "https://vmate.aster0.dev",
         firefox,
       ),
     ],

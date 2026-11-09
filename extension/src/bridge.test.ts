@@ -22,31 +22,31 @@ describe("bridge helpers", () => {
   });
 
   it("maps machine-readable errors", () => {
+    expect(friendlyLoginError(410, '{"code":"request_expired"}')).toContain("phone did not answer");
+    expect(friendlyLoginError(429, "")).toContain("Too many");
+    expect(friendlyLoginError(503, '{"code":"engine_unavailable"}')).toContain("temporarily unavailable");
     expect(
-      friendlyLoginError(410, '{"code":"TOKEN_INVALID","error":"expired"}'),
-    ).toContain("new Token");
-    expect(friendlyLoginError(429, '{"code":"RATE_LIMITED"}')).toContain(
-      "Too many",
-    );
-    expect(
-      friendlyLoginError(
-        200,
-        "Bad state: VTOP session is not authenticated after login.",
-      ),
-    ).toContain("refresh your VTOP login");
+      friendlyLoginError(200, '{"status":"error","code":"forwarding_required","error":"forwarding_required: Set up OTP email forwarding."}'),
+    ).toBe("Set up OTP email forwarding.");
+    expect(friendlyLoginError(200, "not json")).toContain("Could not connect");
   });
 
   it("parses errors and clamps polling intervals", () => {
-    expect(parseAPIError('{"code":"STORE_UNAVAILABLE"}').code).toBe(
-      "STORE_UNAVAILABLE",
-    );
+    expect(parseAPIError('{"code":"key_unknown"}').code).toBe("key_unknown");
     expect(clampPollAfter(10)).toBe(500);
     expect(clampPollAfter(9000)).toBe(5000);
     expect(clampPollAfter(undefined)).toBe(1500);
   });
 });
 
-import { interpretSessionResponse, isAccessKey, isLoginRedirect } from "./bridge";
+import {
+  PAIR_TTL_MS,
+  interpretPairResponse,
+  interpretSessionResponse,
+  isAccessKey,
+  isLoginRedirect,
+  newPairCode,
+} from "./bridge";
 
 const KEY = `vtm_${"ab".repeat(32)}`;
 
@@ -99,7 +99,9 @@ describe("session responses", () => {
       error: "phone_unreachable: Open VITAP Mate → Connected apps → Reconnect this phone.",
     });
     expect(unreachable.kind).toBe("error");
-    expect(unreachable.kind === "error" && unreachable.message).toContain("Reconnect this phone");
+    expect(unreachable.kind === "error" && unreachable.message).toBe(
+      "Your phone is not linked. Open VITAP Mate → Connected apps → Reconnect this phone.",
+    );
 
     const unknown = interpretSessionResponse(401, { code: "key_unknown", error: "x" });
     expect(unknown.kind === "error" && unknown.message).toContain("access key");
@@ -136,7 +138,7 @@ describe("login redirects", () => {
 
 describe("bridge URL setting", () => {
   it("defaults to the URL from .env", () => {
-    expect(DEFAULT_BRIDGE_URL).toBe("https://vmate-api.aster0.dev");
+    expect(DEFAULT_BRIDGE_URL).toBe("https://vmate.aster0.dev");
   });
 
   it("keeps only an https origin", () => {
@@ -158,7 +160,6 @@ describe("bridge URL setting", () => {
     expect(outcome).toMatchObject({ kind: "pending", stage: "phone" });
     if (outcome.kind !== "pending") throw new Error("not pending");
     expect(outcome.serverDueAt).toBe(Date.parse("2026-10-18T10:00:10Z"));
-    // Older servers send no stage.
     expect(interpretSessionResponse(202, { status: "pending" })).toMatchObject({
       stage: "starting",
       serverDueAt: undefined,
@@ -176,7 +177,6 @@ describe("bridge URL setting", () => {
       kind: "ready",
       source: { from: "server", cached: true, madeAt: Date.parse("2026-10-18T10:00:00Z") },
     });
-    // Older servers say nothing.
     expect(interpretSessionResponse(200, { status: "ready", cookies: [] })).toMatchObject({
       source: { from: "unknown", cached: false },
     });
@@ -187,5 +187,26 @@ describe("bridge URL setting", () => {
     expect(progressText("phone", 10_000, 0)).toContain("takes over in 10 s");
     expect(progressText("phone", 0, 5_000)).toBe("Waiting for your phone…");
     expect(progressText("starting", undefined)).toBe("Starting sign-in…");
+  });
+});
+
+describe("pairing", () => {
+  it("makes codes the edge reads", () => {
+    expect(newPairCode()).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/);
+    expect(newPairCode((b) => b.fill(255))).toBe("ZZZZZ-ZZZZZ");
+    expect(newPairCode((b) => b.fill(0))).toBe("00000-00000");
+    expect(newPairCode()).not.toBe(newPairCode());
+    expect(PAIR_TTL_MS).toBe(300_000);
+  });
+
+  it("reads the edge's replies", () => {
+    expect(interpretPairResponse(200, { status: "ready", key: KEY })).toEqual({ kind: "ready", key: KEY });
+    expect(interpretPairResponse(202, { status: "pending", pollAfterMs: 2000 })).toEqual({
+      kind: "pending",
+      pollAfterMs: 2000,
+    });
+    const bad = interpretPairResponse(400, { code: "bad_request", error: "code must be a pairing code." });
+    expect(bad).toEqual({ kind: "error", message: "code must be a pairing code." });
+    expect(interpretPairResponse(200, { status: "ready", key: "nope" }).kind).toBe("error");
   });
 });

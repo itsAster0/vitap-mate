@@ -25,5 +25,9 @@
     "vite": "^8.3.4",
     "vitest": "^3.2.7",
     "web-ext": "^10.8.0"
+  },
+  "trustedDependencies": ["esbuild"],
+  "dependencies": {
+    "uqr": "0.1.3"
   }
 }

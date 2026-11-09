@@ -18,11 +18,8 @@ export type APIErrorResponse = {
   error?: string;
 };
 
-const INVALID_TOKEN_MESSAGE =
-  "This Token is invalid or expired. Get a new Token from the VITAP Mate app and try again.";
-
 export function validateCookies(cookies: CookieEditorCookie[]) {
-  if (cookies.length === 0) throw new Error(INVALID_TOKEN_MESSAGE);
+  if (cookies.length === 0) throw new Error("The server sent no VTOP cookies. Try again.");
 
   for (const cookie of cookies) {
     if (!cookie.name?.trim()) throw new Error("The mobile app returned a cookie without a name.");
@@ -59,46 +56,15 @@ export function friendlyLoginError(
 
   const parsed = parseAPIError(responseText);
   const code = parsed.code ?? "";
-  if (code === "key_unknown" || (code === "" && status === 401)) return UNKNOWN_KEY_MESSAGE;
-  if (code === "phone_unreachable") {
-    return parsed.error?.replace(/^phone_unreachable:\s*/, "Your phone is not linked. ") ??
-      "Your phone is not linked. Open VITAP Mate → Connected apps → Reconnect this phone.";
-  }
-  if (code === "phone_timeout" || code === "request_expired") return PHONE_TIMEOUT_MESSAGE;
-  if (code === "rate_limited") return "Too many attempts. Wait a minute and try again.";
-  if ((code === "phone_session_invalid" || code === "account_mismatch") && parsed.error) {
-    return parsed.error.replace(/^[a-z_]+:\s*/, "");
-  }
-  const normalized = `${parsed.error ?? ""} ${responseText}`.toLowerCase();
-  if (
-    code === "TOKEN_INVALID" ||
-    code === "TOKEN_REQUIRED" ||
-    ((normalized.includes("token") || normalized.includes("registration")) &&
-      ["invalid", "expired", "not found", "unregistered"].some((word) =>
-        normalized.includes(word),
-      ))
-  ) {
-    return INVALID_TOKEN_MESSAGE;
-  }
-  if (code === "REQUEST_EXPIRED" || status === 410) {
-    return "The connection expired. Keep your mobile online and try again.";
-  }
-  if (code === "RATE_LIMITED" || status === 429) {
-    return "Too many attempts. Wait a minute and try again.";
-  }
-  if (
-    normalized.includes("vtop session is not authenticated") ||
-    normalized.includes("no vtop account is configured")
-  ) {
-    return "Open VITAP Mate on your mobile, refresh your VTOP login, then try again.";
-  }
-  if (["STORE_UNAVAILABLE", "FCM_UNAVAILABLE", "FCM_MISCONFIGURED"].includes(code)) {
-    return "The sign-in service is temporarily unavailable. Please try again shortly.";
-  }
+  if (code === "key_unknown" || status === 401) return UNKNOWN_KEY_MESSAGE;
+  if (code === "phone_unreachable") return "Your phone is not linked. Open VITAP Mate → Connected apps → Reconnect this phone.";
+  if (code === "phone_timeout" || code === "request_expired" || status === 410) return PHONE_TIMEOUT_MESSAGE;
+  if (code === "rate_limited" || status === 429) return "Too many attempts. Wait a minute and try again.";
   if ([502, 503, 504].includes(status)) {
     return "The sign-in service is temporarily unavailable. Please try again shortly.";
   }
-  return parsed.error || "Could not connect right now. Please try again.";
+  // The edge's request errors read `code: what to do`.
+  return parsed.error?.replace(/^[a-z_]+:\s*/, "") || "Could not connect right now. Please try again.";
 }
 
 export async function fetchWithTimeout(
@@ -124,7 +90,7 @@ export function clampPollAfter(value: unknown) {
 const ACCESS_KEY_PATTERN = /^vtm_[0-9a-f]{64}$/;
 
 const UNKNOWN_KEY_MESSAGE =
-  "This access key is unknown or was revoked. Create one in VITAP Mate → Connected apps and paste it here.";
+  "This access key is unknown or was revoked. Pair the extension again from VITAP Mate → Connected apps.";
 const PHONE_TIMEOUT_MESSAGE =
   "Your phone did not answer in time. Open VITAP Mate once (so it can sign in) and try again.";
 
@@ -229,9 +195,9 @@ export function interpretSessionResponse(httpStatus: number, body: unknown): Ses
   return { kind: "error", message: friendlyLoginError(httpStatus, JSON.stringify(reply)) };
 }
 
-/** The bridge the extension uses unless another is set; from .env. */
+/** The server (vtop-edge) the extension uses unless another is set; from .env. */
 export const DEFAULT_BRIDGE_URL = (
-  import.meta.env.VITE_BRIDGE_URL ?? "https://vmate-api.aster0.dev"
+  import.meta.env.VITE_BRIDGE_URL ?? "https://vmate.aster0.dev"
 ).replace(/\/+$/, "");
 
 /** The https origin of a bridge URL the user typed, or null. */
@@ -246,4 +212,37 @@ export function normalizeBridgeUrl(input: string): string | null {
   } catch {
     return null;
   }
+}
+
+// ---- pairing with the app (`POST /v1/pair`, see vtop-edge's pair.ts) ---------
+
+/** Crockford base32: no I, L, O or U, so a code reads back as typed. */
+const PAIR_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** How long the edge holds a key made for a code. */
+export const PAIR_TTL_MS = 300_000;
+
+/** A fresh pairing code, 10 characters (50 bits), as `XXXXX-XXXXX`. */
+export function newPairCode(
+  random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array = (b) => crypto.getRandomValues(b),
+) {
+  const chars = [...random(new Uint8Array(10))].map((byte) => PAIR_ALPHABET[byte & 31]);
+  return `${chars.slice(0, 5).join("")}-${chars.slice(5).join("")}`;
+}
+
+export type PairOutcome =
+  | { kind: "ready"; key: string }
+  | { kind: "pending"; pollAfterMs: number }
+  | { kind: "error"; message: string };
+
+/** Reads a reply from `POST /v1/pair`. */
+export function interpretPairResponse(httpStatus: number, body: unknown): PairOutcome {
+  const reply = (typeof body === "object" && body !== null ? body : {}) as {
+    status?: string;
+    key?: string;
+    pollAfterMs?: number;
+  };
+  if (reply.status === "ready" && isAccessKey(reply.key ?? "")) return { kind: "ready", key: reply.key!.trim() };
+  if (httpStatus === 202) return { kind: "pending", pollAfterMs: clampPollAfter(reply.pollAfterMs ?? 2000) };
+  return { kind: "error", message: friendlyLoginError(httpStatus, JSON.stringify(reply)) };
 }

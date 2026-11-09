@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VITAP Mate – VTOP Sign In",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "Sign in to VTOP with an access key from the VITAP Mate app.",
   "browser_specific_settings": {
     "gecko": {
