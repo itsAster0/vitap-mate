@@ -1,0 +1,8 @@
+vitapmate 3.0, rebuilt as a native app: faster start, smoother scrolling, smaller download.
+• Change inbox: see what changed on VTOP
+• Background sync that tells you what changed
+• Attendance calculator, plan days and calendar
+• Fetch all pages at once
+• Connection: direct, compressing proxy or server fetch
+• Pair the browser extension by QR; keys for AI apps
+• OTP auto-fill from Gmail or a forwarding address

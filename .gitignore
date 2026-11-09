@@ -21,11 +21,13 @@
 # Build outputs (Kotlin toolchain)
 /build/
 *.apk
+*.aab
 *.idsig
 
 # Release signing and Firebase config: kept in keystore/ on this machine only.
 /keystore/
 app/keystore.properties
+app/res/values/firebase.xml
 *.jks
 *.keystore
 google-services.json

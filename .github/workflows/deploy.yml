@@ -1,0 +1,67 @@
+name: Deploy
+
+# The server from rust/vtop-edge/alchemy.run.ts: the edge (Cloudflare Worker
+# vmate-edge), the engine (Railway engine-v2) and the UDP gateway (built here,
+# pushed to GHCR, run on the VPS over SSH). Alchemy's state lives in the
+# Cloudflare account, so this and a deploy from a laptop agree.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/**"
+      - "!rust/vtop-ffi/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust/vtop-edge
+    env:
+      CI: "true"
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+      INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+      VAULT_KEY: ${{ secrets.VAULT_KEY }}
+      FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+      GHCR_USERNAME: ${{ github.actor }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GATEWAY_SSH: ssh://${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: bun
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Docker reaches the VPS over SSH with the deploy key.
+      - name: SSH to the VPS
+        env:
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          target="${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}"
+          ssh "$target" 'mkdir -p vitapmate-gateway/data && chmod 700 vitapmate-gateway/data'
+          scp ../vps/resolv.conf "$target:vitapmate-gateway/"
+          # The gateway used to run under docker compose; Alchemy runs it now.
+          ssh "$target" 'cd vitapmate-gateway && [ -f compose.yml ] && docker compose down --remove-orphans && rm compose.yml || true'
+
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+      - run: bun run deploy -- --yes --no-input

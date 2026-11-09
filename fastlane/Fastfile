@@ -1,71 +1,53 @@
 default_platform(:android)
-update_priority  =4;
+
+# Paths are from the repo root (fastlane runs there); `sh` runs in fastlane/.
+AAB = "build/vitapmate-release.aab".freeze
+METADATA = "fastlane/metadata/android".freeze
+UPDATE_PRIORITY = 4
+
+# The versionCode the AAB is built with, from app/module.yaml.
+def version_code
+  File.read(File.expand_path("../app/module.yaml", __dir__))[/^\s*versionCode:\s*(\d+)/, 1] or
+    UI.user_error!("no versionCode in app/module.yaml")
+end
+
 platform :android do
-  desc "Deploy a new version to the Internal track only"
-  lane :deploy_internal do
-    # sh runs in fastlane/; actions resolve paths from the repo root.
-    sh "cd .. && mise run release"
+  desc "Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt"
+  lane :deploy_internal do |options|
+    sh("cd .. && mise run bundle") unless [false, "false"].include?(options[:build])
+    code = version_code
+    missing = Dir["#{METADATA}/*/"].reject { |dir| File.exist?("#{dir}changelogs/#{code}.txt") }
+    UI.user_error!("no changelogs/#{code}.txt in #{missing.join(', ')}") unless missing.empty?
     upload_to_play_store(
       track: "internal",
-      apk: "build/vitapmate-release.apk",
-      skip_upload_changelogs: true,
-    skip_upload_metadata: true,
-    skip_upload_images: true,
-    skip_upload_screenshots: true,
-    in_app_update_priority: update_priority 
+      aab: AAB,
+      metadata_path: METADATA,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      in_app_update_priority: UPDATE_PRIORITY
     )
   end
 
-  desc "Promote latest internal build to closed, open and production"
+  desc "Promote the latest internal build to the closed (friends), alpha and beta tracks"
   lane :promote_all do
-    upload_to_play_store(
-      track: "internal",
-      track_promote_to:"friends",
-      skip_upload_changelogs: true,
-    skip_upload_metadata: true,
-    skip_upload_images: true,
-    skip_upload_screenshots: true,
-    in_app_update_priority: update_priority 
-    )
-    upload_to_play_store(
-      track: "internal",
-      track_promote_to:"alpha",
-      skip_upload_changelogs: true,
-    skip_upload_metadata: true,
-    skip_upload_images: true,
-    skip_upload_screenshots: true,
-    in_app_update_priority: update_priority 
-    )
-
-    upload_to_play_store(
-      track: "internal",
-      track_promote_to:"beta", 
-      skip_upload_changelogs: true,
-    skip_upload_metadata: true,
-    skip_upload_images: true,
-    skip_upload_screenshots: true,
-    in_app_update_priority: update_priority 
-    )
-
-    # upload_to_play_store(
-    #   track: "internal",
-    #   track_promote_to:"production",
-    #   skip_upload_changelogs: true,
-    # skip_upload_metadata: true,
-    # skip_upload_images: true,
-    # skip_upload_screenshots: true,
-    #   in_app_update_priority: update_priority 
-    # )
+    %w[friends alpha beta].each do |track|
+      upload_to_play_store(
+        track: "internal",
+        track_promote_to: track,
+        skip_upload_changelogs: true,
+        skip_upload_metadata: true,
+        skip_upload_images: true,
+        skip_upload_screenshots: true,
+        in_app_update_priority: UPDATE_PRIORITY
+      )
+    end
+    # Production stays a manual step in the Play Console.
   end
 
-  desc "Build & upload to internal, then promote through all tracks"
+  desc "Build, upload to internal, then promote through the testing tracks"
   lane :deploy_all do
-    deploy_internal
-    promote_all
-  end
-
-  desc "Build & upload for actions"
-  lane :deploy_actions do
     deploy_internal
     promote_all
   end

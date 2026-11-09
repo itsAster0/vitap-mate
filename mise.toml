@@ -1,8 +1,10 @@
 [tools]
+bun = "latest"
 firebase = "latest"
 java = "26"
 kotlin = { version = "latest", asset_pattern = "kotlin-compiler-*.zip", bin_path = "kotlinc/bin" }
 kotlin-toolchain = { version = "0.13.0", bin = "kotlin", checksum_url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper.sha256", platforms = { windows-arm64 = { bin = "kotlin.bat", checksum_url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper.bat.sha256", url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper.bat" }, windows-x64 = { bin = "kotlin.bat", checksum_url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper.bat.sha256", url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper.bat" } }, url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/{{ version }}/kotlin-cli-{{ version }}-wrapper", version_list_url = "https://packages.jetbrains.team/maven/p/amper/amper/org/jetbrains/kotlin/kotlin-cli/maven-metadata.xml", version_regex = '<version>(\d+\.\d+\.\d+)</version>' }
+ruby = "3.4.12"
 
 [tasks.rust-android]
 description = "Build libvtop_ffi.so (arm64: phones and Apple-silicon emulators) into app/jniLibs and generate the Kotlin bindings"
@@ -17,8 +19,34 @@ run = [
   'cargo run -q -p vtop-ffi --features cli --bin uniffi-bindgen -- generate "target/debug/libvtop_ffi.$([ "$(uname)" = Darwin ] && echo dylib || echo so)" --language kotlin --out-dir ../core/src --no-format',
   # The Kotlin toolchain doesn't see changes in app/jniLibs, so an APK built
   # earlier would keep the old library: drop the cached Android builds.
-  "rm -rf ../build/tasks/_app_buildAndroidDebug ../build/tasks/_app_buildAndroidRelease",
+  "rm -rf ../build/tasks/_app_buildAndroidDebug ../build/tasks/_app_buildAndroidRelease ../build/tasks/_app_bundleAndroid",
 ]
+
+[tasks.firebase]
+description = "Write app/res/values/firebase.xml (gitignored) from .env.json, the resources Firebase starts from; prints no secrets"
+run = '''
+set -eu
+python3 - <<'PY'
+import json, os
+from xml.sax.saxutils import escape
+env = json.load(open(".env.json"))
+keys = {
+    "google_app_id": "FIREBASE_ANDROID_APP_ID",
+    "google_api_key": "FIREBASE_ANDROID_API_KEY",
+    "gcm_defaultSenderId": "FIREBASE_MESSAGING_SENDER_ID",
+    "project_id": "FIREBASE_PROJECT_ID",
+    "google_storage_bucket": "FIREBASE_STORAGE_BUCKET",
+}
+missing = [v for v in keys.values() if not env.get(v)]
+if missing:
+    raise SystemExit("missing in .env.json: " + ", ".join(missing))
+lines = [f'  <string name="{k}" translatable="false">{escape(env[v])}</string>' for k, v in keys.items()]
+os.umask(0o077)
+with open("app/res/values/firebase.xml", "w") as f:
+    f.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- Written by `mise run firebase` from .env.json; not committed. -->\n<resources>\n" + "\n".join(lines) + "\n</resources>\n")
+print("wrote app/res/values/firebase.xml")
+PY
+'''
 
 [tasks.signing]
 description = "Write app/keystore.properties (gitignored) from keystore/keystore.properties; prints no secrets"
@@ -49,13 +77,26 @@ cp build/tasks/_app_buildAndroidRelease/gradle-project-release.apk "$apk"
 echo "$apk (phone: adb install -r $apk)"
 '''
 
+[tasks.bundle]
+description = "Signed, minified release App Bundle for Play: build/vitapmate-release.aab"
+depends = ["signing"]
+run = '''
+set -eu
+./kotlin package -m app -p android -f aab -v release
+aab=build/vitapmate-release.aab
+cp build/tasks/_app_bundleAndroid/gradle-project-release.aab "$aab"
+# jarsigner exits 0 on an unsigned bundle too, so look for the verdict.
+jarsigner -verify "$aab" | grep -q '^jar verified' || { echo "$aab is not signed" >&2; exit 1; }
+echo "$aab (Play: bundle exec fastlane android deploy_internal)"
+'''
+
 [tasks.logs]
 description = "Follow the app's log (Kotlin and Rust) in logcat"
 run = "$HOME/Library/Android/sdk/platform-tools/adb logcat -v time -s vitapmate"
 
 [tasks.logs-pull]
 description = "Print the app's JSON-lines log file (files/logs/app.jsonl)"
-run = "$HOME/Library/Android/sdk/platform-tools/adb exec-out run-as com.vitapmate.kmp cat files/logs/app.jsonl"
+run = "$HOME/Library/Android/sdk/platform-tools/adb exec-out run-as com.vitap_pal.app cat files/logs/app.jsonl"
 
 [tasks.trace]
 description = "Capture 10 s of Perfetto (app + Rust spans, gfx, view) to traces/"
@@ -64,7 +105,7 @@ set -e
 adb="$HOME/Library/Android/sdk/platform-tools/adb"
 out="traces/vitapmate-$(date +%Y%m%d-%H%M%S).perfetto-trace"
 mkdir -p traces
-"$adb" shell perfetto -o /data/misc/perfetto-traces/vitapmate.perfetto-trace -t 10s -a com.vitapmate.kmp gfx view sched freq
+"$adb" shell perfetto -o /data/misc/perfetto-traces/vitapmate.perfetto-trace -t 10s -a com.vitap_pal.app gfx view sched freq
 "$adb" pull /data/misc/perfetto-traces/vitapmate.perfetto-trace "$out"
 echo "$out (open in ui.perfetto.dev, or query:)"
 echo "  trace_processor $out -q <(echo \"select name, dur/1e6 as ms from slice where name like 'core.%' or name like 'flow.%' order by ts\")"
@@ -82,14 +123,14 @@ adb="$HOME/Library/Android/sdk/platform-tools/adb"
 description = "Dump the running debug app's state (route, settings, pages, last 20 flows) to files/state.json and print it"
 run = '''
 adb="$HOME/Library/Android/sdk/platform-tools/adb ${ANDROID_SERIAL:+-s $ANDROID_SERIAL}"
-$adb shell run-as com.vitapmate.kmp rm -f files/state.json
-$adb shell am broadcast -a vitapmate.DUMP -p com.vitapmate.kmp >/dev/null
+$adb shell run-as com.vitap_pal.app rm -f files/state.json
+$adb shell am broadcast -a vitapmate.DUMP -p com.vitap_pal.app >/dev/null
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if $adb shell run-as com.vitapmate.kmp test -s files/state.json; then
-    exec $adb exec-out run-as com.vitapmate.kmp cat files/state.json
+  if $adb shell run-as com.vitap_pal.app test -s files/state.json; then
+    exec $adb exec-out run-as com.vitap_pal.app cat files/state.json
   fi
   sleep 0.3
 done
-echo "no files/state.json: is a debug build of com.vitapmate.kmp running?" >&2
+echo "no files/state.json: is a debug build of com.vitap_pal.app running?" >&2
 exit 1
 '''

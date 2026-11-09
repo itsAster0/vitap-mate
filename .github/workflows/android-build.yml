@@ -14,7 +14,6 @@ on:
       - "extension/**"
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
-      - ".github/workflows/gateway-deploy.yml"
       - "**/*.md"
   pull_request:
     paths-ignore:
@@ -27,11 +26,11 @@ on:
       - "extension/**"
       - "fastlane/**"
       - ".github/workflows/extension-build.yml"
-      - ".github/workflows/gateway-deploy.yml"
       - "**/*.md"
   workflow_dispatch:
 permissions:
-  contents: read
+  # `contents: write` only to replace the `nightly` release on a push to main.
+  contents: write
 concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
@@ -77,6 +76,14 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
         run: mise run rust-android
+      # Firebase values (push), as in the release; skipped where ENV_JSON isn't set (forks).
+      - name: Write Firebase resources
+        env:
+          ENV_JSON: ${{ secrets.ENV_JSON }}
+        run: |
+          if [ -z "$ENV_JSON" ]; then echo "ENV_JSON is not set; building without Firebase."; exit 0; fi
+          (umask 077; printf '%s' "$ENV_JSON" > .env.json)
+          mise run firebase
       - name: Build app
         run: ./kotlin build
       - name: Test core
@@ -106,7 +113,7 @@ jobs:
         run: mise run release
       - name: Remove secrets
         if: always()
-        run: rm -rf keystore app/keystore.properties
+        run: rm -rf keystore app/keystore.properties .env.json app/res/values/firebase.xml
       - name: Upload release APK
         if: steps.signing.outputs.signed == 'true'
         uses: actions/upload-artifact@v4
@@ -115,6 +122,25 @@ jobs:
           path: build/vitapmate-release.apk
           if-no-files-found: error
           retention-days: 30
+      # The README links the `nightly` release; a push to main replaces it.
+      - name: Publish nightly release
+        if: steps.signing.outputs.signed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/vitapmate-release.apk vitapmate.apk
+          version=$(sed -n 's/^ *versionName: *"\(.*\)".*/\1/p' app/module.yaml)
+          {
+            echo "Nightly build of vitapmate ${version}, from \`${GITHUB_SHA::7}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo
+            echo "**$(git log -1 --format=%s)**"
+            echo
+            cat .github/nightly-notes.md
+          } > nightly-notes.md
+          gh release delete nightly --yes --cleanup-tag || true
+          gh release create nightly vitapmate.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Nightly ${GITHUB_SHA::7}" --notes-file nightly-notes.md
       - name: Upload debug APK
         if: steps.signing.outputs.signed != 'true'
         uses: actions/upload-artifact@v4

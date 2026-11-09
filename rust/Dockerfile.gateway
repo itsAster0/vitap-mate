@@ -1,4 +1,4 @@
-# The UDP gateway alone (vtop-gateway), for the VPS (see vps/compose.yml),
+# The UDP gateway alone (vtop-gateway), for the VPS (deployed by vtop-edge/alchemy.run.ts),
 # with this folder as context. The engine runs elsewhere (Railway); the
 # gateway reaches it at ENGINE_URL.
 FROM rust:1.98-slim-bookworm AS build
@@ -10,5 +10,5 @@ RUN cargo build --locked --profile server --package vtop-gateway --bin vtop-gate
 FROM debian:bookworm-slim
 # TLS uses rustls with built-in roots: no system certificates needed.
 COPY --from=build /vtop-gateway /usr/local/bin/vtop-gateway
-ENV RUST_LOG=info
+ENV RUST_LOG=info GATEWAY_DATA_DIR=/data
 CMD ["vtop-gateway"]

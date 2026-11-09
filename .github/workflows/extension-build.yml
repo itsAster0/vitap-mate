@@ -32,30 +32,23 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Set up bun
+        uses: jdx/mise-action@v2
         with:
-          version: 12
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-          cache-dependency-path: extension/pnpm-lock.yaml
+          install_args: bun
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Type check
-        run: pnpm check
+        run: bun run check
 
       - name: Test
-        run: pnpm test
+        run: bun run test
 
       # Uses the server URL in extension/.env.
       - name: Build
-        run: pnpm build
+        run: bun run build
 
       # Chrome shows version_name on the extensions page, so a build can be
       # matched to its commit. The manifest version itself is bumped by hand.
@@ -84,20 +77,20 @@ jobs:
       # a fourth version part.
       - name: Prepare Firefox build
         run: |
-          pnpm build:firefox
+          bun run build:firefox
           version=$(jq -r .version dist-firefox/manifest.json)
           jq --arg v "$version.$GITHUB_RUN_NUMBER" '.version = $v' \
             dist-firefox/manifest.json > dist-firefox/manifest.tmp
           mv dist-firefox/manifest.tmp dist-firefox/manifest.json
 
       - name: Lint for Firefox
-        run: pnpm exec web-ext lint --source-dir dist-firefox --self-hosted
+        run: bunx web-ext lint --source-dir dist-firefox --self-hosted
 
       # Unlisted: Mozilla signs it automatically and we host the .xpi ourselves.
       - name: Sign for Firefox
         if: env.AMO_JWT_ISSUER != ''
         run: |
-          pnpm exec web-ext sign --source-dir dist-firefox --channel unlisted \
+          bunx web-ext sign --source-dir dist-firefox --channel unlisted \
             --artifacts-dir web-ext-artifacts \
             --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
           mv web-ext-artifacts/*.xpi extension.xpi

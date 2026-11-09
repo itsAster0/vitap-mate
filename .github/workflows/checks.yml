@@ -1,0 +1,49 @@
+name: Checks
+# Formatting, lints and tests for the Rust workspace and the edge Worker. The
+# app's own build and Kotlin tests run in App Build; the extension's in
+# Extension Build.
+on:
+  push:
+    branches: [main]
+    paths: ["rust/**", ".github/workflows/checks.yml"]
+  pull_request:
+    paths: ["rust/**", ".github/workflows/checks.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          cache-on-failure: true
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+  edge:
+    name: Edge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust/vtop-edge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+        with:
+          install_args: bun
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run test

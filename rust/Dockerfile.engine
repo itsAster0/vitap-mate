@@ -1,5 +1,5 @@
-# The engine (vtop-bridge), deployed on Railway (root directory rust,
-# RAILWAY_DOCKERFILE_PATH=Dockerfile.engine) with this folder as context.
+# The engine (vtop-bridge), deployed to the Railway service engine-v2 by
+# rust/vtop-edge/alchemy.run.ts (`bun run deploy`) with this folder as context.
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
 COPY . .
