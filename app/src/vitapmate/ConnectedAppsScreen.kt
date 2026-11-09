@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
@@ -49,6 +50,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.KeyRound
+import com.composables.icons.lucide.Download
+import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Sparkles
@@ -87,6 +90,9 @@ import vitapmate.data.Problem
 /** Route id of Settings → Account → Connected apps. */
 const val CONNECTED_APPS = "connected_apps"
 
+/** The extension's latest build (Chrome zip and signed Firefox add-on), replaced by CI. */
+private const val EXTENSION_URL = "https://github.com/itsAster0/vitap-mate/releases/tag/extension-latest"
+
 private const val MCP_URL = "https://vmate.aster0.dev/mcp"
 
 /**
@@ -100,6 +106,7 @@ private const val MCP_URL = "https://vmate.aster0.dev/mcp"
 @Composable
 fun ConnectedAppsScreen() {
     val scope = rememberCoroutineScope()
+    val uri = LocalUriHandler.current
     var apps by remember { mutableStateOf<ConnectedApps?>(null) }
     var problem by remember { mutableStateOf<Problem?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -124,6 +131,7 @@ fun ConnectedAppsScreen() {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
                     GroupItem("Pair a browser", "connected_apps.pair", Lucide.Globe, "Scan the code the vitapmate extension shows", onClick = { pairing = true }, trailing = { Chevron() })
                     GroupItem("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, "For Claude and other AI apps", onClick = { newMcp = true }, trailing = { Chevron() })
+                    GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
             }
             val current = apps
