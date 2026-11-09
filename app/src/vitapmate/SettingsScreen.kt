@@ -122,7 +122,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
                     )
                     BackgroundSyncSetting()
-                    GroupItem(
+                    if (Settings.backgroundSync) GroupItem(
                         "Sync history",
                         "settings.sync_history",
                         Lucide.History,

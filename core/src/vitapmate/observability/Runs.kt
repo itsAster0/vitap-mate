@@ -69,6 +69,8 @@ enum class RunTrigger { Opened, Pulled, Retried, Automatic, Returned, AfterOtp, 
  */
 fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
     val runs = mutableListOf<MRun>()
+    // Background syncs that finished: when, and how many changes they notified (joined below).
+    val notified = mutableListOf<Pair<FlowSummary, String>>()
     for (f in flows.sortedBy { it.startT }) {
         // The prompt this flow answers: OTP steps that started waiting shortly before.
         fun waitingSteps() = runs.flatMap { r -> r.steps.filter { it.state == StepState.WaitingOtp && f.startT - it.startT in 0..OTP_WINDOW_MS }.map { r to it } }
@@ -76,6 +78,16 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
         val end = f.lines.lastOrNull { it.src == "flow" && it.fields["ev"] in ENDS }?.t
         when {
             name.startsWith("forwarding.") -> Unit
+            // The worker's own flow: a run of its own when it stopped before VTOP ("skipped: …"),
+            // else only the count it notified, added to its pages' run.
+            name == "sync.background" -> {
+                val skipped = f.lines.firstOrNull { it.src == "sync" && it.msg.startsWith("skipped: ") }
+                if (skipped != null) {
+                    val step = MStep(BACKGROUND_SYNC, StepState.Skipped, f.startT).apply { end(StepState.Skipped, skipped.t, skipped.msg.removePrefix("skipped: ")) }
+                    runs += MRun(f.id, BACKGROUND_SYNC, RunTrigger.Automatic, f.startT, listOf(step))
+                }
+                f.lines.firstOrNull { it.src == "sync" && it.msg == "background done" }?.fields?.get("notified")?.let { notified += f to it }
+            }
             name.endsWith(".submit_otp") -> when (f.outcome) {
                 null -> waitingSteps().forEach { (_, s) -> s.reason = "Checking the code" }
                 "ok" -> waitingSteps().forEach { (r, s) ->
@@ -115,6 +127,12 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
             }
         }
     }
+    for ((f, count) in notified) {
+        val run = runs.lastOrNull { it.title == BACKGROUND_SYNC && it.startT >= f.startT } ?: continue
+        val t = f.lines.last().t
+        val label = when (count) { "0" -> "Nothing new"; "1" -> "1 change notified"; else -> "$count changes notified" }
+        run.steps += MStep(label, StepState.Done, t).apply { end(StepState.Done, t) }
+    }
     return runs.map { it.freeze() }.sortedByDescending { it.startT }
 }
 
@@ -133,6 +151,7 @@ private const val OTP_WINDOW_MS = 15 * 60_000L
 private const val FOLLOW_OTP_MS = 120_000L
 private const val FOLLOW_SIGN_IN_MS = 20_000L
 private const val SIGN_IN = "Sign in"
+private const val BACKGROUND_SYNC = "Background sync"
 private const val OTP = "OTP"
 private const val NET = "rust.network"
 private const val AUTH = "rust.auth"
@@ -346,7 +365,7 @@ private fun titleOf(f: FlowSummary, steps: List<MStep>): String {
         name == "login.sign_in" -> SIGN_IN
         name == "sync.stale" -> "Background refresh"
         name == "sync.all" -> "Fetch all"
-        name.startsWith("sync.background") -> "Background sync"
+        name.startsWith("sync.background") -> BACKGROUND_SYNC
         name.endsWith(".refresh") -> pageLabel(name.removeSuffix(".refresh"))
         name.endsWith(".calendar") -> "Calendar"
         name.endsWith(".exams") -> "Exams"

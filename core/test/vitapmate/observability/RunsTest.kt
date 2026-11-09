@@ -141,4 +141,26 @@ class RunsTest {
         assertTrue(r.running)
         assertEquals("Exams Running", r.chain())
     }
+
+    @Test
+    fun backgroundSyncSkippedOrNotified() {
+        val list = runs(
+            """
+            {"ev":"start","flow":"s1","l":"info","msg":"sync.background start","src":"flow","step":"sync.background","t":1000}
+            {"flow":"s1","l":"info","msg":"skipped: OTP auto-fill isn't set up","src":"sync","t":1001}
+            {"ev":"done","flow":"s1","l":"info","ms":"2","msg":"sync.background done","outcome":"ok","src":"flow","step":"sync.background","t":1002}
+            {"ev":"start","flow":"s2","l":"info","msg":"sync.background start","src":"flow","step":"sync.background","t":2000}
+            {"ev":"start","flow":"p2","l":"info","msg":"sync.background.pages start","src":"flow","step":"sync.background.pages","t":2001}
+            {"flow":"p2","l":"info","msg":"response vtop.vitap.ac.in/vtop/processViewStudentAttendance 200 90ms","src":"rust.network","t":2100}
+            {"flow":"p2","l":"info","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_attendance","t":2105}
+            {"ev":"done","flow":"p2","l":"info","ms":"110","msg":"sync.background.pages done","outcome":"ok","src":"flow","step":"sync.background.pages","t":2110}
+            {"flow":"s2","l":"info","msg":"background done","notified":"2","src":"sync","t":2200}
+            {"ev":"done","flow":"s2","l":"info","ms":"201","msg":"sync.background done","outcome":"ok","src":"flow","step":"sync.background","t":2201}
+            """,
+        )
+        assertEquals(2, list.size)
+        assertEquals("Background sync", list[0].title)
+        assertEquals("Attendance Done → 2 changes notified Done", list[0].chain())
+        assertEquals("Background sync (OTP auto-fill isn't set up) Skipped", list[1].chain())
+    }
 }
