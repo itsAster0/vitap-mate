@@ -15,6 +15,9 @@ dependencies:
   - androidx.core:core-ktx:1.19.0
   # VTOP's HTTP hops for Rust (VtopHttp).
   - com.squareup.okhttp3:okhttp:5.5.1
+  # The VTOP password in the phone's password manager (SavedPasswords); Play services below Android 14.
+  - androidx.credentials:credentials:1.6.0
+  - androidx.credentials:credentials-play-services-auth:1.6.0
 
 settings:
   android:

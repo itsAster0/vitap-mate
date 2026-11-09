@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentType
@@ -64,6 +66,7 @@ import vitapmate.core.CoreInterface
 import vitapmate.core.SignIn
 import vitapmate.data.AppCore
 import vitapmate.data.Problem
+import vitapmate.data.SavedPasswords
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -78,7 +81,8 @@ import vitapmate.ui.Space
  * banner with "Try again" and "Details" (the flow in the Inspector). [onSignedIn] runs as soon
  * as VTOP lets the user in; the app then asks for the semester ([ChooseSemester]). [core] is the Rust
  * core (a stand-in in previews). Flows `login.sign_in`, `login.submit_otp`, `login.resend_otp`,
- * `login.cancel_otp`; log src `ui.login`.
+ * `login.cancel_otp`; log src `ui.login`. Fills from and offers to save to the phone's password
+ * manager ([SavedPasswords]).
  * TODO: server / UDP sign-in and email-OTP auto-fill go here (not in the prototype).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -98,6 +102,27 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
     var signingIn by remember { mutableStateOf(false) }
     var otp by remember { mutableStateOf<OtpChallenge?>(null) }
     val haptics = rememberHaptics()
+    val context = LocalContext.current
+    // A saved password from the phone's password manager, offered once when the form opens empty.
+    var picked by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var offered by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (offered || username.isNotEmpty()) return@LaunchedEffect
+        offered = true
+        SavedPasswords.pick(context)?.let { (id, pass) ->
+            if (username.isNotEmpty() || password.isNotEmpty()) return@let
+            username = id
+            password = pass
+            picked = id to pass
+        }
+    }
+
+    /** VTOP let the user in: offers to save what they typed (unless it came from the password manager), then goes on. */
+    fun signedIn() {
+        val typed = username.trim() to password
+        if (typed != picked) SavedPasswords.offerSave(context, typed.first, typed.second)
+        onSignedIn()
+    }
 
     fun submit() {
         if (signingIn) return
@@ -124,7 +149,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     core().signIn(id, username.trim(), password)
                 }
                 when (result) {
-                    is SignIn.Done -> onSignedIn()
+                    is SignIn.Done -> signedIn()
                     is SignIn.NeedsOtp -> otp = OtpChallenge(result.message, "login", "ui.login")
                 }
             } catch (e: CancellationException) {
@@ -245,7 +270,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                         if (challenge.submit(core())) {
                             haptics.confirm()
                             otp = null
-                            onSignedIn()
+                            signedIn()
                         } else if (challenge.error != null) {
                             haptics.reject()
                         }

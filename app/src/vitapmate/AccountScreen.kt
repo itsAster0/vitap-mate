@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentType
@@ -51,6 +52,7 @@ import vitapmate.data.AccountState
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
+import vitapmate.data.SavedPasswords
 import vitapmate.data.SemesterChoice
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
@@ -81,6 +83,7 @@ fun AccountScreen() {
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     val haptics = rememberHaptics()
+    val context = LocalContext.current
     val saved = LocalUser.current.orEmpty()
     var username by remember(saved) { mutableStateOf(saved) }
     var password by remember { mutableStateOf("") }
@@ -100,6 +103,7 @@ fun AccountScreen() {
         if (!ready) return
         focus.clearFocus()
         val other = !username.trim().equals(saved, ignoreCase = true)
+        val changed = other || password != savedPassword
         scope.launch {
             saving = true
             var flowId = ""
@@ -130,6 +134,8 @@ fun AccountScreen() {
                     }
                     accountVersion++
                     haptics.confirm()
+                    // Keeps the phone's password manager in step with what VTOP just accepted.
+                    if (changed) SavedPasswords.offerSave(context, username.trim(), password)
                     showToast("Account saved", "VTOP accepted the new details.")
                 }
             } catch (e: CancellationException) {
