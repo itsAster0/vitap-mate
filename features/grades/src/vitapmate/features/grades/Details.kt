@@ -5,11 +5,10 @@ import androidx.compose.runtime.mutableStateMapOf
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import vitapmate.core.CoreException
 import vitapmate.core.GradeDetails
 import vitapmate.data.Activity
 import vitapmate.data.AppCore
-import vitapmate.data.OtpPrompt
+import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -54,7 +53,7 @@ internal class Details {
             throw e
         } catch (e: Exception) {
             failed[key] = Unit
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+            askedOtp(e)
             val problem = problemOf(e, id).copy(userInitiated = trigger == "button")
             Log.warn("ui.grades", "details not fetched", id, mapOf("course" to courseId, "trigger" to trigger, "kind" to problem.kind.name))
             // Only for the button (or with "Show background errors"); never for an OTP request.

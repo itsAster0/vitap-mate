@@ -52,18 +52,17 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Plus
 import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import vitapmate.core.Core
 import vitapmate.core.GpaPlan
 import vitapmate.core.GradeHistory
 import vitapmate.core.PlannedCourse
 import vitapmate.core.TargetOutlook
 import vitapmate.core.planGpa
-import vitapmate.data.AppCore
 import vitapmate.data.SemesterChoice
+import vitapmate.data.coreFlow
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
@@ -86,7 +85,7 @@ import vitapmate.ui.tappable
 internal fun PlannerView(planner: Planner, history: GradeHistory?, list: LazyListState) {
     val scope = rememberCoroutineScope()
     fun act(what: String, fields: Map<String, String> = emptyMap()) {
-        scope.launch { flow("grades.plan.$what") { id -> Log.info("ui.grades", "plan $what", id, fields + ("rows" to "${planner.rows.size}")) } }
+        scope.logAction("grades.plan.$what", "ui.grades", "plan $what", fields + ("rows" to "${planner.rows.size}"))
     }
     LaunchedEffect(history) {
         if (history == null || planner.prefilled) return@LaunchedEffect
@@ -96,7 +95,7 @@ internal fun PlannerView(planner: Planner, history: GradeHistory?, list: LazyLis
     }
     LaunchedEffect(SemesterChoice.selected) {
         try {
-            planner.semester = flow("grades.plan.courses") { id -> withContext(Dispatchers.IO) { AppCore.await().plannerCourses(id) } }
+            planner.semester = coreFlow("grades.plan.courses", Core::plannerCourses)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {

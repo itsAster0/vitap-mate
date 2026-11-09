@@ -12,9 +12,9 @@ import vitapmate.core.CoreException
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
 import vitapmate.data.AppCore
-import vitapmate.data.OtpPrompt
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
+import vitapmate.data.askedOtp
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
@@ -90,7 +90,7 @@ object MailForwarding {
             throw e
         } catch (e: Throwable) {
             Log.warn("ui.forwarding", "$name failed: ${e::class.simpleName}", flowId)
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+            askedOtp(e)
             if (!quiet) problem(e).let { (title, message) -> showToast(title, message) }
             load("after_$name")
             null

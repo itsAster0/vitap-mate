@@ -47,6 +47,7 @@ import java.util.Calendar
 import java.util.TimeZone
 import vitapmate.core.AttendedClass
 import vitapmate.core.ClassStatus
+import vitapmate.data.epochDayOf
 import vitapmate.ui.AppTheme
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
@@ -146,7 +147,7 @@ private fun Month(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
     val scheme = MaterialTheme.colorScheme
     val leading = isoWeekday(first) - 1
     val length = daysInMonth(first)
-    val today = remember { System.currentTimeMillis().let { Math.floorDiv(it + TimeZone.getDefault().getOffset(it), 86_400_000L).toInt() } }
+    val today = remember { epochDayOf(System.currentTimeMillis()) }
     val tile = RoundedCornerShape(12.dp)
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (week in 0 until (leading + length + 6) / 7) {

@@ -3,6 +3,8 @@ package vitapmate.observability
 import androidx.tracing.traceAsync
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Runs [block] as one user action or background run named [name]: makes a short flow id (pass it
@@ -26,4 +28,9 @@ suspend fun <T> flow(name: String, block: suspend (id: String) -> T): T {
             throw e
         }
     }
+}
+
+/** A tap that only changes the screen (a filter, a tab, a sheet): its own flow [name] and one log line. */
+fun CoroutineScope.logAction(name: String, src: String, msg: String, fields: Map<String, String> = emptyMap()) {
+    launch { flow(name) { id -> Log.info(src, msg, id, fields) } }
 }

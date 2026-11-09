@@ -46,7 +46,7 @@ import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.LocalContentPadding
@@ -79,7 +79,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
     val pickedClasses = days.filter { it.day in picked }.sumOf { it.classes }
     val missing = skip + pickedClasses
     val log: (String, Map<String, String>) -> Unit = { what, fields ->
-        scope.launch { flow("attendance.detail.calc") { id -> Log.info("ui.attendance", "calc $what ${course.key}", id, fields + ("course" to course.key)) } }
+        scope.logAction("attendance.detail.calc", "ui.attendance", "calc $what ${course.key}", fields + ("course" to course.key))
     }
     val unit = if (course.isLab) "sessions" else "classes"
     LazyColumn(

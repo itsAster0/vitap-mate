@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,18 +32,21 @@ import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
 import vitapmate.data.CalendarRefresh
+import vitapmate.data.Histories
 import vitapmate.data.PageState
 import vitapmate.data.Settings
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.ScrollToTopOnReselect
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
+import vitapmate.ui.rememberSyncedPager
 
 /**
  * Attendance: the saved copy first, then VTOP (`page.attendance`, log src `ui.attendance`).
@@ -75,7 +77,7 @@ fun AttendanceScreen() {
         seen = fresh
         if (before == null || before == fresh) return@LaunchedEffect
         (page.state as? PageState.Ready)?.data?.semesterId?.let { launch { CalendarRefresh.ifOld(it, "attendance", anyway = true) } }
-        Histories.syncMismatched()
+        Histories.sync("attendance") { c, id -> c.mismatchedAttendanceDetails(id) }
     }
     PageScaffold(
         page.state,
@@ -88,17 +90,16 @@ fun AttendanceScreen() {
         val labs = data.courses.count { it.isLab }
         // With one kind only there is no filter and no pager.
         val pages = if (labs in 1..<data.courses.size) Kind.entries else listOf(Kind.All)
-        val pager = rememberPagerState(pages.indexOf(filter).coerceAtLeast(0)) { pages.size }
+        // A swipe that lands on another list moves the filter with it.
+        val pager = rememberSyncedPager(pages, filter) { kind ->
+            filter = kind
+            flow("attendance.filter") { id -> Log.info("ui.attendance", "filter ${kind.name.lowercase()} (swipe)", id, mapOf("filter" to kind.name.lowercase(), "by" to "swipe")) }
+        }
         // One list state per kind, kept across refreshes and process death.
         val lists = Kind.entries.map { rememberLazyListState() }
         ScrollToTopOnReselect(lists[pages[pager.currentPage.coerceIn(0, pages.lastIndex)].ordinal])
-        // A swipe that lands on another list moves the filter with it.
         LaunchedEffect(pager.settledPage) {
             val kind = pages.getOrNull(pager.settledPage) ?: return@LaunchedEffect
-            if (kind != filter && pages.size > 1) {
-                filter = kind
-                flow("attendance.filter") { id -> Log.info("ui.attendance", "filter ${kind.name.lowercase()} (swipe)", id, mapOf("filter" to kind.name.lowercase(), "by" to "swipe")) }
-            }
             StateRegistry.report("ui.attendance", mapOf("filter" to kind.name.lowercase(), "shown" to data.courses.of(kind).size, "debarred" to data.courses.count { it.debarred }))
         }
         val canSkipDay = outlook.values.any { it.days.isNotEmpty() }
@@ -125,7 +126,7 @@ fun AttendanceScreen() {
                     FilledTonalIconButton(
                         {
                             skipDay = true
-                            scope.launch { flow("attendance.skip_day.open") { id -> Log.info("ui.attendance", "open skip days", id) } }
+                            scope.logAction("attendance.skip_day.open", "ui.attendance", "open skip days")
                         },
                         Modifier.padding(start = Space.sm).testTag("attendance.skip_day.open"),
                     ) { Icon(Lucide.CalendarMinus, "Skip days") }
@@ -140,7 +141,7 @@ fun AttendanceScreen() {
         data.courses.firstOrNull { it.key == open }?.let { course ->
             CourseSheet(course.key, course.name.ifBlank { course.code }) {
                 open = null
-                scope.launch { flow("attendance.detail.close") { id -> Log.info("ui.attendance", "close ${course.key}", id, mapOf("course" to course.key)) } }
+                scope.logAction("attendance.detail.close", "ui.attendance", "close ${course.key}", mapOf("course" to course.key))
             }
         }
     }

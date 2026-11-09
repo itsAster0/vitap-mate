@@ -29,7 +29,7 @@ import vitapmate.data.PageState
 import vitapmate.data.SemesterChoice
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
@@ -68,7 +68,7 @@ internal fun SemesterView(
     Column(Modifier.fillMaxSize()) {
         SemesterChips(data?.semesterId ?: semester.ifEmpty { SemesterChoice.selected.orEmpty() }) { id ->
             onView(id)
-            scope.launch { flow("grades.semester") { f -> Log.info("ui.grades", "semester $id", f, mapOf("semester" to id)) } }
+            scope.logAction("grades.semester", "ui.grades", "semester $id", mapOf("semester" to id))
         }
         PageScaffold(
             page.state,

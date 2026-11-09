@@ -38,7 +38,7 @@ import vitapmate.data.Meal
 import vitapmate.data.MealWindow
 import vitapmate.data.MessTimings
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Space
 import vitapmate.ui.clock
@@ -62,7 +62,7 @@ fun MessTimingsSheet(onDismiss: () -> Unit) {
     val h24 = is24Hour()
     var picking by remember { mutableStateOf<Pair<Meal, Boolean>?>(null) }
     val windows = MessTimings.windows
-    fun log(what: String) = scope.launch { flow("settings.mess_timings") { f -> Log.info("ui.settings", "mess timings $what", f) } }
+    fun log(what: String) = scope.logAction("settings.mess_timings", "ui.settings", "mess timings $what")
 
     OpenHaptic()
     ModalBottomSheet(onDismiss, Modifier.semantics { testTagsAsResourceId = true }.testTag("settings.mess_timings.sheet"), sheet, containerColor = MaterialTheme.colorScheme.surface) {

@@ -11,12 +11,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
@@ -118,7 +120,7 @@ class PageHandle<T> internal constructor(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+            askedOtp(e)
             // No pick (any more): SemesterChoice.selected turns null and the app shows the picker.
             if (e is CoreException.SemesterNeeded) SemesterChoice.readCache(flow)
             throw e
@@ -279,6 +281,14 @@ object OtpPrompt {
         this.message = message
     }
 
+    /** [ask]s, then waits for the prompt to close; true when the code was accepted ([done]). */
+    suspend fun askAndWait(message: String): Boolean {
+        val before = generation
+        ask(message)
+        snapshotFlow { this.message }.first { it == null }
+        return generation != before
+    }
+
     /** The code was accepted: open pages fetch again. */
     fun done() {
         message = null
@@ -293,7 +303,7 @@ object OtpPrompt {
         message = null
         scope.launch {
             try {
-                flow("otp.cancel") { id -> withContext(Dispatchers.IO) { AppCore.await().cancelOtp(id) } }
+                coreFlow("otp.cancel", Core::cancelOtp)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Throwable) {

@@ -5,16 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.CircleUser
@@ -24,10 +21,12 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.Space
+import vitapmate.ui.rememberSyncedPager
 
 private enum class Tab { Profile, Mentor }
 
@@ -52,16 +51,9 @@ fun ProfileScreen() {
         isEmpty = { it.name.isBlank() && it.registrationNumber.isBlank() },
         empty = { EmptyView(Lucide.CircleUser, "No profile yet", Modifier.testTag("profile.empty")) },
     ) { profile ->
-        val pager = rememberPagerState(tab.ordinal) { Tab.entries.size }
-        val current by rememberUpdatedState(tab)
-        LaunchedEffect(pager) {
-            snapshotFlow { pager.settledPage }.collect { settled ->
-                val landed = Tab.entries[settled]
-                if (landed != current) {
-                    tab = landed
-                    flow("profile.tab") { id -> Log.info("ui.profile", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe")) }
-                }
-            }
+        val pager = rememberSyncedPager(Tab.entries, tab) { landed ->
+            tab = landed
+            flow("profile.tab") { id -> Log.info("ui.profile", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe")) }
         }
         LaunchedEffect(profile, tab) {
             StateRegistry.report(
@@ -84,7 +76,7 @@ fun ProfileScreen() {
                 onSelect = { t ->
                     tab = t
                     scope.launch { pager.animateScrollToPage(t.ordinal) }
-                    scope.launch { flow("profile.tab") { id -> Log.info("ui.profile", "tab ${t.name.lowercase()}", id, mapOf("tab" to t.name.lowercase(), "by" to "tap")) } }
+                    scope.logAction("profile.tab", "ui.profile", "tab ${t.name.lowercase()}", mapOf("tab" to t.name.lowercase(), "by" to "tap"))
                 },
                 tag = "profile.tab",
                 key = { it.name.lowercase() },

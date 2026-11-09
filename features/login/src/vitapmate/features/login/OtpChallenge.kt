@@ -112,7 +112,6 @@ class OtpChallenge(vtopMessage: String, val prefix: String, private val src: Str
                 remaining = 0
                 message = EXPIRED_MESSAGE
             }
-            minimized = false
             error = reason
             return false
         } catch (e: CoreException) {

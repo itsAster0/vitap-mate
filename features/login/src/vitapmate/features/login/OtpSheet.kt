@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.IconButton
 import com.composables.icons.lucide.Minimize2
 import vitapmate.observability.Log
-import vitapmate.observability.flow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +63,7 @@ import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import kotlinx.coroutines.launch
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 import vitapmate.ui.nums
@@ -87,7 +87,7 @@ internal fun OtpSheet(challenge: OtpChallenge, onSubmit: () -> Unit, onResend: (
     fun minimize(open: Boolean) {
         challenge.minimized = !open
         val what = if (open) "reopen_otp" else "minimize_otp"
-        scope.launch { flow("${challenge.prefix}.$what") { id -> Log.info("ui.otp", what, id, mapOf("remaining_s" to "${challenge.remaining}")) } }
+        scope.logAction("${challenge.prefix}.$what", "ui.otp", what, mapOf("remaining_s" to "${challenge.remaining}"))
     }
     // Just above the floating nav bar, following it as it slides; at the bottom without one.
     val insets = WindowInsets.navigationBars

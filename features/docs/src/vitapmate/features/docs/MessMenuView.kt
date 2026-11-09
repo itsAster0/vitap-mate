@@ -75,7 +75,9 @@ import vitapmate.data.MessMenu
 import vitapmate.data.MessSheet
 import vitapmate.data.MessTimings
 import vitapmate.data.currentOrNextMeal
+import vitapmate.data.epochDayOf
 import vitapmate.data.messMenuYear
+import vitapmate.data.minuteOf
 import vitapmate.data.parseMessMenu
 import vitapmate.data.readSpreadsheet
 import vitapmate.ui.AppTheme
@@ -86,11 +88,9 @@ import vitapmate.ui.Space
 import vitapmate.ui.Surface
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.clock
-import vitapmate.ui.epochDayOf
 import vitapmate.ui.formatDay
 import vitapmate.ui.is24Hour
 import vitapmate.ui.isoWeekday
-import vitapmate.ui.minuteOf
 import vitapmate.ui.nums
 import vitapmate.ui.rememberNow
 

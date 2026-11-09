@@ -31,9 +31,9 @@ import vitapmate.core.OutingRequest
 import vitapmate.core.OutingResult
 import vitapmate.core.OutingStanding
 import vitapmate.data.AppCore
-import vitapmate.data.OtpPrompt
 import vitapmate.data.PageHandle
 import vitapmate.data.PageState
+import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
@@ -161,7 +161,7 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
                                 } catch (e: CancellationException) {
                                     throw e
                                 } catch (e: Throwable) {
-                                    if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason) else showToast("Couldn't get the pass", failureOf(e, ""))
+                                    if (!askedOtp(e)) showToast("Couldn't get the pass", failureOf(e, ""))
                                 } finally {
                                     passLoading = null
                                 }
@@ -192,7 +192,7 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason) else showToast("Couldn't cancel", failureOf(e, ""))
+                    if (!askedOtp(e)) showToast("Couldn't cancel", failureOf(e, ""))
                 }
                 // Sent or maybe sent: show what VTOP has now, then let the row go.
                 refreshAfterWrite(page, "cancel")

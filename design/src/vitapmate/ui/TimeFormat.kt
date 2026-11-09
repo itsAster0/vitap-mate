@@ -10,17 +10,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.delay
+import vitapmate.data.DAY_MS
 
 // Port of logic/time_format.dart plus the agenda's date helpers. Dates are local epoch days (no
 // java.time: minSdk 24), times are minutes since midnight, as the Rust records give them.
-
-private const val DAY_MS = 86_400_000L
-
-/** Today's local epoch day for the wall clock [ms]. */
-fun epochDayOf(ms: Long): Int = Math.floorDiv(ms + TimeZone.getDefault().getOffset(ms), DAY_MS).toInt()
-
-/** Minutes since local midnight for the wall clock [ms]. */
-fun minuteOf(ms: Long): Int = (Math.floorMod(ms + TimeZone.getDefault().getOffset(ms), DAY_MS) / 60_000).toInt()
 
 /** ISO weekday (1 = Monday) of an epoch day; 1970-01-01 was a Thursday. */
 fun isoWeekday(day: Int): Int = Math.floorMod(day + 3, 7) + 1

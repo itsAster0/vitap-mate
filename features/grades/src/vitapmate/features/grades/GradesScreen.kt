@@ -5,17 +5,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.Calculator
@@ -30,9 +27,11 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.ScrollToTopOnReselect
 import vitapmate.ui.Space
+import vitapmate.ui.rememberSyncedPager
 
 /** The three views, as the Flutter app's Grades, Grade History and GPA Planner pages. */
 private enum class View { Semester, History, Planner }
@@ -60,19 +59,12 @@ fun GradesScreen() {
     var shown by remember { mutableStateOf<Grades?>(null) }
     val details = remember { Details() }
     val planner = remember { Planner() }
-    val pager = rememberPagerState(view.ordinal) { View.entries.size }
+    val pager = rememberSyncedPager(View.entries, view) { to ->
+        view = to
+        flow("grades.view") { id -> Log.info("ui.grades", "view ${to.name.lowercase()} (swipe)", id, mapOf("view" to to.name.lowercase(), "by" to "swipe")) }
+    }
     val lists = View.entries.map { rememberLazyListState() }
     ScrollToTopOnReselect(lists[pager.currentPage])
-    val current by rememberUpdatedState(view)
-    LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { settled ->
-            val to = View.entries[settled]
-            if (to != current) {
-                view = to
-                flow("grades.view") { id -> Log.info("ui.grades", "view ${to.name.lowercase()} (swipe)", id, mapOf("view" to to.name.lowercase(), "by" to "swipe")) }
-            }
-        }
-    }
     val historyData = (history.state as? PageState.Ready)?.data
     LaunchedEffect(view, shown, expanded, filter, historyData, planner.rows.size) {
         StateRegistry.report(
@@ -98,7 +90,7 @@ fun GradesScreen() {
             onSelect = { to ->
                 view = to
                 scope.launch { pager.animateScrollToPage(to.ordinal) }
-                scope.launch { flow("grades.view") { id -> Log.info("ui.grades", "view ${to.name.lowercase()}", id, mapOf("view" to to.name.lowercase(), "by" to "tap")) } }
+                scope.logAction("grades.view", "ui.grades", "view ${to.name.lowercase()}", mapOf("view" to to.name.lowercase(), "by" to "tap"))
             },
             tag = "grades.view",
             key = { it.name.lowercase() },
@@ -137,7 +129,7 @@ fun GradesScreen() {
                     filter,
                     onFilter = { to ->
                         filter = to
-                        scope.launch { flow("grades.filter") { id -> Log.info("ui.grades", "filter ${to ?: "all"}", id, mapOf("filter" to (to ?: "all"))) } }
+                        scope.logAction("grades.filter", "ui.grades", "filter ${to ?: "all"}", mapOf("filter" to (to ?: "all")))
                     },
                     expanded = historyOpen,
                     onToggle = { key ->

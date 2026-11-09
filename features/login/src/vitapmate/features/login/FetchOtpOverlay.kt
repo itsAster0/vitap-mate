@@ -10,7 +10,7 @@ import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.ToastTone
 import vitapmate.ui.showToast
 
@@ -44,7 +44,7 @@ fun FetchOtpOverlay() {
         onResend = { scope.launch { challenge.resend(AppCore.await()) } },
         onCancel = {
             OtpPrompt.cancel()
-            scope.launch { flow("fetch_otp.cancel_otp") { id -> Log.info("ui.otp", "otp cancelled", id) } }
+            scope.logAction("fetch_otp.cancel_otp", "ui.otp", "otp cancelled")
         },
     )
 }

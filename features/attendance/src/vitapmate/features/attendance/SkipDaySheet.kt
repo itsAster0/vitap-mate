@@ -58,7 +58,7 @@ import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.OpenHaptic
@@ -87,7 +87,7 @@ internal fun SkipDaySheet(courses: List<AttendanceCourse>, outlook: Map<String, 
     var attended by rememberSaveable { mutableStateOf(emptyList<Int>()) }
     var calendar by rememberSaveable { mutableStateOf(false) }
     val log: (String, Map<String, String>) -> Unit = { what, fields ->
-        scope.launch { flow("attendance.plan_days") { id -> Log.info("ui.attendance", "plan days $what", id, fields) } }
+        scope.logAction("attendance.plan_days", "ui.attendance", "plan days $what", fields)
     }
     OpenHaptic()
     ModalBottomSheet(

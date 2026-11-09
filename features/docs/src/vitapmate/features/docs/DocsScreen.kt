@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -86,6 +86,7 @@ import vitapmate.data.queryDocs
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
@@ -217,8 +218,8 @@ internal fun DocsScreen() {
                 EmptyView(Lucide.Search, "No documents found", action = { TextButton({ query = "" }) { Text("Clear search") } })
             }
         }
-        items(shown, key = { it.id }) { doc ->
-            DocCard(doc, shown.indexOf(doc), Modifier.animateItem(), onOpen = { open(doc) }, onLongPress = { actions = doc.id })
+        itemsIndexed(shown, key = { _, it -> it.id }) { i, doc ->
+            DocCard(doc, i, Modifier.animateItem(), onOpen = { open(doc) }, onLongPress = { actions = doc.id })
         }
     }
     actions?.let(Docs::byId)?.let { DocActions(it, scope) { actions = null } }
@@ -249,7 +250,7 @@ private fun SearchRow(query: String, onQuery: (String) -> Unit, sort: DocSort) {
                         onClick = {
                             menu = false
                             Docs.sort = option
-                            scope.launch { flow("docs.sort") { f -> Log.info(SRC, "sort ${option.name}", f) } }
+                            scope.logAction("docs.sort", SRC, "sort ${option.name}")
                         },
                         leadingIcon = { Icon(if (option == sort) Lucide.Check else Lucide.ArrowUpDown, null, Modifier.size(18.dp)) },
                         modifier = Modifier.testTag("docs.sort.${option.name.lowercase()}"),

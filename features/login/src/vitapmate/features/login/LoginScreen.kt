@@ -67,6 +67,7 @@ import vitapmate.data.Problem
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.PasswordField
 import vitapmate.ui.ProblemBanner
 import vitapmate.ui.Space
@@ -260,7 +261,7 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
             onResend = { scope.launch { challenge.resend(core()) } },
             onCancel = {
                 otp = null
-                scope.launch { flow("login.cancel_otp") { id -> Log.info("ui.login", "otp cancelled", id) } }
+                scope.logAction("login.cancel_otp", "ui.login", "otp cancelled")
             },
         )
     }

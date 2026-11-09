@@ -56,11 +56,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vitapmate.core.CoreException
 import vitapmate.core.WebSession
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.Problem
+import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -131,7 +131,7 @@ internal fun VtopScreen() {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+            askedOtp(e)
             problem = problemOf(e, id)
             Log.warn(SRC, "not opened: ${e::class.simpleName}", id)
         }

@@ -13,16 +13,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.ClipboardList
@@ -40,6 +37,7 @@ import vitapmate.ui.PageScaffold
 import vitapmate.ui.ScrollToTopOnReselect
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
+import vitapmate.ui.rememberSyncedPager
 
 /** Which courses the list shows. */
 private enum class Kind { All, Theory, Lab }
@@ -76,22 +74,13 @@ fun MarksScreen() {
         val labs = data.courses.count { it.isLab }
         // With one kind only there is no filter and no pager.
         val pages = if (labs in 1..<data.courses.size) Kind.entries else listOf(Kind.All)
-        val pager = rememberPagerState(pages.indexOf(filter).coerceAtLeast(0)) { pages.size }
+        // A swipe that lands on another list moves the filter with it.
+        val pager = rememberSyncedPager(pages, filter) { kind ->
+            filter = kind
+            flow("marks.filter") { id -> Log.info("ui.marks", "filter ${kind.name.lowercase()} (swipe)", id, mapOf("filter" to kind.name.lowercase(), "by" to "swipe")) }
+        }
         val lists = Kind.entries.map { rememberLazyListState() }
         ScrollToTopOnReselect(lists[pages[pager.currentPage.coerceIn(0, pages.lastIndex)].ordinal])
-        val current by rememberUpdatedState(filter)
-        val shownPages by rememberUpdatedState(pages)
-        // A swipe that lands on another list moves the filter with it; reads the filter through
-        // rememberUpdatedState so a recreated state is never written stale.
-        LaunchedEffect(pager) {
-            snapshotFlow { pager.settledPage }.collect { settled ->
-                val kind = shownPages.getOrNull(settled) ?: return@collect
-                if (kind != current && shownPages.size > 1) {
-                    filter = kind
-                    flow("marks.filter") { id -> Log.info("ui.marks", "filter ${kind.name.lowercase()} (swipe)", id, mapOf("filter" to kind.name.lowercase(), "by" to "swipe")) }
-                }
-            }
-        }
         LaunchedEffect(data, filter, expanded) {
             StateRegistry.report(
                 "ui.marks",

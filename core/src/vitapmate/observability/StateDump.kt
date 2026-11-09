@@ -13,7 +13,7 @@ import org.json.JSONObject
 
 /**
  * The agent state dump (debuggable builds only): `adb shell am broadcast -a vitapmate.DUMP -p
- * com.vitapmate.kmp` writes `files/state.json` (route, settings, every page's state, the last 20
+ * com.vitap_pal.app` writes `files/state.json` (route, settings, every page's state, the last 20
  * flows) and logs `state dumped`. `mise run state` does both and prints it.
  */
 internal object StateDump {

@@ -5,10 +5,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
-import vitapmate.core.CoreException
 import vitapmate.core.OutingResult
 import vitapmate.data.AppCore
-import vitapmate.data.OtpPrompt
+import vitapmate.data.askedOtp
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -35,7 +34,7 @@ internal fun sendApplication(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason) else onError(failureOf(e, ""))
+            if (!askedOtp(e)) onError(failureOf(e, ""))
         } finally {
             onDone()
         }

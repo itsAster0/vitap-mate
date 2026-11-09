@@ -1,6 +1,7 @@
 package vitapmate.data
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import vitapmate.core.CoreException
@@ -54,6 +55,22 @@ fun interface InspectorOpener {
 }
 
 val LocalInspector = staticCompositionLocalOf { InspectorOpener {} }
+
+/** Opens the OTP prompt when [e] is a re-login asking for the code; true then (the prompt says it all, no toast). */
+fun askedOtp(e: Throwable): Boolean {
+    if (e !is CoreException.OtpRequired) return false
+    OtpPrompt.ask(e.reason)
+    return true
+}
+
+/** [block]'s value, or null when it fails; a cancellation still cancels (unlike `runCatching`). */
+inline fun <T> orNull(block: () -> T): T? = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Throwable) {
+    null
+}
 
 /**
  * The one mapping from a failure to a [Problem] (texts from the Flutter app's `app_errors.dart`

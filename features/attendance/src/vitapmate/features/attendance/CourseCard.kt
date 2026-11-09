@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
+import vitapmate.ui.KindChip
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip

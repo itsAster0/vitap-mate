@@ -46,8 +46,10 @@ import vitapmate.core.CoursePlan
 import vitapmate.core.CourseView
 import vitapmate.core.Lecture
 import vitapmate.core.SavedFile
+import vitapmate.data.epochDayOf
 import vitapmate.data.rememberPage
 import vitapmate.observability.StateRegistry
+import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.LocalContentPadding
@@ -56,7 +58,6 @@ import vitapmate.ui.SectionHeader
 import vitapmate.ui.SkeletonList
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
-import vitapmate.ui.epochDayOf
 import vitapmate.ui.rememberNow
 
 /** Planned lectures shown before "Show all". */
@@ -85,7 +86,7 @@ internal fun CourseScreen(courseId: String) {
     val pick: (String, String) -> Unit = { classId, by ->
         picked = classId
         sheet = false
-        scope.action("coursepage.section", "section picked ($by)", mapOf("by" to by))
+        scope.logAction("coursepage.section", "ui.coursepage", "section picked ($by)", mapOf("by" to by))
     }
     PageScaffold(
         page.state,
@@ -196,7 +197,7 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
                 onSelect = { only ->
                     withMaterialOnly = only
                     val filter = if (only) "material" else "all"
-                    scope.action("coursepage.filter", "filter $filter", mapOf("filter" to filter))
+                    scope.logAction("coursepage.filter", "ui.coursepage", "filter $filter", mapOf("filter" to filter))
                 },
                 tag = "coursepage.filter",
                 key = { if (it) "material" else "all" },
@@ -222,7 +223,7 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
                 TextButton(
                     {
                         showAll = !showAll
-                        scope.action("coursepage.planned", if (showAll) "show all planned" else "show fewer planned")
+                        scope.logAction("coursepage.planned", "ui.coursepage", if (showAll) "show all planned" else "show fewer planned")
                     },
                     Modifier.fillMaxWidth().animateItem().testTag("coursepage.upcoming.toggle"),
                 ) { Text(if (showAll) "Show fewer" else "Show all ${upcoming.size} planned") }

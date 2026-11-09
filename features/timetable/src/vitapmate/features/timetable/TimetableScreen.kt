@@ -29,15 +29,13 @@ import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.ClassDay
 import vitapmate.core.DayClass
 import vitapmate.core.Timetable
 import vitapmate.core.TimetableDay
-import vitapmate.data.Activity
+import vitapmate.data.Histories
 import vitapmate.data.AppCore
 import vitapmate.data.CalendarRefresh
 import vitapmate.data.ExamDayRefresh
@@ -47,6 +45,7 @@ import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.EmptyView
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.is24Hour
@@ -99,7 +98,7 @@ private fun TimetableContent(tt: Timetable) {
     // Bumped when class histories arrive, so held classes show what VTOP posted.
     var histories by remember { mutableIntStateOf(0) }
     LaunchedEffect(tt.updatedAt, semester, today, calendars) {
-        if (Settings.autoRefresh && fetchStaleHistories(tt.semesterId, mondayOf(today)) > 0) histories++
+        if (Settings.autoRefresh && Histories.sync("timetable", tt.semesterId) { c, id -> c.staleAttendanceDetails(id, mondayOf(today), WINDOW) } > 0) histories++
     }
     val extra by produceState<Extra?>(null, tt, today, semester, calendars, histories) {
         value = flow("timetable.days") { id -> withContext(Dispatchers.IO) { loadExtra(id, tt, today) } }
@@ -138,7 +137,7 @@ private fun TimetableContent(tt: Timetable) {
 
     fun select(day: Int, how: String) {
         selectedDay = day
-        scope.launch { flow("timetable.day") { id -> Log.info("ui.timetable", "day $day", id, mapOf("day" to "$day", "how" to how)) } }
+        scope.logAction("timetable.day", "ui.timetable", "day $day", mapOf("day" to "$day", "how" to how))
     }
     fun open(c: DayClass, from: String) {
         sheet = c
@@ -209,43 +208,4 @@ private suspend fun loadExtra(flow: String, tt: Timetable, today: Int): Extra {
         ),
     )
     return Extra(days, attendance)
-}
-
-
-/** One history sync at a time, and each course tried at most once per [HISTORY_RETRY_MS]. */
-private val historyLock = Mutex()
-private val historyTries = mutableMapOf<String, Long>()
-private const val HISTORY_RETRY_MS = 15 * 60_000L
-
-/**
- * Fetches, one course at a time in the background (flow `timetable.histories`), the class history
- * of each course with a class held this window whose saved history is missing or behind VTOP's
- * summary (Rust decides from the cache), so held classes show Present / Absent / On duty. Returns
- * how many arrived; failures are logged and skipped. The screen never waits for it.
- */
-private suspend fun fetchStaleHistories(semester: String, from: Int): Int = historyLock.withLock {
-    flow("timetable.histories") { id ->
-        withContext(Dispatchers.IO) {
-            val core = AppCore.await()
-            val now = System.currentTimeMillis()
-            val due = core.staleAttendanceDetails(id, from, WINDOW).filter { key -> historyTries["$semester/$key"]?.let { now - it >= HISTORY_RETRY_MS } ?: true }
-            if (due.isEmpty()) return@withContext 0
-            Log.info("ui.timetable", "histories to fetch", id, mapOf("courses" to "${due.size}"))
-            Activity.track("Refreshing class history", id) {
-                due.count { key ->
-                    historyTries["$semester/$key"] = System.currentTimeMillis()
-                    try {
-                        core.fetchAttendanceDetail(id, key)
-                        true
-                    } catch (e: CancellationException) {
-                        historyTries.remove("$semester/$key")
-                        throw e
-                    } catch (e: Exception) {
-                        Log.warn("ui.timetable", "history not fetched", id, mapOf("course" to key, "error" to (e::class.simpleName ?: "Exception")))
-                        false
-                    }
-                }
-            }.also { Log.info("ui.timetable", "histories fetched", id, mapOf("fetched" to "$it", "due" to "${due.size}")) }
-        }
-    }
 }

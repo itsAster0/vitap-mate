@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import vitapmate.core.SavedFile
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -222,12 +223,19 @@ object Docs {
     }
 
     /**
-     * The document [id] from Docs, or [download]ed and saved the first time (Flutter's
-     * `keepInDocs`), so app-fetched files (outing passes) open offline later.
+     * The document [id] from Docs when [reuse] and its file is still there (second: true), else
+     * [fetch]ed by Rust to a temporary file and saved as [id], replacing any old copy (Flutter's
+     * `keepInDocs`), so app-fetched files open offline later. The temporary file goes once saved.
      */
-    suspend fun keep(id: String, name: String, mime: String?, source: String, flow: String? = null, download: suspend () -> ByteArray): Doc {
-        byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it }
-        return save(name, mime, download(), source, id, flow)
+    suspend fun keep(id: String, source: String, flow: String, reuse: Boolean = true, fetch: suspend () -> SavedFile): Pair<Doc, Boolean> {
+        if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
+        val saved = fetch()
+        val file = File(saved.path)
+        return try {
+            save(saved.name, saved.mime.ifEmpty { null }, file, source, id, flow) to false
+        } finally {
+            withContext(Dispatchers.IO) { file.delete() }
+        }
     }
 
     suspend fun rename(id: String, name: String) = update(id) { it.copy(name = name.trim().ifEmpty { it.name }) }

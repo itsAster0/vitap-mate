@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 import vitapmate.core.OutingKind
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.Space
 
@@ -42,7 +42,7 @@ fun OutingScreen() {
             tab,
             onSelect = { kind ->
                 tab = kind
-                scope.launch { flow("outing.tab") { id -> Log.info("ui.outing", "tab ${kind.key}", id, mapOf("tab" to kind.key)) } }
+                scope.logAction("outing.tab", "ui.outing", "tab ${kind.key}", mapOf("tab" to kind.key))
             },
             tag = "outing.tab",
             key = { it.key },

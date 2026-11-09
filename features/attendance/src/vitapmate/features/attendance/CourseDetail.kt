@@ -9,6 +9,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.ui.text.style.TextOverflow
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
+import vitapmate.data.Histories
 import vitapmate.data.PageState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.SecondaryTabRow
@@ -33,10 +33,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -50,11 +48,13 @@ import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.PageScaffold
+import vitapmate.ui.KindChip
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.StatTile
 import vitapmate.ui.UpdatedFooter
 import vitapmate.ui.nums
+import vitapmate.ui.rememberSyncedPager
 
 /** The course sheet's tabs. */
 private enum class DetailTab(val label: String) { Overview("Overview"), Calculator("Calculator") }
@@ -110,18 +110,10 @@ internal fun CourseDetail(key: String, title: String) {
     }
     PageScaffold(state, { page.refresh("retry") }, isEmpty = { false }, empty = {}, pullToRefresh = false) { detail ->
         val course = detail.course
-        val pager = rememberPagerState(tab.ordinal) { DetailTab.entries.size }
-        val current by rememberUpdatedState(tab)
-        // A swipe that lands on the other tab selects it; reads the tab through
-        // rememberUpdatedState so a recreated state is never written stale.
-        LaunchedEffect(pager) {
-            snapshotFlow { pager.settledPage }.collect { settled ->
-                val landed = DetailTab.entries[settled]
-                if (landed != current) {
-                    tab = landed
-                    flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe", "course" to course.key)) }
-                }
-            }
+        // A swipe that lands on the other tab selects it.
+        val pager = rememberSyncedPager(DetailTab.entries, tab) { landed ->
+            tab = landed
+            flow("attendance.detail.tab") { id -> Log.info("ui.attendance", "tab ${landed.name.lowercase()} (swipe)", id, mapOf("tab" to landed.name.lowercase(), "by" to "swipe", "course" to course.key)) }
         }
         LaunchedEffect(detail, tab) {
             StateRegistry.report(

@@ -39,6 +39,7 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
 import vitapmate.core.MarksCourse
+import vitapmate.ui.KindChip
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip

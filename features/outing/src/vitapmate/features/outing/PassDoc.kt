@@ -4,6 +4,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.OutingKind
+import vitapmate.core.SavedFile
 import vitapmate.data.AppCore
 import vitapmate.data.Doc
 import vitapmate.data.Docs
@@ -15,15 +16,10 @@ import vitapmate.observability.Log
  * to a temporary file, which goes once saved.
  */
 internal suspend fun passDoc(kind: OutingKind, passId: String, flow: String): Doc {
-    val id = "outing:$passId"
-    Docs.byId(id)?.takeIf { withContext(Dispatchers.IO) { Docs.exists(it) } }?.let {
-        Log.info("ui.outing", "pass from docs", flow, mapOf("kind" to kind.key))
-        return it
+    val (doc, kept) = Docs.keep("outing:$passId", "outing", flow) {
+        val file = File(withContext(Dispatchers.IO) { AppCore.await().outingPass(flow, kind, passId) })
+        SavedFile(file.path, "Outing pass $passId", "application/pdf", file.length().toULong())
     }
-    val file = File(withContext(Dispatchers.IO) { AppCore.await().outingPass(flow, kind, passId) })
-    return try {
-        Docs.save("Outing pass $passId", "application/pdf", file, "outing", id, flow)
-    } finally {
-        withContext(Dispatchers.IO) { file.delete() }
-    }.also { Log.info("ui.outing", "pass saved to docs", flow, mapOf("kind" to kind.key, "bytes" to "${it.size}")) }
+    Log.info("ui.outing", if (kept) "pass from docs" else "pass saved to docs", flow, mapOf("kind" to kind.key, "bytes" to "${doc.size}"))
+    return doc
 }

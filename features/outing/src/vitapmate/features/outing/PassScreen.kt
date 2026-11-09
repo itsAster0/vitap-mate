@@ -38,10 +38,9 @@ import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import vitapmate.core.CoreException
 import vitapmate.core.OutingKind
 import vitapmate.data.Docs
-import vitapmate.data.OtpPrompt
+import vitapmate.data.askedOtp
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
@@ -78,7 +77,7 @@ internal fun PassScreen(item: String) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+                askedOtp(e)
                 failure = failureOf(e, "")
             }
             StateRegistry.report("ui.outing.pass", mapOf("kind" to kind.key, "pages" to pages?.size, "failed" to (failure != null)))

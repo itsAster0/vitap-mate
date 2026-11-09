@@ -5,197 +5,132 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
-
+import kotlin.reflect.KProperty
 
 /** App settings (SharedPreferences "settings", the Flutter app's keys) as Compose-observable state. */
 object Settings {
     private var prefs: SharedPreferences? = null
-    private val skipAdvice = mutableStateOf(false)
-    private val theme = mutableStateOf(ThemeMode.System)
-    private val colors = mutableStateOf<String?>(null)
-    private val black = mutableStateOf(false)
-    private val tabs = mutableStateOf(NavTabs.DEFAULT)
-    private val avatar = mutableStateOf<String?>(null)
-    private val otp = mutableStateOf<OtpSource?>(null)
-    private val auto = mutableStateOf(true)
-    private val haptic = mutableStateOf(true)
-    private val backgroundErrors = mutableStateOf(false)
-    private val devAlways = mutableStateOf(false)
-    private val inspect = mutableStateOf(false)
-    private val engine = mutableStateOf(false)
+    private val all = mutableListOf<Pref<*>>()
     private val tuned = mutableStateMapOf<Tunable, Int>()
-    private val sync = mutableStateOf(false)
-    private val syncEvery = mutableStateOf(SYNC_HOURS_DEFAULT)
-    private val paused = mutableStateOf<String?>(null)
     private val notifyOff = mutableStateMapOf<String, Boolean>()
 
-    /** Whether attendance shows how many classes can be skipped. */
-    var showSkipAdvice: Boolean
-        get() = skipAdvice.value
-        set(value) {
-            skipAdvice.value = value
-            prefs?.edit()?.putBoolean("settings_show_skip_advice", value)?.apply()
+    /** One saved value: Compose state, read by [load] and written through on every set. */
+    private class Pref<T>(val key: String, val default: T, val read: SharedPreferences.(String, T) -> T, val write: SharedPreferences.Editor.(String, T) -> Unit) {
+        val state = mutableStateOf(default)
+        operator fun getValue(owner: Any?, property: KProperty<*>): T = state.value
+        operator fun setValue(owner: Any?, property: KProperty<*>, value: T) {
+            state.value = value
+            prefs?.edit { write(key, value) }
         }
+        fun load(p: SharedPreferences) { state.value = p.read(key, default) }
+    }
+
+    private fun <T> pref(key: String, default: T, read: SharedPreferences.(String, T) -> T, write: SharedPreferences.Editor.(String, T) -> Unit) =
+        Pref(key, default, read, write).also { all += it }
+
+    private fun flag(key: String, default: Boolean) = pref(key, default, { k, d -> getBoolean(k, d) }, { k, v -> putBoolean(k, v) })
+
+    private fun text(key: String) = pref<String?>(key, null, { k, d -> getString(k, d) }, { k, v -> putString(k, v) })
+
+    /** An enum saved as its lowercase name. */
+    private fun <T : Enum<*>?> choice(key: String, default: T, entries: List<T & Any>) =
+        pref(key, default, { k, d -> entries.firstOrNull { it.name.lowercase() == getString(k, null) } ?: d }, { k, v -> putString(k, v?.name?.lowercase()) })
+
+    /** Whether attendance shows how many classes can be skipped. */
+    var showSkipAdvice by flag("settings_show_skip_advice", false)
 
     /**
      * Which one fills in VTOP's OTP: one at a time. Set when one is set up or connected, or chosen
      * with "Use this for OTPs"; null before either is. The other stays set up, on standby.
      */
-    var otpSource: OtpSource?
-        get() = otp.value
-        set(value) {
-            otp.value = value
-            prefs?.edit()?.putString("settings_otp_source", value?.name?.lowercase())?.apply()
-        }
+    var otpSource by choice<OtpSource?>("settings_otp_source", null, OtpSource.entries)
 
     /** Haptic feedback on taps, toggles, refreshes and results (the system's touch feedback setting still applies). */
-    var haptics: Boolean
-        get() = haptic.value
-        set(value) {
-            haptic.value = value
-            prefs?.edit()?.putBoolean("settings_haptics", value)?.apply()
-        }
+    var haptics by flag("settings_haptics", true)
 
     /**
      * The Flutter app's "Auto Refresh": pages fetch on their own (on open, when old, on return to
      * the app, the open-app sweep). Off, only a page with nothing saved fetches by itself.
      */
-    var autoRefresh: Boolean
-        get() = auto.value
-        set(value) {
-            auto.value = value
-            prefs?.edit()?.putBoolean("settings_auto_refresh", value)?.apply()
-        }
+    var autoRefresh by flag("settings_auto_refresh", true)
 
     /** Failures of work the student didn't ask for (auto refresh, the sweep) show as toasts too; off, they only log. */
-    var showBackgroundErrors: Boolean
-        get() = backgroundErrors.value
-        set(value) {
-            backgroundErrors.value = value
-            prefs?.edit()?.putBoolean("settings_show_background_errors", value)?.apply()
-        }
+    var showBackgroundErrors by flag("settings_show_background_errors", false)
 
     /** Light, dark, or as the phone is set. */
-    var themeMode: ThemeMode
-        get() = theme.value
-        set(value) {
-            theme.value = value
-            prefs?.edit()?.putString("settings_theme_mode", value.name.lowercase())?.apply()
-        }
+    var themeMode by choice("settings_theme_mode", ThemeMode.System, ThemeMode.entries)
 
     /** The colours: [WALLPAPER], a palette's name (the design module's `Palette`), or null for the default. */
-    var colorChoice: String?
-        get() = colors.value
-        set(value) {
-            colors.value = value
-            prefs?.edit()?.putString("settings_colors", value)?.apply()
-        }
+    var colorChoice by pref<String?>(
+        "settings_colors",
+        null,
+        // The old wallpaper switch carries over.
+        { k, d -> getString(k, d) ?: WALLPAPER.takeIf { getBoolean("settings_dynamic_color", false) } },
+        { k, v -> putString(k, v) },
+    )
 
     const val WALLPAPER = "wallpaper"
 
     /** Black backgrounds in dark mode (OLED screens). */
-    var pureBlack: Boolean
-        get() = black.value
-        set(value) {
-            black.value = value
-            prefs?.edit()?.putBoolean("settings_pure_black", value)?.apply()
-        }
+    var pureBlack by flag("settings_pure_black", false)
 
     /** The student's chosen avatar photo (a file in the app's private files), or null for the initial. */
-    var avatarPath: String?
-        get() = avatar.value
-        set(value) {
-            avatar.value = value
-            prefs?.edit{putString("settings_avatar_path", value)}
-        }
+    var avatarPath by text("settings_avatar_path")
+
+    private var tabs by pref("settings_nav_tabs", NavTabs.DEFAULT, { k, _ -> NavTabs.decode(getString(k, null)) }, { k, v -> putString(k, NavTabs.encode(v)) })
 
     /**
      * The nav bar's tabs, feature ids in order (rules in [NavTabs]: at most 4, always "more").
      * Ids of features that no longer exist may be in it; the app skips them.
      */
-    val navTabs: List<String> get() = tabs.value
+    val navTabs: List<String> get() = tabs
 
-    fun setNavTabs(ids: List<String>) = saveTabs(NavTabs.normalize(ids))
+    fun setNavTabs(ids: List<String>) { tabs = NavTabs.normalize(ids) }
 
     /** Pins [id]; false when the bar is full (4) and nothing changed. */
-    fun addNavTab(id: String): Boolean = (id in navTabs || navTabs.size < NavTabs.MAX).also { saveTabs(NavTabs.add(navTabs, id)) }
+    fun addNavTab(id: String): Boolean = (id in navTabs || navTabs.size < NavTabs.MAX).also { tabs = NavTabs.add(navTabs, id) }
 
-    fun removeNavTab(id: String) = saveTabs(NavTabs.remove(navTabs, id))
+    fun removeNavTab(id: String) { tabs = NavTabs.remove(navTabs, id) }
 
-    fun moveNavTab(id: String, to: Int) = saveTabs(NavTabs.move(navTabs, id, to))
-
-    private fun saveTabs(value: List<String>) {
-        tabs.value = value
-        prefs?.edit()?.putString("settings_nav_tabs", NavTabs.encode(value))?.apply()
-    }
+    fun moveNavTab(id: String, to: Int) { tabs = NavTabs.move(navTabs, id, to) }
 
     /**
      * Developer listed in Settings, as on Android: turned on by tapping the version 7 times,
      * off from the switch at the top of Developer. Kept across launches.
      */
-    var developerEnabled: Boolean
-        get() = devAlways.value
-        set(value) {
-            devAlways.value = value
-            prefs?.edit()?.putBoolean("dev_always_show", value)?.apply()
-        }
+    var developerEnabled by flag("dev_always_show", false)
 
     /** Developer → Inspect Traffic: from the next launch, VTOP requests use the Wi-Fi proxy and trust user CAs. */
-    var inspectTraffic: Boolean
-        get() = inspect.value
-        set(value) {
-            inspect.value = value
-            prefs?.edit()?.putBoolean("dev_inspect_traffic", value)?.apply()
-        }
+    var inspectTraffic by flag("dev_inspect_traffic", false)
 
     /**
      * Developer → HttpEngine, on by default: from the next launch, on Android 14+ (where the
      * phone has HttpEngine) and with Inspect Traffic off, requests go through [VtopHttpEngine]
      * (HTTP/3 where the server offers it); otherwise plain OkHttp.
      */
-    var httpEngine: Boolean
-        get() = engine.value
-        set(value) {
-            engine.value = value
-            prefs?.edit()?.putBoolean("dev_http_engine", value)?.apply()
-        }
+    var httpEngine by flag("dev_http_engine", true)
 
     /**
      * Background sync (WorkManager, every [syncHours]): off by default, and offered only while OTP
      * auto-fill works, since nobody can type a code in the background.
      */
-    var backgroundSync: Boolean
-        get() = sync.value
-        set(value) {
-            sync.value = value
-            prefs?.edit()?.putBoolean("settings_background_sync", value)?.apply()
-        }
+    var backgroundSync by flag("settings_background_sync", false)
 
     /** Hours between background syncs, one of [SYNC_HOURS]. */
-    var syncHours: Int
-        get() = syncEvery.value
-        set(value) {
-            syncEvery.value = value
-            prefs?.edit()?.putInt("settings_sync_hours", value)?.apply()
-        }
+    var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
 
     /**
      * Why background sync is paused ("Gmail needs reconnecting"), set when a background run
      * couldn't finish the OTP and cleared by the next good run; null when it isn't.
      */
-    var syncPaused: String?
-        get() = paused.value
-        set(value) {
-            paused.value = value
-            prefs?.edit()?.putString("settings_sync_paused", value)?.apply()
-        }
+    var syncPaused by text("settings_sync_paused")
 
     /** Whether background sync notifies about changes of [kind] ("attendance", "marks", "timetable", "exams", "grades"). */
     fun notifies(kind: String): Boolean = notifyOff[kind] != true
 
     fun setNotifies(kind: String, on: Boolean) {
         if (on) notifyOff.remove(kind) else notifyOff[kind] = true
-        prefs?.edit()?.putBoolean("settings_notify_$kind", on)?.apply()
+        prefs?.edit { putBoolean("settings_notify_$kind", on) }
     }
 
     /** [t]'s value, in its unit. */
@@ -205,31 +140,15 @@ object Settings {
     fun setTunable(t: Tunable, value: Int?) {
         val v = value?.coerceIn(t.range)
         if (v == null || v == t.default) tuned.remove(t) else tuned[t] = v
-        prefs?.edit()?.apply { if (v == null || v == t.default) remove(t.key) else putInt(t.key, v) }?.apply()
+        prefs?.edit { if (v == null || v == t.default) remove(t.key) else putInt(t.key, v) }
     }
 
     /** Reads the saved values; call once at start. */
     fun load(context: Context) {
         val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
         prefs = p
-        skipAdvice.value = p.getBoolean("settings_show_skip_advice", false)
-        auto.value = p.getBoolean("settings_auto_refresh", true)
-        haptic.value = p.getBoolean("settings_haptics", true)
-        backgroundErrors.value = p.getBoolean("settings_show_background_errors", false)
-        theme.value = ThemeMode.entries.firstOrNull { it.name.lowercase() == p.getString("settings_theme_mode", null) } ?: ThemeMode.System
-        black.value = p.getBoolean("settings_pure_black", false)
-        // The old wallpaper switch carries over.
-        colors.value = p.getString("settings_colors", null) ?: WALLPAPER.takeIf { p.getBoolean("settings_dynamic_color", false) }
-        tabs.value = NavTabs.decode(p.getString("settings_nav_tabs", null))
-        avatar.value = p.getString("settings_avatar_path", null)
-        otp.value = OtpSource.entries.firstOrNull { it.name.lowercase() == p.getString("settings_otp_source", null) }
-        devAlways.value = p.getBoolean("dev_always_show", false)
-        inspect.value = p.getBoolean("dev_inspect_traffic", false)
-        engine.value = p.getBoolean("dev_http_engine", true)
+        all.forEach { it.load(p) }
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
-        sync.value = p.getBoolean("settings_background_sync", false)
-        syncEvery.value = p.getInt("settings_sync_hours", SYNC_HOURS_DEFAULT).takeIf { it in SYNC_HOURS } ?: SYNC_HOURS_DEFAULT
-        paused.value = p.getString("settings_sync_paused", null)
         NOTIFY_KINDS.forEach { k -> if (!p.getBoolean("settings_notify_$k", true)) notifyOff[k] = true }
     }
 
@@ -255,6 +174,7 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     VtopTimeout("dev_vtop_timeout_s", "VTOP request timeout", "s", 30, 5..180, "One VTOP request, from the next launch"),
     SessionReuse("dev_session_reuse_min", "VTOP session reuse", "min", 0, 0..10_080, "A saved session older than this signs in again at launch; 0: any age"),
     OtpPoll("dev_otp_poll_s", "Forwarded OTP check", "s", 2, 1..30, "How often the OTP prompt checks forwarded mail"),
+    SessionAnswer("dev_session_answer_s", "Session request timeout", "s", 15, 3..60, "How long the phone tries to answer a browser's or AI app's session request"),
 }
 
 /** The background sync intervals on offer, in hours. */

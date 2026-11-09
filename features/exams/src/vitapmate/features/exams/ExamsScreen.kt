@@ -5,34 +5,33 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.CalendarX
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.launch
+import vitapmate.data.epochDayOf
+import vitapmate.data.minuteOf
 import vitapmate.data.rememberPage
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.PageScaffold
 import vitapmate.ui.ScrollToTopOnReselect
 import vitapmate.ui.Space
-import vitapmate.ui.epochDayOf
-import vitapmate.ui.minuteOf
 import vitapmate.ui.rememberNow
+import vitapmate.ui.rememberSyncedPager
 
 /**
  * Exams: the saved schedule first, then VTOP (`page.exams`, log src `ui.exams`). With several
@@ -64,21 +63,13 @@ fun ExamsScreen() {
         val today = epochDayOf(now)
         val minute = minuteOf(now)
         val start = groups.indexOfFirst { it.name == picked }.takeIf { it >= 0 } ?: data.opens.coerceIn(0, groups.lastIndex)
-        val pager = rememberPagerState(start) { groups.size }
+        // A swipe that lands on another exam picks it.
+        val pager = rememberSyncedPager(groups.map { it.name }, groups[start].name) { name ->
+            picked = name
+            flow("exams.filter") { id -> Log.info("ui.exams", "exam $name (swipe)", id, mapOf("exam" to name, "by" to "swipe")) }
+        }
         val lists = remember(groups.size) { List(groups.size) { LazyListState() } }
         ScrollToTopOnReselect(lists[pager.currentPage.coerceIn(0, groups.lastIndex)])
-        val shown by rememberUpdatedState(groups)
-        val current by rememberUpdatedState(groups[start].name)
-        // A swipe that lands on another exam picks it.
-        LaunchedEffect(pager) {
-            snapshotFlow { pager.settledPage }.collect { settled ->
-                val name = shown.getOrNull(settled)?.name ?: return@collect
-                if (name != current) {
-                    picked = name
-                    flow("exams.filter") { id -> Log.info("ui.exams", "exam $name (swipe)", id, mapOf("exam" to name, "by" to "swipe")) }
-                }
-            }
-        }
         val group = groups[pager.settledPage.coerceIn(0, groups.lastIndex)]
         LaunchedEffect(data, group, expanded, today) {
             StateRegistry.report(
@@ -103,7 +94,7 @@ fun ExamsScreen() {
                     onSelect = { name ->
                         picked = name
                         scope.launch { pager.animateScrollToPage(groups.indexOfFirst { it.name == name }) }
-                        scope.launch { flow("exams.filter") { id -> Log.info("ui.exams", "exam $name", id, mapOf("exam" to name, "by" to "tap")) } }
+                        scope.logAction("exams.filter", "ui.exams", "exam $name", mapOf("exam" to name, "by" to "tap"))
                     },
                     tag = "exams.filter",
                     key = { it.tagKey() },

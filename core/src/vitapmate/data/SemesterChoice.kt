@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import vitapmate.core.CoreException
 import vitapmate.core.Semesters
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -42,7 +41,7 @@ object SemesterChoice {
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             problem = problemOf(e, f)
-            if (e is CoreException.OtpRequired) OtpPrompt.ask(e.reason)
+            askedOtp(e)
             Log.warn("ui.semesters", "refresh failed", f, mapOf("trigger" to trigger, "kind" to problem!!.kind.name))
         } finally {
             loading = false

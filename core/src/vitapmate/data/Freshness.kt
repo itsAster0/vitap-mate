@@ -101,7 +101,7 @@ object ExamDayRefresh {
             withContext(Dispatchers.IO) {
                 val core = AppCore.await()
                 val now = System.currentTimeMillis()
-                val today = Math.floorDiv(now + java.util.TimeZone.getDefault().getOffset(now), 86_400_000L).toInt()
+                val today = epochDayOf(now)
                 val saved = core.cachedExams(id) ?: return@withContext false
                 if (saved.groups.none { g -> g.papers.any { it.day == today } }) return@withContext false
                 if (tries[semester]?.let { now - it < RETRY_MS } == true) return@withContext false
