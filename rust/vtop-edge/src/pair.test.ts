@@ -22,7 +22,9 @@ function indexes() {
       return object;
     },
   };
-  return { INDEX, alarms, env: { INDEX } as unknown as Env };
+  // No MCP sign-in waits on these codes (oauth.ts).
+  const OAUTH = { getByName: () => ({ pending: async () => null }) };
+  return { INDEX, OAUTH, alarms, env: { INDEX } as unknown as Env };
 }
 
 describe("pairing codes", () => {
@@ -38,8 +40,8 @@ describe("pairing codes", () => {
 
 describe("POST /v1/pair", () => {
   it("is pending until the app makes the key, then hands it over once", async () => {
-    const { INDEX, alarms, env } = indexes();
-    const rig = accountObject(undefined, { INDEX, PUBLIC_URL: "https://vmate.example" });
+    const { INDEX, OAUTH, alarms, env } = indexes();
+    const rig = accountObject(undefined, { INDEX, OAUTH, PUBLIC_URL: "https://vmate.example" });
     const at = Math.floor(Date.now() / 1000);
     const doc = new AccountRecord("22BCE0001", at);
     doc.addPhone({ deviceId: "d1", label: null, addedAt: at, seenAt: at });

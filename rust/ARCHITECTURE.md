@@ -88,6 +88,12 @@ the last 10 sign-ins and each key's last 10 uses (extension or MCP, from the
 records, with a delete for each (`vtop-ffi/src/server.rs`). `/healthz` reports
 `version` and `colo`.
 
+MCP clients (Claude and others) connect to `/mcp` with OAuth (`vtop-edge/src/
+oauth.ts`): `/mcp` answers 401 with the metadata URL, the client registers and
+opens `/authorize`, which shows a pairing code and QR. The student scans it in
+Connected apps → Pair a browser; the app makes an access key with that
+`pairCode`, named after the client, and `/token` hands the client that key.
+
 ## UDP mode
 
 ```

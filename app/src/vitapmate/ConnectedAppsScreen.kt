@@ -129,7 +129,7 @@ fun ConnectedAppsScreen() {
         LazyColumn(contentPadding = padding) {
             item {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
-                    GroupItem("Pair a browser", "connected_apps.pair", Lucide.Globe, "Scan the code the vitapmate extension shows", onClick = { pairing = true }, trailing = { Chevron() })
+                    GroupItem("Pair a browser", "connected_apps.pair", Lucide.Globe, "Scan the code the extension or an AI app's sign-in page shows", onClick = { pairing = true }, trailing = { Chevron() })
                     GroupItem("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, "For Claude and other AI apps", onClick = { newMcp = true }, trailing = { Chevron() })
                     GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
@@ -208,7 +208,9 @@ private fun Note(text: String) = Text(text, style = MaterialTheme.typography.bod
 
 /**
  * Pair a browser: Scan QR (Play services' scanner: the code, or a link ending in `#code`) or type
- * the code; then the screen lock, then the key goes to the extension through the edge.
+ * the code; then the screen lock, then the key goes to the extension through the edge. An AI app's
+ * OAuth sign-in page (`/authorize`) shows a code too: it is named first (`pairApp`), and its key
+ * takes the app's name.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -223,17 +225,23 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
     val code = pairCode(text)
 
     fun pair(code: String) {
-        deviceAuth.confirm("Pair a browser") {
-            scope.launch {
-                busy = true
-                run("pair") { c, f -> c.createKey(f, false, code) }
-                    .onSuccess {
-                        haptics.confirm()
-                        showToast("Browser paired", "The extension signs in to VTOP by itself now.")
-                        onDone()
-                    }
-                    .onFailure { haptics.reject() }
-                busy = false
+        scope.launch {
+            busy = true
+            val app = run("pair_app") { c, f -> c.pairApp(f, code) }.getOrElse { busy = false; haptics.reject(); return@launch }
+            busy = false
+            deviceAuth.confirm(app?.let { "Connect ${it.name} (${it.host})" } ?: "Pair a browser") {
+                scope.launch {
+                    busy = true
+                    run("pair") { c, f -> c.createKey(f, false, code) }
+                        .onSuccess {
+                            haptics.confirm()
+                            if (app == null) showToast("Browser paired", "The extension signs in to VTOP by itself now.")
+                            else showToast("${app.name} connected", "It can read your VTOP data now; outings stay off unless you turn them on.")
+                            onDone()
+                        }
+                        .onFailure { haptics.reject() }
+                    busy = false
+                }
             }
         }
     }
@@ -251,7 +259,7 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
                     val scanned = pairCode(barcode.rawValue.orEmpty())
                     Log.info("ui.connected_apps", "scanned", fields = mapOf("pair_code" to "${scanned != null}"))
                     if (scanned == null) {
-                        showToast("Not a pairing code", "Scan the QR code the vitapmate extension shows.")
+                        showToast("Not a pairing code", "Scan the QR code the extension or the AI app's sign-in page shows.")
                     } else {
                         text = shown(scanned)
                         pair(scanned)
@@ -263,7 +271,7 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
 
     Sheet("connected_apps.pair_sheet", onDismiss) {
         Text("Pair a browser", style = MaterialTheme.typography.titleLarge)
-        Note("Open the vitapmate extension in Chrome or Firefox. It shows a QR code and a 10-character code.")
+        Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to $MCP_URL. It shows a QR code and a 10-character code.")
         Button(if (busy) null else ::scan, Modifier.fillMaxWidth().testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
         OutlinedTextField(
             text,
@@ -282,7 +290,7 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         Button(code?.takeIf { !busy }?.let { { pair(it) } }, Modifier.fillMaxWidth().testTag("connected_apps.pair_confirm"), variant = ButtonVariant.Outline) {
             if (busy) LoadingIndicator() else Text("Pair")
         }
-        Note("The extension gets its own key; it can't apply for outings. You can revoke it here any time.")
+        Note("It gets its own key, which can't apply for outings unless you turn them on. You can revoke it here any time.")
     }
 }
 

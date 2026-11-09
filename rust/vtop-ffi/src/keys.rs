@@ -56,6 +56,15 @@ pub struct ConnectedApps {
     pub keys: Vec<AccessKey>,
 }
 
+/// The MCP client (Claude and others) whose sign-in page shows a pairing code: asked before the
+/// student approves, so the sheet can name it.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct PairApp {
+    pub name: String,
+    /// Where the client goes back to (`claude.ai`), from its redirect URI.
+    pub host: String,
+}
+
 /// A key just made: [`NewKey::key`] is shown once.
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct NewKey {
@@ -148,6 +157,7 @@ fn cookie_list(header: &str) -> Vec<Value> {
 pub(crate) fn refused(error: EdgeError) -> CoreError {
     let reason = match error.code() {
         "key_limit" => "Revoke a key first: this account has the most keys allowed.",
+        "pair_expired" => "That code has expired. Start connecting again in the app.",
         "bad_request" => "Check the code: it's the 10 characters the extension shows.",
         "key_not_found" => "That key is already gone.",
         "phone_not_found" => "That phone is already gone.",
@@ -202,6 +212,15 @@ impl Core {
                 pair_code,
             )
             .await
+        })
+        .await
+    }
+
+    /// The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
+    pub async fn pair_app(&self, flow: String, code: String) -> Result<Option<PairApp>, CoreError> {
+        traced("pair_app", &flow, async {
+            self.pair_app_with(&self.forwarding_server(), &flow, &code)
+                .await
         })
         .await
     }
@@ -264,6 +283,25 @@ impl Core {
     /// The live VTOP session's cookie header (checked with VTOP, signed in again if needed).
     pub(crate) async fn live_cookies(&self) -> Result<String, CoreError> {
         self.session_cookies().await?.ok_or(CoreError::NotSignedIn)
+    }
+
+    async fn pair_app_with(
+        &self,
+        server: &str,
+        flow: &str,
+        code: &str,
+    ) -> Result<Option<PairApp>, CoreError> {
+        let answer = self
+            .edge_post(server, "/v1/pair/info", flow, &json!({ "code": code }))
+            .await
+            .map_err(refused)?;
+        let text = |key: &str| answer[key].as_str().map(str::to_string);
+        let app = match (answer["kind"].as_str(), text("name"), text("host")) {
+            (Some("mcp"), Some(name), Some(host)) => Some(PairApp { name, host }),
+            _ => None,
+        };
+        info!(mcp = app.is_some(), "pair code checked");
+        Ok(app)
     }
 
     async fn create_key_with(
@@ -493,6 +531,38 @@ mod tests {
             edge.requests[2].body,
             json!({ "session": { "cookies": "JSESSIONID=c" }, "label": "vitapmate" })
         );
+    }
+
+    #[tokio::test]
+    async fn pair_codes_name_their_mcp_client() {
+        let core = core("pair-app");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let server = serve(edge.clone()).await;
+        can(
+            &edge,
+            "/v1/pair/info",
+            200,
+            json!({ "kind": "mcp", "name": "Claude", "host": "claude.ai" }),
+        );
+        can(&edge, "/v1/pair/info", 200, json!({ "kind": "browser" }));
+        let app = core
+            .pair_app_with(&server, "f-pair", "ABCDE12345")
+            .await
+            .unwrap();
+        assert_eq!(
+            app,
+            Some(PairApp {
+                name: "Claude".into(),
+                host: "claude.ai".into()
+            })
+        );
+        let browser = core
+            .pair_app_with(&server, "f-pair", "ABCDE12345")
+            .await
+            .unwrap();
+        assert_eq!(browser, None);
+        let edge = edge.lock().unwrap();
+        assert_eq!(edge.requests[1].body, json!({ "code": "ABCDE12345" }));
     }
 
     #[tokio::test]

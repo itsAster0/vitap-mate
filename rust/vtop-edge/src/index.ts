@@ -7,7 +7,8 @@
 //   the event channel (`GET /v1/events`: server-sent events, a WebSocket or
 //   a catch-up read). Phones sign every call but `register` with their
 //   device key (auth.ts). `/mcp` goes on to the engine (`ENGINE_URL`), which
-//   serves the MCP tools, so clients only ever talk to this host.
+//   serves the MCP tools, so clients only ever talk to this host. MCP
+//   clients get their access key by OAuth (oauth.ts).
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
 //   see account.ts. The engine does the VTOP work for them.
@@ -18,12 +19,13 @@
 //
 // State lives in Durable Objects: `Device` (per install), `Mailbox` (per
 // address), `Index` (owner hash → mailbox, key hash → account, the UDP
-// gateway), `Account` (per student) and `FcmToken` (one, caches the OAuth
-// token), each in its own SQLite tables. Whose VTOP session a request
+// gateway), `Account` (per student), `FcmToken` (one, caches the OAuth
+// token) and `OAuth` (one, MCP clients and their sign-ins), each in its own SQLite tables. Whose VTOP session a request
 // carries is asked of the engine, which holds the key the owner hash is
 // made with.
 
 import * as account from "./account";
+import * as oauth from "./oauth";
 import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
 import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
@@ -73,6 +75,7 @@ export { Account } from "./account";
 export { Device } from "./device";
 export { FcmToken } from "./fcm";
 export { Index, Mailbox } from "./store";
+export { OAuth } from "./oauth";
 
 function unknownMailbox(): Response {
   return error(404, "mailbox_not_found", "No such forwarding address.");
@@ -433,8 +436,21 @@ async function route(req: Request, env: Env): Promise<Response> {
     return withCors(response, origin, env);
   }
   if (path.startsWith("/internal/")) return error(404, "not_found", "No such route.");
-  if (path === "/mcp" || path.startsWith("/mcp/")) return passOn(req, env);
+  const oauthReply = await oauth.handle(req, env, path);
+  if (oauthReply) return oauthReply;
+  if (path === "/mcp" || path.startsWith("/mcp/")) return mcp(req, env);
   return error(404, "not_found", "No such route.");
+}
+
+/** `/mcp`: a client with no token is told where to get one (MCP
+ * authorization); the rest go to the engine, whose 401s get the same hint. */
+async function mcp(req: Request, env: Env): Promise<Response> {
+  if (req.method !== "OPTIONS" && !req.headers.get("authorization")) return oauth.unauthorized(env);
+  const response = await passOn(req, env);
+  if (response.status !== 401 || response.headers.has("www-authenticate")) return response;
+  const out = new Response(response.body, response);
+  out.headers.set("www-authenticate", oauth.challenge(env));
+  return out;
 }
 
 /** Hands a request to the engine as it came, with the caller's address for

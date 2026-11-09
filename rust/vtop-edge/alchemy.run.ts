@@ -63,6 +63,7 @@ export const Edge = Cloudflare.Worker("Edge", {
     INDEX: Cloudflare.DurableObject("INDEX", { className: "Index" }),
     FCM_TOKEN: Cloudflare.DurableObject("FCM_TOKEN", { className: "FcmToken" }),
     ACCOUNT: Cloudflare.DurableObject("ACCOUNT", { className: "Account" }),
+    OAUTH: Cloudflare.DurableObject("OAUTH", { className: "OAuth" }),
     // Addresses are otp+<id>@vmate.aster0.dev: one Email Routing rule, otp@vmate.aster0.dev → this Worker.
     MAIL_DOMAIN: DOMAIN,
     ENGINE_URL,

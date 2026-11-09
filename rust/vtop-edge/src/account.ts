@@ -16,6 +16,7 @@
 //   `POST /v1/session`, `GET /v1/session/requests/{id}`,
 //   `POST /v1/session/expire`.
 // - The extension while it pairs, with no key yet: `POST /v1/pair` (pair.ts).
+//   The app asks `POST /v1/pair/info` whose code it is (oauth.ts).
 // - Phones sign every call (auth.ts); a phone is its device id.
 // - The phone's answer to a request: `POST /v1/session/answer?account=`.
 // - The app, with a live VTOP session: `/v1/link`, `/v1/keys`,
@@ -53,6 +54,7 @@ import {
   validCookies,
 } from "./account-state";
 import { type Signed, signed } from "./auth";
+import { oauthStub, pairInfo } from "./oauth";
 import { PAIR_TTL_SECS, claim, pairCode, pairStub } from "./pair";
 import {
   type Env,
@@ -117,7 +119,7 @@ async function forwardingMailbox(env: Env, ownerHash: string): Promise<string | 
 /** The routes this module answers at the edge. */
 export function handles(path: string): boolean {
   return (
-    ["/v1/whoami", "/v1/session", "/v1/pair", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
+    ["/v1/whoami", "/v1/session", "/v1/pair", "/v1/pair/info", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
       path,
     ) ||
     path.startsWith("/v1/session/") ||
@@ -155,6 +157,7 @@ export async function handle(req: Request, env: Env, path: string): Promise<Resp
   if (path === "/v1/session") return withKey(req, env, (a, c) => a.startSession(c, keyVia(req)));
   if (path === "/v1/session/expire") return withKey(req, env, (a, c) => a.expire(c));
   if (path === "/v1/pair") return claim(await jsonBody(req), env);
+  if (path === "/v1/pair/info") return pairInfo(await jsonBody(req), env);
   const op = APP_OPS[path];
   if (!op && path !== "/v1/session/answer" && path !== "/v1/account/credentials-rejected") {
     return error(404, "not_found", "No such route.");
@@ -1297,20 +1300,27 @@ export class Account extends DurableObject<Env> {
     if (me === null && op !== "revoke-key" && op !== "delete") return notLinked();
     switch (op) {
       case "create-key": {
-        // A code from the extension, which then collects the key (pair.ts).
+        // A code from the extension, which then collects the key (pair.ts),
+        // or from an MCP client's authorize page (oauth.ts), whose key is
+        // named after the client.
         const pair = body.pairCode === undefined ? undefined : pairCode(str(body.pairCode));
         if (pair === null) return badRequest("pairCode must be a pairing code.");
+        const app = pair === undefined ? null : await oauthStub(this.env).pending(pair, at);
         const key = newKey();
         const keyHash = hash(key);
         // Only this phone is asked for the key's sessions.
         const outings = body.outings === true;
-        if (!doc.addKey(keyHash, keyLabel(str(body.label)), doc.phones[me!].deviceId, at, outings)) {
+        const label = keyLabel(app?.name ?? str(body.label));
+        if (!doc.addKey(keyHash, label, doc.phones[me!].deviceId, at, outings)) {
           return error(409, "key_limit", "This account already has the most keys allowed; revoke one first.");
         }
+        if (app !== null && !(await oauthStub(this.env).approve(pair!, key, at))) {
+          return error(410, "pair_expired", "That code has expired; start connecting again.");
+        }
         await keyIndex(this.env, keyHash).put(doc.id);
-        if (pair !== undefined) await pairStub(this.env, pair).putUntil(key, (at + PAIR_TTL_SECS) * 1000);
+        if (pair !== undefined && app === null) await pairStub(this.env, pair).putUntil(key, (at + PAIR_TTL_SECS) * 1000);
         this.save(doc);
-        return Response.json({ id: keyId(keyHash), key, mcpUrl: mcpUrl(this.env) }, { status: 201 });
+        return Response.json({ id: keyId(keyHash), key, mcpUrl: mcpUrl(this.env), app }, { status: 201 });
       }
       case "key-outings": {
         if (typeof body.outings !== "boolean") return badRequest("outings must be true or false.");

@@ -62,6 +62,14 @@ class_name = "FcmToken"
 name = "ACCOUNT"
 class_name = "Account"
 
+[[durable_objects.bindings]]
+name = "OAUTH"
+class_name = "OAuth"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken", "Account"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["OAuth"]

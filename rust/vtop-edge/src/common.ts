@@ -6,6 +6,7 @@ import { EDGE_VERSION } from "./version";
 import type { Account } from "./account";
 import type { Device } from "./device";
 import type { FcmToken } from "./fcm";
+import type { OAuth } from "./oauth";
 import type { Index, Mailbox } from "./store";
 import { hash, hashesEqual } from "./shared/tokens";
 
@@ -15,6 +16,8 @@ export interface Env {
   INDEX: DurableObjectNamespace<Index>;
   FCM_TOKEN: DurableObjectNamespace<FcmToken>;
   ACCOUNT: DurableObjectNamespace<Account>;
+  /** MCP clients signing in with OAuth (oauth.ts). */
+  OAUTH: DurableObjectNamespace<OAuth>;
   MAIL_DOMAIN: string;
   ENGINE_URL: string;
   FCM_URL: string;

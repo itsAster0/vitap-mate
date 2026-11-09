@@ -189,12 +189,18 @@ an MCP use.
 | `GET /v1/session/requests/{id}` | key | `202` pending, `200` ready or `{ status: "error", code, error }`, `410 request_expired` |
 | `POST /v1/session/expire` | key | `204`; drops the cached session |
 | `POST /v1/pair` | none | `{ code }` → `200 { status: "ready", key }` once the app made a key with this `pairCode`, else `202 { status: "pending", pollAfterMs }`; `400` for a malformed code |
+| `POST /v1/pair/info` | none | `{ code }` → `{ kind: "mcp", name, host }` when the code is an MCP client's authorize page (below) still waiting, else `{ kind: "browser" }`; `400` for a malformed code. The app asks before it approves. |
 
 **Pairing.** The extension makes a 10-character Crockford base32 code
 (`XXXXX-XXXXX`; case, dashes and spaces ignored, `O` read as `0`, `I`/`L`
 as `1`), shows it, and polls `POST /v1/pair`. The app sends it as
 `pairCode` on `/v1/keys`; the edge holds the new key under the code's
 SHA-256 for 5 minutes and hands it out once.
+
+When the code is an MCP client's (see OAuth below), `/v1/keys` names the
+key after the client (`label` is ignored), hands it to that sign-in
+instead, and answers with `app: { name, host }` (else `app: null`); `410
+pair_expired` when the sign-in ran out meanwhile.
 
 ## VTOP for phones
 
@@ -214,7 +220,52 @@ byte. `504 vtop_timeout` after 32 s, `503 engine_unavailable`.
 
 `/mcp`, `/mcp/*`: passed to `ENGINE_URL` unchanged (the client's own
 `Authorization: Bearer vtm_…` included), with `x-forwarded-for` set to the
-client's address.
+client's address. Without an `Authorization` header (except `OPTIONS`) the
+edge answers `401` itself with `WWW-Authenticate: Bearer
+resource_metadata="<PUBLIC_URL>/.well-known/oauth-protected-resource/mcp"`;
+the engine's own `401`s get the same header.
+
+## OAuth for MCP clients
+
+MCP authorization (2025-06-18): OAuth 2.1, authorization code with PKCE
+`S256` only, public clients, dynamic registration. The token is an
+ordinary `vtm_…` access key, so revoking, last uses, the outings switch and
+the 10-key cap apply as for any key. It does not expire; there are no
+refresh tokens. All routes but `/authorize*` send
+`access-control-allow-origin: *` and answer `OPTIONS` with `204`. Errors
+are `{ error, error_description }` (RFC 6749), `cache-control: no-store`.
+
+| Route | Auth | Request | Response |
+|---|---|---|---|
+| `GET /.well-known/oauth-protected-resource`, `…/mcp` | none | — | RFC 9728: `{ resource: "<PUBLIC_URL>/mcp", authorization_servers: ["<PUBLIC_URL>"], bearer_methods_supported: ["header"], resource_name }` |
+| `GET /.well-known/oauth-authorization-server`, `…/mcp` | none | — | RFC 8414: `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `response_types_supported: ["code"]`, `grant_types_supported: ["authorization_code"]`, `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]`, `authorization_response_iss_parameter_supported: true` |
+| `POST /register` | none | RFC 7591 JSON: `redirect_uris` (1–5), `client_name?`, `grant_types?` (must include `authorization_code`) | `201 { client_id, client_id_issued_at, client_name, redirect_uris, grant_types, response_types, token_endpoint_auth_method: "none" }`; `400 invalid_redirect_uri`, `400 invalid_client_metadata` |
+| `GET /authorize` | none | `response_type=code`, `client_id`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`, `state?`, `resource?`, `scope?` (ignored) | the pairing page (HTML); `400` page for an unknown client or unregistered `redirect_uri` (nothing is sent to it); other errors go back to `redirect_uri` with `error`, `error_description`, `state`, `iss` |
+| `POST /authorize/poll` | none | `{ poll }` (from the page) | `202 { status: "pending", pollAfterMs }`, `200 { status: "ready", redirect }`, `410 { status: "expired" }` |
+| `POST /token` | none | form: `grant_type=authorization_code`, `code`, `client_id`, `redirect_uri`, `code_verifier`, `resource?` | `{ access_token: "vtm_…", token_type: "Bearer" }`; `400 invalid_grant` (unknown, used or expired code, other client, other `redirect_uri`, verifier mismatch), `unsupported_grant_type`, `invalid_request`, `invalid_target` |
+
+Rules:
+
+- Redirect URIs: `https`, `http` on `localhost`/`127.0.0.1`/`[::1]`, or an
+  app's own scheme (not `javascript`, `data`, `file` and the like); no
+  fragment; at most 512 characters. `/authorize` and `/token` want one of
+  the registered URIs exactly, except that a loopback URI may change port
+  (RFC 8252).
+- `resource`, when sent, must be `<PUBLIC_URL>/mcp` or `<PUBLIC_URL>`
+  (`invalid_target`).
+- Names are cut to 40 characters (`MCP app` when missing). At most 2000
+  clients are kept; registering past that drops the one unused longest.
+
+**Approval.** The page shows the client's name, its redirect host, a
+10-character pairing code (`XXXXX-XXXXX`) and its QR, and polls
+`/authorize/poll` every 2 s. In the app, Connected apps → Pair a browser
+scans or takes the code, asks `/v1/pair/info` to show the client's name,
+then makes the key with `pairCode` on `/v1/keys` (outings off). The next
+poll turns the request into a one-time code and the page goes to
+`redirect_uri?code=…&state=…&iss=<PUBLIC_URL>`. The request lives 10
+minutes, the code 60 seconds and is gone after one `/token` try. Clients,
+requests and codes live in the `OAuth` Durable Object (one, named
+`oauth`); pairing codes, poll ids and codes are stored as SHA-256 only.
 
 ## Internal (engine and gateway)
 
