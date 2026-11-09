@@ -7,9 +7,16 @@ description = "The phone ↔ gateway UDP transport for slow, lossy networks: Noi
 [dependencies]
 chacha20poly1305 = "0.10"
 reed-solomon-simd = "3"
-snow = { version = "0.10", features = ["risky-raw-split"] }
-tokio = { workspace = true, features = ["net", "time", "rt", "macros", "sync"] }
+# Only the crypto of `NOISE` (25519, ChaChaPoly, BLAKE2s): snow's defaults add AES-GCM, SHA-2 and,
+# through its `std` feature, ring, which would all end up in the app's library.
+snow = { version = "0.10", default-features = false, features = ["use-curve25519", "use-chacha20poly1305", "use-blake2", "use-getrandom", "risky-raw-split"] }
+# Only for `client::fetch` over tokio's sockets; the app passes its own `client::Net`.
+tokio = { workspace = true, features = ["net", "time"], optional = true }
 log = { workspace = true }
+
+[features]
+default = ["tokio"]
+tokio = ["dep:tokio"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

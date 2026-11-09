@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::client::{fetch, ClientConfig, WireError};
+use crate::client::{fetch, fetch_over, ClientConfig, WireError};
 use crate::fec;
 use crate::frame::{Keys, ReplayWindow, T_DATA};
 use crate::gateway::{Gateway, Token};
@@ -334,13 +334,20 @@ async fn nothing_listening_is_unreachable() {
     drop(sock);
     let (_, public) = crate::generate_keypair();
     let dir = state_dir("unreachable");
+    // A long timeout: a gateway that never answers is given up on after `SILENT`.
+    let start = std::time::Instant::now();
     let got = fetch(
         &config(port, public, &dir),
         &ask(10),
-        Duration::from_secs(4),
+        Duration::from_secs(60),
     )
     .await;
     assert_eq!(got.map(|g| g.body), Err(WireError::Unreachable));
+    assert!(
+        start.elapsed() < Duration::from_secs(7),
+        "{:?}",
+        start.elapsed()
+    );
 }
 
 #[tokio::test]
@@ -610,5 +617,89 @@ async fn a_secret_request_waits_for_the_handshake() {
     let hs1 = seen.iter().find(|p| p[0] == crate::frame::T_HS1).unwrap();
     assert!(hs1.len() < body.len(), "message 1 is {} bytes", hs1.len());
     drop(seen);
+    gw.task.abort();
+}
+
+/// Blocking std sockets: a [`crate::client::Net`] with no runtime behind it, as the app's is.
+struct Blocking;
+
+impl crate::client::Net for Blocking {
+    type Socket = std::net::UdpSocket;
+
+    async fn bind(&self, ipv6: bool) -> std::io::Result<Self::Socket> {
+        std::net::UdpSocket::bind(if ipv6 { "[::]:0" } else { "0.0.0.0:0" })
+    }
+
+    async fn sleep(&self, duration: Duration) {
+        std::thread::sleep(duration);
+    }
+
+    async fn resolve(&self, host: &str, port: u16, _until: Instant) -> Vec<std::net::IpAddr> {
+        use std::net::ToSocketAddrs;
+        let found = (host, port).to_socket_addrs().into_iter().flatten();
+        found.map(|a| a.ip()).collect()
+    }
+}
+
+impl crate::client::Socket for std::net::UdpSocket {
+    async fn send_to(&self, packet: &[u8], to: SocketAddr) -> std::io::Result<()> {
+        std::net::UdpSocket::send_to(self, packet, to).map(drop)
+    }
+
+    async fn recv_from(&self, buf: &mut [u8], until: Instant) -> Option<(usize, SocketAddr)> {
+        let left = until.saturating_duration_since(Instant::now());
+        self.set_read_timeout(Some(left.max(Duration::from_millis(1))))
+            .ok()?;
+        std::net::UdpSocket::recv_from(self, buf).ok()
+    }
+}
+
+/// Polls `work` on this thread until done: no runtime.
+fn block_on<F: std::future::Future>(work: F) -> F::Output {
+    struct Unpark(std::thread::Thread);
+    impl std::task::Wake for Unpark {
+        fn wake(self: Arc<Self>) {
+            self.0.unpark();
+        }
+    }
+    let waker = Arc::new(Unpark(std::thread::current())).into();
+    let mut context = std::task::Context::from_waker(&waker);
+    let mut work = std::pin::pin!(work);
+    loop {
+        if let std::task::Poll::Ready(out) = work.as_mut().poll(&mut context) {
+            return out;
+        }
+        std::thread::park();
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn fetches_on_a_runtime_free_net() {
+    let gw = spawn_gateway(None, 0, Duration::from_millis(200)).await;
+    let dir = state_dir("blocking");
+    let cfg = ClientConfig {
+        host: "localhost".into(),
+        ..config(gw.port, gw.public, &dir)
+    };
+    let fetched = std::thread::spawn(move || {
+        let first = block_on(fetch_over(
+            &Blocking,
+            &cfg,
+            &ask(3000),
+            Duration::from_secs(20),
+        ));
+        let second = block_on(fetch_over(
+            &Blocking,
+            &cfg,
+            &ask(100),
+            Duration::from_secs(20),
+        ));
+        (first, second)
+    })
+    .join()
+    .unwrap();
+    let (first, second) = (fetched.0.unwrap(), fetched.1.unwrap());
+    assert_eq!((first.body, first.handshake), (answer(3000), true));
+    assert_eq!((second.body, second.handshake), (answer(100), false));
     gw.task.abort();
 }

@@ -12,15 +12,18 @@
 //!   local address prefix).
 //! - `gateway.addr`: the gateway's resolved address, so a cold start on a
 //!   slow link does not wait on DNS.
+//!
+//! The socket, the timers and DNS come from a [`Net`], so the client needs no
+//! async runtime: the app passes its own (Kotlin's sockets), and [`fetch`]
+//! uses tokio's (feature `tokio`, on by default).
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File, OpenOptions};
+use std::future::Future;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-
-use tokio::net::UdpSocket;
 
 use crate::fec::{self, DATA_WIRE};
 use crate::frame::{
@@ -35,6 +38,9 @@ pub const COUNTER_BLOCK: u32 = 1024;
 pub const REKEY: Duration = Duration::from_secs(24 * 3600);
 const SLOTS: usize = 4;
 const DNS_KEEP_MS: u64 = 7 * 24 * 3600 * 1000;
+/// How long a gateway that never answers gets before the run gives up (UDP blocked or the
+/// gateway down), unless this network's measured link needs longer for a handshake.
+const SILENT: Duration = Duration::from_secs(5);
 /// Gap between a control packet and its duplicate.
 const DUPLICATE_GAP: Duration = Duration::from_millis(30);
 
@@ -92,8 +98,100 @@ pub struct Fetched {
     pub link: Link,
 }
 
-/// Sends `body` to the gateway and returns its answer.
+/// What the client needs from the platform.
+pub trait Net: Send + Sync {
+    type Socket: Socket;
+    /// A socket on any local port, for IPv6 or IPv4.
+    fn bind(&self, ipv6: bool) -> impl Future<Output = std::io::Result<Self::Socket>> + Send;
+    fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
+    /// The host's addresses; empty when the lookup fails or `until` passes.
+    fn resolve(
+        &self,
+        host: &str,
+        port: u16,
+        until: Instant,
+    ) -> impl Future<Output = Vec<IpAddr>> + Send;
+}
+
+pub trait Socket: Send + Sync {
+    fn send_to(
+        &self,
+        packet: &[u8],
+        to: SocketAddr,
+    ) -> impl Future<Output = std::io::Result<()>> + Send;
+    /// The next datagram, or None once `until` passes (or the socket fails).
+    fn recv_from(
+        &self,
+        buf: &mut [u8],
+        until: Instant,
+    ) -> impl Future<Output = Option<(usize, SocketAddr)>> + Send;
+}
+
+/// tokio's sockets, timers and DNS.
+#[cfg(feature = "tokio")]
+pub struct Tokio;
+
+#[cfg(feature = "tokio")]
+impl Net for Tokio {
+    type Socket = tokio::net::UdpSocket;
+
+    async fn bind(&self, ipv6: bool) -> std::io::Result<Self::Socket> {
+        tokio::net::UdpSocket::bind(if ipv6 { "[::]:0" } else { "0.0.0.0:0" }).await
+    }
+
+    async fn sleep(&self, duration: Duration) {
+        tokio::time::sleep(duration).await;
+    }
+
+    async fn resolve(&self, host: &str, port: u16, until: Instant) -> Vec<IpAddr> {
+        let lookup = tokio::net::lookup_host((host, port));
+        match tokio::time::timeout_at(until.into(), lookup).await {
+            Ok(Ok(addrs)) => addrs.map(|a| a.ip()).collect(),
+            _ => Vec::new(),
+        }
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl Socket for tokio::net::UdpSocket {
+    async fn send_to(&self, packet: &[u8], to: SocketAddr) -> std::io::Result<()> {
+        tokio::net::UdpSocket::send_to(self, packet, to)
+            .await
+            .map(drop)
+    }
+
+    async fn recv_from(&self, buf: &mut [u8], until: Instant) -> Option<(usize, SocketAddr)> {
+        let received = tokio::net::UdpSocket::recv_from(self, buf);
+        tokio::time::timeout_at(until.into(), received)
+            .await
+            .ok()?
+            .ok()
+    }
+}
+
+/// [`fetch_over`] tokio's sockets.
+#[cfg(feature = "tokio")]
 pub async fn fetch(
+    cfg: &ClientConfig,
+    body: &[u8],
+    timeout: Duration,
+) -> Result<Fetched, WireError> {
+    fetch_over(&Tokio, cfg, body, timeout).await
+}
+
+/// [`SILENT`], or three handshakes' worth of this network's measured link if longer.
+fn silent_window(link: &Link) -> Duration {
+    if !link.measured {
+        return SILENT;
+    }
+    let handshake = link.rtt + 2.0 * 1300.0 / link.rate + link.slack();
+    SILENT.max(Duration::from_secs_f64((3.0 * handshake).min(60.0)))
+}
+
+/// Sends `body` to the gateway and returns its answer; gives up after [`SILENT`] (or longer on a
+/// slow measured link) when the gateway never answers.
+pub async fn fetch_over<N: Net>(
+    net: &N,
     cfg: &ClientConfig,
     body: &[u8],
     timeout: Duration,
@@ -108,7 +206,7 @@ pub async fn fetch(
     let deadline = start + timeout;
     fs::create_dir_all(&cfg.state_dir).map_err(io)?;
     let device = device_key(&cfg.state_dir)?;
-    let ip = resolve(cfg, deadline).await?;
+    let ip = resolve(net, cfg, deadline).await?;
     let mut slot = Slot::claim(&cfg.state_dir);
     let profile = cfg
         .state_dir
@@ -117,16 +215,15 @@ pub async fn fetch(
         .ok()
         .and_then(|t| Link::parse(&t))
         .unwrap_or_default();
-    let bind: SocketAddr = if ip.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" }
-        .parse()
-        .expect("valid");
-    let sock = UdpSocket::bind(bind).await.map_err(io)?;
+    let sock = net.bind(ip.is_ipv6()).await.map_err(io)?;
     let mut run = Run {
+        net,
         sock,
         ip,
         ports: &cfg.ports,
         server_key: cfg.server_key,
         device,
+        silent_until: start + silent_window(&link),
         link,
         deadline,
         up: 0,
@@ -269,14 +366,17 @@ struct Round {
     received: usize,
 }
 
-struct Run<'a> {
-    sock: UdpSocket,
+struct Run<'a, N: Net> {
+    net: &'a N,
+    sock: N::Socket,
     ip: IpAddr,
     ports: &'a [u16],
     server_key: [u8; 32],
     device: [u8; 32],
     link: Link,
     deadline: Instant,
+    /// When to give up while the gateway hasn't answered at all.
+    silent_until: Instant,
     up: usize,
     down: usize,
     retries: usize,
@@ -284,12 +384,12 @@ struct Run<'a> {
     heard: bool,
 }
 
-impl Run<'_> {
+impl<N: Net> Run<'_, N> {
     async fn send(&mut self, port: usize, packet: &[u8], duplicate: bool) {
         let to = SocketAddr::new(self.ip, self.ports[port % self.ports.len()]);
         for copy in 0..if duplicate { 2 } else { 1 } {
             if copy > 0 {
-                tokio::time::sleep(DUPLICATE_GAP).await;
+                self.net.sleep(DUPLICATE_GAP).await;
             }
             if self.sock.send_to(packet, to).await.is_ok() {
                 self.up += packet.len() + IP_UDP;
@@ -298,17 +398,23 @@ impl Run<'_> {
     }
 
     async fn recv(&mut self, until: Instant, buf: &mut [u8]) -> Option<usize> {
-        let until = tokio::time::Instant::from_std(until.min(self.deadline));
+        let until = until.min(self.give_up_at());
         loop {
-            let Ok(Ok((n, from))) = tokio::time::timeout_at(until, self.sock.recv_from(buf)).await
-            else {
-                return None;
-            };
+            let (n, from) = self.sock.recv_from(buf, until).await?;
             if from.ip() == self.ip {
                 self.down += n + IP_UDP;
                 self.heard = true;
                 return Some(n);
             }
+        }
+    }
+
+    /// The deadline, or sooner while nothing came back.
+    fn give_up_at(&self) -> Instant {
+        if self.heard {
+            self.deadline
+        } else {
+            self.deadline.min(self.silent_until)
         }
     }
 
@@ -515,7 +621,7 @@ impl Run<'_> {
                 }
                 continue;
             }
-            if Instant::now() >= self.deadline {
+            if Instant::now() >= self.give_up_at() {
                 return Err(self.failure());
             }
             // Timer: what was outstanding is presumed lost.
@@ -650,7 +756,7 @@ impl Run<'_> {
         let mut wait = base;
         let mut buf = [0u8; 1500];
         for attempt in 0.. {
-            if Instant::now() >= self.deadline {
+            if Instant::now() >= self.give_up_at() {
                 return Err(self.failure());
             }
             let port = (self.link.port + attempt) % self.ports.len();
@@ -838,7 +944,11 @@ fn device_key(dir: &Path) -> Result<[u8; 32], WireError> {
 
 /// The gateway's address: cached for a week, refreshed by DNS after that
 /// (and still used if the refresh fails).
-async fn resolve(cfg: &ClientConfig, deadline: Instant) -> Result<IpAddr, WireError> {
+async fn resolve(
+    net: &impl Net,
+    cfg: &ClientConfig,
+    deadline: Instant,
+) -> Result<IpAddr, WireError> {
     if let Ok(ip) = cfg.host.parse::<IpAddr>() {
         return Ok(ip);
     }
@@ -857,18 +967,8 @@ async fn resolve(cfg: &ClientConfig, deadline: Instant) -> Result<IpAddr, WireEr
             return Ok(ip);
         }
     }
-    let lookup = tokio::net::lookup_host((cfg.host.as_str(), cfg.ports[0]));
-    let found = tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), lookup)
-        .await
-        .ok()
-        .and_then(Result::ok)
-        .and_then(|mut addrs| {
-            let all: Vec<SocketAddr> = addrs.by_ref().collect();
-            all.iter()
-                .find(|a| a.is_ipv4())
-                .or(all.first())
-                .map(SocketAddr::ip)
-        });
+    let all = net.resolve(&cfg.host, cfg.ports[0], deadline).await;
+    let found = all.iter().find(|a| a.is_ipv4()).or(all.first()).copied();
     match (found, cached) {
         (Some(ip), _) => {
             let _ = write_atomic(
