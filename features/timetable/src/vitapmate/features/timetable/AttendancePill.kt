@@ -57,7 +57,7 @@ fun AttendancePill(record: AttendanceCourse, modifier: Modifier = Modifier, hint
             gapSize = 0.dp,
         )
         Spacer(Modifier.width(6.dp))
-        Text(percent, style = MaterialTheme.typography.labelMediumEmphasized.nums(), color = tone.onSubtle, maxLines = 1)
+        Text(percent, style = MaterialTheme.typography.labelMediumEmphasized.nums(), color = tone.onSubtle, maxLines = 1, softWrap = false)
         if (skips) {
             Spacer(Modifier.width(6.dp))
             Text(skipHint(record), style = MaterialTheme.typography.labelSmall.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)

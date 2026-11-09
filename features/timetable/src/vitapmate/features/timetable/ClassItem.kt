@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,9 +106,13 @@ fun ClassItem(
                     val attendance = record?.takeIf { !labFat }
                     if (where || attendance != null) {
                         Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Wraps the pill under the room when both don't fit (narrow phones, skip hint on).
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            itemVerticalAlignment = Alignment.CenterVertically,
+                        ) {
                             if (where) Location(slot.room, slot.block, if (labFat) tones.warning.base else tone.base, muted)
-                            if (where && attendance != null) Spacer(Modifier.width(12.dp))
                             if (attendance != null) AttendancePill(attendance, Modifier.testTag("timetable.attendance"))
                         }
                     }
