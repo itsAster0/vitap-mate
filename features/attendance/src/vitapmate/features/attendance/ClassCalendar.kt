@@ -207,7 +207,7 @@ private fun rank(s: ClassStatus?) = when (s) {
     null -> 0
 }
 
-private fun firstOfMonth(day: Int) = day - formatDay(day, "d").toInt() + 1
+internal fun firstOfMonth(day: Int) = day - formatDay(day, "d").toInt() + 1
 
-private fun daysInMonth(first: Int): Int =
+internal fun daysInMonth(first: Int): Int =
     Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = first * 86_400_000L }.getActualMaximum(Calendar.DAY_OF_MONTH)

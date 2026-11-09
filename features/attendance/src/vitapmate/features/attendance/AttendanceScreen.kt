@@ -6,6 +6,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import com.composables.icons.lucide.CalendarMinus
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -57,6 +63,7 @@ fun AttendanceScreen() {
     val scope = rememberCoroutineScope()
     var filter by rememberSaveable { mutableStateOf(Kind.All) }
     var open by rememberSaveable { mutableStateOf<String?>(null) }
+    var skipDay by rememberSaveable { mutableStateOf(false) }
     // After each fetch of the summary, histories that fell behind it are fetched again in the
     // background, and the calendar when a day old; the refresh spinner doesn't wait. A newer
     // refresh cancels the last run.
@@ -94,9 +101,13 @@ fun AttendanceScreen() {
             }
             StateRegistry.report("ui.attendance", mapOf("filter" to kind.name.lowercase(), "shown" to data.courses.of(kind).size, "debarred" to data.courses.count { it.debarred }))
         }
+        val canSkipDay = outlook.values.any { it.days.isNotEmpty() }
         Column(Modifier.fillMaxSize()) {
-            if (pages.size > 1) {
-                KindFilter(
+            if (pages.size > 1 || canSkipDay) Row(
+                Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (pages.size > 1) KindFilter(
                     pages[pager.targetPage],
                     mapOf(Kind.All to data.courses.size, Kind.Theory to data.courses.size - labs, Kind.Lab to labs),
                     onSelect = { kind ->
@@ -108,13 +119,23 @@ fun AttendanceScreen() {
                             }
                         }
                     },
-                    Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.sm),
-                )
+                    Modifier.weight(1f),
+                ) else Spacer(Modifier.weight(1f))
+                if (canSkipDay) {
+                    FilledTonalIconButton(
+                        {
+                            skipDay = true
+                            scope.launch { flow("attendance.skip_day.open") { id -> Log.info("ui.attendance", "open skip days", id) } }
+                        },
+                        Modifier.padding(start = Space.sm).testTag("attendance.skip_day.open"),
+                    ) { Icon(Lucide.CalendarMinus, "Skip days") }
+                }
             }
             HorizontalPager(pager, Modifier.weight(1f).testTag("attendance.pager"), key = { pages[it].name }) { i ->
                 CourseList(data.courses.of(pages[i]), lists[pages[i].ordinal], outlook, { open = it }, Modifier.testTag("attendance.list.${pages[i].name.lowercase()}"))
             }
         }
+        if (skipDay) SkipDaySheet(data.courses, outlook) { skipDay = false }
         // A course gone after a refresh closes its sheet.
         data.courses.firstOrNull { it.key == open }?.let { course ->
             CourseSheet(course.key, course.name.ifBlank { course.code }) {
