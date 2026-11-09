@@ -6,11 +6,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
-import com.composables.icons.lucide.FlaskConical
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -20,7 +16,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -51,7 +46,7 @@ import vitapmate.ui.nums
 
 /**
  * One class of the day as a segmented list item: start and end, a lab/theory bar, then the name,
- * code and room and the attendance stacked, and on the right only its live state ("Now", "in 25m", done) or, once the day is
+ * the code, where it is ([Location]) with the attendance ring beside it, and any tags, and on the right only its live state ("Now", "in 25m", done) or, once the day is
  * over, what VTOP posted ([showPosted]; null [posted] is not posted yet), over the attendance.
  * Back-to-back classes share a group ([shapes]); free time splits groups. Tap opens the sheet.
  */
@@ -104,9 +99,20 @@ fun ClassItem(
             supportingContent = {
                 Column {
                     Text(slot.code, maxLines = 1, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
-                    if (lastClass || clash || note != null) {
-                        Spacer(Modifier.height(6.dp))
-                        ClassTags(lastClass = lastClass, clash = clash, note = note)
+                    // Where it is, then how the course stands: colour only on the ring.
+                    val where = slot.room.isNotBlank() || slot.block.isNotBlank()
+                    val attendance = record?.takeIf { !labFat }
+                    if (where || attendance != null) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (where) Location(slot.room, slot.block, if (labFat) tones.warning.base else tone.base, muted)
+                            if (where && attendance != null) Spacer(Modifier.width(12.dp))
+                            if (attendance != null) AttendancePill(attendance, Modifier.testTag("timetable.attendance"))
+                        }
+                    }
+                    if (labFat || lastClass || clash || note != null) {
+                        Spacer(Modifier.height(8.dp))
+                        ClassTags(labFat = labFat, lastClass = lastClass, clash = clash, note = note)
                     }
                 }
             },
@@ -115,37 +121,32 @@ fun ClassItem(
             Text(slot.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmallEmphasized, color = text)
         }
     }
-    // Every card has a band at its foot: where (and a Lab FAT) on the left, the attendance on the
-    // right.
-    // The band takes the rail's colour: lab, theory, or amber on a Lab FAT.
-    val bandTone = if (labFat) tones.warning else tone
-    val band = bandTone.subtle
-    val onBand = bandTone.onSubtle
-    Column(Modifier.clip(shapes.shape).background(container)) {
-        item()
-        // Only what applies, spaced evenly (Flutter's spaceEvenly): Lab FAT, room, block, and the
-        // attendance pill (not on a Lab FAT: nothing to skip).
-        Row(
-            Modifier.fillMaxWidth().background(band).padding(horizontal = 8.dp, vertical = 8.dp).testTag(if (labFat) "timetable.labfat" else "timetable.band"),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            val label = MaterialTheme.typography.labelMedium
-            @Composable
-            fun Piece(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) =
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    icon?.let { Icon(it, null, Modifier.size(14.dp), tint = onBand) }
-                    Text(text, maxLines = 1, softWrap = false, style = label, color = onBand)
-                }
-            if (labFat) Piece("Lab FAT", Lucide.FlaskConical)
-            if (slot.room.isNotBlank()) Piece("Room ${slot.room}", Lucide.MapPin.takeIf { !labFat })
-            if (slot.block.isNotBlank()) Piece(slot.block)
-            if (record != null && !labFat) {
-                AttendancePill(
-                    record,
-                    Modifier.clip(CircleShape).background(onBand.copy(alpha = 0.12f)).padding(start = 6.dp, end = 10.dp, top = 3.dp, bottom = 3.dp),
-                )
-            }
+    item()
+}
+
+/**
+ * Where the class is, as one token: the room in tabular figures (what you look for on the way),
+ * its block beside it, muted, and a pin in the rail's colour. Neutral fill, so the row stays quiet.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun Location(room: String, block: String, pin: androidx.compose.ui.graphics.Color, muted: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .background(scheme.surfaceContainerHighest, RoundedCornerShape(8.dp))
+            .padding(start = 6.dp, end = 8.dp, top = 3.dp, bottom = 3.dp)
+            .testTag("timetable.location"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Lucide.MapPin, null, Modifier.size(13.dp), tint = if (muted) scheme.onSurfaceVariant else pin)
+        if (room.isNotBlank()) {
+            Spacer(Modifier.width(4.dp))
+            Text(room, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = if (muted) scheme.onSurfaceVariant else scheme.onSurface)
+        }
+        if (block.isNotBlank()) {
+            Spacer(Modifier.width(if (room.isNotBlank()) 6.dp else 4.dp))
+            Text(block, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
         }
     }
 }
