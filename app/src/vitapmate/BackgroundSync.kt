@@ -201,6 +201,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
             val fresh = withContext(Dispatchers.IO) { AppCore.await().changes(f) }
                 .filter { it.atMs > since && Settings.notifies(it.kind.name.lowercase()) }
             BackgroundSync.notify(app, fresh)
+            LiveUpdates.outings(app, "live.sync")
             prefs.edit().putLong("notified_ms", System.currentTimeMillis()).apply()
             Log.info("sync", "background done", f, mapOf("outcome" to result.outcome.name.lowercase(), "fetched" to "${result.fetched}", "notified" to "${fresh.size}"))
             withContext(Dispatchers.IO) { ActivityHistory.save() }

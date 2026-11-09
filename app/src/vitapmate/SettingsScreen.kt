@@ -165,6 +165,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                 }
             }
+            item { LiveUpdatesSetting() }
             item { AppearanceGroup() }
             item {
                 ListGroup("Files and mess") {

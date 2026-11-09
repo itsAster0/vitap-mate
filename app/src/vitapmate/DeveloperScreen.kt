@@ -42,6 +42,7 @@ import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.Bug
 import com.composables.icons.lucide.FlaskConical
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Radio
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Mail
 import com.composables.icons.lucide.Pin
@@ -216,6 +217,14 @@ fun DeveloperScreen() {
                         Lucide.BellRing,
                         "A sample change, the way background sync posts them",
                         onClick = { BackgroundSync.notifyTest(context) },
+                    )
+                    if (LiveUpdates.supported()) GroupItem(
+                        "Preview live updates",
+                        "dev.live_preview",
+                        Lucide.Radio,
+                        if (Settings.liveUpdates) "A sample class on now and an approved outing" else "Turn on Live updates in Settings first",
+                        enabled = Settings.liveUpdates,
+                        onClick = { LiveUpdates.preview(context) },
                     )
                     tunable(Tunable.PageMaxAge, Lucide.Clock)
                     tunable(Tunable.JustFetched, Lucide.Clock)

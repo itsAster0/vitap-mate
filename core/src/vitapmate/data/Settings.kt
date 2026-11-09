@@ -116,6 +116,9 @@ object Settings {
      */
     var backgroundSync by flag("settings_background_sync", false)
 
+    /** Live updates (Android 16+): the class on now and outing requests as promoted notifications; off by default. */
+    var liveUpdates by flag("settings_live_updates", false)
+
     /** Hours between background syncs, one of [SYNC_HOURS]. */
     var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
 
@@ -155,7 +158,7 @@ object Settings {
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 

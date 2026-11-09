@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import vitapmate.core.Core
 import vitapmate.core.CoreException
+import vitapmate.core.OutingStanding
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -81,6 +82,9 @@ object VtopSync {
             if (everything) {
                 page("profile") { it.fetchProfile(f) }
                 page("course_page") { it.fetchCoursePage(f) }
+            }
+            // With Live updates on, outings are checked while a trip ahead is pending (Android 16+).
+            if (everything || Settings.liveUpdates && android.os.Build.VERSION.SDK_INT >= 36 && withContext(Dispatchers.IO) { pendingOuting(core, f) }) {
                 page("general_outing") { it.fetchGeneralOuting(f) }
                 page("weekend_outing") { it.fetchWeekendOuting(f) }
             }
@@ -91,4 +95,7 @@ object VtopSync {
         Log.info("sync", "done", f, mapOf("fetched" to "$fetched", "failed" to "$failed"))
         Result(Outcome.Done, fetched, failed)
     }
+
+    private fun pendingOuting(core: Core, f: String) =
+        (core.cachedGeneralOuting(f)?.requests.orEmpty() + core.cachedWeekendOuting(f)?.requests.orEmpty()).any { it.standing == OutingStanding.PENDING && it.highlight != null }
 }
