@@ -205,7 +205,7 @@ private fun iconOf(kind: ChangeKind): ImageVector = when (kind) {
 }
 
 /** The feature a change belongs to. */
-private fun pageOf(kind: ChangeKind): String = when (kind) {
+internal fun pageOf(kind: ChangeKind): String = when (kind) {
     ChangeKind.ATTENDANCE -> "attendance"
     ChangeKind.MARKS -> "marks"
     ChangeKind.TIMETABLE -> "timetable"

@@ -29,6 +29,8 @@
       <!-- Long-press shortcuts: Timetable, Attendance, Outing. -->
       <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
     </activity>
+    <!-- A change notification's "Mark as seen" (BackgroundSync.kt). -->
+    <receiver android:name="vitapmate.SeenReceiver" android:exported="false" />
     <!-- Push from the edge: new FCM tokens and messages (PushService.kt). -->
     <service android:name="vitapmate.PushService" android:exported="false">
       <intent-filter>

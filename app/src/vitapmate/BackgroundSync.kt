@@ -48,7 +48,8 @@ import vitapmate.observability.flow
  */
 object BackgroundSync {
     private const val WORK = "vtop_sync"
-    const val CHANNEL = "changes"
+    /** Before channels were per kind; deleted when notifying. */
+    private const val OLD_CHANNEL = "changes"
 
     /** Whether it can be turned on: OTP auto-fill is set up and working. */
     fun available(): Boolean = OtpAutofill.inUse() != null
@@ -104,33 +105,66 @@ object BackgroundSync {
         listOf(Change("test", ChangeKind.ATTENDANCE, System.currentTimeMillis(), "Attendance posted", "Sample course (Theory): 1 class present, now 92%", null, "")),
     )
 
-    /** Posts one notification per kind for [changes] (newest first); tapping opens the inbox. */
+    /**
+     * Posts one notification per kind for [changes] (newest first), each on its kind's channel (so
+     * the student can mute marks but keep attendance): tapping opens the inbox, "Open …" the page,
+     * "Mark as seen" clears the inbox's new count ([SeenReceiver]).
+     */
     internal fun notify(context: Context, changes: List<Change>) {
         if (changes.isEmpty()) return
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(NotificationChannel(CHANNEL, "VTOP changes", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "What changed on VTOP since you last looked" })
+            manager.deleteNotificationChannel(OLD_CHANNEL)
+            for (kind in ChangeKind.entries) {
+                val name = kind.name.lowercase().replaceFirstChar { it.uppercase() }
+                manager.createNotificationChannel(NotificationChannel(channelOf(kind), name, NotificationManager.IMPORTANCE_DEFAULT).apply { description = "$name changes on VTOP" })
+            }
         }
-        val open = PendingIntent.getActivity(
-            context, 0,
-            Intent(context, MainActivity::class.java).putExtra(MainActivity.OPEN, MainActivity.OPEN_INBOX).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+        fun openPage(id: String, request: Int) = PendingIntent.getActivity(
+            context, request,
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.OPEN, id).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val open = openPage(MainActivity.OPEN_INBOX, 0)
+        val seen = PendingIntent.getBroadcast(context, 0, Intent(context, SeenReceiver::class.java), PendingIntent.FLAG_IMMUTABLE)
         for ((kind, list) in changes.groupBy { it.kind }) {
             val title = if (list.size == 1) list[0].title else "${list[0].title} and ${list.size - 1} more"
             // One change: its text in full; several: a line each.
             val style = if (list.size == 1) NotificationCompat.BigTextStyle().bigText(list[0].body)
             else NotificationCompat.InboxStyle().also { s -> list.take(6).forEach { s.addLine("${it.title}: ${it.body}") } }
-            val n = NotificationCompat.Builder(context, CHANNEL)
+            val page = pageOf(kind)
+            val n = NotificationCompat.Builder(context, channelOf(kind))
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(list[0].body)
                 .setStyle(style)
                 .setContentIntent(open)
+                .addAction(0, "Open ${featureById(page)?.label ?: page}", openPage(page, kind.ordinal + 1))
+                .addAction(0, "Mark as seen", seen)
                 .setAutoCancel(true)
                 .build()
             NotificationManagerCompat.from(context).notify(kind.ordinal + 100, n)
+        }
+    }
+}
+
+private fun channelOf(kind: ChangeKind) = "changes.${kind.name.lowercase()}"
+
+/** A change notification's "Mark as seen": every change counts as seen, and the notifications go. */
+class SeenReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pending = goAsync()
+        val app = context.applicationContext
+        kotlinx.coroutines.MainScope().launch {
+            try {
+                Settings.load(app)
+                AppCore.start(app)
+                flow("notify.seen") { f -> withContext(Dispatchers.IO) { AppCore.await().markChangesSeen(f) } }
+                ChangeKind.entries.forEach { NotificationManagerCompat.from(app).cancel(it.ordinal + 100) }
+            } finally {
+                pending.finish()
+            }
         }
     }
 }
