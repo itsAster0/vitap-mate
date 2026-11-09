@@ -84,10 +84,6 @@ jobs:
           if [ -z "$ENV_JSON" ]; then echo "ENV_JSON is not set; building without Firebase."; exit 0; fi
           (umask 077; printf '%s' "$ENV_JSON" > .env.json)
           mise run firebase
-      - name: Build app
-        run: ./kotlin build
-      - name: Test core
-        run: ./kotlin test -m core
       # Signed release only when the repository has the keystore secrets
       # (forks and pull requests from forks do not).
       - name: Configure release signing
@@ -107,7 +103,13 @@ jobs:
           printf '%s' "$KEYSTORE_PROPERTIES_BASE64" | base64 --decode > keystore/keystore.properties
           store=$(awk -F= '$1 == "storeFile" { sub(/^[^=]*=/, ""); sub(/\r$/, ""); print; exit }' keystore/keystore.properties)
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "keystore/$(basename "$store")"
+          # app/keystore.properties, so the build below finds the signing config.
+          mise run signing
           echo "signed=true" >> "$GITHUB_OUTPUT"
+      - name: Build app
+        run: ./kotlin build
+      - name: Test core
+        run: ./kotlin test -m core
       - name: Build signed release APK
         if: steps.signing.outputs.signed == 'true'
         run: mise run release
