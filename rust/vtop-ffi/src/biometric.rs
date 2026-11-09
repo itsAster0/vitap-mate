@@ -11,6 +11,7 @@ use vtop_core::VtopError;
 use vtop_core::inputs::BiometricDate;
 use vtop_core::types::{BiometricData, BiometricRecord};
 
+use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
 const DIR: &str = "biometric";
@@ -131,8 +132,9 @@ impl Core {
     }
 
     async fn fetch_day(&self, day: i32) -> Result<BiometricData, CoreError> {
-        let date = BiometricDate::parse(&vtop_date(day))?;
-        let data = signed_in!(self, |client| client.biometric_history(&date))?;
+        let text = vtop_date(day);
+        let date = BiometricDate::parse(&text)?;
+        let data = page!(self, "biometric", None, ["date" => &text], |client| client.biometric_history(&date))?;
         let _ = fs::create_dir_all(self.dir.join(PAGES).join(DIR));
         self.write(&format!("{PAGES}/{DIR}/{day}.json"), &data);
         Ok(data)

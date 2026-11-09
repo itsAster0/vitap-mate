@@ -138,7 +138,7 @@ impl Core {
     pub async fn fetch_course_page(&self, flow: String) -> Result<CoursePage, CoreError> {
         traced("fetch_course_page", &flow, async {
             let data = self
-                .fetch(COURSES, |client, semester| {
+                .fetch(COURSES, "course_page_courses", &[], |client, semester| {
                     Box::pin(client.course_page_courses(semester))
                 })
                 .await?;
@@ -185,10 +185,17 @@ impl Core {
         traced("fetch_course_view", &flow, async {
             let course_id = plain(&course_id)?;
             let classes = self
-                .fetch(&classes_file(course_id), |client, semester| {
-                    let course_id = course_id.to_string();
-                    Box::pin(async move { client.course_page_classes(semester, &course_id).await })
-                })
+                .fetch(
+                    &classes_file(course_id),
+                    "course_page_classes",
+                    &[("course_id", course_id)],
+                    |client, semester| {
+                        let course_id = course_id.to_string();
+                        Box::pin(
+                            async move { client.course_page_classes(semester, &course_id).await },
+                        )
+                    },
+                )
                 .await?;
             let mut view = self.view(course_id, classes.clone(), class_id.as_deref());
             if let Some(selected) = view.selected.clone() {
@@ -199,14 +206,19 @@ impl Core {
                     .map(|class| class.erp_id.clone())
                     .unwrap_or_default();
                 let detail = self
-                    .fetch(&plan_file(&selected), |client, semester| {
-                        let (erp_id, selected) = (erp_id.clone(), selected.clone());
-                        Box::pin(async move {
-                            client
-                                .course_page_detail(semester, &erp_id, &selected)
-                                .await
-                        })
-                    })
+                    .fetch(
+                        &plan_file(&selected),
+                        "course_page_detail",
+                        &[("erp_id", &erp_id), ("class_id", &selected)],
+                        |client, semester| {
+                            let (erp_id, selected) = (erp_id.clone(), selected.clone());
+                            Box::pin(async move {
+                                client
+                                    .course_page_detail(semester, &erp_id, &selected)
+                                    .await
+                            })
+                        },
+                    )
                     .await?;
                 view.add_plan(detail);
             }
@@ -872,6 +884,7 @@ mod tests {
             },
             logins: 0,
             otp: None,
+            server_otp: false,
         };
         let core = Core {
             dir: dir.clone(),

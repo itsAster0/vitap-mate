@@ -16,6 +16,11 @@ thread_local! {
     static FLOW: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
+/// The flow of the call being polled on this thread (empty outside one).
+pub(crate) fn flow() -> String {
+    FLOW.with_borrow(Clone::clone).unwrap_or_default()
+}
+
 /// Runs `work` with `flow` set in [`FLOW`] around each poll (tokio's `task_local` without
 /// tokio), whichever thread polls it.
 pub(crate) async fn with_flow<F: Future>(flow: String, work: F) -> F::Output {
@@ -173,16 +178,17 @@ pub fn set_http_transport(transport: Arc<dyn HttpTransport>) {
 }
 
 /// The transport set by [`set_http_transport`], else vtop-core's default (none in the app
-/// build: vtop-core comes without reqwest).
+/// build: vtop-core comes without reqwest), behind the route switch ([`crate::route::Routed`]).
 pub(crate) fn current() -> vtop_core::VtopResult<Arc<dyn Transport>> {
     let set = TRANSPORT
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .clone();
-    match set {
-        Some(transport) => Ok(transport),
-        None => vtop_core::client::default_transport(&crate::dev::vtop_config()),
-    }
+    let inner = match set {
+        Some(transport) => transport,
+        None => vtop_core::client::default_transport(&crate::dev::vtop_config())?,
+    };
+    Ok(Arc::new(crate::route::Routed(inner)))
 }
 
 /// The intermediate CA VTOP leaves out of its chain (PEM), for the app's TLS to trust too.

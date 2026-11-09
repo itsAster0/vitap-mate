@@ -116,7 +116,9 @@ impl Core {
     pub async fn fetch_marks(&self, flow: String) -> Result<Marks, CoreError> {
         traced("fetch_marks", &flow, async {
             let data = self
-                .fetch(MARKS, |client, semester| Box::pin(client.marks(semester)))
+                .fetch(MARKS, "marks", &[], |client, semester| {
+                    Box::pin(client.marks(semester))
+                })
                 .await?;
             let path = format!("{PAGES}/{}/{SEEN}", data.semester_id);
             let mut seen = self.read(&path).unwrap_or_default();

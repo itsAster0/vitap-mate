@@ -5,6 +5,7 @@ mod calendar;
 mod changes;
 mod cookies;
 mod dev;
+mod device;
 mod exams;
 mod marks;
 mod obs;
@@ -207,6 +208,8 @@ struct Session {
     logins: u64,
     /// The OTP prompt while VTOP waits for the emailed code.
     otp: Option<String>,
+    /// That sign-in was the server's ([`Core::server_otp`] sends the code).
+    server_otp: bool,
 }
 
 impl Session {
@@ -226,6 +229,7 @@ impl Session {
             account,
             logins: 0,
             otp: None,
+            server_otp: false,
         })
     }
 
@@ -235,6 +239,7 @@ impl Session {
         let fresh = Self::new(self.account.clone())?;
         fresh.cookies.activate(true);
         (self.client, self.cookies, self.otp) = (fresh.client, fresh.cookies, None);
+        self.server_otp = false;
         Ok(())
     }
 }
@@ -302,8 +307,12 @@ mod biometric;
 mod course_page;
 mod forwarding;
 mod grades;
+mod keys;
 mod outing;
 mod profile;
+mod route;
+mod server;
+mod udp;
 mod web;
 
 #[derive(uniffi::Object)]
@@ -326,6 +335,7 @@ impl Core {
         };
         traced_sync("new", &flow, || {
             fs::create_dir_all(&core.dir)?;
+            route::load(&core);
             let Some(account) = core.read::<Account>(ACCOUNT) else {
                 return Ok(());
             };
@@ -416,6 +426,9 @@ impl Core {
     pub async fn submit_otp(&self, flow: String, code: String) -> Result<(), CoreError> {
         traced("submit_otp", &flow, async {
             let slot = self.current()?;
+            if slot.read().await.server_otp {
+                return self.server_otp(&slot, Some(code.trim()), &flow).await;
+            }
             let mut session = slot.write().await;
             session
                 .client
@@ -437,6 +450,9 @@ impl Core {
     pub async fn resend_otp(&self, flow: String) -> Result<(), CoreError> {
         traced("resend_otp", &flow, async {
             let slot = self.current()?;
+            if slot.read().await.server_otp {
+                return self.server_otp(&slot, None, &flow).await;
+            }
             let mut session = slot.write().await;
             Ok(session.client.resend_security_otp().await?)
         })
@@ -492,7 +508,7 @@ impl Core {
     /// Fetches the semester list from VTOP (newest first) and caches it.
     pub async fn fetch_semesters(&self, flow: String) -> Result<Semesters, CoreError> {
         traced("fetch_semesters", &flow, async {
-            let list = signed_in!(self, |client| client.semesters())?;
+            let list = route::page!(self, "semesters", None, [], |client| client.semesters())?;
             if list.semesters.is_empty() {
                 return Err(VtopError::ParseError("VTOP lists no semesters".into()).into());
             }
@@ -534,7 +550,7 @@ impl Core {
     pub async fn fetch_attendance(&self, flow: String) -> Result<Attendance, CoreError> {
         traced("fetch_attendance", &flow, async {
             let data = self
-                .fetch(ATTENDANCE, |client, semester| {
+                .fetch(ATTENDANCE, "attendance", &[], |client, semester| {
                     Box::pin(client.attendance(semester))
                 })
                 .await?;
@@ -590,7 +606,7 @@ impl Core {
             let course = match self.cached_course(&course_key) {
                 Some(course) => course,
                 None => Attendance::from(
-                    self.fetch(ATTENDANCE, |client, semester| {
+                    self.fetch(ATTENDANCE, "attendance", &[], |client, semester| {
                         Box::pin(client.attendance(semester))
                     })
                     .await?,
@@ -607,10 +623,18 @@ impl Core {
                 CourseType::parse(&course.course_type)?,
             );
             let data = self
-                .fetch(&detail_file(&course), |client, semester| {
-                    let (id, kind) = (id.clone(), kind.clone());
-                    Box::pin(async move { client.full_attendance(semester, &id, &kind).await })
-                })
+                .fetch(
+                    &detail_file(&course),
+                    "full_attendance",
+                    &[
+                        ("course_id", &course.course_id),
+                        ("course_type", &course.course_type),
+                    ],
+                    |client, semester| {
+                        let (id, kind) = (id.clone(), kind.clone());
+                        Box::pin(async move { client.full_attendance(semester, &id, &kind).await })
+                    },
+                )
                 .await?;
             info!(course = %course.key, classes = data.records.len(), "attendance detail");
             let plans = self.plans(&course);
@@ -810,7 +834,7 @@ impl Core {
     pub async fn fetch_calendar(&self, flow: String) -> Result<AcademicCalendar, CoreError> {
         traced("fetch_calendar", &flow, async {
             let data = self
-                .fetch(CALENDAR, |client, semester| {
+                .fetch(CALENDAR, "academic_calendar", &[], |client, semester| {
                     Box::pin(client.academic_calendar(semester))
                 })
                 .await?;
@@ -822,7 +846,7 @@ impl Core {
     pub async fn fetch_timetable(&self, flow: String) -> Result<Timetable, CoreError> {
         traced("fetch_timetable", &flow, async {
             let data = self
-                .fetch(TIMETABLE, |client, semester| {
+                .fetch(TIMETABLE, "timetable", &[], |client, semester| {
                     Box::pin(client.timetable(semester))
                 })
                 .await?;
@@ -851,9 +875,12 @@ impl Core {
 
     /// Fetches a page of the selected semester and caches it as `file` for
     /// that semester.
-    async fn fetch<T: Serialize + Send>(
+    /// `page` and `args` name it for the server route (`vtop-bridge/src/pages.rs`).
+    async fn fetch<T: Serialize + DeserializeOwned + Send>(
         &self,
         file: &str,
+        page: &str,
+        args: &[(&str, &str)],
         op: impl PageOp<T>,
     ) -> Result<T, CoreError> {
         self.current()?; // Signed out wins over no pick.
@@ -862,7 +889,10 @@ impl Core {
             .and_then(|list| self.pick(&list))
             .ok_or(CoreError::SemesterNeeded)?;
         let id = SemesterId::parse(&semester).map_err(CoreError::from)?;
-        let data = signed_in!(self, |client| op(client, &id))?;
+        let data = match self.server_page(page, Some(&semester), args).await {
+            Some(result) => result?,
+            None => signed_in!(self, |client| op(client, &id))?,
+        };
         let path = format!("{PAGES}/{semester}/{file}");
         if let Some(parent) = self.dir.join(&path).parent() {
             let _ = fs::create_dir_all(parent);

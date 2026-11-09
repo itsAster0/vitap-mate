@@ -9,6 +9,7 @@ use tracing::{info, warn};
 use vtop_core::VtopError;
 use vtop_core::types::{MentorData, ProfileField, ProfileGroup, StudentProfile};
 
+use crate::route::page;
 use crate::{Core, CoreError, PAGES, traced, traced_sync};
 
 /// Not per semester: straight under `pages/`.
@@ -144,10 +145,10 @@ impl Core {
     /// fails), and caches both.
     pub async fn fetch_profile(&self, flow: String) -> Result<Profile, CoreError> {
         traced("fetch_profile", &flow, async {
-            let data = signed_in!(self, |client| client.profile())?;
+            let data = page!(self, "profile", None, [], |client| client.profile())?;
             let _ = std::fs::create_dir_all(self.dir.join(PAGES));
             self.write(&format!("{PAGES}/{PROFILE}"), &data);
-            let mentor = match signed_in!(self, |client| client.mentor()) {
+            let mentor = match page!(self, "mentor", None, [], |client| client.mentor()) {
                 Ok(mentor) => {
                     self.write(&format!("{PAGES}/{MENTOR}"), &mentor);
                     Some(mentor)

@@ -21,6 +21,7 @@ use vtop_core::types::{
 };
 
 use crate::marks::{ScoreBand, is_reevaluation, normalized, strip_reevaluation};
+use crate::route::page;
 use crate::{Core, CoreError, PAGES, SEMESTERS, TIMETABLE, traced, traced_sync};
 
 const GRADES: &str = "grades.json";
@@ -311,7 +312,7 @@ impl Core {
                 SemesterId::parse(&semester_id)?,
                 CourseId::parse(&course_id)?,
             );
-            let data = signed_in!(self, |client| client.grade_view_details(&semester, &course))?;
+            let data = page!(self, "grade_details", Some(&semester_id), ["course_id" => &course_id], |client| client.grade_view_details(&semester, &course))?;
             if let Some(parent) = self.dir.join(&path).parent() {
                 let _ = fs::create_dir_all(parent);
             }
@@ -342,7 +343,8 @@ impl Core {
     /// Fetches the grade history and caches it.
     pub async fn fetch_grade_history(&self, flow: String) -> Result<GradeHistory, CoreError> {
         traced("fetch_grade_history", &flow, async {
-            let data = signed_in!(self, |client| client.grade_history())?;
+            let data = page!(self, "grade_history", None, [], |client| client
+                .grade_history())?;
             let _ = fs::create_dir_all(self.dir.join(PAGES));
             self.write(&format!("{PAGES}/{HISTORY}"), &data);
             Ok(logged_history(GradeHistory::from(data)))
@@ -511,7 +513,8 @@ impl Core {
     /// `semester` (one VTOP lists) fetched and cached.
     async fn fetch_grade_view(&self, semester: &str) -> Result<Grades, CoreError> {
         let id = SemesterId::parse(semester)?;
-        let data = signed_in!(self, |client| client.grade_view(&id))?;
+        let data = page!(self, "grades", Some(semester), [], |client| client
+            .grade_view(&id))?;
         let path = format!("{PAGES}/{semester}/{GRADES}");
         if let Some(parent) = self.dir.join(&path).parent() {
             let _ = fs::create_dir_all(parent);

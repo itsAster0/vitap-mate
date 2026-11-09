@@ -78,7 +78,7 @@ impl Core {
     pub async fn fetch_exams(&self, flow: String) -> Result<Exams, CoreError> {
         traced("fetch_exams", &flow, async {
             let data = self
-                .fetch(EXAMS, |client, semester| {
+                .fetch(EXAMS, "exam_schedule", &[], |client, semester| {
                     Box::pin(client.exam_schedule(semester))
                 })
                 .await?;

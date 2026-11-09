@@ -532,6 +532,7 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
         },
         logins: 0,
         otp: None,
+        server_otp: false,
     };
     let core = Core {
         dir: dir.clone(),

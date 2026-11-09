@@ -1,8 +1,10 @@
 //! Mail forwarding (the Flutter app's `mail_forwarding_service.dart`): Gmail forwards VTOP's OTP
-//! mail to `vtop-otp-<id>@<domain>`; the edge Worker reads it, seals the code to this install's
-//! X25519 public key (`vtop_shared::mail_seal`) and keeps the latest box for 5 minutes, which the
-//! app pulls from `/v1/mail-otp/inbox`. The private key and the mailbox secret stay in
-//! `forwarding.json` in the data dir and are never logged; neither are codes or mail contents.
+//! mail to `otp+<id>@<domain>`; the edge Worker reads it, seals the code to this install's
+//! X25519 seal key (`device.json`, see [`crate::device`]; `vtop_shared::mail_seal`, the mailbox
+//! id as associated data) and keeps the latest box for 5 minutes, which the app pulls from
+//! `/v1/mail-otp/inbox`. Every call is signed as this install ([`Core::edge_post`]); the edge
+//! knows the mailbox's members by device id, so `forwarding.json` holds no secret. Codes and
+//! mail contents are never logged.
 //!
 //! Only two kinds of mail are relayed: VTOP's OTP and Gmail's forwarding confirmation (sent once,
 //! when the student adds the address in Gmail). That confirmation reaching the phone proves the
@@ -10,28 +12,23 @@
 
 use std::fs;
 use std::sync::{Mutex, PoisonError};
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tracing::{debug, info, warn};
-use vtop_core::client::Hop;
 use vtop_core::{VtopClient, VtopError};
 use vtop_shared::mail_seal;
 
-use crate::{Core, CoreError, traced, traced_sync, transport};
+use crate::{Core, CoreError, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
 /// Optional one-line server URL (e.g. `http://127.0.0.1:8787` for `wrangler dev` behind
 /// `adb reverse`), read when an address is set up; the address keeps the server it was made on.
 pub(crate) const SERVER_FILE: &str = "forwarding_server";
-/// The Flutter app's `defaultServerUrl`.
-const DEFAULT_SERVER: &str = "https://vmate-api.aster0.dev";
+/// The edge (`rust/vtop-edge`).
+const DEFAULT_SERVER: &str = "https://vmate.aster0.dev";
 /// VTOP's OTP sender: the Gmail filter's From.
 pub const VTOP_SENDER: &str = "noreply.sdc@vitap.ac.in";
-/// The name this install shows in the address's device list.
-const LABEL: &str = "vitapmate (Compose)";
-const TIMEOUT: Duration = Duration::from_secs(10);
 /// VTOP's clock and the mail's `Date:` may differ a little.
 const CLOCK_SKEW_SECS: i64 = 60;
 
@@ -73,17 +70,15 @@ pub struct Forwarding {
     pub last_otp_at: Option<i64>,
 }
 
-/// This phone's address. No `Debug`: it holds the private key and secrets.
+/// This phone's address. A file from before signed requests (it held a mailbox secret and its
+/// own key) does not parse, so it reads as no address.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Saved {
+    /// The edge the address lives on.
     server: String,
     id: String,
     address: String,
-    /// Proves to the edge that this install is a member of the mailbox.
-    secret: String,
-    private_key: String,
-    device_id: String,
-    device_secret: String,
     #[serde(default)]
     owner_claimed: bool,
     /// Mail arrived, or the address was joined (Gmail already forwards to it).
@@ -144,79 +139,15 @@ impl Payload {
     }
 }
 
-/// Opens a box sealed to `saved`'s key; the reason it couldn't is logged, never the content.
-fn open(saved: &Saved, sealed: &str) -> Option<Payload> {
-    let plaintext = mail_seal::open(&saved.private_key, &saved.id, sealed)
+/// Opens a box sealed to this install's seal key for mailbox `id`; the reason it couldn't is
+/// logged, never the content.
+fn open(seal_secret: &str, id: &str, sealed: &str) -> Option<Payload> {
+    let plaintext = mail_seal::open(seal_secret, id, sealed)
         .inspect_err(|error| warn!(?error, "forwarded box not opened"))
         .ok()?;
     serde_json::from_slice(&plaintext)
         .inspect_err(|_| warn!("forwarded box holds an unknown payload"))
         .ok()
-}
-
-#[derive(Debug)]
-enum EdgeError {
-    Offline,
-    Status { code: String, message: String },
-}
-
-impl EdgeError {
-    fn code(&self) -> &str {
-        match self {
-            Self::Offline => "offline",
-            Self::Status { code, .. } => code,
-        }
-    }
-}
-
-impl From<EdgeError> for CoreError {
-    fn from(error: EdgeError) -> Self {
-        match error {
-            EdgeError::Offline => Self::Offline,
-            EdgeError::Status { message, .. } => Self::Other { reason: message },
-        }
-    }
-}
-
-/// POSTs JSON to the edge through the app's transport, with the flow as `x-request-id`; errors
-/// carry the edge's `code`.
-async fn post(server: &str, path: &str, flow: &str, body: &Value) -> Result<Value, EdgeError> {
-    let offline = |error: &dyn std::fmt::Display| {
-        warn!(path, error = %error, "edge unreachable");
-        EdgeError::Offline
-    };
-    let transport = transport::current().map_err(|error| offline(&error))?;
-    let hop = Hop {
-        method: "POST".into(),
-        url: format!("{}{path}", server.trim_end_matches('/')),
-        headers: vec![
-            ("content-type".into(), "application/json".into()),
-            ("x-request-id".into(), flow.into()),
-        ],
-        body: serde_json::to_vec(body).unwrap_or_default(),
-        timeout: TIMEOUT,
-        connect_timeout: TIMEOUT,
-        download_to: None,
-    };
-    let response = transport.send(hop).await.map_err(|error| offline(&error))?;
-    let status = response.status;
-    // 204 has no body.
-    let body: Value = response
-        .bytes()
-        .await
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or(Value::Null);
-    if (200..300).contains(&status) {
-        return Ok(body);
-    }
-    let text = |key: &str| body[key].as_str().map(str::to_string);
-    let error = EdgeError::Status {
-        code: text("code").unwrap_or_else(|| format!("http_{status}")),
-        message: text("error").unwrap_or_else(|| format!("The server answered HTTP {status}.")),
-    };
-    info!(path, status, code = error.code(), "edge refused");
-    Err(error)
 }
 
 fn string(body: &Value, key: &str) -> Result<String, CoreError> {
@@ -228,7 +159,7 @@ fn string(body: &Value, key: &str) -> Result<String, CoreError> {
         })
 }
 
-/// The edge no longer knows this address (deleted, or the secret is no longer a member's).
+/// The edge no longer knows this address (deleted, or this install is no longer on it).
 const GONE: &str = "mailbox_not_found";
 
 /// Mail forwarding calls; each takes the caller's flow id first.
@@ -256,26 +187,13 @@ impl Core {
                 Err(CoreError::NotSignedIn) => None,
                 Err(error) => return Err(error),
             };
-            let device = post(
-                &server,
-                "/v1/devices/register",
-                &flow,
-                // No FCM in this build: an install without a push token, which pulls the inbox.
-                &json!({}),
-            )
-            .await?;
-            let (device_id, device_secret) = (string(&device, "id")?, string(&device, "secret")?);
-            let (private_key, public_key) = mail_seal::generate_keypair();
-            let mut join = json!({
-                "publicKey": public_key,
-                "deviceId": device_id,
-                "deviceSecret": device_secret,
-                "label": LABEL,
-            });
             let mut joined = None;
             if let Some(cookies) = &cookies {
-                join["session"] = json!({ "cookies": cookies });
-                match post(&server, "/v1/mail-otp/reclaim", &flow, &join).await {
+                let reclaim = json!({ "session": { "cookies": cookies } });
+                match self
+                    .edge_post(&server, "/v1/mail-otp/reclaim", &flow, &reclaim)
+                    .await
+                {
                     Ok(body) => joined = Some(body),
                     Err(error) if error.code() == GONE => info!("no address yet: making one"),
                     Err(error) => return Err(error.into()),
@@ -284,16 +202,15 @@ impl Core {
             let reclaimed = joined.is_some();
             let body = match joined {
                 Some(body) => body,
-                None => post(&server, "/v1/mail-otp/register", &flow, &join).await?,
+                None => {
+                    self.edge_post(&server, "/v1/mail-otp/register", &flow, &json!({}))
+                        .await?
+                }
             };
             let mut saved = Saved {
                 server: server.clone(),
                 id: string(&body, "id")?,
                 address: string(&body, "address")?,
-                secret: string(&body, "secret")?,
-                private_key,
-                device_id,
-                device_secret,
                 owner_claimed: reclaimed,
                 ready: reclaimed,
                 last_mail_at: None,
@@ -304,12 +221,11 @@ impl Core {
             info!(reclaimed, "forwarding address set up");
             // Best effort: lets the student's next phone join it, and the server sign in with it.
             if let (false, Some(cookies)) = (reclaimed, cookies) {
-                let owner = json!({
-                    "id": saved.id,
-                    "secret": saved.secret,
-                    "session": { "cookies": cookies },
-                });
-                match post(&server, "/v1/mail-otp/owner", &flow, &owner).await {
+                let owner = json!({ "id": saved.id, "session": { "cookies": cookies } });
+                match self
+                    .edge_post(&server, "/v1/mail-otp/owner", &flow, &owner)
+                    .await
+                {
                     Ok(_) => {
                         saved.owner_claimed = true;
                         self.write(FILE, &saved);
@@ -351,24 +267,45 @@ impl Core {
     /// Takes this phone off its address and forgets it. The edge deletes the address when no
     /// other phone uses it; mail forwarded to it is rejected from then on.
     pub async fn turn_off_forwarding(&self, flow: String) -> Result<(), CoreError> {
-        traced("turn_off_forwarding", &flow, async {
-            let Some(saved) = self.read::<Saved>(FILE) else {
-                return Ok(());
-            };
-            let body = json!({ "id": saved.id, "secret": saved.secret });
-            match post(&saved.server, "/v1/mail-otp/delete", &flow, &body).await {
-                Ok(_) => info!("left the address"),
-                Err(error) if error.code() == GONE => info!("address already gone"),
-                Err(error) => return Err(error.into()),
-            }
-            self.forget_forwarding(&saved.id);
-            Ok(())
-        })
+        traced(
+            "turn_off_forwarding",
+            &flow,
+            self.leave_forwarding(&flow, false),
+        )
         .await
     }
 }
 
 impl Core {
+    /// This phone's address as `(server, mailbox id, address)`, if it has one.
+    pub(crate) fn saved_mailbox(&self) -> Option<(String, String, String)> {
+        self.read::<Saved>(FILE)
+            .map(|saved| (saved.server, saved.id, saved.address))
+    }
+
+    /// Takes this phone off its address (deleting it for every phone with `everywhere`) and
+    /// forgets it here.
+    pub(crate) async fn leave_forwarding(
+        &self,
+        flow: &str,
+        everywhere: bool,
+    ) -> Result<(), CoreError> {
+        let Some(saved) = self.read::<Saved>(FILE) else {
+            return Ok(());
+        };
+        let body = json!({ "id": saved.id, "everywhere": everywhere });
+        match self
+            .edge_post(&saved.server, "/v1/mail-otp/delete", flow, &body)
+            .await
+        {
+            Ok(_) => info!(everywhere, "left the address"),
+            Err(error) if error.code() == GONE => info!("address already gone"),
+            Err(error) => return Err(error.into()),
+        }
+        self.forget_forwarding(&saved.id);
+        Ok(())
+    }
+
     fn forwarding_view(&self) -> Forwarding {
         view(self.read::<Saved>(FILE).as_ref())
     }
@@ -383,7 +320,7 @@ impl Core {
 
     /// The signed-in VTOP session's cookies, after VTOP confirmed it (signing in again when it
     /// had expired), so the edge can tell whose session it is.
-    async fn session_cookies(&self) -> Result<Option<String>, CoreError> {
+    pub(crate) async fn session_cookies(&self) -> Result<Option<String>, CoreError> {
         let cookies = |client: &VtopClient| client.export_persisted_session(0).cookies;
         signed_in!(self, |client| async {
             client.verify_session().await.map(|_| cookies(client))
@@ -398,8 +335,11 @@ impl Core {
                 reason: "Mail forwarding is off.".into(),
             });
         };
-        let body = json!({ "id": saved.id, "secret": saved.secret });
-        let inbox = match post(&saved.server, "/v1/mail-otp/inbox", flow, &body).await {
+        let body = json!({ "id": saved.id });
+        let inbox = match self
+            .edge_post(&saved.server, "/v1/mail-otp/inbox", flow, &body)
+            .await
+        {
             Ok(inbox) => inbox,
             Err(error) if error.code() == GONE => {
                 self.forget_forwarding(&saved.id);
@@ -413,7 +353,7 @@ impl Core {
             debug!("inbox empty");
             return Ok(None);
         };
-        let Some(payload) = open(&saved, sealed) else {
+        let Some(payload) = open(&self.device().seal_secret, &saved.id, sealed) else {
             return Ok(None);
         };
         info!(
@@ -456,7 +396,7 @@ impl Core {
         }
     }
 
-    fn forget_forwarding(&self, id: &str) {
+    pub(crate) fn forget_forwarding(&self, id: &str) {
         let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         if self.read::<Saved>(FILE).is_some_and(|saved| saved.id == id) {
             let _ = fs::remove_file(self.dir.join(FILE));
@@ -481,25 +421,71 @@ fn view(saved: Option<&Saved>) -> Forwarding {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
+    use std::collections::{HashMap, VecDeque};
     use std::sync::Arc;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
+    use vtop_shared::device_sig;
 
     use super::*;
 
+    /// One request the fake edge got.
+    pub(crate) struct Request {
+        pub(crate) path: String,
+        /// `x-request-id`.
+        pub(crate) flow: String,
+        pub(crate) body: Value,
+        /// Whether `x-vm-*` verified against the registered key (or, for registration, the key
+        /// it registers), with `x-vm-device` only off registration.
+        pub(crate) signed: bool,
+    }
+
     /// A stand-in edge: answers the routes the app calls, from `Edge`.
     #[derive(Default)]
-    struct Edge {
-        /// Each request: path, the `x-request-id`, the JSON body.
-        requests: Vec<(String, String, Value)>,
-        public_key: Option<String>,
+    pub(crate) struct Edge {
+        pub(crate) requests: Vec<Request>,
+        /// Answers for other routes (path with query), taken in order before the built-in ones.
+        pub(crate) canned: HashMap<String, VecDeque<(u16, Value)>>,
+        /// The registered `signKey` and `sealKey`.
+        sign_key: Option<String>,
+        seal_key: Option<String>,
         sealed: Option<String>,
         gone: bool,
     }
 
     const ID: &str = "k3f9x2ab7q";
+    pub(crate) const DEVICE_ID: &str = "0123456789abcdef0123456789abcdef";
+
+    fn header<'a>(head: &'a str, name: &str) -> Option<&'a str> {
+        head.lines().find_map(|line| {
+            let (key, value) = line.split_once(':')?;
+            key.eq_ignore_ascii_case(name).then(|| value.trim())
+        })
+    }
+
+    /// Checks the vm1 headers the way the edge does.
+    fn verify(edge: &Edge, path: &str, head: &str, body: &[u8], json: &Value) -> bool {
+        let register = path == "/v1/devices/register";
+        let key = if register {
+            json["signKey"].as_str()
+        } else {
+            edge.sign_key.as_deref()
+        };
+        let device_ok = match header(head, device_sig::DEVICE) {
+            None => register,
+            Some(id) => !register && id == DEVICE_ID,
+        };
+        let time = header(head, device_sig::TIME).and_then(|t| t.parse::<i64>().ok());
+        let fresh = time.is_some_and(|t| (t - now()).abs() <= 120);
+        match (key, header(head, device_sig::SIG), time) {
+            (Some(key), Some(sig), Some(time)) => {
+                device_ok && fresh && device_sig::verify(key, sig, "POST", path, time, body)
+            }
+            _ => false,
+        }
+    }
 
     fn answer(edge: &mut Edge, path: &str, body: &Value) -> (u16, Value) {
         let gone = (
@@ -507,17 +493,23 @@ mod tests {
             json!({ "code": GONE, "error": "No such forwarding address." }),
         );
         match path {
-            "/v1/devices/register" => (201, json!({ "id": "dev1", "secret": "ds_device" })),
+            _ if edge.canned.get(path).is_some_and(|c| !c.is_empty()) => {
+                edge.canned.get_mut(path).unwrap().pop_front().unwrap()
+            }
+            "/v1/devices/register" => {
+                edge.sign_key = body["signKey"].as_str().map(str::to_string);
+                edge.seal_key = body["sealKey"].as_str().map(str::to_string);
+                (201, json!({ "deviceId": DEVICE_ID }))
+            }
             "/v1/mail-otp/register" => {
-                edge.public_key = body["publicKey"].as_str().map(str::to_string);
-                let address = format!("vtop-otp-{ID}@aster0.dev");
-                (
-                    201,
-                    json!({ "id": ID, "address": address, "secret": "ms_mailbox" }),
-                )
+                let address = format!("otp+{ID}@vmate.aster0.dev");
+                (201, json!({ "id": ID, "address": address }))
             }
             _ if edge.gone => gone,
-            "/v1/mail-otp/inbox" => (200, json!({ "sealed": edge.sealed })),
+            "/v1/mail-otp/inbox" => match &edge.sealed {
+                Some(sealed) => (200, json!({ "sealed": sealed, "receivedAt": now() })),
+                None => (200, json!({ "sealed": null })),
+            },
             "/v1/mail-otp/delete" => (204, Value::Null),
             _ => (
                 404,
@@ -526,7 +518,7 @@ mod tests {
         }
     }
 
-    async fn serve(edge: Arc<Mutex<Edge>>) -> String {
+    pub(crate) async fn serve(edge: Arc<Mutex<Edge>>) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         tokio::spawn(async move {
@@ -537,32 +529,39 @@ mod tests {
                 let (head, body) = loop {
                     let n = socket.read(&mut buf).await.unwrap();
                     raw.extend_from_slice(&buf[..n]);
-                    let text = String::from_utf8_lossy(&raw).to_string();
-                    if let Some((head, body)) = text.split_once("\r\n\r\n") {
-                        let length = head
-                            .lines()
-                            .find_map(|line| {
-                                let (name, value) = line.split_once(':')?;
-                                name.eq_ignore_ascii_case("content-length")
-                                    .then(|| value.trim().parse::<usize>().ok())?
-                            })
-                            .unwrap_or(0);
-                        if body.len() >= length {
-                            break (head.to_string(), body.to_string());
-                        }
+                    let Some(end) = raw.windows(4).position(|w| w == b"\r\n\r\n") else {
+                        continue;
+                    };
+                    let head = String::from_utf8_lossy(&raw[..end]).to_string();
+                    let length = header(&head, "content-length")
+                        .and_then(|v| v.parse::<usize>().ok())
+                        .unwrap_or(0);
+                    if raw.len() >= end + 4 + length {
+                        break (head, raw[end + 4..end + 4 + length].to_vec());
                     }
                 };
                 let path = head.split(' ').nth(1).unwrap().to_string();
-                let flow = head
-                    .lines()
-                    .find_map(|line| line.strip_prefix("x-request-id: "))
+                let flow = header(&head, "x-request-id")
                     .unwrap_or_default()
                     .to_string();
-                let json: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+                let json: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
                 let (status, reply) = {
                     let mut edge = edge.lock().unwrap();
-                    let reply = answer(&mut edge, &path, &json);
-                    edge.requests.push((path, flow, json));
+                    let signed = verify(&edge, &path, &head, &body, &json);
+                    let reply = if signed {
+                        answer(&mut edge, &path, &json)
+                    } else {
+                        (
+                            401,
+                            json!({ "code": "bad_signature", "error": "Bad signature." }),
+                        )
+                    };
+                    edge.requests.push(Request {
+                        path,
+                        flow,
+                        body: json,
+                        signed,
+                    });
                     reply
                 };
                 let text = if reply.is_null() {
@@ -580,9 +579,10 @@ mod tests {
         url
     }
 
+    /// Seals `payload` the way the edge does: to the registered seal key, for mailbox [`ID`].
     fn seal(edge: &Arc<Mutex<Edge>>, payload: Value) {
         let mut edge = edge.lock().unwrap();
-        let key = edge.public_key.clone().unwrap();
+        let key = edge.seal_key.clone().unwrap();
         edge.sealed = Some(mail_seal::seal(&key, ID, payload.to_string().as_bytes()).unwrap());
     }
 
@@ -616,23 +616,23 @@ mod tests {
         assert_eq!(set_up.state, ForwardingState::Waiting);
         assert_eq!(
             set_up.address.as_deref(),
-            Some("vtop-otp-k3f9x2ab7q@aster0.dev")
+            Some("otp+k3f9x2ab7q@vmate.aster0.dev")
         );
         assert_eq!(set_up.sender, VTOP_SENDER);
         {
             let edge = edge.lock().unwrap();
-            let paths: Vec<&str> = edge.requests.iter().map(|r| r.0.as_str()).collect();
+            let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
             assert_eq!(paths, ["/v1/devices/register", "/v1/mail-otp/register"]);
-            assert_eq!(edge.requests[0].2, json!({}));
-            assert!(edge.requests.iter().all(|r| r.1 == "f-setup"));
-            let register = &edge.requests[1].2;
+            assert!(edge.requests.iter().all(|r| r.flow == "f-setup"));
+            let register = &edge.requests[0].body;
             assert_eq!(
-                (&register["deviceId"], &register["deviceSecret"]),
-                (&json!("dev1"), &json!("ds_device"))
+                (&register["label"], &register["platform"]),
+                (&json!(crate::server::label()), &json!("android"))
             );
             assert!(mail_seal::is_public_key(
-                register["publicKey"].as_str().unwrap()
+                register["sealKey"].as_str().unwrap()
             ));
+            assert_eq!(edge.requests[1].body, json!({}));
         }
         // Set up already: nothing is sent.
         core.set_up_forwarding("f".into()).await.unwrap();
@@ -641,6 +641,10 @@ mod tests {
         // Nothing forwarded yet.
         let checked = core.check_forwarding("f".into()).await.unwrap();
         assert_eq!(checked.state, ForwardingState::Waiting);
+        assert_eq!(
+            edge.lock().unwrap().requests.last().unwrap().body,
+            json!({ "id": ID })
+        );
 
         // Gmail's confirmation proves the address works.
         seal(
@@ -668,19 +672,19 @@ mod tests {
         assert_eq!(code, Ok(None));
         let status = core.forwarding_status("f".into());
         assert_eq!(status.last_otp_at, Some(sent));
-        // The key and secrets stay out of what the app sees.
+        // No key or secret in forwarding.json.
         let saved = fs::read_to_string(dir.join(FILE)).unwrap();
-        assert!(saved.contains("ms_mailbox") && saved.contains("private_key"));
+        assert!(!saved.contains("secret") && !saved.contains("seed"));
 
         core.turn_off_forwarding("f-off".into()).await.unwrap();
         {
             let edge = edge.lock().unwrap();
-            let (path, flow, body) = edge.requests.last().unwrap();
+            let last = edge.requests.last().unwrap();
             assert_eq!(
-                (path.as_str(), flow.as_str()),
+                (last.path.as_str(), last.flow.as_str()),
                 ("/v1/mail-otp/delete", "f-off")
             );
-            assert_eq!(body, &json!({ "id": ID, "secret": "ms_mailbox" }));
+            assert_eq!(last.body, json!({ "id": ID, "everywhere": false }));
         }
         assert_eq!(
             core.forwarding_status("f".into()).state,
@@ -693,6 +697,69 @@ mod tests {
         edge.lock().unwrap().gone = true;
         let checked = core.check_forwarding("f".into()).await;
         assert!(matches!(checked, Err(CoreError::Other { .. })));
+        assert_eq!(
+            core.forwarding_status("f".into()).state,
+            ForwardingState::Off
+        );
+
+        // Registered once; every request was signed as this install.
+        let edge = edge.lock().unwrap();
+        let registers = edge
+            .requests
+            .iter()
+            .filter(|r| r.path == "/v1/devices/register")
+            .count();
+        assert_eq!(registers, 1);
+        assert!(edge.requests.iter().all(|r| r.signed));
+    }
+
+    #[tokio::test]
+    async fn requests_carry_valid_signatures() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-sig-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let server = serve(edge.clone()).await;
+        let core = Core {
+            dir: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        let body = json!({ "id": ID });
+        core.edge_post(&server, "/v1/mail-otp/inbox", "f", &body)
+            .await
+            .unwrap();
+        let edge = edge.lock().unwrap();
+        assert_eq!(edge.requests.len(), 2);
+        assert!(edge.requests.iter().all(|r| r.signed));
+        // The key the edge saw is this install's: a signature by another seed does not verify.
+        let other = device_sig::generate_seed();
+        let sig = device_sig::sign(&other, "POST", "/v1/mail-otp/inbox", now(), b"{}").unwrap();
+        let key = edge.sign_key.as_deref().unwrap();
+        assert!(!device_sig::verify(
+            key,
+            &sig,
+            "POST",
+            "/v1/mail-otp/inbox",
+            now(),
+            b"{}"
+        ));
+    }
+
+    #[tokio::test]
+    async fn old_file_reads_as_no_address() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-old-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let old = json!({
+            "server": "https://vmate-api.aster0.dev", "id": ID, "address": "a@b",
+            "secret": "ms_x", "private_key": "pk", "device_id": "d", "device_secret": "ds",
+            "ready": true,
+        });
+        fs::write(dir.join(FILE), old.to_string()).unwrap();
+        let core = Core {
+            dir: dir.clone(),
+            slot: Mutex::new(None),
+        };
         assert_eq!(
             core.forwarding_status("f".into()).state,
             ForwardingState::Off
@@ -713,10 +780,6 @@ mod tests {
             server: "http://127.0.0.1:9".into(),
             id: ID.into(),
             address: "a@b".into(),
-            secret: "s".into(),
-            private_key: mail_seal::generate_keypair().0,
-            device_id: "d".into(),
-            device_secret: "ds".into(),
             owner_claimed: false,
             ready: false,
             last_mail_at: None,

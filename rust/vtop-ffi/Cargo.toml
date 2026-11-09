@@ -19,6 +19,8 @@ cli = ["uniffi/cli"]
 [dependencies]
 vtop-core = { path = "../vtop-core" }
 vtop-shared = { path = "../vtop-shared" }
+# The UDP route; its client runs on the app's sockets (`udp::UdpNetwork`), not tokio's.
+vtop-wire = { path = "../vtop-wire", default-features = false }
 # No tokio: async exports run on the futures Kotlin polls (see vtop_core::sync).
 uniffi = "0.32.2"
 # UniFFI's foreign async traits (HttpTransport) need it; already in the tree via vtop-mcp.

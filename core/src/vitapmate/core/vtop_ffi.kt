@@ -674,6 +674,21 @@ internal interface UniffiCallbackInterfaceSharedCookiesMethod3 : com.sun.jna.Cal
 internal interface UniffiCallbackInterfaceHttpTransportMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`request`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
 }
+internal interface UniffiCallbackInterfaceUdpNetworkMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: LongByReference,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceUdpNetworkMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`host`: RustBuffer.ByValue,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
+internal interface UniffiCallbackInterfaceUdpSocketMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`ip`: RustBuffer.ByValue,`port`: Short,`data`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteVoid,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
+internal interface UniffiCallbackInterfaceUdpSocketMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
+internal interface UniffiCallbackInterfaceUdpSocketMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
 @Structure.FieldOrder("uniffiFree", "uniffiClone", "cookie", "setCookies", "clear", "flush")
 internal open class UniffiVTableCallbackInterfaceSharedCookies(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
@@ -721,6 +736,53 @@ internal open class UniffiVTableCallbackInterfaceHttpTransport(
     }
 
 }
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "open", "resolve")
+internal open class UniffiVTableCallbackInterfaceUdpNetwork(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `open`: UniffiCallbackInterfaceUdpNetworkMethod0? = null,
+    @JvmField internal var `resolve`: UniffiCallbackInterfaceUdpNetworkMethod1? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `open`: UniffiCallbackInterfaceUdpNetworkMethod0? = null,
+        `resolve`: UniffiCallbackInterfaceUdpNetworkMethod1? = null,
+    ): UniffiVTableCallbackInterfaceUdpNetwork(`uniffiFree`,`uniffiClone`,`open`,`resolve`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceUdpNetwork) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `open` = other.`open`
+        `resolve` = other.`resolve`
+    }
+
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "send", "receive", "shutdown")
+internal open class UniffiVTableCallbackInterfaceUdpSocket(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `send`: UniffiCallbackInterfaceUdpSocketMethod0? = null,
+    @JvmField internal var `receive`: UniffiCallbackInterfaceUdpSocketMethod1? = null,
+    @JvmField internal var `shutdown`: UniffiCallbackInterfaceUdpSocketMethod2? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `send`: UniffiCallbackInterfaceUdpSocketMethod0? = null,
+        `receive`: UniffiCallbackInterfaceUdpSocketMethod1? = null,
+        `shutdown`: UniffiCallbackInterfaceUdpSocketMethod2? = null,
+    ): UniffiVTableCallbackInterfaceUdpSocket(`uniffiFree`,`uniffiClone`,`send`,`receive`,`shutdown`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceUdpSocket) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `send` = other.`send`
+        `receive` = other.`receive`
+        `shutdown` = other.`shutdown`
+    }
+
+}
 
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
@@ -754,6 +816,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_semester_summary(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_func_pair_code(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_log_event(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_obs_init(
@@ -766,9 +830,13 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_general_return_last_day(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_func_set_device_label(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_set_http_transport(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_func_set_udp_network(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_attendance_outlook(
     ): Int
@@ -868,6 +936,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_dev_simulate_changes(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_push_token(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_exams(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_exams(
@@ -896,6 +966,16 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_planner_courses(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_answer_session_request(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_connected_apps(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_create_key(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_marks(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_marks(
@@ -920,6 +1000,30 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_profile(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_route_status(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_route(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_clear_server_session(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_clear_server_sign_ins(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_delete_forwarding_everywhere(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_delete_server_account(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_delete_server_device(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_forget_server_password(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_remove_phone(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_server_status(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_set_server_options(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_web_session(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_sharedcookies_cookie(
@@ -931,6 +1035,16 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_sharedcookies_flush(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_httptransport_send(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_udpnetwork_open(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_udpnetwork_resolve(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_udpsocket_send(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_udpsocket_receive(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_udpsocket_shutdown(
     ): Int
     external fun uniffi_vtop_ffi_checksum_constructor_core_new(
     ): Int
@@ -952,6 +1066,8 @@ internal object UniffiLib {
         Native.register(UniffiLib::class.java, findLibraryName(componentName = "vtop_ffi"))
         uniffiCallbackInterfaceHttpTransport.register(this)
         uniffiCallbackInterfaceSharedCookies.register(this)
+        uniffiCallbackInterfaceUdpNetwork.register(this)
+        uniffiCallbackInterfaceUdpSocket.register(this)
         
     }
 
@@ -1060,6 +1176,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_dev_simulate_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_vtop_ffi_fn_method_core_set_push_token(`ptr`: Long,`flow`: RustBuffer.ByValue,`token`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1088,6 +1206,16 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_planner_courses(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_answer_session_request(`ptr`: Long,`flow`: RustBuffer.ByValue,`requestId`: RustBuffer.ByValue,`callbackUrl`: RustBuffer.ByValue,`error`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_revoke_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_key_outings(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`outings`: Byte,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_marks(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_marks(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1111,6 +1239,30 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_cached_profile(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_profile(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_route_status(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_set_route(`ptr`: Long,`flow`: RustBuffer.ByValue,`route`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_clear_server_session(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_clear_server_sign_ins(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_delete_forwarding_everywhere(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_delete_server_account(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_delete_server_device(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_forget_server_password(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_remove_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_server_status(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_set_server_options(`ptr`: Long,`flow`: RustBuffer.ByValue,`options`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_web_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`force`: Byte,
     ): Long
@@ -1136,6 +1288,28 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_httptransport_send(`ptr`: Long,`request`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_clone_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_udpnetwork(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_udpnetwork(`vtable`: UniffiVTableCallbackInterfaceUdpNetwork,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_udpnetwork_open(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_udpnetwork_resolve(`ptr`: Long,`host`: RustBuffer.ByValue,`timeoutMs`: Int,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_clone_udpsocket(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_udpsocket(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_udpsocket(`vtable`: UniffiVTableCallbackInterfaceUdpSocket,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_udpsocket_send(`ptr`: Long,`ip`: RustBuffer.ByValue,`port`: Short,`data`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_udpsocket_receive(`ptr`: Long,`timeoutMs`: Int,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_udpsocket_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_func_set_shared_cookies(`cookies`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_dev_configure(`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1143,6 +1317,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_func_plan_gpa(`courses`: RustBuffer.ByValue,`cgpa`: RustBuffer.ByValue,`completedCredits`: RustBuffer.ByValue,`target`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_semester_summary(`courses`: RustBuffer.ByValue,`history`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_pair_code(`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_log_event(`level`: RustBuffer.ByValue,`src`: RustBuffer.ByValue,`flow`: RustBuffer.ByValue,`msg`: RustBuffer.ByValue,`fields`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1156,10 +1332,14 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_func_general_return_last_day(`day`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_vtop_ffi_fn_func_set_device_label(`label`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_func_set_http_transport(`transport`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_vtop_intermediate_ca(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_func_set_udp_network(`network`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun ffi_vtop_ffi_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_vtop_ffi_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1291,6 +1471,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_semester_summary() and 0xFFFF) != 39778) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_func_pair_code() and 0xFFFF) != 61274) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_func_log_event() and 0xFFFF) != 39318) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1309,10 +1492,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_general_return_last_day() and 0xFFFF) != 34529) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_device_label() and 0xFFFF) != 17918) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_func_set_http_transport() and 0xFFFF) != 30478) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_vtop_intermediate_ca() and 0xFFFF) != 39519) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_udp_network() and 0xFFFF) != 36254) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_attendance_outlook() and 0xFFFF) != 27067) {
@@ -1462,6 +1651,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_dev_simulate_changes() and 0xFFFF) != 13736) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_push_token() and 0xFFFF) != 39948) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_exams() and 0xFFFF) != 29991) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1504,6 +1696,21 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_planner_courses() and 0xFFFF) != 6197) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 33475) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 26142) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 2814) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_revoke_key() and 0xFFFF) != 35772) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_key_outings() and 0xFFFF) != 32559) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_marks() and 0xFFFF) != 11752) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1540,6 +1747,42 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_profile() and 0xFFFF) != 12020) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_route_status() and 0xFFFF) != 65047) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_route() and 0xFFFF) != 35705) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_session() and 0xFFFF) != 4581) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_server_sign_ins() and 0xFFFF) != 28357) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_forwarding_everywhere() and 0xFFFF) != 10845) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_account() and 0xFFFF) != 391) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_delete_server_device() and 0xFFFF) != 32346) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_forget_server_password() and 0xFFFF) != 4153) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone() and 0xFFFF) != 28579) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 63686) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_set_server_options() and 0xFFFF) != 10688) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_web_session() and 0xFFFF) != 60390) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1556,6 +1799,21 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_httptransport_send() and 0xFFFF) != 72) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_open() and 0xFFFF) != 34948) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpnetwork_resolve() and 0xFFFF) != 50492) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_send() and 0xFFFF) != 42276) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_receive() and 0xFFFF) != 38987) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 52948) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 43601) {
@@ -2489,6 +2747,11 @@ public interface CoreInterface {
     fun `devSimulateChanges`(`flow`: kotlin.String): kotlin.UInt
     
     /**
+     * Saves the FCM token and sends it to every server this install is registered with.
+     */
+    suspend fun `setPushToken`(`flow`: kotlin.String, `token`: kotlin.String)
+    
+    /**
      * The selected semester's cached exam schedule.
      */
     fun `cachedExams`(`flow`: kotlin.String): Exams?
@@ -2572,6 +2835,28 @@ public interface CoreInterface {
     fun `plannerCourses`(`flow`: kotlin.String): List<PlanCourse>
     
     /**
+     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
+     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned.
+     */
+    suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?)
+    
+    /**
+     * The account's access keys and whether this phone is linked to it.
+     */
+    suspend fun `connectedApps`(`flow`: kotlin.String): ConnectedApps
+    
+    /**
+     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
+     * else for an MCP client. Links this phone first when it is not yet.
+     */
+    suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
+    
+    suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean)
+    
+    /**
      * The selected semester's cached marks.
      */
     fun `cachedMarks`(`flow`: kotlin.String): Marks?
@@ -2631,6 +2916,68 @@ public interface CoreInterface {
      * fails), and caches both.
      */
     suspend fun `fetchProfile`(`flow`: kotlin.String): Profile
+    
+    fun `routeStatus`(`flow`: kotlin.String): RouteStatus
+    
+    /**
+     * Saves the choice; earlier failures are forgotten so it is tried straight away.
+     */
+    fun `setRoute`(`flow`: kotlin.String, `route`: Route)
+    
+    /**
+     * Drops the sealed VTOP session the server keeps for the extension and MCP.
+     */
+    suspend fun `clearServerSession`(`flow`: kotlin.String)
+    
+    /**
+     * Drops the sign-in history; false when the server doesn't offer it yet.
+     */
+    suspend fun `clearServerSignIns`(`flow`: kotlin.String): kotlin.Boolean
+    
+    /**
+     * Deletes this phone's forwarding address for every phone on it.
+     */
+    suspend fun `deleteForwardingEverywhere`(`flow`: kotlin.String)
+    
+    /**
+     * Deletes the account on the server: phones, keys, saved session and password, options and
+     * sign-ins. Not the forwarding address, nor this phone's registration.
+     */
+    suspend fun `deleteServerAccount`(`flow`: kotlin.String)
+    
+    /**
+     * Deletes this install on the server (keys, push token, events), unlinks it from the account
+     * and takes it off its forwarding address there, then forgets its id, so the next call
+     * registers afresh. False when the server doesn't offer it yet.
+     */
+    suspend fun `deleteServerDevice`(`flow`: kotlin.String): kotlin.Boolean
+    
+    /**
+     * Drops the sealed password; the server can then no longer sign in by itself.
+     */
+    suspend fun `forgetServerPassword`(`flow`: kotlin.String)
+    
+    /**
+     * Takes another phone (a [`MailPhone::id`]) off this phone's forwarding address.
+     */
+    suspend fun `removeForwardingPhone`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    /**
+     * Removes a linked phone (an id from [`ServerStatus::phones`]).
+     */
+    suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    /**
+     * Everything the server keeps for this student and this phone: the account and its options,
+     * phones, keys, saved session and password, sign-ins, the forwarding address and this
+     * install's registration.
+     */
+    suspend fun `serverStatus`(`flow`: kotlin.String): ServerStatus
+    
+    /**
+     * Sets how the server serves sessions (see [`ServerOptions`]).
+     */
+    suspend fun `setServerOptions`(`flow`: kotlin.String, `options`: ServerOptions)
     
     /**
      * The signed-in session for the web view, after VTOP confirmed it (signing in again with
@@ -3795,6 +4142,33 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Saves the FCM token and sends it to every server this install is registered with.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setPushToken`(`flow`: kotlin.String, `token`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_push_token(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`token`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * The selected semester's cached exam schedule.
      */override fun `cachedExams`(`flow`: kotlin.String): Exams? {
             return FfiConverterOptionalTypeExams.lift(
@@ -4118,6 +4492,139 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
+     * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_answer_session_request(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`requestId`),
+        FfiConverterString.lower(`callbackUrl`),
+        FfiConverterOptionalString.lower(`error`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The account's access keys and whether this phone is linked to it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `connectedApps`(`flow`: kotlin.String) : ConnectedApps {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_connected_apps(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeConnectedApps.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Makes a key: for the extension that shows `pair_code` (it collects the key from the edge),
+     * else for an MCP client. Links this phone first when it is not yet.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?) : NewKey {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_create_key(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterBoolean.lower(`outings`),
+        FfiConverterOptionalString.lower(`pairCode`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeNewKey.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_revoke_key(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_key_outings(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+        FfiConverterBoolean.lower(`outings`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
      * The selected semester's cached marks.
      */override fun `cachedMarks`(`flow`: kotlin.String): Marks? {
             return FfiConverterOptionalTypeMarks.lift(
@@ -4386,6 +4893,303 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeProfile.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    override fun `routeStatus`(`flow`: kotlin.String): RouteStatus {
+            return FfiConverterTypeRouteStatus.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_route_status(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Saves the choice; earlier failures are forgotten so it is tried straight away.
+     */
+    @Throws(CoreException::class)override fun `setRoute`(`flow`: kotlin.String, `route`: Route)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_set_route(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeRoute.lower(`route`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Drops the sealed VTOP session the server keeps for the extension and MCP.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `clearServerSession`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_clear_server_session(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Drops the sign-in history; false when the server doesn't offer it yet.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `clearServerSignIns`(`flow`: kotlin.String) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_clear_server_sign_ins(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Deletes this phone's forwarding address for every phone on it.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `deleteForwardingEverywhere`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_delete_forwarding_everywhere(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Deletes the account on the server: phones, keys, saved session and password, options and
+     * sign-ins. Not the forwarding address, nor this phone's registration.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `deleteServerAccount`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_delete_server_account(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Deletes this install on the server (keys, push token, events), unlinks it from the account
+     * and takes it off its forwarding address there, then forgets its id, so the next call
+     * registers afresh. False when the server doesn't offer it yet.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `deleteServerDevice`(`flow`: kotlin.String) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_delete_server_device(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Drops the sealed password; the server can then no longer sign in by itself.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `forgetServerPassword`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_forget_server_password(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Takes another phone (a [`MailPhone::id`]) off this phone's forwarding address.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `removeForwardingPhone`(`flow`: kotlin.String, `id`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Removes a linked phone (an id from [`ServerStatus::phones`]).
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_remove_phone(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Everything the server keeps for this student and this phone: the account and its options,
+     * phones, keys, saved session and password, sign-ins, the forwarding address and this
+     * install's registration.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `serverStatus`(`flow`: kotlin.String) : ServerStatus {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_server_status(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeServerStatus.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Sets how the server serves sessions (see [`ServerOptions`]).
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `setServerOptions`(`flow`: kotlin.String, `options`: ServerOptions) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_set_server_options(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeServerOptions.lower(`options`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -5225,6 +6029,843 @@ public object FfiConverterTypeSharedCookies: FfiConverter<SharedCookies, Long> {
 }
 
 
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+/**
+ * The app's UDP: sockets on the network it uses, and DNS on that network.
+ */
+public interface UdpNetwork {
+    
+    /**
+     * A new socket on any local port (quick: binding sends nothing).
+     */
+    fun `open`(): UdpSocket
+    
+    /**
+     * `host`'s addresses (IPv4 first); empty when the lookup fails or takes over `timeout_ms`.
+     */
+    suspend fun `resolve`(`host`: kotlin.String, `timeoutMs`: kotlin.UInt): List<kotlin.String>
+    
+    companion object
+}
+
+/**
+ * The app's UDP: sockets on the network it uses, and DNS on that network.
+ */
+open class UdpNetworkImpl: Disposable, AutoCloseable, UdpNetwork
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_vtop_ffi_fn_free_udpnetwork(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_vtop_ffi_fn_clone_udpnetwork(handle, status)
+        }
+    }
+
+    
+    /**
+     * A new socket on any local port (quick: binding sends nothing).
+     */
+    @Throws(TransportException::class)override fun `open`(): UdpSocket {
+            return FfiConverterTypeUdpSocket.lift(
+    callWithHandle {
+    uniffiRustCallWithError(TransportException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_udpnetwork_open(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * `host`'s addresses (IPv4 first); empty when the lookup fails or takes over `timeout_ms`.
+     */
+    @Throws(TransportException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `resolve`(`host`: kotlin.String, `timeoutMs`: kotlin.UInt) : List<kotlin.String> {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_udpnetwork_resolve(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`host`),
+        FfiConverterUInt.lower(`timeoutMs`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterSequenceString.lift(it) },
+        // Error FFI converter
+        TransportException.ErrorHandler,
+    )
+    }
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceUdpNetwork {
+    internal object `open`: UniffiCallbackInterfaceUdpNetworkMethod0 {
+        override fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: LongByReference,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeUdpNetwork.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`open`(
+                )
+            }
+            val writeReturn = { value: UdpSocket -> uniffiOutReturn.setValue(FfiConverterTypeUdpSocket.lower(value)) }
+            uniffiTraitInterfaceCallWithError(
+                uniffiCallStatus,
+                makeCall,
+                writeReturn,
+                { e: TransportException -> FfiConverterTypeTransportError.lower(e) }
+            )
+        }
+    }
+    internal object `resolve`: UniffiCallbackInterfaceUdpNetworkMethod1 {
+        override fun callback(`uniffiHandle`: Long,`host`: RustBuffer.ByValue,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeUdpNetwork.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`resolve`(
+                    FfiConverterString.lift(`host`),
+                    FfiConverterUInt.lift(`timeoutMs`),
+                )
+            }
+            val uniffiHandleSuccess = { returnValue: List<kotlin.String> ->
+                val uniffiResult = UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                    FfiConverterSequenceString.lower(returnValue),
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                        RustBuffer.ByValue(),
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: TransportException -> FfiConverterTypeTransportError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeUdpNetwork.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeUdpNetwork.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceUdpNetwork.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `open`,
+        `resolve`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_vtop_ffi_fn_init_callback_vtable_udpnetwork(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUdpNetwork: FfiConverter<UdpNetwork, Long> {
+    internal val handleMap = UniffiHandleMap<UdpNetwork>()
+
+    override fun lower(value: UdpNetwork): Long {
+        if (value is UdpNetworkImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): UdpNetwork {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return UdpNetworkImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): UdpNetwork {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: UdpNetwork) = 8UL
+
+    override fun write(value: UdpNetwork, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
+public interface UdpSocket {
+    
+    suspend fun `send`(`ip`: kotlin.String, `port`: kotlin.UShort, `data`: kotlin.ByteArray)
+    
+    /**
+     * The next datagram, or None after `timeout_ms` (at least 1).
+     */
+    suspend fun `receive`(`timeoutMs`: kotlin.UInt): Datagram?
+    
+    /**
+     * Closes the socket (not `close`: UniFFI objects already have one).
+     */
+    fun `shutdown`()
+    
+    companion object
+}
+
+open class UdpSocketImpl: Disposable, AutoCloseable, UdpSocket
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_vtop_ffi_fn_free_udpsocket(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_vtop_ffi_fn_clone_udpsocket(handle, status)
+        }
+    }
+
+    
+    @Throws(TransportException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `send`(`ip`: kotlin.String, `port`: kotlin.UShort, `data`: kotlin.ByteArray) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_udpsocket_send(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`ip`),
+        FfiConverterUShort.lower(`port`),
+        FfiConverterByteArray.lower(`data`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        TransportException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * The next datagram, or None after `timeout_ms` (at least 1).
+     */
+    @Throws(TransportException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `receive`(`timeoutMs`: kotlin.UInt) : Datagram? {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_udpsocket_receive(
+                uniffiHandle,
+                
+        FfiConverterUInt.lower(`timeoutMs`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalTypeDatagram.lift(it) },
+        // Error FFI converter
+        TransportException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Closes the socket (not `close`: UniFFI objects already have one).
+     */override fun `shutdown`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_udpsocket_shutdown(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceUdpSocket {
+    internal object `send`: UniffiCallbackInterfaceUdpSocketMethod0 {
+        override fun callback(`uniffiHandle`: Long,`ip`: RustBuffer.ByValue,`port`: Short,`data`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteVoid,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeUdpSocket.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`send`(
+                    FfiConverterString.lift(`ip`),
+                    FfiConverterUShort.lift(`port`),
+                    FfiConverterByteArray.lift(`data`),
+                )
+            }
+            val uniffiHandleSuccess = { _: Unit ->
+                val uniffiResult = UniffiForeignFutureResultVoid.UniffiByValue(
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultVoid.UniffiByValue(
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: TransportException -> FfiConverterTypeTransportError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
+    internal object `receive`: UniffiCallbackInterfaceUdpSocketMethod1 {
+        override fun callback(`uniffiHandle`: Long,`timeoutMs`: Int,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeUdpSocket.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`receive`(
+                    FfiConverterUInt.lift(`timeoutMs`),
+                )
+            }
+            val uniffiHandleSuccess = { returnValue: Datagram? ->
+                val uniffiResult = UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                    FfiConverterOptionalTypeDatagram.lower(returnValue),
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                        RustBuffer.ByValue(),
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: TransportException -> FfiConverterTypeTransportError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
+    internal object `shutdown`: UniffiCallbackInterfaceUdpSocketMethod2 {
+        override fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeUdpSocket.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`shutdown`(
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeUdpSocket.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeUdpSocket.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceUdpSocket.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `send`,
+        `receive`,
+        `shutdown`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_vtop_ffi_fn_init_callback_vtable_udpsocket(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUdpSocket: FfiConverter<UdpSocket, Long> {
+    internal val handleMap = UniffiHandleMap<UdpSocket>()
+
+    override fun lower(value: UdpSocket): Long {
+        if (value is UdpSocketImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): UdpSocket {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return UdpSocketImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): UdpSocket {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: UdpSocket) = 8UL
+
+    override fun write(value: UdpSocket, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
 
 /**
  * The semester calendar, ready to draw.
@@ -5297,6 +6938,78 @@ public object FfiConverterTypeAcademicCalendar: FfiConverterRustBuffer<AcademicC
             FfiConverterSequenceTypeCalendarMonth.write(value.`months`, buf)
             FfiConverterInt.write(value.`daysLeft`, buf)
             FfiConverterOptionalTypeCalendarDay.write(value.`nextHoliday`, buf)
+    }
+}
+
+
+
+data class AccessKey (
+    /**
+     * The short id the edge revokes it by.
+     */
+    var `id`: kotlin.String
+    , 
+    var `label`: kotlin.String
+    , 
+    var `kind`: KeyKind
+    , 
+    /**
+     * Whether it may apply for and cancel outings.
+     */
+    var `outings`: kotlin.Boolean
+    , 
+    var `createdAt`: kotlin.Long
+    , 
+    var `lastUsedAt`: kotlin.Long?
+    , 
+    /**
+     * Newest first, at most 10.
+     */
+    var `uses`: List<KeyUse>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeAccessKey: FfiConverterRustBuffer<AccessKey> {
+    override fun read(buf: ByteBuffer): AccessKey {
+        return AccessKey(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterTypeKeyKind.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterSequenceTypeKeyUse.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: AccessKey) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterTypeKeyKind.allocationSize(value.`kind`) +
+            FfiConverterBoolean.allocationSize(value.`outings`) +
+            FfiConverterLong.allocationSize(value.`createdAt`) +
+            FfiConverterOptionalLong.allocationSize(value.`lastUsedAt`) +
+            FfiConverterSequenceTypeKeyUse.allocationSize(value.`uses`)
+    )
+
+    override fun write(value: AccessKey, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterTypeKeyKind.write(value.`kind`, buf)
+            FfiConverterBoolean.write(value.`outings`, buf)
+            FfiConverterLong.write(value.`createdAt`, buf)
+            FfiConverterOptionalLong.write(value.`lastUsedAt`, buf)
+            FfiConverterSequenceTypeKeyUse.write(value.`uses`, buf)
     }
 }
 
@@ -6392,6 +8105,47 @@ public object FfiConverterTypeClassSlot: FfiConverterRustBuffer<ClassSlot> {
 
 
 
+data class ConnectedApps (
+    /**
+     * This phone is one of the account's phones (it made a key, or linked before).
+     */
+    var `linked`: kotlin.Boolean
+    , 
+    var `keys`: List<AccessKey>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConnectedApps: FfiConverterRustBuffer<ConnectedApps> {
+    override fun read(buf: ByteBuffer): ConnectedApps {
+        return ConnectedApps(
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceTypeAccessKey.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ConnectedApps) = (
+            FfiConverterBoolean.allocationSize(value.`linked`) +
+            FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+    )
+
+    override fun write(value: ConnectedApps, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`linked`, buf)
+            FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
+    }
+}
+
+
+
 data class Contact (
     var `label`: kotlin.String
     , 
@@ -6862,6 +8616,52 @@ public object FfiConverterTypeCourseView: FfiConverterRustBuffer<CourseView> {
             FfiConverterSequenceTypeCourseSection.write(value.`sections`, buf)
             FfiConverterOptionalString.write(value.`selected`, buf)
             FfiConverterOptionalTypeCoursePlan.write(value.`plan`, buf)
+    }
+}
+
+
+
+/**
+ * One datagram received; `ip` without a scope.
+ */
+data class Datagram (
+    var `ip`: kotlin.String
+    , 
+    var `port`: kotlin.UShort
+    , 
+    var `data`: kotlin.ByteArray
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDatagram: FfiConverterRustBuffer<Datagram> {
+    override fun read(buf: ByteBuffer): Datagram {
+        return Datagram(
+            FfiConverterString.read(buf),
+            FfiConverterUShort.read(buf),
+            FfiConverterByteArray.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Datagram) = (
+            FfiConverterString.allocationSize(value.`ip`) +
+            FfiConverterUShort.allocationSize(value.`port`) +
+            FfiConverterByteArray.allocationSize(value.`data`)
+    )
+
+    override fun write(value: Datagram, buf: ByteBuffer) {
+            FfiConverterString.write(value.`ip`, buf)
+            FfiConverterUShort.write(value.`port`, buf)
+            FfiConverterByteArray.write(value.`data`, buf)
     }
 }
 
@@ -8752,6 +10552,47 @@ public object FfiConverterTypeHttpResponse: FfiConverterRustBuffer<HttpResponse>
 
 
 
+data class KeyUse (
+    /**
+     * Unix seconds.
+     */
+    var `at`: kotlin.Long
+    , 
+    var `via`: KeyKind
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeyUse: FfiConverterRustBuffer<KeyUse> {
+    override fun read(buf: ByteBuffer): KeyUse {
+        return KeyUse(
+            FfiConverterLong.read(buf),
+            FfiConverterTypeKeyKind.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: KeyUse) = (
+            FfiConverterLong.allocationSize(value.`at`) +
+            FfiConverterTypeKeyKind.allocationSize(value.`via`)
+    )
+
+    override fun write(value: KeyUse, buf: ByteBuffer) {
+            FfiConverterLong.write(value.`at`, buf)
+            FfiConverterTypeKeyKind.write(value.`via`, buf)
+    }
+}
+
+
+
 data class Lecture (
     var `serial`: kotlin.String
     , 
@@ -8806,6 +10647,121 @@ public object FfiConverterTypeLecture: FfiConverterRustBuffer<Lecture> {
             FfiConverterString.write(value.`weekday`, buf)
             FfiConverterString.write(value.`topic`, buf)
             FfiConverterSequenceTypeMaterial.write(value.`materials`, buf)
+    }
+}
+
+
+
+data class LinkedPhone (
+    /**
+     * The short id the edge removes it by.
+     */
+    var `id`: kotlin.String
+    , 
+    var `label`: kotlin.String?
+    , 
+    var `addedAt`: kotlin.Long
+    , 
+    var `seenAt`: kotlin.Long
+    , 
+    var `thisPhone`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLinkedPhone: FfiConverterRustBuffer<LinkedPhone> {
+    override fun read(buf: ByteBuffer): LinkedPhone {
+        return LinkedPhone(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LinkedPhone) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterOptionalString.allocationSize(value.`label`) +
+            FfiConverterLong.allocationSize(value.`addedAt`) +
+            FfiConverterLong.allocationSize(value.`seenAt`) +
+            FfiConverterBoolean.allocationSize(value.`thisPhone`)
+    )
+
+    override fun write(value: LinkedPhone, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterOptionalString.write(value.`label`, buf)
+            FfiConverterLong.write(value.`addedAt`, buf)
+            FfiConverterLong.write(value.`seenAt`, buf)
+            FfiConverterBoolean.write(value.`thisPhone`, buf)
+    }
+}
+
+
+
+/**
+ * A phone on this phone's forwarding address.
+ */
+data class MailPhone (
+    /**
+     * Its device id, which removes it.
+     */
+    var `id`: kotlin.String
+    , 
+    var `label`: kotlin.String?
+    , 
+    var `addedAt`: kotlin.Long
+    , 
+    var `seenAt`: kotlin.Long
+    , 
+    var `thisPhone`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMailPhone: FfiConverterRustBuffer<MailPhone> {
+    override fun read(buf: ByteBuffer): MailPhone {
+        return MailPhone(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MailPhone) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterOptionalString.allocationSize(value.`label`) +
+            FfiConverterLong.allocationSize(value.`addedAt`) +
+            FfiConverterLong.allocationSize(value.`seenAt`) +
+            FfiConverterBoolean.allocationSize(value.`thisPhone`)
+    )
+
+    override fun write(value: MailPhone, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterOptionalString.write(value.`label`, buf)
+            FfiConverterLong.write(value.`addedAt`, buf)
+            FfiConverterLong.write(value.`seenAt`, buf)
+            FfiConverterBoolean.write(value.`thisPhone`, buf)
     }
 }
 
@@ -9179,6 +11135,52 @@ public object FfiConverterTypeMentorMessage: FfiConverterRustBuffer<MentorMessag
     override fun write(value: MentorMessage, buf: ByteBuffer) {
             FfiConverterString.write(value.`body`, buf)
             FfiConverterSequenceString.write(value.`meta`, buf)
+    }
+}
+
+
+
+/**
+ * A key just made: [`NewKey::key`] is shown once.
+ */
+data class NewKey (
+    var `id`: kotlin.String
+    , 
+    var `key`: kotlin.String
+    , 
+    var `mcpUrl`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeNewKey: FfiConverterRustBuffer<NewKey> {
+    override fun read(buf: ByteBuffer): NewKey {
+        return NewKey(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: NewKey) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterString.allocationSize(value.`mcpUrl`)
+    )
+
+    override fun write(value: NewKey, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterString.write(value.`mcpUrl`, buf)
     }
 }
 
@@ -9924,6 +11926,57 @@ public object FfiConverterTypePunch: FfiConverterRustBuffer<Punch> {
 
 
 
+data class RouteStatus (
+    var `chosen`: Route
+    , 
+    /**
+     * The route VTOP's last answer came by, and when (unix seconds).
+     */
+    var `lastUsed`: Route?
+    , 
+    var `lastUsedAt`: kotlin.Long?
+    , 
+    var `skipped`: List<SkippedRoute>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRouteStatus: FfiConverterRustBuffer<RouteStatus> {
+    override fun read(buf: ByteBuffer): RouteStatus {
+        return RouteStatus(
+            FfiConverterTypeRoute.read(buf),
+            FfiConverterOptionalTypeRoute.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterSequenceTypeSkippedRoute.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RouteStatus) = (
+            FfiConverterTypeRoute.allocationSize(value.`chosen`) +
+            FfiConverterOptionalTypeRoute.allocationSize(value.`lastUsed`) +
+            FfiConverterOptionalLong.allocationSize(value.`lastUsedAt`) +
+            FfiConverterSequenceTypeSkippedRoute.allocationSize(value.`skipped`)
+    )
+
+    override fun write(value: RouteStatus, buf: ByteBuffer) {
+            FfiConverterTypeRoute.write(value.`chosen`, buf)
+            FfiConverterOptionalTypeRoute.write(value.`lastUsed`, buf)
+            FfiConverterOptionalLong.write(value.`lastUsedAt`, buf)
+            FfiConverterSequenceTypeSkippedRoute.write(value.`skipped`, buf)
+    }
+}
+
+
+
 /**
  * [`Core::saved_account`]'s answer.
  */
@@ -10316,6 +12369,401 @@ public object FfiConverterTypeSemesters: FfiConverterRustBuffer<Semesters> {
             FfiConverterSequenceTypeSemester.write(value.`items`, buf)
             FfiConverterOptionalString.write(value.`selected`, buf)
             FfiConverterLong.write(value.`updatedAt`, buf)
+    }
+}
+
+
+
+/**
+ * This install as the server knows it.
+ */
+data class ServerDevice (
+    /**
+     * The first 8 characters of its id; None while it isn't registered.
+     */
+    var `id`: kotlin.String?
+    , 
+    var `label`: kotlin.String
+    , 
+    var `pushToken`: kotlin.Boolean
+    , 
+    /**
+     * From the server; None when it doesn't say (before `/v1/devices/info`).
+     */
+    var `registeredAt`: kotlin.Long?
+    , 
+    var `events`: kotlin.UInt?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerDevice: FfiConverterRustBuffer<ServerDevice> {
+    override fun read(buf: ByteBuffer): ServerDevice {
+        return ServerDevice(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ServerDevice) = (
+            FfiConverterOptionalString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterBoolean.allocationSize(value.`pushToken`) +
+            FfiConverterOptionalLong.allocationSize(value.`registeredAt`) +
+            FfiConverterOptionalUInt.allocationSize(value.`events`)
+    )
+
+    override fun write(value: ServerDevice, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`id`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterBoolean.write(value.`pushToken`, buf)
+            FfiConverterOptionalLong.write(value.`registeredAt`, buf)
+            FfiConverterOptionalUInt.write(value.`events`, buf)
+    }
+}
+
+
+
+data class ServerMailbox (
+    var `address`: kotlin.String
+    , 
+    var `phones`: List<MailPhone>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerMailbox: FfiConverterRustBuffer<ServerMailbox> {
+    override fun read(buf: ByteBuffer): ServerMailbox {
+        return ServerMailbox(
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeMailPhone.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ServerMailbox) = (
+            FfiConverterString.allocationSize(value.`address`) +
+            FfiConverterSequenceTypeMailPhone.allocationSize(value.`phones`)
+    )
+
+    override fun write(value: ServerMailbox, buf: ByteBuffer) {
+            FfiConverterString.write(value.`address`, buf)
+            FfiConverterSequenceTypeMailPhone.write(value.`phones`, buf)
+    }
+}
+
+
+
+/**
+ * How the server serves sessions to connected apps (`/v1/account/settings`).
+ */
+data class ServerOptions (
+    /**
+     * Sign in with the saved password at once, without asking a phone first.
+     */
+    var `alwaysUseVault`: kotlin.Boolean
+    , 
+    /**
+     * Otherwise, how long a phone gets to answer first: 10, 20 or 45.
+     */
+    var `phoneWaitSecs`: kotlin.UInt
+    , 
+    /**
+     * How long the saved password is kept: 86400, 172800, or None (until VTOP rejects it).
+     */
+    var `vaultTtlSecs`: kotlin.Long?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerOptions: FfiConverterRustBuffer<ServerOptions> {
+    override fun read(buf: ByteBuffer): ServerOptions {
+        return ServerOptions(
+            FfiConverterBoolean.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterOptionalLong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ServerOptions) = (
+            FfiConverterBoolean.allocationSize(value.`alwaysUseVault`) +
+            FfiConverterUInt.allocationSize(value.`phoneWaitSecs`) +
+            FfiConverterOptionalLong.allocationSize(value.`vaultTtlSecs`)
+    )
+
+    override fun write(value: ServerOptions, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`alwaysUseVault`, buf)
+            FfiConverterUInt.write(value.`phoneWaitSecs`, buf)
+            FfiConverterOptionalLong.write(value.`vaultTtlSecs`, buf)
+    }
+}
+
+
+
+data class ServerSignIn (
+    /**
+     * Unix seconds.
+     */
+    var `at`: kotlin.Long
+    , 
+    /**
+     * The server signed in with the saved password, else a phone did.
+     */
+    var `byServer`: kotlin.Boolean
+    , 
+    var `ok`: kotlin.Boolean
+    , 
+    var `reason`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerSignIn: FfiConverterRustBuffer<ServerSignIn> {
+    override fun read(buf: ByteBuffer): ServerSignIn {
+        return ServerSignIn(
+            FfiConverterLong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ServerSignIn) = (
+            FfiConverterLong.allocationSize(value.`at`) +
+            FfiConverterBoolean.allocationSize(value.`byServer`) +
+            FfiConverterBoolean.allocationSize(value.`ok`) +
+            FfiConverterOptionalString.allocationSize(value.`reason`)
+    )
+
+    override fun write(value: ServerSignIn, buf: ByteBuffer) {
+            FfiConverterLong.write(value.`at`, buf)
+            FfiConverterBoolean.write(value.`byServer`, buf)
+            FfiConverterBoolean.write(value.`ok`, buf)
+            FfiConverterOptionalString.write(value.`reason`, buf)
+    }
+}
+
+
+
+data class ServerStatus (
+    /**
+     * This phone is one of the account's phones; the account's lists are empty when it is not.
+     */
+    var `linked`: kotlin.Boolean
+    , 
+    var `registrationNumber`: kotlin.String
+    , 
+    /**
+     * When the server made the account (None from servers that don't say, or no account yet).
+     */
+    var `createdAt`: kotlin.Long?
+    , 
+    /**
+     * The semester connected apps read.
+     */
+    var `semesterId`: kotlin.String?
+    , 
+    var `options`: ServerOptions
+    , 
+    /**
+     * The student has a forwarding address, on this phone or another.
+     */
+    var `forwarding`: kotlin.Boolean
+    , 
+    /**
+     * This phone's forwarding address and the phones on it.
+     */
+    var `mailbox`: ServerMailbox?
+    , 
+    var `device`: ServerDevice
+    , 
+    /**
+     * When the sealed VTOP session was saved, and by whom (`phone` or `server`).
+     */
+    var `sessionSavedAt`: kotlin.Long?
+    , 
+    var `sessionSource`: kotlin.String?
+    , 
+    /**
+     * When the sealed password was saved and when it expires (None: kept until forgotten).
+     */
+    var `vaultSavedAt`: kotlin.Long?
+    , 
+    var `vaultExpiresAt`: kotlin.Long?
+    , 
+    var `vaultGmail`: kotlin.Boolean
+    , 
+    var `credentialsRejectedAt`: kotlin.Long?
+    , 
+    /**
+     * Newest first, at most 10.
+     */
+    var `signIns`: List<ServerSignIn>
+    , 
+    var `phones`: List<LinkedPhone>
+    , 
+    var `keys`: List<AccessKey>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeServerStatus: FfiConverterRustBuffer<ServerStatus> {
+    override fun read(buf: ByteBuffer): ServerStatus {
+        return ServerStatus(
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterTypeServerOptions.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalTypeServerMailbox.read(buf),
+            FfiConverterTypeServerDevice.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterSequenceTypeServerSignIn.read(buf),
+            FfiConverterSequenceTypeLinkedPhone.read(buf),
+            FfiConverterSequenceTypeAccessKey.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ServerStatus) = (
+            FfiConverterBoolean.allocationSize(value.`linked`) +
+            FfiConverterString.allocationSize(value.`registrationNumber`) +
+            FfiConverterOptionalLong.allocationSize(value.`createdAt`) +
+            FfiConverterOptionalString.allocationSize(value.`semesterId`) +
+            FfiConverterTypeServerOptions.allocationSize(value.`options`) +
+            FfiConverterBoolean.allocationSize(value.`forwarding`) +
+            FfiConverterOptionalTypeServerMailbox.allocationSize(value.`mailbox`) +
+            FfiConverterTypeServerDevice.allocationSize(value.`device`) +
+            FfiConverterOptionalLong.allocationSize(value.`sessionSavedAt`) +
+            FfiConverterOptionalString.allocationSize(value.`sessionSource`) +
+            FfiConverterOptionalLong.allocationSize(value.`vaultSavedAt`) +
+            FfiConverterOptionalLong.allocationSize(value.`vaultExpiresAt`) +
+            FfiConverterBoolean.allocationSize(value.`vaultGmail`) +
+            FfiConverterOptionalLong.allocationSize(value.`credentialsRejectedAt`) +
+            FfiConverterSequenceTypeServerSignIn.allocationSize(value.`signIns`) +
+            FfiConverterSequenceTypeLinkedPhone.allocationSize(value.`phones`) +
+            FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+    )
+
+    override fun write(value: ServerStatus, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`linked`, buf)
+            FfiConverterString.write(value.`registrationNumber`, buf)
+            FfiConverterOptionalLong.write(value.`createdAt`, buf)
+            FfiConverterOptionalString.write(value.`semesterId`, buf)
+            FfiConverterTypeServerOptions.write(value.`options`, buf)
+            FfiConverterBoolean.write(value.`forwarding`, buf)
+            FfiConverterOptionalTypeServerMailbox.write(value.`mailbox`, buf)
+            FfiConverterTypeServerDevice.write(value.`device`, buf)
+            FfiConverterOptionalLong.write(value.`sessionSavedAt`, buf)
+            FfiConverterOptionalString.write(value.`sessionSource`, buf)
+            FfiConverterOptionalLong.write(value.`vaultSavedAt`, buf)
+            FfiConverterOptionalLong.write(value.`vaultExpiresAt`, buf)
+            FfiConverterBoolean.write(value.`vaultGmail`, buf)
+            FfiConverterOptionalLong.write(value.`credentialsRejectedAt`, buf)
+            FfiConverterSequenceTypeServerSignIn.write(value.`signIns`, buf)
+            FfiConverterSequenceTypeLinkedPhone.write(value.`phones`, buf)
+            FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
+    }
+}
+
+
+
+/**
+ * A route skipped after it failed.
+ */
+data class SkippedRoute (
+    var `route`: Route
+    , 
+    /**
+     * Unix seconds.
+     */
+    var `until`: kotlin.Long
+    , 
+    var `reason`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSkippedRoute: FfiConverterRustBuffer<SkippedRoute> {
+    override fun read(buf: ByteBuffer): SkippedRoute {
+        return SkippedRoute(
+            FfiConverterTypeRoute.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SkippedRoute) = (
+            FfiConverterTypeRoute.allocationSize(value.`route`) +
+            FfiConverterLong.allocationSize(value.`until`) +
+            FfiConverterString.allocationSize(value.`reason`)
+    )
+
+    override fun write(value: SkippedRoute, buf: ByteBuffer) {
+            FfiConverterTypeRoute.write(value.`route`, buf)
+            FfiConverterLong.write(value.`until`, buf)
+            FfiConverterString.write(value.`reason`, buf)
     }
 }
 
@@ -11439,6 +13887,40 @@ public object FfiConverterTypeForwardingState: FfiConverterRustBuffer<Forwarding
 
 
 
+enum class KeyKind {
+    
+    MCP,
+    BROWSER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeyKind: FfiConverterRustBuffer<KeyKind> {
+    override fun read(buf: ByteBuffer) = try {
+        KeyKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: KeyKind) = 4UL
+
+    override fun write(value: KeyKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 enum class OutingKind {
     
     GENERAL,
@@ -11535,6 +14017,42 @@ public object FfiConverterTypePunchKind: FfiConverterRustBuffer<PunchKind> {
     override fun allocationSize(value: PunchKind) = 4UL
 
     override fun write(value: PunchKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class Route {
+    
+    DIRECT,
+    PROXY,
+    SERVER,
+    UDP;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRoute: FfiConverterRustBuffer<Route> {
+    override fun read(buf: ByteBuffer) = try {
+        Route.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: Route) = 4UL
+
+    override fun write(value: Route, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -11822,6 +14340,38 @@ public object FfiConverterTypeTransportError : FfiConverterRustBuffer<TransportE
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
 
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalUInt: FfiConverterRustBuffer<kotlin.UInt?> {
+    override fun read(buf: ByteBuffer): kotlin.UInt? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterUInt.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.UInt?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterUInt.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.UInt?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterUInt.write(value, buf)
+        }
+    }
 }
 
 
@@ -12236,6 +14786,38 @@ public object FfiConverterOptionalTypeCourseView: FfiConverterRustBuffer<CourseV
         } else {
             buf.put(1)
             FfiConverterTypeCourseView.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypeDatagram: FfiConverterRustBuffer<Datagram?> {
+    override fun read(buf: ByteBuffer): Datagram? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeDatagram.read(buf)
+    }
+
+    override fun allocationSize(value: Datagram?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeDatagram.allocationSize(value)
+        }
+    }
+
+    override fun write(value: Datagram?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeDatagram.write(value, buf)
         }
     }
 }
@@ -12694,6 +15276,38 @@ public object FfiConverterOptionalTypeSemesters: FfiConverterRustBuffer<Semester
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeServerMailbox: FfiConverterRustBuffer<ServerMailbox?> {
+    override fun read(buf: ByteBuffer): ServerMailbox? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeServerMailbox.read(buf)
+    }
+
+    override fun allocationSize(value: ServerMailbox?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeServerMailbox.allocationSize(value)
+        }
+    }
+
+    override fun write(value: ServerMailbox?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeServerMailbox.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeTimetable: FfiConverterRustBuffer<Timetable?> {
     override fun read(buf: ByteBuffer): Timetable? {
         if (buf.get().toInt() == 0) {
@@ -12854,6 +15468,38 @@ public object FfiConverterOptionalTypeClassStatus: FfiConverterRustBuffer<ClassS
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeRoute: FfiConverterRustBuffer<Route?> {
+    override fun read(buf: ByteBuffer): Route? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeRoute.read(buf)
+    }
+
+    override fun allocationSize(value: Route?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeRoute.allocationSize(value)
+        }
+    }
+
+    override fun write(value: Route?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeRoute.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeTargetOutlook: FfiConverterRustBuffer<TargetOutlook?> {
     override fun read(buf: ByteBuffer): TargetOutlook? {
         if (buf.get().toInt() == 0) {
@@ -12932,6 +15578,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeAccessKey: FfiConverterRustBuffer<List<AccessKey>> {
+    override fun read(buf: ByteBuffer): List<AccessKey> {
+        val len = buf.getInt()
+        return List<AccessKey>(len) {
+            FfiConverterTypeAccessKey.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<AccessKey>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeAccessKey.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<AccessKey>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeAccessKey.write(it, buf)
         }
     }
 }
@@ -13838,6 +16512,34 @@ public object FfiConverterSequenceTypeHistoryCourse: FfiConverterRustBuffer<List
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeKeyUse: FfiConverterRustBuffer<List<KeyUse>> {
+    override fun read(buf: ByteBuffer): List<KeyUse> {
+        val len = buf.getInt()
+        return List<KeyUse>(len) {
+            FfiConverterTypeKeyUse.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<KeyUse>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeKeyUse.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<KeyUse>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeKeyUse.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeLecture: FfiConverterRustBuffer<List<Lecture>> {
     override fun read(buf: ByteBuffer): List<Lecture> {
         val len = buf.getInt()
@@ -13856,6 +16558,62 @@ public object FfiConverterSequenceTypeLecture: FfiConverterRustBuffer<List<Lectu
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeLecture.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeLinkedPhone: FfiConverterRustBuffer<List<LinkedPhone>> {
+    override fun read(buf: ByteBuffer): List<LinkedPhone> {
+        val len = buf.getInt()
+        return List<LinkedPhone>(len) {
+            FfiConverterTypeLinkedPhone.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<LinkedPhone>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeLinkedPhone.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<LinkedPhone>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeLinkedPhone.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeMailPhone: FfiConverterRustBuffer<List<MailPhone>> {
+    override fun read(buf: ByteBuffer): List<MailPhone> {
+        val len = buf.getInt()
+        return List<MailPhone>(len) {
+            FfiConverterTypeMailPhone.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<MailPhone>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeMailPhone.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<MailPhone>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeMailPhone.write(it, buf)
         }
     }
 }
@@ -14314,6 +17072,62 @@ public object FfiConverterSequenceTypeSemester: FfiConverterRustBuffer<List<Seme
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeServerSignIn: FfiConverterRustBuffer<List<ServerSignIn>> {
+    override fun read(buf: ByteBuffer): List<ServerSignIn> {
+        val len = buf.getInt()
+        return List<ServerSignIn>(len) {
+            FfiConverterTypeServerSignIn.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ServerSignIn>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeServerSignIn.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ServerSignIn>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeServerSignIn.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSkippedRoute: FfiConverterRustBuffer<List<SkippedRoute>> {
+    override fun read(buf: ByteBuffer): List<SkippedRoute> {
+        val len = buf.getInt()
+        return List<SkippedRoute>(len) {
+            FfiConverterTypeSkippedRoute.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SkippedRoute>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSkippedRoute.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SkippedRoute>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSkippedRoute.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTimetableDay: FfiConverterRustBuffer<List<TimetableDay>> {
     override fun read(buf: ByteBuffer): List<TimetableDay> {
         val len = buf.getInt()
@@ -14473,6 +17287,22 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
+         * A pairing code as typed or scanned (`ABCDE-12345`, or a link ending in `#ABCDE-12345`), the
+         * way the edge reads it: case, dashes and spaces ignored, `O` as `0`, `I`/`L` as `1`. None when
+         * it is not one.
+         */ fun `pairCode`(`text`: kotlin.String): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_pair_code(
+    
+        
+        FfiConverterString.lower(`text`),_status)
+}
+    )
+    }
+    
+
+        /**
          * Writes one line from Kotlin into the same file and logcat, in order.
          */ fun `logEvent`(`level`: kotlin.String, `src`: kotlin.String, `flow`: kotlin.String?, `msg`: kotlin.String, `fields`: Map<kotlin.String, kotlin.String>)
         = 
@@ -14567,6 +17397,19 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
+         * Sets the name the server shows for this phone ("OnePlus CPH2573"); the first call wins.
+         */ fun `setDeviceLabel`(`label`: kotlin.String)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_device_label(
+    
+        
+        FfiConverterString.lower(`label`),_status)
+}
+    
+    
+
+        /**
          * Sends VTOP clients made after this through `transport`; call before [`crate::Core::new`].
          */ fun `setHttpTransport`(`transport`: HttpTransport)
         = 
@@ -14590,6 +17433,19 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 }
     )
     }
+    
+
+        /**
+         * Sends the UDP route through `network`; without one the route fails and falls back to HTTPS.
+         */ fun `setUdpNetwork`(`network`: UdpNetwork)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_udp_network(
+    
+        
+        FfiConverterTypeUdpNetwork.lower(`network`),_status)
+}
+    
     
 
 

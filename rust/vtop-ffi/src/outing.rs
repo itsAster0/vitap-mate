@@ -21,6 +21,7 @@ use vtop_core::types::{
 };
 use vtop_core::{VtopError, VtopResult};
 
+use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
 /// Outings are not per semester; under `pages/` so signing out drops them.
@@ -254,7 +255,8 @@ impl Core {
     /// Fetches the general outing page (form and requests) and caches it.
     pub async fn fetch_general_outing(&self, flow: String) -> Result<GeneralOuting, CoreError> {
         traced("fetch_general_outing", &flow, async {
-            let data = signed_in!(self, |client| client.general_outing())?;
+            let data = page!(self, "general_outing", None, [], |client| client
+                .general_outing())?;
             self.write_outing(GENERAL, &data);
             Ok(logged_general(GeneralOuting::new(data, now())))
         })
@@ -274,7 +276,8 @@ impl Core {
     /// Fetches the weekend outing page (form and requests) and caches it.
     pub async fn fetch_weekend_outing(&self, flow: String) -> Result<WeekendOuting, CoreError> {
         traced("fetch_weekend_outing", &flow, async {
-            let data = signed_in!(self, |client| client.weekend_outing())?;
+            let data = page!(self, "weekend_outing", None, [], |client| client
+                .weekend_outing())?;
             self.write_outing(WEEKEND, &data);
             Ok(logged_weekend(WeekendOuting::new(data, now())))
         })

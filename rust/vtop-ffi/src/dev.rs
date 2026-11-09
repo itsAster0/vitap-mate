@@ -29,7 +29,7 @@ use crate::{
 };
 
 /// The Flutter app's Cookie-Editor domain.
-const COOKIE_DOMAIN: &str = "vtop.vitap.ac.in";
+pub(crate) const COOKIE_DOMAIN: &str = "vtop.vitap.ac.in";
 
 /// How the client is set up, read before [`Core::new`] (changes apply from the next launch).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
