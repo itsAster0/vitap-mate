@@ -30,33 +30,17 @@ pub struct DevConfig {
     pub session_reuse_minutes: u32,
     /// Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
     pub request_timeout_s: u32,
-    /// Developer → Inspect Traffic: VTOP requests go through this proxy (`host:port`)…
-    pub inspect_proxy: Option<String>,
-    /// …and trust these user-installed CAs (PEM).
-    pub inspect_cas: Vec<String>,
 }
 
 static CONFIG: Mutex<Option<DevConfig>> = Mutex::new(None);
 
-/// Sets [`DevConfig`]; call before the core is made. Inspection is taken once per process.
+/// Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
+/// HTTP stack's: Rust sends nothing itself.)
 #[uniffi::export]
 pub fn dev_configure(config: DevConfig) {
-    let inspect = config.inspect_proxy.is_some() || !config.inspect_cas.is_empty();
-    if inspect {
-        warn!(
-            proxy = config.inspect_proxy.as_deref().unwrap_or("none"),
-            cas = config.inspect_cas.len(),
-            "traffic inspection on"
-        );
-        vtop_core::client::set_inspection(vtop_core::client::Inspection {
-            proxy: config.inspect_proxy.clone(),
-            ca_pems: config.inspect_cas.clone(),
-        });
-    }
     info!(
         session_reuse_minutes = config.session_reuse_minutes,
         request_timeout_s = config.request_timeout_s,
-        inspect,
         "dev config"
     );
     *CONFIG.lock().unwrap_or_else(PoisonError::into_inner) = Some(config);

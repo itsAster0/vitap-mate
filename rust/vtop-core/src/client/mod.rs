@@ -39,9 +39,7 @@ pub use hostel::{
     check_general_outing, check_weekend_outing, GeneralOutingApplication, OutingKind,
     WeekendOutingApplication,
 };
-#[cfg(feature = "reqwest")]
-pub(crate) use http::inspected;
-pub use http::{set_inspection, Inspection, VITAP_INTERMEDIATE_CA_PEM};
+pub use http::VITAP_INTERMEDIATE_CA_PEM;
 pub use transport::{Hop, HopFuture, HopResponse, Transport, TransportError};
 
 const AUTH: &str = "rust.auth";

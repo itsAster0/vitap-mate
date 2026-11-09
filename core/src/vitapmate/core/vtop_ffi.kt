@@ -1254,7 +1254,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_set_shared_cookies() and 0xFFFF) != 39215) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_dev_configure() and 0xFFFF) != 33937) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_dev_configure() and 0xFFFF) != 30902) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_plan_gpa() and 0xFFFF) != 10389) {
@@ -6747,16 +6747,6 @@ data class DevConfig (
      * Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
      */
     var `requestTimeoutS`: kotlin.UInt
-    , 
-    /**
-     * Developer → Inspect Traffic: VTOP requests go through this proxy (`host:port`)…
-     */
-    var `inspectProxy`: kotlin.String?
-    , 
-    /**
-     * …and trust these user-installed CAs (PEM).
-     */
-    var `inspectCas`: List<kotlin.String>
     
 ){
     
@@ -6775,23 +6765,17 @@ public object FfiConverterTypeDevConfig: FfiConverterRustBuffer<DevConfig> {
         return DevConfig(
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
-            FfiConverterOptionalString.read(buf),
-            FfiConverterSequenceString.read(buf),
         )
     }
 
     override fun allocationSize(value: DevConfig) = (
             FfiConverterUInt.allocationSize(value.`sessionReuseMinutes`) +
-            FfiConverterUInt.allocationSize(value.`requestTimeoutS`) +
-            FfiConverterOptionalString.allocationSize(value.`inspectProxy`) +
-            FfiConverterSequenceString.allocationSize(value.`inspectCas`)
+            FfiConverterUInt.allocationSize(value.`requestTimeoutS`)
     )
 
     override fun write(value: DevConfig, buf: ByteBuffer) {
             FfiConverterUInt.write(value.`sessionReuseMinutes`, buf)
             FfiConverterUInt.write(value.`requestTimeoutS`, buf)
-            FfiConverterOptionalString.write(value.`inspectProxy`, buf)
-            FfiConverterSequenceString.write(value.`inspectCas`, buf)
     }
 }
 
@@ -14013,7 +13997,8 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
-         * Sets [`DevConfig`]; call before the core is made. Inspection is taken once per process.
+         * Sets [`DevConfig`]; call before the core is made. (Developer → Inspect Traffic is the app's
+         * HTTP stack's: Rust sends nothing itself.)
          */ fun `devConfigure`(`config`: DevConfig)
         = 
     uniffiRustCall() { _status ->

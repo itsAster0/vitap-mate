@@ -27,7 +27,8 @@ fn http() -> Result<&'static reqwest::Client, GmailOtpError> {
     static CLIENT: OnceLock<Option<reqwest::Client>> = OnceLock::new();
     CLIENT
         .get_or_init(|| {
-            crate::client::inspected(reqwest::Client::builder().timeout(Duration::from_secs(15)))
+            reqwest::Client::builder()
+                .timeout(Duration::from_secs(15))
                 .build()
                 .ok()
         })

@@ -43,10 +43,9 @@ object AppCore {
             runCatching {
                 obsInit(dir)
                 runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
-                val dev = devConfig(app)
-                devConfigure(dev)
+                devConfigure(DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt()))
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
-                setHttpTransport(if (engine) VtopHttpEngine(app) else VtopHttp(dev.inspectProxy, dev.inspectCas))
+                setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
                 Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "okhttp"))
                 setSharedCookies(VtopCookies)
                 runBlocking { flow("core_init") { Core(it, dir) } }
@@ -58,15 +57,15 @@ object AppCore {
     }
 
     /**
-     * What Rust reads once, before the core (Settings → Developer, so from the next launch): the
-     * session reuse limit, the VTOP timeout and, with Inspect Traffic on, the Wi-Fi proxy and the
-     * user-installed CAs (the Flutter app's `trafficInspection`). [Settings] must be loaded.
+     * OkHttp for VTOP; with Developer → Inspect Traffic on (from the next launch), through the
+     * Wi-Fi proxy and trusting the user-installed CAs (the Flutter app's `trafficInspection`).
+     * [Settings] must be loaded.
      */
-    private fun devConfig(context: Context): DevConfig {
-        val inspect = Settings.inspectTraffic
-        val proxy = context.takeIf { inspect }?.getSystemService(ConnectivityManager::class.java)?.defaultProxy
+    private fun inspectedHttp(context: Context): VtopHttp {
+        if (!Settings.inspectTraffic) return VtopHttp(null, emptyList())
+        val proxy = context.getSystemService(ConnectivityManager::class.java)?.defaultProxy
             ?.takeIf { !it.host.isNullOrEmpty() }?.let { "${it.host}:${it.port}" }
-        val cas = if (!inspect) emptyList() else runCatching {
+        val cas = runCatching {
             val store = KeyStore.getInstance("AndroidCAStore").apply { load(null) }
             store.aliases().toList().filter { it.startsWith("user:") }.mapNotNull { alias ->
                 store.getCertificate(alias)?.encoded?.let { "-----BEGIN CERTIFICATE-----\n" + Base64.encodeToString(it, Base64.DEFAULT) + "-----END CERTIFICATE-----\n" }
@@ -75,7 +74,8 @@ object AppCore {
             Log.warn("core", "user CAs not read: ${e::class.simpleName}")
             emptyList()
         }
-        return DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt(), proxy, cas)
+        Log.warn("core", "traffic inspection on", fields = mapOf("proxy" to (proxy ?: "none"), "cas" to "${cas.size}"))
+        return VtopHttp(proxy, cas)
     }
 
     /** The core, once created; throws what creating it threw. */
