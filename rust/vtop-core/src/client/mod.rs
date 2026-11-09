@@ -32,7 +32,7 @@ use crate::types::PersistedVtopSession;
 use vtop_proto::http::{join_url, url_parts, Method, Request};
 use vtop_proto::machine::{Machine, OnePost, Signed, Step};
 
-pub use course_page::{CourseFile, CourseFileInfo, SavedCourseFile};
+pub use course_page::{CourseFile, CourseFileInfo, FileLink};
 #[cfg(feature = "reqwest")]
 pub use email_otp::EmailOtpLogin;
 pub use hostel::{

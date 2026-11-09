@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.net.Uri
-import android.os.Environment
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -314,9 +313,9 @@ internal class VtopBrowser(
                 .setMimeType(mime)
                 .setTitle(name)
                 // Progress only: the finished file moves on, so a "completed" tap would find nothing.
+                // In DownloadManager's own cache (a stopped download leaves nothing in the app's
+                // storage); Docs.watchDownload moves it to the download folder.
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-                // The app's own folder first; Docs.watchDownload moves it to the download folder.
-                .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, name)
             val id = context.getSystemService(DownloadManager::class.java).enqueue(request)
             // Into Docs and the download folder; outing pages' files as "outing" (the Flutter app's `_isOutingDownload`).
             val outing = listOfNotNull(page?.url, url, view?.url).any { it.lowercase().let { u -> "studentweekendouting" in u || "studentgeneralouting" in u } }

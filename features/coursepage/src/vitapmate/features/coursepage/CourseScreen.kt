@@ -45,7 +45,7 @@ import vitapmate.core.Core
 import vitapmate.core.CoursePlan
 import vitapmate.core.CourseView
 import vitapmate.core.Lecture
-import vitapmate.core.SavedFile
+import vitapmate.core.FileLink
 import vitapmate.data.epochDayOf
 import vitapmate.data.rememberPage
 import vitapmate.observability.StateRegistry
@@ -131,7 +131,7 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
     var showAll by rememberSaveable(plan.classId) { mutableStateOf(false) }
     // Paths (or file kinds) being fetched, for their spinners.
     var busy by remember { mutableStateOf(setOf<String>()) }
-    val download: (key: String, kind: String, keep: Boolean, fetch: suspend (Core, String) -> SavedFile) -> Unit = { key, kind, keep, fetch ->
+    val download: (key: String, kind: String, keep: Boolean, fetch: suspend (Core, String) -> FileLink) -> Unit = { key, kind, keep, fetch ->
         if (key !in busy) {
             busy = busy + key
             scope.launch {
@@ -178,10 +178,10 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
             ClassHeader(view, onSwitch = onSwitch.takeIf { view.sections.size > 1 })
         }
         val files = buildList {
-            if (plan.syllabusPath.isNotEmpty()) add(FileAction("syllabus", Lucide.FileText, "Syllabus", true) { c, f -> c.downloadCourseFile(f, plan.syllabusPath) })
-            if (plan.hasCoursePlan) add(FileAction("plan", Lucide.Sheet, "Course plan", false) { c, f -> c.downloadCoursePlan(f, plan.classId) })
-            if (plan.generalMaterialsPath.isNotEmpty()) add(FileAction("general", Lucide.FolderArchive, "General material", false) { c, f -> c.downloadCourseFile(f, plan.generalMaterialsPath) })
-            if (plan.allMaterialsPath.isNotEmpty()) add(FileAction("all", Lucide.Download, "All material (zip)", false) { c, f -> c.downloadCourseFile(f, plan.allMaterialsPath) })
+            if (plan.syllabusPath.isNotEmpty()) add(FileAction("syllabus", Lucide.FileText, "Syllabus", true) { c, f -> c.courseFileLink(f, plan.syllabusPath) })
+            if (plan.hasCoursePlan) add(FileAction("plan", Lucide.Sheet, "Course plan", false) { c, f -> c.coursePlanLink(f, plan.classId) })
+            if (plan.generalMaterialsPath.isNotEmpty()) add(FileAction("general", Lucide.FolderArchive, "General material", false) { c, f -> c.courseFileLink(f, plan.generalMaterialsPath) })
+            if (plan.allMaterialsPath.isNotEmpty()) add(FileAction("all", Lucide.Download, "All material (zip)", false) { c, f -> c.courseFileLink(f, plan.allMaterialsPath) })
         }
         if (files.isNotEmpty()) item("files") {
             FlowRow(Modifier.fillMaxWidth().padding(top = Space.xs).testTag("coursepage.files"), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
@@ -206,7 +206,7 @@ private fun Plan(view: CourseView, plan: CoursePlan, onSwitch: () -> Unit) {
             )
         }
         if (lectures.isEmpty()) item("empty") { EmptyView(Lucide.BookOpen, "Nothing here yet", Modifier.fillMaxWidth().testTag("coursepage.lectures.empty")) }
-        val onMaterial: (String) -> Unit = { path -> download(path, "material", true) { c, f -> c.downloadCourseFile(f, path) } }
+        val onMaterial: (String) -> Unit = { path -> download(path, "material", true) { c, f -> c.courseFileLink(f, path) } }
         if (upcoming.isNotEmpty()) {
             item("upcoming.header") { SectionHeader("Coming up", Modifier.animateItem(), trailing = { Text("${upcoming.size} planned") }) }
             lectureItems("upcoming", upcoming.take(UPCOMING_SHOWN), next, today, planned = true, busy, onMaterial)
@@ -255,5 +255,5 @@ private class FileAction(
     val icon: ImageVector,
     val label: String,
     val keep: Boolean,
-    val fetch: suspend (Core, String) -> SavedFile,
+    val fetch: suspend (Core, String) -> FileLink,
 )

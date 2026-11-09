@@ -5,13 +5,9 @@
 //! `course_page_service.dart`).
 
 use std::collections::HashSet;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use tracing::info;
 use vtop_core::VtopError;
-use vtop_core::client::SavedCourseFile;
 use vtop_core::inputs::{CourseFilePath, SemesterId};
 use vtop_core::types::{
     CoursePageClass, CoursePageClasses, CoursePageCourse, CoursePageCourses, CoursePageDetail,
@@ -25,8 +21,6 @@ const COURSES: &str = "course_page.json";
 const CLASSES: &str = "course_page/classes";
 /// A section's lecture plan: `course_page/plan/<class id>.json`.
 const PLANS: &str = "course_page/plan";
-/// Downloaded course files, in the data dir.
-const DOWNLOADS: &str = "downloads";
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct CoursePage {
@@ -111,14 +105,24 @@ pub struct Material {
     pub path: String,
 }
 
-/// A downloaded file in the app's files dir.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
-pub struct SavedFile {
-    pub path: String,
+/// A course page file for Android's DownloadManager, which fetches it straight from VTOP: the
+/// URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
+/// VTOP's name for it (else a name from the link) and its type ("application/pdf").
+#[derive(Clone, PartialEq, uniffi::Record)]
+pub struct FileLink {
+    pub url: String,
+    pub cookie: String,
     pub name: String,
-    /// "application/pdf"; from VTOP, without parameters.
     pub mime: String,
-    pub size: u64,
+}
+
+impl std::fmt::Debug for FileLink {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileLink")
+            .field("name", &self.name)
+            .field("mime", &self.mime)
+            .finish_non_exhaustive()
+    }
 }
 
 #[uniffi::export]
@@ -227,48 +231,45 @@ impl Core {
         .await
     }
 
-    /// Downloads a course page file (a lecture's material, the syllabus, a
-    /// material bundle; a `path` from [`CoursePlan`]) into the app's
-    /// `files/downloads/` under VTOP's name, written there by the transport (never whole in
-    /// memory).
-    pub async fn download_course_file(
+    /// A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
+    /// [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
+    pub async fn course_file_link(
         &self,
         flow: String,
         path: String,
-    ) -> Result<SavedFile, CoreError> {
-        traced("download_course_file", &flow, async {
+    ) -> Result<FileLink, CoreError> {
+        traced("course_file_link", &flow, async {
             let path = CourseFilePath::parse(&path)?;
-            let fallback = path.as_str().rsplit('/').next().unwrap_or("file");
-            let part = self.part_file()?;
-            let saved =
-                async { signed_in!(self, |client| client.save_course_page_file(&path, &part)) }
-                    .await;
-            self.keep_download(saved, &part, fallback)
+            let fallback = path
+                .as_str()
+                .rsplit('/')
+                .next()
+                .unwrap_or("file")
+                .to_string();
+            let link =
+                async { signed_in!(self, |client| client.course_page_file_link(&path)) }.await?;
+            Ok(file_link(link, &fallback))
         })
         .await
     }
 
-    /// Downloads `class_id`'s course plan (an Excel sheet) like
-    /// [`Self::download_course_file`].
-    pub async fn download_course_plan(
+    /// `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
+    pub async fn course_plan_link(
         &self,
         flow: String,
         class_id: String,
-    ) -> Result<SavedFile, CoreError> {
-        traced("download_course_plan", &flow, async {
+    ) -> Result<FileLink, CoreError> {
+        traced("course_plan_link", &flow, async {
             self.current()?;
             let semester = self
                 .read::<vtop_core::types::SemesterData>(crate::SEMESTERS)
                 .and_then(|list| self.pick(&list))
                 .ok_or(CoreError::SemesterNeeded)?;
             let semester = SemesterId::parse(&semester)?;
-            let part = self.part_file()?;
-            let saved = async {
-                signed_in!(self, |client| client
-                    .save_course_plan(&semester, &class_id, &part))
-            }
-            .await;
-            self.keep_download(saved, &part, "course-plan")
+            let link =
+                async { signed_in!(self, |client| client.course_plan_link(&semester, &class_id)) }
+                    .await?;
+            Ok(file_link(link, "course-plan"))
         })
         .await
     }
@@ -325,46 +326,27 @@ impl Core {
             plan: None,
         }
     }
+}
 
-    /// A new temporary file in `files/downloads/` for a download to go to.
-    fn part_file(&self) -> Result<PathBuf, CoreError> {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let dir = self.at(DOWNLOADS);
-        fs::create_dir_all(&dir)?;
-        Ok(dir.join(format!(".{}.part", NEXT.fetch_add(1, Ordering::Relaxed))))
-    }
-
-    /// Names the file `saved` wrote at `part` `files/downloads/<VTOP's name>`; on a failure the
-    /// part file goes, so a failed download leaves nothing.
-    fn keep_download(
-        &self,
-        saved: Result<SavedCourseFile, CoreError>,
-        part: &Path,
-        fallback: &str,
-    ) -> Result<SavedFile, CoreError> {
-        let saved = saved.inspect_err(|_| {
-            let _ = fs::remove_file(part);
-        })?;
-        let mime = saved
-            .content_type
-            .split(';')
-            .next()
-            .unwrap_or_default()
-            .trim()
-            .to_ascii_lowercase();
-        let name = file_name(&saved.file_name, fallback, &mime);
-        let path = self.at(DOWNLOADS).join(&name);
-        fs::rename(part, &path).inspect_err(|_| {
-            let _ = fs::remove_file(part);
-        })?;
-        let size = saved.size;
-        info!(size, %mime, "course file saved");
-        Ok(SavedFile {
-            path: path_string(&path),
-            name,
-            mime,
-            size,
-        })
+/// `link` with VTOP's name, else `fallback`; its type without parameters.
+fn file_link(link: vtop_core::client::FileLink, fallback: &str) -> FileLink {
+    let mime = link
+        .content_type
+        .split(';')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase();
+    info!(%mime, "file link ready");
+    FileLink {
+        url: link.url,
+        cookie: link.cookie,
+        name: if link.file_name.trim().is_empty() {
+            fallback.to_string()
+        } else {
+            link.file_name
+        },
+        mime,
     }
 }
 
@@ -571,60 +553,12 @@ fn my_class<'a>(
     }
 }
 
-/// VTOP's name made safe for the downloads dir; else `fallback` with an
-/// extension from `mime`.
-fn file_name(raw: &str, fallback: &str, mime: &str) -> String {
-    let clean = |name: &str| -> String {
-        let name: String = name
-            .chars()
-            .map(|c| {
-                if c.is_control()
-                    || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|')
-                {
-                    '_'
-                } else {
-                    c
-                }
-            })
-            .collect();
-        let name = name.trim().trim_start_matches('.').trim();
-        name.chars()
-            .rev()
-            .take(120)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .collect()
-    };
-    let name = clean(raw);
-    if !name.is_empty() {
-        return name;
-    }
-    let extension = match mime {
-        "application/pdf" => ".pdf",
-        "application/zip" | "application/x-zip-compressed" => ".zip",
-        "application/vnd.ms-excel" => ".xls",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
-        "application/msword" => ".doc",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
-        "application/vnd.ms-powerpoint" => ".ppt",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
-        _ => "",
-    };
-    let base = clean(fallback);
-    format!(
-        "{}{extension}",
-        if base.is_empty() { "file" } else { &base }
-    )
-}
-
-fn path_string(path: &Path) -> String {
-    PathBuf::from(path).to_string_lossy().into_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use vtop_core::types::{CourseLecture, CourseMaterial, TimetableSlot};
+
+    use std::fs;
+    use std::path::PathBuf;
 
     use super::*;
 
@@ -896,64 +830,71 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn files_stream_into_downloads_under_vtops_name() {
-        let body: Vec<u8> = (0..700_000u32).map(|i| (i % 251) as u8).collect();
+    async fn a_file_link_carries_the_session_and_never_its_secrets_in_debug() {
         let base = serve(
-            "Content-Type: application/pdf\r\nContent-Disposition: attachment; filename=\"Unit 1.pdf\"",
-            body.clone(),
+            "Content-Type: application/pdf; charset=binary\r\nContent-Disposition: attachment; filename=\"Unit 1.pdf\"",
+            vec![0; 1000],
         )
         .await;
-        let (core, dir) = signed_in_core(base, "ok");
-        let saved = core
-            .download_course_file("f".into(), "downloadPdf/AP1/C2/1/14-07-2026".into())
+        let (core, dir) = signed_in_core(base.clone(), "ok");
+        let link = core
+            .course_file_link("f".into(), "downloadPdf/AP1/C2/1/14-07-2026".into())
             .await
             .unwrap();
+        assert!(
+            link.url
+                .starts_with(&format!("{base}/vtop/downloadPdf/AP1/C2/1/14-07-2026?")),
+            "{}",
+            link.url
+        );
+        assert!(link.url.contains("_csrf=") && !link.cookie.is_empty());
         assert_eq!(
-            (saved.name.as_str(), saved.mime.as_str()),
+            (link.name.as_str(), link.mime.as_str()),
             ("Unit 1.pdf", "application/pdf")
         );
-        assert_eq!(saved.size, body.len() as u64);
-        assert_eq!(fs::read(&saved.path).unwrap(), body);
-        let left: Vec<_> = fs::read_dir(dir.join(DOWNLOADS)).unwrap().collect();
-        assert_eq!(left.len(), 1, "no .part file left");
+        let debug = format!("{link:?}");
+        assert!(
+            !debug.contains("_csrf") && !debug.contains(&link.cookie),
+            "{debug}"
+        );
         // Not a course page link: refused before any request.
         assert!(
-            core.download_course_file("f".into(), "hostel/x".into())
+            core.course_file_link("f".into(), "hostel/x".into())
                 .await
                 .is_err()
         );
-        let _ = fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]
-    async fn an_error_page_saves_nothing() {
-        let base = serve("Content-Type: text/html", b"<html>error</html>".to_vec()).await;
-        let (core, dir) = signed_in_core(base, "html");
-        let result = core.download_course_plan("f".into(), "C2".into()).await;
-        // No semester picked yet.
-        assert_eq!(result, Err(CoreError::SemesterNeeded));
-        fs::write(
+    async fn a_plan_link_needs_a_semester() {
+        let base = serve("Content-Type: application/vnd.ms-excel", vec![0; 10]).await;
+        let (core, dir) = signed_in_core(base, "plan");
+        assert_eq!(
+            core.course_plan_link("f".into(), "C2".into()).await,
+            Err(CoreError::SemesterNeeded)
+        );
+        std::fs::write(
             dir.join(crate::SEMESTERS),
             r#"{"semesters":[{"id":"AP1","name":"Fall"}],"update_time":1}"#,
         )
         .unwrap();
-        fs::write(dir.join(crate::SELECTED), r#""AP1""#).unwrap();
-        let result = core.download_course_plan("f".into(), "C2".into()).await;
-        assert!(matches!(result, Err(CoreError::Other { .. })), "{result:?}");
-        let left = fs::read_dir(dir.join(DOWNLOADS)).map_or(0, |entries| entries.count());
-        assert_eq!(left, 0, "nothing saved, no .part file left");
-        let _ = fs::remove_dir_all(&dir);
+        std::fs::write(dir.join(crate::SELECTED), r#""AP1""#).unwrap();
+        let link = core
+            .course_plan_link("f".into(), "C2".into())
+            .await
+            .unwrap();
+        assert!(
+            link.url
+                .contains("CoursePlanExcelDownload?semesterSubId=AP1&classId=C2"),
+            "{}",
+            link.url
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn names_ids_and_labels() {
-        assert_eq!(file_name("Unit 1.pdf", "x", ""), "Unit 1.pdf");
-        assert_eq!(file_name("../a:b.pdf", "x", ""), "_a_b.pdf");
-        assert_eq!(
-            file_name("", "14-07-2026", "application/pdf"),
-            "14-07-2026.pdf"
-        );
-        assert_eq!(file_name("..", "", "text/plain"), "file");
         assert!(plain("AP2026A1").is_ok());
         assert!(plain("../etc").is_err() && plain("").is_err());
         assert_eq!(plan_file("a/../b"), "course_page/plan/a____b.json");

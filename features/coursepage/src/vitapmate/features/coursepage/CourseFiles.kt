@@ -10,7 +10,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
-import vitapmate.core.SavedFile
+import vitapmate.core.FileLink
 import vitapmate.data.AppCore
 import vitapmate.data.Docs
 import vitapmate.data.askedOtp
@@ -20,15 +20,16 @@ import vitapmate.observability.flow
 import vitapmate.ui.showToast
 
 /**
- * Flow `coursepage.file`: Rust streams the VTOP file to `files/downloads/`, it moves to the download folder (Docs) as
- * document `coursepage:<id>` (source `vtop`) and opens in the phone's viewer. With [keep], a copy
+ * Flow `coursepage.file`: Android's DownloadManager fetches the VTOP file from the link Rust signs
+ * ([Docs.download]), it moves to the download folder (Docs) as document `coursepage:<id>` (source
+ * `coursepage`) and opens in the phone's viewer. With [keep], a copy
  * already in Docs opens without fetching (lecture material and syllabi don't change); otherwise the
  * new copy replaces it. Failures are a toast; a re-login's OTP opens its prompt instead.
  */
-internal suspend fun openCourseFile(context: Context, id: String, kind: String, keep: Boolean, fetch: suspend (Core, String) -> SavedFile) {
+internal suspend fun openCourseFile(context: Context, id: String, kind: String, keep: Boolean, fetch: suspend (Core, String) -> FileLink) {
     try {
         flow("coursepage.file") { f ->
-            val (doc, kept) = Docs.keep("coursepage:$id", "coursepage", f, reuse = keep) { withContext(Dispatchers.IO) { fetch(AppCore.await(), f) } }
+            val (doc, kept) = Docs.download(context, "coursepage:$id", "coursepage", f, reuse = keep) { withContext(Dispatchers.IO) { fetch(AppCore.await(), f) } }
             Log.info("ui.coursepage", "file ready", f, mapOf("kind" to kind, "kept" to "$kept", "bytes" to "${doc.size}"))
             Docs.opened(doc.id)
             // TODO(docs): open in the Docs viewer once core has a way to; the phone's viewer until then.

@@ -38,8 +38,8 @@ pub use calendar::{
 };
 pub use cookies::{SharedCookies, set_shared_cookies};
 pub use course_page::{
-    CourseGroup, CoursePage, CoursePart, CoursePlan, CourseSection, CourseView, Lecture, Material,
-    SavedFile,
+    CourseGroup, CoursePage, CoursePart, CoursePlan, CourseSection, CourseView, FileLink, Lecture,
+    Material,
 };
 pub use dev::{CacheScope, DevConfig, dev_configure};
 pub use exams::{ExamGroup, Exams, ScheduledPaper};

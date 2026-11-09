@@ -908,9 +908,9 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_course_view(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_download_course_file(
+    external fun uniffi_vtop_ffi_checksum_method_core_course_file_link(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_download_course_plan(
+    external fun uniffi_vtop_ffi_checksum_method_core_course_plan_link(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_page(
     ): Int
@@ -1154,9 +1154,9 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_vtop_ffi_fn_method_core_download_course_file(`ptr`: Long,`flow`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_course_file_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`path`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_download_course_plan(`ptr`: Long,`flow`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_course_plan_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -1621,10 +1621,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_view() and 0xFFFF) != 13487) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_download_course_file() and 0xFFFF) != 16098) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_file_link() and 0xFFFF) != 11870) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_download_course_plan() and 0xFFFF) != 56884) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_course_plan_link() and 0xFFFF) != 35574) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_page() and 0xFFFF) != 6702) {
@@ -2677,18 +2677,15 @@ public interface CoreInterface {
     fun `cachedCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView?
     
     /**
-     * Downloads a course page file (a lecture's material, the syllabus, a
-     * material bundle; a `path` from [`CoursePlan`]) into the app's
-     * `files/downloads/` under VTOP's name, written there by the transport (never whole in
-     * memory).
+     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
+     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
      */
-    suspend fun `downloadCourseFile`(`flow`: kotlin.String, `path`: kotlin.String): SavedFile
+    suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String): FileLink
     
     /**
-     * Downloads `class_id`'s course plan (an Excel sheet) like
-     * [`Self::download_course_file`].
+     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
      */
-    suspend fun `downloadCoursePlan`(`flow`: kotlin.String, `classId`: kotlin.String): SavedFile
+    suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String): FileLink
     
     /**
      * Fetches the selected semester's course list and caches it.
@@ -3855,17 +3852,15 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Downloads a course page file (a lecture's material, the syllabus, a
-     * material bundle; a `path` from [`CoursePlan`]) into the app's
-     * `files/downloads/` under VTOP's name, written there by the transport (never whole in
-     * memory).
+     * A course page file (a lecture's material, the syllabus, a material bundle; a `path` from
+     * [`CoursePlan`]) as a [`FileLink`], signing in first if needed.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `downloadCourseFile`(`flow`: kotlin.String, `path`: kotlin.String) : SavedFile {
+    override suspend fun `courseFileLink`(`flow`: kotlin.String, `path`: kotlin.String) : FileLink {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_download_course_file(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_file_link(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
@@ -3876,7 +3871,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
-        { FfiConverterTypeSavedFile.lift(it) },
+        { FfiConverterTypeFileLink.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -3884,15 +3879,14 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Downloads `class_id`'s course plan (an Excel sheet) like
-     * [`Self::download_course_file`].
+     * `class_id`'s course plan (an Excel sheet) as [`Self::course_file_link`].
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `downloadCoursePlan`(`flow`: kotlin.String, `classId`: kotlin.String) : SavedFile {
+    override suspend fun `coursePlanLink`(`flow`: kotlin.String, `classId`: kotlin.String) : FileLink {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_download_course_plan(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_course_plan_link(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
@@ -3903,7 +3897,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
-        { FfiConverterTypeSavedFile.lift(it) },
+        { FfiConverterTypeFileLink.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -9287,6 +9281,59 @@ public object FfiConverterTypeFieldGroup: FfiConverterRustBuffer<FieldGroup> {
 
 
 
+/**
+ * A course page file for Android's DownloadManager, which fetches it straight from VTOP: the
+ * URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
+ * VTOP's name for it (else a name from the link) and its type ("application/pdf").
+ */
+data class FileLink (
+    var `url`: kotlin.String
+    , 
+    var `cookie`: kotlin.String
+    , 
+    var `name`: kotlin.String
+    , 
+    var `mime`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeFileLink: FfiConverterRustBuffer<FileLink> {
+    override fun read(buf: ByteBuffer): FileLink {
+        return FileLink(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: FileLink) = (
+            FfiConverterString.allocationSize(value.`url`) +
+            FfiConverterString.allocationSize(value.`cookie`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`mime`)
+    )
+
+    override fun write(value: FileLink, buf: ByteBuffer) {
+            FfiConverterString.write(value.`url`, buf)
+            FfiConverterString.write(value.`cookie`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`mime`, buf)
+    }
+}
+
+
+
 data class Forwarding (
     var `state`: ForwardingState
     , 
@@ -12246,60 +12293,6 @@ public object FfiConverterTypeSavedAccount: FfiConverterRustBuffer<SavedAccount>
             FfiConverterString.write(value.`password`, buf)
             FfiConverterBoolean.write(value.`rejected`, buf)
             FfiConverterOptionalString.write(value.`registrationNumber`, buf)
-    }
-}
-
-
-
-/**
- * A downloaded file in the app's files dir.
- */
-data class SavedFile (
-    var `path`: kotlin.String
-    , 
-    var `name`: kotlin.String
-    , 
-    /**
-     * "application/pdf"; from VTOP, without parameters.
-     */
-    var `mime`: kotlin.String
-    , 
-    var `size`: kotlin.ULong
-    
-){
-    
-
-    
-
-    
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeSavedFile: FfiConverterRustBuffer<SavedFile> {
-    override fun read(buf: ByteBuffer): SavedFile {
-        return SavedFile(
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterULong.read(buf),
-        )
-    }
-
-    override fun allocationSize(value: SavedFile) = (
-            FfiConverterString.allocationSize(value.`path`) +
-            FfiConverterString.allocationSize(value.`name`) +
-            FfiConverterString.allocationSize(value.`mime`) +
-            FfiConverterULong.allocationSize(value.`size`)
-    )
-
-    override fun write(value: SavedFile, buf: ByteBuffer) {
-            FfiConverterString.write(value.`path`, buf)
-            FfiConverterString.write(value.`name`, buf)
-            FfiConverterString.write(value.`mime`, buf)
-            FfiConverterULong.write(value.`size`, buf)
     }
 }
 

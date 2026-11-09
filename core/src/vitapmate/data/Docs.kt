@@ -3,14 +3,18 @@ package vitapmate.data
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableStateOf
 import java.io.File
+import java.io.InputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -18,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import vitapmate.core.SavedFile
+import vitapmate.core.FileLink
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
@@ -161,6 +165,8 @@ object Docs {
             .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
         app = ctx
         scope.launch {
+            // Where Rust used to stream course files, with any partial ones: nothing writes there now.
+            withContext(Dispatchers.IO) { File(ctx.filesDir, "downloads").deleteRecursively() }
             migrate()
             downloads(ctx).all.forEach { (key, value) ->
                 val saved = value as? String ?: return@forEach
@@ -205,11 +211,11 @@ object Docs {
      * before is replaced.
      */
     suspend fun save(name: String, mime: String?, bytes: ByteArray, source: String, id: String? = null, flow: String? = null): Doc =
-        add(name, mime, source, id, flow) { bytes }
+        add(name, mime, source, id, flow, bytes.size.toLong()) { bytes.inputStream() }
 
-    /** Reads [file] (a temporary download) in, as [save]. */
+    /** Streams [file] (a temporary download) in, as [save]. */
     suspend fun save(name: String, mime: String?, file: File, source: String, id: String? = null, flow: String? = null): Doc =
-        add(name, mime, source, id, flow) { file.readBytes() }
+        add(name, mime, source, id, flow, file.length()) { file.inputStream() }
 
     /** Copies a picked file (Storage Access Framework) into the download folder, under its display name without the extension. */
     suspend fun import(context: Context, uri: Uri, flow: String? = null): Doc {
@@ -217,24 +223,94 @@ object Docs {
         val display = withContext(Dispatchers.IO) {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
         } ?: "Document"
-        return add(display, resolver.getType(uri), "import", null, flow) {
-            (resolver.openInputStream(uri) ?: error("can't read the file")).use { it.readBytes() }
+        val bytes = withContext(Dispatchers.IO) { (resolver.openInputStream(uri) ?: error("can't read the file")).use { it.readBytes() } }
+        return save(display, resolver.getType(uri), bytes, "import", null, flow)
+    }
+
+    /**
+     * The document [id] from Docs when [reuse] and its file is still there (second: true), else
+     * [fetch]ed by Rust to a temporary file and saved as [id] named [name], replacing any old copy
+     * (Flutter's `keepInDocs`), so app-fetched files open offline later. The temporary file goes once saved.
+     */
+    suspend fun keep(id: String, source: String, flow: String, name: String, mime: String?, reuse: Boolean = true, fetch: suspend () -> File): Pair<Doc, Boolean> {
+        if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
+        val file = fetch()
+        return try {
+            save(name, mime, file, source, id, flow) to false
+        } finally {
+            withContext(Dispatchers.IO) { file.delete() }
         }
     }
 
     /**
      * The document [id] from Docs when [reuse] and its file is still there (second: true), else
-     * [fetch]ed by Rust to a temporary file and saved as [id], replacing any old copy (Flutter's
-     * `keepInDocs`), so app-fetched files open offline later. The temporary file goes once saved.
+     * fetched by Android's DownloadManager straight from VTOP (whatever the connection setting; its
+     * progress in the system's notification) from the [link] Rust signs, and saved as [id] under
+     * VTOP's name. DownloadManager keeps the partial file in its own cache and its copy goes once
+     * saved, so a stopped download leaves nothing in the app's storage. Finishes even if the
+     * caller's screen goes.
      */
-    suspend fun keep(id: String, source: String, flow: String, reuse: Boolean = true, fetch: suspend () -> SavedFile): Pair<Doc, Boolean> {
+    suspend fun download(context: Context, id: String, source: String, flow: String, reuse: Boolean, link: suspend () -> FileLink): Pair<Doc, Boolean> {
         if (reuse) byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it to true }
-        val saved = fetch()
-        val file = File(saved.path)
-        return try {
-            save(saved.name, saved.mime.ifEmpty { null }, file, source, id, flow) to false
-        } finally {
-            withContext(Dispatchers.IO) { file.delete() }
+        val l = link()
+        val fileName = fileNameOf(l.name, l.mime.ifEmpty { null })
+        val mime = mimeOf(fileName, l.mime.ifEmpty { null })
+        val manager = context.getSystemService(DownloadManager::class.java)
+        // Downloads/vitapmate: DownloadManager writes the file there itself (Android 10+). A chosen
+        // folder is a SAF tree it can't write, so the file streams in from its cache once done.
+        val direct = Build.VERSION.SDK_INT >= 29 && Downloads.target() == null
+        val request = DownloadManager.Request(Uri.parse(l.url))
+            .addRequestHeader("Cookie", l.cookie)
+            .setTitle(fileName)
+            .setMimeType(mime)
+        if (direct) {
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "${Downloads.SUBDIR}/$fileName")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+        } else {
+            // Progress only: the finished file moves on, so a "completed" tap would find nothing.
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+        }
+        val downloadId = manager.enqueue(request)
+        Log.info("docs", "download queued", flow, mapOf("source" to source, "direct" to "$direct"))
+        return scope.async {
+            val done = finished(manager, downloadId)
+            if (direct) {
+                // DownloadManager adds "-1" when the name is taken.
+                val name = done.name.ifEmpty { fileName }
+                val uri = Downloads.adopt(name, mime, manager.getUriForDownloadedFile(downloadId))
+                register(uri, name, done.size, source, id, flow)
+            } else {
+                try {
+                    val file = manager.getUriForDownloadedFile(downloadId) ?: error("no file")
+                    add(fileName, mime, source, id, flow, done.size) { context.contentResolver.openInputStream(file) ?: error("can't read the file") }
+                } finally {
+                    manager.remove(downloadId)
+                }
+            }
+        }.await() to false
+    }
+
+    /** A finished DownloadManager download: its file's name and size. */
+    private class Finished(val name: String, val size: Long)
+
+    /** Waits for DownloadManager download [downloadId]; throws (and removes it) when it failed. */
+    private suspend fun finished(manager: DownloadManager, downloadId: Long): Finished {
+        while (true) {
+            val row = withContext(Dispatchers.IO) {
+                manager.query(DownloadManager.Query().setFilterById(downloadId))?.use { c ->
+                    if (!c.moveToFirst()) return@use null
+                    fun text(column: String) = c.getString(c.getColumnIndexOrThrow(column)).orEmpty()
+                    Triple(c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)), c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)), Finished(Uri.parse(text(DownloadManager.COLUMN_LOCAL_URI)).lastPathSegment.orEmpty(), c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))))
+                }
+            }
+            when (row?.first) {
+                DownloadManager.STATUS_SUCCESSFUL -> return row.third
+                DownloadManager.STATUS_FAILED, null -> {
+                    manager.remove(downloadId)
+                    error("The download failed (${row?.second ?: "cancelled"}).")
+                }
+                else -> delay(500)
+            }
         }
     }
 
@@ -265,26 +341,12 @@ object Docs {
         scope.launch {
             flow("docs.download") { f ->
                 val manager = context.getSystemService(DownloadManager::class.java)
-                while (true) {
-                    val status = manager.query(DownloadManager.Query().setFilterById(downloadId))?.use { c ->
-                        if (c.moveToFirst()) c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) else null
-                    }
-                    when (status) {
-                        DownloadManager.STATUS_SUCCESSFUL -> {
-                            runCatching {
-                                val bytes = context.contentResolver.openInputStream(manager.getUriForDownloadedFile(downloadId) ?: error("no file"))!!.use { it.readBytes() }
-                                save(name, null, bytes, source, "$source:$name", f)
-                                manager.remove(downloadId)
-                            }.onFailure { Log.error("docs", "download copy failed: ${it::class.simpleName}", f) }
-                            break
-                        }
-                        DownloadManager.STATUS_FAILED, null -> {
-                            Log.warn("docs", "download failed", f)
-                            break
-                        }
-                        else -> delay(2_000)
-                    }
-                }
+                runCatching {
+                    val done = finished(manager, downloadId)
+                    val file = manager.getUriForDownloadedFile(downloadId) ?: error("no file")
+                    add(name, null, source, "$source:$name", f, done.size) { context.contentResolver.openInputStream(file) ?: error("can't read the file") }
+                    manager.remove(downloadId)
+                }.onFailure { Log.warn("docs", "download failed: ${it::class.simpleName}", f) }
                 prefs.edit().remove("$downloadId").apply()
             }
         }
@@ -295,25 +357,34 @@ object Docs {
     private fun mimeOf(fileName: String, fallback: String?): String =
         MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileName.substringAfterLast('.', "").lowercase()) ?: fallback ?: "application/octet-stream"
 
-    private suspend fun add(name: String, mime: String?, source: String, id: String?, flow: String?, read: () -> ByteArray): Doc {
+    private suspend fun add(name: String, mime: String?, source: String, id: String?, flow: String?, size: Long, open: () -> InputStream): Doc {
+        val fileName = fileNameOf(name, mime)
+        // Outside the lock: the first save may wait for the student to pick a folder.
+        val uri = Downloads.save(fileName, mimeOf(fileName, mime), size, flow, open)
+        return register(uri, fileName, size, source, id, flow)
+    }
+
+    /** [name] made safe for the folder, with an extension from [mime] when it has none. */
+    private fun fileNameOf(name: String, mime: String?): String {
         val clean = name.substringAfterLast('/').substringAfterLast('\\').trim()
         val ext = clean.substringAfterLast('.', "").lowercase().takeIf { it.isNotEmpty() && it.length <= 5 }
             ?: mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
         val base = clean.substringBeforeLast('.').ifEmpty { clean }.replace(Regex("""[\\/:*?"<>|\u0000-\u001f]"""), "_").take(120).ifEmpty { "document" }
-        val fileName = base + (ext?.let { ".$it" } ?: "")
-        val bytes = withContext(Dispatchers.IO) { read() }
-        // Outside the lock: the first save may wait for the student to pick a folder.
-        val uri = Downloads.save(fileName, mimeOf(fileName, mime), bytes, flow)
+        return base + (ext?.let { ".$it" } ?: "")
+    }
+
+    /** The file [fileName] now at [uri] as document [id] (a new one when null), replacing its old file. */
+    private suspend fun register(uri: Uri, fileName: String, size: Long, source: String, id: String?, flow: String?): Doc {
         return lock.withLock {
             // Saving an [id] again replaces it (a re-download); [keep] is the way to reuse a copy.
             docs.firstOrNull { id != null && it.id == id }?.takeIf { it.uri.isNotEmpty() && it.uri != uri.toString() }?.let { Downloads.delete(uriOf(it)) }
             val doc = Doc(
                 id ?: "doc-${System.currentTimeMillis()}-${counter++}",
-                clean.substringBeforeLast('.').ifEmpty { clean }.ifEmpty { base },
+                fileName.substringBeforeLast('.').ifEmpty { fileName },
                 fileName,
                 uri.toString(),
                 DocKind.of(fileName),
-                bytes.size.toLong(),
+                size,
                 source,
                 System.currentTimeMillis(),
             )

@@ -1,8 +1,6 @@
 //! The course page: every class of a course this semester, and each
 //! class's lecture plan with its reference material.
 
-use std::path::Path;
-
 use log::warn;
 use vtop_proto::course_pages::{self, file_head, plain_id};
 use vtop_proto::http::Request;
@@ -90,50 +88,45 @@ impl VtopClient {
         self.open_course_file("get_course_page_file", request).await
     }
 
-    /// [`Self::course_page_file`] written to the file `to`, for big files:
-    /// never whole in memory (the app's transport writes it there itself).
-    /// Nothing stays at `to` when VTOP did not send the file.
-    pub async fn save_course_page_file(
-        &self,
-        path: &CourseFilePath,
-        to: &Path,
-    ) -> VtopResult<SavedCourseFile> {
+    /// [`Self::course_page_file`] for a downloader outside this client
+    /// (Android's DownloadManager, straight to VTOP): signs in if needed,
+    /// then asks VTOP for the file's name and type (the body is dropped),
+    /// so the downloader can save it under that name.
+    pub async fn course_page_file_link(&self, path: &CourseFilePath) -> VtopResult<FileLink> {
         let signed = self.signed("get_course_page_file").await?;
-        let request = course_pages::file(&signed, path, vtop_proto::now_unix());
-        self.save_course_file("get_course_page_file", request, to)
+        self.file_link(course_pages::file(&signed, path, vtop_proto::now_unix()))
             .await
     }
 
-    /// [`Self::course_plan`] written to the file `to`, as
-    /// [`Self::save_course_page_file`].
-    pub async fn save_course_plan(
+    /// [`Self::course_plan`] as [`Self::course_page_file_link`].
+    pub async fn course_plan_link(
         &self,
         semester: &SemesterId,
         class_id: &str,
-        to: &Path,
-    ) -> VtopResult<SavedCourseFile> {
+    ) -> VtopResult<FileLink> {
         let class_id = plain_id(class_id, "class id")?;
         let signed = self.signed("get_course_plan").await?;
-        let request =
-            course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
-        self.save_course_file("get_course_page_file", request, to)
-            .await
+        self.file_link(course_pages::course_plan(
+            &signed,
+            semester,
+            class_id,
+            vtop_proto::now_unix(),
+        ))
+        .await
     }
 
-    async fn save_course_file(
-        &self,
-        context: &str,
-        request: Request,
-        to: &Path,
-    ) -> VtopResult<SavedCourseFile> {
-        let (head, size) = self.download(context, request, to).await?;
-        let info = self.check_file_head(context, &head).inspect_err(|_| {
-            let _ = std::fs::remove_file(to);
-        })?;
-        Ok(SavedCourseFile {
+    async fn file_link(&self, request: Request) -> VtopResult<FileLink> {
+        let url = request.url.clone();
+        let (_, info) = self
+            .send_course_file("get_course_page_file_info", request)
+            .await?;
+        // The response drops with its body unread, closing the stream.
+        let cookie = self.cookie_header().ok_or(VtopError::SessionExpired)?;
+        Ok(FileLink {
+            url,
+            cookie,
             file_name: info.file_name(),
             content_type: info.content_type,
-            size,
         })
     }
 
@@ -219,12 +212,15 @@ impl VtopClient {
     }
 }
 
-/// A course page file saved to disk: VTOP's name and type, and its size.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SavedCourseFile {
+/// A VTOP file request for another downloader: the URL (its CSRF token in
+/// the query) and the `Cookie` header it needs, both secrets never to log,
+/// and the file's name and type from VTOP.
+#[derive(Clone, PartialEq, Eq)]
+pub struct FileLink {
+    pub url: String,
+    pub cookie: String,
     pub file_name: String,
     pub content_type: String,
-    pub size: u64,
 }
 
 /// A course page file on its way: VTOP's name and type, then the body.

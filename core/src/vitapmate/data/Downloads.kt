@@ -12,9 +12,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.File
+import java.io.InputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +37,7 @@ import vitapmate.observability.flow
  */
 object Downloads {
     const val DEFAULT_LABEL = "Downloads/vitapmate"
-    private const val SUBDIR = "vitapmate"
+    const val SUBDIR = "vitapmate"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Mutex()
     private var app: Context? = null
@@ -58,26 +60,58 @@ object Downloads {
         folder = prefs.getString("tree", null)?.let(Uri::parse)
     }
 
-    /** Where files go, for Settings: the chosen folder's name or [DEFAULT_LABEL]. */
-    fun label(): String = folder?.let { DocumentsContract.getTreeDocumentId(it).substringAfterLast(':').ifEmpty { "Chosen folder" } } ?: DEFAULT_LABEL
-
-    /** Saves [bytes] as [name] in the folder, asking for one the first time; returns where. */
-    suspend fun save(name: String, mime: String, bytes: ByteArray, flow: String? = null): Uri {
+    /** Waits, the first time, for the student to pick where files go; then the chosen folder, or null for Downloads/vitapmate. */
+    suspend fun target(): Uri? {
         if (!prefs.getBoolean("asked", false)) {
             val ask = prompt ?: CompletableDeferred<Unit>().also { prompt = it }
             ask.await()
         }
+        return folder
+    }
+
+    /**
+     * A file DownloadManager wrote to Downloads/vitapmate itself, as [name]: remembered as saved
+     * here, and where it is (its MediaStore entry, else [fallback]).
+     */
+    suspend fun adopt(name: String, mime: String, fallback: Uri?): Uri = lock.withLock {
+        fun find(): Uri? = runCatching {
+            val where = "${MediaStore.MediaColumns.RELATIVE_PATH} = ? AND ${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
+            app!!.contentResolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, arrayOf(MediaStore.MediaColumns._ID), where, arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$SUBDIR/", name), null)
+                ?.use { c -> if (c.moveToFirst()) android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)) else null }
+        }.getOrNull()
+        // DownloadManager publishes the entry a moment after it reports the download done.
+        var found: Uri? = null
+        for (attempt in 0 until 10) {
+            found = withContext(Dispatchers.IO) { find() }
+            if (found != null) break
+            delay(300)
+        }
+        val uri = found ?: fallback ?: error("can't find the file")
+        record(uri, name, mime)
+        Log.info("downloads", "adopted", null, mapOf("media_store" to "${found != null}", "count" to "${saved().length()}"))
+        uri
+    }
+
+    /** Where files go, for Settings: the chosen folder's name or [DEFAULT_LABEL]. */
+    fun label(): String = folder?.let { DocumentsContract.getTreeDocumentId(it).substringAfterLast(':').ifEmpty { "Chosen folder" } } ?: DEFAULT_LABEL
+
+    /** Saves [bytes] as [name] in the folder, asking for one the first time; returns where. */
+    suspend fun save(name: String, mime: String, bytes: ByteArray, flow: String? = null): Uri = save(name, mime, bytes.size.toLong(), flow) { bytes.inputStream() }
+
+    /** Streams what [open] reads ([size] bytes) to [name] in the folder, as [save]; never whole in memory. */
+    suspend fun save(name: String, mime: String, size: Long, flow: String? = null, open: () -> InputStream): Uri {
+        target()
         return lock.withLock {
-            val uri = withContext(Dispatchers.IO) { write(folder, name, mime, bytes) }
+            val uri = withContext(Dispatchers.IO) { write(folder, name, mime, open) }
             record(uri, name, mime)
-            Log.info("downloads", "saved", flow, mapOf("bytes" to "${bytes.size}", "chosen" to "${folder != null}", "count" to "${saved().length()}"))
+            Log.info("downloads", "saved", flow, mapOf("bytes" to "$size", "chosen" to "${folder != null}", "count" to "${saved().length()}"))
             uri
         }
     }
 
     /** Saves without asking for a folder (the chosen one, else Downloads/vitapmate): Docs' move out of app storage. */
     suspend fun saveQuietly(name: String, mime: String, bytes: ByteArray): Uri = lock.withLock {
-        withContext(Dispatchers.IO) { write(folder, name, mime, bytes) }.also { record(it, name, mime) }
+        withContext(Dispatchers.IO) { write(folder, name, mime) { bytes.inputStream() } }.also { record(it, name, mime) }
     }
 
     /** Deletes a file this app saved, and forgets it. */
@@ -171,7 +205,7 @@ object Downloads {
                 gone++
                 continue
             }
-            runCatching { write(to, item.getString("name"), item.getString("mime"), bytes) }
+            runCatching { write(to, item.getString("name"), item.getString("mime")) { bytes.inputStream() } }
                 .onSuccess { uri ->
                     delete(context, from)
                     moves[from.toString()] = uri.toString()
@@ -189,13 +223,13 @@ object Downloads {
         return failed
     }
 
-    private fun write(tree: Uri?, name: String, mime: String, bytes: ByteArray): Uri {
+    private fun write(tree: Uri?, name: String, mime: String, open: () -> InputStream): Uri {
         val context = app!!
         val resolver = context.contentResolver
         if (tree != null) {
             val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
             val doc = DocumentsContract.createDocument(resolver, parent, mime, name) ?: error("can't create the file")
-            resolver.openOutputStream(doc)!!.use { it.write(bytes) }
+            open().use { input -> resolver.openOutputStream(doc)!!.use { input.copyTo(it) } }
             return doc
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -206,7 +240,7 @@ object Downloads {
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: error("can't create the file")
-            resolver.openOutputStream(uri)!!.use { it.write(bytes) }
+            open().use { input -> resolver.openOutputStream(uri)!!.use { input.copyTo(it) } }
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             return uri
         }
@@ -219,7 +253,7 @@ object Downloads {
         var file = File(dir, name)
         var n = 1
         while (file.exists()) file = File(dir, "${name.substringBeforeLast('.')} (${n++})" + (name.substringAfterLast('.', "").takeIf { it.isNotEmpty() }?.let { ".$it" } ?: ""))
-        file.writeBytes(bytes)
+        open().use { input -> file.outputStream().use { input.copyTo(it) } }
         return Uri.fromFile(file)
     }
 
