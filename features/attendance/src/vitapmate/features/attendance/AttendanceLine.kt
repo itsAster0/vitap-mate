@@ -23,11 +23,12 @@ import androidx.compose.ui.unit.dp
 
 /**
  * A rounded track with [percent] (0–100) filled in [color] and a small tick at 75%. The fill
- * springs out from zero when first shown, and to a new value after.
+ * springs out from zero when first shown, and to a new value after. With [from], a dot marks
+ * where it stands now (the calculator's what-if).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun AttendanceLine(percent: Double, color: Color, modifier: Modifier = Modifier, thickness: Dp = 6.dp) {
+internal fun AttendanceLine(percent: Double, color: Color, modifier: Modifier = Modifier, thickness: Dp = 6.dp, from: Double? = null) {
     val scheme = MaterialTheme.colorScheme
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
@@ -37,6 +38,7 @@ internal fun AttendanceLine(percent: Double, color: Color, modifier: Modifier = 
     )
     val track = scheme.surfaceContainerHighest
     val tick = scheme.onSurfaceVariant
+    val dot = scheme.onSurface
     Canvas(modifier.fillMaxWidth().height(thickness + 6.dp)) {
         val h = thickness.toPx()
         val top = (size.height - h) / 2
@@ -47,5 +49,10 @@ internal fun AttendanceLine(percent: Double, color: Color, modifier: Modifier = 
         if (width > 0f) drawRoundRect(color, Offset(0f, top), Size(width.coerceAtLeast(h), h), radius)
         val x = size.width * 0.75f
         drawLine(tick, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx(), StrokeCap.Round)
+        from?.let {
+            val r = h * 0.32f
+            val cx = (size.width * (it / 100).toFloat()).coerceIn(h / 2, size.width - h / 2)
+            drawCircle(dot, r, Offset(cx, size.height / 2))
+        }
     }
 }

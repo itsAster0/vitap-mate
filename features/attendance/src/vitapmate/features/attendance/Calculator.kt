@@ -12,6 +12,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import vitapmate.ui.Tone
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,8 +50,8 @@ import vitapmate.ui.nums
  * The detail page's Calculator tab. "What if": attend N / skip N more → the percentage VTOP would
  * show, in the tone it lands in (warning when only VTOP's rounding keeps it at 75%). With [plans]
  * (Rust, from the timetable and academic calendar), a second card: until the next exam or the
- * semester's end, what is left, what must be attended to finish at 75%, what can be missed and
- * the best reachable. Labs count in sessions.
+ * semester's end, the classes left as a strip (filled: must attend, hollow: can miss), both
+ * counts, and the best reachable; "Try it" plays that split out in What if. Labs count in sessions.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -67,8 +76,15 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
         verticalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
         item("whatif") {
-            SectionCard(Modifier.fillMaxWidth(), title = "What if") {
+            val reset = (attend > 0 || skip > 0)
+            SectionCard(
+                Modifier.fillMaxWidth(),
+                title = "What if",
+                // Always there (disabled at zero), so the card doesn't jump when it turns on.
+                action = { TextButton({ attend = 0; skip = 0; log("reset", emptyMap()) }, Modifier.testTag("attendance.detail.calc.reset"), enabled = reset) { Text("Reset") } },
+            ) {
                 val (percent, exactSafe) = course.projected(attend, skip)
+                val now = course.projected(0, 0).first
                 val tone = when {
                     percent < 75 -> tones.danger
                     exactSafe -> tones.success
@@ -83,11 +99,39 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(course.percentLabel, style = MaterialTheme.typography.titleMedium.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("  →  ", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("$percent%", Modifier.testTag("attendance.detail.calc.result"), style = MaterialTheme.typography.displaySmallEmphasized.nums())
+                    Text(
+                        "$percent%",
+                        Modifier.testTag("attendance.detail.calc.result"),
+                        style = MaterialTheme.typography.displaySmallEmphasized.nums(),
+                        color = if (reset) tone.base else MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (percent != now) {
+                        Text(
+                            if (percent > now) "+${percent - now}" else "−${now - percent}",
+                            Modifier.padding(start = Space.md)
+                                .background(tone.subtle, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                .testTag("attendance.detail.calc.delta"),
+                            style = MaterialTheme.typography.labelLargeEmphasized.nums(),
+                            color = tone.onSubtle,
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (reset) {
+                        Text(
+                            "${attended + attend} of ${counted + attend + skip}",
+                            style = MaterialTheme.typography.titleSmall.nums(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                AttendanceLine(percent.toDouble(), tone.base, Modifier.padding(top = Space.md, bottom = Space.xl), thickness = 10.dp)
+                AttendanceLine(
+                    percent.toDouble(),
+                    tone.base,
+                    Modifier.padding(top = Space.md, bottom = Space.xl),
+                    thickness = 10.dp,
+                    from = if (reset) course.percent else null,
+                )
                 Stepper("Attend", attend, { attend = it; log("attend", mapOf("attend" to "$it", "skip" to "$skip")) }, "attendance.detail.calc.attend")
                 Spacer(Modifier.height(Space.md))
                 Stepper("Skip", skip, { skip = it; log("skip", mapOf("attend" to "$attend", "skip" to "$it")) }, "attendance.detail.calc.skip")
@@ -97,6 +141,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
             val shown = target.coerceIn(0, plans.lastIndex)
             val plan = plans[shown]
             val left = plan.upcoming + plan.unposted
+            val must = plan.mustAttend
             SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calc.plan"), title = "To finish at 75%") {
                 if (plans.size > 1) {
                     ConnectedChoice(
@@ -109,28 +154,78 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                         modifier = Modifier.padding(bottom = Space.lg),
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                    val must = plan.mustAttend
-                    PlanRow(
-                        "Attend",
-                        when {
-                            must == null -> "Can't reach"
-                            must == 0 -> "Done"
-                            else -> "$must of $left"
-                        },
-                        if (must == null) tones.danger.onSubtle else null,
+                val tone = when {
+                    must == null -> tones.danger
+                    plan.canMiss == 0 -> tones.warning
+                    else -> tones.success
+                }
+                if (left > 0) LeftStrip(left, must ?: left, tone, Modifier.padding(bottom = Space.lg))
+                Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
+                    PlanCount(
+                        if (must == null) "–" else "$must",
+                        if (must == null) "can't reach 75%" else "must attend",
+                        if (must == null) tones.danger.base else MaterialTheme.colorScheme.onSurface,
+                        Modifier.weight(1f).testTag("attendance.detail.calc.must"),
                     )
-                    PlanRow("Can miss", "${plan.canMiss}")
-                    PlanRow("Left", if (plan.unposted > 0) "$left $unit · ${plan.unposted} not posted" else "$left $unit")
-                    PlanRow("Best", "${plan.bestPercent.roundToInt()}%")
+                    PlanCount("${plan.canMiss}", "can miss", tone.base, Modifier.weight(1f).testTag("attendance.detail.calc.miss"))
+                }
+                Row(Modifier.padding(top = Space.md), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        listOfNotNull(
+                            "$left $unit left",
+                            "${plan.unposted} not posted".takeIf { plan.unposted > 0 },
+                            "best ${plan.bestPercent.roundToInt()}%",
+                        ).joinToString(" · "),
+                        Modifier.weight(1f).testTag("attendance.detail.calc.left"),
+                        style = MaterialTheme.typography.bodySmall.nums(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (must != null && left > 0) {
+                        TextButton(
+                            { attend = must; skip = plan.canMiss; log("try", mapOf("attend" to "$must", "skip" to "${plan.canMiss}")) },
+                            Modifier.testTag("attendance.detail.calc.try"),
+                        ) { Text("Try it") }
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * The classes left as a strip of cells: the first [must] filled in [tone] (to attend), the rest
+ * hollow (can be missed). Too many to tell apart: one bar split in the same two parts.
+ */
 @Composable
-private fun PlanRow(label: String, value: String, color: Color? = null) = Row(verticalAlignment = Alignment.CenterVertically) {
-    Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Text(value, style = MaterialTheme.typography.titleSmall.nums(), color = color ?: MaterialTheme.colorScheme.onSurface)
+private fun LeftStrip(left: Int, must: Int, tone: Tone, modifier: Modifier = Modifier) {
+    val outline = tone.base.copy(alpha = 0.55f)
+    Canvas(modifier.fillMaxWidth().height(16.dp).testTag("attendance.detail.calc.strip")) {
+        val gap = 3.dp.toPx()
+        val r = CornerRadius(4.dp.toPx())
+        val cell = (size.width - gap * (left - 1)) / left
+        if (cell >= 6.dp.toPx()) {
+            for (i in 0 until left) {
+                val x = i * (cell + gap)
+                if (i < must) {
+                    drawRoundRect(tone.base, Offset(x, 0f), Size(cell, size.height), r)
+                } else {
+                    drawRoundRect(tone.subtle, Offset(x, 0f), Size(cell, size.height), r)
+                    drawRoundRect(outline, Offset(x, 0f), Size(cell, size.height), r, style = Stroke(1.5.dp.toPx()))
+                }
+            }
+        } else {
+            val split = size.width * must / left
+            drawRoundRect(tone.subtle, Offset.Zero, size, r)
+            drawRoundRect(outline, Offset.Zero, size, r, style = Stroke(1.5.dp.toPx()))
+            if (split > 0f) drawRoundRect(tone.base, Offset.Zero, Size(split, size.height), r)
+        }
+    }
+}
+
+/** A large count over its label. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PlanCount(value: String, label: String, color: Color, modifier: Modifier = Modifier) = Column(modifier) {
+    Text(value, style = MaterialTheme.typography.headlineMediumEmphasized.nums(), color = color)
+    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
