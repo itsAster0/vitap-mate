@@ -379,6 +379,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         Core {
+            cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
         }
@@ -534,7 +535,7 @@ mod tests {
             .unwrap();
         // Signed out (no session in this core): the edge hears why, the caller gets the error.
         can(&edge, path, 200, json!({ "ok": true }));
-        fs::write(core.dir.join(crate::forwarding::SERVER_FILE), &server).unwrap();
+        fs::write(core.at(crate::forwarding::SERVER_FILE), &server).unwrap();
         let signed_out = core
             .answer_session_request("f-b".into(), "r2".into(), callback.clone(), None)
             .await;

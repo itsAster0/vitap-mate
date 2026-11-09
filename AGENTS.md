@@ -68,7 +68,7 @@ keystore/             release keystore (gitignored; never read or print it)
 - Every user action or background run is a `flow()`. Its id is the first
   argument of every `Core` call, so Rust's log lines carry it too, and every
   line carries `regno`. Kotlin logs go through Rust into one file
-  (`files/logs/app.jsonl`) and logcat (tag `vitapmate`). Logs stay on the phone
+  (`cache/logs/app.jsonl`) and logcat (tag `vitapmate`). Logs stay on the phone
   until the user shares them from Developer. Never log cookies, passwords,
   OTPs, CSRF tokens or keys.
 - Background work uses short timeouts (the open-app sweep stops at a page that

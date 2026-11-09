@@ -14,7 +14,7 @@ mod transport;
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::SystemTime;
@@ -318,6 +318,8 @@ mod web;
 #[derive(uniffi::Object)]
 pub struct Core {
     dir: PathBuf,
+    /// The change inbox, which Android may clear (see [`Core::at`]).
+    cache: PathBuf,
     slot: Mutex<Option<Arc<Slot>>>,
 }
 
@@ -325,16 +327,19 @@ pub struct Core {
 /// `outcome` on close.
 #[uniffi::export]
 impl Core {
-    /// Opens the cache in `data_dir` and restores the saved session.
+    /// Opens the cache in `data_dir`, the change inbox in `cache_dir`, and
+    /// restores the saved session.
     #[uniffi::constructor]
-    pub fn new(flow: String, data_dir: String) -> Result<Arc<Self>, CoreError> {
-        obs::obs_init(data_dir.clone());
+    pub fn new(flow: String, data_dir: String, cache_dir: String) -> Result<Arc<Self>, CoreError> {
+        obs::obs_init(cache_dir.clone());
         let core = Self {
             dir: PathBuf::from(data_dir),
+            cache: PathBuf::from(cache_dir),
             slot: Mutex::new(None),
         };
         traced_sync("new", &flow, || {
             fs::create_dir_all(&core.dir)?;
+            fs::create_dir_all(&core.cache)?;
             route::load(&core);
             let Some(account) = core.read::<Account>(ACCOUNT) else {
                 return Ok(());
@@ -894,7 +899,7 @@ impl Core {
             None => signed_in!(self, |client| op(client, &id))?,
         };
         let path = format!("{PAGES}/{semester}/{file}");
-        if let Some(parent) = self.dir.join(&path).parent() {
+        if let Some(parent) = self.at(&path).parent() {
             let _ = fs::create_dir_all(parent);
         }
         self.write(&path, &data);
@@ -1099,14 +1104,14 @@ impl Core {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         for file in files {
-            match fs::remove_file(self.dir.join(file)) {
+            match fs::remove_file(self.at(file)) {
                 Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
                     warn!(file, %error, "not removed");
                 }
                 _ => {}
             }
         }
-        match fs::remove_dir_all(self.dir.join(PAGES)) {
+        match fs::remove_dir_all(self.at(PAGES)) {
             Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
                 warn!(%error, "cached pages not removed");
             }
@@ -1114,8 +1119,19 @@ impl Core {
         }
     }
 
+    /// Where `file` lives: the change inbox in the cache folder, everything
+    /// else (pages, account, session, keys) in the data folder.
+    fn at(&self, file: impl AsRef<Path>) -> PathBuf {
+        let file = file.as_ref();
+        if file == Path::new(changes::FILE) {
+            self.cache.join(file)
+        } else {
+            self.dir.join(file)
+        }
+    }
+
     fn read<T: DeserializeOwned>(&self, file: &str) -> Option<T> {
-        let bytes = fs::read(self.dir.join(file)).ok()?;
+        let bytes = fs::read(self.at(file)).ok()?;
         serde_json::from_slice(&bytes)
             .inspect_err(|error| warn!(file, %error, "unreadable"))
             .ok()
@@ -1143,7 +1159,7 @@ impl Core {
     }
 
     fn write_bytes(&self, file: &str, bytes: &[u8]) {
-        let path = self.dir.join(file);
+        let path = self.at(file);
         let temp = path.with_extension("tmp");
         let result = fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, &path));
         if let Err(error) = result {

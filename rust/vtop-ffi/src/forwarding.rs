@@ -311,7 +311,7 @@ impl Core {
     }
 
     pub(crate) fn forwarding_server(&self) -> String {
-        fs::read_to_string(self.dir.join(SERVER_FILE))
+        fs::read_to_string(self.at(SERVER_FILE))
             .ok()
             .map(|text| text.trim().to_string())
             .filter(|text| !text.is_empty())
@@ -399,7 +399,7 @@ impl Core {
     pub(crate) fn forget_forwarding(&self, id: &str) {
         let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         if self.read::<Saved>(FILE).is_some_and(|saved| saved.id == id) {
-            let _ = fs::remove_file(self.dir.join(FILE));
+            let _ = fs::remove_file(self.at(FILE));
             info!("forwarding forgotten");
         }
     }
@@ -603,6 +603,7 @@ pub(crate) mod tests {
         // Not signed in: a new address, no owner claim.
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         assert_eq!(
@@ -722,6 +723,7 @@ pub(crate) mod tests {
         let server = serve(edge.clone()).await;
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         let body = json!({ "id": ID });
@@ -758,6 +760,7 @@ pub(crate) mod tests {
         fs::write(dir.join(FILE), old.to_string()).unwrap();
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         assert_eq!(
@@ -773,6 +776,7 @@ pub(crate) mod tests {
         fs::create_dir_all(&dir).unwrap();
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         let saved = Saved {

@@ -183,7 +183,7 @@ impl Core {
                 host: gateway.host.clone(),
                 ports: gateway.ports.clone(),
                 server_key: key,
-                state_dir: self.dir.join(WIRE_DIR),
+                state_dir: self.at(WIRE_DIR),
                 // Cookies are secret: not in message 1, which is not forward-secret.
                 request_in_handshake: page.session.is_none(),
             };
@@ -368,6 +368,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let core = Core {
+            cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
         };
@@ -407,6 +408,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let core = Core {
+            cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
         };

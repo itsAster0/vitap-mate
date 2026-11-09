@@ -110,7 +110,7 @@ impl Core {
             let slot = self.current()?;
             let mut session = slot.write().await;
             session.restart()?;
-            remove(&self.dir.join(SESSION));
+            remove(&self.at(SESSION));
             info!("session dropped; the next fetch signs in again");
             Ok(())
         })
@@ -171,7 +171,7 @@ impl Core {
                         info!("no semester picked: nothing to clear");
                         return Ok(());
                     };
-                    remove_dir(&self.dir.join(PAGES).join(semester));
+                    remove_dir(&self.at(PAGES).join(semester));
                 }
             }
             info!(?scope, "cache cleared");
@@ -182,7 +182,7 @@ impl Core {
     /// Forgets the semester pick (pages stay cached per semester): the app asks for one again.
     pub fn dev_reset_semester(&self, flow: String) -> Result<(), CoreError> {
         traced_sync("dev_reset_semester", &flow, || {
-            remove(&self.dir.join(SELECTED));
+            remove(&self.at(SELECTED));
             info!("semester pick forgotten");
             Ok(())
         })
@@ -214,11 +214,7 @@ impl Core {
                 return Ok(0);
             };
             let mut dropped = 0;
-            for entry in fs::read_dir(self.dir.join(&dir))
-                .into_iter()
-                .flatten()
-                .flatten()
-            {
+            for entry in fs::read_dir(self.at(&dir)).into_iter().flatten().flatten() {
                 let file = format!("{dir}/{}", entry.file_name().to_string_lossy());
                 let Some(mut data) = self.read::<FullAttendanceData>(&file) else {
                     continue;
@@ -322,7 +318,7 @@ impl Core {
         url: Option<String>,
     ) -> Result<(), CoreError> {
         traced_sync("dev_set_forwarding_server", &flow, || {
-            let path = self.dir.join(forwarding::SERVER_FILE);
+            let path = self.at(forwarding::SERVER_FILE);
             match url.as_deref().map(str::trim).filter(|url| !url.is_empty()) {
                 Some(url) => {
                     if !(url.starts_with("http://") || url.starts_with("https://")) {
@@ -422,6 +418,7 @@ mod tests {
         fs::write(dir.join(PAGES).join("profile.json"), "{}").unwrap();
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         (core, dir)

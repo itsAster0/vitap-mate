@@ -1,5 +1,5 @@
 //! The app's one log pipeline, for Rust and Kotlin alike: JSON lines in
-//! `<data_dir>/logs/app.jsonl` (fields `t l src msg flow regno`, plus span
+//! `<dir>/logs/app.jsonl` (the app passes its cache folder) (fields `t l src msg flow regno`, plus span
 //! fields and `ms` on span close; rolled to `.1` past [`MAX_BYTES`]), logcat
 //! (tag `vitapmate`) and ATrace sections for Perfetto on Android.
 //! vtop-core's `log` records are bridged in. Lines before [`obs_init`] reach
@@ -36,7 +36,8 @@ fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Starts the pipeline, writing to `data_dir/logs/app.jsonl`. Safe to call
+/// Starts the pipeline, writing to `data_dir/logs/app.jsonl` (the app
+/// passes its cache folder). Safe to call
 /// more than once.
 #[uniffi::export]
 pub fn obs_init(data_dir: String) {

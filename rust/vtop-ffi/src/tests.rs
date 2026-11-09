@@ -15,7 +15,12 @@ async fn calls_log_ms_and_outcome_without_secrets() {
     fs::write(dir.join(SESSION), session).unwrap();
     fs::create_dir_all(dir.join(PAGES).join("AP1")).unwrap();
     fs::write(dir.join(SELECTED), r#""AP1""#).unwrap();
-    let core = Core::new("f-new".into(), dir.to_string_lossy().into()).unwrap();
+    let core = Core::new(
+        "f-new".into(),
+        dir.to_string_lossy().into(),
+        dir.to_string_lossy().into(),
+    )
+    .unwrap();
 
     // Both fail before any network call.
     let signed_in = core
@@ -82,6 +87,7 @@ fn pages_follow_the_selected_semester() {
     // Not Core::new: logging is process-wide and the other test reads its own log file.
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     let code = |core: &Core| {
@@ -130,6 +136,7 @@ async fn pages_wait_for_a_picked_semester() {
     };
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(Some(Arc::new(RwLock::new(Session::new(account).unwrap())))),
     };
     // Before any network call: no pick, no request.
@@ -172,6 +179,7 @@ fn attendance_detail_reads_the_course_history() {
     .unwrap();
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     // Course known, history not fetched yet.
@@ -222,6 +230,7 @@ fn the_cached_calendar_shapes_the_agenda() {
     fs::write(dir.join(PAGES).join("AP1").join(TIMETABLE), timetable).unwrap();
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     // Sat 2026-11-07 (epoch day 20 764): a plain class day without a calendar.
@@ -261,6 +270,7 @@ fn outlook_plans_every_saved_course() {
     .unwrap();
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     // No calendar yet: no outlook.
@@ -338,6 +348,7 @@ fn missing_or_behind_histories_are_mismatched() {
     .unwrap();
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     assert_eq!(
@@ -393,6 +404,7 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
     let slot = Arc::new(RwLock::new(Session::new(account("21BCE0002")).unwrap()));
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(Some(slot.clone())),
     };
 
@@ -434,6 +446,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     };
     let slot = Arc::new(RwLock::new(Session::new(account).unwrap()));
     let core = Core {
+        cache: std::env::temp_dir(),
         dir: std::env::temp_dir().join(format!("vtop-ffi-otp-{}", std::process::id())),
         slot: Mutex::new(Some(slot.clone())),
     };
@@ -506,6 +519,7 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
     };
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(None),
     };
     let launch = || {
@@ -567,6 +581,7 @@ async fn clearing_the_session_empties_the_shared_store() {
     memory.set_cookies(vtop.clone(), vec!["JSESSIONID=live; Path=/vtop".into()]);
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: Mutex::new(Some(Arc::new(RwLock::new(session)))),
     };
     assert_eq!(

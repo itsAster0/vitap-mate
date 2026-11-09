@@ -516,6 +516,7 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         Core {
+            cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
         }
@@ -537,7 +538,7 @@ mod tests {
     /// This phone's forwarding address on `server`, as `forwarding.json` holds it.
     fn mailbox(core: &Core, server: &str) {
         let saved = json!({ "server": server, "id": "k3f9x2ab7q", "address": "otp+k3f9x2ab7q@vmate.aster0.dev" });
-        fs::write(core.dir.join(crate::forwarding::FILE), saved.to_string()).unwrap();
+        fs::write(core.at(crate::forwarding::FILE), saved.to_string()).unwrap();
     }
 
     #[tokio::test]
@@ -688,7 +689,7 @@ mod tests {
         let core = core("delete");
         let edge = Arc::new(Mutex::new(Edge::default()));
         let server = serve(edge.clone()).await;
-        fs::write(core.dir.join(crate::forwarding::SERVER_FILE), &server).unwrap();
+        fs::write(core.at(crate::forwarding::SERVER_FILE), &server).unwrap();
         // Never registered: nothing to delete.
         assert_eq!(core.delete_server_device("f0".into()).await, Ok(true));
         assert!(paths(&edge).is_empty());

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
 import android.util.Base64
+import java.io.File
 import java.security.KeyStore
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
@@ -50,7 +51,14 @@ object AppCore {
         val dir = context.filesDir.path
         thread(name = "core-init") {
             runCatching {
-                obsInit(dir)
+                // Logs, the change inbox and Activity history live in the cache folder, which
+                // the student can clear; older versions kept them in files/.
+                File(app.filesDir, "logs").deleteRecursively()
+                for (name in listOf("changes.json", "activity.jsonl")) {
+                    val old = File(app.filesDir, name)
+                    if (old.exists() && !File(app.cacheDir, name).exists()) old.renameTo(File(app.cacheDir, name)) else old.delete()
+                }
+                obsInit(app.cacheDir.path)
                 runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 devConfigure(DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt()))
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
@@ -59,7 +67,7 @@ object AppCore {
                 setUdpNetwork(VtopUdp(app))
                 setSharedCookies(VtopCookies)
                 setDeviceLabel(if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}")
-                runBlocking { flow("core_init") { Core(it, dir) } }
+                runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path) } }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")
                 core.completeExceptionally(e)

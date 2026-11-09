@@ -313,7 +313,7 @@ impl Core {
                 CourseId::parse(&course_id)?,
             );
             let data = page!(self, "grade_details", Some(&semester_id), ["course_id" => &course_id], |client| client.grade_view_details(&semester, &course))?;
-            if let Some(parent) = self.dir.join(&path).parent() {
+            if let Some(parent) = self.at(&path).parent() {
                 let _ = fs::create_dir_all(parent);
             }
             self.write(&path, &data);
@@ -345,7 +345,7 @@ impl Core {
         traced("fetch_grade_history", &flow, async {
             let data = page!(self, "grade_history", None, [], |client| client
                 .grade_history())?;
-            let _ = fs::create_dir_all(self.dir.join(PAGES));
+            let _ = fs::create_dir_all(self.at(PAGES));
             self.write(&format!("{PAGES}/{HISTORY}"), &data);
             Ok(logged_history(GradeHistory::from(data)))
         })
@@ -516,7 +516,7 @@ impl Core {
         let data = page!(self, "grades", Some(semester), [], |client| client
             .grade_view(&id))?;
         let path = format!("{PAGES}/{semester}/{GRADES}");
-        if let Some(parent) = self.dir.join(&path).parent() {
+        if let Some(parent) = self.at(&path).parent() {
             let _ = fs::create_dir_all(parent);
         }
         self.write(&path, &data);

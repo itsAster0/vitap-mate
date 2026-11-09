@@ -95,8 +95,8 @@ description = "Follow the app's log (Kotlin and Rust) in logcat"
 run = "$HOME/Library/Android/sdk/platform-tools/adb logcat -v time -s vitapmate"
 
 [tasks.logs-pull]
-description = "Print the app's JSON-lines log file (files/logs/app.jsonl)"
-run = "$HOME/Library/Android/sdk/platform-tools/adb exec-out run-as com.vitap_pal.app cat files/logs/app.jsonl"
+description = "Print the app's JSON-lines log file (cache/logs/app.jsonl)"
+run = "$HOME/Library/Android/sdk/platform-tools/adb exec-out run-as com.vitap_pal.app cat cache/logs/app.jsonl"
 
 [tasks.trace]
 description = "Capture 10 s of Perfetto (app + Rust spans, gfx, view) to traces/"

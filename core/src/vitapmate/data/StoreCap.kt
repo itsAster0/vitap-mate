@@ -21,7 +21,7 @@ object StoreCap {
     suspend fun enforce(context: Context, flow: String) = withContext(Dispatchers.IO) {
         try {
             val core = AppCore.await()
-            val logs = File(context.filesDir, "logs")
+            val logs = File(context.cacheDir, "logs")
             val rolled = File(logs, "app.jsonl.1")
             val logBytes = logs.listFiles().orEmpty().sumOf { it.length() }
             val activity = ActivityHistory.bytes

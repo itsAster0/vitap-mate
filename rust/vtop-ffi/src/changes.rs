@@ -130,7 +130,7 @@ impl Core {
     /// The inbox file's size, for the app's storage cap.
     pub fn changes_bytes(&self, flow: String) -> u64 {
         traced_sync("changes_bytes", &flow, || {
-            Ok(fs::metadata(self.dir.join(FILE)).map_or(0, |meta| meta.len()))
+            Ok(fs::metadata(self.at(FILE)).map_or(0, |meta| meta.len()))
         })
         .unwrap_or(0)
     }
@@ -170,7 +170,7 @@ impl Core {
         if page != GRADES && picked.as_deref() != Some(semester) {
             return;
         }
-        let Ok(old) = fs::read(self.dir.join(file)) else {
+        let Ok(old) = fs::read(self.at(file)) else {
             // A first copy: nothing to compare, but it is primed now.
             self.update_store(|store| {
                 prime(store, picked.as_deref(), semester, page);
@@ -999,6 +999,7 @@ mod tests {
         fs::create_dir_all(dir.join(format!("{PAGES}/S"))).unwrap();
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(None),
         };
         core.write_plain(SELECTED, &"S".to_string());

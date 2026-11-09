@@ -16,11 +16,10 @@ import kotlinx.coroutines.flow.map
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * The Inspector's data: the app's log file (`files/logs/app.jsonl` + `.1`, Kotlin and Rust
+ * The Inspector's data: the app's log file (`cache/logs/app.jsonl` + `.1`, Kotlin and Rust
  * lines) as [LogLine]s and [FlowSummary]s, tailed while collected. Filter with [LogFilter].
  */
 object Inspector {
-    private lateinit var files: File
     private lateinit var cache: File
 
     /** When this process attached (epoch ms): flows older without an end were cut off. */
@@ -29,13 +28,12 @@ object Inspector {
 
     /** Called by `AppCore.start`. */
     internal fun attach(context: Context) {
-        files = context.filesDir
         cache = context.cacheDir
         startedAt = System.currentTimeMillis()
-        ActivityHistory.attach(files)
+        ActivityHistory.attach(cache)
     }
 
-    private val logs get() = File(files, "logs")
+    private val logs get() = File(cache, "logs")
 
     /** The last [max] lines, oldest first; re-emitted (polling every 500 ms on IO) when lines are appended. */
     fun lines(max: Int = 2000): Flow<List<LogLine>> = flow {

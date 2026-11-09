@@ -53,6 +53,7 @@ mod tests {
     async fn signed_out_has_no_web_session() {
         // Not `Core::new`: that starts the process-wide log, which another test owns.
         let core = Core {
+            cache: std::env::temp_dir(),
             dir: std::env::temp_dir().join(format!("vtop-ffi-web-{}", std::process::id())),
             slot: std::sync::Mutex::new(None),
         };

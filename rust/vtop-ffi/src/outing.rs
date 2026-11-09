@@ -390,7 +390,7 @@ impl Core {
     ) -> Result<String, CoreError> {
         traced("outing_pass", &flow, async {
             let id = OutingPassId::parse(&pass_id)?;
-            let dir = self.dir.join(PAGES).join(PASSES);
+            let dir = self.at(PAGES).join(PASSES);
             let path = dir.join(format!("{}.pdf", id.as_str()));
             if fs::metadata(&path).is_ok_and(|meta| meta.len() > 0) {
                 info!(?kind, "outing pass saved already");
@@ -421,7 +421,7 @@ impl Core {
 
 impl Core {
     fn write_outing(&self, file: &str, data: &impl serde::Serialize) {
-        let _ = fs::create_dir_all(self.dir.join(PAGES));
+        let _ = fs::create_dir_all(self.at(PAGES));
         self.write(&format!("{PAGES}/{file}"), data);
     }
 }

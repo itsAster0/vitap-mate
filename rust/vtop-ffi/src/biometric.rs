@@ -135,7 +135,7 @@ impl Core {
         let text = vtop_date(day);
         let date = BiometricDate::parse(&text)?;
         let data = page!(self, "biometric", None, ["date" => &text], |client| client.biometric_history(&date))?;
-        let _ = fs::create_dir_all(self.dir.join(PAGES).join(DIR));
+        let _ = fs::create_dir_all(self.at(PAGES).join(DIR));
         self.write(&format!("{PAGES}/{DIR}/{day}.json"), &data);
         Ok(data)
     }
@@ -332,6 +332,7 @@ mod tests {
         // Not `Core::new`: it would point the log at this directory.
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: std::sync::Mutex::new(None),
         };
         let ended = (i64::from(DAY + 1) * 86_400) as u64;

@@ -4,7 +4,7 @@ import vitapmate.core.logEvent
 
 /**
  * App logs. Lines go through Rust (`logEvent`), so Kotlin and Rust share one file
- * (`files/logs/app.jsonl`), one logcat tag (`vitapmate`) and one order. Never pass cookies,
+ * (`cache/logs/app.jsonl`), one logcat tag (`vitapmate`) and one order. Never pass cookies,
  * passwords, OTPs, CSRF tokens or keys.
  */
 object Log {

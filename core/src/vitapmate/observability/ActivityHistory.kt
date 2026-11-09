@@ -6,15 +6,15 @@ import org.json.JSONObject
 
 /**
  * Finished [Run]s kept after the log files roll over, one JSON object per line in
- * `files/activity.jsonl`, oldest first, so "Show older" in Activity reaches back further than
+ * `cache/activity.jsonl`, oldest first, so "Show older" in Activity reaches back further than
  * the logs. [save] adds the finished runs the logs hold that aren't saved yet (at start and after
  * a background sync); [StoreCap] trims the oldest lines.
  */
 object ActivityHistory {
     private lateinit var file: File
 
-    internal fun attach(files: File) {
-        file = File(files, "activity.jsonl")
+    internal fun attach(cache: File) {
+        file = File(cache, "activity.jsonl")
     }
 
     val bytes: Long get() = file.length()

@@ -146,7 +146,7 @@ impl Core {
     pub async fn fetch_profile(&self, flow: String) -> Result<Profile, CoreError> {
         traced("fetch_profile", &flow, async {
             let data = page!(self, "profile", None, [], |client| client.profile())?;
-            let _ = std::fs::create_dir_all(self.dir.join(PAGES));
+            let _ = std::fs::create_dir_all(self.at(PAGES));
             self.write(&format!("{PAGES}/{PROFILE}"), &data);
             let mentor = match page!(self, "mentor", None, [], |client| client.mentor()) {
                 Ok(mentor) => {

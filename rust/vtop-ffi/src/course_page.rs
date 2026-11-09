@@ -329,7 +329,7 @@ impl Core {
     /// A new temporary file in `files/downloads/` for a download to go to.
     fn part_file(&self) -> Result<PathBuf, CoreError> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let dir = self.dir.join(DOWNLOADS);
+        let dir = self.at(DOWNLOADS);
         fs::create_dir_all(&dir)?;
         Ok(dir.join(format!(".{}.part", NEXT.fetch_add(1, Ordering::Relaxed))))
     }
@@ -353,7 +353,7 @@ impl Core {
             .trim()
             .to_ascii_lowercase();
         let name = file_name(&saved.file_name, fallback, &mime);
-        let path = self.dir.join(DOWNLOADS).join(&name);
+        let path = self.at(DOWNLOADS).join(&name);
         fs::rename(part, &path).inspect_err(|_| {
             let _ = fs::remove_file(part);
         })?;
@@ -749,6 +749,7 @@ mod tests {
         // Not Core::new: logging is process-wide and another test reads its own log file.
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: std::sync::Mutex::new(None),
         };
         let classes = |list: Vec<CoursePageClass>| CoursePageClasses {
@@ -888,6 +889,7 @@ mod tests {
         };
         let core = Core {
             dir: dir.clone(),
+            cache: dir.clone(),
             slot: Mutex::new(Some(Arc::new(RwLock::new(session)))),
         };
         (core, dir)

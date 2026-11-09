@@ -536,6 +536,7 @@ async fn core_on(mock: &MockVtop, name: &str) -> (Core, PathBuf) {
     };
     let core = Core {
         dir: dir.clone(),
+        cache: dir.clone(),
         slot: std::sync::Mutex::new(Some(Arc::new(RwLock::new(session)))),
     };
     (core, dir)

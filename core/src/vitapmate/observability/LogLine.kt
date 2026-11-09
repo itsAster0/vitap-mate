@@ -1,7 +1,7 @@
 package vitapmate.observability
 
 /**
- * One line of `files/logs/app.jsonl` (written by Rust's `obs.rs`, for Kotlin and Rust alike):
+ * One line of `cache/logs/app.jsonl` (written by Rust's `obs.rs`, for Kotlin and Rust alike):
  * `t` epoch ms, `l` level, `src`, `msg`, optional `flow`, `regno`, `ms` (span close / flow end),
  * `outcome` (`ok` or an error kind); every other field is in [fields].
  */

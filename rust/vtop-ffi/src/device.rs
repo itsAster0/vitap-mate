@@ -332,6 +332,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let core = Core {
+            cache: dir.clone(),
             dir,
             slot: Mutex::new(None),
         };

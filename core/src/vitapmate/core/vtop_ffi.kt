@@ -1076,7 +1076,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_free_core(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_vtop_ffi_fn_constructor_core_new(`flow`: RustBuffer.ByValue,`dataDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_vtop_ffi_fn_constructor_core_new(`flow`: RustBuffer.ByValue,`dataDir`: RustBuffer.ByValue,`cacheDir`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_attendance_outlook(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1477,7 +1477,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_func_log_event() and 0xFFFF) != 39318) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_func_obs_init() and 0xFFFF) != 57587) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_obs_init() and 0xFFFF) != 51801) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_func_check_general_outing() and 0xFFFF) != 4785) {
@@ -1816,7 +1816,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_udpsocket_shutdown() and 0xFFFF) != 52948) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 43601) {
+    if ((lib.uniffi_vtop_ffi_checksum_constructor_core_new() and 0xFFFF) != 5238) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -3015,16 +3015,18 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         this.cleanable = null
     }
     /**
-     * Opens the cache in `data_dir` and restores the saved session.
+     * Opens the cache in `data_dir`, the change inbox in `cache_dir`, and
+     * restores the saved session.
      */
-    constructor(`flow`: kotlin.String, `dataDir`: kotlin.String) :
+    constructor(`flow`: kotlin.String, `dataDir`: kotlin.String, `cacheDir`: kotlin.String) :
         this(UniffiWithHandle, 
     uniffiRustCallWithError(CoreException) { _status ->
     UniffiLib.uniffi_vtop_ffi_fn_constructor_core_new(
     
         
         FfiConverterString.lower(`flow`),
-        FfiConverterString.lower(`dataDir`),_status)
+        FfiConverterString.lower(`dataDir`),
+        FfiConverterString.lower(`cacheDir`),_status)
 }
     )
 
@@ -17320,7 +17322,8 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
     
 
         /**
-         * Starts the pipeline, writing to `data_dir/logs/app.jsonl`. Safe to call
+         * Starts the pipeline, writing to `data_dir/logs/app.jsonl` (the app
+         * passes its cache folder). Safe to call
          * more than once.
          */ fun `obsInit`(`dataDir`: kotlin.String)
         = 
