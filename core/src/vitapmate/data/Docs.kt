@@ -317,10 +317,48 @@ object Docs {
                 source,
                 System.currentTimeMillis(),
             )
-            state.value = docs.filterNot { it.id == doc.id } + doc
+            // A [refresh] meanwhile may have picked the new file up from the folder already.
+            state.value = docs.filterNot { it.id == doc.id || it.uri == doc.uri } + doc
             write()
             Log.info("docs", "saved", flow, mapOf("kind" to doc.kind.name, "bytes" to "${doc.size}", "source" to source, "count" to "${docs.size}"))
             doc
+        }
+    }
+
+    /**
+     * Catches up with what the student did in the download folder outside the app (Docs opened):
+     * a file deleted there leaves Docs, a file added there joins it (source `folder`), and a file
+     * renamed there keeps its document (matched by size and kind), with the new name. Lazy: only
+     * when Docs is opened, never in the background. Log src `docs`: counts only.
+     */
+    suspend fun refresh() {
+        val files = withContext(Dispatchers.IO) { Downloads.list() } ?: return
+        lock.withLock {
+            val byUri = files.associateBy { it.uri }
+            val known = docs.map { it.uri }.toSet()
+            val added = files.filter { it.uri !in known }.toMutableList()
+            var renamed = 0
+            var removed = 0
+            val kept = docs.mapNotNull { d ->
+                val file = byUri[d.uri]
+                when {
+                    d.uri.isEmpty() -> d
+                    file != null -> if (file.name == d.file) d else d.copy(file = file.name, name = file.name.substringBeforeLast('.'), kind = DocKind.of(file.name))
+                    else -> added.firstOrNull { it.size == d.size && DocKind.of(it.name) == d.kind }?.let { moved ->
+                        added -= moved
+                        renamed++
+                        d.copy(uri = moved.uri, file = moved.name, name = moved.name.substringBeforeLast('.').ifEmpty { moved.name })
+                    } ?: run { removed++; null }
+                }
+            }
+            val now = System.currentTimeMillis()
+            val joined = added.mapIndexed { i, f ->
+                Doc("doc-$now-${counter++}-$i", f.name.substringBeforeLast('.').ifEmpty { f.name }, f.name, f.uri, DocKind.of(f.name), f.size, "folder", now)
+            }
+            if (removed == 0 && renamed == 0 && joined.isEmpty() && kept == docs) return
+            state.value = kept + joined
+            write()
+            Log.info("docs", "folder caught up", fields = mapOf("removed" to "$removed", "renamed" to "$renamed", "added" to "${joined.size}", "count" to "${docs.size}"))
         }
     }
 

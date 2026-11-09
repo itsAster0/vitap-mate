@@ -124,6 +124,8 @@ internal fun DocsScreen() {
     val shown = remember(all, sort, query) { queryDocs(all, sort, query) }
     val searching = query.isNotBlank()
 
+    // What the student changed in the folder outside the app, caught up each time Docs opens.
+    LaunchedEffect(Unit) { Docs.refresh() }
     LaunchedEffect(all.size, shown.size, sort) {
         StateRegistry.report(SRC, mapOf("docs" to all.size, "shown" to shown.size, "sort" to sort.name, "bytes" to all.sumOf { it.size }, "kinds" to all.groupingBy { it.kind.name }.eachCount()))
     }

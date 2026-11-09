@@ -93,6 +93,39 @@ object Downloads {
     /** Whether [uri] still opens (the student may have deleted the file in their file manager). */
     fun exists(uri: Uri): Boolean = runCatching { app!!.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
 
+    /** A file in the folder: where it is, its name and size. */
+    class Entry(val uri: String, val name: String, val size: Long)
+
+    /**
+     * Every file in the folder now, or null when it can't be read (permission gone). In the
+     * default folder Android shows the app only the files it saved itself. Disk/binder: off the
+     * main thread.
+     */
+    fun list(): List<Entry>? = runCatching {
+        val resolver = app!!.contentResolver
+        val tree = folder
+        if (tree != null) {
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+            val columns = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME, DocumentsContract.Document.COLUMN_SIZE, DocumentsContract.Document.COLUMN_MIME_TYPE)
+            resolver.query(children, columns, null, null, null)?.use { c ->
+                buildList {
+                    while (c.moveToNext()) {
+                        if (c.getString(3) == DocumentsContract.Document.MIME_TYPE_DIR) continue
+                        add(Entry(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)).toString(), c.getString(1), c.getLong(2)))
+                    }
+                }
+            }
+        } else {
+            val columns = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.SIZE)
+            val where = "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
+            resolver.query(MediaStore.Downloads.EXTERNAL_CONTENT_URI, columns, where, arrayOf("${Environment.DIRECTORY_DOWNLOADS}/$SUBDIR/"), null)?.use { c ->
+                buildList {
+                    while (c.moveToNext()) add(Entry(android.content.ContentUris.withAppendedId(MediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0)).toString(), c.getString(1), c.getLong(2)))
+                }
+            }
+        }
+    }.getOrNull()
+
     /** What the app saved, by file name: its URI (the newest when a name repeats). */
     fun savedByName(): Map<String, String> {
         val list = saved()
