@@ -5,6 +5,8 @@ product:
 
 dependencies:
   - //design
+  # Home-screen widget (TimetableWidget.kt), drawn from the cached timetable.
+  - androidx.glance:glance-appwidget:1.2.0
 
 settings:
   android:

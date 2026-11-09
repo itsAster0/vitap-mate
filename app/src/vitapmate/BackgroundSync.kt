@@ -33,6 +33,7 @@ import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
 import vitapmate.data.coreFlow
 import vitapmate.features.login.MailForwarding
+import vitapmate.features.timetable.TimetableWidget
 import vitapmate.features.login.OtpAutofill
 import vitapmate.observability.ActivityHistory
 import vitapmate.observability.Log
@@ -154,6 +155,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 why == null
             }
             if (result.outcome == VtopSync.Outcome.Done) Settings.syncPaused = null
+            TimetableWidget.refresh(app)
             // New changes since the last notification, of the kinds switched on.
             val since = prefs.getLong("notified_ms", System.currentTimeMillis() - 86_400_000L)
             val fresh = withContext(Dispatchers.IO) { AppCore.await().changes(f) }

@@ -35,6 +35,13 @@
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
       </intent-filter>
     </service>
+    <!-- Home-screen widget: next class and today's timetable (TimetableWidget.kt). -->
+    <receiver android:name="vitapmate.features.timetable.TimetableWidgetReceiver" android:exported="true" android:label="@string/shortcut_timetable">
+      <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+      </intent-filter>
+      <meta-data android:name="android.appwidget.provider" android:resource="@xml/timetable_widget" />
+    </receiver>
     <!-- Shares the log file from the Inspector (share sheet). -->
     <provider
         android:name="androidx.core.content.FileProvider"

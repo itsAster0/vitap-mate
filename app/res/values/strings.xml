@@ -4,4 +4,6 @@
   <string name="shortcut_timetable">Timetable</string>
   <string name="shortcut_attendance">Attendance</string>
   <string name="shortcut_outing">Outing</string>
+  <!-- Home-screen widget (res/xml/timetable_widget.xml). -->
+  <string name="widget_timetable_description">Your next class and today\'s timetable</string>
 </resources>
