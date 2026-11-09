@@ -8,6 +8,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,7 +33,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
@@ -40,6 +47,7 @@ import java.util.Calendar
 import java.util.TimeZone
 import vitapmate.core.AttendedClass
 import vitapmate.core.ClassStatus
+import vitapmate.ui.AppTheme
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.Tone
@@ -48,15 +56,18 @@ import vitapmate.ui.isoWeekday
 import vitapmate.ui.nums
 
 /**
- * The Flutter app's month calendar of a course (`attendance.detail.calendar`): Monday first, each
- * class day filled in its status's tone (several classes on a day: the worst, absent first), today
- * ringed. Pages through the months with classes, opening on the latest.
+ * A course's month calendar (`attendance.detail.calendar`), Monday first. A class day is a tile
+ * filled in its worst status's tone (absent first); a day with several classes adds a pip per
+ * class in that class's own tone; days without a class are faint, weekends fainter, today outlined in primary.
+ * The header counts the month's classes and absences. Pages through the months with classes,
+ * opening on the latest.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ClassCalendar(classes: List<AttendedClass>) {
+    // Each day's statuses, worst first.
     val byDay = remember(classes) {
-        classes.groupBy { it.day }.mapValues { (_, day) -> day.maxBy { rank(it.status) }.status }
+        classes.groupBy { it.day }.mapValues { (_, day) -> day.map { it.status }.sortedByDescending(::rank) }
     }
     // First epoch day of each month that has classes, oldest first.
     val months = remember(byDay) { byDay.keys.map { firstOfMonth(it) }.distinct().sorted() }
@@ -66,11 +77,14 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
     val scheme = MaterialTheme.colorScheme
     SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calendar")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                formatDay(months[i], "MMMM yyyy"),
-                Modifier.weight(1f).testTag("attendance.detail.calendar.month"),
-                style = MaterialTheme.typography.titleMediumEmphasized,
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    formatDay(months[i], "MMMM yyyy"),
+                    Modifier.testTag("attendance.detail.calendar.month"),
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                )
+                Tally(months[i], byDay)
+            }
             IconButton({ index = i - 1 }, modifier = Modifier.testTag("attendance.detail.calendar.prev"), enabled = i > 0, shapes = IconButtonDefaults.shapes()) {
                 Icon(Lucide.ChevronLeft, "Previous month", Modifier.size(20.dp))
             }
@@ -78,12 +92,18 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
                 Icon(Lucide.ChevronRight, "Next month", Modifier.size(20.dp))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = Space.xs, bottom = Space.xs)) {
-            for (d in listOf("M", "T", "W", "T", "F", "S", "S")) {
-                Text(d, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Row(Modifier.fillMaxWidth().padding(top = Space.md, bottom = Space.xs)) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEachIndexed { col, d ->
+                Text(
+                    d,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.onSurfaceVariant.copy(alpha = if (col >= 5) WEEKEND else 1f),
+                    textAlign = TextAlign.Center,
+                )
             }
         }
-        val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntOffset>()
+        val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
         val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         AnimatedContent(
             months[i],
@@ -98,35 +118,73 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
     }
 }
 
+/** "12 classes · 2 absent" for the month starting on [first]; the absences in the danger tone. */
+@Composable
+private fun Tally(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
+    val inMonth = byDay.filterKeys { firstOfMonth(it) == first }.values.flatten()
+    val absent = inMonth.count { it == ClassStatus.ABSENT }
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val danger = AppTheme.tones.danger.base
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append("${inMonth.size}") }
+            append(if (inMonth.size == 1) " class" else " classes")
+            if (absent > 0) {
+                append(" · ")
+                withStyle(SpanStyle(color = danger, fontWeight = FontWeight.SemiBold)) { append("$absent absent") }
+            }
+        },
+        Modifier.testTag("attendance.detail.calendar.tally"),
+        style = MaterialTheme.typography.bodySmall.nums(),
+        color = muted,
+    )
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun Month(first: Int, byDay: Map<Int, ClassStatus?>) {
+private fun Month(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
     val scheme = MaterialTheme.colorScheme
     val leading = isoWeekday(first) - 1
     val length = daysInMonth(first)
     val today = remember { System.currentTimeMillis().let { Math.floorDiv(it + TimeZone.getDefault().getOffset(it), 86_400_000L).toInt() } }
-    Column {
+    val tile = RoundedCornerShape(12.dp)
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (week in 0 until (leading + length + 6) / 7) {
-            Row(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 for (col in 0 until 7) {
                     val n = week * 7 + col - leading
-                    Box(Modifier.weight(1f).height(40.dp), Alignment.Center) {
-                        if (n in 0 until length) {
-                            val day = first + n
-                            val tone: Tone? = if (day in byDay) byDay[day].look().second else null
-                            Box(
-                                Modifier.size(34.dp)
-                                    .then(if (tone != null) Modifier.background(tone.subtle, CircleShape).border(1.5.dp, tone.base, CircleShape) else Modifier)
-                                    .then(if (tone == null && day == today) Modifier.border(1.dp, scheme.outline, CircleShape) else Modifier)
-                                    .testTag("attendance.detail.calendar.$day"),
-                                Alignment.Center,
+                    val day = first + n
+                    val inMonth = n in 0 until length
+                    val statuses = if (inMonth) byDay[day] else null
+                    val tone: Tone? = statuses?.first()?.look()?.second
+                    val pips = statuses?.takeIf { it.size > 1 }
+                    Box(
+                        Modifier.weight(1f).height(44.dp)
+                            .then(if (inMonth) Modifier.testTag("attendance.detail.calendar.$day") else Modifier)
+                            .then(if (tone != null) Modifier.background(tone.subtle, tile) else Modifier)
+                            .then(if (inMonth && day == today) Modifier.border(1.5.dp, scheme.primary, tile) else Modifier),
+                        Alignment.Center,
+                    ) {
+                        if (!inMonth) return@Box
+                        Text(
+                            "${n + 1}",
+                            Modifier.padding(bottom = if (pips != null) 6.dp else 0.dp),
+                            style = MaterialTheme.typography.labelLarge.nums(),
+                            fontWeight = if (tone != null) FontWeight.Bold else FontWeight.Normal,
+                            color = when {
+                                tone != null -> tone.onSubtle
+                                day == today -> scheme.primary
+                                else -> scheme.onSurfaceVariant.copy(alpha = if (col >= 5) WEEKEND else IDLE)
+                            },
+                        )
+                        if (pips != null) {
+                            Row(
+                                Modifier.align(Alignment.BottomCenter).padding(bottom = 7.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
                             ) {
-                                Text(
-                                    "${n + 1}",
-                                    style = MaterialTheme.typography.labelLarge.nums(),
-                                    fontWeight = if (tone != null) FontWeight.Bold else FontWeight.Normal,
-                                    color = tone?.onSubtle ?: scheme.onSurfaceVariant,
-                                )
+                                for (s in pips.take(4)) {
+                                    Box(Modifier.size(width = 6.dp, height = 3.dp).background(s.look().second.base, CircleShape))
+                                }
                             }
                         }
                     }
@@ -135,6 +193,10 @@ private fun Month(first: Int, byDay: Map<Int, ClassStatus?>) {
         }
     }
 }
+
+/** How faint a day without a class is, and a weekend (also the weekend column headers). */
+private const val IDLE = 0.75f
+private const val WEEKEND = 0.45f
 
 /** Which status a day with several classes shows: absent, on duty, present, marked, not posted. */
 private fun rank(s: ClassStatus?) = when (s) {
