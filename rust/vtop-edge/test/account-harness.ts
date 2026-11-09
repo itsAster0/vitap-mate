@@ -19,7 +19,7 @@ export function accountObject(
   vi.stubGlobal("fetch", async (url: string, init: RequestInit) =>
     engine(new URL(url).pathname, JSON.parse(init.body as string)),
   );
-  const env = { ENGINE_URL: "http://engine", BRIDGE_SECRET: "s", ...vars } as unknown as Env;
+  const env = { ENGINE_URL: "http://engine", INTERNAL_TOKEN: "s", ...vars } as unknown as Env;
   const ctx = { storage: { sql: db } } as unknown as DurableObjectState;
   const account = new Account(ctx, env);
   return {

@@ -1,5 +1,5 @@
 // Accounts on the edge: one `Account` object per student, named by the
-// registration number. It holds the linked phones' secrets, access keys,
+// registration number. It holds the linked phones (device ids), access keys,
 // settings, the sealed session cache and saved credentials, and the
 // session requests of agents and the extension.
 //
@@ -15,12 +15,14 @@
 // - Key holders (`Authorization: Bearer vtm_…`): `GET /v1/whoami`,
 //   `POST /v1/session`, `GET /v1/session/requests/{id}`,
 //   `POST /v1/session/expire`.
+// - The extension while it pairs, with no key yet: `POST /v1/pair` (pair.ts).
+// - Phones sign every call (auth.ts); a phone is its device id.
 // - The phone's answer to a request: `POST /v1/session/answer?account=`.
 // - The app, with a live VTOP session: `/v1/link`, `/v1/keys`,
-//   `/v1/keys/revoke`, `/v1/keys/outings`, `/v1/account`, `/v1/account/{fcm-token,
-//   forget-credentials,delete,settings,semester,remove-phone}`. And with
-//   only its app secret: `/v1/account/credentials-rejected` (VTOP turned
-//   the password down on the phone, so the server must stop trying it too).
+//   `/v1/keys/revoke`, `/v1/keys/outings`, `/v1/account`, `/v1/account/{
+//   forget-credentials,delete,settings,semester,remove-phone,clear-sign-ins}`. And without
+//   one: `/v1/account/credentials-rejected` (VTOP turned the password down
+//   on the phone, so the server must stop trying it too) and `/v1/app/*`.
 // - The engine: `/internal/accounts/login-done`.
 
 import { DurableObject } from "cloudflare:workers";
@@ -42,7 +44,6 @@ import {
   isAccountId,
   keyId,
   keyLabel,
-  linkSecret,
   newKey,
   parseSettings,
   plan,
@@ -51,28 +52,27 @@ import {
   toHeader,
   validCookies,
 } from "./account-state";
+import { type Signed, signed } from "./auth";
+import { PAIR_TTL_SECS, claim, pairCode, pairStub } from "./pair";
 import {
   type Env,
   badRequest,
   bearer,
-  createDevice,
-  deviceMatches,
   deviceStub,
   empty,
   engineJson,
   enginePost,
   mcpUrl,
   error,
-  isEngine,
+  isInternal,
   jsonBody,
+  notInternal,
   now,
   ownerStub,
-  setDeviceFcm,
-  unknownDevice,
   str,
   variable,
 } from "./common";
-import type { EventBody } from "./device";
+import type { DeviceInfo, EventBody } from "./device";
 import {
   LOGIN,
   type LoginDone,
@@ -86,7 +86,7 @@ import {
   type SessionChecked,
   accountId,
 } from "./shared/engine-api";
-import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
+import { KEY_PREFIX, hash } from "./shared/tokens";
 import * as sql from "./sql";
 import { address as mailAddress, memberLabel } from "./state";
 
@@ -117,7 +117,7 @@ async function forwardingMailbox(env: Env, ownerHash: string): Promise<string | 
 /** The routes this module answers at the edge. */
 export function handles(path: string): boolean {
   return (
-    ["/v1/whoami", "/v1/session", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
+    ["/v1/whoami", "/v1/session", "/v1/pair", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
       path,
     ) ||
     path.startsWith("/v1/session/") ||
@@ -131,12 +131,12 @@ const APP_OPS: Record<string, AppOp> = {
   "/v1/keys/revoke": "revoke-key",
   "/v1/keys/outings": "key-outings",
   "/v1/account": "account",
-  "/v1/account/fcm-token": "fcm-token",
   "/v1/account/forget-credentials": "forget-credentials",
   "/v1/account/delete": "delete",
   "/v1/account/settings": "settings",
   "/v1/account/semester": "semester",
   "/v1/account/remove-phone": "remove-phone",
+  "/v1/account/clear-sign-ins": "clear-sign-ins",
 };
 
 /** Which app a key call comes from: vtop-mcp says so in `x-vtop-client`;
@@ -152,29 +152,29 @@ export async function handle(req: Request, env: Env, path: string): Promise<Resp
     return withKey(req, env, (a, c) => a.poll(c, requestId));
   }
   if (req.method !== "POST") return error(405, "method_not_allowed", "Method not allowed.");
-  switch (path) {
-    case "/v1/session":
-      return withKey(req, env, (a, c) => a.startSession(c, keyVia(req)));
-    case "/v1/session/expire":
-      return withKey(req, env, (a, c) => a.expire(c));
-    case "/v1/session/answer": {
-      const account = accountId(new URL(req.url).searchParams.get("account") ?? "");
-      if (!isAccountId(account)) return error(404, "request_not_found", "Unknown session request.");
-      const body = await jsonBody(req);
-      if (!body) return badRequest("Invalid JSON body.");
-      return accountStub(env, account).answer(body);
-    }
-    case "/v1/account/credentials-rejected": {
-      const body = await jsonBody(req);
-      if (!body) return badRequest("Invalid JSON body.");
-      const account = accountId(str(body.registrationNumber) ?? "");
-      if (!isAccountId(account)) return badRequest("registrationNumber is required.");
-      return accountStub(env, account).app("credentials-rejected", { checked: null, mailboxId: null, body });
-    }
-  }
+  if (path === "/v1/session") return withKey(req, env, (a, c) => a.startSession(c, keyVia(req)));
+  if (path === "/v1/session/expire") return withKey(req, env, (a, c) => a.expire(c));
+  if (path === "/v1/pair") return claim(await jsonBody(req), env);
   const op = APP_OPS[path];
-  if (!op) return error(404, "not_found", "No such route.");
-  return withSession(req, env, op);
+  if (!op && path !== "/v1/session/answer" && path !== "/v1/account/credentials-rejected") {
+    return error(404, "not_found", "No such route.");
+  }
+  // The rest come from phones.
+  const auth = await signed(req, env);
+  if (auth instanceof Response) return auth;
+  const body = auth.json;
+  if (!body) return badRequest("Invalid JSON body.");
+  if (path === "/v1/session/answer") {
+    const account = accountId(new URL(req.url).searchParams.get("account") ?? "");
+    if (!isAccountId(account)) return error(404, "request_not_found", "Unknown session request.");
+    return accountStub(env, account).answer(auth.device.id, body);
+  }
+  if (path === "/v1/account/credentials-rejected") {
+    const account = accountId(str(body.registrationNumber) ?? "");
+    if (!isAccountId(account)) return badRequest("registrationNumber is required.");
+    return accountStub(env, account).app("credentials-rejected", { checked: null, mailboxId: null, body, device: auth.device });
+  }
+  return withSession(env, op, body, auth.device);
 }
 
 type AccountStub = ReturnType<typeof accountStub>;
@@ -196,9 +196,7 @@ async function withKey(
 
 /** Asks the engine whose live VTOP session the app sent, then hands the
  * call to that student's account. */
-async function withSession(req: Request, env: Env, op: AppOp): Promise<Response> {
-  const body = await jsonBody(req);
-  if (!body) return badRequest("Invalid JSON body.");
+async function withSession(env: Env, op: AppOp, body: Record<string, unknown>, device: DeviceInfo): Promise<Response> {
   const session = body.session as Record<string, unknown> | undefined;
   const cookies = str(session?.cookies)?.trim();
   if (!cookies) return badRequest("session.cookies is required.");
@@ -216,34 +214,39 @@ async function withSession(req: Request, env: Env, op: AppOp): Promise<Response>
       : error(503, "vtop_unreachable", "VTOP is unreachable; try again.");
   }
   const mailboxId = await forwardingMailbox(env, ownerHash);
-  return accountStub(env, registrationNumber).app(op, { checked, mailboxId, body });
+  return accountStub(env, registrationNumber).app(op, { checked, mailboxId, body, device });
 }
 
-/** `POST /v1/data/refresh`: VTOP data through the engine, streamed (see
- * data-refresh.ts). The phone names its account by registration number and
- * proves it is one of its phones with its app secret. */
 /** `POST /v1/app/status`, `/v1/app/session/clear` and `/v1/app/login`: a
- * linked phone's view of its account, and a sign-in by the server,
- * authenticated like `/v1/data/refresh`. */
-export async function appCall(req: Request, env: Env, op: "status" | "session-clear" | "login"): Promise<Response> {
-  const body = await jsonBody(req);
+ * linked phone's view of its account, and a sign-in by the server. The
+ * phone names its account by registration number and signs the call. */
+export async function appCall(auth: Signed, env: Env, op: "status" | "session-clear" | "login"): Promise<Response> {
+  const body = auth.json;
   if (!body) return badRequest("Invalid JSON body.");
   const registrationNumber = str(body.registrationNumber)?.trim();
   if (!registrationNumber) return badRequest("registrationNumber is required.");
   const stub = accountStub(env, accountId(registrationNumber));
+  const device = auth.device.id;
   switch (op) {
     case "status":
-      return stub.appStatus(body);
+      return stub.appStatus(device);
     case "session-clear":
-      return stub.appSessionClear(body);
+      return stub.appSessionClear(device);
     case "login":
-      return stub.appLogin(body);
+      return stub.appLogin(device, body);
   }
+}
+
+/** Takes an install off a student's phones, as it deletes itself
+ * (`/v1/devices/delete`); nothing when it is not one of them. */
+export async function forgetPhone(env: Env, registrationNumber: string, deviceId: string): Promise<void> {
+  const account = accountId(registrationNumber);
+  if (isAccountId(account)) await accountStub(env, account).forgetPhone(deviceId);
 }
 
 /** `POST /internal/accounts/login-done`, from the engine. */
 export async function internal(req: Request, env: Env, path: string): Promise<Response> {
-  if (!isEngine(req, env)) return error(401, "unauthorized", "The engine secret is required.");
+  if (!isInternal(req, env)) return notInternal();
   const body = await jsonBody(req);
   if (!body) return badRequest("Invalid JSON body.");
   if (path !== "/internal/accounts/login-done") return error(404, "not_found", "No such route.");
@@ -282,19 +285,21 @@ type AppOp =
   | "revoke-key"
   | "key-outings"
   | "account"
-  | "fcm-token"
   | "forget-credentials"
   | "delete"
   | "settings"
   | "semester"
-  | "remove-phone";
+  | "remove-phone"
+  | "clear-sign-ins";
 
 /** An app call: whose session came with it (none for
- * `credentials-rejected`), the student's forwarding address and the body. */
+ * `credentials-rejected`), the student's forwarding address, the body and
+ * the install that signed it. */
 interface AppCall {
   checked: SessionChecked | null;
   mailboxId: string | null;
   body: Record<string, unknown>;
+  device: DeviceInfo;
 }
 
 export const SCHEMA = `
@@ -311,6 +316,7 @@ CREATE TABLE account (
     session_saved_at INTEGER,
     session_source TEXT,
     credentials_rejected_at INTEGER,
+    vault_gmail INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     window_start INTEGER NOT NULL,
@@ -321,20 +327,20 @@ CREATE TABLE keys (
     label TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     last_used_at INTEGER,
-    device_id TEXT NOT NULL
+    device_id TEXT NOT NULL,
+    outings INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE phones (
     device_id TEXT PRIMARY KEY,
-    secret_hash TEXT NOT NULL,
     label TEXT,
     added_at INTEGER NOT NULL,
     seen_at INTEGER NOT NULL
 );
 CREATE TABLE requests (
     id TEXT PRIMARY KEY,
-    response_token TEXT NOT NULL,
     status TEXT NOT NULL,
     cookies TEXT,
+    csrf_token TEXT,
     error TEXT,
     created_at INTEGER NOT NULL,
     expires_at INTEGER NOT NULL,
@@ -345,35 +351,12 @@ CREATE TABLE requests (
     source TEXT,
     phones TEXT NOT NULL
 );
-CREATE TABLE pending (request_id TEXT NOT NULL)`;
-
-/** Tables added after `SCHEMA`: made if missing, so accounts stored before
- * them keep everything (a new `SCHEMA_VERSION` would wipe them). */
-const EXTRA_SCHEMA = [
-  "CREATE TABLE IF NOT EXISTS sign_ins (at INTEGER NOT NULL, by TEXT NOT NULL, ok INTEGER NOT NULL, reason TEXT)",
-  "CREATE TABLE IF NOT EXISTS key_uses (key_hash TEXT NOT NULL, at INTEGER NOT NULL, via TEXT NOT NULL)",
-];
-
-/** `account` columns added after `SCHEMA`, the same way. */
-const EXTRA_ACCOUNT_COLUMNS = [["vault_gmail", "INTEGER NOT NULL DEFAULT 0"]];
-/** `keys` columns added after `SCHEMA`. */
-const EXTRA_KEY_COLUMNS = [["outings", "INTEGER NOT NULL DEFAULT 0"]];
-/** `requests` columns added after `SCHEMA`. */
-const EXTRA_REQUEST_COLUMNS = [["csrf_token", "TEXT"]];
-
-function addColumns(db: SqlStorage, table: string, wanted: string[][]): void {
-  const columns = new Set(sql.rows(db, `PRAGMA table_info(${table})`).map((row) => sql.text(row, "name")));
-  for (const [name, type] of wanted) {
-    if (!columns.has(name)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
-  }
-}
+CREATE TABLE pending (request_id TEXT NOT NULL);
+CREATE TABLE sign_ins (at INTEGER NOT NULL, by TEXT NOT NULL, ok INTEGER NOT NULL, reason TEXT);
+CREATE TABLE key_uses (key_hash TEXT NOT NULL, at INTEGER NOT NULL, via TEXT NOT NULL)`;
 
 export function prepareAccountDb(db: SqlStorage): void {
   sql.prepare(db, SCHEMA);
-  for (const statement of EXTRA_SCHEMA) db.exec(statement);
-  addColumns(db, "account", EXTRA_ACCOUNT_COLUMNS);
-  addColumns(db, "keys", EXTRA_KEY_COLUMNS);
-  addColumns(db, "requests", EXTRA_REQUEST_COLUMNS);
 }
 
 type Value = string | number | null;
@@ -516,22 +499,18 @@ export function saveAccount(db: SqlStorage, doc: AccountRecord): void {
 
 function phoneFrom(row: sql.Row): PhoneRecord | null {
   const deviceId = sql.text(row, "device_id");
-  const secretHash = sql.text(row, "secret_hash");
   const addedAt = sql.int(row, "added_at");
-  if (deviceId === null || secretHash === null || addedAt === null) return null;
-  return { deviceId, secretHash, label: sql.text(row, "label"), addedAt, seenAt: sql.int(row, "seen_at") ?? 0 };
+  if (deviceId === null || addedAt === null) return null;
+  return { deviceId, label: sql.text(row, "label"), addedAt, seenAt: sql.int(row, "seen_at") ?? 0 };
 }
 
 function requestFrom(row: sql.Row): RequestRecord | null {
   const id = sql.text(row, "id");
-  const responseToken = sql.text(row, "response_token");
   const status = sql.text(row, "status");
   const createdAt = sql.int(row, "created_at");
   const expiresAt = sql.int(row, "expires_at");
-  if (id === null || responseToken === null || status === null || createdAt === null || expiresAt === null) {
-    return null;
-  }
-  const request = new RequestRecord(id, responseToken, createdAt);
+  if (id === null || status === null || createdAt === null || expiresAt === null) return null;
+  const request = new RequestRecord(id, createdAt);
   request.status = status as RequestStatus;
   request.cookies = sql.text(row, "cookies");
   request.csrfToken = sql.text(row, "csrf_token");
@@ -560,9 +539,8 @@ function putKey(db: SqlStorage, key: KeyRecord): void {
 
 function putPhone(db: SqlStorage, phone: PhoneRecord): void {
   db.exec(
-    "INSERT OR REPLACE INTO phones (device_id, secret_hash, label, added_at, seen_at) VALUES (?, ?, ?, ?, ?)",
+    "INSERT OR REPLACE INTO phones (device_id, label, added_at, seen_at) VALUES (?, ?, ?, ?)",
     phone.deviceId,
-    phone.secretHash,
     phone.label,
     phone.addedAt,
     phone.seenAt,
@@ -590,16 +568,6 @@ function writeAccount(db: SqlStorage, doc: AccountRecord): void {
 
 function sameRecord<T extends object>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function samePhone(a: PhoneRecord, b: PhoneRecord): boolean {
-  return (
-    a.deviceId === b.deviceId &&
-    a.secretHash === b.secretHash &&
-    a.label === b.label &&
-    a.addedAt === b.addedAt &&
-    a.seenAt === b.seenAt
-  );
 }
 
 /** Writes only what changed since `base` was read, so requests running at
@@ -661,6 +629,10 @@ function writeChanges(db: SqlStorage, base: AccountRecord, doc: AccountRecord): 
   }
 }
 
+function samePhone(a: PhoneRecord, b: PhoneRecord): boolean {
+  return a.deviceId === b.deviceId && a.label === b.label && a.addedAt === b.addedAt && a.seenAt === b.seenAt;
+}
+
 function usableText(raw: unknown): string | null {
   return typeof raw === "string" ? raw.trim() || null : null;
 }
@@ -699,8 +671,8 @@ function pending(request: RequestRecord): Response {
   return Response.json(request.startedView(), { status: 202, headers: { "retry-after": "2" } });
 }
 
-function appSecretInvalid(): Response {
-  return error(403, "app_secret_invalid", "This phone is not linked to the account; link it from the app.");
+function notLinked(): Response {
+  return error(403, "not_linked", "This phone is not linked to the account; link it from the app.");
 }
 
 export class Account extends DurableObject<Env> {
@@ -732,11 +704,10 @@ export class Account extends DurableObject<Env> {
 
   private putRequest(request: RequestRecord): void {
     this.db.exec(
-      `INSERT OR REPLACE INTO requests (id, response_token, status, cookies, error, created_at, expires_at,
+      `INSERT OR REPLACE INTO requests (id, status, cookies, error, created_at, expires_at,
            vault_due_at, vault_started, phone_asked, phone_error, source, phones, csrf_token)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       request.id,
-      request.responseToken,
       request.status,
       request.cookies,
       request.error,
@@ -822,7 +793,7 @@ export class Account extends DurableObject<Env> {
 
     // Recorded before any network call, so a session call that comes in
     // meanwhile joins this request instead of starting another.
-    const request = new RequestRecord(crypto.randomUUID(), randomToken(""), at);
+    const request = new RequestRecord(crypto.randomUUID(), at);
     request.phones = doc.phonesForKey(keyHash);
     this.putRequest(request);
     this.setPending(request.id);
@@ -899,7 +870,6 @@ export class Account extends DurableObject<Env> {
     const event: EventBody = {
       kind: "vtop_cookie_request",
       requestId: request.id,
-      responseToken: request.responseToken,
       callbackUrl: `${base}/v1/session/answer?account=${doc.id}`,
       wantCredentials: doc.wantCredentials(at) ? "1" : "0",
     };
@@ -1031,17 +1001,14 @@ export class Account extends DurableObject<Env> {
 
   // ---- app status -----------------------------------------------------------
 
-  /** The account, when [body]'s app secret is one of its phones'. */
-  private phoneDoc(body: Record<string, unknown>): AccountRecord | Response {
+  /** The account, when [deviceId] is one of its phones. */
+  private phoneDoc(deviceId: string): AccountRecord | Response {
     const doc = this.doc();
-    if (!doc || doc.phoneBySecret(str(body.appSecret)) === null) {
-      return error(403, "not_linked", "This phone is not linked to the account.");
-    }
-    return doc;
+    return doc && doc.phoneIndex(deviceId) !== null ? doc : notLinked();
   }
 
-  async appStatus(body: Record<string, unknown>): Promise<Response> {
-    const doc = this.phoneDoc(body);
+  async appStatus(deviceId: string): Promise<Response> {
+    const doc = this.phoneDoc(deviceId);
     if (doc instanceof Response) return doc;
     let forwarding: string | null = null;
     if (doc.mailboxId !== null) {
@@ -1056,11 +1023,11 @@ export class Account extends DurableObject<Env> {
 
   /** A linked phone in UDP mode asks the server to sign it in with the
    * saved password, the engine reading the OTP from forwarded mail or
-   * Gmail, so the phone sends nothing secret but its app secret. Answers
+   * Gmail, so the phone sends nothing secret. Answers
    * once done, like `/v1/vtop/login`; a rejected password is
    * `invalid_credentials`, and the saved one is dropped (see [loginDone]). */
-  async appLogin(body: Record<string, unknown>): Promise<Response> {
-    const doc = this.phoneDoc(body);
+  async appLogin(deviceId: string, body: Record<string, unknown>): Promise<Response> {
+    const doc = this.phoneDoc(deviceId);
     if (doc instanceof Response) return doc;
     const at = now();
     if (doc.usableVault(at) === null) {
@@ -1084,7 +1051,7 @@ export class Account extends DurableObject<Env> {
     let request = pendingId === null ? null : this.request(pendingId);
     if (!request?.pending(at)) {
       // No phones to ask: this phone is the one asking.
-      request = new RequestRecord(crypto.randomUUID(), randomToken(""), at);
+      request = new RequestRecord(crypto.randomUUID(), at);
       this.putRequest(request);
       this.setPending(request.id);
       const started = await this.startLogin(doc, request, at);
@@ -1118,23 +1085,34 @@ export class Account extends DurableObject<Env> {
     }
   }
 
-  async appSessionClear(body: Record<string, unknown>): Promise<Response> {
-    const doc = this.phoneDoc(body);
+  /** Unlinks the install, which is deleting itself; its keys stay. */
+  async forgetPhone(deviceId: string): Promise<void> {
+    const doc = this.doc();
+    const index = doc?.phoneIndex(deviceId) ?? null;
+    if (doc === null || index === null) return;
+    doc.phones.splice(index, 1);
+    this.save(doc);
+    console.log("account: a phone deleted itself");
+  }
+
+  async appSessionClear(deviceId: string): Promise<Response> {
+    const doc = this.phoneDoc(deviceId);
     if (doc instanceof Response) return doc;
     doc.clearSession();
     this.save(doc);
     return Response.json({ ok: true });
   }
 
-  /** The phone's answer to a session request. */
-  async answer(answer: Record<string, unknown>): Promise<Response> {
+  /** The answer of [deviceId], one of the phones asked, to a session
+   * request. */
+  async answer(deviceId: string, answer: Record<string, unknown>): Promise<Response> {
     const notFound = () => error(404, "request_not_found", "Unknown session request.");
     const doc = this.doc();
     if (!doc) return notFound();
     const request = this.request((str(answer.requestId) ?? "").trim());
     if (!request) return notFound();
-    if (!hashesEqual(hash(request.responseToken), hash((str(answer.responseToken) ?? "").trim()))) {
-      return error(403, "token_invalid", "The response token does not match.");
+    if (!request.phones.includes(deviceId) || doc.phoneIndex(deviceId) === null) {
+      return error(403, "not_asked", "This phone was not asked for this session.");
     }
     const at = now();
     const failed = (str(answer.error) ?? "").trim();
@@ -1181,13 +1159,6 @@ export class Account extends DurableObject<Env> {
     }
     if (checked.sealedSession) doc.saveSession(checked.sealedSession, at, "phone");
     doc.recordSignIn(at, "phone", true);
-    // Which phone answered is known only when it says so, or when there is
-    // just one.
-    const device = usableText(answer.deviceId);
-    const answeredBy =
-      device !== null ? doc.phones.find((p) => p.deviceId === device) : doc.phones.length === 1 ? doc.phones[0] : undefined;
-    const token = usableText(answer.fcmToken);
-    if (token !== null && answeredBy) await setDeviceFcm(this.env, answeredBy.deviceId, token);
     const credentials = credentialsOf(answer.credentials);
     if (credentials) {
       const username = usableText(credentials.username) ?? usableText(answer.username);
@@ -1235,10 +1206,10 @@ export class Account extends DurableObject<Env> {
     const at = now();
     const existing = this.doc();
     const body = call.body;
-    const appSecret = str(body.appSecret);
+    const thisPhone = existing?.phoneIndex(call.device.id) ?? null;
 
     if (op === "credentials-rejected") {
-      if (!existing || existing.phoneBySecret(appSecret) === null) return appSecretInvalid();
+      if (!existing || thisPhone === null) return notLinked();
       existing.rejectCredentials(at);
       this.save(existing);
       console.log("account: the phone reported rejected credentials");
@@ -1252,13 +1223,12 @@ export class Account extends DurableObject<Env> {
       this.save(existing);
     }
     const id = accountId(checked.registrationNumber ?? "");
-    const thisPhone = existing?.phoneBySecret(appSecret) ?? null;
     const linked = existing?.linked() ?? false;
     const forwarding = call.mailboxId !== null;
 
     switch (op) {
       case "link":
-        return this.link(existing, id, checked, forwarding, body, at);
+        return this.link(existing, id, call.device, checked, forwarding, body, at);
       case "account": {
         const doc = existing ?? new AccountRecord(id, at);
         if (thisPhone !== null && doc.touchPhone(thisPhone, at)) this.save(doc);
@@ -1272,59 +1242,34 @@ export class Account extends DurableObject<Env> {
         return empty();
     }
     // Revoking and deleting work before any phone is linked; the rest need
-    // a linked phone's secret.
+    // a linked phone.
     if (!linked && op !== "revoke-key" && op !== "delete") {
       return error(409, "not_linked", "Link this account from the app first.");
     }
-    if (linked && thisPhone === null) return appSecretInvalid();
+    if (linked && thisPhone === null) return notLinked();
     return this.linkedOp(op, existing ?? new AccountRecord(id, at), thisPhone, body, at);
   }
 
   /** Links this install, next to any phones linked already; linking it
-   * again hands it a new secret. */
+   * again updates its entry. */
   private async link(
     existing: AccountRecord | null,
     id: string,
+    device: DeviceInfo,
     checked: SessionChecked,
     forwarding: boolean,
     body: Record<string, unknown>,
     at: number,
   ): Promise<Response> {
-    const me = existing?.phoneBySecret(str(body.appSecret)) ?? null;
     const rawSemester = str(body.semesterId);
     const semester = rawSemester === undefined ? null : semesterId(rawSemester);
     if (rawSemester !== undefined && semester === null) return badRequest("semesterId is not a VTOP semester id.");
-    const fcm = usableText(body.fcmToken);
     const doc = existing ?? new AccountRecord(id, at);
-    const previous = me === null ? null : { ...doc.phones[me] };
-
-    let device: string;
-    const deviceId = str(body.deviceId);
-    const deviceSecret = str(body.deviceSecret);
-    if (deviceId !== undefined && deviceSecret !== undefined) {
-      if (!(await deviceMatches(this.env, deviceId, deviceSecret))) return unknownDevice();
-      if (fcm !== null) await setDeviceFcm(this.env, deviceId, fcm);
-      device = deviceId;
-    } else if (fcm === null) {
-      return badRequest("fcmToken, or deviceId and deviceSecret, are required.");
-    } else if (previous) {
-      await setDeviceFcm(this.env, previous.deviceId, fcm);
-      device = previous.deviceId;
-    } else {
-      device = (await createDevice(this.env, fcm)).id;
-    }
-
-    // The install may have moved (a new one after a reinstall of the push
-    // token): its old entry goes.
-    if (previous) {
-      doc.phones = doc.phones.filter((p) => p.deviceId !== previous.deviceId);
-      if (previous.deviceId !== device) doc.phoneMoved(previous.deviceId, device);
-    }
-    const secret = linkSecret(str(body.appSecret), me);
+    const me = doc.phoneIndex(device.id);
+    const previous = me === null ? null : doc.phones[me];
     doc.addPhone({
-      deviceId: device,
-      secretHash: hash(secret),
-      label: memberLabel(str(body.label)) ?? previous?.label ?? null,
+      deviceId: device.id,
+      label: memberLabel(str(body.label)) ?? device.label ?? previous?.label ?? null,
       addedAt: previous?.addedAt ?? at,
       seenAt: at,
     });
@@ -1337,11 +1282,7 @@ export class Account extends DurableObject<Env> {
       saved = await this.keepCredentials(doc, checked.ownerHash ?? "", username, credentials, at);
     }
     this.save(doc);
-    return Response.json({
-      appSecret: secret,
-      savedCredentials: saved || doc.usableVault(at) !== null,
-      forwarding,
-    });
+    return Response.json({ savedCredentials: saved || doc.usableVault(at) !== null, forwarding });
   }
 
   /** `me`: the calling phone, or null while the account has no linked phone
@@ -1353,9 +1294,12 @@ export class Account extends DurableObject<Env> {
     body: Record<string, unknown>,
     at: number,
   ): Promise<Response> {
-    if (me === null && op !== "revoke-key" && op !== "delete") return appSecretInvalid();
+    if (me === null && op !== "revoke-key" && op !== "delete") return notLinked();
     switch (op) {
       case "create-key": {
+        // A code from the extension, which then collects the key (pair.ts).
+        const pair = body.pairCode === undefined ? undefined : pairCode(str(body.pairCode));
+        if (pair === null) return badRequest("pairCode must be a pairing code.");
         const key = newKey();
         const keyHash = hash(key);
         // Only this phone is asked for the key's sessions.
@@ -1364,6 +1308,7 @@ export class Account extends DurableObject<Env> {
           return error(409, "key_limit", "This account already has the most keys allowed; revoke one first.");
         }
         await keyIndex(this.env, keyHash).put(doc.id);
+        if (pair !== undefined) await pairStub(this.env, pair).putUntil(key, (at + PAIR_TTL_SECS) * 1000);
         this.save(doc);
         return Response.json({ id: keyId(keyHash), key, mcpUrl: mcpUrl(this.env) }, { status: 201 });
       }
@@ -1382,39 +1327,16 @@ export class Account extends DurableObject<Env> {
         this.save(doc);
         return empty();
       }
-      case "fcm-token": {
-        const token = usableText(body.fcmToken);
-        if (token === null) return badRequest("fcmToken is required.");
-        const phone = doc.phones[me!];
-        const before = phone.deviceId;
-        const deviceId = str(body.deviceId);
-        const deviceSecret = str(body.deviceSecret);
-        if (deviceId !== undefined && deviceSecret !== undefined) {
-          if (!(await deviceMatches(this.env, deviceId, deviceSecret))) return unknownDevice();
-          await setDeviceFcm(this.env, deviceId, token);
-          phone.deviceId = deviceId;
-        } else if (!(await setDeviceFcm(this.env, phone.deviceId, token))) {
-          // The install is gone: make one for this token, so the phone can
-          // still be asked.
-          phone.deviceId = (await createDevice(this.env, token)).id;
-        }
-        const moved = phone.deviceId;
-        if (before !== moved) doc.phoneMoved(before, moved);
-        // Another entry for the install it moved to is this phone.
-        let seen = false;
-        doc.phones = doc.phones.filter((p) => {
-          const keep = p.deviceId !== moved || !seen;
-          if (p.deviceId === moved) seen = true;
-          return keep;
-        });
-        this.save(doc);
-        return empty();
-      }
       case "remove-phone":
         if (!doc.removePhone(str(body.id) ?? "")) {
           return error(404, "phone_not_found", "No such phone on this account.");
         }
         this.save(doc);
+        return empty();
+      case "clear-sign-ins":
+        doc.signIns = [];
+        this.save(doc);
+        this.db.exec("DELETE FROM sign_ins");
         return empty();
       case "settings": {
         const settings = parseSettings(body.settings);

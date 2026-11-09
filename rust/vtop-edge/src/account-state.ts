@@ -3,7 +3,7 @@
 // session first, how a request looks to its client. No Worker APIs here,
 // so it is tested on its own.
 
-import { APP_SECRET_PREFIX, KEY_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
+import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
 
 /** How long a cached session is handed out before a new one is fetched. */
 export const SESSION_CACHE_SECS = 7 * 24 * 3600;
@@ -67,18 +67,6 @@ export function isAccountId(id: string): boolean {
 
 export function newKey(): string {
   return randomToken(KEY_PREFIX);
-}
-
-export function newAppSecret(): string {
-  return randomToken(APP_SECRET_PREFIX);
-}
-
-/** The secret a linking phone gets. One already linked (`me`, found by the
- * secret it presented) keeps it: a new one would turn away its requests
- * still in flight, and the phone would read that as being unlinked. */
-export function linkSecret(presented: string | undefined, me: number | null): string {
-  const mine = presented?.trim();
-  return me !== null && mine ? mine : newAppSecret();
 }
 
 /** The short id users see and revoke a key by. */
@@ -206,11 +194,10 @@ export interface SignInRecord {
 }
 export const MAX_SIGN_INS = 10;
 
-/** One linked app install: its own app secret, and the install session
- * requests are pushed to. */
+/** One linked app install, by its device id: it signs the account calls it
+ * makes, and session requests are pushed to it. */
 export interface PhoneRecord {
   deviceId: string;
-  secretHash: string;
   /** What the app calls itself ("OnePlus CPH2573"), for the phone list. */
   label: string | null;
   addedAt: number;
@@ -379,12 +366,9 @@ export class AccountRecord {
     return this.phones.length > 0;
   }
 
-  /** The index of the linked phone holding this app secret. */
-  phoneBySecret(presented: string | undefined): number | null {
-    const secret = presented?.trim();
-    if (!secret) return null;
-    const presentedHash = hash(secret);
-    const index = this.phones.findIndex((p) => hashesEqual(p.secretHash, presentedHash));
+  /** The index of this install among the linked phones, or null. */
+  phoneIndex(deviceId: string): number | null {
+    const index = this.phones.findIndex((p) => p.deviceId === deviceId);
     return index < 0 ? null : index;
   }
 
@@ -416,13 +400,6 @@ export class AccountRecord {
   phonesForKey(keyHash: string): string[] {
     const owner = this.keys.find((key) => key.hash === keyHash)?.deviceId;
     return this.phones.map((p) => p.deviceId).filter((device) => device === owner);
-  }
-
-  /** A phone moved to another install: its keys follow it. */
-  phoneMoved(from: string, to: string): void {
-    for (const key of this.keys) {
-      if (key.deviceId === from) key.deviceId = to;
-    }
   }
 
   /** Records a visit of a phone; true when that changed what is stored. */
@@ -496,6 +473,7 @@ export class AccountRecord {
     const vault = this.usableVault(now);
     return {
       registrationNumber: this.id,
+      createdAt: this.createdAt,
       settings: this.settings,
       semesterId: this.semesterId,
       linked: this.linked(),
@@ -524,6 +502,7 @@ export class AccountRecord {
             lastUsedAt: key.lastUsedAt,
             phoneId: phoneId(key.deviceId),
             outings: key.outings,
+            uses: key.uses.map((u) => ({ ...u })),
           }))
         : [],
     };
@@ -569,7 +548,6 @@ export class RequestRecord {
 
   constructor(
     readonly id: string,
-    readonly responseToken: string,
     now: number,
   ) {
     this.createdAt = now;

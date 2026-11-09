@@ -1,28 +1,30 @@
 // The Cloudflare edge Worker:
 //
-// - `email`: the aster0.dev catch-all. Mail to `vtop-otp-<id>@…` is parsed
-//   in memory, the code sealed to the phone's key, and the box handed to
-//   that install's event log. The edge never keeps anything readable.
-// - `fetch`: app routes for mailboxes (`/v1/mail-otp/*`), installs
-//   (`/v1/devices/*`) and the event channel (`GET /v1/events`: server-sent
-//   events, a WebSocket or a catch-up read). `/mcp` goes on to the engine (`ENGINE_URL`), which
+// - `email`: the MAIL_DOMAIN catch-all. Mail to `otp+<id>@…` is parsed
+//   in memory, the code sealed to each phone's `sealKey`, and the box handed
+//   to that install's event log. The edge never keeps anything readable.
+// - `fetch`: installs (`/v1/devices/*`), mailboxes (`/v1/mail-otp/*`) and
+//   the event channel (`GET /v1/events`: server-sent events, a WebSocket or
+//   a catch-up read). Phones sign every call but `register` with their
+//   device key (auth.ts). `/mcp` goes on to the engine (`ENGINE_URL`), which
 //   serves the MCP tools, so clients only ever talk to this host.
 // - Accounts, access keys and VTOP sessions for the extension and agents
 //   (`/v1/link`, `/v1/keys*`, `/v1/account*`, `/v1/whoami`, `/v1/session*`),
 //   see account.ts. The engine does the VTOP work for them.
 // - VTOP for the phone: `/vtop/*` proxies its own requests (vtop-proxy.ts);
 //   `/v1/vtop/*` has the engine sign in and fetch for it (vtop-phone.ts).
-// - `/internal/accounts/*`, `/internal/mail-otp/await`: the engine reports
-//   sign-ins and waits for forwarded OTPs (sealed to its own key).
+// - `/internal/*` (`INTERNAL_TOKEN`): the engine reports sign-ins and waits
+//   for forwarded OTPs; the UDP gateway reports its keys.
 //
 // State lives in Durable Objects: `Device` (per install), `Mailbox` (per
-// address), `Index` (owner hash → mailbox, key hash → account), `Account`
-// (per student) and `FcmToken` (one, caches the OAuth token), each in its
-// own SQLite tables. Whose VTOP
-// session a request carries is asked of the engine, which holds the key the
-// owner hash is made with.
+// address), `Index` (owner hash → mailbox, key hash → account, the UDP
+// gateway), `Account` (per student) and `FcmToken` (one, caches the OAuth
+// token), each in its own SQLite tables. Whose VTOP session a request
+// carries is asked of the engine, which holds the key the owner hash is
+// made with.
 
 import * as account from "./account";
+import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
 import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
 import { udpGateway, udpKeys } from "./udp-gateway";
@@ -30,28 +32,25 @@ import { PHONE_ROUTES, phoneVtop } from "./vtop-phone";
 import {
   type Env,
   badRequest,
-  createDevice,
-  deviceMatches,
   deviceStub,
   empty,
-  enginePost,
   engineSend,
+  enginePost,
   error,
   healthBody,
-  isDeviceId,
-  isEngine,
+  isInternal,
   jsonBody,
+  notInternal,
   now,
   ownerStub,
-  setDeviceFcm,
+  parseJson,
   str,
   variable,
-  unknownDevice,
 } from "./common";
+import type { DeviceChanges } from "./device";
 import { type Payload, payloadFor } from "./mail";
 import { MAIL_OWNER, type OtpAwait } from "./shared/engine-api";
 import { isPublicKey, seal } from "./shared/mail-seal";
-import { MAILBOX_SECRET_PREFIX, hash, randomToken } from "./shared/tokens";
 import {
   type MailboxDoc,
   type MailboxMember,
@@ -61,11 +60,11 @@ import {
   freshSealed,
   idFromAddress,
   isId,
-  memberBySecret,
   memberLabel,
+  memberOf,
   newId,
-  publicKey,
-  setPublicKey,
+  platform,
+  sealKey,
   touch,
   wants,
 } from "./state";
@@ -74,7 +73,6 @@ export { Account } from "./account";
 export { Device } from "./device";
 export { FcmToken } from "./fcm";
 export { Index, Mailbox } from "./store";
-export { UdpKeys } from "./udp-gateway";
 
 function unknownMailbox(): Response {
   return error(404, "mailbox_not_found", "No such forwarding address.");
@@ -90,59 +88,83 @@ async function loadMailbox(env: Env, id: string): Promise<MailboxDoc | null> {
 
 // ---- installs ---------------------------------------------------------------
 
-/** The install a mailbox call names: a registered device, or (older app
- * builds) a new one made for the FCM token sent. Its id, or an error
- * message. */
-async function resolveDevice(
-  env: Env,
-  body: Record<string, unknown>,
-  fcm: string | null,
-): Promise<{ id: string } | { message: string } | { unknown: true }> {
-  const id = str(body.deviceId);
-  const secret = str(body.deviceSecret);
-  if (id !== undefined && secret !== undefined) {
-    if (!(await deviceMatches(env, id, secret))) return { unknown: true };
-    if (fcm !== null) await setDeviceFcm(env, id, fcm);
-    return { id };
-  }
-  if (fcm === null) return { message: "deviceId and deviceSecret, or fcmToken, are required." };
-  return { id: (await createDevice(env, fcm)).id };
-}
-
+/** `POST /v1/devices/register`, signed with the key it registers. The id
+ * comes from the key, so registering again returns the same one. */
 async function deviceRegister(req: Request, env: Env): Promise<Response> {
-  const body = await jsonBody(req);
+  const raw = new Uint8Array(await req.arrayBuffer());
+  const body = parseJson(raw, req.headers);
   if (!body) return badRequest("Invalid JSON body.");
-  const token = fcmToken(str(body.fcmToken));
-  if (!token.ok) return badRequest(token.message);
-  if (token.value === null) return badRequest("fcmToken is required.");
-  const { id, secret } = await createDevice(env, token.value);
-  return Response.json({ id, secret }, { status: 201 });
+  const signKey = base64Url(str(body.signKey) ?? "");
+  if (signKey?.length !== 32) return badRequest("signKey must be a base64url Ed25519 key.");
+  const seal = sealKey(str(body.sealKey));
+  if (!seal.ok) return badRequest(seal.message);
+  if (seal.value === null) return badRequest("sealKey is required.");
+  const kind = platform(str(body.platform));
+  if (!kind.ok) return badRequest(kind.message);
+  const fcm = fcmToken(str(body.fcmToken));
+  if (!fcm.ok) return badRequest(fcm.message);
+  const refused = await checkSignature(req, raw, signKey);
+  if (refused) return refused;
+  const id = deviceIdFor(signKey);
+  const created = await deviceStub(env, id).register({
+    id,
+    signKey: str(body.signKey)!.trim().replace(/=+$/, ""),
+    sealKey: seal.value,
+    label: memberLabel(str(body.label)),
+    platform: kind.value!,
+    fcmToken: fcm.value,
+  });
+  if (created) console.log("device: registered an install");
+  return Response.json({ deviceId: id }, { status: created ? 201 : 200 });
 }
 
-async function deviceUpdate(req: Request, env: Env): Promise<Response> {
-  const body = await jsonBody(req);
+async function deviceUpdate(auth: Signed, env: Env): Promise<Response> {
+  const body = auth.json;
   if (!body) return badRequest("Invalid JSON body.");
-  const id = str(body.id) ?? "";
-  if (!(await deviceMatches(env, id, str(body.secret) ?? ""))) {
-    return unknownDevice();
-  }
-  const token = fcmToken(str(body.fcmToken));
-  if (!token.ok) return badRequest(token.message);
-  if (token.value === null) return badRequest("Nothing to update.");
-  await setDeviceFcm(env, id, token.value);
+  const changes: DeviceChanges = {};
+  const seal = sealKey(str(body.sealKey));
+  if (!seal.ok) return badRequest(seal.message);
+  if (seal.value !== null) changes.sealKey = seal.value;
+  const fcm = fcmToken(str(body.fcmToken));
+  if (!fcm.ok) return badRequest(fcm.message);
+  if (fcm.value !== null) changes.fcmToken = fcm.value;
+  const label = memberLabel(str(body.label));
+  if (label !== null) changes.label = label;
+  if (Object.keys(changes).length === 0) return badRequest("Nothing to update.");
+  await deviceStub(env, auth.device.id).update(changes);
   return empty();
 }
 
-/** Hands the request to the install's object, which checks the secret and
- * answers with a socket or a catch-up page. An `Accept: text/event-stream`
- * request gets server-sent events, read here from a socket to the object. */
-async function events(req: Request, env: Env): Promise<Response> {
-  const id = new URL(req.url).searchParams.get("device") ?? "";
-  if (!isDeviceId(id)) return unknownDevice();
-  const device = deviceStub(env, id);
-  if (!req.headers.get("accept")?.includes("text/event-stream")) return device.fetch(req);
+/** `POST /v1/devices/info`: the install as the edge keeps it. */
+async function deviceInfo(auth: Signed, env: Env): Promise<Response> {
+  const summary = await deviceStub(env, auth.device.id).summary();
+  return summary ? Response.json({ deviceId: auth.device.id, ...summary }) : error(404, "unknown_device", "This install is not registered.");
+}
 
+/** `POST /v1/devices/delete`: the install deletes itself. With `mailbox`
+ * it leaves that address first (deleting it when last), with
+ * `registrationNumber` it is taken off that account's phones. Registering
+ * again later starts afresh. */
+async function deviceDelete(auth: Signed, env: Env): Promise<Response> {
+  const body = auth.json ?? {};
+  const mailbox = str(body.mailbox);
+  if (mailbox) await mailDelete(auth.device.id, { id: mailbox }, env);
+  const registrationNumber = str(body.registrationNumber)?.trim();
+  if (registrationNumber) await account.forgetPhone(env, registrationNumber, auth.device.id);
+  await deviceStub(env, auth.device.id).remove();
+  console.log("device: an install deleted itself");
+  return empty();
+}
+
+/** Hands the request to the install's object, which answers with a socket
+ * or a catch-up page. An `Accept: text/event-stream` request gets
+ * server-sent events, read here from a socket to the object. */
+async function events(auth: Signed, req: Request, env: Env): Promise<Response> {
+  const device = deviceStub(env, auth.device.id);
   const headers = new Headers(req.headers);
+  if (!req.headers.get("accept")?.includes("text/event-stream")) {
+    return device.fetch(new Request(req.url, { headers }));
+  }
   headers.set("upgrade", "websocket");
   const res = await device.fetch(new Request(req.url, { headers }));
   // Not a socket: the object's refusal, passed on.
@@ -158,40 +180,27 @@ async function events(req: Request, env: Env): Promise<Response> {
 
 // ---- mailboxes --------------------------------------------------------------
 
-/** A mailbox call: the address's id and the caller's mailbox secret, plus
- * what the route needs. */
 type MailBody = Record<string, unknown>;
 
-/** The mailbox the body's id and secret open, and which of its installs
- * the secret is. Records the visit, so quiet installs can be told apart. */
-async function owned(env: Env, body: MailBody): Promise<{ doc: MailboxDoc; index: number } | null> {
-  const secret = str(body.secret) ?? "";
-  if (!secret) return null;
+/** The mailbox named by the body's `id`, if the calling install is one of
+ * its members. Records the visit, so quiet installs can be told apart. */
+async function owned(env: Env, deviceId: string, body: MailBody): Promise<{ doc: MailboxDoc; index: number } | null> {
   const doc = await loadMailbox(env, str(body.id) ?? "");
   if (!doc) return null;
-  const index = memberBySecret(doc, hash(secret));
+  const index = memberOf(doc, deviceId);
   if (index === null) return null;
   if (touch(doc, index, now())) await mailboxStub(env, doc.id).save(doc);
   return { doc, index };
 }
 
-function newMember(deviceId: string, secret: string, key: string, label: string | undefined, at: number): MailboxMember {
-  return {
-    deviceId,
-    secretHash: hash(secret),
-    publicKey: key,
-    label: memberLabel(label),
-    sealed: null,
-    sealedAt: null,
-    addedAt: at,
-    seenAt: at,
-  };
+function newMember(deviceId: string, at: number): MailboxMember {
+  return { deviceId, sealed: null, sealedAt: null, addedAt: at, seenAt: at };
 }
 
 /** `POST /internal/mail-otp/await`, from the engine: the next OTP of a
  * student, sealed to the key of the engine's sign-in. */
 async function mailAwait(req: Request, env: Env): Promise<Response> {
-  if (!isEngine(req, env)) return error(401, "unauthorized", "The engine secret is required.");
+  if (!isInternal(req, env)) return notInternal();
   const body = (await jsonBody(req)) as Partial<OtpAwait> | null;
   if (
     !body ||
@@ -250,69 +259,25 @@ async function sessionOwner(env: Env, body: MailBody): Promise<{ owner: string }
   }
 }
 
-function mailboxReply(env: Env, id: string, secret: string, status: number): Response {
-  return Response.json({ id, address: address(id, variable(env, "MAIL_DOMAIN")), secret }, { status });
+function mailboxReply(env: Env, id: string, status: number): Response {
+  return Response.json({ id, address: address(id, variable(env, "MAIL_DOMAIN")) }, { status });
 }
 
-async function mailRegister(body: MailBody, env: Env): Promise<Response> {
-  const key = publicKey(str(body.publicKey));
-  if (!key.ok) return badRequest(key.message);
-  if (key.value === null) return badRequest("publicKey is required.");
-  const fcm = fcmToken(str(body.fcmToken));
-  if (!fcm.ok) return badRequest(fcm.message);
-  const device = await resolveDevice(env, body, fcm.value);
-  if ("unknown" in device) return unknownDevice();
-  if ("message" in device) return badRequest(device.message);
-  const secret = randomToken(MAILBOX_SECRET_PREFIX);
+async function mailRegister(deviceId: string, _body: MailBody, env: Env): Promise<Response> {
   const at = now();
   for (let attempt = 0; attempt < 3; attempt++) {
     const id = newId();
-    const doc: MailboxDoc = {
-      id,
-      ownerHash: null,
-      members: [newMember(device.id, secret, key.value, str(body.label), at)],
-      createdAt: at,
-      updatedAt: at,
-    };
+    const doc: MailboxDoc = { id, ownerHash: null, members: [newMember(deviceId, at)], createdAt: at, updatedAt: at };
     if (await mailboxStub(env, id).create(doc)) {
       console.log("mail-otp: registered a mailbox");
-      return mailboxReply(env, id, secret, 201);
+      return mailboxReply(env, id, 201);
     }
   }
   return error(503, "store_unavailable", "Could not create an address. Try again.");
 }
 
-async function mailUpdate(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
-  if (!mine) return unknownMailbox();
-  const { doc, index } = mine;
-  const key = publicKey(str(body.publicKey));
-  if (!key.ok) return badRequest(key.message);
-  const fcm = fcmToken(str(body.fcmToken));
-  if (!fcm.ok) return badRequest(fcm.message);
-  const label = memberLabel(str(body.label));
-  const moves = str(body.deviceId) !== undefined;
-  if (key.value === null && fcm.value === null && label === null && !moves) {
-    return badRequest("Nothing to update.");
-  }
-  const member = doc.members[index];
-  if (key.value !== null) setPublicKey(member, key.value);
-  if (label !== null) member.label = label;
-  if (moves) {
-    const device = await resolveDevice(env, body, fcm.value);
-    if ("unknown" in device) return unknownDevice();
-  if ("message" in device) return badRequest(device.message);
-    member.deviceId = device.id;
-  } else if (fcm.value !== null) {
-    await setDeviceFcm(env, member.deviceId, fcm.value);
-  }
-  doc.updatedAt = now();
-  await mailboxStub(env, doc.id).save(doc);
-  return empty();
-}
-
-async function mailDelete(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
+async function mailDelete(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const { doc, index } = mine;
   if (body.everywhere !== true && doc.members.length > 1) {
@@ -329,28 +294,30 @@ async function mailDelete(body: MailBody, env: Env): Promise<Response> {
 }
 
 /** The installs an address forwards to, for the app's device list. */
-async function mailDevices(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
+async function mailDevices(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
-  const devices = mine.doc.members.map((m, i) => ({
-    deviceId: m.deviceId,
-    label: m.label,
-    addedAt: m.addedAt,
-    seenAt: m.seenAt,
-    thisDevice: i === mine.index,
-  }));
+  const devices = await Promise.all(
+    mine.doc.members.map(async (m, i) => ({
+      deviceId: m.deviceId,
+      label: (await deviceStub(env, m.deviceId).info())?.label ?? null,
+      addedAt: m.addedAt,
+      seenAt: m.seenAt,
+      thisDevice: i === mine.index,
+    })),
+  );
   return Response.json({ devices });
 }
 
 /** Takes another install off the address; it stops getting OTPs. */
-async function mailRemoveDevice(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
+async function mailRemoveDevice(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const { doc, index } = mine;
   const target = str(body.removeDevice);
   if (target === undefined) return badRequest("removeDevice is required.");
-  const position = doc.members.findIndex((m) => m.deviceId === target);
-  if (position < 0) return error(404, "unknown_device", "That device does not use this address.");
+  const position = memberOf(doc, target);
+  if (position === null) return error(404, "unknown_device", "That device does not use this address.");
   if (position === index) return badRequest("Use delete to take this device off the address.");
   doc.members.splice(position, 1);
   doc.updatedAt = now();
@@ -359,17 +326,17 @@ async function mailRemoveDevice(body: MailBody, env: Env): Promise<Response> {
   return empty();
 }
 
-async function mailInbox(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
+async function mailInbox(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const box = freshSealed(mine.doc.members[mine.index], now());
   return Response.json(box ? { sealed: box.sealed, receivedAt: box.at } : { sealed: null });
 }
 
 /** Ties the mailbox to the student whose session comes with it, so a new
- * phone of theirs can take it back with `/reclaim`. The latest wins. */
-async function mailOwner(body: MailBody, env: Env): Promise<Response> {
-  const mine = await owned(env, body);
+ * phone of theirs can join it with `/reclaim`. The latest wins. */
+async function mailOwner(deviceId: string, body: MailBody, env: Env): Promise<Response> {
+  const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const { doc } = mine;
   const session = await sessionOwner(env, body);
@@ -389,41 +356,56 @@ async function mailOwner(body: MailBody, env: Env): Promise<Response> {
   return empty();
 }
 
-/** Adds this install to the caller's own address, with its own key and
- * secret. The other installs keep getting OTPs. */
-async function mailReclaim(body: MailBody, env: Env): Promise<Response> {
-  const key = publicKey(str(body.publicKey));
-  if (!key.ok) return badRequest(key.message);
-  if (key.value === null) return badRequest("publicKey is required.");
-  const fcm = fcmToken(str(body.fcmToken));
-  if (!fcm.ok) return badRequest(fcm.message);
+/** Adds this install to the student's own address (their VTOP session
+ * says whose). The other installs keep getting OTPs. */
+async function mailReclaim(deviceId: string, body: MailBody, env: Env): Promise<Response> {
   const session = await sessionOwner(env, body);
   if ("reply" in session) return session.reply;
   const id = await ownerStub(env, session.owner).get();
   if (id === null) return unknownMailbox();
   const doc = await loadMailbox(env, id);
   if (!doc || doc.ownerHash !== session.owner) return unknownMailbox();
-  const device = await resolveDevice(env, body, fcm.value);
-  if ("unknown" in device) return unknownDevice();
-  if ("message" in device) return badRequest(device.message);
-  const secret = randomToken(MAILBOX_SECRET_PREFIX);
   const at = now();
-  addMember(doc, newMember(device.id, secret, key.value, str(body.label), at), at);
+  addMember(doc, newMember(deviceId, at), at);
   doc.updatedAt = at;
   await mailboxStub(env, doc.id).save(doc);
   console.log("mail-otp: a device joined a mailbox");
-  return mailboxReply(env, doc.id, secret, 200);
+  return mailboxReply(env, doc.id, 200);
 }
 
-const MAIL_ROUTES: Record<string, (body: MailBody, env: Env) => Promise<Response>> = {
+const MAIL_ROUTES: Record<string, (deviceId: string, body: MailBody, env: Env) => Promise<Response>> = {
   "/v1/mail-otp/register": mailRegister,
-  "/v1/mail-otp/update": mailUpdate,
   "/v1/mail-otp/delete": mailDelete,
   "/v1/mail-otp/inbox": mailInbox,
   "/v1/mail-otp/owner": mailOwner,
   "/v1/mail-otp/reclaim": mailReclaim,
   "/v1/mail-otp/devices": mailDevices,
   "/v1/mail-otp/devices/remove": mailRemoveDevice,
+};
+
+/** Signed phone routes, by `METHOD path`. */
+const SIGNED: Record<string, (auth: Signed, req: Request, env: Env) => Promise<Response>> = {
+  "POST /v1/devices/update": (auth, _req, env) => deviceUpdate(auth, env),
+  "POST /v1/devices/info": (auth, _req, env) => deviceInfo(auth, env),
+  "POST /v1/devices/delete": (auth, _req, env) => deviceDelete(auth, env),
+  "GET /v1/events": events,
+  "GET /v1/udp": (_auth, _req, env) => udpGateway(env),
+  "POST /v1/app/status": (auth, _req, env) => account.appCall(auth, env, "status"),
+  "POST /v1/app/session/clear": (auth, _req, env) => account.appCall(auth, env, "session-clear"),
+  "POST /v1/app/login": (auth, _req, env) => account.appCall(auth, env, "login"),
+  ...Object.fromEntries(
+    Object.entries(MAIL_ROUTES).map(([path, handler]) => [
+      `POST ${path}`,
+      (auth: Signed, _req: Request, env: Env) =>
+        auth.json ? handler(auth.device.id, auth.json, env) : Promise.resolve(badRequest("Invalid JSON body.")),
+    ]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(PHONE_ROUTES).map((path) => [
+      `POST ${path}`,
+      (auth: Signed, req: Request, env: Env) => phoneVtop(req, auth.body, env),
+    ]),
+  ),
 };
 
 // ---- entry points -----------------------------------------------------------
@@ -435,21 +417,15 @@ async function route(req: Request, env: Env): Promise<Response> {
     return Response.json(healthBody(req.cf as { colo?: unknown } | undefined));
   }
   if (isVtopPath(path)) return proxyVtop(req);
-  if (path in PHONE_ROUTES) return phoneVtop(req, env);
-  if (method === "GET" && path === "/v1/events") return events(req, env);
-  if (method === "GET" && path === "/v1/udp") return udpGateway(env);
-  if (method === "GET" && path === "/internal/udp-keys") return udpKeys(req, env);
   if (method === "POST" && path === "/v1/devices/register") return deviceRegister(req, env);
-  if (method === "POST" && path === "/v1/devices/update") return deviceUpdate(req, env);
-  if (method === "POST" && path === "/v1/app/status") return account.appCall(req, env, "status");
-  if (method === "POST" && path === "/v1/app/session/clear") return account.appCall(req, env, "session-clear");
-  if (method === "POST" && path === "/v1/app/login") return account.appCall(req, env, "login");
-  const mailRoute = MAIL_ROUTES[path];
-  if (method === "POST" && mailRoute) {
-    const body = await jsonBody(req);
-    return body ? mailRoute(body, env) : badRequest("Invalid JSON body.");
+  const phoneRoute = SIGNED[`${method} ${path}`];
+  if (phoneRoute) {
+    const auth = await signed(req, env);
+    return auth instanceof Response ? auth : phoneRoute(auth, req, env);
   }
+  if (path in PHONE_ROUTES) return error(405, "method_not_allowed", "Use POST.");
   if (method === "POST" && path === "/internal/mail-otp/await") return mailAwait(req, env);
+  if (method === "POST" && path === "/internal/udp-keys") return udpKeys(req, env);
   if (path.startsWith("/internal/accounts/")) return account.internal(req, env, path);
   if (account.handles(path)) {
     const origin = req.headers.get("origin");
@@ -501,12 +477,16 @@ async function email(message: ForwardableEmailMessage, env: Env): Promise<void> 
     return;
   }
   const plaintext = new TextEncoder().encode(JSON.stringify(payload));
-  // Sealed once per install, each to its own key.
-  const boxes = doc.members.map((member) => {
-    const sealed = seal(member.publicKey, id, plaintext);
-    if (sealed === null) throw new Error("seal: a member's key is not an X25519 key");
-    return { deviceId: member.deviceId, sealed };
-  });
+  // Sealed once per install, each to its own key; an install no longer
+  // registered is skipped.
+  const sealed = await Promise.all(
+    doc.members.map(async ({ deviceId }) => {
+      const key = (await deviceStub(env, deviceId).info())?.sealKey;
+      const box = key === undefined ? null : seal(key, id, plaintext);
+      return box === null ? [] : [{ deviceId, sealed: box }];
+    }),
+  );
+  const boxes = sealed.flat();
   if (!(await mailboxStub(env, id).deliver(boxes))) throw new Error("deliver failed: no mailbox");
   // The code is stored now. What follows is best effort: an error here must
   // not make the mail server send it again (a second push for the same
@@ -527,7 +507,7 @@ async function email(message: ForwardableEmailMessage, env: Env): Promise<void> 
       console.log(`mail-otp: event append failed: ${e}`);
     }
   }
-  console.log(`mail-otp: relayed a ${payload.kind} to ${doc.members.length} device(s)`);
+  console.log(`mail-otp: relayed a ${payload.kind} to ${boxes.length} device(s)`);
 }
 
 /** Seals an OTP to each engine sign-in waiting on this mailbox. */

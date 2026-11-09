@@ -1,100 +1,65 @@
-// UDP mode's gateway and its keys.
+// UDP mode's gateway: where it is and its public keys.
 //
-// - `GET /v1/udp`: where the gateway is and its current public key, so the
-//   app follows a move or a new key without a release. Every phone keeps
-//   the answer until the same `expiresAt` (the next Monday 00:00 IST), then
-//   asks again; a gateway that cannot read its handshake makes it ask sooner.
-// - `GET /internal/udp-keys`, from the engine (engine secret): the private
-//   keys the gateway answers with, the current one first, sealed to the
-//   gateway's identity key (`GATEWAY_IDENTITY_KEY`). The engine passes them
-//   on to the gateway without being able to open them.
+// - `POST /internal/udp-keys`, from the gateway (`INTERNAL_TOKEN`): its
+//   host, ports and current public keys. The gateway makes and keeps its
+//   own keys; the edge only passes the public halves on.
+// - `GET /v1/udp` (signed, for phones): the latest of those, so the app
+//   follows a move or a new key without a release.
 //
-// `UdpKeys` (one object, named `keys`) makes a new random key pair each
-// Monday 00:00 IST and keeps the one before for a week, for phones still
-// holding it; older keys are deleted, so a handshake recorded then cannot be
-// opened later even if a current key leaks.
+// The latest report is kept in the `Index` object named `udp`.
 
-import { DurableObject } from "cloudflare:workers";
+import { base64Url } from "./auth";
+import { type Env, badRequest, empty, error, isInternal, jsonBody, notInternal } from "./common";
 
-import { utf8ToBytes } from "@noble/hashes/utils.js";
-
-import { type Env, error, isEngine, now } from "./common";
-import { fromBase64Url } from "./shared/base64";
-import { seal } from "./shared/mail-seal";
-
-/** What the box is bound to (vtop-shared's `UDP_KEYS_SEALED_FOR`). */
-export const SEALED_FOR = "udp-keys";
-
-const WEEK_SECS = 7 * 24 * 3600;
-/** A Monday 00:00 IST (Sunday 18:30 UTC), which weeks are counted from. */
-const MONDAY_IST = Date.UTC(2024, 0, 7, 18, 30) / 1000;
-
-/** The first Monday 00:00 IST after `now` (unix seconds). */
-export function nextMondayIst(now: number): number {
-  return MONDAY_IST + (Math.floor((now - MONDAY_IST) / WEEK_SECS) + 1) * WEEK_SECS;
-}
-
-/** A gateway key pair (hex), current until `until`. */
 export interface UdpKey {
-  privateKey: string;
+  id: string;
+  /** X25519, base64url without padding. */
   publicKey: string;
+  /** Unix seconds the key is used from and until. */
+  from: number;
   until: number;
 }
 
-/** `keys` at `now`: a new current key once the current one's week is over,
- * and the one before kept for a week; older ones dropped. */
-export async function rotated(keys: UdpKey[], now: number, make: (until: number) => Promise<UdpKey>): Promise<UdpKey[]> {
-  if (keys.length > 0 && keys[0].until > now) return keys;
-  const kept = keys.filter((key) => key.until > now - WEEK_SECS).slice(0, 1);
-  return [await make(nextMondayIst(now)), ...kept];
+export interface UdpGateway {
+  host: string;
+  ports: number[];
+  keys: UdpKey[];
 }
 
-const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+const isTime = (n: unknown): n is number => Number.isSafeInteger(n) && (n as number) >= 0;
 
-/** A random X25519 key pair, as Noise uses for the gateway's static key. */
-export async function newKey(until: number): Promise<UdpKey> {
-  const pair = (await crypto.subtle.generateKey({ name: "X25519" }, true, ["deriveBits"])) as CryptoKeyPair;
-  const jwk = (await crypto.subtle.exportKey("jwk", pair.privateKey)) as JsonWebKey;
-  const privateKey = fromBase64Url(jwk.d ?? "");
-  const publicKey = fromBase64Url(jwk.x ?? "");
-  if (privateKey?.length !== 32 || publicKey?.length !== 32) throw new Error("X25519 export");
-  return { privateKey: hex(privateKey), publicKey: hex(publicKey), until };
-}
-
-export class UdpKeys extends DurableObject<Env> {
-  /** The keys at `now`, rotated first when a week has turned. */
-  async keys(at: number): Promise<UdpKey[]> {
-    const stored = (await this.ctx.storage.get<UdpKey[]>("keys")) ?? [];
-    const keys = await rotated(stored, at, newKey);
-    if (keys !== stored) {
-      await this.ctx.storage.put("keys", keys);
-      console.log(`udp: a new gateway key, until ${new Date(keys[0].until * 1000).toISOString()}`);
-    }
-    return keys;
+/** The gateway's report, if well formed; public keys are kept unpadded. */
+export function parseGateway(raw: Record<string, unknown> | null): UdpGateway | null {
+  const { host, ports, keys } = raw ?? {};
+  if (typeof host !== "string" || !host.trim() || host.length > 255) return null;
+  if (!Array.isArray(ports) || ports.length === 0 || ports.length > 16) return null;
+  if (!ports.every((p) => Number.isInteger(p) && p > 0 && p < 65536)) return null;
+  if (!Array.isArray(keys) || keys.length === 0 || keys.length > 8) return null;
+  const parsed: UdpKey[] = [];
+  for (const key of keys as Array<Record<string, unknown> | null>) {
+    const { id, publicKey, from, until } = key ?? {};
+    if (typeof id !== "string" || !id || id.length > 64 || typeof publicKey !== "string") return null;
+    if (base64Url(publicKey)?.length !== 32 || !isTime(from) || !isTime(until)) return null;
+    parsed.push({ id, publicKey: publicKey.trim().replace(/=+$/, ""), from, until });
   }
+  return { host: host.trim(), ports: ports as number[], keys: parsed };
 }
 
-function keysStub(env: Env) {
-  return env.UDP_KEYS.getByName("keys");
+function gatewayStub(env: Env) {
+  return env.INDEX.getByName("udp");
 }
 
 export async function udpGateway(env: Env): Promise<Response> {
-  const ports = env.UDP_PORTS.split(",")
-    .map((p) => Number(p.trim()))
-    .filter((p) => Number.isInteger(p) && p > 0 && p < 65536);
-  if (!env.UDP_HOST || ports.length === 0) return error(503, "udp_unavailable", "UDP mode is not set up.");
-  const [current] = await keysStub(env).keys(now());
-  return Response.json(
-    { host: env.UDP_HOST, ports, publicKey: current.publicKey, expiresAt: current.until },
-    { headers: { "cache-control": "no-store" } },
-  );
+  const stored = await gatewayStub(env).get();
+  if (stored === null) return error(503, "udp_unavailable", "UDP mode is not set up.");
+  return new Response(stored, { headers: { "content-type": "application/json", "cache-control": "no-store" } });
 }
 
 export async function udpKeys(req: Request, env: Env): Promise<Response> {
-  if (!isEngine(req, env)) return error(401, "unauthorized", "The engine secret is required.");
-  const keys = await keysStub(env).keys(now());
-  const plain = utf8ToBytes(JSON.stringify({ keys: keys.map((key) => key.privateKey) }));
-  const sealed = seal(env.GATEWAY_IDENTITY_KEY ?? "", SEALED_FOR, plain);
-  if (sealed === null) return error(503, "udp_unavailable", "GATEWAY_IDENTITY_KEY is not set.");
-  return Response.json({ sealed }, { headers: { "cache-control": "no-store" } });
+  if (!isInternal(req, env)) return notInternal();
+  const gateway = parseGateway(await jsonBody(req));
+  if (!gateway) return badRequest("Expected { host, ports, keys: [{ id, publicKey, from, until }] }.");
+  await gatewayStub(env).put(JSON.stringify(gateway));
+  console.log(`udp: the gateway reported ${gateway.keys.length} key(s)`);
+  return empty();
 }

@@ -27,8 +27,10 @@ export const PACKED_PAGE = "application/vnd.vmate.page+br";
  * the phone hears the engine's reason instead of a bare timeout. */
 export const ENGINE_TIMEOUT_MS = 32_000;
 
+/** `body` is the request's, read already to check its signature. */
 export async function phoneVtop(
   req: Request,
+  body: Uint8Array,
   env: Env,
   fetcher: (req: Request) => Promise<Response> = (r) => fetch(r),
   timeoutMs = ENGINE_TIMEOUT_MS,
@@ -36,7 +38,6 @@ export async function phoneVtop(
   const enginePath = PHONE_ROUTES[new URL(req.url).pathname];
   if (!enginePath) return error(404, "not_found", "No such route.");
   if (req.method !== "POST") return error(405, "method_not_allowed", "Use POST.");
-  const body = await req.arrayBuffer();
   if (body.byteLength > MAX_BODY_BYTES) return error(413, "too_large", "The request is too large.");
 
   const abort = new AbortController();
@@ -48,7 +49,7 @@ export async function phoneVtop(
         method: "POST",
         headers: {
           "content-type": "application/json",
-          authorization: `Bearer ${env.BRIDGE_SECRET}`,
+          authorization: `Bearer ${env.INTERNAL_TOKEN}`,
           "accept-encoding": "br, gzip",
         },
         body,

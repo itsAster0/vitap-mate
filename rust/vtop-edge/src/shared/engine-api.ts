@@ -1,7 +1,7 @@
 // What the edge and the engine say to each other, as JSON. Mirrors
 // vtop-shared's `engine` module (the engine's side); a field renamed there
-// must be renamed here. Every call carries `Authorization: Bearer <shared
-// secret>`.
+// must be renamed here. Every call carries `Authorization: Bearer
+// <INTERNAL_TOKEN>`.
 
 /** Engine: whose session this is, or whether a cached one still works. */
 export const SESSION = "/engine/session";

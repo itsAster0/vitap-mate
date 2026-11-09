@@ -44,7 +44,8 @@ pub fn generate_keypair() -> (String, String) {
     )
 }
 
-fn key32(encoded: &str) -> Result<[u8; 32], SealError> {
+/// A base64url 32-byte key (X25519), padded or not.
+pub fn key32(encoded: &str) -> Result<[u8; 32], SealError> {
     URL_SAFE_NO_PAD
         .decode(encoded.trim().trim_end_matches('='))
         .ok()

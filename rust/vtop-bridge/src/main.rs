@@ -30,7 +30,7 @@ async fn main() {
     let edge = Arc::new(HttpEdge {
         http: reqwest::Client::new(),
         base_url: config.edge_url.clone(),
-        secret: config.mail_relay_secret.clone(),
+        token: config.internal_token.clone(),
     });
     // The MCP tools run here too, with sessions from the edge under each
     // caller's own key; the edge sends `/mcp` on to this service.

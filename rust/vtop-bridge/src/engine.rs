@@ -7,7 +7,7 @@
 //! forwarding address, from their Gmail with the access sealed in their
 //! credentials.
 //!
-//! Routes (`Authorization: Bearer $MAIL_RELAY_SECRET`):
+//! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/session`, `/engine/seal`, `/engine/login`, `/engine/fetch`
 //! (in `fetch`), and
 //! `/internal/mail-otp/owner` (whose a session is, as an owner hash).
@@ -28,7 +28,7 @@ use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
     GmailGrant, LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
-    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT, UDP_KEYS_INTERNAL,
+    SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
 };
 use vtop_shared::mail_seal;
 use vtop_shared::mailbox::owner_hash;
@@ -47,11 +47,6 @@ pub trait EdgeLink: Send + Sync {
     /// `request.public_key`; `None` when nothing came in time.
     async fn await_otp(&self, request: &OtpAwait) -> Result<Option<String>, EdgeError>;
     async fn login_done(&self, done: &LoginDone) -> Result<(), EdgeError>;
-    /// The UDP gateway's keys, sealed to the gateway: this engine cannot
-    /// open them.
-    async fn udp_keys(&self) -> Result<String, EdgeError> {
-        Err(EdgeError::Unavailable("no UDP keys here".into()))
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,11 +56,11 @@ pub enum EdgeError {
     Unavailable(String),
 }
 
-/// The edge over HTTPS.
+/// The edge over HTTPS, with `Authorization: Bearer $INTERNAL_TOKEN`.
 pub struct HttpEdge {
     pub http: reqwest::Client,
     pub base_url: String,
-    pub secret: String,
+    pub token: String,
 }
 
 impl HttpEdge {
@@ -76,7 +71,7 @@ impl HttpEdge {
     ) -> Result<reqwest::Response, EdgeError> {
         self.http
             .post(format!("{}{path}", self.base_url))
-            .bearer_auth(&self.secret)
+            .bearer_auth(&self.token)
             .timeout(Duration::from_secs(40))
             .json(body)
             .send()
@@ -112,29 +107,6 @@ impl EdgeLink for HttpEdge {
                 response.status()
             )))
         }
-    }
-
-    async fn udp_keys(&self) -> Result<String, EdgeError> {
-        let unavailable = |error: String| EdgeError::Unavailable(error);
-        let response = self
-            .http
-            .get(format!("{}{UDP_KEYS_INTERNAL}", self.base_url))
-            .bearer_auth(&self.secret)
-            .timeout(Duration::from_secs(10))
-            .send()
-            .await
-            .map_err(|error| unavailable(error.without_url().to_string()))?;
-        if !response.status().is_success() {
-            return Err(unavailable(format!("edge answered {}", response.status())));
-        }
-        let body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|error| unavailable(error.to_string()))?;
-        body["sealed"]
-            .as_str()
-            .map(str::to_owned)
-            .ok_or_else(|| unavailable("no sealed keys in the answer".into()))
     }
 }
 
@@ -252,7 +224,7 @@ fn accounts_aad(account: &str) -> String {
     format!("accounts/{account}")
 }
 
-/// Every route needs the secret shared with the edge.
+/// Every route needs `INTERNAL_TOKEN`, shared with the edge and the gateway.
 pub(crate) fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<(), ApiError> {
     let presented = headers
         .get(axum::http::header::AUTHORIZATION)
@@ -261,13 +233,13 @@ pub(crate) fn require_secret(state: &AppState, headers: &HeaderMap) -> Result<()
         .unwrap_or_default()
         .trim();
     if !tokens::hashes_equal(
-        &tokens::hash(&state.config.mail_relay_secret),
+        &tokens::hash(&state.config.internal_token),
         &tokens::hash(presented),
     ) {
         return Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "unauthorized",
-            "The engine secret is required.",
+            "The internal token is required.",
         ));
     }
     Ok(())
@@ -350,26 +322,6 @@ pub async fn session(
         }
     };
     Ok(Json(outcome).into_response())
-}
-
-/// The UDP gateway's keys for the gateway, which holds the engine secret:
-/// sealed by the edge to the gateway's own key, so passed on unopened.
-pub async fn udp_keys(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Response, ApiError> {
-    require_secret(&state, &headers)?;
-    match state.edge.udp_keys().await {
-        Ok(sealed) => Ok(Json(json!({ "sealed": sealed })).into_response()),
-        Err(error) => {
-            tracing::warn!("engine: no UDP keys from the edge: {error:?}");
-            Err(ApiError::new(
-                StatusCode::SERVICE_UNAVAILABLE,
-                "edge_unavailable",
-                "The edge did not hand out the UDP keys.",
-            ))
-        }
-    }
 }
 
 /// Seals saved credentials for an account; the edge stores the result.
@@ -614,7 +566,6 @@ mod tests {
         no_mailbox: bool,
         done: Mutex<Vec<LoginDone>>,
         awaited: Mutex<Vec<OtpAwait>>,
-        udp_keys: Option<&'static str>,
     }
 
     #[async_trait]
@@ -639,12 +590,6 @@ mod tests {
             self.done.lock().unwrap().push(done.clone());
             Ok(())
         }
-
-        async fn udp_keys(&self) -> Result<String, EdgeError> {
-            self.udp_keys
-                .map(str::to_owned)
-                .ok_or_else(|| EdgeError::Unavailable("down".into()))
-        }
     }
 
     fn engine_app(edge: Arc<FakeEdge>, login: FakeLogin) -> (axum::Router, Arc<AppState>) {
@@ -668,7 +613,7 @@ mod tests {
         let config = Config::from_lookup(|name| match name {
             "VAULT_KEY" => Some("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".into()),
             "EDGE_URL" => Some("https://edge.example".into()),
-            "MAIL_RELAY_SECRET" => Some(RELAY.into()),
+            "INTERNAL_TOKEN" => Some(RELAY.into()),
             "OTP_WAIT_SECS" => Some("2".into()),
             _ => None,
         })
@@ -703,32 +648,6 @@ mod tests {
             status,
             serde_json::from_slice(&bytes).unwrap_or(Value::Null),
         )
-    }
-
-    #[tokio::test]
-    async fn udp_keys_pass_through_unopened() {
-        let edge = Arc::new(FakeEdge {
-            udp_keys: Some("sealed-box"),
-            ..FakeEdge::default()
-        });
-        let (app, _) = engine_app(edge, FakeLogin::default());
-        let get = |auth: &'static str| {
-            let request = Request::builder()
-                .uri(vtop_shared::engine::UDP_KEYS)
-                .header("authorization", format!("Bearer {auth}"))
-                .body(Body::empty())
-                .unwrap();
-            app.clone().oneshot(request)
-        };
-        let response = get(RELAY).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body: Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(body, json!({ "sealed": "sealed-box" }));
-        assert_eq!(
-            get("wrong").await.unwrap().status(),
-            StatusCode::UNAUTHORIZED
-        );
     }
 
     async fn wait_for_done(edge: &FakeEdge) -> LoginDone {

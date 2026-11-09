@@ -4,6 +4,7 @@
 //! I/O, so it builds for every target.
 
 pub mod account;
+pub mod device_sig;
 pub mod engine;
 pub mod mail_seal;
 pub mod mailbox;

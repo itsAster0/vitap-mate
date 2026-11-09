@@ -4,7 +4,7 @@
 //! goes back to the phone, which asks the student (or reads its forwarded
 //! mail) and sends the code with that session to [`otp`].
 //!
-//! Routes (`Authorization: Bearer $MAIL_RELAY_SECRET`):
+//! Routes (`Authorization: Bearer $INTERNAL_TOKEN`):
 //! `POST /engine/vtop-login`, `/engine/vtop-login/otp`,
 //! `/engine/vtop-login/resend`.
 

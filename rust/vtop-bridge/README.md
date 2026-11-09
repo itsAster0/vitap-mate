@@ -1,8 +1,8 @@
 # vtop-bridge (the engine)
 
-The VTOP work behind the Cloudflare edge (`vtop-edge`), run on Railway from
-`../Dockerfile.engine` (`RAILWAY_DOCKERFILE_PATH`); the edge reaches it at its
-`ENGINE_URL`. It stores nothing: accounts,
+The VTOP work behind the Cloudflare edge (`vtop-edge`), run on Railway as the
+`engine-v2` service from `../Dockerfile.engine`; the edge reaches it at its
+`ENGINE_URL` (https://engine-v2-production.up.railway.app). It stores nothing: accounts,
 keys, devices, mailboxes and pending requests live in the edge's Durable
 Objects. The engine only:
 
@@ -41,13 +41,14 @@ the app.
 
 ## Configuration
 
-Set as variables on the Railway service:
+Set on the Railway service by `alchemy.run.ts` (`VAULT_KEY`, `EDGE_URL`,
+`INTERNAL_TOKEN`, `RUST_LOG`); the rest keep their defaults:
 
 | Variable            | Default | Notes                                        |
 | ------------------- | ------- | -------------------------------------------- |
 | `VAULT_KEY`         | —       | required; base64 of 32 bytes                 |
 | `EDGE_URL`          | —       | required; the edge's public URL              |
-| `MAIL_RELAY_SECRET` | —       | required; the edge's `BRIDGE_SECRET`, 32+ characters |
+| `INTERNAL_TOKEN`    | —       | required; shared with the edge and the UDP gateway (bearer, both ways), 32+ characters |
 | `OTP_WAIT_SECS`     | 45      | wait for the OTP mail (forwarded or Gmail) on sign-in |
 | `PORT`              | 8080    | listens on `[::]`, IPv4 where that fails     |
 
@@ -60,8 +61,8 @@ are cleared, and the phone is asked again.
 cd rust
 cargo test -p vtop-bridge
 VAULT_KEY="$(openssl rand -base64 32)" EDGE_URL=http://localhost:8787 \
-  MAIL_RELAY_SECRET="$(openssl rand -hex 32)" cargo run -p vtop-bridge
+  INTERNAL_TOKEN="$(openssl rand -hex 32)" cargo run -p vtop-bridge
 ```
 
-Deployed with the edge: `npx wrangler deploy` in `rust/vtop-edge` builds
-`rust/Dockerfile.engine`.
+Deployed with the edge: `bun run deploy` in `rust/vtop-edge` (`alchemy.run.ts`)
+builds `rust/Dockerfile.engine` into the Railway service `engine-v2`.

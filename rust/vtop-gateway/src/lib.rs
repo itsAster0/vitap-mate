@@ -6,27 +6,29 @@
 //!
 //! Page fetches and sign-ins ([`SIGN_IN_BODY`]); changes to VTOP stay on
 //! HTTPS. It runs on its own host (UDP needs one) and calls the engine
-//! exactly as the edge does (`BRIDGE_SECRET`, the phone's session in the
-//! body) and passes the answer back byte for byte, so it holds no VTOP
-//! logic. Its Noise keys come from the edge, which makes a new one every
-//! week: the edge seals them to the gateway's own identity key and the
-//! engine passes them on ([`UDP_KEYS`]) without being able to open them.
-//! It keeps them and asks again only every [`KEYS_EVERY`] and just after
-//! each rotation ([`next_key_check`]), so an idle engine can sleep. What it keeps, in memory only: Noise sessions, and
-//! each device's VTOP session for six hours, so a fetch can carry an 8-byte
-//! hash instead of ~700 bytes of cookies (see `vtop_shared::wire_page`).
+//! exactly as the edge does (`Authorization: Bearer $INTERNAL_TOKEN`, the
+//! phone's session in the body) and passes the answer back byte for byte,
+//! so it holds no VTOP logic. It makes its own Noise keys ([`keys`]): a new
+//! one every Monday 00:00 IST, the previous kept a week. At start and after
+//! each rotation it posts the public halves, with where it listens, to the
+//! edge's [`UDP_KEYS_INTERNAL`], which hands them to the app. What it keeps
+//! in memory: Noise sessions, and each device's VTOP session for six hours,
+//! so a fetch can carry an 8-byte hash instead of ~700 bytes of cookies
+//! (see `vtop_shared::wire_page`).
+
+pub mod keys;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 use vtop_shared::engine::{
-    PageFetch, FETCH, UDP_KEYS, UDP_KEYS_SEALED_FOR, VTOP_LOGIN, VTOP_LOGIN_OTP, VTOP_LOGIN_RESEND,
+    PageFetch, FETCH, UDP_KEYS_INTERNAL, VTOP_LOGIN, VTOP_LOGIN_OTP, VTOP_LOGIN_RESEND,
 };
-use vtop_shared::mail_seal;
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
     session_hash, WirePageRequest, WirePageResponse, BUSY, NEED_SESSION, SIGN_IN_BODY, TOO_LARGE,
@@ -47,32 +49,27 @@ const MAX_SESSIONS: usize = 20_000;
 /// and VTOP.
 const MAX_ENGINE_CALLS: usize = 256;
 const SWEEP_EVERY: Duration = Duration::from_secs(30);
-/// How often the keys are asked for between rotations.
-const KEYS_EVERY: Duration = Duration::from_secs(6 * 3600);
-/// After a failed ask, the next one.
-const KEYS_RETRY: Duration = Duration::from_secs(60);
-const WEEK_SECS: u64 = 7 * 24 * 3600;
-/// A Monday 00:00 IST (Sunday 18:30 UTC): the edge's `UdpKeys` makes a new
-/// key every week from it (`vtop-edge/src/udp-gateway.ts`).
-const MONDAY_IST: u64 = 1_704_652_200;
+/// The longest sleep between checks for a new week, so a changed clock is
+/// noticed within it.
+const ROTATE_CHECK: Duration = Duration::from_secs(3600);
+/// The first wait after a failed post of the keys to the edge; it doubles
+/// up to [`ANNOUNCE_RETRY_MAX`].
+const ANNOUNCE_RETRY: Duration = Duration::from_secs(5);
+const ANNOUNCE_RETRY_MAX: Duration = Duration::from_secs(600);
 
-/// How long until the keys are asked for again at unix time `now`: in
-/// [`KEYS_EVERY`], or 30 s after the next rotation if that comes first.
-pub fn next_key_check(now: u64) -> Duration {
-    let since = now.saturating_sub(MONDAY_IST) % WEEK_SECS;
-    let rotation = Duration::from_secs(WEEK_SECS - since + 30);
-    rotation.min(KEYS_EVERY)
-}
-
+/// No `Debug`: it holds the internal token.
 pub struct Config {
     pub engine_url: String,
-    /// The edge, for `/v1/app/login`.
+    /// The edge: `/v1/app/login`, and [`UDP_KEYS_INTERNAL`] for the keys.
     pub edge_url: String,
-    /// The engine's relay secret (the edge's `BRIDGE_SECRET`).
-    pub engine_secret: String,
-    /// The gateway's identity secret (`mail_seal`, base64url): opens the
-    /// keys the edge seals to it. Only the gateway holds it.
-    pub identity: String,
+    /// `INTERNAL_TOKEN`, shared with the engine and the edge.
+    pub token: String,
+    /// The public host name or address the app sends UDP to.
+    pub host: String,
+    /// The public UDP ports, as the app should try them.
+    pub ports: Vec<u16>,
+    /// Where the keys are kept (`GATEWAY_DATA_DIR`).
+    pub data_dir: PathBuf,
 }
 
 /// The public key the app must hold for `private`.
@@ -81,17 +78,11 @@ pub fn public_key(private: &[u8; 32]) -> [u8; 32] {
     x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(*private)).to_bytes()
 }
 
-/// The gateway's sockets, bound as the environment says: `BIND` (default
-/// `0.0.0.0`) and `PORTS` (comma-separated, default 3478,51820,443).
-pub async fn bind_from_env() -> Result<Vec<UdpSocket>, String> {
-    let bind = std::env::var("BIND").unwrap_or_else(|_| "0.0.0.0".into());
-    let ports: Vec<u16> = match std::env::var("PORTS") {
-        Ok(p) => p.split(',').filter_map(|s| s.trim().parse().ok()).collect(),
-        Err(_) => vtop_wire::PORTS.to_vec(),
-    };
+/// One socket per port on `bind`.
+pub async fn bind(bind: &str, ports: &[u16]) -> Result<Vec<UdpSocket>, String> {
     let mut sockets = Vec::new();
-    for port in &ports {
-        let socket = UdpSocket::bind((bind.as_str(), *port))
+    for port in ports {
+        let socket = UdpSocket::bind((bind, *port))
             .await
             .map_err(|e| format!("cannot bind {bind}:{port}: {e}"))?;
         sockets.push(socket);
@@ -100,48 +91,97 @@ pub async fn bind_from_env() -> Result<Vec<UdpSocket>, String> {
     Ok(sockets)
 }
 
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs())
+}
+
+/// This week's keys, newest first; retried while the data dir fails.
+async fn current_keys(dir: &std::path::Path) -> Vec<keys::Key> {
+    loop {
+        match keys::rotate(dir, unix_now()) {
+            Ok(keys) => return keys,
+            Err(e) => {
+                tracing::warn!("keys: {e}");
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
+        }
+    }
+}
+
+/// Posts the public keys to the edge until it takes them, backing off.
+async fn announce(http: reqwest::Client, url: String, token: String, body: keys::Announce) {
+    let mut wait = ANNOUNCE_RETRY;
+    loop {
+        let sent = http
+            .post(&url)
+            .bearer_auth(&token)
+            .timeout(Duration::from_secs(10))
+            .json(&body)
+            .send()
+            .await;
+        match sent {
+            Ok(answer) if answer.status().is_success() => {
+                tracing::info!(keys = body.keys.len(), "keys posted to the edge");
+                return;
+            }
+            Ok(answer) => tracing::warn!(
+                "edge took no keys: HTTP {}; again in {}s",
+                answer.status().as_u16(),
+                wait.as_secs()
+            ),
+            Err(e) => tracing::warn!(
+                "edge took no keys: {}; again in {}s",
+                e.without_url(),
+                wait.as_secs()
+            ),
+        }
+        tokio::time::sleep(wait).await;
+        wait = (wait * 2).min(ANNOUNCE_RETRY_MAX);
+    }
+}
+
 /// Serves on `sockets` (one per port) until the process ends.
 pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
     let engine = Arc::new(Engine::new(
         config.engine_url,
-        config.engine_secret,
-        config.edge_url,
-        config.identity,
+        config.token.clone(),
+        config.edge_url.clone(),
     ));
-    let keys = loop {
-        match engine.keys().await {
-            Ok(keys) => break keys,
-            Err(e) => {
-                tracing::warn!("no keys yet (edge, through the engine): {e}");
-                tokio::time::sleep(Duration::from_secs(10)).await;
-            }
-        }
-    };
-    let mut current = keys[0];
-    tracing::info!(public_key = vtop_wire::hex(&public_key(&current)), "keys");
+    let keys = current_keys(&config.data_dir).await;
+    let privates = |keys: &[keys::Key]| keys.iter().map(keys::Key::private).collect::<Vec<_>>();
+    let initial = privates(&keys);
+    tracing::info!(key = keys[0].id(), "keys");
     let (keys_tx, mut keys_rx) = mpsc::channel::<Vec<[u8; 32]>>(1);
-    let asker = engine.clone();
+    let announce_to = format!("{}{UDP_KEYS_INTERNAL}", engine.edge_url);
     tokio::spawn(async move {
-        let unix = || {
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |since| since.as_secs())
+        let post = |keys: &[keys::Key]| {
+            let body = keys::Announce::new(&config.host, &config.ports, keys);
+            tokio::spawn(announce(
+                engine_http(),
+                announce_to.clone(),
+                config.token.clone(),
+                body,
+            ))
         };
-        let mut wait = next_key_check(unix());
+        let mut posting = post(&keys);
+        let mut week = keys[0].from;
         loop {
-            tokio::time::sleep(wait).await;
-            wait = match asker.keys().await {
-                Ok(keys) => {
-                    if keys_tx.send(keys).await.is_err() {
-                        return;
-                    }
-                    next_key_check(unix())
-                }
-                Err(e) => {
-                    tracing::warn!("keys: {e}");
-                    KEYS_RETRY
-                }
-            };
+            let next = week + keys::WEEK_SECS;
+            let wait = Duration::from_secs(next.saturating_sub(unix_now()) + 1);
+            tokio::time::sleep(wait.min(ROTATE_CHECK)).await;
+            if keys::week_start(unix_now()) == week {
+                continue;
+            }
+            let keys = current_keys(&config.data_dir).await;
+            week = keys[0].from;
+            tracing::info!(key = keys[0].id(), "a new key");
+            if keys_tx.send(privates(&keys)).await.is_err() {
+                return;
+            }
+            posting.abort();
+            posting = post(&keys);
         }
     });
     let sockets: Vec<Arc<UdpSocket>> = sockets.into_iter().map(Arc::new).collect();
@@ -162,7 +202,7 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
     }
     let (done_tx, mut done_rx) = mpsc::unbounded_channel::<(Token, Vec<u8>)>();
     let calls = Arc::new(tokio::sync::Semaphore::new(MAX_ENGINE_CALLS));
-    let mut gw = Gateway::new(keys);
+    let mut gw = Gateway::new(initial);
     let mut last_sweep = Instant::now();
     loop {
         let wake = gw
@@ -187,13 +227,7 @@ pub async fn run(config: Config, sockets: Vec<UdpSocket>) {
                 }
             }
             Some((token, body)) = done_rx.recv() => gw.respond(token, body, Instant::now()),
-            Some(keys) = keys_rx.recv() => {
-                if keys[0] != current {
-                    current = keys[0];
-                    tracing::info!(public_key = vtop_wire::hex(&public_key(&current)), "a new key");
-                }
-                gw.set_keys(keys);
-            }
+            Some(keys) = keys_rx.recv() => gw.set_keys(keys),
             _ = tokio::time::sleep_until(tokio::time::Instant::from_std(wake)) => {}
         }
         for out in gw.poll(Instant::now()) {
@@ -222,56 +256,20 @@ struct Kept {
 struct Engine {
     http: reqwest::Client,
     url: String,
-    secret: String,
+    token: String,
     edge_url: String,
-    identity: String,
     sessions: std::sync::Mutex<HashMap<[u8; 32], Kept>>,
 }
 
 impl Engine {
-    fn new(url: String, secret: String, edge_url: String, identity: String) -> Self {
-        let http = reqwest::Client::builder()
-            .timeout(ENGINE_TIMEOUT)
-            .build()
-            .expect("HTTP client");
+    fn new(url: String, token: String, edge_url: String) -> Self {
         Self {
-            http,
+            http: engine_http(),
             url: url.trim_end_matches('/').to_string(),
-            secret,
+            token,
             edge_url: edge_url.trim_end_matches('/').to_string(),
-            identity,
             sessions: std::sync::Mutex::default(),
         }
-    }
-
-    /// The gateway's private keys, the current one first: from the edge
-    /// through the engine, sealed to [`Engine::identity`].
-    async fn keys(&self) -> Result<Vec<[u8; 32]>, String> {
-        let answer = self
-            .http
-            .get(format!("{}{UDP_KEYS}", self.url))
-            .bearer_auth(&self.secret)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        if !answer.status().is_success() {
-            return Err(format!("HTTP {}", answer.status()));
-        }
-        let body: serde_json::Value = answer.json().await.map_err(|e| e.to_string())?;
-        let sealed = body["sealed"].as_str().ok_or("no sealed keys")?;
-        let opened = mail_seal::open(&self.identity, UDP_KEYS_SEALED_FOR, sealed)
-            .map_err(|e| format!("the keys do not open: {e:?}"))?;
-        let body: serde_json::Value = serde_json::from_slice(&opened).map_err(|e| e.to_string())?;
-        let keys: Vec<[u8; 32]> = body["keys"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|key| vtop_wire::unhex(key.as_str()?)?.try_into().ok())
-            .collect();
-        if keys.is_empty() {
-            return Err("no keys in the answer".into());
-        }
-        Ok(keys)
     }
 
     fn sweep(&self) {
@@ -347,7 +345,7 @@ impl Engine {
         };
         let sent = self
             .post(page, format!("{}{FETCH}", self.url))
-            .bearer_auth(&self.secret)
+            .bearer_auth(&self.token)
             .json(&body)
             .send()
             .await;
@@ -420,7 +418,7 @@ impl Engine {
     async fn sign_in(&self, page: &WirePageRequest, path: &str, body: String) -> WirePageResponse {
         let to_engine = |route: &str| {
             self.post(page, format!("{}{route}", self.url))
-                .bearer_auth(&self.secret)
+                .bearer_auth(&self.token)
         };
         let request = match path {
             "/v1/vtop/login" => to_engine(VTOP_LOGIN),
@@ -530,6 +528,13 @@ impl Engine {
             },
         );
     }
+}
+
+fn engine_http() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(ENGINE_TIMEOUT)
+        .build()
+        .expect("HTTP client")
 }
 
 /// Whether the engine said the session expired.

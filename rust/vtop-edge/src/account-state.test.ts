@@ -19,8 +19,6 @@ import {
   isAccountId,
   keyId,
   keyLabel,
-  linkSecret,
-  newAppSecret,
   newKey,
   parseSettings,
   phoneId,
@@ -30,7 +28,6 @@ import {
   toHeader,
   validCookies,
 } from "./account-state";
-import { hash } from "./shared/tokens";
 
 const NOW = 1_800_000_000;
 
@@ -38,8 +35,8 @@ function account(): AccountRecord {
   return new AccountRecord("22BCE0001", NOW);
 }
 
-function phone(device: string, secret: string): PhoneRecord {
-  return { deviceId: device, secretHash: hash(secret), label: null, addedAt: NOW, seenAt: NOW };
+function phone(device: string): PhoneRecord {
+  return { deviceId: device, label: null, addedAt: NOW, seenAt: NOW };
 }
 
 describe("settings and ids", () => {
@@ -62,7 +59,6 @@ describe("settings and ids", () => {
     expect(keyLabel("  ")).toBe("Access key");
     expect(keyLabel("x".repeat(80)).length).toBe(60);
     expect(newKey().startsWith("vtm_")).toBe(true);
-    expect(newAppSecret().startsWith("vta_")).toBe(true);
     expect(semesterId(" VL2025 ")).toBe("VL2025");
     expect(semesterId("VL 2025")).toBeNull();
     expect(errorCode("phone_unreachable: x")).toBe("phone_unreachable");
@@ -186,7 +182,7 @@ describe("accounts", () => {
 
   it("outing actions are off for a new key until turned on", () => {
     const a = account();
-    a.addPhone(phone("d1", "vta_x"));
+    a.addPhone(phone("d1"));
     a.addKey("00abcdefgh", "k", "d1", NOW);
     a.addKey("01abcdefgh", "k", "d1", NOW, true);
     expect(a.keys.map((k) => k.outings)).toEqual([false, true]);
@@ -199,7 +195,7 @@ describe("accounts", () => {
 
   it("limit, touch and revoke keys", () => {
     const a = account();
-    a.addPhone(phone("d1", "vta_x"));
+    a.addPhone(phone("d1"));
     for (let n = 0; n < MAX_KEYS_PER_ACCOUNT; n++) {
       expect(a.addKey(`${String(n).padStart(2, "0")}abcdefgh`, "k", "d1", NOW)).toBe(true);
     }
@@ -217,29 +213,28 @@ describe("accounts", () => {
     expect(a.view(null, true, NOW).keys).toEqual([]);
   });
 
-  it("find phones by app secret", () => {
+  it("find phones by device id", () => {
     const a = account();
-    expect(a.phoneBySecret("vta_x")).toBeNull();
-    a.addPhone(phone("d1", "vta_x"));
-    a.addPhone(phone("d2", "vta_y"));
-    expect(a.phoneBySecret(" vta_x ")).toBe(0);
-    expect(a.phoneBySecret("vta_y")).toBe(1);
-    expect(a.phoneBySecret("vta_z")).toBeNull();
-    expect(a.phoneBySecret(undefined)).toBeNull();
+    expect(a.phoneIndex("d1")).toBeNull();
+    a.addPhone(phone("d1"));
+    a.addPhone(phone("d2"));
+    expect(a.phoneIndex("d1")).toBe(0);
+    expect(a.phoneIndex("d2")).toBe(1);
+    expect(a.phoneIndex("d3")).toBeNull();
   });
 
   it("link and unlink several phones", () => {
     const a = account();
-    for (let n = 0; n < MAX_PHONES; n++) a.addPhone({ ...phone(`d${n}`, `vta_${n}`), seenAt: NOW + n });
+    for (let n = 0; n < MAX_PHONES; n++) a.addPhone({ ...phone(`d${n}`), seenAt: NOW + n });
     // Linking the same install again replaces it, not adds.
-    a.addPhone(phone("d3", "vta_new"));
+    a.addPhone(phone("d3"));
     expect(a.phones.length).toBe(MAX_PHONES);
-    expect(a.phoneBySecret("vta_3")).toBeNull();
+    expect(a.phones.filter((p) => p.deviceId === "d3")).toHaveLength(1);
     // One more drops the least recently seen (d0).
-    a.addPhone(phone("d9", "vta_9"));
+    a.addPhone(phone("d9"));
     expect(a.phones.length).toBe(MAX_PHONES);
     expect(a.phones.every((p) => p.deviceId !== "d0")).toBe(true);
-    const view = a.view(a.phoneBySecret("vta_9"), false, NOW);
+    const view = a.view(a.phoneIndex("d9"), false, NOW);
     expect(view.phones.length).toBe(MAX_PHONES);
     expect(view.phones[MAX_PHONES - 1].thisPhone).toBe(true);
     expect(a.view(null, false, NOW).phones).toEqual([]);
@@ -253,15 +248,12 @@ describe("accounts", () => {
 
   it("ask only the phone that made a key", () => {
     const a = account();
-    a.addPhone(phone("d1", "vta_1"));
-    a.addPhone(phone("d2", "vta_2"));
+    a.addPhone(phone("d1"));
+    a.addPhone(phone("d2"));
     a.addKey("mine", "k", "d2", NOW);
     expect(a.phonesForKey("mine")).toEqual(["d2"]);
     expect(a.view(0, false, NOW).keys[0].phoneId).toBe(phoneId("d2"));
-    a.phoneMoved("d2", "d3");
-    a.phones[1].deviceId = "d3";
-    expect(a.phonesForKey("mine")).toEqual(["d3"]);
-    a.removePhone(phoneId("d3"));
+    a.removePhone(phoneId("d2"));
     expect(a.phonesForKey("mine")).toEqual([]);
   });
 
@@ -274,7 +266,7 @@ describe("accounts", () => {
 
   it("copy deeply when marked loaded", () => {
     const a = account();
-    a.addPhone(phone("d1", "vta_1"));
+    a.addPhone(phone("d1"));
     a.markLoaded();
     a.phones[0].seenAt = NOW + 1;
     a.settings.phoneWaitSecs = 45;
@@ -286,7 +278,7 @@ describe("accounts", () => {
 
 describe("session requests", () => {
   it("look as clients expect", () => {
-    const r = new RequestRecord("r", "h", NOW);
+    const r = new RequestRecord("r", NOW);
     expect(r.pending(NOW)).toBe(true);
     expect(r.pollView(NOW).status).toBe(202);
     expect(r.pollView(NOW).body).toMatchObject({ stage: "starting" });
@@ -325,7 +317,7 @@ describe("sign-ins and key uses", () => {
 
   it("records a key use when its last use is written", () => {
     const a = account();
-    a.addPhone(phone("d1", "vta_x"));
+    a.addPhone(phone("d1"));
     a.addKey("00abcdefgh", "k", "d1", NOW);
     a.touchKey("00abcdefgh", NOW, "mcp");
     a.touchKey("00abcdefgh", NOW + 59, "mcp");
@@ -338,12 +330,7 @@ describe("sign-ins and key uses", () => {
     ]);
     for (let n = 2; n < 14; n++) a.touchKey("00abcdefgh", NOW + 60 * n);
     expect(key().uses).toHaveLength(MAX_KEY_USES);
-  });
-  it("a phone linking again keeps its secret, so its requests in flight still count", () => {
-    expect(linkSecret(" vta_mine ", 2)).toBe("vta_mine");
-    const fresh = linkSecret("vta_stranger", null);
-    expect(fresh.startsWith("vta_")).toBe(true);
-    expect(fresh).not.toBe("vta_stranger");
-    expect(linkSecret(undefined, null).startsWith("vta_")).toBe(true);
+    // The linked phone's view lists them too, newest first.
+    expect(a.view(0, false, NOW).keys[0].uses[0]).toEqual({ at: NOW + 60 * 13, via: "extension" });
   });
 });

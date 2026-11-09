@@ -4,9 +4,10 @@
 import { randomBytes } from "@noble/hashes/utils.js";
 
 import { isPublicKey } from "./shared/mail-seal";
-import { hashesEqual } from "./shared/tokens";
 
-// ---- forwarding addresses: `vtop-otp-<id>@<domain>` ----------------------------
+// ---- forwarding addresses: `otp+<id>@<domain>` --------------------------------
+// One Email Routing rule (`otp@<domain>` → this Worker) catches every plus
+// address; a subdomain can have no catch-all.
 
 export const ID_LEN = 10;
 /** No `l`, `o`, `0` or `1`, so an id read aloud or typed is unambiguous. */
@@ -14,7 +15,7 @@ export const ID_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
 /** How long a sealed box waits to be collected. */
 export const SEALED_TTL_SECS = 300;
 export const MAX_FCM_TOKEN_LEN = 4096;
-export const ADDRESS_PREFIX = "vtop-otp-";
+export const ADDRESS_PREFIX = "otp+";
 
 export function newId(): string {
   // 32 letters: a byte modulo 32 is uniform.
@@ -48,14 +49,10 @@ export const MEMBER_STALE_SECS = 60 * 24 * 3600;
 const SEEN_EVERY_SECS = 3600;
 export const MAX_LABEL_LEN = 60;
 
-/** One install an address forwards to: its own key, secret and pending
- * box, so each opens only what was sealed for it. */
+/** One install an address forwards to and its pending box, sealed to the
+ * install's own `sealKey`, so each opens only what was sealed for it. */
 export interface MailboxMember {
   deviceId: string;
-  secretHash: string;
-  publicKey: string;
-  /** What the app calls this install ("Pixel 8"), for the device list. */
-  label: string | null;
   sealed: string | null;
   sealedAt: number | null;
   addedAt: number;
@@ -79,18 +76,9 @@ export function freshSealed(member: MailboxMember, now: number): { sealed: strin
   return Math.max(0, now - at) <= SEALED_TTL_SECS ? { sealed, at } : null;
 }
 
-/** A box sealed for the old key can no longer be opened. */
-export function setPublicKey(member: MailboxMember, key: string): void {
-  if (key !== member.publicKey) {
-    member.sealed = null;
-    member.sealedAt = null;
-  }
-  member.publicKey = key;
-}
-
-/** The member whose secret this is. */
-export function memberBySecret(doc: MailboxDoc, secretHash: string): number | null {
-  const index = doc.members.findIndex((m) => hashesEqual(m.secretHash, secretHash));
+/** The index of this install among the members, or null. */
+export function memberOf(doc: MailboxDoc, deviceId: string): number | null {
+  const index = doc.members.findIndex((m) => m.deviceId === deviceId);
   return index < 0 ? null : index;
 }
 
@@ -142,7 +130,8 @@ export function nextExpiry(doc: MailboxDoc): number | null {
   return times.length ? Math.max(...times) + SEALED_TTL_SECS + 1 : null;
 }
 
-/** A label as sent by the app: trimmed, short, or none. */
+/** A label as sent by the app (a device's or a key's): trimmed, short, or
+ * none. */
 export function memberLabel(raw: string | undefined | null): string | null {
   const label = raw?.trim();
   return label ? [...label].slice(0, MAX_LABEL_LEN).join("") : null;
@@ -180,10 +169,19 @@ export function fcmToken(raw: string | undefined): Checked {
   return { ok: true, value: token };
 }
 
-export function publicKey(raw: string | undefined): Checked {
+/** An X25519 key (`sealKey`), stored without padding. */
+export function sealKey(raw: string | undefined): Checked {
   if (raw === undefined) return { ok: true, value: null };
-  const key = raw.trim();
-  return isPublicKey(key)
-    ? { ok: true, value: key }
-    : { ok: false, message: "publicKey must be a base64url X25519 key." };
+  const key = raw.trim().replace(/=+$/, "");
+  return isPublicKey(key) ? { ok: true, value: key } : { ok: false, message: "sealKey must be a base64url X25519 key." };
+}
+
+export const MAX_PLATFORM_LEN = 20;
+
+/** `platform` as the app sends it ("android", "ios"). */
+export function platform(raw: string | undefined): Checked {
+  const value = raw?.trim().toLowerCase() ?? "";
+  return /^[a-z0-9_-]+$/.test(value) && value.length <= MAX_PLATFORM_LEN
+    ? { ok: true, value }
+    : { ok: false, message: "platform is required (android, ios, ...)." };
 }

@@ -7,8 +7,7 @@ import type { Account } from "./account";
 import type { Device } from "./device";
 import type { FcmToken } from "./fcm";
 import type { Index, Mailbox } from "./store";
-import type { UdpKeys } from "./udp-gateway";
-import { DEVICE_SECRET_PREFIX, hash, hashesEqual, randomToken } from "./shared/tokens";
+import { hash, hashesEqual } from "./shared/tokens";
 
 export interface Env {
   DEVICE: DurableObjectNamespace<Device>;
@@ -22,15 +21,10 @@ export interface Env {
   PUBLIC_URL: string;
   ALLOWED_ORIGINS: string;
   FALLBACK_FORWARD: string;
-  UDP_KEYS: DurableObjectNamespace<UdpKeys>;
-  /** UDP mode's gateway (`GET /v1/udp`): host and comma-separated ports. */
-  UDP_HOST: string;
-  UDP_PORTS: string;
   FIREBASE_CREDENTIALS_JSON: string;
-  BRIDGE_SECRET: string;
-  /** The UDP gateway's identity public key (base64url): its keys are sealed
-   * to it. */
-  GATEWAY_IDENTITY_KEY: string;
+  /** Shared with the engine and the UDP gateway: sent on every call to the
+   * engine and required on `/internal/*`. */
+  INTERNAL_TOKEN: string;
 }
 
 /** Unix seconds. */
@@ -71,11 +65,15 @@ export function empty(status = 204): Response {
 
 /** A request's JSON body as an object; null when it is not one. */
 export async function jsonBody(req: Request): Promise<Record<string, unknown> | null> {
+  return parseJson(new Uint8Array(await req.arrayBuffer()), req.headers);
+}
+
+/** A body read already, as `jsonBody` parses it (`x-vtop-encoding:
+ * deflate-raw` is inflated first). */
+export function parseJson(bytes: Uint8Array, headers: Headers): Record<string, unknown> | null {
   try {
-    const body: unknown =
-      req.headers.get("x-vtop-encoding") === "deflate-raw"
-        ? JSON.parse(strFromU8(inflateCapped(new Uint8Array(await req.arrayBuffer()), MAX_INFLATED)))
-        : await req.json();
+    const raw = headers.get("x-vtop-encoding") === "deflate-raw" ? inflateCapped(bytes, MAX_INFLATED) : bytes;
+    const body: unknown = JSON.parse(strFromU8(raw));
     return body !== null && typeof body === "object" && !Array.isArray(body)
       ? (body as Record<string, unknown>)
       : null;
@@ -106,10 +104,14 @@ export function bearer(req: Request): string {
   return value.startsWith("Bearer ") ? value.slice("Bearer ".length).trim() : "";
 }
 
-/** The caller holds the secret shared with the engine. */
-export function isEngine(req: Request, env: Env): boolean {
-  const secret = env.BRIDGE_SECRET ?? "";
-  return secret !== "" && hashesEqual(hash(secret), hash(bearer(req)));
+/** The caller (the engine or the UDP gateway) holds `INTERNAL_TOKEN`. */
+export function isInternal(req: Request, env: Env): boolean {
+  const token = env.INTERNAL_TOKEN ?? "";
+  return token !== "" && hashesEqual(hash(token), hash(bearer(req)));
+}
+
+export function notInternal(): Response {
+  return error(401, "unauthorized", "The internal token is required.");
 }
 
 // ---- the engine ---------------------------------------------------------------
@@ -119,11 +121,11 @@ export function engineSend(env: Env, path: string, init: RequestInit): Promise<R
   return fetch(`${variable(env, "ENGINE_URL")}${path}`, init);
 }
 
-/** Posts to the engine with the shared secret. */
+/** Posts to the engine with `INTERNAL_TOKEN`. */
 export function enginePost(env: Env, path: string, body: unknown): Promise<Response> {
   return engineSend(env, path, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${env.BRIDGE_SECRET}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${env.INTERNAL_TOKEN}` },
     body: JSON.stringify(body),
   });
 }
@@ -144,25 +146,6 @@ export function isDeviceId(id: string): boolean {
 
 export function deviceStub(env: Env, id: string) {
   return env.DEVICE.getByName(id);
-}
-
-/** A new install for this FCM token: its id and secret. */
-export async function createDevice(env: Env, fcmToken: string): Promise<{ id: string; secret: string }> {
-  const id = randomToken("").slice(0, 32);
-  const secret = randomToken(DEVICE_SECRET_PREFIX);
-  if (!(await deviceStub(env, id).init(id, hash(secret), fcmToken))) {
-    throw new Error("device create failed: the id is taken");
-  }
-  return { id, secret };
-}
-
-export async function deviceMatches(env: Env, id: string, secret: string): Promise<boolean> {
-  return isDeviceId(id) && (await deviceStub(env, id).auth(hash(secret)));
-}
-
-/** False when the install no longer exists. */
-export function setDeviceFcm(env: Env, id: string, token: string): Promise<boolean> {
-  return deviceStub(env, id).setFcm(token);
 }
 
 /** The forwarding-address index entry of a student (`owner:<hash>`). */

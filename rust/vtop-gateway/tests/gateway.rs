@@ -1,9 +1,10 @@
 use std::time::Duration;
 
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine as _;
 use tokio::net::UdpSocket;
-use vtop_gateway::{next_key_check, run, Config};
-use vtop_shared::engine::{UDP_KEYS, UDP_KEYS_SEALED_FOR};
-use vtop_shared::mail_seal;
+use vtop_gateway::{run, Config};
+use vtop_shared::engine::UDP_KEYS_INTERNAL;
 use vtop_shared::page_dictionary;
 use vtop_shared::wire_page::{
     session_hash, WirePageRequest, WirePageResponse, NEED_SESSION, SIGN_IN_BODY, UNSUPPORTED,
@@ -15,30 +16,42 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const SESSION: &str = r#"{"cookies":"JSESSIONID=abc","csrf":"t"}"#;
 
+/// A gateway whose engine and edge are `engine`, and its public key, as it
+/// posts it to the edge.
 async fn gateway(engine: &MockServer) -> (u16, [u8; 32]) {
-    let (private, public) = vtop_wire::generate_keypair();
-    // The engine passes on the key, sealed by the edge to the gateway.
-    let (identity, identity_public) = mail_seal::generate_keypair();
-    let keys = serde_json::json!({ "keys": [vtop_wire::hex(&private)] }).to_string();
-    let sealed = mail_seal::seal(&identity_public, UDP_KEYS_SEALED_FOR, keys.as_bytes()).unwrap();
-    Mock::given(method("GET"))
-        .and(path(UDP_KEYS))
-        .and(header("authorization", "Bearer relay-secret"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(serde_json::json!({ "sealed": sealed })),
-        )
+    Mock::given(method("POST"))
+        .and(path(UDP_KEYS_INTERNAL))
+        .and(header("authorization", "Bearer internal-token"))
+        .respond_with(ResponseTemplate::new(204))
         .mount(engine)
         .await;
     let sock = UdpSocket::bind("127.0.0.1:0").await.unwrap();
     let port = sock.local_addr().unwrap().port();
+    let data_dir =
+        std::env::temp_dir().join(format!("vtop-gateway-data-{}-{port}", std::process::id()));
     let config = Config {
         engine_url: engine.uri(),
         edge_url: engine.uri(),
-        engine_secret: "relay-secret".into(),
-        identity,
+        token: "internal-token".into(),
+        host: "udp.example".into(),
+        ports: vec![port],
+        data_dir,
     };
     tokio::spawn(run(config, vec![sock]));
-    (port, public)
+    for _ in 0..200 {
+        let posted = engine.received_requests().await.unwrap();
+        if let Some(post) = posted.iter().find(|r| r.url.path() == UDP_KEYS_INTERNAL) {
+            let body: serde_json::Value = serde_json::from_slice(&post.body).unwrap();
+            assert_eq!(body["host"], "udp.example");
+            assert_eq!(body["ports"], serde_json::json!([port]));
+            let public = URL_SAFE_NO_PAD
+                .decode(body["keys"][0]["publicKey"].as_str().unwrap())
+                .unwrap();
+            return (port, public.try_into().unwrap());
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("the gateway never posted its keys");
 }
 
 fn request(session: Option<&str>, hash_of: &str) -> Vec<u8> {
@@ -62,7 +75,7 @@ async fn fetches_through_the_engine_and_keeps_the_session() {
     let packed = vec![7u8; 1500];
     Mock::given(method("POST"))
         .and(path("/engine/fetch"))
-        .and(header("authorization", "Bearer relay-secret"))
+        .and(header("authorization", "Bearer internal-token"))
         .and(header("x-request-id", "0f10d00e"))
         .and(body_partial_json(serde_json::json!({
             "name": "attendance",
@@ -141,7 +154,7 @@ async fn a_request_newer_than_the_gateway_is_told_to_use_https() {
         UNSUPPORTED
     );
     let asked = engine.received_requests().await.unwrap();
-    assert!(asked.iter().all(|r| r.url.path() == UDP_KEYS));
+    assert!(asked.iter().all(|r| r.url.path() == UDP_KEYS_INTERNAL));
 }
 
 /// A sign-in request named by its edge path, after the handshake.
@@ -186,7 +199,7 @@ async fn sign_ins_go_where_the_edge_would_send_them() {
     let ok = r#"{"status":"ok","session":{"cookies":"JSESSIONID=s"}}"#;
     Mock::given(method("POST"))
         .and(path("/engine/vtop-login"))
-        .and(header("authorization", "Bearer relay-secret"))
+        .and(header("authorization", "Bearer internal-token"))
         .and(body_partial_json(
             serde_json::json!({ "username": "U", "password": "P" }),
         ))
@@ -297,18 +310,4 @@ async fn an_expired_session_is_renewed_in_the_fetch() {
         .await
         .unwrap();
     assert_eq!(WirePageResponse::decode(&got.body).unwrap().status, 200);
-}
-
-#[test]
-fn keys_are_asked_for_rarely_and_right_after_a_rotation() {
-    let monday = 1_793_557_800; // Mon 2 Nov 2026 00:00 IST
-                                // Mid-week: every six hours.
-    assert_eq!(
-        next_key_check(monday - 3 * 86_400),
-        Duration::from_secs(6 * 3600)
-    );
-    // An hour before the rotation: 30 s after it.
-    assert_eq!(next_key_check(monday - 3600), Duration::from_secs(3630));
-    // Just after it: a week (capped at six hours) to the next.
-    assert_eq!(next_key_check(monday + 60), Duration::from_secs(6 * 3600));
 }

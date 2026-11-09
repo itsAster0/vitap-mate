@@ -3,12 +3,11 @@ import { describe, expect, it } from "vitest";
 import { accountObject } from "../test/account-harness";
 import { AccountRecord, RequestRecord } from "./account-state";
 import { gmailGrantOf, keyVia } from "./account";
-import { hash } from "./shared/tokens";
 
 function linked(): AccountRecord {
   const at = Math.floor(Date.now() / 1000);
   const a = new AccountRecord("22BCE0001", at);
-  a.addPhone({ deviceId: "d1", secretHash: hash("vta_x"), label: null, addedAt: at, seenAt: at });
+  a.addPhone({ deviceId: "d1", label: null, addedAt: at, seenAt: at });
   a.saveVault("sealed", at);
   return a;
 }
@@ -57,15 +56,32 @@ describe("sign-in history", () => {
       Response.json({ status: "valid", registrationNumber: "22BCE0001", cookies: "A=1", sealedSession: "s" }),
     );
     rig.seed(linked());
-    const request = new RequestRecord("req1", "tok", Math.floor(Date.now() / 1000));
+    const request = new RequestRecord("req1", Math.floor(Date.now() / 1000));
+    request.phones = ["d1"];
     rig.inner.putRequest(request);
-    const response = await rig.account.answer({
+    const response = await rig.account.answer("d1", {
       requestId: "req1",
-      responseToken: "tok",
       cookies: [{ name: "JSESSIONID", value: "a", domain: "vtop.vitap.ac.in" }],
     });
     expect(response.status).toBe(200);
     expect(rig.load()!.signIns[0]).toMatchObject({ by: "phone", ok: true });
+  });
+});
+
+describe("session answers", () => {
+  it("come only from a phone that was asked", async () => {
+    const rig = accountObject();
+    const doc = linked();
+    const at = Math.floor(Date.now() / 1000);
+    doc.addPhone({ deviceId: "d2", label: null, addedAt: at, seenAt: at });
+    rig.seed(doc);
+    const request = new RequestRecord("req1", at);
+    request.phones = ["d1"];
+    rig.inner.putRequest(request);
+    const cookies = [{ name: "JSESSIONID", value: "a", domain: "vtop.vitap.ac.in" }];
+    const response = await rig.account.answer("d2", { requestId: "req1", cookies });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "not_asked" });
   });
 });
 
@@ -96,7 +112,7 @@ describe("rejected password", () => {
     const rig = accountObject(undefined, { DEVICE });
     const doc = linked();
     const at = Math.floor(Date.now() / 1000);
-    doc.addPhone({ deviceId: "d2", secretHash: hash("vta_y"), label: null, addedAt: at, seenAt: at });
+    doc.addPhone({ deviceId: "d2", label: null, addedAt: at, seenAt: at });
     rig.seed(doc);
     const response = await rig.account.loginDone({
       account: "22BCE0001",
@@ -166,10 +182,11 @@ describe("Gmail access with credentials", () => {
     const doc = linked();
     doc.clearVault();
     rig.seed(doc);
-    rig.inner.putRequest(new RequestRecord("req1", "tok", Math.floor(Date.now() / 1000)));
-    const response = await rig.account.answer({
+    const request = new RequestRecord("req1", Math.floor(Date.now() / 1000));
+    request.phones = ["d1"];
+    rig.inner.putRequest(request);
+    const response = await rig.account.answer("d1", {
       requestId: "req1",
-      responseToken: "tok",
       cookies: [{ name: "JSESSIONID", value: "a", domain: "vtop.vitap.ac.in" }],
       credentials,
     });
@@ -191,5 +208,36 @@ describe("Gmail access with credentials", () => {
     const { sealed, after } = await answerWith({ username: "student", password: "pw" });
     expect(sealed).toEqual([]);
     expect(after.sealedVault).toBeNull();
+  });
+});
+
+describe("clearing the sign-in history", () => {
+  const checked = { status: "valid", registrationNumber: "22BCE0001", ownerHash: "o" } as const;
+  const device = (id: string) => ({ id, signKey: "k", sealKey: "s", label: null, platform: "android", fcmToken: "" });
+
+  it("drops every sign-in, for a linked phone only", async () => {
+    const rig = accountObject();
+    const doc = linked();
+    doc.recordSignIn(10, "server", true);
+    doc.recordSignIn(20, "phone", false, "VTOP down");
+    rig.seed(doc);
+    const call = (id: string) => rig.account.app("clear-sign-ins", { checked, mailboxId: null, body: {}, device: device(id) });
+    expect((await call("d9")).status).toBe(403);
+    expect(rig.load()!.signIns).toHaveLength(2);
+    expect((await call("d1")).status).toBe(204);
+    expect(rig.load()!.signIns).toEqual([]);
+    // New sign-ins are kept again.
+    await rig.account.loginDone({ account: "22BCE0001", requestId: "r1", outcome: { status: "failed", reason: "x" } });
+    expect(rig.load()!.signIns).toHaveLength(1);
+  });
+
+  it("unlinks a phone that deletes itself, keeping the rest", async () => {
+    const rig = accountObject();
+    const doc = linked();
+    doc.addPhone({ deviceId: "d2", label: null, addedAt: 1, seenAt: 1 });
+    rig.seed(doc);
+    await rig.account.forgetPhone("d1");
+    await rig.account.forgetPhone("d9");
+    expect(rig.load()!.phones.map((p) => p.deviceId)).toEqual(["d2"]);
   });
 });

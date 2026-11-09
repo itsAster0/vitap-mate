@@ -5,8 +5,8 @@
 // longer be collected. While the engine signs its student in, it waits
 // here for the next OTP, sealed to a key made for that sign-in (a
 // "waiter").
-// `Index`: one lookup value, named by what it indexes (`owner:<hash>`,
-// `key:<hash>`).
+// `Index`: one stored value, named by what it holds (`owner:<hash>`,
+// `key:<hash>`, `udp`: the UDP gateway's latest report).
 
 import { DurableObject } from "cloudflare:workers";
 
@@ -237,5 +237,22 @@ export class Index extends DurableObject<Env> {
   /** Deletes only while it still holds the value given. */
   async remove(expected: string): Promise<void> {
     this.db.exec("DELETE FROM entry WHERE value = ?", expected);
+  }
+
+  /** Stores `value` until `untilMs`, when an alarm deletes it. */
+  async putUntil(value: string, untilMs: number): Promise<void> {
+    await this.put(value);
+    await this.ctx.storage.setAlarm(untilMs);
+  }
+
+  /** Reads and deletes the value, so only one caller gets it. */
+  async take(): Promise<string | null> {
+    const value = await this.get();
+    if (value !== null) this.db.exec("DELETE FROM entry");
+    return value;
+  }
+
+  override async alarm(): Promise<void> {
+    this.db.exec("DELETE FROM entry");
   }
 }

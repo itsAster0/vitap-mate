@@ -1,38 +1,35 @@
 # The Cloudflare edge, in TypeScript.
-# Deploy from this directory:
-#   pnpm install && pnpm exec wrangler deploy
+# Deployed with Alchemy (alchemy.run.ts: `bun run deploy`); this file is kept
+# for `wrangler dev` and the tests. Keep the two in step.
 # Secrets (wrangler secret put):
-#   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the bridge)
-#   BRIDGE_SECRET              the engine's MAIL_RELAY_SECRET; it guards
-#                              /internal/*
+#   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the engine)
+#   INTERNAL_TOKEN             shared with the engine and the UDP gateway:
+#                              sent on every call to the engine, required
+#                              on /internal/*
 # The engine (vtop-bridge) runs on Railway from ../Dockerfile.engine, at
-# ENGINE_URL below; UDP mode's gateway runs on the VPS (../vps).
-name = "vitapmate-edge"
+# ENGINE_URL below; UDP mode's gateway runs on the VPS (../vps) and reports
+# its host, ports and keys to POST /internal/udp-keys.
+#
+# A new Worker (the old `vitapmate-edge` on vmate-api.aster0.dev is left
+# as it was), so its Durable Objects start from one migration.
+name = "vmate-edge"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 workers_dev = false
-routes = [{ pattern = "vmate-api.aster0.dev", custom_domain = true }]
+routes = [{ pattern = "vmate.aster0.dev", custom_domain = true }]
 
 [vars]
 # Every address the edge uses; nothing is hard-coded. ENGINE_URL serves the
 # engine routes and /mcp.
-MAIL_DOMAIN = "aster0.dev"
-ENGINE_URL = "https://engine-production-96d4.up.railway.app"
+MAIL_DOMAIN = "vmate.aster0.dev"
+ENGINE_URL = "https://engine-v2-production.up.railway.app"
 FCM_URL = "https://fcm.googleapis.com"
 # This Worker's own address, for links it hands out; MCP clients get its /mcp.
-PUBLIC_URL = "https://vmate-api.aster0.dev"
+PUBLIC_URL = "https://vmate.aster0.dev"
 # Comma-separated origins allowed by CORS; empty allows every origin.
 ALLOWED_ORIGINS = ""
 # Where other @MAIL_DOMAIN mail goes; empty rejects it.
 FALLBACK_FORWARD = ""
-# UDP mode's gateway, handed to the app by GET /v1/udp with its current
-# public key (the UdpKeys object makes a new key pair every Monday). A new
-# host or ports reach every phone by its next weekly refresh.
-UDP_HOST = "140.245.225.49"
-UDP_PORTS = "3478,51820,8443"
-# The gateway's identity public key (`vtop-gateway identity`): its keys
-# are sealed to it, so the engine passes them on without reading them.
-GATEWAY_IDENTITY_KEY = "dq7b9VnJ-k6pJcv7YNtj5rVVJFvGAHaG_Bj7TfvpMQ0"
 
 [observability.logs]
 enabled = true
@@ -65,37 +62,6 @@ class_name = "FcmToken"
 name = "ACCOUNT"
 class_name = "Account"
 
-[[durable_objects.bindings]]
-name = "UDP_KEYS"
-class_name = "UdpKeys"
-
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken"]
-
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["Doc", "DocSet"]
-
-[[migrations]]
-tag = "v3"
-new_sqlite_classes = ["Account"]
-
-# Doc and DocSet held the engine's storage while accounts moved over; the
-# Account objects replaced them. This erases their data.
-[[migrations]]
-tag = "v4"
-deleted_classes = ["Doc", "DocSet"]
-
-[[migrations]]
-tag = "v5"
-new_sqlite_classes = ["Engine"]
-
-# The engine moved to Railway; this removes its container's object.
-[[migrations]]
-tag = "v6"
-deleted_classes = ["Engine"]
-
-[[migrations]]
-tag = "v7"
-new_sqlite_classes = ["UdpKeys"]
+new_sqlite_classes = ["Device", "Mailbox", "Index", "FcmToken", "Account"]

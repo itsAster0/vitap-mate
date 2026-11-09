@@ -11,9 +11,9 @@ pub struct Config {
     pub vault_key: [u8; 32],
     /// The Cloudflare edge this engine works for.
     pub edge_url: String,
-    /// The bearer secret shared with the edge (its `BRIDGE_SECRET`), both
-    /// ways.
-    pub mail_relay_secret: String,
+    /// The bearer token shared with the edge and the UDP gateway, both
+    /// ways (`INTERNAL_TOKEN`).
+    pub internal_token: String,
     /// How long a sign-in waits for the forwarded OTP mail.
     pub otp_wait: Duration,
     pub listen: SocketAddr,
@@ -56,10 +56,10 @@ impl Config {
             return Err(ConfigError("EDGE_URL must be an HTTP(S) URL".into()));
         }
 
-        let mail_relay_secret = required("MAIL_RELAY_SECRET")?;
-        if mail_relay_secret.len() < 32 {
+        let internal_token = required("INTERNAL_TOKEN")?;
+        if internal_token.len() < 32 {
             return Err(ConfigError(
-                "MAIL_RELAY_SECRET must be at least 32 characters".into(),
+                "INTERNAL_TOKEN must be at least 32 characters".into(),
             ));
         }
 
@@ -68,7 +68,7 @@ impl Config {
         Ok(Self {
             vault_key,
             edge_url,
-            mail_relay_secret,
+            internal_token,
             otp_wait,
             listen: SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, port)),
         })
@@ -95,13 +95,13 @@ mod tests {
     use std::collections::HashMap;
 
     const KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-    const SECRET: &str = "relay-secret-relay-secret-relay-secret";
+    const SECRET: &str = "internal-token-internal-token-internal";
 
     fn config(extra: &[(&str, &str)]) -> Result<Config, ConfigError> {
         let mut vars: HashMap<&str, &str> = HashMap::from([
             ("VAULT_KEY", KEY),
             ("EDGE_URL", "https://edge.example/"),
-            ("MAIL_RELAY_SECRET", SECRET),
+            ("INTERNAL_TOKEN", SECRET),
         ]);
         vars.extend(extra.iter().copied());
         Config::from_lookup(|name| vars.get(name).map(|value| value.to_string()))
@@ -126,7 +126,7 @@ mod tests {
     fn rejects_bad_values() {
         assert!(config(&[("VAULT_KEY", "short")]).is_err());
         assert!(config(&[("EDGE_URL", "edge.example")]).is_err());
-        assert!(config(&[("MAIL_RELAY_SECRET", "short")]).is_err());
+        assert!(config(&[("INTERNAL_TOKEN", "short")]).is_err());
         assert!(config(&[("OTP_WAIT_SECS", "x")]).is_err());
     }
 

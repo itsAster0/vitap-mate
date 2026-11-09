@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MAILBOX_SECRET_PREFIX, hash, hashesEqual, randomToken } from "./tokens";
+import { KEY_PREFIX, hash, hashesEqual, randomToken } from "./tokens";
 import { accountId } from "./engine-api";
 
 describe("tokens", () => {
@@ -10,9 +10,9 @@ describe("tokens", () => {
   });
 
   it("makes prefixed random tokens", () => {
-    const token = randomToken(MAILBOX_SECRET_PREFIX);
-    expect(token).toMatch(/^vmb_[0-9a-f]{64}$/);
-    expect(token).not.toBe(randomToken(MAILBOX_SECRET_PREFIX));
+    const token = randomToken(KEY_PREFIX);
+    expect(token).toMatch(/^vtm_[0-9a-f]{64}$/);
+    expect(token).not.toBe(randomToken(KEY_PREFIX));
   });
 
   it("compares whole hashes", () => {

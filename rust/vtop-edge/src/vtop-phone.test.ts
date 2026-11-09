@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { Env } from "./common";
-import { PACKED_PAGE, phoneVtop } from "./vtop-phone";
+import { PACKED_PAGE, phoneVtop as pass } from "./vtop-phone";
 
 const EDGE = "https://edge.example";
-const env = { ENGINE_URL: "https://engine.example/", BRIDGE_SECRET: "s3cret" } as Env;
+const env = { ENGINE_URL: "https://engine.example/", INTERNAL_TOKEN: "s3cret" } as Env;
 
 function capture(response: Response) {
   const seen: Request[] = [];
@@ -19,8 +19,14 @@ function post(path: string, body: unknown): Request {
   return new Request(`${EDGE}${path}`, { method: "POST", body: JSON.stringify(body) });
 }
 
+/** As the Worker calls it: the body read already. */
+async function phoneVtop(req: Request, env: Env, fetcher: (r: Request) => Promise<Response>, timeoutMs?: number) {
+  const body = new Uint8Array(await req.arrayBuffer());
+  return pass(req, body, env, fetcher, timeoutMs);
+}
+
 describe("phoneVtop", () => {
-  it("passes a fetch to the engine with the shared secret, body unchanged", async () => {
+  it("passes a fetch to the engine with the internal token, body unchanged", async () => {
     const { seen, fetcher } = capture(Response.json({ data: { semesters: [] } }));
     const body = { session: { cookies: "JSESSIONID=a" }, name: "semesters" };
     const res = await phoneVtop(post("/v1/vtop/fetch", body), env, fetcher);

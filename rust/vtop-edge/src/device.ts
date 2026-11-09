@@ -1,4 +1,5 @@
-// One Durable Object per app install: its FCM token, its event log and,
+// One Durable Object per app install, named by its device id: its signing
+// and sealing keys, its FCM token, its event log and,
 // while the app is in front, its WebSocket (the app's own, or the Worker's
 // when the app reads server-sent events, see event-stream.ts). Every event gets the next
 // sequence number and goes out over the socket and FCM; the app applies
@@ -6,9 +7,8 @@
 
 import { DurableObject } from "cloudflare:workers";
 
-import { type Env, bearer, error, now } from "./common";
+import { type Env, error, now } from "./common";
 import { send } from "./fcm";
-import { hash, hashesEqual } from "./shared/tokens";
 import * as sql from "./sql";
 
 /** How long the log keeps an event for catch-up. */
@@ -22,12 +22,11 @@ export type EventBody =
   /** A forwarded mail, sealed to the install's mail key. */
   | { kind: "mail_otp"; mailbox: string; sealed: string }
   /** An app or agent wants a VTOP session: the phone answers with its
-   * cookies at `callbackUrl`. `wantCredentials` is "1" when saved
-   * credentials should come with the answer. */
+   * cookies at `callbackUrl` (a signed request). `wantCredentials` is "1"
+   * when saved credentials should come with the answer. */
   | {
       kind: "vtop_cookie_request";
       requestId: string;
-      responseToken: string;
       callbackUrl: string;
       wantCredentials: string;
     }
@@ -41,18 +40,37 @@ export type Event = { seq: number; at: number } & EventBody;
  * connecting: events after the client's cursor follow. */
 export type ServerFrame = { type: "event"; event: Event } | { type: "hello"; latest: number };
 
-interface DeviceDoc {
+/** A registered install. Keys are base64url: `signKey` (Ed25519) checks its
+ * requests, `sealKey` (X25519) is what OTP codes are sealed to. */
+export interface DeviceInfo {
   id: string;
-  secretHash: string;
+  signKey: string;
+  sealKey: string;
+  label: string | null;
+  platform: string;
+  /** Empty when there is none, or Google said it is gone. */
   fcmToken: string;
+}
+
+interface DeviceDoc extends DeviceInfo {
   /** The last sequence number handed out. */
   seq: number;
+}
+
+/** What `/v1/devices/update` may change; absent fields stay. */
+export interface DeviceChanges {
+  sealKey?: string;
+  label?: string;
+  fcmToken?: string;
 }
 
 const SCHEMA = `
 CREATE TABLE device (
     id TEXT PRIMARY KEY,
-    secret_hash TEXT NOT NULL,
+    sign_key TEXT NOT NULL,
+    seal_key TEXT NOT NULL,
+    label TEXT,
+    platform TEXT NOT NULL,
     fcm_token TEXT NOT NULL,
     seq INTEGER NOT NULL,
     created_at INTEGER NOT NULL
@@ -84,37 +102,87 @@ export class Device extends DurableObject<Env> {
 
   private doc(): DeviceDoc | null {
     const row = sql.first(this.db, "SELECT * FROM device LIMIT 1");
-    const id = row && sql.text(row, "id");
-    const secretHash = row && sql.text(row, "secret_hash");
-    const fcmToken = row && sql.text(row, "fcm_token");
-    const seq = row && sql.int(row, "seq");
-    if (id === null || secretHash === null || fcmToken === null || seq === null) return null;
-    return { id, secretHash, fcmToken, seq };
+    if (!row) return null;
+    const id = sql.text(row, "id");
+    const signKey = sql.text(row, "sign_key");
+    const sealKey = sql.text(row, "seal_key");
+    const platform = sql.text(row, "platform");
+    const fcmToken = sql.text(row, "fcm_token");
+    const seq = sql.int(row, "seq");
+    if (id === null || signKey === null || sealKey === null || platform === null || fcmToken === null || seq === null) {
+      return null;
+    }
+    return { id, signKey, sealKey, label: sql.text(row, "label"), platform, fcmToken, seq };
   }
 
-  /** Makes the install; false when it exists. */
-  async init(id: string, secretHash: string, fcmToken: string): Promise<boolean> {
-    if (this.doc()) return false;
+  /** The install, or null when it is not registered. */
+  async info(): Promise<DeviceInfo | null> {
+    const doc = this.doc();
+    if (!doc) return null;
+    const { seq: _, ...info } = doc;
+    return info;
+  }
+
+  /** What the app's Server page shows of the install: no keys or token,
+   * only whether it has a token and how many events wait in its log. */
+  async summary(): Promise<{ label: string | null; platform: string; pushToken: boolean; createdAt: number; events: number; latest: number } | null> {
+    const row = sql.first(this.db, "SELECT label, platform, fcm_token, created_at, seq FROM device LIMIT 1");
+    if (!row) return null;
+    const count = sql.first(this.db, "SELECT COUNT(*) AS n FROM events");
+    return {
+      label: sql.text(row, "label"),
+      platform: sql.text(row, "platform") ?? "",
+      pushToken: Boolean(sql.text(row, "fcm_token")),
+      createdAt: sql.int(row, "created_at") ?? 0,
+      events: (count && sql.int(count, "n")) ?? 0,
+      latest: sql.int(row, "seq") ?? 0,
+    };
+  }
+
+  /** Forgets the install: keys, FCM token and events. Its sockets close. */
+  async remove(): Promise<void> {
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.close(1000, "deleted");
+      } catch {}
+    }
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+    this.ready = false;
+  }
+
+  /** Registers the install, or (same `signKey`, so same id) updates its
+   * keys, label and platform, and its FCM token when one is sent. True
+   * when it is new. */
+  async register(info: Omit<DeviceInfo, "fcmToken"> & { fcmToken: string | null }): Promise<boolean> {
+    if (this.doc()) {
+      this.db.exec(
+        "UPDATE device SET seal_key = ?, label = ?, platform = ?, fcm_token = COALESCE(?, fcm_token)",
+        info.sealKey,
+        info.label,
+        info.platform,
+        info.fcmToken,
+      );
+      return false;
+    }
     this.db.exec(
-      "INSERT INTO device (id, secret_hash, fcm_token, seq, created_at) VALUES (?, ?, ?, 0, ?)",
-      id,
-      secretHash,
-      fcmToken,
+      `INSERT INTO device (id, sign_key, seal_key, label, platform, fcm_token, seq, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+      info.id,
+      info.signKey,
+      info.sealKey,
+      info.label,
+      info.platform,
+      info.fcmToken ?? "",
       now(),
     );
     return true;
   }
 
-  async auth(secretHash: string): Promise<boolean> {
-    const doc = this.doc();
-    return doc !== null && hashesEqual(doc.secretHash, secretHash);
-  }
-
-  /** False when the install does not exist. */
-  async setFcm(fcmToken: string): Promise<boolean> {
-    if (!this.doc()) return false;
-    this.db.exec("UPDATE device SET fcm_token = ?", fcmToken);
-    return true;
+  async update(changes: DeviceChanges): Promise<void> {
+    if (changes.sealKey !== undefined) this.db.exec("UPDATE device SET seal_key = ?", changes.sealKey);
+    if (changes.label !== undefined) this.db.exec("UPDATE device SET label = ?", changes.label);
+    if (changes.fcmToken !== undefined) this.db.exec("UPDATE device SET fcm_token = ?", changes.fcmToken);
   }
 
   private eventsAfter(after: number): Event[] {
@@ -166,10 +234,8 @@ export class Device extends DurableObject<Env> {
    * without anyone knowing yet, and the app drops duplicates by `seq`.
    * True when Google reports the token gone. */
   private async push(token: string, event: Event): Promise<boolean> {
-    // Older app builds read `type` and `receivedAt`.
-    const { kind, ...rest } = event;
     try {
-      const outcome = await send(this.env, token, { ...rest, type: kind, receivedAt: event.at });
+      const outcome = await send(this.env, token, event);
       if (outcome === "token_invalid") console.log("device: FCM token is gone, cleared");
       if (outcome === "failed") console.log("device: FCM send failed");
       return outcome === "token_invalid";
@@ -179,15 +245,15 @@ export class Device extends DurableObject<Env> {
     }
   }
 
-  /** `GET /v1/events`: a WebSocket, or a catch-up page. */
+  /** `GET /v1/events`, its signature checked by the Worker: a WebSocket,
+   * or a catch-up page. */
   override async fetch(req: Request): Promise<Response> {
-    const unknown = () => error(404, "unknown_device", "This install is not registered.");
     const url = new URL(req.url);
     if (req.method !== "GET" || url.pathname !== "/v1/events") {
       return error(404, "not_found", "No such route.");
     }
     const doc = this.doc();
-    if (!doc || !hashesEqual(doc.secretHash, hash(bearer(req)))) return unknown();
+    if (!doc) return error(404, "unknown_device", "This install is not registered.");
     const after = Number.parseInt(url.searchParams.get("after") ?? "", 10);
     const events = this.eventsAfter(Number.isSafeInteger(after) && after > 0 ? after : 0);
     if (req.headers.get("upgrade")?.toLowerCase() !== "websocket") {

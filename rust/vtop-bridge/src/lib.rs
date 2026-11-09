@@ -86,7 +86,6 @@ pub fn router(state: Arc<AppState>) -> Router {
         .route("/internal/mail-otp/owner", post(engine::owner_check))
         .route(vtop_shared::engine::SESSION, post(engine::session))
         .route(vtop_shared::engine::SEAL, post(engine::seal))
-        .route(vtop_shared::engine::UDP_KEYS, get(engine::udp_keys))
         .route(vtop_shared::engine::LOGIN, post(engine::login))
         .route(vtop_shared::engine::FETCH, post(fetch::fetch))
         .route(vtop_shared::engine::VTOP_LOGIN, post(vtop_login::login))

@@ -9,6 +9,7 @@ describe("account routes", () => {
       "/v1/session",
       "/v1/session/requests/abc",
       "/v1/session/answer",
+      "/v1/pair",
       "/v1/link",
       "/v1/keys",
       "/v1/keys/outings",

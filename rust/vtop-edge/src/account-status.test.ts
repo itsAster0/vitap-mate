@@ -2,14 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { accountObject } from "../test/account-harness";
 import { AccountRecord } from "./account-state";
-import { hash } from "./shared/tokens";
 
 const now = () => Math.floor(Date.now() / 1000);
 
 function linked(): AccountRecord {
   const at = now();
   const a = new AccountRecord("22BCE0001", at);
-  a.addPhone({ deviceId: "d1", secretHash: hash("vta_x"), label: null, addedAt: at, seenAt: at });
+  a.addPhone({ deviceId: "d1", label: null, addedAt: at, seenAt: at });
   a.addKey("00abcdefgh", "laptop", "d1", at);
   a.touchKey("00abcdefgh", at, "mcp");
   a.saveVault("sealed", 1000);
@@ -20,21 +19,21 @@ function linked(): AccountRecord {
   return a;
 }
 
-const body = (secret = "vta_x") => ({ appSecret: secret, registrationNumber: "22BCE0001" });
+const body = { registrationNumber: "22BCE0001" };
 
 describe("app status", () => {
-  it("needs this phone's app secret", async () => {
+  it("needs one of the account's phones", async () => {
     const rig = accountObject();
     rig.seed(linked());
-    const response = await rig.account.appStatus(body("vta_wrong"));
+    const response = await rig.account.appStatus("d9");
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ code: "not_linked" });
   });
 
   it("reports what the server keeps and recent activity", async () => {
-    const rig = accountObject(undefined, { MAIL_DOMAIN: "aster0.dev" });
+    const rig = accountObject(undefined, { MAIL_DOMAIN: "vmate.aster0.dev" });
     rig.seed(linked());
-    const response = await rig.account.appStatus(body());
+    const response = await rig.account.appStatus("d1");
     expect(response.status).toBe(200);
     const status = (await response.json()) as Record<string, unknown>;
     expect(status).toMatchObject({
@@ -43,7 +42,7 @@ describe("app status", () => {
       vaultSavedAt: 1000,
       vaultExpiresAt: 1000 + 86400,
       credentialsRejectedAt: null,
-      forwarding: "vtop-otp-k3f9x2ab7q@aster0.dev",
+      forwarding: "otp+k3f9x2ab7q@vmate.aster0.dev",
       signIns: [{ at: 3000, by: "server", ok: true, reason: null }],
       phones: 1,
     });
@@ -56,9 +55,9 @@ describe("app status", () => {
   it("clears the cached session", async () => {
     const rig = accountObject();
     rig.seed(linked());
-    expect((await rig.account.appSessionClear(body())).status).toBe(200);
+    expect((await rig.account.appSessionClear("d1")).status).toBe(200);
     expect(rig.load()!.sealedSession).toBeNull();
-    const status = (await (await rig.account.appStatus(body())).json()) as Record<string, unknown>;
+    const status = (await (await rig.account.appStatus("d1")).json()) as Record<string, unknown>;
     expect(status.sessionSavedAt).toBeNull();
     expect(status.forwarding).toBeNull();
   });
@@ -86,7 +85,7 @@ describe("app login", () => {
   it("needs a saved password", async () => {
     const rig = accountObject();
     rig.seed(linked()); // its password is past the chosen lifetime
-    const response = await rig.account.appLogin(body());
+    const response = await rig.account.appLogin("d1", body);
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: "no_saved_credentials" });
   });
@@ -95,7 +94,7 @@ describe("app login", () => {
     const { started, fake } = engine();
     const rig = accountObject(fake);
     rig.seed(withVault());
-    const answer = rig.account.appLogin(body());
+    const answer = rig.account.appLogin("d1", body);
     await vi.waitFor(() => expect(started).toHaveLength(1));
     await rig.account.loginDone({
       account: "22BCE0001",
@@ -119,7 +118,7 @@ describe("app login", () => {
     const a = withVault();
     a.saveSession("sealed-c", now(), "server");
     rig.seed(a);
-    const response = await rig.account.appLogin(body());
+    const response = await rig.account.appLogin("d1", body);
     expect(await response.json()).toEqual({
       status: "ok",
       session: { cookies: "JSESSIONID=c", csrf_token: "t", registration_number: "22BCE0001" },
@@ -130,14 +129,14 @@ describe("app login", () => {
     const { started, fake } = engine();
     const rig = accountObject(fake);
     rig.seed(withVault());
-    const answer = rig.account.appLogin(body());
+    const answer = rig.account.appLogin("d1", body);
     await vi.waitFor(() => expect(started).toHaveLength(1));
     await rig.account.loginDone({ account: "22BCE0001", requestId: started[0], outcome: { status: "invalid_credentials" } });
     const response = await answer;
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ code: "invalid_credentials" });
     // The next ask finds no password and starts nothing.
-    expect((await rig.account.appLogin(body())).status).toBe(409);
+    expect((await rig.account.appLogin("d1", body)).status).toBe(409);
     expect(started).toHaveLength(1);
   });
 });

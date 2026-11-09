@@ -16,12 +16,12 @@ import {
   freshSealed,
   idFromAddress,
   isId,
-  memberBySecret,
   memberLabel,
+  memberOf,
   newId,
   nextExpiry,
-  publicKey,
-  setPublicKey,
+  platform,
+  sealKey,
   touch,
 } from "./state";
 import { isDeviceId } from "./common";
@@ -29,9 +29,6 @@ import { isDeviceId } from "./common";
 function member(device: string, seenAt: number): MailboxMember {
   return {
     deviceId: device,
-    secretHash: `hash-${device}`,
-    publicKey: `key-${device}`,
-    label: null,
     sealed: null,
     sealedAt: null,
     addedAt: seenAt,
@@ -47,10 +44,12 @@ describe("mailbox ids", () => {
   it("round trip through addresses", () => {
     const id = newId();
     expect(isId(id)).toBe(true);
-    expect(idFromAddress(address(id, "aster0.dev"))).toBe(id);
-    expect(idFromAddress(` VTOP-OTP-${id.toUpperCase()}@Aster0.dev`)).toBe(id);
+    expect(idFromAddress(address(id, "vmate.aster0.dev"))).toBe(id);
+    expect(idFromAddress(` OTP+${id.toUpperCase()}@Vmate.Aster0.dev`)).toBe(id);
     expect(idFromAddress("someone@aster0.dev")).toBeNull();
-    expect(idFromAddress("vtop-otp-short@aster0.dev")).toBeNull();
+    expect(idFromAddress("otp@vmate.aster0.dev")).toBeNull();
+    expect(idFromAddress("OTP+K3F9X2AB7Q@vmate.aster0.dev")).toBe("k3f9x2ab7q");
+    expect(idFromAddress("otp+short@vmate.aster0.dev")).toBeNull();
   });
 });
 
@@ -68,29 +67,19 @@ describe("mailboxes", () => {
     expect(doc.members[0].sealed).toBeNull();
   });
 
-  it("drop the box on a new key", () => {
-    const m = member("a", 0);
-    m.sealed = "AQ";
-    m.sealedAt = 1;
-    setPublicKey(m, "key-a");
-    expect(m.sealed).not.toBeNull();
-    setPublicKey(m, "k2");
-    expect([m.sealed, m.sealedAt]).toEqual([null, null]);
-  });
-
-  it("find members by secret", () => {
+  it("find members by device id", () => {
     const doc = mailbox([member("a", 0), member("b", 0)]);
-    expect(memberBySecret(doc, "hash-b")).toBe(1);
-    expect(memberBySecret(doc, "hash-c")).toBeNull();
+    expect(memberOf(doc, "b")).toBe(1);
+    expect(memberOf(doc, "c")).toBeNull();
   });
 
   it("replace the entry of a device joining again", () => {
     const now = 1_000_000;
     const doc = mailbox([member("a", now), member("b", now)]);
-    addMember(doc, { ...member("a", now), publicKey: "new" }, now);
+    addMember(doc, { ...member("a", now), addedAt: now + 1 }, now);
     expect(doc.members.length).toBe(2);
     expect(doc.members[1].deviceId).toBe("a");
-    expect(doc.members[1].publicKey).toBe("new");
+    expect(doc.members[1].addedAt).toBe(now + 1);
   });
 
   it("make room by dropping the least recently seen", () => {
@@ -132,8 +121,11 @@ describe("inputs", () => {
     expect(fcmToken("  t ")).toEqual({ ok: true, value: "t" });
     expect(fcmToken(" ").ok).toBe(false);
     expect(fcmToken(undefined)).toEqual({ ok: true, value: null });
-    expect(publicKey("nope").ok).toBe(false);
+    expect(sealKey("nope").ok).toBe(false);
     const key = toBase64Url(x25519.keygen().publicKey);
-    expect(publicKey(key)).toEqual({ ok: true, value: key });
+    expect(sealKey(key)).toEqual({ ok: true, value: key });
+    expect(sealKey(`${key}=`)).toEqual({ ok: true, value: key });
+    expect(platform(" Android ")).toEqual({ ok: true, value: "android" });
+    expect(platform(undefined).ok).toBe(false);
   });
 });
