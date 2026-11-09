@@ -18,13 +18,12 @@ import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Bug
 import com.composables.icons.lucide.CalendarMinus
 import com.composables.icons.lucide.FolderDown
-import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.History
-import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Key
 import com.composables.icons.lucide.LogOut
 import com.composables.icons.lucide.Network
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.RefreshCcw
 import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Utensils
@@ -62,7 +61,6 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
         value = orNull { coreFlow("settings.profile", Core::cachedProfile) }
             ?.let { it.name.ifBlank { null }?.to(it.photo) }
     }
-    val version = rememberAppVersion()
     var confirmSignOut by remember { mutableStateOf(false) }
     var messTimings by remember { mutableStateOf(false) }
     var downloadFolder by remember { mutableStateOf(false) }
@@ -93,22 +91,6 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                     SemesterSetting()
                     OtpAutofillSetting()
-                    GroupItem(
-                        "Connected apps",
-                        "settings.connected_apps",
-                        Lucide.Globe,
-                        "Browser extension and AI apps (MCP)",
-                        onClick = { nav.push(Route.Screen(CONNECTED_APPS)) },
-                        trailing = { Chevron() },
-                    )
-                    GroupItem(
-                        "Server",
-                        "settings.server",
-                        Lucide.Server,
-                        "What the server keeps and your linked phones",
-                        onClick = { nav.push(Route.Screen(SERVER)) },
-                        trailing = { Chevron() },
-                    )
                 }
             }
             item {
@@ -130,12 +112,32 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         onClick = { nav.push(Route.Screen(SYNC_HISTORY)) },
                         trailing = { Chevron() },
                     )
+                }
+            }
+            item {
+                ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
                     GroupItem(
                         "Connection",
                         "settings.connection",
                         Lucide.Network,
                         "How the app reaches VTOP",
                         onClick = { nav.push(Route.Screen(CONNECTION)) },
+                        trailing = { Chevron() },
+                    )
+                    GroupItem(
+                        "Connected apps",
+                        "settings.connected_apps",
+                        Lucide.Unplug,
+                        "Browser extension and AI apps (MCP)",
+                        onClick = { nav.push(Route.Screen(CONNECTED_APPS)) },
+                        trailing = { Chevron() },
+                    )
+                    GroupItem(
+                        "Server",
+                        "settings.server",
+                        Lucide.Server,
+                        "What the server keeps and your linked phones",
+                        onClick = { nav.push(Route.Screen(SERVER)) },
                         trailing = { Chevron() },
                     )
                 }
@@ -164,7 +166,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             item {
                 ListGroup("Files and mess") {
                     GroupItem("Download folder", "settings.download_folder", Lucide.FolderDown, Downloads.label(), onClick = { downloadFolder = true }, trailing = { Chevron() })
-                    GroupItem("Mess Timings", "settings.mess_timings", Lucide.Utensils, messTimingsSummary(), onClick = { messTimings = true }, trailing = { Chevron() })
+                    GroupItem("Mess timings", "settings.mess_timings", Lucide.Utensils, messTimingsSummary(), onClick = { messTimings = true }, trailing = { Chevron() })
                 }
             }
             item {
@@ -188,11 +190,6 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                             tone = AppTheme.tones.warning,
                         )
                     }
-                }
-            }
-            item {
-                ListGroup("About", footer = "Unofficial client for VIT-AP's VTOP.") {
-                    GroupItem("vitapmate", "settings.version", Lucide.Info, onClick = rememberDeveloperTaps(), trailing = { version?.let { TrailingValue(it) } })
                 }
             }
             item {

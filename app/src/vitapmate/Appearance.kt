@@ -82,7 +82,8 @@ fun AppearanceGroup() {
                 )
             }
         }
-        GroupItem(
+        // Only matters when the app can be dark.
+        if (Settings.themeMode != ThemeMode.Light) GroupItem(
             "Pure black",
             "settings.pure_black",
             Lucide.Moon,

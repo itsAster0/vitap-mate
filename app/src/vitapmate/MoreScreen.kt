@@ -37,9 +37,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronRight
-import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Pin
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Feature
@@ -82,6 +82,7 @@ fun MoreScreen() {
             item("app") {
                 ListGroup("App") {
                     val context = LocalContext.current
+                    InboxRow()
                     GroupItem(
                         "Fetch all",
                         "more.fetch_all",
@@ -90,9 +91,9 @@ fun MoreScreen() {
                         onClick = { FetchAll.start(context) },
                         trailing = { if (FetchAll.running) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
                     )
-                    InboxRow()
-                    GroupItem("Connected apps", "more.connected_apps", Lucide.Globe, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
-                    builtIns.filter { it.id != MORE && it.id != INSPECTOR }.forEach { f ->
+                    GroupItem("Connected apps", "more.connected_apps", Lucide.Unplug, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
+                    // Settings when it isn't already in the bar.
+                    builtIns.filter { it.id != MORE && it.id != INSPECTOR && it.id !in tabs }.forEach { f ->
                         GroupItem(f.label, "more.${f.id}", f.icon, onClick = { nav.push(Route.Screen(f.id)) }, trailing = { Chevron() })
                     }
                     GroupItem("About", "more.about", Lucide.Info, version?.let { "vitapmate $it · what's new and credits" } ?: "What's new and credits", onClick = { nav.push(Route.Screen(UPDATES)) }, trailing = { Chevron() })
