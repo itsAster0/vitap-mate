@@ -33,7 +33,7 @@ settings:
     versionCode: 3000000
     versionName: "3.0.0"
     namespace: vitapmate
-    minSdk: 24
+    minSdk: 28
     abiFilters: [arm64-v8a]
     resourcePackaging:
       excludes:

@@ -9,7 +9,7 @@ dependencies:
 settings:
   android:
     namespace: vitapmate.features.attendance
-    minSdk: 24
+    minSdk: 28
   compose: enabled
   jvm:
     jdk:

@@ -244,7 +244,7 @@ object Downloads {
             resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
             return uri
         }
-        // API 24–28: the public Downloads needs WRITE_EXTERNAL_STORAGE (manifest, maxSdk 28); without
+        // API 28: the public Downloads needs WRITE_EXTERNAL_STORAGE (manifest, maxSdk 28); without
         // it, the app's own external Downloads.
         @Suppress("DEPRECATION")
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), SUBDIR)

@@ -10,8 +10,8 @@ ruby = "3.4.12"
 description = "Build libvtop_ffi.so (arm64: phones and Apple-silicon emulators) into app/jniLibs and generate the Kotlin bindings"
 dir = "rust"
 run = [
-  # API 24 = the app's minSdk (ATrace needs 23+).
-  "cargo ndk -t arm64-v8a -P 24 -o ../app/jniLibs build --release -p vtop-ffi",
+  # API 28 = the app's minSdk (ATrace needs 23+).
+  "cargo ndk -t arm64-v8a -P 28 -o ../app/jniLibs build --release -p vtop-ffi",
   # Bindgen reads the metadata from a host build: the stripped Android .so
   # keeps only dynamic symbols, which bindgen does not read. Same API.
   # The host library is .dylib on macOS, .so on Linux (CI).

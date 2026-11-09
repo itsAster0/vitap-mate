@@ -11,7 +11,7 @@ dependencies:
 settings:
   android:
     namespace: vitapmate.features.vtop
-    minSdk: 24
+    minSdk: 28
   compose: enabled
   jvm:
     jdk:

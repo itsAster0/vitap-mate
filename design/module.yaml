@@ -18,7 +18,7 @@ dependencies:
 settings:
   android:
     namespace: vitapmate.ui
-    minSdk: 24
+    minSdk: 28
   compose: enabled
   jvm:
     jdk:

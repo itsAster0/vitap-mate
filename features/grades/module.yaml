@@ -9,7 +9,7 @@ dependencies:
 settings:
   android:
     namespace: vitapmate.features.grades
-    minSdk: 24
+    minSdk: 28
   compose: enabled
   jvm:
     jdk:
