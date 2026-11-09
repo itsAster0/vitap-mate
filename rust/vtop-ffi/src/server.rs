@@ -211,6 +211,16 @@ fn supported(answer: Result<Value, EdgeError>, path: &str) -> Result<bool, CoreE
     }
 }
 
+/// Gmail access the server may use to read the sign-in code while no phone answers (the
+/// student's own Google client, from OTP auto-fill).
+#[derive(uniffi::Record)]
+pub struct GmailGrant {
+    pub refresh_token: String,
+    pub client_id: String,
+    pub client_secret: Option<String>,
+    pub delete_after_reading: bool,
+}
+
 /// Server-page calls; each takes the caller's flow id first.
 #[uniffi::export]
 impl Core {
@@ -249,6 +259,22 @@ impl Core {
         )
         .await
         .map(drop)
+    }
+
+    /// Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
+    /// while no phone answers. It needs the sign-in code too: the server keeps the password only
+    /// with a forwarding address or [`GmailGrant`], and says so otherwise.
+    pub async fn save_server_password(
+        &self,
+        flow: String,
+        gmail: Option<GmailGrant>,
+    ) -> Result<(), CoreError> {
+        traced("save_server_password", &flow, async {
+            let cookies = self.live_cookies().await?;
+            self.save_password_with(&self.forwarding_server(), &flow, &cookies, gmail)
+                .await
+        })
+        .await
     }
 
     /// Drops the sealed password; the server can then no longer sign in by itself.
@@ -519,6 +545,48 @@ impl Core {
     }
 }
 
+impl Core {
+    /// [`Core::save_server_password`] against `server` with `cookies`.
+    async fn save_password_with(
+        &self,
+        server: &str,
+        flow: &str,
+        cookies: &str,
+        gmail: Option<GmailGrant>,
+    ) -> Result<(), CoreError> {
+        let account = self
+            .read::<crate::Account>(crate::ACCOUNT)
+            .ok_or(CoreError::NotSignedIn)?;
+        let mut credentials = json!({ "username": account.username, "password": account.password });
+        if let Some(grant) = gmail {
+            credentials["gmail"] = json!({
+                "refreshToken": grant.refresh_token,
+                "clientId": grant.client_id,
+                "clientSecret": grant.client_secret,
+                "deleteAfterReading": grant.delete_after_reading,
+            });
+        }
+        let body = json!({
+            "session": { "cookies": cookies },
+            "label": label(),
+            "credentials": credentials,
+        });
+        let answer = self
+            .edge_post(server, "/v1/link", flow, &body)
+            .await
+            .map_err(refused)?;
+        if answer["savedCredentials"] != json!(true) {
+            return Err(CoreError::Other {
+                reason: "The server keeps a password only with a forwarding address or \
+                             Gmail OTP auto-fill set up."
+                    .into(),
+            });
+        }
+        info!("password sealed on the server");
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -726,5 +794,56 @@ mod tests {
             (last.path.as_str(), &last.body),
             ("/v1/devices/delete", &json!({ "mailbox": "k3f9x2ab7q" }))
         );
+    }
+
+    #[tokio::test]
+    async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
+        let core = core("password");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let server = serve(edge.clone()).await;
+        fs::write(
+            core.at(crate::ACCOUNT),
+            r#"{"username":"22BCE0001","password":"pw"}"#,
+        )
+        .unwrap();
+        can(
+            &edge,
+            "/v1/link",
+            200,
+            json!({ "savedCredentials": true, "forwarding": false }),
+        );
+        can(
+            &edge,
+            "/v1/link",
+            200,
+            json!({ "savedCredentials": false, "forwarding": false }),
+        );
+        let gmail = GmailGrant {
+            refresh_token: "r".into(),
+            client_id: "c.apps.googleusercontent.com".into(),
+            client_secret: None,
+            delete_after_reading: true,
+        };
+        core.save_password_with(&server, "f", "c=1", Some(gmail))
+            .await
+            .unwrap();
+        assert!(
+            core.save_password_with(&server, "f", "c=1", None)
+                .await
+                .is_err()
+        );
+        let edge = edge.lock().unwrap();
+        let sent = &edge
+            .requests
+            .iter()
+            .find(|r| r.path == "/v1/link")
+            .unwrap()
+            .body;
+        assert_eq!(sent["credentials"]["username"], "22BCE0001");
+        assert_eq!(
+            sent["credentials"]["gmail"]["clientId"],
+            "c.apps.googleusercontent.com"
+        );
+        assert_eq!(sent["session"]["cookies"], "c=1");
     }
 }

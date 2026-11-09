@@ -972,6 +972,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_create_key(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_pair_app(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_key_outings(
@@ -1019,6 +1021,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_remove_forwarding_phone(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remove_phone(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_save_server_password(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_send_server_semester(
     ): Int
@@ -1214,6 +1218,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_pair_app(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_method_core_revoke_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_set_key_outings(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,`outings`: Byte,
@@ -1261,6 +1267,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_remove_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_save_server_password(`ptr`: Long,`flow`: RustBuffer.ByValue,`gmail`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_send_server_semester(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -1709,6 +1717,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 2814) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_pair_app() and 0xFFFF) != 31779) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_revoke_key() and 0xFFFF) != 35772) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1779,6 +1790,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 55780) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 59799) {
@@ -2859,6 +2873,11 @@ public interface CoreInterface {
      */
     suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
     
+    /**
+     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
+     */
+    suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String): PairApp?
+    
     suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String)
     
     suspend fun `setKeyOutings`(`flow`: kotlin.String, `id`: kotlin.String, `outings`: kotlin.Boolean)
@@ -2973,6 +2992,13 @@ public interface CoreInterface {
      * Removes a linked phone (an id from [`ServerStatus::phones`]).
      */
     suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    /**
+     * Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
+     * while no phone answers. It needs the sign-in code too: the server keeps the password only
+     * with a forwarding address or [`GmailGrant`], and says so otherwise.
+     */
+    suspend fun `saveServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?)
     
     /**
      * Tells the server the semester picked here, so connected apps read the same one. Does
@@ -4590,6 +4616,32 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     }
 
     
+    /**
+     * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `pairApp`(`flow`: kotlin.String, `code`: kotlin.String) : PairApp? {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_pair_app(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterString.lower(`code`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterOptionalTypePairApp.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
     override suspend fun `revokeKey`(`flow`: kotlin.String, `id`: kotlin.String) {
@@ -5143,6 +5195,35 @@ open class Core: Disposable, AutoCloseable, CoreInterface
                 
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
+     * while no phone answers. It needs the sign-in code too: the server keeps the password only
+     * with a forwarding address or [`GmailGrant`], and says so otherwise.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `saveServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_save_server_password(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterOptionalTypeGmailGrant.lower(`gmail`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
@@ -9654,6 +9735,58 @@ public object FfiConverterTypeGmailConfirmation: FfiConverterRustBuffer<GmailCon
 
 
 
+/**
+ * Gmail access the server may use to read the sign-in code while no phone answers (the
+ * student's own Google client, from OTP auto-fill).
+ */
+data class GmailGrant (
+    var `refreshToken`: kotlin.String
+    , 
+    var `clientId`: kotlin.String
+    , 
+    var `clientSecret`: kotlin.String?
+    , 
+    var `deleteAfterReading`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeGmailGrant: FfiConverterRustBuffer<GmailGrant> {
+    override fun read(buf: ByteBuffer): GmailGrant {
+        return GmailGrant(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: GmailGrant) = (
+            FfiConverterString.allocationSize(value.`refreshToken`) +
+            FfiConverterString.allocationSize(value.`clientId`) +
+            FfiConverterOptionalString.allocationSize(value.`clientSecret`) +
+            FfiConverterBoolean.allocationSize(value.`deleteAfterReading`)
+    )
+
+    override fun write(value: GmailGrant, buf: ByteBuffer) {
+            FfiConverterString.write(value.`refreshToken`, buf)
+            FfiConverterString.write(value.`clientId`, buf)
+            FfiConverterOptionalString.write(value.`clientSecret`, buf)
+            FfiConverterBoolean.write(value.`deleteAfterReading`, buf)
+    }
+}
+
+
+
 data class GpaPlan (
     /**
      * 0 without credits.
@@ -11592,6 +11725,51 @@ public object FfiConverterTypeOutingWhen: FfiConverterRustBuffer<OutingWhen> {
     override fun write(value: OutingWhen, buf: ByteBuffer) {
             FfiConverterOptionalString.write(value.`label`, buf)
             FfiConverterString.write(value.`text`, buf)
+    }
+}
+
+
+
+/**
+ * The MCP client (Claude and others) whose sign-in page shows a pairing code: asked before the
+ * student approves, so the sheet can name it.
+ */
+data class PairApp (
+    var `name`: kotlin.String
+    , 
+    /**
+     * Where the client goes back to (`claude.ai`), from its redirect URI.
+     */
+    var `host`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePairApp: FfiConverterRustBuffer<PairApp> {
+    override fun read(buf: ByteBuffer): PairApp {
+        return PairApp(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PairApp) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`host`)
+    )
+
+    override fun write(value: PairApp, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`host`, buf)
     }
 }
 
@@ -15030,6 +15208,38 @@ public object FfiConverterOptionalTypeGmailConfirmation: FfiConverterRustBuffer<
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeGmailGrant: FfiConverterRustBuffer<GmailGrant?> {
+    override fun read(buf: ByteBuffer): GmailGrant? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeGmailGrant.read(buf)
+    }
+
+    override fun allocationSize(value: GmailGrant?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeGmailGrant.allocationSize(value)
+        }
+    }
+
+    override fun write(value: GmailGrant?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeGmailGrant.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeGradeDetails: FfiConverterRustBuffer<GradeDetails?> {
     override fun read(buf: ByteBuffer): GradeDetails? {
         if (buf.get().toInt() == 0) {
@@ -15212,6 +15422,38 @@ public object FfiConverterOptionalTypeMentor: FfiConverterRustBuffer<Mentor?> {
         } else {
             buf.put(1)
             FfiConverterTypeMentor.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterOptionalTypePairApp: FfiConverterRustBuffer<PairApp?> {
+    override fun read(buf: ByteBuffer): PairApp? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypePairApp.read(buf)
+    }
+
+    override fun allocationSize(value: PairApp?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypePairApp.allocationSize(value)
+        }
+    }
+
+    override fun write(value: PairApp?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypePairApp.write(value, buf)
         }
     }
 }

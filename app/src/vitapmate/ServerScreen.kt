@@ -48,13 +48,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.AccessKey
 import vitapmate.core.Core
+import vitapmate.core.GmailGrant
 import vitapmate.core.CoreException
 import vitapmate.core.ServerOptions
 import vitapmate.core.ServerStatus
 import vitapmate.data.AppCore
+import vitapmate.data.Gmail
 import vitapmate.data.OtpPrompt
 import vitapmate.data.Problem
 import vitapmate.data.problemOf
+import vitapmate.features.login.OtpAutofill
 import vitapmate.features.login.ago
 import vitapmate.observability.Log
 import vitapmate.observability.flow
@@ -153,7 +156,22 @@ fun ServerScreen() {
                             GroupItem("VTOP session", "server.session", Lucide.Cookie, sessionText(s), trailing = trash("server.clear_session", "Clear", s.sessionSavedAt != null) {
                                 ask("Clear the session?", "The server drops the VTOP session it keeps. Connected apps get a fresh one on their next request.", "Clear", "clear_session", "The server's session is cleared.") { c, f -> c.clearServerSession(f); true }
                             })
-                            GroupItem("Password", "server.password", Lucide.Lock, passwordText(s), trailing = trash("server.forget_password", "Forget", s.vaultSavedAt != null) {
+                            GroupItem("Password", "server.password", Lucide.Lock, passwordText(s), onClick = if (s.vaultSavedAt != null) null else {
+                                {
+                                    val gmail = Gmail.account?.takeIf { !it.needsReconnect && OtpAutofill.inUse() != null }
+                                    ask(
+                                        "Let the server sign in for you?",
+                                        "The server keeps your VTOP password sealed, so connected apps get a session while your phone is off. It reads the sign-in code from your " +
+                                            (if (gmail != null) "Gmail" else "forwarding address") + ". Only its sign-in engine can open the password, and you can forget it here any time.",
+                                        "Allow",
+                                        "save_password",
+                                        "The server keeps your password.",
+                                    ) { c, f ->
+                                        c.saveServerPassword(f, gmail?.let { GmailGrant(it.refreshToken, it.client.id, it.client.secret, it.deleteAfterReading) })
+                                        true
+                                    }
+                                }
+                            }, trailing = trash("server.forget_password", "Forget", s.vaultSavedAt != null) {
                                 ask("Forget the saved password?", "The server drops your sealed VTOP password${if (s.vaultGmail) " and Gmail access" else ""}. It can then no longer sign in by itself: connected apps work only while a phone answers.", "Forget", "forget_password", "The server no longer keeps your password.") { c, f -> c.forgetServerPassword(f); true }
                             })
                         }
@@ -331,7 +349,7 @@ private fun sessionText(s: ServerStatus) = s.sessionSavedAt?.let {
 } ?: "None kept"
 
 private fun passwordText(s: ServerStatus): String {
-    val saved = s.vaultSavedAt ?: return "Not kept"
+    val saved = s.vaultSavedAt ?: return "Not kept. Tap to let the server sign in for you"
     val expires = s.vaultExpiresAt?.let { "expires in ${((it - System.currentTimeMillis() / 1000) / 3600).coerceAtLeast(0)} h" } ?: "kept until VTOP rejects it"
     return listOfNotNull("Saved ${ago(saved)}", "with Gmail access".takeIf { s.vaultGmail }, expires).joinToString(" · ")
 }
