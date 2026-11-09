@@ -106,15 +106,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         onClick = { Settings.autoRefresh = !Settings.autoRefresh; haptics.toggle(Settings.autoRefresh) },
                         trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
                     )
-                    BackgroundSyncSetting()
-                    if (Settings.backgroundSync) GroupItem(
-                        "Sync history",
-                        "settings.sync_history",
-                        Lucide.History,
-                        "Each background sync and what it fetched",
-                        onClick = { nav.push(Route.Screen(SYNC_HISTORY)) },
-                        trailing = { Chevron() },
-                    )
+                    BackgroundSyncRow { nav.push(Route.Screen(SYNC_HISTORY)) }
                 }
             }
             item {

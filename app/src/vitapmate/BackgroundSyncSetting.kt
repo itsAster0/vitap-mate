@@ -35,11 +35,36 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 
 /**
- * Settings → Data → Background sync: off by default, greyed out until OTP auto-fill works (nobody
+ * Background sync's switch on its page ([SyncHistoryScreen]): off by default, greyed out until OTP auto-fill works (nobody
  * can type the code in the background), "Paused: …" in the warning tone after a run couldn't
  * finish the OTP. When on, one segment under it: how often it checks, and which changes notify. Turning it on asks for
  * the notification permission (Android 13+).
  */
+/** Settings → Sync → Background sync: how it stands, and a way into its page. */
+@Composable
+fun BackgroundSyncRow(onClick: () -> Unit) {
+    LaunchedEffect(Unit) { MailForwarding.load("settings") }
+    val available = BackgroundSync.available()
+    val on = Settings.backgroundSync && available
+    val paused = Settings.syncPaused?.takeIf { on }
+    GroupItem(
+        "Background sync",
+        "settings.background_sync",
+        Lucide.RefreshCw,
+        syncSummary(available, on, paused),
+        onClick = onClick,
+        trailing = { Chevron() },
+        tone = if (paused != null) AppTheme.tones.warning else null,
+    )
+}
+
+private fun syncSummary(available: Boolean, on: Boolean, paused: String?): String = when {
+    !available -> "Needs OTP auto-fill: set it up in Settings → Account"
+    paused != null -> "Paused: $paused"
+    on -> "Checks VTOP every ${Settings.syncHours} h and tells you what changed"
+    else -> "Check VTOP in the background and tell you what changed"
+}
+
 @Composable
 fun BackgroundSyncSetting() {
     val context = LocalContext.current
@@ -60,14 +85,9 @@ fun BackgroundSyncSetting() {
     val paused = Settings.syncPaused?.takeIf { on }
     GroupItem(
         "Background sync",
-        "settings.background_sync",
+        "sync.toggle",
         Lucide.RefreshCw,
-        when {
-            !available -> "Needs OTP auto-fill: set it up above"
-            paused != null -> "Paused: $paused"
-            on -> "Checks VTOP every ${Settings.syncHours} h and tells you what changed"
-            else -> "Check VTOP in the background and tell you what changed"
-        },
+        syncSummary(available, on, paused),
         enabled = available,
         onClick = { set(!on) },
         trailing = { Switch(on, { set(it) }, enabled = available) },
