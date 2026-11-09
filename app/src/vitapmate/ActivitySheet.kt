@@ -74,6 +74,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Check
@@ -108,8 +109,6 @@ const val ACTIVITY = "activity"
 /** [ActivityScreen] with the older saved history already shown (from Settings). */
 const val ACTIVITY_HISTORY = "activity.history"
 
-/** [ActivityScreen] with only the background sync runs, all history shown (Settings → Sync). */
-const val SYNC_HISTORY = "activity.sync"
 
 /** [source]'s runs with the OTP prompt's state, only this process's unless [older]; null until first read. */
 @Composable
@@ -151,21 +150,14 @@ fun ActivitySheet(onDismiss: () -> Unit) {
 /**
  * This app session's runs: Now, Earlier today, ...; "Show older" at the end (or [showOlder], from
  * Settings) adds every run the log files still hold from earlier sessions and the saved history
- * ([ActivityHistory]), grouped by day. [only] keeps one kind of run, under [title].
+ * ([ActivityHistory]), grouped by day.
  */
 @Composable
-fun ActivityScreen(showOlder: Boolean = false, title: String = "Activity", only: ((Run) -> Boolean)? = null) {
+fun ActivityScreen(showOlder: Boolean = false) {
     var older by remember { mutableStateOf(showOlder) }
-    val recent = rememberRuns(Inspector.recentRuns)
-    // This session's runs stay while both files are read.
-    val logged = (if (older) rememberRuns(Inspector.allRuns, older = true) else null) ?: recent
-    // Older still: runs saved before the logs rolled over (ActivityHistory).
-    val saved by produceState(emptyList<Run>(), older) { if (older) value = withContext(Dispatchers.IO) { ActivityHistory.load() } }
-    val runs = remember(logged, saved) {
-        logged?.let { live -> (live + saved.filter { s -> live.none { it.id == s.id } }).filter { only?.invoke(it) ?: true }.sortedByDescending { it.startT } }
-    }
+    val runs = rememberAllRuns(older)
     val card = AppTheme.colors.card
-    Page(title, ACTIVITY) { padding ->
+    Page("Activity", ACTIVITY) { padding ->
         LazyColumn(
             contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -182,13 +174,26 @@ fun ActivityScreen(showOlder: Boolean = false, title: String = "Activity", only:
     }
 }
 
+/** This session's runs and, when [older], every earlier one the logs and [ActivityHistory] hold; newest first, null until read. */
+@Composable
+internal fun rememberAllRuns(older: Boolean): List<Run>? {
+    val recent = rememberRuns(Inspector.recentRuns)
+    // This session's runs stay while both files are read.
+    val logged = (if (older) rememberRuns(Inspector.allRuns, older = true) else null) ?: recent
+    // Older still: runs saved before the logs rolled over (ActivityHistory).
+    val saved by produceState(emptyList<Run>(), older) { if (older) value = withContext(Dispatchers.IO) { ActivityHistory.load() } }
+    return remember(logged, saved) {
+        logged?.let { live -> (live + saved.filter { s -> live.none { it.id == s.id } }).sortedByDescending { it.startT } }
+    }
+}
+
 private const val SHEET_RUNS = 6
 
-/** Run cards in [container] colour under group headers; at most [limit] finished ones. */
-private fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Color) {
+/** Run cards in [container] colour under group headers; at most [limit] finished ones; [inset] at the sides. */
+internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Color, inset: Dp = 0.dp, empty: String = "Nothing yet") {
     if (runs == null) return
     if (runs.isEmpty()) {
-        item { EmptyState(Lucide.SquareActivity, "Nothing yet", Modifier.padding(vertical = 32.dp)) }
+        item { EmptyState(Lucide.SquareActivity, empty, Modifier.padding(vertical = 32.dp)) }
         return
     }
     val now = System.currentTimeMillis()
@@ -201,13 +206,13 @@ private fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Colo
             item(key = "group.$g", contentType = "group") {
                 Text(
                     g,
-                    Modifier.animateItem().padding(start = 8.dp, top = 8.dp),
+                    Modifier.animateItem().padding(start = inset + 8.dp, top = 8.dp),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        item(key = run.id, contentType = "run") { RunCard(run, container, Modifier.animateItem()) }
+        item(key = run.id, contentType = "run") { RunCard(run, container, Modifier.animateItem().padding(horizontal = inset)) }
     }
 }
 

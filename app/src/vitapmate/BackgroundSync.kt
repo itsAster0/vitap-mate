@@ -69,6 +69,12 @@ object BackgroundSync {
         work.enqueueUniquePeriodicWork(WORK, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
+    /** When WorkManager plans the next scheduled run (epoch ms), or null when none is planned. */
+    suspend fun nextRunAt(context: Context): Long? = withContext(Dispatchers.IO) {
+        WorkManager.getInstance(context).getWorkInfosForUniqueWork(WORK).get()
+            .firstOrNull { !it.state.isFinished }?.nextScheduleTimeMillis?.takeIf { it in 1 until Long.MAX_VALUE }
+    }
+
     /** One run now, as a scheduled one would (Developer → Run background sync now). */
     fun runNow(context: Context) {
         WorkManager.getInstance(context).enqueueUniqueWork(
