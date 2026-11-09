@@ -234,6 +234,23 @@ impl Core {
             .map(drop)
     }
 
+    /// Tells the server the semester picked here, so connected apps read the same one. Does
+    /// nothing while no semester is picked; fails with `not_linked` before a key is made.
+    pub async fn send_server_semester(&self, flow: String) -> Result<(), CoreError> {
+        let Some(semester) = self.read::<String>(crate::SELECTED) else {
+            return Ok(());
+        };
+        let path = "/v1/account/semester";
+        self.account_op(
+            "send_server_semester",
+            flow,
+            path,
+            json!({ "semesterId": semester }),
+        )
+        .await
+        .map(drop)
+    }
+
     /// Drops the sealed password; the server can then no longer sign in by itself.
     pub async fn forget_server_password(&self, flow: String) -> Result<(), CoreError> {
         let path = "/v1/account/forget-credentials";

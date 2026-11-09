@@ -61,5 +61,16 @@ object SemesterChoice {
         withContext(Dispatchers.IO) { AppCore.await().selectSemester(f, id) }
         readCache(f)
         Log.info("ui.semesters", "selected", f, mapOf("semester" to id))
+        sendToServer()
+    }
+
+    /** Connected apps read the semester picked here; best effort (skipped before a key is made). */
+    private fun sendToServer() {
+        scope.launch {
+            flow("semesters.server") { f ->
+                runCatching { withContext(Dispatchers.IO) { AppCore.await().sendServerSemester(f) } }
+                    .onFailure { Log.info("ui.semesters", "not sent to the server: ${it::class.simpleName}", f) }
+            }
+        }
     }
 }

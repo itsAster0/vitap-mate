@@ -1020,6 +1020,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remove_phone(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_send_server_semester(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_server_status(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_set_server_options(
@@ -1259,6 +1261,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_remove_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_send_server_semester(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_server_status(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
@@ -1775,6 +1779,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 59799) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 63686) {
@@ -2966,6 +2973,12 @@ public interface CoreInterface {
      * Removes a linked phone (an id from [`ServerStatus::phones`]).
      */
     suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    /**
+     * Tells the server the semester picked here, so connected apps read the same one. Does
+     * nothing while no semester is picked; fails with `not_linked` before a key is made.
+     */
+    suspend fun `sendServerSemester`(`flow`: kotlin.String)
     
     /**
      * Everything the server keeps for this student and this phone: the account and its options,
@@ -5130,6 +5143,33 @@ open class Core: Disposable, AutoCloseable, CoreInterface
                 
         FfiConverterString.lower(`flow`),
         FfiConverterString.lower(`id`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Tells the server the semester picked here, so connected apps read the same one. Does
+     * nothing while no semester is picked; fails with `not_linked` before a key is made.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `sendServerSemester`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_send_server_semester(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
             )
         },
         { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },

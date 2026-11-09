@@ -288,7 +288,10 @@ impl Core {
         let answer = loop {
             match self.edge_post(server, "/v1/keys", flow, &body).await {
                 Err(error) if error.code() == "not_linked" && !linked_now => {
-                    let link = json!({ "session": session, "label": crate::server::label() });
+                    let mut link = json!({ "session": session, "label": crate::server::label() });
+                    if let Some(semester) = self.read::<String>(crate::SELECTED) {
+                        link["semesterId"] = json!(semester);
+                    }
                     self.edge_post(server, "/v1/link", flow, &link)
                         .await
                         .map_err(refused)?;
