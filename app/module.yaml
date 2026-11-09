@@ -28,6 +28,14 @@ settings:
     namespace: vitapmate
     minSdk: 24
     abiFilters: [arm64-v8a]
+    # Build metadata the app never reads: library version stamps, Kotlin
+    # builtins (only kotlin-reflect reads them; not a dependency) and the
+    # coroutines debug agent's probes. Licence texts stay (Apache 2.0, LGPL).
+    resourcePackaging:
+      excludes:
+        - META-INF/*.version
+        - kotlin/**
+        - DebugProbesKt.bin
   compose: enabled
   # Builds with mise's JDK 26 (JAVA_HOME).
   jvm:
