@@ -33,7 +33,6 @@ import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
 import vitapmate.data.coreFlow
 import vitapmate.features.login.MailForwarding
-import vitapmate.features.timetable.TimetableWidget
 import vitapmate.features.login.OtpAutofill
 import vitapmate.observability.ActivityHistory
 import vitapmate.observability.Log

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget colours: light, before Android 12 -->
+<resources>
+    <color name="widget_background">#FFF7F2FA</color>
+    <color name="widget_text">#FF1D1B20</color>
+    <color name="widget_muted">#FF49454F</color>
+    <color name="widget_accent">#FF65558F</color>
+</resources>

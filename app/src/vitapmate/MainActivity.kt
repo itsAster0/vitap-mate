@@ -17,7 +17,6 @@ import vitapmate.data.AppCore
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.ThemeMode
-import vitapmate.features.timetable.TimetableWidget
 import vitapmate.ui.Palette
 import vitapmate.ui.AppTheme
 import kotlin.time.Duration.Companion.microseconds
