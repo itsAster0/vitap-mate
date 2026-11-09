@@ -123,6 +123,14 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                     BackgroundSyncSetting()
                     GroupItem(
+                        "Sync history",
+                        "settings.sync_history",
+                        Lucide.History,
+                        "Each background sync and what it fetched",
+                        onClick = { nav.push(Route.Screen(SYNC_HISTORY)) },
+                        trailing = { Chevron() },
+                    )
+                    GroupItem(
                         "Connection",
                         "settings.connection",
                         Lucide.Network,

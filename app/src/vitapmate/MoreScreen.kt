@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Pin
@@ -90,6 +91,7 @@ fun MoreScreen() {
                         trailing = { if (FetchAll.running) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
                     )
                     InboxRow()
+                    GroupItem("Connected apps", "more.connected_apps", Lucide.Globe, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
                     builtIns.filter { it.id != MORE && it.id != INSPECTOR }.forEach { f ->
                         GroupItem(f.label, "more.${f.id}", f.icon, onClick = { nav.push(Route.Screen(f.id)) }, trailing = { Chevron() })
                     }
