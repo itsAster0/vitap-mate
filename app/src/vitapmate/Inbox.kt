@@ -42,13 +42,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
+import vitapmate.core.Core
 import vitapmate.data.Activity
 import vitapmate.data.AppCore
+import vitapmate.data.coreFlow
+import vitapmate.data.epochDayOf
+import vitapmate.data.minuteOf
+import vitapmate.data.orNull
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.EmptyView
+import vitapmate.ui.clock
 import vitapmate.ui.formatDay
+import vitapmate.ui.is24Hour
 import vitapmate.ui.tappable
 
 const val INBOX = "inbox"
@@ -63,7 +71,7 @@ private object Unseen {
     var count by mutableIntStateOf(0)
 
     suspend fun read() {
-        count = runCatching { flow("inbox.unseen") { id -> withContext(Dispatchers.IO) { AppCore.await().unseenChanges(id).toInt() } } }.getOrDefault(count)
+        count = orNull { coreFlow("inbox.unseen") { c, id -> c.unseenChanges(id).toInt() } } ?: count
     }
 }
 
@@ -118,7 +126,7 @@ fun InboxScreen() {
         if (!changes.isNullOrEmpty()) {
             TextButton({
                 scope.launch {
-                    flow("inbox.clear") { id -> withContext(Dispatchers.IO) { AppCore.await().clearChanges(id) } }
+                    coreFlow("inbox.clear", Core::clearChanges)
                     changes = emptyList()
                 }
             }, Modifier.testTag("inbox.clear")) { Text("Clear") }
@@ -134,13 +142,13 @@ fun InboxScreen() {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            list.groupBy { formatDay(Math.floorDiv(it.atMs + java.util.TimeZone.getDefault().getOffset(it.atMs), 86_400_000L).toInt(), "EEEE, d MMMM") }.forEach { (day, items) ->
+            list.groupBy { formatDay(epochDayOf(it.atMs), "EEEE, d MMMM") }.forEach { (day, items) ->
                 item("day.$day") {
                     Text(day, Modifier.padding(start = 4.dp, top = 8.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 }
                 items(items, key = { it.id }) { change ->
                     ChangeRow(change, change.id in newIds) {
-                        scope.launch { flow("inbox.open_change") { id -> Log.info("ui.inbox", "open ${change.kind.name.lowercase()}", id) } }
+                        scope.logAction("inbox.open_change", "ui.inbox", "open ${change.kind.name.lowercase()}")
                         val target = pageOf(change.kind)
                         if (target in navTabs) nav.goTab(target) else nav.push(Route.Screen(target))
                     }
@@ -174,7 +182,7 @@ private fun ChangeRow(change: Change, new: Boolean, onClick: () -> Unit) {
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(change.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-                Text(java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(change.atMs), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                Text(clock(minuteOf(change.atMs), is24Hour()), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
             }
             Text(change.body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
         }

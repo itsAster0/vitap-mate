@@ -6,7 +6,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import vitapmate.data.Activity
 import vitapmate.data.OtpPrompt
@@ -43,10 +42,7 @@ object FetchAll {
             }
             val result = VtopSync.run("sync.all", LABEL, everything = true, pageTimeoutMs = 60_000) { e, _ ->
                 status = "Waiting for the OTP…"
-                val before = OtpPrompt.generation
-                OtpPrompt.ask(e.reason)
-                snapshotFlow { OtpPrompt.message }.first { it == null }
-                OtpPrompt.generation != before
+                OtpPrompt.askAndWait(e.reason)
             }
             follow.cancel()
             status = when (result.outcome) {

@@ -15,8 +15,8 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -26,10 +26,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
+import vitapmate.core.Core
 import vitapmate.data.AppCore
 import vitapmate.data.Settings
 import vitapmate.data.StoreCap
 import vitapmate.data.VtopSync
+import vitapmate.data.coreFlow
 import vitapmate.features.login.MailForwarding
 import vitapmate.features.login.OtpAutofill
 import vitapmate.observability.ActivityHistory
@@ -75,7 +77,7 @@ object BackgroundSync {
     }
 
     /**
-     * Debuggable builds only: `adb shell am broadcast -a vitapmate.SYNC_NOW -p com.vitapmate.kmp`
+     * Debuggable builds only: `adb shell am broadcast -a vitapmate.SYNC_NOW -p com.vitap_pal.app`
      * starts [runNow], for testing without tapping through Developer; with `--ez simulate true`
      * it first rolls the saved pages back (Developer → Simulate VTOP changes).
      */
@@ -86,7 +88,7 @@ object BackgroundSync {
             override fun onReceive(c: Context, intent: Intent) {
                 if (!intent.getBooleanExtra("simulate", false)) return runNow(app)
                 kotlinx.coroutines.MainScope().launch {
-                    flow("dev.simulate_changes") { f -> withContext(Dispatchers.IO) { AppCore.await().devSimulateChanges(f) } }
+                    coreFlow("dev.simulate_changes", Core::devSimulateChanges)
                     runNow(app)
                 }
             }

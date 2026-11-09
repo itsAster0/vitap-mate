@@ -7,18 +7,26 @@ import android.util.Base64
 import java.security.KeyStore
 import kotlin.concurrent.thread
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.DevConfig
 import vitapmate.core.devConfigure
 import vitapmate.core.obsInit
+import vitapmate.core.setDeviceLabel
 import vitapmate.core.setHttpTransport
 import vitapmate.core.setSharedCookies
+import vitapmate.core.setUdpNetwork
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
 import vitapmate.observability.StateDump
 import vitapmate.observability.ActivityHistory
 import vitapmate.observability.flow
+
+/** [block] with the [Core] on [Dispatchers.IO], in flow [name] (its id is [block]'s second argument). */
+suspend fun <T> coreFlow(name: String, block: suspend (Core, String) -> T): T =
+    flow(name) { id -> withContext(Dispatchers.IO) { block(AppCore.await(), id) } }
 
 /** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio, hands Rust OkHttp and the cookie store). */
 object AppCore {
@@ -48,7 +56,9 @@ object AppCore {
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
                 setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
                 Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "okhttp"))
+                setUdpNetwork(VtopUdp(app))
                 setSharedCookies(VtopCookies)
+                setDeviceLabel(if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}")
                 runBlocking { flow("core_init") { Core(it, dir) } }
             }.fold(core::complete) { e ->
                 Log.error("core", "init failed: $e")

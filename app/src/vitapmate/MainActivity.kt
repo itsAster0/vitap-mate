@@ -28,7 +28,10 @@ class MainActivity : ComponentActivity() {
         opened(intent)
         // Keeps the background job in step with the settings (an update can drop it).
         BackgroundSync.apply(applicationContext)
-        if (savedInstanceState == null) BackgroundSync.registerDebugTrigger(applicationContext)
+        if (savedInstanceState == null) {
+            BackgroundSync.registerDebugTrigger(applicationContext)
+            Push.start(applicationContext)
+        }
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade
         // with the icon growing a little, even mid-animation.
         if (Build.VERSION.SDK_INT >= 31) {

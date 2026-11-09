@@ -93,7 +93,7 @@ fun MoreScreen() {
                     builtIns.filter { it.id != MORE && it.id != INSPECTOR }.forEach { f ->
                         GroupItem(f.label, "more.${f.id}", f.icon, onClick = { nav.push(Route.Screen(f.id)) }, trailing = { Chevron() })
                     }
-                    GroupItem("About", "more.about", Lucide.Info, "vitapmate", onClick = rememberDeveloperTaps(), trailing = { version?.let { TrailingValue(it) } })
+                    GroupItem("About", "more.about", Lucide.Info, version?.let { "vitapmate $it · what's new and credits" } ?: "What's new and credits", onClick = { nav.push(Route.Screen(UPDATES)) }, trailing = { Chevron() })
                 }
             }
         }

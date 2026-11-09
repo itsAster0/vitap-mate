@@ -1,10 +1,5 @@
 package vitapmate
 
-import com.composables.icons.lucide.BookOpen
-import vitapmate.features.attendance.SKIP_DISCLAIMER
-import vitapmate.features.attendance.ATTENDANCE_GUIDE
-import vitapmate.data.AccountState
-import vitapmate.ui.rememberHaptics
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Switch
@@ -19,31 +14,38 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Bug
 import com.composables.icons.lucide.CalendarMinus
+import com.composables.icons.lucide.FolderDown
+import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Key
 import com.composables.icons.lucide.LogOut
+import com.composables.icons.lucide.Network
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCcw
-import com.composables.icons.lucide.FolderDown
+import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Utensils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import vitapmate.data.AppCore
+import vitapmate.core.Core
+import vitapmate.data.AccountState
+import vitapmate.data.Downloads
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
-import vitapmate.data.Downloads
 import vitapmate.data.Settings
+import vitapmate.data.coreFlow
+import vitapmate.data.orNull
+import vitapmate.features.attendance.ATTENDANCE_GUIDE
+import vitapmate.features.attendance.SKIP_DISCLAIMER
 import vitapmate.features.docs.MessTimingsSheet
 import vitapmate.features.docs.messTimingsSummary
 import vitapmate.observability.Log
-import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
 import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.DownloadFolderDialog
+import vitapmate.ui.rememberHaptics
 
 /** Account (with the semester), appearance (theme, colours, tabs), diagnostics and about. */
 @Composable
@@ -53,11 +55,11 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
     val deviceAuth = rememberDeviceAuth()
     val haptics = rememberHaptics()
     val user by produceState<String?>(null, accountVersion) {
-        value = runCatching { flow("settings.user") { id -> withContext(Dispatchers.IO) { AppCore.await().signedInUser(id) } } }.getOrNull()
+        value = orNull { coreFlow("settings.user", Core::signedInUser) }
     }
     // The name and VTOP's photo from the cached profile, when the Profile page has fetched it.
     val profile by produceState<Pair<String, String>?>(null) {
-        value = runCatching { flow("settings.profile") { id -> withContext(Dispatchers.IO) { AppCore.await().cachedProfile(id) } } }.getOrNull()
+        value = orNull { coreFlow("settings.profile", Core::cachedProfile) }
             ?.let { it.name.ifBlank { null }?.to(it.photo) }
     }
     val version = rememberAppVersion()
@@ -91,6 +93,22 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                     SemesterSetting()
                     OtpAutofillSetting()
+                    GroupItem(
+                        "Connected apps",
+                        "settings.connected_apps",
+                        Lucide.Globe,
+                        "Browser extension and AI apps (MCP)",
+                        onClick = { nav.push(Route.Screen(CONNECTED_APPS)) },
+                        trailing = { Chevron() },
+                    )
+                    GroupItem(
+                        "Server",
+                        "settings.server",
+                        Lucide.Server,
+                        "What the server keeps and your linked phones",
+                        onClick = { nav.push(Route.Screen(SERVER)) },
+                        trailing = { Chevron() },
+                    )
                 }
             }
             item {
@@ -104,6 +122,14 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
                     )
                     BackgroundSyncSetting()
+                    GroupItem(
+                        "Connection",
+                        "settings.connection",
+                        Lucide.Network,
+                        "How the app reaches VTOP",
+                        onClick = { nav.push(Route.Screen(CONNECTION)) },
+                        trailing = { Chevron() },
+                    )
                 }
             }
             item {
@@ -205,7 +231,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     {
                         confirmSignOut = false
                         scope.launch {
-                            runCatching { flow("sign_out") { id -> withContext(Dispatchers.IO) { AppCore.await().signOut(id) } } }
+                            runCatching { coreFlow("sign_out", Core::signOut) }
                                 .onFailure { Log.error("ui.settings", "sign out failed: $it") }
                             // A collapsed OTP prompt and running page fetches belong to the session
                             // just dropped: not over the login screen, not into the next account.

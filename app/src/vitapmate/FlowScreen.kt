@@ -41,6 +41,8 @@ import vitapmate.observability.Inspector
 import vitapmate.observability.LogFilter
 import vitapmate.observability.LogLine
 import vitapmate.observability.Log
+import vitapmate.observability.fallbackOf
+import vitapmate.observability.routeOf
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ToastTone
 import vitapmate.ui.showToast
@@ -67,6 +69,7 @@ fun FlowScreen(flow: String) {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Flow $flow · ${lines.size} lines${summary?.ms?.let { " · $it ms" }.orEmpty()}${summary?.outcome?.let { " · $it" }.orEmpty()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        RouteLine(routeOf(lines), fallbackOf(lines))
                         LevelChips(min, "inspector.flow.level") { min = it }
                     }
                 }
@@ -79,11 +82,13 @@ fun FlowScreen(flow: String) {
 @Composable
 private fun LineRow(line: LogLine, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
+    val route = line.msg == "route used" || line.msg.startsWith("route failed")
     val color = when (line.level.lowercase()) {
         "error" -> scheme.error
         "warn" -> AppTheme.palette.warning.base
         "debug" -> scheme.onSurfaceVariant
-        else -> scheme.onSurface
+        // The route switch's lines ("route used") stand out in the timeline.
+        else -> if (route) scheme.primary else scheme.onSurface
     }
     val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
     Column(modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

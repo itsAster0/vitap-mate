@@ -53,6 +53,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import vitapmate.data.epochDayOf
+import vitapmate.data.minuteOf
 import vitapmate.observability.ActivityHistory
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -94,10 +96,9 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.EmptyState
 import vitapmate.ui.Tone
 import vitapmate.ui.clock
-import vitapmate.ui.epochDayOf
 import vitapmate.ui.formatDay
 import vitapmate.ui.is24Hour
-import vitapmate.ui.minuteOf
+import vitapmate.ui.StatusChip
 import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
 import vitapmate.ui.rememberNow
@@ -238,6 +239,7 @@ private fun RunCard(run: Run, container: Color, modifier: Modifier) {
                 )
             }
             StepLine(run.steps, Modifier.padding(start = 28.dp, top = 4.dp))
+            RouteLine(run.route, run.fallback, Modifier.padding(start = 28.dp, top = 6.dp))
             AnimatedVisibility(
                 open,
                 enter = expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
@@ -273,6 +275,16 @@ private fun RunGlyph(run: Run) {
                 Icon(look.icon, null, Modifier.size(12.dp), tint = look.tone.onSubtle)
             }
         }
+    }
+}
+
+/** How VTOP's answers came ("Proxy") as a chip, and "Server failed → Direct" after a fallback. */
+@Composable
+internal fun RouteLine(route: String?, fallback: String?, modifier: Modifier = Modifier) {
+    if (route == null && fallback == null) return
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        route?.let { StatusChip(it, neutralTone, Modifier.testTag("route.chip")) }
+        fallback?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = AppTheme.tones.warning.base, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
 }
 

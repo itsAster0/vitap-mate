@@ -10,6 +10,25 @@ class RunsTest {
     private fun Run.chain() = steps.joinToString(" → ") { s -> s.label + (s.reason?.let { " ($it)" } ?: "") + " " + s.state }
 
     @Test
+    fun routeAndFallback() {
+        val r = runs(
+            """
+            {"ev":"start","flow":"a1","l":"info","msg":"attendance.refresh start","src":"flow","step":"attendance.refresh","t":1000}
+            {"flow":"a1","l":"warn","msg":"route failed; skipped for 5 min","reason":"edge answered 502","route":"Proxy","src":"rust.route","t":1010}
+            {"flow":"a1","l":"info","msg":"route used","route":"Direct","src":"rust.route","t":1100}
+            {"flow":"a1","l":"info","msg":"response vtop.vitap.ac.in/vtop/processViewStudentAttendance 200 90ms","src":"rust.network","t":1100}
+            {"flow":"a1","l":"info","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_attendance","t":1105}
+            {"ev":"done","flow":"a1","l":"info","ms":"110","msg":"attendance.refresh done","outcome":"ok","src":"flow","step":"attendance.refresh","t":1110}
+            """,
+        ).single()
+        assertEquals("Direct", r.route)
+        assertEquals("Proxy failed → Direct", r.fallback)
+        val udp = parseLogLine("""{"flow":"b","l":"info","msg":"route used","route":"Udp","src":"rust.route","t":1}""")!!
+        assertEquals("UDP", routeOf(listOf(udp)))
+        assertEquals(null, fallbackOf(listOf(udp)))
+    }
+
+    @Test
     fun signedInRefreshIsOneStep() {
         // Real lines from the emulator.
         val r = runs(

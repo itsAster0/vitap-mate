@@ -163,6 +163,7 @@ fun DeveloperScreen() {
                     GroupItem("Set credentials without checking", "dev.set_account", Lucide.KeySquare, "Replace the saved ones; VTOP isn't asked", onClick = { setAccount = true })
                     tunable(Tunable.SessionReuse, Lucide.Timer)
                     tunable(Tunable.VtopTimeout, Lucide.Hourglass)
+                    tunable(Tunable.SessionAnswer, Lucide.Hourglass)
                     GroupItem("Copy saved cookies", "dev.copy_cookies", Lucide.Cookie, "Cookie-Editor JSON, for a browser", onClick = {
                         scope.launch {
                             val json = dev("dev.copy_cookies") { c, f -> c.devCookieEditorJson(f).orEmpty() }

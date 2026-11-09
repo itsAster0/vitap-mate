@@ -1,6 +1,5 @@
 package vitapmate
 
-import vitapmate.data.AccountState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -20,20 +19,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import vitapmate.data.AppCore
+import vitapmate.core.Core
+import vitapmate.data.AccountState
 import vitapmate.data.InspectorOpener
 import vitapmate.data.LocalInspector
 import vitapmate.data.SemesterChoice
+import vitapmate.data.coreFlow
+import vitapmate.data.orNull
 import vitapmate.features.login.ChooseSemester
 import vitapmate.features.login.FetchOtpOverlay
 import vitapmate.features.login.LoginScreen
-import vitapmate.observability.flow
 import vitapmate.observability.Log
+import vitapmate.observability.flow
+import vitapmate.ui.DownloadFolderPrompt
 import vitapmate.ui.EmptyState
 import vitapmate.ui.LocalSignIn
-import vitapmate.ui.DownloadFolderPrompt
 import vitapmate.ui.ToastHost
 
 /**
@@ -48,13 +48,13 @@ fun App() {
     var user by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         signedIn = runCatching {
-            flow("app_start") { id -> withContext(Dispatchers.IO) { AppCore.await().signedInUser(id) }.also { user = it } != null }
+            coreFlow("app_start", Core::signedInUser).also { user = it } != null
         }
     }
     // After signing in, the avatar needs the new name.
     LaunchedEffect(signedIn, accountVersion) {
         if (signedIn?.getOrNull() == true && (user == null || accountVersion > 0)) {
-            user = runCatching { flow("app_user") { id -> withContext(Dispatchers.IO) { AppCore.await().signedInUser(id) } } }.getOrNull()
+            user = orNull { coreFlow("app_user", Core::signedInUser) }
         }
     }
     // The saved pick, read once per sign-in before choosing between the picker and the shell.
@@ -62,7 +62,7 @@ fun App() {
     LaunchedEffect(signedIn) {
         if (signedIn?.getOrNull() == true) {
             AccountState.rejected = runCatching {
-                flow("account.check") { id -> withContext(Dispatchers.IO) { AppCore.await().savedAccount(id)?.rejected == true } }
+                coreFlow("account.check") { c, id -> c.savedAccount(id)?.rejected == true }
             }.getOrDefault(false)
             flow("semesters.check") { SemesterChoice.readCache(it) }
             semesterRead = true

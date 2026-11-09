@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: only the settings go to Google Drive or a new phone. Keys, the VTOP session and
+     password, Gmail tokens and cached pages stay on this phone; a reinstall signs in again and
+     joins the student's forwarding address with a fresh device key. -->
+<data-extraction-rules>
+  <cloud-backup>
+    <include domain="sharedpref" path="settings.xml" />
+  </cloud-backup>
+  <device-transfer>
+    <include domain="sharedpref" path="settings.xml" />
+  </device-transfer>
+</data-extraction-rules>

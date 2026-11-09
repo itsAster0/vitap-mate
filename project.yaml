@@ -1,5 +1,5 @@
 # One module per layer; features never depend on each other (the build
-# enforces it). See docs/plans/kmp-prototype.md "Modules".
+# enforces it). See docs/plans/app.md "Modules".
 modules:
   - app
   - core

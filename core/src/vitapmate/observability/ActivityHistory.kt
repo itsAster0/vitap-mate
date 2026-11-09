@@ -56,6 +56,8 @@ object ActivityHistory {
         .put("title", run.title)
         .put("trigger", run.trigger.name)
         .put("t", run.startT)
+        .put("route", run.route)
+        .put("fallback", run.fallback)
         .put("steps", JSONArray(run.steps.map { s ->
             JSONObject()
                 .put("label", s.label)
@@ -92,6 +94,8 @@ object ActivityHistory {
                     s.optInt("count", 1),
                 )
             },
+            o.optString("route").takeIf { o.has("route") },
+            o.optString("fallback").takeIf { o.has("fallback") },
         )
     }
 }

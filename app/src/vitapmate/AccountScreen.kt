@@ -1,8 +1,5 @@
 package vitapmate
 
-import androidx.compose.runtime.LaunchedEffect
-import vitapmate.data.AccountState
-import vitapmate.ui.rememberHaptics
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,13 +19,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
@@ -45,20 +42,24 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.User
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import vitapmate.core.Core
 import vitapmate.core.CoreException
 import vitapmate.core.SignIn
+import vitapmate.data.AccountState
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
 import vitapmate.data.PageFetches
 import vitapmate.data.SemesterChoice
+import vitapmate.data.coreFlow
+import vitapmate.data.orNull
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.PasswordField
+import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 
 /** Route id of Settings → Account (opened after [DeviceAuth]). */
@@ -89,7 +90,7 @@ fun AccountScreen() {
     // when VTOP rejected it, so the student can see what to correct.
     var savedPassword by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        val account = runCatching { flow("account.read") { id -> withContext(Dispatchers.IO) { AppCore.await().savedAccount(id) } } }.getOrNull()
+        val account = orNull { coreFlow("account.read", Core::savedAccount) }
         savedPassword = account?.password
         if (password.isEmpty()) password = account?.password.orEmpty()
     }
@@ -115,10 +116,7 @@ fun AccountScreen() {
                         // VTOP accepted the password before asking for the OTP; Rust already kept it.
                         AccountState.rejected = false
                         savedPassword = password
-                        val before = OtpPrompt.generation
-                        OtpPrompt.ask(result.message)
-                        snapshotFlow { OtpPrompt.message }.first { it == null }
-                        OtpPrompt.generation != before
+                        OtpPrompt.askAndWait(result.message)
                     }
                 }
                 Log.info("ui.account", "save result", flowId, mapOf("done" to "$done"))

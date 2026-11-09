@@ -14,6 +14,8 @@ import androidx.compose.runtime.Immutable
  *   "Sign in"; `rust.auth` stages end it (`login completed`, `restored session validation
  *   succeeded`), turn it into "OTP" (`security OTP verification is required`) or fail it;
  * - `rust.network` responses are the pages fetched in a step; none in an ok step: served cached;
+ * - `route used` / `route failed` lines (Rust's route switch) give the run's [Run.route] and
+ *   [Run.fallback];
  * - a later `*.submit_otp` / `*.resend_otp` / `otp.cancel` flow settles the waiting OTP step, and
  *   the refreshes it sets off (trigger `otp`, or opens right after a sign-in) join that run.
  */
@@ -26,6 +28,10 @@ data class Run(
     val trigger: RunTrigger,
     val startT: Long,
     val steps: List<RunStep>,
+    /** How VTOP's answers came: "Direct", "Proxy", "Server" or "UDP"; null before any did. */
+    val route: String? = null,
+    /** "Proxy failed → Direct" when a route failed and the run fell back. */
+    val fallback: String? = null,
 ) {
     val endT: Long? get() = if (running) null else steps.mapNotNull { it.endT }.maxOrNull()
     val running: Boolean get() = steps.any { it.state == StepState.Running }
@@ -98,12 +104,12 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
                     RunTrigger.Opened -> runs.lastOrNull { r -> r.signedInAt?.let { f.startT - it in 0..FOLLOW_SIGN_IN_MS } == true }
                     else -> null
                 }
-                if (host != null) {
-                    host.steps += steps
-                    host.flows += f.id
-                } else {
-                    val run = MRun(f.id, title, trigger, f.startT, steps)
-                    runs += run
+                val run = host ?: MRun(f.id, title, trigger, f.startT, mutableListOf()).also { runs += it }
+                run.steps += steps
+                if (host != null) host.flows += f.id
+                routeOf(f.lines)?.let { run.route = it }
+                fallbackOf(f.lines)?.let { run.fallback = it }
+                if (host == null) {
                     if (trigger == RunTrigger.SignedIn && f.outcome == "ok" && steps.none { it.state == StepState.WaitingOtp }) run.signedInAt = end
                 }
             }
@@ -151,6 +157,8 @@ private class MStep(val label: String, var state: StepState, val startT: Long) {
 private class MRun(val id: String, val title: String, val trigger: RunTrigger, val startT: Long, steps: List<MStep>) {
     val flows = mutableListOf(id)
     val steps = steps.toMutableList()
+    var route: String? = null
+    var fallback: String? = null
     var otpAcceptedAt: Long? = null
     var signedInAt: Long? = null
 
@@ -163,7 +171,7 @@ private class MRun(val id: String, val title: String, val trigger: RunTrigger, v
                 folded[folded.lastIndex] = last.copy(endT = s.endT ?: last.endT, pages = last.pages + s.pages, count = last.count + 1)
             } else folded += s
         }
-        return Run(id, flows.toList(), title, trigger, startT, folded)
+        return Run(id, flows.toList(), title, trigger, startT, folded, route, fallback)
     }
 }
 
@@ -258,6 +266,18 @@ private fun segment(lines: List<LogLine>, call: String?, label: String): List<MS
 }
 
 private val STARTS = setOf("refreshing", "fetching")
+
+/** The route of the flow's last `route used` line, in words. */
+fun routeOf(lines: List<LogLine>): String? = lines.lastOrNull { it.msg == "route used" }?.fields?.get("route")?.let(::routeName)
+
+/** "Proxy failed → Direct": the flow's last failed route and the one used after it. */
+fun fallbackOf(lines: List<LogLine>): String? {
+    val i = lines.indexOfLast { it.msg.startsWith("route failed") }.takeIf { it >= 0 } ?: return null
+    val failed = lines[i].fields["route"]?.let(::routeName) ?: return null
+    return "$failed failed → ${routeOf(lines.drop(i + 1)) ?: "Direct"}"
+}
+
+private fun routeName(route: String) = if (route.equals("udp", true)) "UDP" else route.replaceFirstChar { it.uppercase() }
 
 /** "response vtop.vitap.ac.in/vtop/processViewStudentAttendance 200 158ms" (a size may come before the ms). */
 private fun hitOf(msg: String): PageHit? {

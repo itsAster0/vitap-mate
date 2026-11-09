@@ -166,6 +166,10 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () 
             ACTIVITY_HISTORY -> ActivityScreen(showOlder = true)
             DEVELOPER -> DeveloperScreen()
             ACCOUNT -> AccountScreen()
+            CONNECTED_APPS -> ConnectedAppsScreen()
+            SERVER -> ServerScreen()
+            CONNECTION -> ConnectionScreen()
+            UPDATES -> UpdatesScreen()
             INBOX -> InboxScreen()
             else -> {
                 val f = featureById(route.id) ?: return Page(route.id, route.id) { ComingSoon(route.id) }

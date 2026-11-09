@@ -30,7 +30,7 @@ import vitapmate.data.SYNC_HOURS
 import vitapmate.data.Settings
 import vitapmate.features.login.MailForwarding
 import vitapmate.observability.Log
-import vitapmate.observability.flow
+import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 
@@ -48,14 +48,14 @@ fun BackgroundSyncSetting() {
     val available = BackgroundSync.available()
     val on = Settings.backgroundSync && available
     val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        scope.launch { flow("settings.notifications") { id -> Log.info("ui.settings", "notification permission", id, mapOf("granted" to "$granted")) } }
+        scope.logAction("settings.notifications", "ui.settings", "notification permission", mapOf("granted" to "$granted"))
     }
     val set = { value: Boolean ->
         Settings.backgroundSync = value
         if (value) Settings.syncPaused = null
         BackgroundSync.apply(context)
         if (value && Build.VERSION.SDK_INT >= 33) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
-        scope.launch { flow("settings.background_sync") { id -> Log.info("ui.settings", "background sync ${if (value) "on" else "off"}", id, mapOf("hours" to "${Settings.syncHours}")) } }
+        scope.logAction("settings.background_sync", "ui.settings", "background sync ${if (value) "on" else "off"}", mapOf("hours" to "${Settings.syncHours}"))
     }
     val paused = Settings.syncPaused?.takeIf { on }
     GroupItem(
@@ -84,7 +84,7 @@ fun BackgroundSyncSetting() {
                 { h ->
                     Settings.syncHours = h
                     BackgroundSync.apply(context)
-                    scope.launch { flow("settings.sync_hours") { id -> Log.info("ui.settings", "sync every $h h", id, mapOf("hours" to "$h")) } }
+                    scope.logAction("settings.sync_hours", "ui.settings", "sync every $h h", mapOf("hours" to "$h"))
                 },
                 tag = "settings.sync_hours",
                 key = { "$it" },
