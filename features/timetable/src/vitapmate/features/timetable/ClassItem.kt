@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,9 +87,9 @@ fun ClassItem(
             onLongClickLabel = null,
             leadingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.width(58.dp), horizontalAlignment = Alignment.End) {
-                        Text(clock(slot.start, h24), Modifier.fitDown(end = true), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = text)
-                        Text(clock(slot.end, h24), Modifier.fitDown(end = true), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodySmall.nums(), color = scheme.onSurfaceVariant)
+                    Column(Modifier.width(58.dp), horizontalAlignment = Alignment.Start) {
+                        Text(clock(slot.start, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = text)
+                        Text(clock(slot.end, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodySmall.nums(), color = scheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.width(12.dp))
                     // The rail runs the item's height, with the same gap above and below.
@@ -106,12 +105,8 @@ fun ClassItem(
                     val attendance = record?.takeIf { !labFat }
                     if (where || attendance != null) {
                         Spacer(Modifier.height(8.dp))
-                        // Wraps the pill under the room when both don't fit (narrow phones, skip hint on).
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            itemVerticalAlignment = Alignment.CenterVertically,
-                        ) {
+                        // One row: the room, then the ring.
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (where) Location(slot.room, slot.block, if (labFat) tones.warning.base else tone.base, muted)
                             if (attendance != null) AttendancePill(attendance, Modifier.testTag("timetable.attendance"))
                         }
