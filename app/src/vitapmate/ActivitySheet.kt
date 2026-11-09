@@ -193,7 +193,7 @@ private const val SHEET_RUNS = 6
 internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Color, inset: Dp = 0.dp, empty: String = "Nothing yet") {
     if (runs == null) return
     if (runs.isEmpty()) {
-        item { EmptyState(Lucide.SquareActivity, empty, Modifier.padding(vertical = 32.dp)) }
+        item { EmptyState(Lucide.SquareActivity, empty, Modifier.fillMaxWidth().padding(vertical = 32.dp)) }
         return
     }
     val now = System.currentTimeMillis()
