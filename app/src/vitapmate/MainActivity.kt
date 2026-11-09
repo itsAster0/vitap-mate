@@ -11,10 +11,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import vitapmate.data.AppCore
 import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.ThemeMode
+import vitapmate.features.timetable.TimetableWidget
 import vitapmate.ui.Palette
 import vitapmate.ui.AppTheme
 import kotlin.time.Duration.Companion.microseconds
@@ -34,6 +37,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             BackgroundSync.registerDebugTrigger(applicationContext)
             Push.start(applicationContext)
+            PlayUpdate.check(this)
         }
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade
         // with the icon growing a little, even mid-animation.
@@ -85,5 +89,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         Foreground.stopped()
+        // Picks up a timetable refreshed in the app.
+        lifecycleScope.launch { TimetableWidget.refresh(applicationContext) }
     }
 }

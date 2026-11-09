@@ -23,6 +23,8 @@ dependencies:
   - com.google.firebase:firebase-messaging:26.0.1
   # Settings → Connected apps → Pair a browser: Play services' QR scanner (its own UI, no CAMERA permission).
   - com.google.android.gms:play-services-code-scanner:16.1.0
+  # Play's flexible in-app updates (PlayUpdate).
+  - com.google.android.play:app-update:2.1.0
 settings:
   android:
     # Release is signed from keystore.properties (gitignored; `mise run signing`).
