@@ -84,7 +84,8 @@ export const Gateway = Effect.gen(function* () {
     docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault("ssh://rocky@robin"))}`,
   });
   const image = yield* Docker.Image("GatewayImage", {
-    name: "itsaster0/vitapmate-gateway",
+    // With the host, or Alchemy pushes the bare name to Docker Hub.
+    name: "ghcr.io/itsaster0/vitapmate-gateway",
     registry: {
       server: "ghcr.io",
       username: yield* Config.String("GHCR_USERNAME").pipe(Config.withDefault("itsAster0")),
@@ -112,6 +113,7 @@ export const Gateway = Effect.gen(function* () {
       UDP_PORTS: "3478,51820,8443",
       RUST_LOG: "warn,vtop_gateway=info",
     },
+    start: true,
     restart: "unless-stopped",
     logDriver: "json-file",
     logOptions: { "max-size": "10m", "max-file": "3" },

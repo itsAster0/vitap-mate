@@ -224,7 +224,7 @@ async function mailAwait(req: Request, env: Env): Promise<Response> {
 }
 
 /** CORS as the bridge sends it: every origin, or the listed ones. */
-function withCors(response: Response, origin: string | null, env: Env): Response {
+export function withCors(response: Response, origin: string | null, env: Env): Response {
   const out = new Response(response.body, response);
   const allowed = (env.ALLOWED_ORIGINS ?? "")
     .split(",")
@@ -237,7 +237,7 @@ function withCors(response: Response, origin: string | null, env: Env): Response
     out.headers.set("vary", "Origin");
   }
   out.headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
-  out.headers.set("access-control-allow-headers", "Content-Type");
+  out.headers.set("access-control-allow-headers", "Content-Type, Authorization");
   return out;
 }
 
