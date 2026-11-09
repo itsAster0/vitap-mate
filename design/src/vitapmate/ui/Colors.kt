@@ -55,13 +55,18 @@ fun appColorScheme(dark: Boolean, palette: Palette = Palette.Default, pureBlack:
 
 /**
  * A [Tone] from a seed's tonal palette. [Tone.subtle] sits a step quieter than M3's container
- * tone (95 light, 20 dark) so tints read as a hint on neutral surfaces, like the Flutter app's.
+ * tone (95 light, 25 dark) so tints read as a hint on neutral surfaces, like the Flutter app's.
+ * In dark mode the fill keeps the seed's hue at low chroma (as M3's own dark containers do): a
+ * vivid seed at tone 20 is a deep saturated block that shouts over the text on it.
  */
 private fun toneOf(seed: Color, dark: Boolean): Tone {
     val palette = TonalPalette.from(seed)
-    return if (dark) Tone(palette.toneColor(80), palette.toneColor(20), palette.toneColor(90))
-    else Tone(palette.toneColor(40), palette.toneColor(95), palette.toneColor(20))
+    if (!dark) return Tone(palette.toneColor(40), palette.toneColor(95), palette.toneColor(20))
+    val quiet = TonalPalette.fromHueAndChroma(palette.hue, minOf(palette.chroma, DARK_SUBTLE_CHROMA))
+    return Tone(palette.toneColor(80), quiet.toneColor(25), palette.toneColor(90))
 }
+
+private const val DARK_SUBTLE_CHROMA = 16.0
 
 fun ColorScheme.card(dark: Boolean): Color = if (dark) surfaceContainerLow else surfaceContainerLowest
 
