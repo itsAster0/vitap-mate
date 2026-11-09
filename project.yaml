@@ -1,5 +1,5 @@
 # One module per layer; features never depend on each other (the build
-# enforces it). See docs/plans/app.md "Modules".
+# enforces it). See AGENTS.md "Where a change goes".
 modules:
   - app
   - core

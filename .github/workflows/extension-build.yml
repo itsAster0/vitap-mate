@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "extension/**"
+      - "!**/*.md"
       - ".github/workflows/extension-build.yml"
   workflow_dispatch:
 

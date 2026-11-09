@@ -1,5 +1,5 @@
-// The server, deployed with Alchemy: `bun run deploy` here, or CI on a push to
-// main (.github/workflows/deploy.yml), both as stage `prod`. Needs the variables in .env.example.
+// The server, deployed with Alchemy from a laptop: `bun run deploy` here, stage `prod`.
+// Needs the variables in .env.example; CI deploys nothing.
 // State lives in the account's Alchemy state-store Worker.
 //
 // - Edge: the `vmate-edge` Worker on vmate.aster0.dev, its Durable Objects
@@ -127,7 +127,7 @@ export default Alchemy.Stack(
   Effect.gen(function* () {
     const engine = yield* Engine;
     const edge = yield* Edge;
-    // SKIP_GATEWAY=1 deploys without it (no GHCR token on this machine); CI always deploys it.
+    // SKIP_GATEWAY=1 deploys without it (when there is no GHCR_TOKEN).
     if (yield* Config.Boolean("SKIP_GATEWAY").pipe(Config.withDefault(false))) {
       return { edge: edge.url, engine: engine.url };
     }

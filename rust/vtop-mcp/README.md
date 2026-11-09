@@ -11,20 +11,20 @@ Students create an access key in VITAP Mate → Settings → Connected apps and
 add the MCP URL to their agent, with the key in the `Authorization` header:
 
 ```
-URL:    https://vmate-api.aster0.dev/mcp
+URL:    https://vmate.aster0.dev/mcp
 Header: Authorization: Bearer vtm_…
 ```
 
 An agent that only takes a URL can carry the key in the path instead:
 
 ```
-https://vmate-api.aster0.dev/mcp/vtm_…
+https://vmate.aster0.dev/mcp/vtm_…
 ```
 
 For Claude Code:
 
 ```sh
-claude mcp add --transport http vtop https://vmate-api.aster0.dev/mcp \
+claude mcp add --transport http vtop https://vmate.aster0.dev/mcp \
   --header "Authorization: Bearer vtm_…"
 ```
 
