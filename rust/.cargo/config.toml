@@ -1,0 +1,5 @@
+# Android libraries only (measured on libvtop_ffi.so arm64, 2,610,592 B):
+# packed relocations (Android APS2, API 23+; the app's minSdk is 24)
+# −293 KB, identical code folding −19 KB.
+[target.'cfg(target_os = "android")']
+rustflags = ["-C", "link-arg=-Wl,--pack-dyn-relocs=android", "-C", "link-arg=-Wl,--icf=all"]
