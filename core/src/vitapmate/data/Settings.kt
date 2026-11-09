@@ -24,6 +24,10 @@ object Settings {
     private val inspect = mutableStateOf(false)
     private val engine = mutableStateOf(false)
     private val tuned = mutableStateMapOf<Tunable, Int>()
+    private val sync = mutableStateOf(false)
+    private val syncEvery = mutableStateOf(SYNC_HOURS_DEFAULT)
+    private val paused = mutableStateOf<String?>(null)
+    private val notifyOff = mutableStateMapOf<String, Boolean>()
 
     /** Whether attendance shows how many classes can be skipped. */
     var showSkipAdvice: Boolean
@@ -156,6 +160,44 @@ object Settings {
             prefs?.edit()?.putBoolean("dev_http_engine", value)?.apply()
         }
 
+    /**
+     * Background sync (WorkManager, every [syncHours]): off by default, and offered only while OTP
+     * auto-fill works, since nobody can type a code in the background.
+     */
+    var backgroundSync: Boolean
+        get() = sync.value
+        set(value) {
+            sync.value = value
+            prefs?.edit()?.putBoolean("settings_background_sync", value)?.apply()
+        }
+
+    /** Hours between background syncs, one of [SYNC_HOURS]. */
+    var syncHours: Int
+        get() = syncEvery.value
+        set(value) {
+            syncEvery.value = value
+            prefs?.edit()?.putInt("settings_sync_hours", value)?.apply()
+        }
+
+    /**
+     * Why background sync is paused ("Gmail needs reconnecting"), set when a background run
+     * couldn't finish the OTP and cleared by the next good run; null when it isn't.
+     */
+    var syncPaused: String?
+        get() = paused.value
+        set(value) {
+            paused.value = value
+            prefs?.edit()?.putString("settings_sync_paused", value)?.apply()
+        }
+
+    /** Whether background sync notifies about changes of [kind] ("attendance", "marks", "timetable", "exams", "grades"). */
+    fun notifies(kind: String): Boolean = notifyOff[kind] != true
+
+    fun setNotifies(kind: String, on: Boolean) {
+        if (on) notifyOff.remove(kind) else notifyOff[kind] = true
+        prefs?.edit()?.putBoolean("settings_notify_$kind", on)?.apply()
+    }
+
     /** [t]'s value, in its unit. */
     fun tunable(t: Tunable): Int = tuned[t] ?: t.default
 
@@ -185,11 +227,16 @@ object Settings {
         inspect.value = p.getBoolean("dev_inspect_traffic", false)
         engine.value = p.getBoolean("dev_http_engine", true)
         Tunable.entries.forEach { t -> if (p.contains(t.key)) tuned[t] = p.getInt(t.key, t.default).coerceIn(t.range) }
+        sync.value = p.getBoolean("settings_background_sync", false)
+        syncEvery.value = p.getInt("settings_sync_hours", SYNC_HOURS_DEFAULT).takeIf { it in SYNC_HOURS } ?: SYNC_HOURS_DEFAULT
+        paused.value = p.getString("settings_sync_paused", null)
+        NOTIFY_KINDS.forEach { k -> if (!p.getBoolean("settings_notify_$k", true)) notifyOff[k] = true }
     }
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
+            mapOf("backgroundSync" to backgroundSync, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 
@@ -209,6 +256,13 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     SessionReuse("dev_session_reuse_min", "VTOP session reuse", "min", 0, 0..10_080, "A saved session older than this signs in again at launch; 0: any age"),
     OtpPoll("dev_otp_poll_s", "Forwarded OTP check", "s", 2, 1..30, "How often the OTP prompt checks forwarded mail"),
 }
+
+/** The background sync intervals on offer, in hours. */
+val SYNC_HOURS = listOf(3, 6, 12, 24)
+const val SYNC_HOURS_DEFAULT = 3
+
+/** The kinds of change the inbox records and background sync can notify about. */
+val NOTIFY_KINDS = listOf("attendance", "marks", "timetable", "exams", "grades")
 
 enum class ThemeMode { System, Light, Dark }
 

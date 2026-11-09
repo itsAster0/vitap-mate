@@ -325,6 +325,8 @@ private fun titleOf(f: FlowSummary, steps: List<MStep>): String {
     return when {
         name == "login.sign_in" -> SIGN_IN
         name == "sync.stale" -> "Background refresh"
+        name == "sync.all" -> "Fetch all"
+        name.startsWith("sync.background") -> "Background sync"
         name.endsWith(".refresh") -> pageLabel(name.removeSuffix(".refresh"))
         name.endsWith(".calendar") -> "Calendar"
         name.endsWith(".exams") -> "Exams"

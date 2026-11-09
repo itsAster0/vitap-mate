@@ -53,6 +53,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import vitapmate.observability.ActivityHistory
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -142,14 +146,20 @@ fun ActivitySheet(onDismiss: () -> Unit) {
 
 /**
  * This app session's runs: Now, Earlier today, ...; "Show older" at the end (or [showOlder], from
- * Settings) adds every run the log files still hold from earlier sessions, grouped by day.
+ * Settings) adds every run the log files still hold from earlier sessions and the saved history
+ * ([ActivityHistory]), grouped by day.
  */
 @Composable
 fun ActivityScreen(showOlder: Boolean = false) {
     var older by remember { mutableStateOf(showOlder) }
     val recent = rememberRuns(Inspector.recentRuns)
     // This session's runs stay while both files are read.
-    val runs = (if (older) rememberRuns(Inspector.allRuns, older = true) else null) ?: recent
+    val logged = (if (older) rememberRuns(Inspector.allRuns, older = true) else null) ?: recent
+    // Older still: runs saved before the logs rolled over (ActivityHistory).
+    val saved by produceState(emptyList<Run>(), older) { if (older) value = withContext(Dispatchers.IO) { ActivityHistory.load() } }
+    val runs = remember(logged, saved) {
+        logged?.let { live -> (live + saved.filter { s -> live.none { it.id == s.id } }).sortedByDescending { it.startT } }
+    }
     val card = AppTheme.colors.card
     Page("Activity", ACTIVITY) { padding ->
         LazyColumn(

@@ -32,6 +32,7 @@ object Inspector {
         files = context.filesDir
         cache = context.cacheDir
         startedAt = System.currentTimeMillis()
+        ActivityHistory.attach(files)
     }
 
     private val logs get() = File(files, "logs")

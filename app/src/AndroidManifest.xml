@@ -7,6 +7,8 @@
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
   <!-- Device auth before the Account page (platform BiometricPrompt). -->
   <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+  <!-- Background sync's change notifications (asked for when it is turned on, Android 13+). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <application
       android:label="vitapmate (Compose)"
       android:icon="@mipmap/launcher_icon"

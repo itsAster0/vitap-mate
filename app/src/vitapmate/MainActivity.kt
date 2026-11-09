@@ -2,6 +2,7 @@ package vitapmate
 
 import android.graphics.Color
 import android.os.Build
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -24,6 +25,10 @@ class MainActivity : ComponentActivity() {
         Settings.load(applicationContext)
         AppCore.start(applicationContext)
         super.onCreate(savedInstanceState)
+        opened(intent)
+        // Keeps the background job in step with the settings (an update can drop it).
+        BackgroundSync.apply(applicationContext)
+        if (savedInstanceState == null) BackgroundSync.registerDebugTrigger(applicationContext)
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade
         // with the icon growing a little, even mid-animation.
         if (Build.VERSION.SDK_INT >= 31) {
@@ -47,6 +52,21 @@ class MainActivity : ComponentActivity() {
             val choice = Settings.colorChoice
             AppTheme(dark, if (choice == Settings.WALLPAPER) null else Palette.entries.firstOrNull { it.name == choice } ?: Palette.Default, Settings.pureBlack) { App() }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        opened(intent)
+    }
+
+    /** A change notification was tapped: the shell opens the inbox. */
+    private fun opened(intent: Intent?) {
+        if (intent?.getStringExtra(OPEN) == OPEN_INBOX) InboxRequest.pending = true
+    }
+
+    companion object {
+        const val OPEN = "open"
+        const val OPEN_INBOX = "inbox"
     }
 
     override fun onStart() {

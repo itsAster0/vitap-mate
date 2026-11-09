@@ -74,6 +74,12 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
     val barTop = remember { mutableIntStateOf(0) }
     LaunchedEffect(scroll) { snapshotFlow { (barTop.intValue + scroll.state.offset).roundToInt().coerceAtLeast(0) }.collect { NavBarSpace.px = it } }
     DisposableEffect(Unit) { onDispose { NavBarSpace.px = 0 } }
+    // A change notification was tapped.
+    LaunchedEffect(InboxRequest.pending) {
+        if (!InboxRequest.pending) return@LaunchedEffect
+        InboxRequest.pending = false
+        if (nav.top.key != INBOX) nav.push(Route.Screen(INBOX))
+    }
     // Back on a tab other than the first goes to the first, then leaves the app.
     BackHandler(nav.stack.size == 1 && nav.root.key != tabs.first()) { nav.goTab(tabs.first()) }
     Box(Modifier.fillMaxSize().nestedScroll(scroll)) {
@@ -160,6 +166,7 @@ private fun Entry(route: Route, tabStates: SaveableStateHolder, onSignedOut: () 
             ACTIVITY_HISTORY -> ActivityScreen(showOlder = true)
             DEVELOPER -> DeveloperScreen()
             ACCOUNT -> AccountScreen()
+            INBOX -> InboxScreen()
             else -> {
                 val f = featureById(route.id) ?: return Page(route.id, route.id) { ComingSoon(route.id) }
                 if (f.fullScreen) return Box(Modifier.fillMaxSize().testTag("screen.${f.id}")) { f.content() }

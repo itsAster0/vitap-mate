@@ -17,6 +17,8 @@ dependencies:
   - androidx.activity:activity-compose:1.13.0
   # Typed back stack and predictive back for the shell (Compose Multiplatform build).
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
+  # Background sync (Settings → Background sync): periodic, survives reboots and Doze.
+  - androidx.work:work-runtime:2.11.2
 settings:
   android:
     # Release is signed from keystore.properties (gitignored; `mise run signing`).

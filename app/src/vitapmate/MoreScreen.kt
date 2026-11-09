@@ -23,6 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.CircularProgressIndicator
+import com.composables.icons.lucide.CloudDownload
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +80,16 @@ fun MoreScreen() {
             }
             item("app") {
                 ListGroup("App") {
+                    val context = LocalContext.current
+                    GroupItem(
+                        "Fetch all",
+                        "more.fetch_all",
+                        Lucide.CloudDownload,
+                        FetchAll.status ?: "Refresh every VTOP page now",
+                        onClick = { FetchAll.start(context) },
+                        trailing = { if (FetchAll.running) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
+                    )
+                    InboxRow()
                     builtIns.filter { it.id != MORE && it.id != INSPECTOR }.forEach { f ->
                         GroupItem(f.label, "more.${f.id}", f.icon, onClick = { nav.push(Route.Screen(f.id)) }, trailing = { Chevron() })
                     }

@@ -91,7 +91,19 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                     SemesterSetting()
                     OtpAutofillSetting()
-                    GroupItem("Sign out", "settings.sign_out", Lucide.LogOut, onClick = { confirmSignOut = true }, tone = AppTheme.tones.danger)
+                }
+            }
+            item {
+                ListGroup("Sync") {
+                    GroupItem(
+                        "Auto refresh",
+                        "settings.auto_refresh",
+                        Lucide.RefreshCcw,
+                        "Fetch pages on open, when old and when you come back",
+                        onClick = { Settings.autoRefresh = !Settings.autoRefresh; haptics.toggle(Settings.autoRefresh) },
+                        trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
+                    )
+                    BackgroundSyncSetting()
                 }
             }
             item {
@@ -114,29 +126,13 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     )
                 }
             }
+            item { AppearanceGroup() }
             item {
-                ListGroup("Mess") {
+                ListGroup("Files and mess") {
+                    GroupItem("Download folder", "settings.download_folder", Lucide.FolderDown, Downloads.label(), onClick = { downloadFolder = true }, trailing = { Chevron() })
                     GroupItem("Mess Timings", "settings.mess_timings", Lucide.Utensils, messTimingsSummary(), onClick = { messTimings = true }, trailing = { Chevron() })
                 }
             }
-            item {
-                ListGroup("Files") {
-                    GroupItem("Download folder", "settings.download_folder", Lucide.FolderDown, Downloads.label(), onClick = { downloadFolder = true }, trailing = { Chevron() })
-                }
-            }
-            item {
-                ListGroup("Data") {
-                    GroupItem(
-                        "Auto refresh",
-                        "settings.auto_refresh",
-                        Lucide.RefreshCcw,
-                        "Fetch pages on open, when old and when you come back",
-                        onClick = { Settings.autoRefresh = !Settings.autoRefresh; haptics.toggle(Settings.autoRefresh) },
-                        trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
-                    )
-                }
-            }
-            item { AppearanceGroup() }
             item {
                 ListGroup("Diagnostics") {
                     GroupItem(
@@ -163,6 +159,11 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             item {
                 ListGroup("About", footer = "Unofficial client for VIT-AP's VTOP.") {
                     GroupItem("vitapmate", "settings.version", Lucide.Info, onClick = rememberDeveloperTaps(), trailing = { version?.let { TrailingValue(it) } })
+                }
+            }
+            item {
+                ListGroup(null) {
+                    GroupItem("Sign out", "settings.sign_out", Lucide.LogOut, onClick = { confirmSignOut = true }, tone = AppTheme.tones.danger)
                 }
             }
         }

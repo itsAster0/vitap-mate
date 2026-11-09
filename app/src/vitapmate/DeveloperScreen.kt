@@ -40,7 +40,9 @@ import com.composables.icons.lucide.Hourglass
 import com.composables.icons.lucide.KeySquare
 import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.Bug
+import com.composables.icons.lucide.FlaskConical
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Mail
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.RotateCw
@@ -187,7 +189,7 @@ fun DeveloperScreen() {
                 }
             }
             item {
-                ListGroup("Refresh", footer = "Auto refresh itself is in Settings → Data.") {
+                ListGroup("Refresh", footer = "Auto refresh and background sync are in Settings → Sync.") {
                     GroupItem(
                         "Show background errors",
                         "dev.background_errors",
@@ -195,6 +197,24 @@ fun DeveloperScreen() {
                         "Toasts when automatic refreshes fail",
                         onClick = { Settings.showBackgroundErrors = !Settings.showBackgroundErrors; haptics.toggle(Settings.showBackgroundErrors) },
                         trailing = { Switch(Settings.showBackgroundErrors, { Settings.showBackgroundErrors = it; haptics.toggle(it) }) },
+                    )
+                    GroupItem(
+                        "Run background sync now",
+                        "dev.sync_now",
+                        Lucide.RefreshCw,
+                        if (Settings.backgroundSync) "Once, in the background, as a scheduled run would" else "Turn on background sync in Settings first",
+                        enabled = Settings.backgroundSync,
+                        onClick = {
+                            BackgroundSync.runNow(context)
+                            showToast("Background sync started", "Go to the home screen; a notification shows if anything changed.")
+                        },
+                    )
+                    GroupItem(
+                        "Show a test notification",
+                        "dev.test_notification",
+                        Lucide.BellRing,
+                        "A sample change, the way background sync posts them",
+                        onClick = { BackgroundSync.notifyTest(context) },
                     )
                     tunable(Tunable.PageMaxAge, Lucide.Clock)
                     tunable(Tunable.JustFetched, Lucide.Clock)
@@ -235,6 +255,11 @@ fun DeveloperScreen() {
                     GroupItem("Clear attendance", "dev.clear_attendance", Lucide.CircleMinus, "Show it as not posted, until the next refresh", onClick = {
                         act("dev.clear_attendance", { if (it == "true") "Attendance cleared" to "Refresh to bring it back." else "No attendance saved" to "Nothing to clear." }) { c, f ->
                             "${c.devClearAttendance(f)}"
+                        }
+                    })
+                    GroupItem("Simulate VTOP changes", "dev.simulate_changes", Lucide.FlaskConical, "Roll back one class, one score, one slot and one exam; the next fetch finds them", onClick = {
+                        act("dev.simulate_changes", { n -> "Rolled back $n pages" to "Fetch all (More) or a background run now records them in Changes." }) { c, f ->
+                            "${c.devSimulateChanges(f)}"
                         }
                     })
                 }

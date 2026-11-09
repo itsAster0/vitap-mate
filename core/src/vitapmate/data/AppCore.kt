@@ -17,6 +17,7 @@ import vitapmate.core.setSharedCookies
 import vitapmate.observability.Inspector
 import vitapmate.observability.Log
 import vitapmate.observability.StateDump
+import vitapmate.observability.ActivityHistory
 import vitapmate.observability.flow
 
 /** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio, hands Rust OkHttp and the cookie store). */
@@ -53,6 +54,11 @@ object AppCore {
                 Log.error("core", "init failed: $e")
                 core.completeExceptionally(e)
             }
+            // History kept past the log roll-over, then the 20 MB cap; never in the way of start.
+            runCatching {
+                ActivityHistory.save()
+                runBlocking { flow("store.start") { StoreCap.enforce(app, it) } }
+            }.onFailure { Log.warn("store", "start housekeeping failed: ${it::class.simpleName}") }
         }
     }
 
