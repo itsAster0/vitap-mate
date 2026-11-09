@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class DocsTest {
     private fun doc(id: String, name: String, added: Long, opened: Long? = null) =
-        Doc(id, name, "$id.pdf", DocKind.Pdf, 1, "import", added, opened)
+        Doc(id, name, "$id.pdf", "content://test/$id", DocKind.Pdf, 1, "import", added, opened)
 
     private val docs = listOf(
         doc("a", "Mess menu", added = 3, opened = 10),

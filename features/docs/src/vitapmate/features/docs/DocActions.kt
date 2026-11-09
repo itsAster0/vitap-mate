@@ -68,8 +68,13 @@ import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
 
-/** A content URI for [doc] through the app's FileProvider (`<package>.logs`, which also serves `files/docs/`). */
-private fun uriOf(context: Context, doc: Doc): Uri = FileProvider.getUriForFile(context, "${context.packageName}.logs", Docs.fileOf(doc))
+/**
+ * [doc]'s content URI in the download folder, shared as is; a plain file (Android 9 and older,
+ * when the public Downloads wasn't writable) goes through the app's FileProvider instead.
+ */
+private fun uriOf(context: Context, doc: Doc): Uri = Docs.uriOf(doc).let { uri ->
+    if (uri.scheme == "file") FileProvider.getUriForFile(context, "${context.packageName}.logs", java.io.File(uri.path!!)) else uri
+}
 
 private fun mimeOf(doc: Doc): String =
     MimeTypeMap.getSingleton().getMimeTypeFromExtension(doc.file.substringAfterLast('.', "").lowercase()) ?: "application/octet-stream"

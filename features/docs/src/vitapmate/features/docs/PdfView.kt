@@ -45,8 +45,8 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 
 /** An open PDF: page sizes up front, pages rendered one at a time on its own thread (PdfRenderer allows one). */
-private class Pdf(file: File) : AutoCloseable {
-    private val renderer = PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY))
+private class Pdf(fd: ParcelFileDescriptor) : AutoCloseable {
+    private val renderer = PdfRenderer(fd)
     private val executor = Executors.newSingleThreadExecutor()
     private val thread = executor.asCoroutineDispatcher()
     private val cache = object : LruCache<Int, Bitmap>(48 * 1024 * 1024) {
@@ -76,8 +76,8 @@ private class Pdf(file: File) : AutoCloseable {
 @OptIn(FlowPreview::class)
 @Composable
 internal fun PdfView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
-    val pdf by produceState<Pdf?>(null, doc.file) {
-        value = runCatching { withContext(Dispatchers.IO) { Pdf(Docs.fileOf(doc)) } }.onFailure(onFailed).getOrNull()
+    val pdf by produceState<Pdf?>(null, doc.uri) {
+        value = runCatching { withContext(Dispatchers.IO) { Pdf(Docs.open(doc)) } }.onFailure(onFailed).getOrNull()
     }
     val open = pdf ?: return Box(Modifier.fillMaxSize())
     DisposableEffect(open) { onDispose { open.close() } }

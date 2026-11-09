@@ -94,14 +94,20 @@ internal fun DocViewer(id: String) {
 /** [doc] drawn by its kind; [embedded] is Docs' "Continue viewing" card (no saved position, the menu's next meal only). */
 @Composable
 internal fun DocContent(doc: Doc, embedded: Boolean) {
-    var failed by remember(doc.file) { mutableStateOf<Throwable?>(null) }
+    var failed by remember(doc.uri) { mutableStateOf<Throwable?>(null) }
     val fail: (Throwable) -> Unit = { e ->
         if (e !is CancellationException) {
             Log.warn(SRC, "unreadable: ${e::class.simpleName}", fields = mapOf("kind" to doc.kind.name))
             failed = e
         }
     }
-    if (!Docs.fileOf(doc).exists()) return EmptyView(Lucide.FileX, "File missing")
+    // The file lives in the download folder, where a file manager can delete it.
+    val there by produceState<Boolean?>(null, doc.uri) { value = withContext(Dispatchers.IO) { Docs.exists(doc) } }
+    when (there) {
+        null -> return Loading()
+        false -> return EmptyView(Lucide.FileX, "File missing")
+        true -> Unit
+    }
     failed?.let { return EmptyView(Lucide.FileX, "Couldn't read this file", message = (it as? vitapmate.data.MessMenuFormatException)?.message) }
     when {
         doc.kind == DocKind.Spreadsheet && doc.asMessMenu -> MessMenuView(doc, compact = embedded, onFailed = fail)
@@ -118,8 +124,8 @@ internal fun DocContent(doc: Doc, embedded: Boolean) {
 
 @Composable
 private fun ImageView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
-    val bitmap by produceState<android.graphics.Bitmap?>(null, doc.file) {
-        value = runCatching { withContext(Dispatchers.IO) { decodeImage(Docs.fileOf(doc)) } }.onFailure(onFailed).getOrNull()
+    val bitmap by produceState<android.graphics.Bitmap?>(null, doc.uri) {
+        value = runCatching { withContext(Dispatchers.IO) { decodeImage(Docs.readBytes(doc)) } }.onFailure(onFailed).getOrNull()
     }
     val zoom = rememberZoom()
     Box(Modifier.fillMaxSize().zoomGestures(zoom, list = false).testTag("docs.viewer.image"), Alignment.Center) {
@@ -129,18 +135,18 @@ private fun ImageView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit
 }
 
 /** Decoded at most 4096 px on a side, so a camera photo fits a texture. */
-private fun decodeImage(file: File): android.graphics.Bitmap {
+private fun decodeImage(bytes: ByteArray): android.graphics.Bitmap {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeFile(file.path, bounds)
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     var sample = 1
     while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 4096) sample *= 2
-    return BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: error("not an image")
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }) ?: error("not an image")
 }
 
 @Composable
 private fun TextView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
-    val text by produceState<String?>(null, doc.file) {
-        value = runCatching { withContext(Dispatchers.IO) { Docs.fileOf(doc).readText().take(1_000_000) } }.onFailure(onFailed).getOrNull()
+    val text by produceState<String?>(null, doc.uri) {
+        value = runCatching { withContext(Dispatchers.IO) { Docs.readBytes(doc).decodeToString().take(1_000_000) } }.onFailure(onFailed).getOrNull()
     }
     var query by rememberSaveable { mutableStateOf("") }
     val body = text ?: return Loading()
@@ -175,8 +181,8 @@ private fun marked(text: String, needle: String, color: Color): AnnotatedString 
 
 @Composable
 private fun SheetView(doc: Doc, embedded: Boolean, onFailed: (Throwable) -> Unit) {
-    val tables by produceState<Map<String, List<List<String>>>?>(null, doc.file) {
-        value = runCatching { withContext(Dispatchers.IO) { readSpreadsheet(Docs.fileOf(doc)) } }.onFailure(onFailed).getOrNull()
+    val tables by produceState<Map<String, List<List<String>>>?>(null, doc.uri) {
+        value = runCatching { withContext(Dispatchers.IO) { Docs.withFile(doc, ::readSpreadsheet) } }.onFailure(onFailed).getOrNull()
     }
     var sheet by rememberSaveable { mutableIntStateOf(0) }
     var query by rememberSaveable { mutableStateOf("") }

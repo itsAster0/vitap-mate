@@ -30,7 +30,8 @@ import vitapmate.observability.flow
  * passes) land for the student: a folder they chose (Storage Access Framework tree, persistable
  * permission) or, by default, Downloads/vitapmate. The first save asks which ([prompt], drawn by
  * the design module's `DownloadFolderPrompt`). The app remembers what it saved, so changing the
- * folder moves those files (and only those). Log src `downloads`: counts only.
+ * folder moves those files (and only those), and [onMoved] tells Docs (a view over this folder)
+ * where each went. Log src `downloads`: counts only.
  */
 object Downloads {
     const val DEFAULT_LABEL = "Downloads/vitapmate"
@@ -43,6 +44,9 @@ object Downloads {
     /** The chosen folder (a tree URI), or null for Downloads/vitapmate. */
     var folder by mutableStateOf<Uri?>(null)
         private set
+
+    /** Told the old → new URI of each file a folder change moved (Docs follows them). */
+    var onMoved: ((Map<String, String>) -> Unit)? = null
 
     /** Set while a save waits for the student to pick a folder the first time; complete it to go on. */
     var prompt by mutableStateOf<CompletableDeferred<Unit>?>(null)
@@ -71,9 +75,28 @@ object Downloads {
         }
     }
 
-    /** Saves in the background (a toast-free fire and forget for features that keep their own copy). */
-    fun saveLater(name: String, mime: String, bytes: ByteArray, flow: String? = null) {
-        scope.launch { runCatching { save(name, mime, bytes, flow) }.onFailure { Log.warn("downloads", "save failed: ${it::class.simpleName}", flow) } }
+    /** Saves without asking for a folder (the chosen one, else Downloads/vitapmate): Docs' move out of app storage. */
+    suspend fun saveQuietly(name: String, mime: String, bytes: ByteArray): Uri = lock.withLock {
+        withContext(Dispatchers.IO) { write(folder, name, mime, bytes) }.also { record(it, name, mime) }
+    }
+
+    /** Deletes a file this app saved, and forgets it. */
+    suspend fun delete(uri: Uri) = lock.withLock {
+        val context = app ?: return@withLock
+        withContext(Dispatchers.IO) { delete(context, uri) }
+        val list = saved()
+        val kept = JSONArray()
+        for (i in 0 until list.length()) list.getJSONObject(i).takeIf { it.optString("uri") != uri.toString() }?.let(kept::put)
+        prefs.edit().putString("saved", kept.toString()).apply()
+    }
+
+    /** Whether [uri] still opens (the student may have deleted the file in their file manager). */
+    fun exists(uri: Uri): Boolean = runCatching { app!!.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
+
+    /** What the app saved, by file name: its URI (the newest when a name repeats). */
+    fun savedByName(): Map<String, String> {
+        val list = saved()
+        return (0 until list.length()).associate { i -> list.getJSONObject(i).let { it.optString("name") to it.optString("uri") } }
     }
 
     /**
@@ -103,6 +126,7 @@ object Downloads {
         val resolver = context.contentResolver
         val list = saved()
         val kept = JSONArray()
+        val moves = mutableMapOf<String, String>()
         var moved = 0
         var gone = 0
         var failed = 0
@@ -117,6 +141,7 @@ object Downloads {
             runCatching { write(to, item.getString("name"), item.getString("mime"), bytes) }
                 .onSuccess { uri ->
                     delete(context, from)
+                    moves[from.toString()] = uri.toString()
                     kept.put(JSONObject(item.toString()).put("uri", uri.toString()))
                     moved++
                 }
@@ -126,6 +151,7 @@ object Downloads {
                 }
         }
         prefs.edit().putString("saved", kept.toString()).apply()
+        if (moves.isNotEmpty()) onMoved?.invoke(moves)
         Log.info("downloads", "moved", flow, mapOf("moved" to "$moved", "gone" to "$gone", "failed" to "$failed", "chosen" to "${to != null}"))
         return failed
     }

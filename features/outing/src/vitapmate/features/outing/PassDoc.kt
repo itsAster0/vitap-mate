@@ -10,13 +10,13 @@ import vitapmate.data.Docs
 import vitapmate.observability.Log
 
 /**
- * The pass as document `outing:<pass id>` in Docs (source `outing`, so it also lands in the
- * download folder): kept there after the first download, so it opens offline at the gate. Rust
- * fetches it; its copy moves into Docs.
+ * The pass as document `outing:<pass id>` in Docs (source `outing`; the file is in the download
+ * folder): kept there after the first download, so it opens offline at the gate. Rust fetches it
+ * to a temporary file, which goes once saved.
  */
 internal suspend fun passDoc(kind: OutingKind, passId: String, flow: String): Doc {
     val id = "outing:$passId"
-    Docs.byId(id)?.takeIf { Docs.fileOf(it).exists() }?.let {
+    Docs.byId(id)?.takeIf { withContext(Dispatchers.IO) { Docs.exists(it) } }?.let {
         Log.info("ui.outing", "pass from docs", flow, mapOf("kind" to kind.key))
         return it
     }

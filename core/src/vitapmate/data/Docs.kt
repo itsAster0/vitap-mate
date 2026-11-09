@@ -3,6 +3,7 @@ package vitapmate.data
 import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableStateOf
@@ -34,13 +35,16 @@ enum class DocKind(val extensions: List<String>) {
 }
 
 /**
- * A saved document: [file] is its name under `files/docs/`; [source] is where it came from
- * ("import", "vtop", "outing", ...). [page] and [zoom] are where the viewer was left.
+ * A saved document: the file at [uri] in the download folder ([Downloads]), [file] its file name
+ * there (for the kind and type); [source] is where it came from ("import", "vtop", "outing", ...).
+ * [page] and [zoom] are where the viewer was left.
  */
 data class Doc(
     val id: String,
     val name: String,
     val file: String,
+    /** Empty only for a document still in app storage from before (moved out at start). */
+    val uri: String,
     val kind: DocKind,
     val size: Long,
     val source: String,
@@ -79,7 +83,7 @@ internal object DocIndex {
     fun encode(sort: DocSort, docs: List<Doc>): String = JSONObject()
         .put("sort", sort.name)
         .put("docs", JSONArray(docs.map { d ->
-            JSONObject().put("id", d.id).put("name", d.name).put("file", d.file).put("kind", d.kind.name).put("size", d.size)
+            JSONObject().put("id", d.id).put("name", d.name).put("file", d.file).put("uri", d.uri).put("kind", d.kind.name).put("size", d.size)
                 .put("source", d.source).put("addedAt", d.addedAt).put("lastOpenedAt", d.lastOpenedAt ?: JSONObject.NULL)
                 .put("asMessMenu", d.asMessMenu).put("page", d.page).put("zoom", d.zoom.toDouble())
         }))
@@ -93,7 +97,7 @@ internal object DocIndex {
             val o = list.optJSONObject(i) ?: return@mapNotNull null
             runCatching {
                 Doc(
-                    o.getString("id"), o.getString("name"), o.getString("file"),
+                    o.getString("id"), o.getString("name"), o.getString("file"), o.optString("uri"),
                     DocKind.entries.firstOrNull { it.name == o.optString("kind") } ?: DocKind.of(o.getString("file")),
                     o.optLong("size"), o.optString("source", "import"), o.optLong("addedAt"),
                     if (o.isNull("lastOpenedAt")) null else o.optLong("lastOpenedAt"),
@@ -106,10 +110,11 @@ internal object DocIndex {
 }
 
 /**
- * Files the app keeps (VTOP downloads, outing passes, imported files) in app-private
- * `files/docs/`, with `index.json` beside them; the Flutter app's Docs repository and
- * `download_to_docs.dart`. Any feature saves into it with [save] or [keep]. Log src `docs`:
- * counts, sizes and kinds only, never file names.
+ * The app's view of the files it saved for the student (VTOP downloads, outing passes, imported
+ * files): each lives only in the download folder ([Downloads]); `files/docs/index.json` keeps the
+ * names, sources and viewer state; the Flutter app's Docs repository and `download_to_docs.dart`.
+ * Any feature saves with [save] or [keep]. Log src `docs`: counts, sizes and kinds only, never
+ * file names.
  */
 object Docs {
     private val state = mutableStateOf<List<Doc>>(emptyList())
@@ -131,13 +136,18 @@ object Docs {
             scope.launch { lock.withLock { write() } }
         }
 
-    /** Loads the index and the mess timings and resumes VTOP downloads still to copy; later calls do nothing. */
+    /**
+     * Loads the index and the mess timings, moves documents still in app storage (from before)
+     * to the download folder, and resumes VTOP downloads still to copy; later calls do nothing.
+     */
     @Synchronized
     fun init(context: Context) {
         if (app != null) return
         val ctx = context.applicationContext
         MessTimings.load(ctx)
         Downloads.init(ctx)
+        // Docs follow their files when the student picks another folder.
+        Downloads.onMoved = { moves -> scope.launch { remap(moves) } }
         val d = File(ctx.filesDir, "docs").apply { mkdirs() }
         dir = d
         // Small; read here so a feature's first [byId] already sees it.
@@ -150,6 +160,7 @@ object Docs {
             .onFailure { Log.error("docs", "index unreadable: ${it::class.simpleName}") }
         app = ctx
         scope.launch {
+            migrate()
             downloads(ctx).all.forEach { (key, value) ->
                 val saved = value as? String ?: return@forEach
                 key.toLongOrNull()?.let { watchDownload(ctx, it, saved.substringAfter('/'), saved.substringBefore('/')) }
@@ -158,31 +169,55 @@ object Docs {
     }
 
     /** Where [doc]'s file is. */
-    fun fileOf(doc: Doc): File = File(dir ?: error("Docs.init not called"), doc.file)
+    fun uriOf(doc: Doc): Uri = Uri.parse(doc.uri)
+
+    /** Whether [doc]'s file is still there (it can be deleted in a file manager). Disk/binder: off the main thread. */
+    fun exists(doc: Doc): Boolean = doc.uri.isNotEmpty() && Downloads.exists(uriOf(doc))
+
+    /** [doc]'s file for reading in place (PdfRenderer). */
+    fun open(doc: Doc): ParcelFileDescriptor =
+        app!!.contentResolver.openFileDescriptor(uriOf(doc), "r") ?: error("can't open the file")
+
+    fun readBytes(doc: Doc): ByteArray = (app!!.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { it.readBytes() }
+
+    /**
+     * Runs [block] on a temporary copy of [doc] in the cache, for APIs that need a [File] (a zip
+     * reader); the copy is deleted after.
+     */
+    fun <T> withFile(doc: Doc, block: (File) -> T): T {
+        val ctx = app!!
+        val tmp = File(File(ctx.cacheDir, "docs").apply { mkdirs() }, "${System.nanoTime()}-${doc.file.substringAfterLast('/')}")
+        try {
+            (ctx.contentResolver.openInputStream(uriOf(doc)) ?: error("can't open the file")).use { input -> tmp.outputStream().use(input::copyTo) }
+            return block(tmp)
+        } finally {
+            tmp.delete()
+        }
+    }
 
     fun byId(id: String): Doc? = docs.firstOrNull { it.id == id }
 
     /**
      * The one save for fetched files: [bytes] as [name] (an extension from [mime] is added when
-     * the name has none) into Docs with its [source] ("vtop", "coursepage", "outing", ...) and, for
-     * anything but an import, into the download folder ([Downloads]). An [id] saved before is
-     * replaced.
+     * the name has none) into the download folder ([Downloads], which asks for one the first
+     * time) and Docs, with its [source] ("vtop", "coursepage", "outing", ...). An [id] saved
+     * before is replaced.
      */
     suspend fun save(name: String, mime: String?, bytes: ByteArray, source: String, id: String? = null, flow: String? = null): Doc =
-        add(name, mime, source, id, flow) { it.writeBytes(bytes) }
+        add(name, mime, source, id, flow) { bytes }
 
-    /** Copies [file] in, as [save]. */
+    /** Reads [file] (a temporary download) in, as [save]. */
     suspend fun save(name: String, mime: String?, file: File, source: String, id: String? = null, flow: String? = null): Doc =
-        add(name, mime, source, id, flow) { file.copyTo(it, overwrite = true) }
+        add(name, mime, source, id, flow) { file.readBytes() }
 
-    /** Copies a picked file (Storage Access Framework) in, under its display name without the extension. */
+    /** Copies a picked file (Storage Access Framework) into the download folder, under its display name without the extension. */
     suspend fun import(context: Context, uri: Uri, flow: String? = null): Doc {
         val resolver = context.contentResolver
         val display = withContext(Dispatchers.IO) {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
         } ?: "Document"
-        return add(display, resolver.getType(uri), "import", null, flow) { out ->
-            (resolver.openInputStream(uri) ?: error("can't read the file")).use { input -> out.outputStream().use(input::copyTo) }
+        return add(display, resolver.getType(uri), "import", null, flow) {
+            (resolver.openInputStream(uri) ?: error("can't read the file")).use { it.readBytes() }
         }
     }
 
@@ -191,7 +226,7 @@ object Docs {
      * `keepInDocs`), so app-fetched files (outing passes) open offline later.
      */
     suspend fun keep(id: String, name: String, mime: String?, source: String, flow: String? = null, download: suspend () -> ByteArray): Doc {
-        byId(id)?.takeIf { fileOf(it).exists() }?.let { return it }
+        byId(id)?.takeIf { withContext(Dispatchers.IO) { exists(it) } }?.let { return it }
         return save(name, mime, download(), source, id, flow)
     }
 
@@ -203,17 +238,18 @@ object Docs {
 
     suspend fun saveView(id: String, page: Int, zoom: Float) = update(id) { it.copy(page = page, zoom = zoom) }
 
+    /** Removes [id] from Docs and its file from the download folder. */
     suspend fun remove(id: String) = lock.withLock {
         val doc = docs.firstOrNull { it.id == id } ?: return@withLock
-        withContext(Dispatchers.IO) { deleteFile(doc) }
+        if (doc.uri.isNotEmpty()) Downloads.delete(uriOf(doc))
         state.value = docs - doc
         write()
     }
 
     /**
-     * Once DownloadManager download [downloadId] finishes, [save]s it as [name] from [source] (so
-     * into Docs and the download folder; the same name from the same source replaces the earlier
-     * one), then removes the DownloadManager copy. Kept across launches until done.
+     * Once DownloadManager download [downloadId] finishes, [save]s it as [name] from [source] (the
+     * same name from the same source replaces the earlier one), then removes the DownloadManager
+     * copy. Kept across launches until done.
      */
     fun watchDownload(context: Context, downloadId: Long, name: String, source: String) {
         val prefs = downloads(context)
@@ -246,47 +282,86 @@ object Docs {
         }
     }
 
-    /** [doc]'s file, and its own folder when it has one (`doc-<stamp>/<name>`). */
-    private fun deleteFile(doc: Doc) {
-        val file = fileOf(doc)
-        file.delete()
-        if (doc.file.contains('/')) file.parentFile?.delete()
-    }
-
     private fun downloads(context: Context) = context.getSharedPreferences("docs_downloads", Context.MODE_PRIVATE)
 
-    private suspend fun add(name: String, mime: String?, source: String, id: String?, flow: String?, write: (File) -> Unit): Doc = lock.withLock {
-        // Saving an [id] again replaces it (a re-download); [keep] is the way to reuse a copy.
-        docs.firstOrNull { id != null && it.id == id }?.let { withContext(Dispatchers.IO) { deleteFile(it) } }
+    private fun mimeOf(fileName: String, fallback: String?): String =
+        MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileName.substringAfterLast('.', "").lowercase()) ?: fallback ?: "application/octet-stream"
+
+    private suspend fun add(name: String, mime: String?, source: String, id: String?, flow: String?, read: () -> ByteArray): Doc {
         val clean = name.substringAfterLast('/').substringAfterLast('\\').trim()
         val ext = clean.substringAfterLast('.', "").lowercase().takeIf { it.isNotEmpty() && it.length <= 5 }
             ?: mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-        val stamp = "${System.currentTimeMillis()}-${counter++}"
-        // In its own folder under its real name, so other apps (share, open with) show that name.
         val base = clean.substringBeforeLast('.').ifEmpty { clean }.replace(Regex("""[\\/:*?"<>|\u0000-\u001f]"""), "_").take(120).ifEmpty { "document" }
-        val stored = "doc-$stamp/$base" + (ext?.let { ".$it" } ?: "")
-        val target = File(dir ?: error("Docs.init not called"), stored).apply { parentFile?.mkdirs() }
-        withContext(Dispatchers.IO) {
-            runCatching { write(target) }.onFailure { target.parentFile?.deleteRecursively() }.getOrThrow()
+        val fileName = base + (ext?.let { ".$it" } ?: "")
+        val bytes = withContext(Dispatchers.IO) { read() }
+        // Outside the lock: the first save may wait for the student to pick a folder.
+        val uri = Downloads.save(fileName, mimeOf(fileName, mime), bytes, flow)
+        return lock.withLock {
+            // Saving an [id] again replaces it (a re-download); [keep] is the way to reuse a copy.
+            docs.firstOrNull { id != null && it.id == id }?.takeIf { it.uri.isNotEmpty() && it.uri != uri.toString() }?.let { Downloads.delete(uriOf(it)) }
+            val doc = Doc(
+                id ?: "doc-${System.currentTimeMillis()}-${counter++}",
+                clean.substringBeforeLast('.').ifEmpty { clean }.ifEmpty { base },
+                fileName,
+                uri.toString(),
+                DocKind.of(fileName),
+                bytes.size.toLong(),
+                source,
+                System.currentTimeMillis(),
+            )
+            state.value = docs.filterNot { it.id == doc.id } + doc
+            write()
+            Log.info("docs", "saved", flow, mapOf("kind" to doc.kind.name, "bytes" to "${doc.size}", "source" to source, "count" to "${docs.size}"))
+            doc
         }
-        val doc = Doc(
-            id ?: "doc-$stamp",
-            clean.substringBeforeLast('.').ifEmpty { clean }.ifEmpty { base },
-            stored,
-            DocKind.of(stored),
-            target.length(),
-            source,
-            System.currentTimeMillis(),
-        )
-        state.value = docs.filterNot { it.id == doc.id } + doc
+    }
+
+    /** The folder changed: each document whose file moved points at its new place. */
+    private suspend fun remap(moves: Map<String, String>) = lock.withLock {
+        state.value = docs.map { d -> moves[d.uri]?.let { d.copy(uri = it) } ?: d }
         write()
-        // What the app fetched also goes to the download folder; imports are on the phone already.
-        if (source != "import") {
-            val type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.orEmpty()) ?: mime ?: "application/octet-stream"
-            Downloads.saveLater(doc.name + (ext?.let { ".$it" } ?: ""), type, withContext(Dispatchers.IO) { target.readBytes() }, flow)
+    }
+
+    /**
+     * Documents saved before Docs became a view (their file under `files/docs/doc-<stamp>/`): each
+     * points at its copy in the download folder when that is still there, else its file is written
+     * there now (no folder prompt: the chosen folder or Downloads/vitapmate); then the app's copy
+     * goes. Counts only in the log.
+     */
+    private suspend fun migrate() {
+        val d = dir ?: return
+        val old = docs.filter { it.uri.isEmpty() }
+        if (old.isEmpty() && d.listFiles().orEmpty().none { it.isDirectory }) return
+        flow("docs.migrate") { f ->
+            val byName = Downloads.savedByName()
+            var linked = 0
+            var written = 0
+            var lost = 0
+            val moved = old.mapNotNull { doc ->
+                val file = File(d, doc.file)
+                val fileName = doc.file.substringAfterLast('/')
+                val copy = byName[fileName]?.let(Uri::parse)?.takeIf { Downloads.exists(it) }
+                val uri = when {
+                    copy != null -> copy.also { linked++ }
+                    file.exists() -> runCatching { Downloads.saveQuietly(fileName, mimeOf(fileName, null), file.readBytes()) }
+                        .onFailure { Log.warn("docs", "move failed: ${it::class.simpleName}", f) }.getOrNull()?.also { written++ }
+                    else -> null
+                }
+                if (uri == null && file.exists()) return@mapNotNull doc // Try again next start.
+                if (uri == null) lost++
+                uri?.let { doc.copy(file = fileName, uri = it.toString()) }
+            }
+            lock.withLock {
+                val byId = moved.associateBy { it.id }
+                // Gone everywhere: dropped. Still in app storage after a failed write: kept for next time.
+                state.value = docs.mapNotNull { doc -> if (doc.uri.isNotEmpty()) doc else byId[doc.id] ?: doc.takeIf { File(d, it.file).exists() } }
+                write()
+            }
+            // Only the index stays in app storage.
+            val keep = docs.filter { it.uri.isEmpty() }.map { it.file.substringBefore('/') }.toSet()
+            d.listFiles().orEmpty().filter { it.isDirectory && it.name !in keep }.forEach { it.deleteRecursively() }
+            Log.info("docs", "moved to download folder", f, mapOf("linked" to "$linked", "written" to "$written", "lost" to "$lost", "count" to "${docs.size}"))
         }
-        Log.info("docs", "saved", flow, mapOf("kind" to doc.kind.name, "bytes" to "${doc.size}", "source" to source, "count" to "${docs.size}"))
-        doc
     }
 
     private suspend fun update(id: String, change: (Doc) -> Doc) = lock.withLock {

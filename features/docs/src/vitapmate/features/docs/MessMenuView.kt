@@ -97,7 +97,7 @@ import vitapmate.ui.rememberNow
 /** Reads [doc] as the mess menu; throws [vitapmate.data.MessMenuFormatException] when it isn't one. */
 internal suspend fun loadMessMenu(doc: Doc): MessMenu = withContext(Dispatchers.Default) {
     val now = Calendar.getInstance()
-    parseMessMenu(readSpreadsheet(Docs.fileOf(doc))) { month -> messMenuYear(month, doc.name, now.get(Calendar.YEAR), now.get(Calendar.MONTH) + 1) }
+    parseMessMenu(withContext(Dispatchers.IO) { Docs.withFile(doc, ::readSpreadsheet) }) { month -> messMenuYear(month, doc.name, now.get(Calendar.YEAR), now.get(Calendar.MONTH) + 1) }
 }
 
 private const val SHEET_KEY = "mess_menu_sheet"
@@ -108,7 +108,7 @@ private const val SHEET_KEY = "mess_menu_sheet"
  */
 @Composable
 internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> Unit) {
-    val menu by produceState<MessMenu?>(null, doc.file) { value = runCatching { loadMessMenu(doc) }.onFailure(onFailed).getOrNull() }
+    val menu by produceState<MessMenu?>(null, doc.uri) { value = runCatching { loadMessMenu(doc) }.onFailure(onFailed).getOrNull() }
     val data = menu ?: return Loading()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }

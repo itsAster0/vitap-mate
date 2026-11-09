@@ -72,7 +72,7 @@ internal fun PassScreen(item: String) {
                 pages = flow("outing.pass") { id ->
                     val doc = passDoc(kind, passId, id)
                     Docs.opened(doc.id)
-                    withContext(Dispatchers.IO) { render(Docs.fileOf(doc), widthPx) }
+                    withContext(Dispatchers.IO) { render(Docs.open(doc), widthPx) }
                         .also { Log.info("ui.outing", "pass shown", id, mapOf("kind" to kind.key, "pages" to "${it.size}")) }
                 }
             } catch (e: CancellationException) {
@@ -112,8 +112,8 @@ internal fun PassScreen(item: String) {
 }
 
 /** Each page of [file] [width] pixels wide, on white (a PDF page has no background). */
-private fun render(file: File, width: Int): List<Bitmap> =
-    PdfRenderer(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { pdf ->
+private fun render(fd: ParcelFileDescriptor, width: Int): List<Bitmap> =
+    PdfRenderer(fd).use { pdf ->
         (0 until pdf.pageCount).map { i ->
             pdf.openPage(i).use { page ->
                 val height = (width.toLong() * page.height / page.width.coerceAtLeast(1)).toInt().coerceAtLeast(1)
