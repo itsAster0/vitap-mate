@@ -126,6 +126,7 @@ async fn pages_wait_for_a_picked_semester() {
         username: "STUDENT".into(),
         password: "pw".into(),
         rejected: false,
+        registration_number: None,
     };
     let core = Core {
         dir: dir.clone(),
@@ -387,6 +388,7 @@ async fn another_student_signing_in_drops_the_last_ones_pages() {
         username: username.into(),
         password: "pw".into(),
         rejected: false,
+        registration_number: None,
     };
     let slot = Arc::new(RwLock::new(Session::new(account("21BCE0002")).unwrap()));
     let core = Core {
@@ -428,6 +430,7 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
         username: "21BCE0001".into(),
         password: "pw".into(),
         rejected: false,
+        registration_number: None,
     };
     let slot = Arc::new(RwLock::new(Session::new(account).unwrap()));
     let core = Core {
@@ -499,6 +502,7 @@ async fn saved_cookies_move_to_the_shared_store_once_and_stay_there() {
         username: "22BCE0001".into(),
         password: "pw".into(),
         rejected: false,
+        registration_number: None,
     };
     let core = Core {
         dir: dir.clone(),
@@ -556,6 +560,7 @@ async fn clearing_the_session_empties_the_shared_store() {
         username: "22BCE0001".into(),
         password: "pw".into(),
         rejected: false,
+        registration_number: None,
     };
     let session = Session::new(account).unwrap();
     session.cookies.activate(false);

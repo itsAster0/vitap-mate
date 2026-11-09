@@ -37,10 +37,12 @@ object AppCore {
         Inspector.attach(app)
         StateDump.register(app, Settings::snapshot)
         Docs.init(app)
+        Gmail.init(app)
         val dir = context.filesDir.path
         thread(name = "core-init") {
             runCatching {
                 obsInit(dir)
+                runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 val dev = devConfig(app)
                 devConfigure(dev)
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34

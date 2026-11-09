@@ -16,6 +16,7 @@ object Settings {
     private val black = mutableStateOf(false)
     private val tabs = mutableStateOf(NavTabs.DEFAULT)
     private val avatar = mutableStateOf<String?>(null)
+    private val otp = mutableStateOf<OtpSource?>(null)
     private val auto = mutableStateOf(true)
     private val haptic = mutableStateOf(true)
     private val backgroundErrors = mutableStateOf(false)
@@ -30,6 +31,17 @@ object Settings {
         set(value) {
             skipAdvice.value = value
             prefs?.edit()?.putBoolean("settings_show_skip_advice", value)?.apply()
+        }
+
+    /**
+     * Which one fills in VTOP's OTP: one at a time. Set when one is set up or connected, or chosen
+     * with "Use this for OTPs"; null before either is. The other stays set up, on standby.
+     */
+    var otpSource: OtpSource?
+        get() = otp.value
+        set(value) {
+            otp.value = value
+            prefs?.edit()?.putString("settings_otp_source", value?.name?.lowercase())?.apply()
         }
 
     /** Haptic feedback on taps, toggles, refreshes and results (the system's touch feedback setting still applies). */
@@ -168,6 +180,7 @@ object Settings {
         colors.value = p.getString("settings_colors", null) ?: WALLPAPER.takeIf { p.getBoolean("settings_dynamic_color", false) }
         tabs.value = NavTabs.decode(p.getString("settings_nav_tabs", null))
         avatar.value = p.getString("settings_avatar_path", null)
+        otp.value = OtpSource.entries.firstOrNull { it.name.lowercase() == p.getString("settings_otp_source", null) }
         devAlways.value = p.getBoolean("dev_always_show", false)
         inspect.value = p.getBoolean("dev_inspect_traffic", false)
         engine.value = p.getBoolean("dev_http_engine", true)
@@ -198,3 +211,6 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
 }
 
 enum class ThemeMode { System, Light, Dark }
+
+/** Where the OTP prompt reads VTOP's code from. */
+enum class OtpSource { Forwarding, Gmail }

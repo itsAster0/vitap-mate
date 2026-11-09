@@ -182,6 +182,9 @@ struct Account {
     /// lock the VTOP account) until the student signs in with a new one.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     rejected: bool,
+    /// VTOP's registration number, saved at the first sign-in (the college email ends with it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    registration_number: Option<String>,
 }
 
 /// [`Core::saved_account`]'s answer.
@@ -190,6 +193,8 @@ pub struct SavedAccount {
     pub username: String,
     pub password: String,
     pub rejected: bool,
+    /// Known once signed in.
+    pub registration_number: Option<String>,
 }
 
 struct Session {
@@ -357,6 +362,11 @@ impl Core {
                 username: account.username,
                 password: account.password,
                 rejected: account.rejected,
+                // An account saved before this field: the saved session has it.
+                registration_number: account.registration_number.or_else(|| {
+                    self.read::<PersistedVtopSession>(SESSION)
+                        .and_then(|saved| saved.registration_number)
+                }),
             })
     }
 
@@ -370,6 +380,7 @@ impl Core {
             username: username.trim().to_uppercase(),
             password,
             rejected: false,
+            registration_number: None,
         };
         traced("sign_in", &flow, async {
             let mut session = Session::new(account)?;
@@ -949,7 +960,7 @@ impl Core {
                     CookieStore::clear(session.cookies.as_ref());
                     session.account.rejected = true;
                     if self.is_current(slot) {
-                        self.write(ACCOUNT, &session.account);
+                        self.write_account(&session.account);
                     }
                 }
                 _ => {}
@@ -977,7 +988,11 @@ impl Core {
         let saved_at_ms = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |elapsed| elapsed.as_millis() as u64);
-        self.write(ACCOUNT, &session.account);
+        let mut account = session.account.clone();
+        if let Ok(regno) = session.client.registration_number() {
+            account.registration_number = Some(regno);
+        }
+        self.write_account(&account);
         let mut saved = session.client.export_persisted_session(saved_at_ms);
         if session.cookies.is_shared() {
             // The shared store keeps (and saves) them.
@@ -1014,6 +1029,19 @@ impl Core {
         }
     }
 
+    /// Writes `account`, keeping the saved registration number when `account` has none (it is
+    /// only known once signed in).
+    fn write_account(&self, account: &Account) {
+        let mut account = account.clone();
+        if account.registration_number.is_none() {
+            account.registration_number = self
+                .read::<Account>(ACCOUNT)
+                .filter(|saved| saved.username == account.username)
+                .and_then(|saved| saved.registration_number);
+        }
+        self.write(ACCOUNT, &account);
+    }
+
     /// Saves `account`'s password over the saved account's when it's the same username
     /// (another username is another account, saved only once signed in).
     fn keep_accepted_password(&self, account: &Account) {
@@ -1022,7 +1050,7 @@ impl Core {
             && (saved.password != account.password || saved.rejected)
         {
             info!("password accepted before the otp: saved");
-            self.write(ACCOUNT, account);
+            self.write_account(account);
         }
     }
 

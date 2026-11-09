@@ -36,6 +36,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
+import vitapmate.data.OtpSource
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
@@ -46,14 +47,14 @@ import vitapmate.ui.StatusChip
 private const val WAITING_POLL_MS = 5_000L
 
 /**
- * Settings → Account → Mail forwarding (the Flutter app's `MailForwardingPage`): off, a button
- * that makes (or joins) the student's address; then the address with a copy button, the status,
- * Gmail's confirmation once it arrives, the three Gmail steps, Check and Turn off. While waiting
- * for Gmail's mail the inbox is checked every 5 s. Test tags `forwarding.*`.
+ * Mail forwarding in the OTP auto-fill sheet (the Flutter app's `MailForwardingPage`): off, a
+ * button that makes (or joins) the student's address; then the address with a copy button, the
+ * status, Gmail's confirmation once it arrives, the three Gmail steps, Check and Turn off. While
+ * waiting for Gmail's mail the inbox is checked every 5 s. Test tags `forwarding.*`.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ForwardingSheet(onDismiss: () -> Unit) {
+internal fun ForwardingContent() {
     val scope = rememberCoroutineScope()
     val status = MailForwarding.status
     var confirmOff by remember { mutableStateOf(false) }
@@ -67,28 +68,10 @@ fun ForwardingSheet(onDismiss: () -> Unit) {
             delay(WAITING_POLL_MS)
         }
     }
-    val sheet = rememberBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-    )
-    OpenHaptic()
-    ModalBottomSheet(
-        onDismiss,
-        Modifier.semantics { testTagsAsResourceId = true }.testTag("forwarding.sheet"),
-        sheet,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = Space.xl).padding(bottom = Space.xl),
-            verticalArrangement = Arrangement.spacedBy(Space.lg),
-        ) {
-            Header(status)
-            when {
-                status == null -> Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator() }
-                status.state == ForwardingState.OFF -> ForwardingIntro(MailForwarding::setUp)
-                else -> ForwardingSetup(status, onCheck = { scope.launch { MailForwarding.check() } }, onOff = { confirmOff = true })
-            }
-        }
+    when {
+        status == null -> Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) { LoadingIndicator() }
+        status.state == ForwardingState.OFF -> ForwardingIntro(MailForwarding::setUp)
+        else -> ForwardingSetup(status, onCheck = { scope.launch { MailForwarding.check() } }, onOff = { confirmOff = true })
     }
     if (confirmOff) {
         AlertDialog(
@@ -106,19 +89,5 @@ fun ForwardingSheet(onDismiss: () -> Unit) {
             },
             dismissButton = { TextButton({ confirmOff = false }) { Text("Cancel") } },
         )
-    }
-}
-
-@Composable
-private fun Header(status: Forwarding?) {
-    val tones = AppTheme.tones
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-        Text("Mail forwarding", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-        when (status?.state) {
-            ForwardingState.ON -> StatusChip("On", tones.success, Modifier.testTag("forwarding.state"))
-            ForwardingState.WAITING -> StatusChip("Setting up", tones.warning, Modifier.testTag("forwarding.state"))
-            ForwardingState.OFF -> StatusChip("Off", tones.accentTone, Modifier.testTag("forwarding.state"))
-            null -> {}
-        }
     }
 }

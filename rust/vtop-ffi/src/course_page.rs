@@ -868,6 +868,7 @@ mod tests {
                 username: "22BCE0001".into(),
                 password: "pw".into(),
                 rejected: false,
+                registration_number: None,
             },
             logins: 0,
             otp: None,

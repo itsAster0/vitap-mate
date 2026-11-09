@@ -9615,6 +9615,11 @@ data class SavedAccount (
     var `password`: kotlin.String
     , 
     var `rejected`: kotlin.Boolean
+    , 
+    /**
+     * Known once signed in.
+     */
+    var `registrationNumber`: kotlin.String?
     
 ){
     
@@ -9634,19 +9639,22 @@ public object FfiConverterTypeSavedAccount: FfiConverterRustBuffer<SavedAccount>
             FfiConverterString.read(buf),
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterOptionalString.read(buf),
         )
     }
 
     override fun allocationSize(value: SavedAccount) = (
             FfiConverterString.allocationSize(value.`username`) +
             FfiConverterString.allocationSize(value.`password`) +
-            FfiConverterBoolean.allocationSize(value.`rejected`)
+            FfiConverterBoolean.allocationSize(value.`rejected`) +
+            FfiConverterOptionalString.allocationSize(value.`registrationNumber`)
     )
 
     override fun write(value: SavedAccount, buf: ByteBuffer) {
             FfiConverterString.write(value.`username`, buf)
             FfiConverterString.write(value.`password`, buf)
             FfiConverterBoolean.write(value.`rejected`, buf)
+            FfiConverterOptionalString.write(value.`registrationNumber`, buf)
     }
 }
 

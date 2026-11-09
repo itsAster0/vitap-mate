@@ -140,6 +140,7 @@ impl Core {
                 username: username.trim().to_uppercase(),
                 password,
                 rejected: false,
+                registration_number: None,
             };
             let fresh = Session::new(account.clone())?;
             match self.current() {
@@ -405,6 +406,7 @@ mod tests {
             username: "22BCE0001".into(),
             password: "pw-secret-1".into(),
             rejected: false,
+            registration_number: None,
         };
         fs::write(
             dir.join(crate::ACCOUNT),
@@ -562,6 +564,7 @@ mod tests {
             username: "22BCE0001".into(),
             password: "pw-1".into(),
             rejected: true,
+            registration_number: None,
         };
         core.write(ACCOUNT, &account);
         // No Debug on SavedAccount, so a failing test never prints the password.
@@ -576,6 +579,7 @@ mod tests {
             username: "22BCE0001".into(),
             password: "old".into(),
             rejected: true,
+            registration_number: None,
         };
         core.write(ACCOUNT, &saved);
 
@@ -584,6 +588,7 @@ mod tests {
             username: "22BCE0002".into(),
             password: "other".into(),
             rejected: false,
+            registration_number: None,
         });
         let kept: Account = core.read(ACCOUNT).unwrap();
         assert!(kept.username == "22BCE0001" && kept.password == "old" && kept.rejected);
@@ -593,6 +598,7 @@ mod tests {
             username: "22BCE0001".into(),
             password: "new".into(),
             rejected: false,
+            registration_number: None,
         });
         let kept: Account = core.read(ACCOUNT).unwrap();
         assert!(kept.password == "new" && !kept.rejected);

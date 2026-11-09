@@ -126,12 +126,12 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
     }
 }
 
-/** One Gmail step: a number in a circle, a title, what to do, and a link to the Gmail page. */
+/** One setup step: a number in a circle, a title, what to do, and a link to the page; test tags `<tag>.step<n>`. */
 @Composable
-private fun Step(number: Int, title: String, link: String?, linkLabel: String?, body: () -> String) {
+internal fun Step(number: Int, title: String, link: String?, linkLabel: String?, tag: String = "forwarding", body: () -> String) {
     val scheme = MaterialTheme.colorScheme
     val uri = LocalUriHandler.current
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.md), modifier = Modifier.testTag("forwarding.step$number")) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Space.md), modifier = Modifier.testTag("$tag.step$number")) {
         Box(Modifier.size(28.dp).background(scheme.primaryContainer, CircleShape), Alignment.Center) {
             Text("$number", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimaryContainer)
         }
@@ -139,7 +139,7 @@ private fun Step(number: Int, title: String, link: String?, linkLabel: String?, 
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(body(), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             if (link != null && linkLabel != null) {
-                TextButton({ uri.openUri(link) }, Modifier.testTag("forwarding.step$number.link")) {
+                TextButton({ uri.openUri(link) }, Modifier.testTag("$tag.step$number.link")) {
                     Icon(Lucide.ExternalLink, null, Modifier.size(16.dp))
                     Spacer(Modifier.size(Space.xs))
                     Text(linkLabel)

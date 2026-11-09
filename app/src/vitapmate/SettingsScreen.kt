@@ -90,7 +90,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         tone = if (AccountState.rejected) AppTheme.tones.warning else null,
                     )
                     SemesterSetting()
-                    ForwardingSetting()
+                    OtpAutofillSetting()
                     GroupItem("Sign out", "settings.sign_out", Lucide.LogOut, onClick = { confirmSignOut = true }, tone = AppTheme.tones.danger)
                 }
             }

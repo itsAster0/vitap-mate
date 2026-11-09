@@ -13,6 +13,8 @@ import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
+import vitapmate.data.OtpSource
+import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
@@ -51,7 +53,7 @@ object MailForwarding {
 
     /** Makes or joins the address; runs on after the sheet closes. */
     fun setUp() {
-        scope.launch { run("setup") { id -> AppCore.await().setUpForwarding(id) } }
+        scope.launch { run("setup") { id -> AppCore.await().setUpForwarding(id) }?.let { Settings.otpSource = OtpSource.Forwarding } }
     }
 
     /** Pulls the latest forwarded mail; [quiet] skips the "nothing yet" toast and error toasts. */
