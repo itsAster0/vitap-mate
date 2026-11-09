@@ -10,14 +10,22 @@ use std::time::{Duration, SystemTime};
 
 use serde_json::json;
 use tracing::{info, warn};
+
+use crate::exams::EXAMS;
+
+/// The marks page (as in `marks.rs`).
+const MARKS: &str = "marks.json";
 use vtop_core::VtopConfig;
-use vtop_core::types::{AttendanceData, FullAttendanceData, PersistedVtopSession, SemesterData};
+use vtop_core::types::{
+    AttendanceData, ExamScheduleData, FullAttendanceData, MarksData, PersistedVtopSession,
+    SemesterData, TimetableData,
+};
 
 use vtop_core::sync::RwLock;
 
 use crate::{
     ACCOUNT, ATTENDANCE, ATTENDANCE_DETAIL, Account, Core, CoreError, PAGES, SELECTED, SEMESTERS,
-    SESSION, Session, forwarding, records, traced, traced_sync,
+    SESSION, Session, TIMETABLE, forwarding, records, traced, traced_sync,
 };
 
 /// The Flutter app's Cookie-Editor domain.
@@ -222,6 +230,63 @@ impl Core {
             }
             info!(dropped, "latest history entries dropped");
             Ok(dropped)
+        })
+    }
+
+    /// Rolls the selected semester's saved pages back by one change each, without recording
+    /// it, so the next fetch finds real differences for the change inbox and its
+    /// notifications: a course's last class unposted (attendance), its newest score blanked
+    /// (marks), one slot removed (timetable), one exam removed (exams). Returns how many pages
+    /// changed; a refresh restores them all.
+    pub fn dev_simulate_changes(&self, flow: String) -> Result<u32, CoreError> {
+        traced_sync("dev_simulate_changes", &flow, || {
+            let mut changed = 0;
+            if let Some(path) = self.page_path(ATTENDANCE)
+                && let Some(mut data) = self.read::<AttendanceData>(&path)
+                && let Some(record) = data.records.iter_mut().find(|r| {
+                    r.classes_attended.parse::<u32>().is_ok_and(|a| a > 0)
+                        && r.total_classes.parse::<u32>().is_ok_and(|t| t > 1)
+                })
+            {
+                let attended = record.classes_attended.parse::<u32>().unwrap_or(1) - 1;
+                let total = record.total_classes.parse::<u32>().unwrap_or(2) - 1;
+                record.classes_attended = attended.to_string();
+                record.total_classes = total.to_string();
+                record.attendance_percentage = (attended * 100).div_ceil(total).to_string();
+                self.write_plain(&path, &data);
+                changed += 1;
+            }
+            if let Some(path) = self.page_path(MARKS)
+                && let Some(mut data) = self.read::<MarksData>(&path)
+                && let Some(mark) = data
+                    .records
+                    .iter_mut()
+                    .flat_map(|r| r.marks.iter_mut())
+                    .rfind(|m| !m.scoredmark.trim().is_empty())
+            {
+                mark.scoredmark.clear();
+                mark.weightagemark.clear();
+                self.write_plain(&path, &data);
+                changed += 1;
+            }
+            if let Some(path) = self.page_path(TIMETABLE)
+                && let Some(mut data) = self.read::<TimetableData>(&path)
+                && !data.slots.is_empty()
+            {
+                data.slots.remove(0);
+                self.write_plain(&path, &data);
+                changed += 1;
+            }
+            if let Some(path) = self.page_path(EXAMS)
+                && let Some(mut data) = self.read::<ExamScheduleData>(&path)
+                && let Some(exam) = data.exams.iter_mut().find(|e| !e.records.is_empty())
+            {
+                exam.records.remove(0);
+                self.write_plain(&path, &data);
+                changed += 1;
+            }
+            info!(changed, "pages rolled back for the change inbox");
+            Ok(changed)
         })
     }
 

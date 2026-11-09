@@ -824,6 +824,18 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_changes_bytes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_clear_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_mark_changes_seen(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_trim_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_unseen_changes(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_course_page(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_course_view(
@@ -853,6 +865,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_dev_set_account(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_dev_set_forwarding_server(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_dev_simulate_changes(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_exams(
     ): Int
@@ -1002,6 +1016,18 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_biometric_range(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: Int,`to`: Int,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_changes_bytes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_clear_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_mark_changes_seen(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_trim_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,`maxBytes`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_unseen_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1032,6 +1058,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_dev_set_forwarding_server(`ptr`: Long,`flow`: RustBuffer.ByValue,`url`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_vtop_ffi_fn_method_core_dev_simulate_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Int
     external fun uniffi_vtop_ffi_fn_method_core_cached_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_fetch_exams(`ptr`: Long,`flow`: RustBuffer.ByValue,
@@ -1341,7 +1369,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 54732) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 55926) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 37871) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 31526) {
@@ -1366,6 +1394,24 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_biometric_range() and 0xFFFF) != 21062) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes() and 0xFFFF) != 35120) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_changes_bytes() and 0xFFFF) != 10020) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_clear_changes() and 0xFFFF) != 20128) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_mark_changes_seen() and 0xFFFF) != 9920) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_trim_changes() and 0xFFFF) != 28537) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_changes() and 0xFFFF) != 3681) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_page() and 0xFFFF) != 62516) {
@@ -1411,6 +1457,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_dev_set_forwarding_server() and 0xFFFF) != 373) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_dev_simulate_changes() and 0xFFFF) != 13736) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_exams() and 0xFFFF) != 29991) {
@@ -2258,7 +2307,7 @@ public interface CoreInterface {
     suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
     
     /**
-     * Forgets the account, session, cache and mail-forwarding address (a sign-in can join the
+     * Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
      * address again through the edge). Logs stay.
      */
     fun `signOut`(`flow`: kotlin.String)
@@ -2306,6 +2355,36 @@ public interface CoreInterface {
      * time and cached.
      */
     suspend fun `fetchBiometricRange`(`flow`: kotlin.String, `from`: kotlin.Int, `to`: kotlin.Int): List<BiometricDay>
+    
+    /**
+     * The recorded changes, newest first.
+     */
+    fun `changes`(`flow`: kotlin.String): List<Change>
+    
+    /**
+     * The inbox file's size, for the app's storage cap.
+     */
+    fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong
+    
+    /**
+     * Empties the inbox (what is compared stays primed).
+     */
+    fun `clearChanges`(`flow`: kotlin.String)
+    
+    /**
+     * Every change so far counts as seen.
+     */
+    fun `markChangesSeen`(`flow`: kotlin.String)
+    
+    /**
+     * Drops the oldest changes until the file is at most `max_bytes`.
+     */
+    fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
+    
+    /**
+     * How many changes came after the inbox was last seen.
+     */
+    fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt
     
     /**
      * The selected semester's cached course list.
@@ -2399,6 +2478,15 @@ public interface CoreInterface {
      * goes back to the default. An existing address keeps its server.
      */
     fun `devSetForwardingServer`(`flow`: kotlin.String, `url`: kotlin.String?)
+    
+    /**
+     * Rolls the selected semester's saved pages back by one change each, without recording
+     * it, so the next fetch finds real differences for the change inbox and its
+     * notifications: a course's last class unposted (attendance), its newest score blanked
+     * (marks), one slot removed (timetable), one exam removed (exams). Returns how many pages
+     * changed; a refresh restores them all.
+     */
+    fun `devSimulateChanges`(`flow`: kotlin.String): kotlin.UInt
     
     /**
      * The selected semester's cached exam schedule.
@@ -3049,7 +3137,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Forgets the account, session, cache and mail-forwarding address (a sign-in can join the
+     * Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
      * address again through the edge). Logs stay.
      */override fun `signOut`(`flow`: kotlin.String)
         = 
@@ -3239,6 +3327,106 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * The recorded changes, newest first.
+     */override fun `changes`(`flow`: kotlin.String): List<Change> {
+            return FfiConverterSequenceTypeChange.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * The inbox file's size, for the app's storage cap.
+     */override fun `changesBytes`(`flow`: kotlin.String): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_changes_bytes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Empties the inbox (what is compared stays primed).
+     */override fun `clearChanges`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_clear_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Every change so far counts as seen.
+     */override fun `markChangesSeen`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_mark_changes_seen(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * Drops the oldest changes until the file is at most `max_bytes`.
+     */override fun `trimChanges`(`flow`: kotlin.String, `maxBytes`: kotlin.ULong)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_trim_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),
+        FfiConverterULong.lower(`maxBytes`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * How many changes came after the inbox was last seen.
+     */override fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt {
+            return FfiConverterUInt.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_unseen_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -3581,6 +3769,28 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 }
     }
     
+    
+
+    
+    /**
+     * Rolls the selected semester's saved pages back by one change each, without recording
+     * it, so the next fetch finds real differences for the change inbox and its
+     * notifications: a course's last class unposted (attendance), its newest score blanked
+     * (marks), one slot removed (timetable), one exam removed (exams). Returns how many pages
+     * changed; a refresh restores them all.
+     */
+    @Throws(CoreException::class)override fun `devSimulateChanges`(`flow`: kotlin.String): kotlin.UInt {
+            return FfiConverterUInt.lift(
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_dev_simulate_changes(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
     
 
     
@@ -6013,6 +6223,78 @@ public object FfiConverterTypeCalendarMonth: FfiConverterRustBuffer<CalendarMont
             FfiConverterString.write(value.`month`, buf)
             FfiConverterSequenceTypeCalendarDay.write(value.`days`, buf)
             FfiConverterSequenceTypeCalendarEvent.write(value.`events`, buf)
+    }
+}
+
+
+
+/**
+ * One change, for the inbox and notifications.
+ */
+data class Change (
+    var `id`: kotlin.String
+    , 
+    var `kind`: ChangeKind
+    , 
+    /**
+     * When it was found (ms since 1970).
+     */
+    var `atMs`: kotlin.Long
+    , 
+    var `title`: kotlin.String
+    , 
+    var `body`: kotlin.String
+    , 
+    /**
+     * The attendance course it is about ("CSE4007.theory"), for opening it.
+     */
+    var `courseKey`: kotlin.String?
+    , 
+    var `semester`: kotlin.String
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeChange: FfiConverterRustBuffer<Change> {
+    override fun read(buf: ByteBuffer): Change {
+        return Change(
+            FfiConverterString.read(buf),
+            FfiConverterTypeChangeKind.read(buf),
+            FfiConverterLong.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: Change) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterTypeChangeKind.allocationSize(value.`kind`) +
+            FfiConverterLong.allocationSize(value.`atMs`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterString.allocationSize(value.`body`) +
+            FfiConverterOptionalString.allocationSize(value.`courseKey`) +
+            FfiConverterString.allocationSize(value.`semester`)
+    )
+
+    override fun write(value: Change, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterTypeChangeKind.write(value.`kind`, buf)
+            FfiConverterLong.write(value.`atMs`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterString.write(value.`body`, buf)
+            FfiConverterOptionalString.write(value.`courseKey`, buf)
+            FfiConverterString.write(value.`semester`, buf)
     }
 }
 
@@ -10737,6 +11019,43 @@ public object FfiConverterTypeCalendarMark: FfiConverterRustBuffer<CalendarMark>
 
 
 
+enum class ChangeKind {
+    
+    ATTENDANCE,
+    MARKS,
+    TIMETABLE,
+    EXAMS,
+    GRADES;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeChangeKind: FfiConverterRustBuffer<ChangeKind> {
+    override fun read(buf: ByteBuffer) = try {
+        ChangeKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: ChangeKind) = 4UL
+
+    override fun write(value: ChangeKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
 enum class ClassDay {
     
     HELD,
@@ -12893,6 +13212,34 @@ public object FfiConverterSequenceTypeCalendarMonth: FfiConverterRustBuffer<List
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeCalendarMonth.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeChange: FfiConverterRustBuffer<List<Change>> {
+    override fun read(buf: ByteBuffer): List<Change> {
+        val len = buf.getInt()
+        return List<Change>(len) {
+            FfiConverterTypeChange.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<Change>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeChange.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<Change>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeChange.write(it, buf)
         }
     }
 }

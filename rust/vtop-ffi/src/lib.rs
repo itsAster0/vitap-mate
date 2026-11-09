@@ -2,6 +2,7 @@
 //! a JSON cache in the app's data directory, and ready-to-draw records.
 
 mod calendar;
+mod changes;
 mod cookies;
 mod dev;
 mod exams;
@@ -458,13 +459,20 @@ impl Core {
         .await
     }
 
-    /// Forgets the account, session, cache and mail-forwarding address (a sign-in can join the
+    /// Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
     /// address again through the edge). Logs stay.
     pub fn sign_out(&self, flow: String) {
         let _ = traced_sync("sign_out", &flow, || {
             self.install(None);
             cookies::sign_out();
-            self.forget(&[ACCOUNT, SESSION, SEMESTERS, SELECTED, forwarding::FILE]);
+            self.forget(&[
+                ACCOUNT,
+                SESSION,
+                SEMESTERS,
+                SELECTED,
+                forwarding::FILE,
+                changes::FILE,
+            ]);
             obs::set_regno(None);
             Ok(())
         });
@@ -983,7 +991,7 @@ impl Core {
             .is_some_and(|saved| saved.username != session.account.username)
         {
             info!("another account signed in: cached pages and forwarding address dropped");
-            self.forget(&[SEMESTERS, SELECTED, forwarding::FILE]);
+            self.forget(&[SEMESTERS, SELECTED, forwarding::FILE, changes::FILE]);
         }
         let saved_at_ms = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -1084,14 +1092,30 @@ impl Core {
     }
 
     /// Writes `value` as JSON through a temporary file, so a crash never
-    /// leaves half a file.
+    /// leaves half a file. A page compared for the change inbox records
+    /// what changed against the copy it replaces.
     fn write(&self, file: &str, value: &impl Serialize) {
+        match serde_json::to_vec(value) {
+            Ok(bytes) => {
+                self.record_changes(file, &bytes);
+                self.write_bytes(file, &bytes);
+            }
+            Err(error) => warn!(file, %error, "not saved"),
+        }
+    }
+
+    /// [`Core::write`] without the change inbox (the inbox's own file).
+    fn write_plain(&self, file: &str, value: &impl Serialize) {
+        match serde_json::to_vec(value) {
+            Ok(bytes) => self.write_bytes(file, &bytes),
+            Err(error) => warn!(file, %error, "not saved"),
+        }
+    }
+
+    fn write_bytes(&self, file: &str, bytes: &[u8]) {
         let path = self.dir.join(file);
         let temp = path.with_extension("tmp");
-        let result = serde_json::to_vec(value)
-            .map_err(std::io::Error::from)
-            .and_then(|bytes| fs::write(&temp, bytes))
-            .and_then(|()| fs::rename(&temp, &path));
+        let result = fs::write(&temp, bytes).and_then(|()| fs::rename(&temp, &path));
         if let Err(error) = result {
             warn!(file, %error, "not saved");
         }
