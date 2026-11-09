@@ -90,6 +90,8 @@ fun ClassItem(
                     Column(Modifier.width(58.dp), horizontalAlignment = Alignment.Start) {
                         Text(clock(slot.start, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = text)
                         Text(clock(slot.end, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodySmall.nums(), color = scheme.onSurfaceVariant)
+                        // How long until it starts (or ends), under the times so the name keeps the width.
+                        Countdown(state, slot, minuteNow, showPosted)
                     }
                     Spacer(Modifier.width(12.dp))
                     // The rail runs the item's height, with the same gap above and below.
@@ -154,28 +156,43 @@ private fun Location(room: String, block: String, pin: androidx.compose.ui.graph
 
 private val RailInset = 14.dp
 
-/** The right-hand state: posted attendance after the day, else Now / in 25m / done / the length. */
+/** Under the times: "in 25m" (the next class in the accent), "12m left", or the length on other days. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun Countdown(state: ClassState, slot: ClassSlot, minuteNow: Int?, showPosted: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val (text, accent) = when {
+        showPosted || state == ClassState.Done && minuteNow != null -> return
+        state == ClassState.Now && minuteNow != null -> "${compactMinutes(slot.end - minuteNow)} left" to true
+        state == ClassState.Next && minuteNow != null -> "in ${compactMinutes(slot.start - minuteNow)}" to true
+        state == ClassState.Later && minuteNow != null -> "in ${compactMinutes(slot.start - minuteNow)}" to false
+        else -> compactMinutes(slot.end - slot.start) to false
+    }
+    Text(
+        text,
+        Modifier.padding(top = 4.dp).fitDown(),
+        maxLines = 1,
+        softWrap = false,
+        style = (if (accent) MaterialTheme.typography.labelMediumEmphasized else MaterialTheme.typography.labelMedium).nums(),
+        color = if (accent) scheme.primary else scheme.onSurfaceVariant,
+    )
+}
+
+/** The right-hand state: posted attendance after the day, else Now or done. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun Trailing(state: ClassState, slot: ClassSlot, minuteNow: Int?, showPosted: Boolean, posted: ClassStatus?) {
     val tones = AppTheme.tones
     val scheme = MaterialTheme.colorScheme
-    val muted = MaterialTheme.typography.labelMedium.nums()
     when {
         showPosted -> when (posted) {
             ClassStatus.PRESENT -> StatusChip("Present", tones.success)
             ClassStatus.ON_DUTY -> StatusChip("On duty", tones.accentTone)
             ClassStatus.ABSENT -> StatusChip("Absent", tones.danger)
             ClassStatus.OTHER -> StatusChip("Marked", tones.accentTone)
-            null -> Text("Not posted", style = muted, color = scheme.onSurfaceVariant)
+            null -> Text("Not posted", style = MaterialTheme.typography.labelMedium.nums(), color = scheme.onSurfaceVariant)
         }
-        state == ClassState.Now && minuteNow != null -> Column(horizontalAlignment = Alignment.End) {
-            StatusChip("Now", tones.accentTone)
-            Text("${compactMinutes(slot.end - minuteNow)} left", style = MaterialTheme.typography.labelMediumEmphasized.nums(), color = scheme.primary)
-        }
-        state == ClassState.Next && minuteNow != null -> Text("in ${compactMinutes(slot.start - minuteNow)}", style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = scheme.primary)
+        state == ClassState.Now && minuteNow != null -> StatusChip("Now", tones.accentTone)
         state == ClassState.Done && minuteNow != null -> Icon(Lucide.Check, "Done", Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
-        state == ClassState.Later && minuteNow != null -> Text("in ${compactMinutes(slot.start - minuteNow)}", style = muted, color = scheme.onSurfaceVariant)
-        else -> Text(compactMinutes(slot.end - slot.start), style = muted, color = scheme.onSurfaceVariant)
     }
 }
