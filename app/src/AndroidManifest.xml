@@ -26,6 +26,8 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- Long-press shortcuts: Timetable, Attendance, Outing. -->
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
     </activity>
     <!-- Push from the edge: new FCM tokens and messages (PushService.kt). -->
     <service android:name="vitapmate.PushService" android:exported="false">

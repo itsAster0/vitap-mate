@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Launcher shortcuts (res/xml/shortcuts.xml). -->
+  <string name="shortcut_timetable">Timetable</string>
+  <string name="shortcut_attendance">Attendance</string>
+  <string name="shortcut_outing">Outing</string>
+</resources>

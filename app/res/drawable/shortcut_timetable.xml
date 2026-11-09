@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut (timetable): the feature's Lucide icon on a tonal circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+  <path android:fillColor="#FFE6E1E5" android:pathData="M24,0a24,24 0 1,0 0.01,0z" />
+  <group android:translateX="12" android:translateY="12">
+    <path
+        android:strokeColor="#FF1D1B20"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M5,4h14a2,2 0 0 1 2,2v14a2,2 0 0 1 -2,2h-14a2,2 0 0 1 -2,-2v-14a2,2 0 0 1 2,-2z M8,2v4 M16,2v4 M3,10h18 M8,14h0.01 M12,14h0.01 M16,14h0.01 M8,18h0.01 M12,18h0.01 M16,18h0.01" />
+  </group>
+</vector>

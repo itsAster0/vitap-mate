@@ -74,11 +74,15 @@ fun Shell(nav: Nav, onSignedOut: () -> Unit) {
     val barTop = remember { mutableIntStateOf(0) }
     LaunchedEffect(scroll) { snapshotFlow { (barTop.intValue + scroll.state.offset).roundToInt().coerceAtLeast(0) }.collect { NavBarSpace.px = it } }
     DisposableEffect(Unit) { onDispose { NavBarSpace.px = 0 } }
-    // A change notification was tapped.
-    LaunchedEffect(InboxRequest.pending) {
-        if (!InboxRequest.pending) return@LaunchedEffect
-        InboxRequest.pending = false
-        if (nav.top.key != INBOX) nav.push(Route.Screen(INBOX))
+    // A change notification or a launcher shortcut was tapped: its tab, else its screen.
+    val open = LocalOpenRequest.current
+    LaunchedEffect(open.screen) {
+        val id = open.screen ?: return@LaunchedEffect
+        open.screen = null
+        when {
+            id in tabs -> nav.goTab(id)
+            id == INBOX || featureById(id) != null -> if (nav.top.key != id) nav.push(Route.Screen(id))
+        }
     }
     // Back on a tab other than the first goes to the first, then leaves the app.
     BackHandler(nav.stack.size == 1 && nav.root.key != tabs.first()) { nav.goTab(tabs.first()) }

@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,10 +62,16 @@ import vitapmate.ui.tappable
 
 const val INBOX = "inbox"
 
-/** A change notification was tapped; the shell opens the inbox and clears it. */
-object InboxRequest {
-    var pending by mutableStateOf(false)
+/**
+ * A screen to open from outside (a change notification, a launcher shortcut); the shell opens it
+ * and clears it. One per activity: a launcher shortcut clears the task, and the activity on its way
+ * out must not take the new one's request.
+ */
+class OpenRequest {
+    var screen by mutableStateOf<String?>(null)
 }
+
+val LocalOpenRequest = staticCompositionLocalOf { OpenRequest() }
 
 /** The unread count for the bell, read again after each VTOP run finishes. */
 private object Unseen {

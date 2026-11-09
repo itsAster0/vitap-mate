@@ -9,6 +9,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import vitapmate.data.AppCore
 import vitapmate.data.Foreground
@@ -20,6 +21,8 @@ import kotlin.time.Duration.Companion.microseconds
 import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
+    private val openRequest = OpenRequest()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Settings first: the core reads the developer settings when it starts.
         Settings.load(applicationContext)
@@ -53,7 +56,9 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
             val choice = Settings.colorChoice
-            AppTheme(dark, if (choice == Settings.WALLPAPER) null else Palette.entries.firstOrNull { it.name == choice } ?: Palette.Default, Settings.pureBlack) { App() }
+            AppTheme(dark, if (choice == Settings.WALLPAPER) null else Palette.entries.firstOrNull { it.name == choice } ?: Palette.Default, Settings.pureBlack) {
+                CompositionLocalProvider(LocalOpenRequest provides openRequest) { App() }
+            }
         }
     }
 
@@ -62,9 +67,9 @@ class MainActivity : ComponentActivity() {
         opened(intent)
     }
 
-    /** A change notification was tapped: the shell opens the inbox. */
+    /** A change notification ([OPEN_INBOX]) or a launcher shortcut (a feature id) was tapped: the shell opens it. */
     private fun opened(intent: Intent?) {
-        if (intent?.getStringExtra(OPEN) == OPEN_INBOX) InboxRequest.pending = true
+        intent?.getStringExtra(OPEN)?.let { openRequest.screen = it }
     }
 
     companion object {
