@@ -72,8 +72,18 @@ run = '''
 set -eu
 ./kotlin build -v release
 apk=build/vitapmate-release.apk
-cp build/tasks/_app_buildAndroidRelease/gradle-project-release.apk "$apk"
-"$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/* | tail -1)/apksigner" verify "$apk"
+tools="$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/* | tail -1)"
+# English only: the app has no translations, but its libraries bring ~80 locales (about 445 KB of
+# resources.arsc). Play's AAB already splits by language; this is for the sideloaded APK.
+tmp="$(mktemp -d)"
+"$tools/aapt2" optimize -c en -o "$tmp/en.apk" build/tasks/_app_buildAndroidRelease/gradle-project-release.apk
+"$tools/zipalign" -P 16 -f 4 "$tmp/en.apk" "$tmp/aligned.apk"
+prop() { sed -n "s/^$1=//p" app/keystore.properties; }
+STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign \
+  --ks "$(prop storeFile)" --ks-key-alias "$(prop keyAlias)" \
+  --ks-pass env:STORE_PASS --key-pass env:KEY_PASS --out "$apk" "$tmp/aligned.apk"
+rm -rf "$tmp"
+"$tools/apksigner" verify "$apk"
 echo "$apk (phone: adb install -r $apk)"
 '''
 
