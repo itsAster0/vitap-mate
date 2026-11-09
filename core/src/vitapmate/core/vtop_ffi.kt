@@ -5542,6 +5542,11 @@ data class AttendancePlan (
      * The percentage when every one left is attended.
      */
     var `bestPercent`: kotlin.Double
+    , 
+    /**
+     * The days of `upcoming`, oldest first, with how many classes each holds.
+     */
+    var `days`: List<PlanDay>
     
 ){
     
@@ -5567,6 +5572,7 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
             FfiConverterInt.read(buf),
             FfiConverterOptionalInt.read(buf),
             FfiConverterDouble.read(buf),
+            FfiConverterSequenceTypePlanDay.read(buf),
         )
     }
 
@@ -5579,7 +5585,8 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
             FfiConverterInt.allocationSize(value.`unposted`) +
             FfiConverterInt.allocationSize(value.`canMiss`) +
             FfiConverterOptionalInt.allocationSize(value.`mustAttend`) +
-            FfiConverterDouble.allocationSize(value.`bestPercent`)
+            FfiConverterDouble.allocationSize(value.`bestPercent`) +
+            FfiConverterSequenceTypePlanDay.allocationSize(value.`days`)
     )
 
     override fun write(value: AttendancePlan, buf: ByteBuffer) {
@@ -5592,6 +5599,7 @@ public object FfiConverterTypeAttendancePlan: FfiConverterRustBuffer<AttendanceP
             FfiConverterInt.write(value.`canMiss`, buf)
             FfiConverterOptionalInt.write(value.`mustAttend`, buf)
             FfiConverterDouble.write(value.`bestPercent`, buf)
+            FfiConverterSequenceTypePlanDay.write(value.`days`, buf)
     }
 }
 
@@ -9368,6 +9376,50 @@ public object FfiConverterTypePlanCourse: FfiConverterRustBuffer<PlanCourse> {
             FfiConverterString.write(value.`code`, buf)
             FfiConverterString.write(value.`name`, buf)
             FfiConverterDouble.write(value.`credits`, buf)
+    }
+}
+
+
+
+/**
+ * A day still to come with classes of the course (sessions for labs).
+ */
+data class PlanDay (
+    /**
+     * Days since 1970-01-01.
+     */
+    var `day`: kotlin.Int
+    , 
+    var `classes`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePlanDay: FfiConverterRustBuffer<PlanDay> {
+    override fun read(buf: ByteBuffer): PlanDay {
+        return PlanDay(
+            FfiConverterInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PlanDay) = (
+            FfiConverterInt.allocationSize(value.`day`) +
+            FfiConverterInt.allocationSize(value.`classes`)
+    )
+
+    override fun write(value: PlanDay, buf: ByteBuffer) {
+            FfiConverterInt.write(value.`day`, buf)
+            FfiConverterInt.write(value.`classes`, buf)
     }
 }
 
@@ -13765,6 +13817,34 @@ public object FfiConverterSequenceTypePlanCourse: FfiConverterRustBuffer<List<Pl
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypePlanCourse.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypePlanDay: FfiConverterRustBuffer<List<PlanDay>> {
+    override fun read(buf: ByteBuffer): List<PlanDay> {
+        val len = buf.getInt()
+        return List<PlanDay>(len) {
+            FfiConverterTypePlanDay.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<PlanDay>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypePlanDay.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<PlanDay>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypePlanDay.write(it, buf)
         }
     }
 }

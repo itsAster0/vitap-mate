@@ -199,6 +199,16 @@ pub struct AttendancePlan {
     pub must_attend: Option<i32>,
     /// The percentage when every one left is attended.
     pub best_percent: f64,
+    /// The days of `upcoming`, oldest first, with how many classes each holds.
+    pub days: Vec<PlanDay>,
+}
+
+/// A day still to come with classes of the course (sessions for labs).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct PlanDay {
+    /// Days since 1970-01-01.
+    pub day: i32,
+    pub classes: i32,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -689,19 +699,23 @@ pub(crate) fn attendance_plans(
                     })
                     .sum()
             });
-    let upcoming = |until_day: i32| -> i32 {
+    let upcoming = |until_day: i32| -> Vec<PlanDay> {
         (today..until_day.min(last + 1))
             .filter(|&day| calendar.holds_classes(day, lab))
             .map(|day| {
                 let weekday = calendar.weekday_of(day);
-                mine.iter()
+                let classes = mine
+                    .iter()
                     .filter(|slot| slot.day == weekday && (day > today || slot.start > minute))
-                    .count() as i32
+                    .count() as i32;
+                PlanDay { day, classes }
             })
-            .sum()
+            .filter(|day| day.classes > 0)
+            .collect()
     };
     let plan = |until: String, until_day: i32| {
-        let upcoming = upcoming(until_day);
+        let days = upcoming(until_day);
+        let upcoming = days.iter().map(|day| day.classes).sum();
         let left = i64::from(upcoming + unposted);
         let (a, t) = (i64::from(attended), i64::from(held));
         let total = t + left;
@@ -720,6 +734,7 @@ pub(crate) fn attendance_plans(
             } else {
                 (a + left) as f64 / total as f64 * 100.0
             },
+            days,
         }
     };
     let mut plans = Vec::new();
@@ -1252,6 +1267,20 @@ mod tests {
         let plan = &plans[0];
         assert_eq!((plan.until.as_str(), plan.until_day), ("", 20_772));
         assert_eq!((plan.upcoming, plan.unposted), (2, 0));
+        // Today (Thursday 5 Nov) and next Thursday (12 Nov), one class each.
+        assert_eq!(
+            plan.days,
+            vec![
+                PlanDay {
+                    day: 20_762,
+                    classes: 1
+                },
+                PlanDay {
+                    day: 20_769,
+                    classes: 1
+                },
+            ]
+        );
         assert_eq!((plan.can_miss, plan.must_attend), (0, Some(2)));
         assert!((plan.best_percent - 32.0 / 42.0 * 100.0).abs() < 1e-9);
         // Labs stop at the Lab FAT; the 2 sessions not posted yet still count.

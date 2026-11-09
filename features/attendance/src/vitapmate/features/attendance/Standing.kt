@@ -79,13 +79,13 @@ internal fun AttendanceCourse.debarLine(): String? {
 
 /**
  * The percentage VTOP would show (it rounds up: 31 of 34 is 92%) after attending [attend] and
- * missing [skip] more classes (sessions for labs), and whether the exact figure is still at 75% or
- * above.
+ * missing [skip] more classes (sessions for labs), with [od] absences turned to present by on-duty
+ * approvals still to come, and whether the exact figure is still at 75% or above.
  */
-internal fun AttendanceCourse.projected(attend: Int, skip: Int): Pair<Int, Boolean> {
+internal fun AttendanceCourse.projected(attend: Int, skip: Int, od: Int = 0): Pair<Int, Boolean> {
     val (a, t) = sessions
     val total = t + attend + skip
     if (total == 0) return 0 to true
-    val attended = a + attend
+    val attended = a + attend + od
     return (attended * 100 + total - 1) / total to (attended * 4 >= total * 3)
 }

@@ -12,6 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Check
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import vitapmate.ui.formatDay
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.FlowRow
 import vitapmate.ui.Tone
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Size
@@ -33,7 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
+import kotlin.math.floor
 import kotlinx.coroutines.launch
 import vitapmate.core.AttendanceCourse
 import vitapmate.core.AttendancePlan
@@ -51,7 +59,9 @@ import vitapmate.ui.nums
  * show, in the tone it lands in (warning when only VTOP's rounding keeps it at 75%). With [plans]
  * (Rust, from the timetable and academic calendar), a second card: until the next exam or the
  * semester's end, the classes left as a strip (filled: must attend, hollow: can miss), both
- * counts, and the best reachable; "Try it" plays that split out in What if. Labs count in sessions.
+ * counts at the chosen goal (75–90%), and the best reachable; "Try it" plays that split out in
+ * What if. What if also takes on-duty approvals still to come (absences turned present) and the
+ * upcoming days picked to miss. Labs count in sessions.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -60,7 +70,14 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
     val tones = AppTheme.tones
     var attend by rememberSaveable(course.key) { mutableIntStateOf(0) }
     var skip by rememberSaveable(course.key) { mutableIntStateOf(0) }
+    var od by rememberSaveable(course.key) { mutableIntStateOf(0) }
+    var picked by rememberSaveable(course.key) { mutableStateOf(emptyList<Int>()) }
     var target by rememberSaveable(course.key) { mutableIntStateOf(0) }
+    var goal by rememberSaveable(course.key) { mutableIntStateOf(75) }
+    // The days still to come (till the semester's end), for picking the ones to miss.
+    val days = plans.lastOrNull()?.days.orEmpty()
+    val pickedClasses = days.filter { it.day in picked }.sumOf { it.classes }
+    val missing = skip + pickedClasses
     val log: (String, Map<String, String>) -> Unit = { what, fields ->
         scope.launch { flow("attendance.detail.calc") { id -> Log.info("ui.attendance", "calc $what ${course.key}", id, fields + ("course" to course.key)) } }
     }
@@ -76,14 +93,14 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
         verticalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
         item("whatif") {
-            val reset = (attend > 0 || skip > 0)
+            val reset = attend > 0 || missing > 0 || od > 0
             SectionCard(
                 Modifier.fillMaxWidth(),
                 title = "What if",
                 // Always there (disabled at zero), so the card doesn't jump when it turns on.
-                action = { TextButton({ attend = 0; skip = 0; log("reset", emptyMap()) }, Modifier.testTag("attendance.detail.calc.reset"), enabled = reset) { Text("Reset") } },
+                action = { TextButton({ attend = 0; skip = 0; od = 0; picked = emptyList(); log("reset", emptyMap()) }, Modifier.testTag("attendance.detail.calc.reset"), enabled = reset) { Text("Reset") } },
             ) {
-                val (percent, exactSafe) = course.projected(attend, skip)
+                val (percent, exactSafe) = course.projected(attend, missing, od)
                 val now = course.projected(0, 0).first
                 val tone = when {
                     percent < 75 -> tones.danger
@@ -119,7 +136,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                     Spacer(Modifier.weight(1f))
                     if (reset) {
                         Text(
-                            "${attended + attend} of ${counted + attend + skip}",
+                            "${attended + attend + od} of ${counted + attend + missing}",
                             style = MaterialTheme.typography.titleSmall.nums(),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -135,14 +152,57 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                 Stepper("Attend", attend, { attend = it; log("attend", mapOf("attend" to "$it", "skip" to "$skip")) }, "attendance.detail.calc.attend")
                 Spacer(Modifier.height(Space.md))
                 Stepper("Skip", skip, { skip = it; log("skip", mapOf("attend" to "$attend", "skip" to "$it")) }, "attendance.detail.calc.skip")
+                // On duty already held but marked absent: VTOP turns them present when the OD posts.
+                val absences = counted - attended
+                if (absences > 0) {
+                    Spacer(Modifier.height(Space.md))
+                    Stepper("OD pending", od, { od = it; log("od", mapOf("od" to "$it")) }, "attendance.detail.calc.od", max = absences)
+                }
+                if (days.isNotEmpty()) {
+                    Text(
+                        if (pickedClasses > 0) "Missing $pickedClasses on ${picked.size} ${if (picked.size == 1) "day" else "days"}" else "Days you'll miss",
+                        Modifier.padding(top = Space.xl, bottom = Space.sm),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                        for (d in days) {
+                            val on = d.day in picked
+                            FilterChip(
+                                on,
+                                {
+                                    picked = if (on) picked - d.day else picked + d.day
+                                    log("day", mapOf("day" to formatDay(d.day, "yyyy-MM-dd"), "on" to "${!on}"))
+                                },
+                                { Text(formatDay(d.day, "EEE d") + if (d.classes > 1) " ×${d.classes}" else "", style = MaterialTheme.typography.labelLarge.nums()) },
+                                Modifier.testTag("attendance.detail.calc.day.${d.day}"),
+                                leadingIcon = if (on) {
+                                    { Icon(Lucide.Check, null, Modifier.size(16.dp)) }
+                                } else null,
+                            )
+                        }
+                    }
+                }
             }
         }
         if (plans.isNotEmpty()) item("plan") {
             val shown = target.coerceIn(0, plans.lastIndex)
             val plan = plans[shown]
             val left = plan.upcoming + plan.unposted
-            val must = plan.mustAttend
-            SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calc.plan"), title = "To finish at 75%") {
+            // Strict arithmetic at the chosen goal, like Rust's 75% plan.
+            val total = plan.held + left
+            val need = ((goal * total - 100 * plan.attended + 99).floorDiv(100)).coerceAtLeast(0)
+            val must = need.takeIf { it <= left }
+            val canMiss = (left - need).coerceIn(0, left)
+            SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calc.plan"), title = "To finish at $goal%") {
+                ConnectedChoice(
+                    GOALS,
+                    goal,
+                    { g -> goal = g; log("goal", mapOf("goal" to "$g")) },
+                    tag = "attendance.detail.calc.goal",
+                    key = { "$it" },
+                    label = { "$it%" },
+                    modifier = Modifier.padding(bottom = Space.md),
+                )
                 if (plans.size > 1) {
                     ConnectedChoice(
                         plans.indices.toList(),
@@ -156,25 +216,25 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                 }
                 val tone = when {
                     must == null -> tones.danger
-                    plan.canMiss == 0 -> tones.warning
+                    canMiss == 0 -> tones.warning
                     else -> tones.success
                 }
                 if (left > 0) LeftStrip(left, must ?: left, tone, Modifier.padding(bottom = Space.lg))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.lg)) {
                     PlanCount(
                         if (must == null) "–" else "$must",
-                        if (must == null) "can't reach 75%" else "must attend",
+                        if (must == null) "can't reach $goal%" else "must attend",
                         if (must == null) tones.danger.base else MaterialTheme.colorScheme.onSurface,
                         Modifier.weight(1f).testTag("attendance.detail.calc.must"),
                     )
-                    PlanCount("${plan.canMiss}", "can miss", tone.base, Modifier.weight(1f).testTag("attendance.detail.calc.miss"))
+                    PlanCount("$canMiss", "can miss", tone.base, Modifier.weight(1f).testTag("attendance.detail.calc.miss"))
                 }
                 Row(Modifier.padding(top = Space.md), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         listOfNotNull(
                             "$left $unit left",
                             "${plan.unposted} not posted".takeIf { plan.unposted > 0 },
-                            "best ${plan.bestPercent.roundToInt()}%",
+                            "best ${floor(plan.bestPercent).toInt()}%",
                         ).joinToString(" · "),
                         Modifier.weight(1f).testTag("attendance.detail.calc.left"),
                         style = MaterialTheme.typography.bodySmall.nums(),
@@ -182,7 +242,7 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
                     )
                     if (must != null && left > 0) {
                         TextButton(
-                            { attend = must; skip = plan.canMiss; log("try", mapOf("attend" to "$must", "skip" to "${plan.canMiss}")) },
+                            { attend = must; skip = canMiss; od = 0; picked = emptyList(); log("try", mapOf("attend" to "$must", "skip" to "$canMiss", "goal" to "$goal")) },
                             Modifier.testTag("attendance.detail.calc.try"),
                         ) { Text("Try it") }
                     }
@@ -191,6 +251,9 @@ internal fun Calculator(course: AttendanceCourse, plans: List<AttendancePlan>, m
         }
     }
 }
+
+/** The finishing targets on offer; VTOP's line is 75%. */
+private val GOALS = listOf(75, 80, 85, 90)
 
 /**
  * The classes left as a strip of cells: the first [must] filled in [tone] (to attend), the rest

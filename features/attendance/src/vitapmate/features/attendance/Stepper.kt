@@ -33,7 +33,7 @@ import vitapmate.ui.nums
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun Stepper(label: String, value: Int, onChanged: (Int) -> Unit, tag: String, modifier: Modifier = Modifier, min: Int = 0) {
+internal fun Stepper(label: String, value: Int, onChanged: (Int) -> Unit, tag: String, modifier: Modifier = Modifier, min: Int = 0, max: Int = Int.MAX_VALUE) {
     val slide = MaterialTheme.motionScheme.fastSpatialSpec<IntOffset>()
     val fade = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Row(modifier.fillMaxWidth().testTag(tag), verticalAlignment = Alignment.CenterVertically) {
@@ -54,7 +54,7 @@ internal fun Stepper(label: String, value: Int, onChanged: (Int) -> Unit, tag: S
         ) {
             Text("$it", style = MaterialTheme.typography.titleLargeEmphasized.nums(), textAlign = TextAlign.Center)
         }
-        FilledTonalIconButton({ onChanged(value + 1) }, Modifier.testTag("$tag.plus")) {
+        FilledTonalIconButton({ onChanged(value + 1) }, Modifier.testTag("$tag.plus"), enabled = value < max) {
             Icon(Lucide.Plus, "More to $label")
         }
     }
