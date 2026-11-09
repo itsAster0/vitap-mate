@@ -20,6 +20,9 @@ import androidx.compose.ui.semantics.testTagsAsResourceId
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
 import vitapmate.core.Core
+import androidx.compose.ui.platform.LocalContext
+import kotlin.concurrent.thread
+import vitapmate.data.AccountBackup
 import vitapmate.data.AccountState
 import vitapmate.data.InspectorOpener
 import vitapmate.data.LocalInspector
@@ -103,7 +106,12 @@ fun App() {
                             else -> Shell(nav, onSignedOut = toLogin)
                         }
                     } else {
-                        LoginScreen { signedIn = Result.success(true) }
+                        val context = LocalContext.current
+                        LoginScreen {
+                            signedIn = Result.success(true)
+                            // Kept across a reinstall from now on (AccountBackup).
+                            thread(name = "backup") { AccountBackup.save(context.applicationContext) }
+                        }
                         // Signed out, the only screen over the login is a flow opened from "Details".
                         (nav.top as? Route.FlowLog)?.let {
                             BackHandler { nav.pop() }

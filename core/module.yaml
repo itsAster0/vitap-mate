@@ -18,6 +18,8 @@ dependencies:
   # The VTOP password in the phone's password manager (SavedPasswords); Play services below Android 14.
   - androidx.credentials:credentials:1.6.0
   - androidx.credentials:credentials-play-services-auth:1.6.0
+  # The sign-in kept across reinstalls (AccountBackup).
+  - com.google.android.gms:play-services-auth-blockstore:16.4.0
 
 settings:
   android:

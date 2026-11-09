@@ -29,6 +29,9 @@ import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Utensils
 import kotlinx.coroutines.launch
 import vitapmate.core.Core
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import vitapmate.data.AccountBackup
 import vitapmate.data.AccountState
 import vitapmate.data.Downloads
 import vitapmate.data.OtpPrompt
@@ -238,6 +241,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         scope.launch {
                             runCatching { coreFlow("sign_out", Core::signOut) }
                                 .onFailure { Log.error("ui.settings", "sign out failed: $it") }
+                            withContext(Dispatchers.IO) { AccountBackup.forgetAccount(context) }
                             // A collapsed OTP prompt and running page fetches belong to the session
                             // just dropped: not over the login screen, not into the next account.
                             OtpPrompt.cancel()

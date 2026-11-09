@@ -59,6 +59,7 @@ object AppCore {
                     if (old.exists() && !File(app.cacheDir, name).exists()) old.renameTo(File(app.cacheDir, name)) else old.delete()
                 }
                 obsInit(app.cacheDir.path)
+                AccountBackup.restore(app)
                 runCatching(Gmail::load).onFailure { Log.warn("core.gmail", "load failed: ${it::class.simpleName}") }
                 devConfigure(DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt()))
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
@@ -76,6 +77,7 @@ object AppCore {
             runCatching {
                 ActivityHistory.save()
                 runBlocking { flow("store.start") { StoreCap.enforce(app, it) } }
+                AccountBackup.save(app)
             }.onFailure { Log.warn("store", "start housekeeping failed: ${it::class.simpleName}") }
         }
     }
