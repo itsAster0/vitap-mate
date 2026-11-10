@@ -92,5 +92,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { TimetableWidget.refresh(applicationContext) }
         // And outing pages fetched in it; the class update follows a changed timetable.
         lifecycleScope.launch { LiveUpdates.refresh(applicationContext, "live.leave"); LiveUpdates.outings(applicationContext, "live.leave") }
+        lifecycleScope.launch { ClassMode.refresh(applicationContext, "classmode.leave") }
     }
 }

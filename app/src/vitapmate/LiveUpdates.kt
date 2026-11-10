@@ -253,7 +253,7 @@ object LiveUpdates {
     private fun atMinute(ms: Long, minute: Int): Long = ms + (minute * 60L - istSecond(ms)) * 1000
 }
 
-/** The class update's alarm, and after a reboot or an update (alarms don't survive them). */
+/** The class update's alarm and [ClassMode]'s, and after a reboot or an update (alarms don't survive them). */
 class LiveUpdateReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val pending = goAsync()
@@ -263,6 +263,7 @@ class LiveUpdateReceiver : BroadcastReceiver() {
                 Settings.load(app)
                 AppCore.start(app)
                 LiveUpdates.refresh(app, "live.alarm")
+                ClassMode.refresh(app, "classmode.alarm")
             } finally {
                 pending.finish()
             }

@@ -12,6 +12,8 @@
   <!-- Live updates (LiveUpdates.kt, Android 16+): promoted ongoing notifications; re-armed after a reboot. -->
   <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- In class (ClassMode.kt): the app's own Do Not Disturb rule, once the student allows it. -->
+  <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
   <!-- Gmail sign-in keeps the app awake while the student is in the browser (SignInService.kt). -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <application
@@ -27,6 +29,10 @@
         android:exported="true"
         android:windowSoftInputMode="adjustResize"
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density">
+      <!-- Android's Modes opens the app from the "In class" rule (ClassMode.kt). -->
+      <intent-filter>
+        <action android:name="android.app.action.AUTOMATIC_ZEN_RULE" />
+      </intent-filter>
     </activity>
     <!-- The launcher entries, one for each app icon; AppIcon.kt keeps exactly one enabled (yellow at first).
          Each carries the long-press shortcuts: Timetable, Attendance, Outing. -->
@@ -92,7 +98,7 @@
     </activity-alias>
     <!-- A change notification's "Mark as seen" (BackgroundSync.kt). -->
     <receiver android:name="vitapmate.SeenReceiver" android:exported="false" />
-    <!-- Live updates' class alarm, and re-arming it after a reboot or an update (LiveUpdates.kt). -->
+    <!-- Live updates' class alarm and In class's, and re-arming them after a reboot or an update (LiveUpdates.kt). -->
     <receiver android:name="vitapmate.LiveUpdateReceiver" android:exported="false">
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED" />
