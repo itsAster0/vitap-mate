@@ -135,6 +135,14 @@ object Gmail {
      * Cancelling the coroutine stops the listener.
      */
     suspend fun connect(client: Client, regno: String, flow: String, open: (String) -> Unit): Account = withContext(Dispatchers.IO) {
+        try {
+            signIn(client, regno, flow, open)
+        } finally {
+            SignInService.stop(app)
+        }
+    }
+
+    private suspend fun signIn(client: Client, regno: String, flow: String, open: (String) -> Unit): Account {
         val verifier = random(32)
         val challenge = b64(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
         val state = random(16)
@@ -153,11 +161,13 @@ object Gmail {
                 "hd" to "vitapstudent.ac.in",
             )
             Log.info(SRC, "sign-in opened", flow, mapOf("port" to "${server.localPort}"))
+            // Awake (with its network) while the student is in the browser, until it's all done.
+            SignInService.start(app)
             withContext(Dispatchers.Main) { open(url) }
             awaitRedirect(server, state, flow) to redirect
         }
-        // Android blocks the network of an app in the background, and the student is still in the
-        // browser: try until they're back (the code stays valid for minutes).
+        // Past SignInService's 3 minutes Android may block the network of the app in the background
+        // while the student is still in the browser: try until they're back (the code stays valid for minutes).
         val tokens = untilReachable(flow) {
             post(
                 TOKEN,
@@ -185,7 +195,7 @@ object Gmail {
             save(saved)
             Settings.otpSource = OtpSource.Gmail
             Log.info(SRC, "connected", flow, mapOf("grant_days" to "${saved.daysLeft ?: "-"}"))
-            saved
+            return saved
         } catch (e: Throwable) {
             revoke(refresh.ifEmpty { access }, flow)
             throw e

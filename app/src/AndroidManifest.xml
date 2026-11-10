@@ -12,6 +12,8 @@
   <!-- Live updates (LiveUpdates.kt, Android 16+): promoted ongoing notifications; re-armed after a reboot. -->
   <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+  <!-- Gmail sign-in keeps the app awake while the student is in the browser (SignInService.kt). -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <application
       android:label="Vitap Mate"
       android:icon="@mipmap/launcher_icon"
@@ -47,6 +49,8 @@
         <action android:name="com.google.firebase.MESSAGING_EVENT" />
       </intent-filter>
     </service>
+    <!-- Gmail sign-in: awake until Google's redirect and the token exchange, 3 minutes at most. -->
+    <service android:name="vitapmate.data.SignInService" android:exported="false" android:foregroundServiceType="shortService" />
     <!-- Home-screen widget: next class and today's timetable (TimetableWidget.kt). -->
     <receiver android:name="vitapmate.TimetableWidgetReceiver" android:exported="true" android:label="@string/shortcut_timetable">
       <intent-filter>
