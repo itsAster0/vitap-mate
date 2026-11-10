@@ -2,6 +2,7 @@ package vitapmate
 
 import vitapmate.ui.rememberHaptics
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -21,7 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,12 +34,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Moon
+import com.composables.icons.lucide.Smile
 import com.composables.icons.lucide.Vibrate
 import com.composables.icons.lucide.Palette as PaletteIcon
 import com.composables.icons.lucide.PanelBottom
@@ -49,7 +57,7 @@ import vitapmate.ui.Palette
 import vitapmate.ui.appColorScheme
 import vitapmate.ui.showToast
 
-/** Settings → Appearance: light/dark, the colours (wallpaper or a palette) and the nav bar's tabs. */
+/** Settings → Appearance: light/dark, the colours (wallpaper or a palette), the app icon ([AppIcon]) and the nav bar's tabs. */
 @Composable
 fun AppearanceGroup() {
     val nav = LocalNav.current
@@ -119,6 +127,36 @@ fun AppearanceGroup() {
                     Swatch(p.label, "settings.colors.${p.name.lowercase()}", p == selected, { pick(p.name) }) {
                         val scheme = remember(p, dark) { appColorScheme(dark, p) }
                         PaletteDot(scheme.primary, scheme.surfaceContainerHigh, p.accent)
+                    }
+                }
+            }
+        }
+        GroupSegment {
+            Label("App icon", Lucide.Smile)
+            val context = LocalContext.current
+            var icon by remember { mutableStateOf(AppIcon.current(context)) }
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                AppIcon.entries.forEach { i ->
+                    Swatch(i.name, "settings.icon.${i.name.lowercase()}", i == icon, {
+                        if (i != icon) {
+                            AppIcon.set(context, i)
+                            icon = i
+                            haptics.tick()
+                            Log.info("ui.settings", "icon ${i.name.lowercase()}")
+                            showToast("App icon changed", "Your home screen may take a moment to show it.")
+                        }
+                    }) {
+                        // The adaptive icon's layers: the foreground's middle two thirds fill the circle.
+                        Box(Modifier.size(48.dp).clip(CircleShape).background(i.background).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape), Alignment.Center) {
+                            Image(
+                                painterResource(if (i.lightHead) R.drawable.ic_launcher_foreground_light else R.drawable.ic_launcher_foreground),
+                                null,
+                                Modifier.requiredSize(72.dp),
+                            )
+                        }
                     }
                 }
             }

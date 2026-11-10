@@ -27,13 +27,69 @@
         android:exported="true"
         android:windowSoftInputMode="adjustResize"
         android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density">
+    </activity>
+    <!-- The launcher entries, one for each app icon; AppIcon.kt keeps exactly one enabled (yellow at first).
+         Each carries the long-press shortcuts: Timetable, Attendance, Outing. -->
+    <activity-alias
+        android:name="vitapmate.IconYellow"
+        android:targetActivity="vitapmate.MainActivity"
+        android:icon="@mipmap/launcher_icon"
+        android:enabled="true"
+        android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
-      <!-- Long-press shortcuts: Timetable, Attendance, Outing. -->
       <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
-    </activity>
+    </activity-alias>
+    <activity-alias
+        android:name="vitapmate.IconOrange"
+        android:targetActivity="vitapmate.MainActivity"
+        android:icon="@mipmap/launcher_icon_orange"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+    </activity-alias>
+    <activity-alias
+        android:name="vitapmate.IconGreen"
+        android:targetActivity="vitapmate.MainActivity"
+        android:icon="@mipmap/launcher_icon_green"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+    </activity-alias>
+    <activity-alias
+        android:name="vitapmate.IconBlue"
+        android:targetActivity="vitapmate.MainActivity"
+        android:icon="@mipmap/launcher_icon_blue"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+    </activity-alias>
+    <activity-alias
+        android:name="vitapmate.IconWhite"
+        android:targetActivity="vitapmate.MainActivity"
+        android:icon="@mipmap/launcher_icon_white"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+    </activity-alias>
     <!-- A change notification's "Mark as seen" (BackgroundSync.kt). -->
     <receiver android:name="vitapmate.SeenReceiver" android:exported="false" />
     <!-- Live updates' class alarm, and re-arming it after a reboot or an update (LiveUpdates.kt). -->
