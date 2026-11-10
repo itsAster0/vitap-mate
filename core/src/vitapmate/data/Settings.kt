@@ -122,6 +122,9 @@ object Settings {
     /** In class: Do Not Disturb while a class is on (ClassMode); off by default. */
     var classMode by flag("settings_class_mode", false)
 
+    /** Assistant (Android 16+): the saved timetable and attendance for Android's app functions; off by default. */
+    var assistant by flag("settings_assistant", false)
+
     /** Hours between background syncs, one of [SYNC_HOURS]. */
     var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
 
@@ -161,7 +164,7 @@ object Settings {
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
         mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
-            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
+            mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }
 

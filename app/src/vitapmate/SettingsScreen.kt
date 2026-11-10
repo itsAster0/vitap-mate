@@ -159,6 +159,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             }
             item { LiveUpdatesSetting() }
             item { ClassModeSetting() }
+            item { AssistantSetting() }
             item { AppearanceGroup() }
             item {
                 ListGroup("Files and mess") {

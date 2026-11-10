@@ -113,6 +113,16 @@
     </service>
     <!-- Gmail sign-in: awake until Google's redirect and the token exchange, 3 minutes at most. -->
     <service android:name="vitapmate.data.SignInService" android:exported="false" android:foregroundServiceType="shortService" />
+    <!-- Settings → Assistant: app functions for Android's assistant (AssistantFunctions.kt generates the class and the XML). -->
+    <service
+        android:name="vitapmate.VitapmateFunctions"
+        android:exported="true"
+        android:permission="android.permission.BIND_APP_FUNCTION_SERVICE">
+      <property android:name="android.app.appfunctions.v2" android:value="vitapmate_functions.xml" />
+      <intent-filter>
+        <action android:name="android.app.appfunctions.AppFunctionService" />
+      </intent-filter>
+    </service>
     <!-- Home-screen widget: next class and today's timetable (TimetableWidget.kt). -->
     <receiver android:name="vitapmate.TimetableWidgetReceiver" android:exported="true" android:label="@string/shortcut_timetable">
       <intent-filter>

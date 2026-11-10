@@ -23,6 +23,7 @@ import androidx.work.WorkerParameters
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import vitapmate.core.Change
 import vitapmate.core.ChangeKind
@@ -70,7 +71,8 @@ object BackgroundSync {
 
     /** When WorkManager plans the next scheduled run (epoch ms), or null when none is planned. */
     suspend fun nextRunAt(context: Context): Long? = withContext(Dispatchers.IO) {
-        WorkManager.getInstance(context).getWorkInfosForUniqueWork(WORK).get()
+        // The Flow, not the ListenableFuture: Guava (with AppFunctions) hides that class from the compiler.
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(WORK).first()
             .firstOrNull { !it.state.isFinished }?.nextScheduleTimeMillis?.takeIf { it in 1 until Long.MAX_VALUE }
     }
 
