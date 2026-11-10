@@ -12,8 +12,8 @@
     "@noble/ciphers": "2.4.0",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "fflate": "0.8.2",
-    "postal-mime": "4.0.4"
+    "fflate": "0.8.3",
+    "postal-mime": "4.0.8"
   },
   "devDependencies": {
     "@alchemy.run/cloudflare": "2.0.0-beta.85",
