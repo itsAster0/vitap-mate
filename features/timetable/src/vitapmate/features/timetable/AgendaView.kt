@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItemDefaults
@@ -128,6 +130,9 @@ fun AgendaView(
     }
 }
 
+private val Outer = CornerSize(22.dp)
+private val Inner = CornerSize(6.dp)
+
 /** The settle spring for tapping a day: a little bounce, quick to rest. */
 private val MotionSpring = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
 
@@ -179,7 +184,14 @@ private fun DayContent(
         if (i0 > 0) {
             val prev = d.schedule[i0 - 1].slot
             val next = d.schedule[i0].slot
-            GapRow(prev.end, next.start, isNow = d.isToday && d.dayOff == null && prev.end <= minuteNow && next.start > minuteNow, minuteNow, d.isLongestGap(i0), h24)
+            GapRow(
+                prev.end,
+                next.start,
+                isNow = d.isToday && d.dayOff == null && prev.end <= minuteNow && next.start > minuteNow,
+                done = d.stateOf(d.schedule[i0]).let { it == ClassState.Done || it == ClassState.Now },
+                minuteNow,
+                h24,
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
             group.forEachIndexed { k, i ->
@@ -190,7 +202,15 @@ private fun DayContent(
                 ClassItem(
                     slot = c.slot,
                     state = d.stateOf(c),
-                    shapes = ListItemDefaults.segmentedShapes(k, group.size),
+                    // Large outer corners on the group, small inner ones between its classes.
+                    shapes = ListItemDefaults.shapes(
+                        shape = RoundedCornerShape(
+                            if (k == 0) Outer else Inner,
+                            if (k == 0) Outer else Inner,
+                            if (k == group.size - 1) Outer else Inner,
+                            if (k == group.size - 1) Outer else Inner,
+                        ),
+                    ),
                     // A Lab FAT doesn't count towards attendance.
                     record = if (labFat) null else attendance.forSlot(c.slot),
                     minuteNow = if (d.isToday && !off) minuteNow else null,
@@ -201,6 +221,8 @@ private fun DayContent(
                     note = if (off && d.dayOff == null && c.slot.kind == ClassKind.LAB) "No lab" else null,
                     showPosted = d.done && !off && !labFat,
                     posted = c.posted,
+                    first = i == 0,
+                    last = i == d.schedule.lastIndex,
                     h24 = h24,
                     onOpen = { onOpen(c) },
                 )

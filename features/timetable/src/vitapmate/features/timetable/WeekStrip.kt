@@ -2,7 +2,7 @@ package vitapmate.features.timetable
 
 import vitapmate.ui.rememberHaptics
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -36,15 +36,14 @@ import vitapmate.ui.formatDay
 import vitapmate.ui.nums
 
 /**
- * The week as a day selector: weekday over its date, the selected day filled (its shape morphs
- * from a circle to a squircle, on the primary container), today ringed, a dot per class (up to five) and an amber dot on
+ * The week as a day selector: weekday over its date, the selected day one primary pill (its
+ * corners grow as it fills), today ringed, a dot per class (up to five) and an amber dot on
  * [examDays]. Class-free days recede unless selected or today. Days are ISO weekdays (1 = Monday).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun WeekStrip(dates: List<Int>, today: Int, selectedDay: Int, onSelect: (Int) -> Unit, classCounts: List<Int>, examDays: Set<Int>, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val spatial = MaterialTheme.motionScheme.fastSpatialSpec<Int>()
     val haptics = rememberHaptics()
     val effects = MaterialTheme.motionScheme.fastEffectsSpec<Color>()
     Row(modifier.fillMaxWidth().testTag("timetable.week"), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -56,46 +55,40 @@ fun WeekStrip(dates: List<Int>, today: Int, selectedDay: Int, onSelect: (Int) ->
             val exam = day in examDays
             // Class-free days recede to the muted role unless selected or today.
             val free = count == 0 && !exam && !selected && !isToday
-            val corner by animateIntAsState(if (selected) 32 else 50, spatial)
-            val fill by animateColorAsState(if (selected) scheme.primaryContainer else Color.Transparent, effects)
+            // The selected day is one pill behind weekday, date and dots; today is ringed.
+            val corner by animateDpAsState(if (selected || isToday) 22.dp else 12.dp, MaterialTheme.motionScheme.fastSpatialSpec())
+            val fill by animateColorAsState(if (selected) scheme.primary else Color.Transparent, effects)
             val number by animateColorAsState(
                 when {
-                    selected -> scheme.onPrimaryContainer
+                    selected -> scheme.onPrimary
                     isToday -> scheme.primary
                     free -> scheme.onSurfaceVariant
                     else -> scheme.onSurface
                 },
                 effects,
             )
+            val label by animateColorAsState(if (selected) scheme.onPrimary else if (isToday) scheme.primary else scheme.onSurfaceVariant, effects)
+            val shape = RoundedCornerShape(corner)
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(16.dp))
+                    .padding(horizontal = 2.dp)
+                    .clip(shape)
+                    .background(fill)
+                    .then(if (isToday && !selected) Modifier.border(1.5.dp, scheme.primary, shape) else Modifier)
                     .selectable(selected, role = Role.Tab, onClick = { if (day != selectedDay) haptics.tick(); onSelect(day) })
                     .semantics { contentDescription = "${formatDay(date, "EEEE, d MMMM")}, ${if (count == 0) "no classes" else "$count classes"}" }
                     .testTag("timetable.day.$day")
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    formatDay(date, "EEE"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (isToday) scheme.primary else scheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .background(fill, RoundedCornerShape(corner))
-                        .then(if (isToday && !selected) Modifier.border(1.5.dp, scheme.primary, CircleShape) else Modifier),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("${dayOfMonth(date)}", style = MaterialTheme.typography.titleMediumEmphasized.nums(), color = number)
-                }
-                Spacer(Modifier.height(5.dp))
+                Text(formatDay(date, "EEE"), style = MaterialTheme.typography.labelMedium, color = label)
+                Spacer(Modifier.height(2.dp))
+                Text("${dayOfMonth(date)}", style = MaterialTheme.typography.titleMediumEmphasized.nums(), color = number)
+                Spacer(Modifier.height(3.dp))
                 // One dot per class, so the week's load reads at a glance.
                 Row(Modifier.height(4.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    repeat(count.coerceAtMost(5)) { Box(Modifier.size(4.dp).background(scheme.onSurfaceVariant, CircleShape)) }
+                    repeat(count.coerceAtMost(5)) { Box(Modifier.size(4.dp).background(if (selected) label else scheme.onSurfaceVariant, CircleShape)) }
                     if (exam) Box(Modifier.size(4.dp).background(AppTheme.tones.warning.base, CircleShape))
                 }
             }

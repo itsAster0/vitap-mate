@@ -21,23 +21,24 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import vitapmate.ui.nums
 
 /** The room, large, in an expressive cookie shape (it's what you look for on the way), its block under it. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun RoomTile(room: String, block: String, fill: Color, onFill: Color, modifier: Modifier = Modifier) {
+fun RoomTile(room: String, block: String, fill: Color, onFill: Color, size: Dp, blockColor: Color = MaterialTheme.colorScheme.onSurfaceVariant, modifier: Modifier = Modifier) {
     Column(
-        modifier.width(88.dp).clearAndSetSemantics { contentDescription = "Room $room, $block" },
+        modifier.width(size + 4.dp).clearAndSetSemantics { contentDescription = "Room $room, $block" },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(84.dp).background(fill, MaterialShapes.Cookie9Sided.toShape()).padding(14.dp), Alignment.Center) {
+        Box(Modifier.size(size).background(fill, MaterialShapes.Cookie9Sided.toShape()).padding(14.dp), Alignment.Center) {
             Text(room.ifBlank { "–" }, Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.headlineSmallEmphasized.nums(), color = onFill)
         }
         if (block.isNotBlank()) {
             Spacer(Modifier.height(4.dp))
-            Text(block, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(block, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium, color = blockColor)
         }
     }
 }

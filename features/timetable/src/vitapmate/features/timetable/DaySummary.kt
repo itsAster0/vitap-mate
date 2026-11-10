@@ -78,7 +78,7 @@ fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean
     ) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(72.dp).clearAndSetSemantics {
+                Modifier.size(92.dp).clearAndSetSemantics {
                     contentDescription = classes.joinToString("; ") { c ->
                         "${c.slot.name}, ${if (c in labFats) "Lab FAT" else c.posted?.name?.lowercase()?.replace('_', ' ') ?: "not posted"}"
                     }
@@ -87,7 +87,7 @@ fun DaySummary(classes: List<DayClass>, labFats: Set<DayClass>, isToday: Boolean
             ) {
                 Canvas(Modifier.fillMaxSize()) {
                     if (arcs.isEmpty()) return@Canvas
-                    val stroke = 7.dp.toPx()
+                    val stroke = 8.dp.toPx()
                     val radius = (size.minDimension - stroke) / 2
                     // Round caps reach past each arc's end; the gap leaves room for both.
                     val gap = if (arcs.size == 1) 0f else stroke / radius + 0.14f

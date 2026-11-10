@@ -1,6 +1,6 @@
 package vitapmate.features.timetable
 
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,10 +9,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,7 @@ import vitapmate.core.AttendanceCourse
 import vitapmate.core.DayClass
 import vitapmate.ui.AppTheme
 import vitapmate.ui.StatusChip
+import vitapmate.ui.Tone
 import vitapmate.ui.clock
 import vitapmate.ui.compactMinutes
 import vitapmate.ui.dayLabel
@@ -35,9 +38,9 @@ import vitapmate.ui.nums
 import vitapmate.ui.rememberNow
 
 /**
- * The day's focus: the class under way (with a countdown to its end, a wavy progress line and
- * what's next), or the next one (a countdown to it on today, "First class" before the day
- * starts). Neutral cards; the live one is outlined in the accent.
+ * The day's focus: the class under way (solid accent, with a large countdown to its end, a wavy
+ * progress line and what's next), or the next one (the quiet accent fill, a countdown to it on
+ * today, "First class" before the day starts). Another day's first class sits on a neutral card.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -47,31 +50,34 @@ fun FocusCard(d: AgendaDay, today: Int, attendance: List<AttendanceCourse>, h24:
     val live = d.current != null
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
-    // Neutral, a step up from the other cards; the live class is outlined in the accent.
-    val container = if (d.isToday) scheme.surfaceContainerHigh else scheme.surfaceContainerLow
-    val content = scheme.onSurface
-    val secondary = scheme.onSurfaceVariant
+    val container = when {
+        live -> tones.accent
+        d.isToday -> tones.accentTone.subtle
+        else -> scheme.surfaceContainerLow
+    }
+    val content = when {
+        live -> tones.onAccent
+        d.isToday -> tones.accentTone.onSubtle
+        else -> scheme.onSurface
+    }
+    val secondary = if (d.isToday) content.copy(alpha = 0.82f) else scheme.onSurfaceVariant
     val labFat = c in d.labFats
     Card(
         onClick = { onOpen(c) },
         modifier = Modifier.fillMaxWidth().testTag("timetable.focus"),
-        border = if (live) BorderStroke(1.5.dp, scheme.primary.copy(alpha = 0.4f)) else null,
         shape = MaterialTheme.shapes.extraLargeIncreased,
         colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
     ) {
         Column(Modifier.padding(20.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val label = when {
-                    live -> "Now"
-                    !d.isToday -> "First class · ${dayLabel(d.day.day, today)}"
-                    d.beforeFirst -> "First class"
-                    else -> "Next"
-                }
-                StatusChip(label, tones.accentTone)
-                Spacer(Modifier.weight(1f))
-                if (d.isToday) Countdown(if (live) s.end else s.start, if (live) "Ends in" else "Starts in")
+            val label = when {
+                live -> "Now"
+                !d.isToday -> "First class · ${dayLabel(d.day.day, today)}"
+                d.beforeFirst -> "First class"
+                else -> "Next"
             }
-            Spacer(Modifier.height(14.dp))
+            // On the solid fill the chip is drawn inverted; on the quiet fill, solid.
+            if (live) StatusChip(label, Tone(tones.accent, tones.onAccent, tones.accent)) else StatusChip(label, tones.accentTone, solid = d.isToday)
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(s.name, style = MaterialTheme.typography.headlineSmallEmphasized, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -94,46 +100,58 @@ fun FocusCard(d: AgendaDay, today: Int, attendance: List<AttendanceCourse>, h24:
                     val record = if (labFat) null else attendance.forSlot(s)
                     if (record != null) {
                         Spacer(Modifier.height(10.dp))
-                        AttendancePill(record)
+                        // On the accent fills the pill sits on the surface, so its tone stays readable.
+                        AttendancePill(record, if (d.isToday) Modifier.background(scheme.surface, CircleShape).padding(start = 6.dp, end = 9.dp, top = 3.dp, bottom = 3.dp) else Modifier)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
                 RoomTile(
                     s.room,
                     s.block,
-                    fill = if (live) tones.accentTone.subtle else scheme.surfaceContainerHighest,
-                    onFill = if (live) tones.accentTone.onSubtle else scheme.onSurface,
+                    fill = when {
+                        live -> tones.onAccent
+                        d.isToday -> scheme.surface
+                        else -> scheme.surfaceContainerHighest
+                    },
+                    onFill = if (live) tones.accent else content,
+                    size = if (live) 92.dp else 84.dp,
+                    blockColor = secondary,
                 )
             }
-            if (live) {
+            if (d.isToday) {
                 Spacer(Modifier.height(16.dp))
+                Countdown(if (live) s.end else s.start, ends = live)
+            }
+            if (live) {
+                Spacer(Modifier.height(12.dp))
                 // Read in the draw lambda only: the line moves each second without recomposing.
                 val now = rememberNow(1_000)
                 LinearWavyProgressIndicator(
                     progress = { ((istSecond(now.value) / 60f - s.start) / (s.end - s.start)).coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
-                    color = scheme.primary,
+                    color = content,
+                    trackColor = content.copy(alpha = 0.24f),
                 )
-                d.next?.let { n -> UpNext(n, d.minuteNow, h24) { onOpen(n) } }
+                d.next?.let { n -> UpNext(n, d.minuteNow, h24, content) { onOpen(n) } }
             }
         }
     }
 }
 
-/** The class after the current one, one line under a divider, in the focus card's own colours. */
+/** The class after the current one, in an inset panel of the focus card's own colours. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun UpNext(c: DayClass, minuteNow: Int, h24: Boolean, onOpen: () -> Unit) {
+private fun UpNext(c: DayClass, minuteNow: Int, h24: Boolean, content: Color, onOpen: () -> Unit) {
     val gap = c.slot.start - minuteNow
-    Spacer(Modifier.height(12.dp))
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Spacer(Modifier.height(14.dp))
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .clip(RoundedCornerShape(20.dp))
+            .background(content.copy(alpha = 0.12f))
             .clickable(onClickLabel = "Open ${c.slot.name}", onClick = onOpen)
             .testTag("timetable.focus.next")
-            .padding(top = 12.dp, bottom = 4.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {

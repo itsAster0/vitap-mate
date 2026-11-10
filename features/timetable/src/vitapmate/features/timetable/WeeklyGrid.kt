@@ -41,8 +41,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -199,7 +199,7 @@ fun WeeklyGrid(
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(line))
                 Row(Modifier.fillMaxWidth().weight(1f).verticalScroll(vertical).padding(top = GRID_TOP, bottom = bottom + 12.dp)) {
-                    HourLabels(start, end, h24, ::yOf, Modifier.width(GUTTER).height(gridHeight + 8.dp))
+                    HourLabels(start, end, h24, ::yOf, if (todayIndex >= 0) now else null, Modifier.width(GUTTER).height(gridHeight + 8.dp))
                     Box(Modifier.weight(1f).horizontalScroll(horizontal)) {
                         Layout(
                             content = {
@@ -259,14 +259,43 @@ fun WeeklyGrid(
 
 private fun blockHeight(slot: ClassSlot, yOf: (Int) -> Dp): Dp = max(30.dp, yOf(slot.end) - yOf(slot.start) - 3.dp)
 
-/** 8, 9 … 12, 1, 2 on a 12-hour phone (the grid reads as a school day, no AM/PM noise); 8 … 13, 14 on a 24-hour one. */
+/**
+ * 8, 9 … 12, 1, 2 on a 12-hour phone (the grid reads as a school day, no AM/PM noise); 8 … 13, 14
+ * on a 24-hour one. With [now] (today is in the grid), the current time sits on the now line.
+ */
 @Composable
-private fun HourLabels(start: Int, end: Int, h24: Boolean, yOf: (Int) -> Dp, modifier: Modifier) = Box(modifier) {
+private fun HourLabels(start: Int, end: Int, h24: Boolean, yOf: (Int) -> Dp, now: State<Long>?, modifier: Modifier) = Box(modifier) {
     val style = MaterialTheme.typography.labelSmall.nums()
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     for (m in start..end step 60) {
         val h = if (h24) m / 60 else (m / 60 % 12).let { if (it == 0) 12 else it }
         Text("$h", Modifier.width(GUTTER - 8.dp).offset(y = yOf(m) - 7.dp), textAlign = TextAlign.End, style = style, color = color)
+    }
+    if (now != null) NowTime(now, start, end, h24, yOf)
+}
+
+/** "10:26" in a primary pill at the now line. Recomposes alone, once a minute, not the grid. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun NowTime(now: State<Long>, start: Int, end: Int, h24: Boolean, yOf: (Int) -> Dp) {
+    val minute by remember(now) { derivedStateOf { istMinute(now.value) } }
+    if (minute !in start..end) return
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        Modifier.width(GUTTER - 2.dp).layout { measurable, constraints ->
+            val p = measurable.measure(constraints)
+            layout(p.width, p.height) { p.place(0, yOf(minute).roundToPx() - p.height / 2) }
+        },
+        contentAlignment = Alignment.CenterEnd,
+    ) {
+        Text(
+            clock(minute, h24).substringBefore(' '),
+            Modifier.background(scheme.primary, CircleShape).padding(horizontal = 3.dp, vertical = 1.dp).fitDown(),
+            maxLines = 1,
+            softWrap = false,
+            style = MaterialTheme.typography.labelSmallEmphasized.nums(fontSize = 9.5.sp),
+            color = scheme.onPrimary,
+        )
     }
 }
 
@@ -294,7 +323,7 @@ private fun DayHeader(name: String, date: Int?, isToday: Boolean, count: Int, no
     }
 }
 
-/** One class in the grid: the kind's quiet fill (opaque, so grid lines don't show through) with an inset kind bar, outlined while live. */
+/** One class in the grid: the kind's quiet fill (opaque, so grid lines don't show through), solid while live. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun GridBlock(slot: ClassSlot, labFat: Boolean, live: Boolean, height: Dp, h24: Boolean, onPress: () -> Unit) {
@@ -302,9 +331,12 @@ private fun GridBlock(slot: ClassSlot, labFat: Boolean, live: Boolean, height: D
     val tones = AppTheme.tones
     val isLab = slot.kind == ClassKind.LAB
     val tone = if (labFat) tones.warning else if (isLab) tones.lab else tones.accentTone
-    val fill = tone.subtle
+    val fill = if (live) tone.base else tone.subtle
+    val ink = if (live) scheme.surface else scheme.onSurface
+    val accent = if (live) scheme.surface else tone.onSubtle
+    val muted = if (live) scheme.surface else scheme.onSurfaceVariant
     // Lines of course name that fit under code, room and time.
-    val nameLines = floor((height - 10.dp - 40.dp).value / 12f).toInt()
+    val nameLines = floor((height - 10.dp - 46.dp).value / 12f).toInt()
     fun short(m: Int) = clock(m, h24).substringBefore(' ')
     PressScale(
         onPress,
@@ -315,32 +347,24 @@ private fun GridBlock(slot: ClassSlot, labFat: Boolean, live: Boolean, height: D
         Column(
             Modifier
                 .fillMaxSize()
-                .drawBehind {
-                    val r = CornerRadius(10.dp.toPx())
-                    drawRoundRect(fill, cornerRadius = r)
-                    drawRoundRect(tone.base, Offset(4.dp.toPx(), 5.dp.toPx()), Size(3.dp.toPx(), size.height - 10.dp.toPx()), CornerRadius(1.5.dp.toPx()))
-                    if (live) {
-                        val w = 1.5.dp.toPx()
-                        drawRoundRect(tone.base, Offset(w / 2, w / 2), Size(size.width - w, size.height - w), CornerRadius(r.x - w / 2), Stroke(w))
-                    }
-                }
-                .padding(start = 11.dp, top = 5.dp, end = 4.dp, bottom = 4.dp),
+                .drawBehind { drawRoundRect(fill, cornerRadius = CornerRadius(14.dp.toPx())) }
+                .padding(start = 9.dp, top = 5.dp, end = 4.dp, bottom = 4.dp),
         ) {
-            val small = MaterialTheme.typography.labelSmall.nums(fontSize = 9.5.sp)
-            Text(slot.code, Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMediumEmphasized.nums(fontSize = 11.sp), color = scheme.onSurface)
-            Text(slot.room, maxLines = 1, overflow = TextOverflow.Clip, style = MaterialTheme.typography.labelMediumEmphasized.nums(fontSize = 10.sp), color = tone.onSubtle)
+            val small = MaterialTheme.typography.labelSmall.nums(fontSize = 10.sp)
+            Text(slot.code, Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelMediumEmphasized.nums(fontSize = 12.sp), color = ink)
+            Text(slot.room, maxLines = 1, overflow = TextOverflow.Clip, style = MaterialTheme.typography.labelMediumEmphasized.nums(fontSize = 11.5.sp), color = accent)
             Row(Modifier.fitDown(), verticalAlignment = Alignment.CenterVertically) {
                 if (labFat) {
-                    Text("LAB FAT ", style = small, color = tone.onSubtle)
+                    Text("LAB FAT ", style = small, color = accent)
                 } else if (isLab) {
-                    Icon(Lucide.FlaskConical, null, Modifier.size(10.dp), tint = tone.base)
+                    Icon(Lucide.FlaskConical, null, Modifier.size(10.dp), tint = if (live) scheme.surface else tone.base)
                     Spacer(Modifier.width(2.dp))
                 }
-                Text("${short(slot.start)}–${short(slot.end)}", style = small, color = scheme.onSurfaceVariant)
+                Text("${short(slot.start)}–${short(slot.end)}", style = small, color = muted)
             }
             if (nameLines > 0) {
                 Spacer(Modifier.height(2.dp))
-                Text(slot.name, maxLines = nameLines, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp, lineHeight = 12.sp), color = scheme.onSurfaceVariant)
+                Text(slot.name, maxLines = nameLines, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 12.sp), color = muted)
             }
         }
     }

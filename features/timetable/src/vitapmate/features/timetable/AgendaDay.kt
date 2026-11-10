@@ -72,14 +72,11 @@ class AgendaDay(val day: TimetableDay, today: Int, val minuteNow: Int) {
         else -> day.title
     }
 
-    // Free time between classes; the longest is tagged when the day has more than one.
+    // Free time between classes.
     private val gaps = schedule.zipWithNext { a, b -> b.slot.start - a.slot.end }
-    private val longestGap = gaps.filter { it >= MIN_BREAK }.takeIf { it.size > 1 }?.max()
 
     /** Free minutes before schedule[i] (0 for the first, negative for a clash). */
     fun gapBefore(i: Int): Int = if (i == 0) 0 else gaps[i - 1]
-
-    fun isLongestGap(i: Int) = i > 0 && gaps[i - 1] == longestGap
 
     fun isLastClass(c: DayClass) = c.state == ClassDay.HELD && c.lastClass
 

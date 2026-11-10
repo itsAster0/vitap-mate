@@ -35,7 +35,7 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.clock
 import vitapmate.ui.nums
 
-/** A day without classes: why (your exam, the calendar's holiday or no-class day, or nothing on your timetable). */
+/** A day without classes: why (your exam, the calendar's holiday or no-class day, or nothing on your timetable), on that reason's tone. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FreeDayCard(
@@ -71,22 +71,22 @@ fun FreeDayCard(
     Card(
         Modifier.fillMaxWidth().testTag("timetable.free"),
         shape = MaterialTheme.shapes.extraLargeIncreased,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = tone.subtle, contentColor = tone.onSubtle),
     ) {
         Column(Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(56.dp).background(tone.subtle, MaterialShapes.Sunny.toShape()), Alignment.Center) {
-                    Icon(icon, null, Modifier.size(24.dp), tint = tone.base)
+                Box(Modifier.size(72.dp).background(tone.base, MaterialShapes.Sunny.toShape()), Alignment.Center) {
+                    Icon(icon, null, Modifier.size(28.dp), tint = scheme.surface)
                 }
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     if (eyebrow != null) {
-                        StatusChip(eyebrow, tone)
+                        StatusChip(eyebrow, tone, solid = true)
                         Spacer(Modifier.height(6.dp))
                     }
-                    Text(title, style = MaterialTheme.typography.titleLargeEmphasized, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = MaterialTheme.typography.headlineSmallEmphasized, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (countdown != null) {
-                        Text(countdown, style = MaterialTheme.typography.bodySmall.nums(), color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(countdown, style = MaterialTheme.typography.bodySmall.nums(), color = tone.onSubtle.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

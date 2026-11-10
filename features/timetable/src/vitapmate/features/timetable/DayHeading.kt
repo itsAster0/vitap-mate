@@ -49,7 +49,7 @@ fun DayHeading(day: Int, isToday: Boolean, slots: List<DayClass>, note: String?,
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (isToday) "Today" else formatDay(day, "EEEE"),
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

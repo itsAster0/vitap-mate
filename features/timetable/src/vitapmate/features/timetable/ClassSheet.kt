@@ -2,8 +2,11 @@ package vitapmate.features.timetable
 
 import vitapmate.ui.OpenHaptic
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -21,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -51,40 +57,61 @@ private val WEEKDAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Fri
 fun ClassSheet(slot: ClassSlot, record: AttendanceCourse?, labFat: Boolean, h24: Boolean, onDismiss: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
 
+    // One tile of the group: its label with the icon over the value.
     @Composable
-    fun line(icon: ImageVector, text: String) = Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(36.dp).background(scheme.surfaceContainerHigh, MaterialTheme.shapes.medium), Alignment.Center) {
-            Icon(icon, null, Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
+    fun tile(icon: ImageVector, label: String, text: String, shape: Shape, modifier: Modifier = Modifier) =
+        Column(modifier.background(scheme.surfaceContainerHigh, shape).padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+                Spacer(Modifier.width(6.dp))
+                Text(label, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(3.dp))
+            Text(text, style = MaterialTheme.typography.titleSmallEmphasized.nums())
         }
-        Spacer(Modifier.width(14.dp))
-        Text(text, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge.nums())
-    }
 
     OpenHaptic()
     ModalBottomSheet(onDismissRequest = onDismiss, modifier = Modifier.testTag("timetable.sheet"), containerColor = scheme.surfaceContainerLow) {
         Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
             val lab = slot.kind == ClassKind.LAB
-            Text(
-                listOf(if (labFat) "Lab FAT" else if (lab) "Lab" else "Theory", slot.code).filter { it.isNotBlank() }.joinToString(" · "),
-                style = MaterialTheme.typography.labelLarge,
-                color = when {
-                    labFat -> AppTheme.tones.warning.onSubtle
-                    lab -> AppTheme.tones.lab.onSubtle
-                    else -> AppTheme.tones.accentTone.onSubtle
-                },
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(slot.name, style = MaterialTheme.typography.headlineSmallEmphasized)
-            Spacer(Modifier.height(12.dp))
-            line(Lucide.Clock, "${WEEKDAYS.getOrElse(slot.day) { "" }}, ${clock(slot.start, h24)} – ${clock(slot.end, h24)} · ${formatMinutes(slot.end - slot.start)}")
-            line(Lucide.MapPin, listOf("Room ${slot.room}", slot.block).filter { it.isNotBlank() }.joinToString(" · "))
-            if (slot.faculty.isNotBlank()) line(Lucide.User, slot.faculty)
-            line(Lucide.Hash, "${slot.code} · Slot ${slot.slot}")
-            slot.credits?.takeIf { it > 0 }?.let { c ->
-                val n = if (c % 1.0 == 0.0) "%.0f".format(c) else c.toString()
-                line(Lucide.Award, "$n ${if (n == "1") "credit" else "credits"}")
+            val tone = if (labFat) AppTheme.tones.warning else if (lab) AppTheme.tones.lab else AppTheme.tones.accentTone
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        listOf(if (labFat) "Lab FAT" else if (lab) "Lab" else "Theory", slot.code).filter { it.isNotBlank() }.joinToString(" · "),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = tone.onSubtle,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(slot.name, style = MaterialTheme.typography.headlineSmallEmphasized)
+                }
+                Spacer(Modifier.width(12.dp))
+                RoomTile(slot.room, slot.block, tone.subtle, tone.onSubtle, size = 80.dp)
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(18.dp))
+            // A connected group: large corners outside, small ones between tiles.
+            val big = CornerSize(20.dp)
+            val small = CornerSize(6.dp)
+            val credits = slot.credits?.takeIf { it > 0 }?.let { c ->
+                val n = if (c % 1.0 == 0.0) "%.0f".format(c) else c.toString()
+                "$n ${if (n == "1") "credit" else "credits"}"
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val wide = Modifier.fillMaxWidth()
+                tile(Lucide.Clock, "When", "${WEEKDAYS.getOrElse(slot.day) { "" }}, ${clock(slot.start, h24)} – ${clock(slot.end, h24)} · ${formatMinutes(slot.end - slot.start)}", RoundedCornerShape(big, big, small, small), wide)
+                tile(Lucide.MapPin, "Where", listOf("Room ${slot.room}", slot.block).filter { it.isNotBlank() }.joinToString(" · "), RoundedCornerShape(small), wide)
+                if (slot.faculty.isNotBlank()) tile(Lucide.User, "Faculty", slot.faculty, RoundedCornerShape(small), wide)
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val code = "${slot.code} · Slot ${slot.slot}"
+                    if (credits == null) {
+                        tile(Lucide.Hash, "Code and slot", code, RoundedCornerShape(small, small, big, big), wide)
+                    } else {
+                        tile(Lucide.Hash, "Code and slot", code, RoundedCornerShape(small, small, small, big), Modifier.weight(3f).fillMaxHeight())
+                        tile(Lucide.Award, "Credits", credits, RoundedCornerShape(small, small, big, small), Modifier.weight(2f).fillMaxHeight())
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
             when {
                 labFat -> Note("Lab FAT: this session doesn't count towards attendance.")
                 record == null -> Note("No attendance for this course yet. It shows here once VTOP counts a class.")
@@ -116,7 +143,7 @@ private fun AttendanceBox(record: AttendanceCourse) {
         Box(contentAlignment = Alignment.Center) {
             CircularProgressIndicator(
                 progress = { (record.percent / 100).toFloat() },
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(60.dp),
                 color = tone.base,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 strokeWidth = 5.dp,
