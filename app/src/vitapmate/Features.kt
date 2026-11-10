@@ -18,24 +18,19 @@ import vitapmate.features.timetable.timetableFeature
 import vitapmate.features.vtop.vtopFeature
 import vitapmate.ui.Feature
 
+/** More's sections, three features to a row. */
+val featureGroups: List<Pair<String, List<Feature>>> = listOf(
+    "Classes" to listOf(timetableFeature, attendanceFeature, coursePageFeature),
+    "Exams and results" to listOf(examsFeature, marksFeature, gradesFeature),
+    "Campus" to listOf(calendarFeature, outingFeature, biometricFeature),
+    "Tools" to listOf(docsFeature, profileFeature, vtopFeature),
+)
+
 /**
  * Every feature, in the order More and Settings list them. The one place a feature is listed:
  * its id is its route, its settings key and its log src (`ui.<id>`).
  */
-val features: List<Feature> = listOf(
-    timetableFeature,
-    attendanceFeature,
-    calendarFeature,
-    marksFeature,
-    gradesFeature,
-    examsFeature,
-    coursePageFeature,
-    outingFeature,
-    profileFeature,
-    biometricFeature,
-    docsFeature,
-    vtopFeature,
-)
+val features: List<Feature> = featureGroups.flatMap { it.second }
 
 /** Screens the shell itself provides; they can be tabs too. Their content is drawn by [Shell]. */
 const val MORE = "more"

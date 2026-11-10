@@ -49,32 +49,33 @@ import vitapmate.ui.tappable
 private const val COLUMNS = 3
 
 /**
- * Every feature as a grid of tiles, the ones in the bar first and pinned (tapping one switches
- * to its tab), then Settings, the Inspector and the version.
+ * Every feature as tiles under its section ([featureGroups]), the ones in the bar pinned (tapping
+ * one switches to its tab), then Settings, the Inspector and the version.
  */
 @Composable
 fun MoreScreen() {
     val nav = LocalNav.current
     val tabs = navTabs
     val version = rememberAppVersion()
-    val ordered = features.sortedBy { f -> tabs.indexOf(f.id).let { if (it < 0) Int.MAX_VALUE else it } }
     Page("More", MORE) { padding ->
         LazyColumn(contentPadding = padding) {
-            item("features") {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Features",
-                        Modifier.padding(start = 16.dp).semantics { heading() },
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    ordered.chunked(COLUMNS).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { f ->
-                                val pinned = f.id in tabs
-                                FeatureTile(f, pinned, { if (pinned) nav.goTab(f.id) else nav.push(Route.Screen(f.id)) }, Modifier.weight(1f))
+            featureGroups.forEach { (title, group) ->
+                item(title) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            title,
+                            Modifier.padding(start = 16.dp).semantics { heading() },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        group.chunked(COLUMNS).forEach { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                row.forEach { f ->
+                                    val pinned = f.id in tabs
+                                    FeatureTile(f, pinned, { if (pinned) nav.goTab(f.id) else nav.push(Route.Screen(f.id)) }, Modifier.weight(1f))
+                                }
+                                repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                             }
-                            repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
