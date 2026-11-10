@@ -3,6 +3,7 @@ package vitapmate.features.timetable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.FlaskConical
@@ -16,9 +17,17 @@ import vitapmate.ui.StatusChip
  * and lab need no tag (the code and the rail's colour tell them apart).
  */
 @Composable
-fun ClassTags(modifier: Modifier = Modifier, labFat: Boolean = false, lastClass: Boolean = false, clash: Boolean = false, note: String? = null) {
+fun ClassTags(
+    modifier: Modifier = Modifier,
+    labFat: Boolean = false,
+    lastClass: Boolean = false,
+    clash: Boolean = false,
+    note: String? = null,
+    lead: @Composable () -> Unit = {},
+) {
     val tones = AppTheme.tones
-    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        lead()
         if (labFat) StatusChip("Lab FAT", tones.warning, icon = Lucide.FlaskConical)
         if (lastClass) StatusChip("Last class", tones.accentTone)
         if (clash) StatusChip("Clash", tones.danger, icon = Lucide.TriangleAlert)

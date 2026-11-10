@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
@@ -87,8 +88,12 @@ fun ClassItem(
             onLongClickLabel = null,
             leadingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.width(58.dp), horizontalAlignment = Alignment.Start) {
-                        Text(clock(slot.start, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelLargeEmphasized.nums(), color = text)
+                    // As wide as the widest clock, the same on every row so the rails line up; the countdown shrinks to it.
+                    val timeStyle = MaterialTheme.typography.labelLargeEmphasized.nums()
+                    val measurer = rememberTextMeasurer()
+                    val timeWidth = with(LocalDensity.current) { remember(h24, timeStyle, this) { measurer.measure(clock(23 * 60, h24), timeStyle).size.width.toDp() } }
+                    Column(Modifier.width(timeWidth), horizontalAlignment = Alignment.Start) {
+                        Text(clock(slot.start, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = timeStyle, color = text)
                         Text(clock(slot.end, h24), Modifier.fitDown(), maxLines = 1, softWrap = false, style = MaterialTheme.typography.bodySmall.nums(), color = scheme.onSurfaceVariant)
                         // How long until it starts (or ends), under the times so the name keeps the width.
                         Countdown(state, slot, minuteNow, showPosted)
@@ -105,17 +110,13 @@ fun ClassItem(
                     // Where it is, then how the course stands: colour only on the ring.
                     val where = slot.room.isNotBlank() || slot.block.isNotBlank()
                     val attendance = record?.takeIf { !labFat }
-                    if (where || attendance != null) {
+                    // The room, then the ring and the tags; whatever doesn't fit wraps whole to the next line.
+                    if (where || attendance != null || labFat || lastClass || clash || note != null) {
                         Spacer(Modifier.height(8.dp))
-                        // One row: the room, then the ring.
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ClassTags(labFat = labFat, lastClass = lastClass, clash = clash, note = note) {
                             if (where) Location(slot.room, slot.block, if (labFat) tones.warning.base else tone.base, muted)
                             if (attendance != null) AttendancePill(attendance, Modifier.testTag("timetable.attendance"))
                         }
-                    }
-                    if (labFat || lastClass || clash || note != null) {
-                        Spacer(Modifier.height(8.dp))
-                        ClassTags(labFat = labFat, lastClass = lastClass, clash = clash, note = note)
                     }
                 }
             },
@@ -161,12 +162,14 @@ private val RailInset = 14.dp
 @Composable
 private fun Countdown(state: ClassState, slot: ClassSlot, minuteNow: Int?, showPosted: Boolean) {
     val scheme = MaterialTheme.colorScheme
+    // No space in "1h30m", so it shrinks less to the clock's width.
+    fun span(m: Int) = compactMinutes(m).replace(" ", "")
     val (text, accent) = when {
         showPosted || state == ClassState.Done && minuteNow != null -> return
-        state == ClassState.Now && minuteNow != null -> "${compactMinutes(slot.end - minuteNow)} left" to true
-        state == ClassState.Next && minuteNow != null -> "in ${compactMinutes(slot.start - minuteNow)}" to true
-        state == ClassState.Later && minuteNow != null -> "in ${compactMinutes(slot.start - minuteNow)}" to false
-        else -> compactMinutes(slot.end - slot.start) to false
+        state == ClassState.Now && minuteNow != null -> "${span(slot.end - minuteNow)} left" to true
+        state == ClassState.Next && minuteNow != null -> "in ${span(slot.start - minuteNow)}" to true
+        state == ClassState.Later && minuteNow != null -> "in ${span(slot.start - minuteNow)}" to false
+        else -> span(slot.end - slot.start) to false
     }
     Text(
         text,
