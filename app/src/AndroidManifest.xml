@@ -32,6 +32,7 @@
       <!-- Android's Modes opens the app from the "In class" rule (ClassMode.kt). -->
       <intent-filter>
         <action android:name="android.app.action.AUTOMATIC_ZEN_RULE" />
+        <category android:name="android.intent.category.DEFAULT" />
       </intent-filter>
     </activity>
     <!-- The launcher entries, one for each app icon; AppIcon.kt keeps exactly one enabled (yellow at first).

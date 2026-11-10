@@ -1,25 +1,25 @@
 default_platform(:android)
 
 # Paths are from the repo root (fastlane runs there); `sh` runs in fastlane/.
-AAB = "build/vitapmate-release.aab".freeze
-METADATA = "fastlane/metadata/android".freeze
-UPDATE_PRIORITY = 4
+AAB = 'build/vitapmate-release.aab'.freeze
+METADATA = 'fastlane/metadata/android'.freeze
+UPDATE_PRIORITY = 3
 
 # The versionCode the AAB is built with, from app/module.yaml.
 def version_code
-  File.read(File.expand_path("../app/module.yaml", __dir__))[/^\s*versionCode:\s*(\d+)/, 1] or
-    UI.user_error!("no versionCode in app/module.yaml")
+  File.read(File.expand_path('../app/module.yaml', __dir__))[/^\s*versionCode:\s*(\d+)/, 1] or
+    UI.user_error!('no versionCode in app/module.yaml')
 end
 
 platform :android do
-  desc "Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt"
+  desc 'Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt'
   lane :deploy_internal do |options|
-    sh("cd .. && mise run bundle") unless [false, "false"].include?(options[:build])
+    sh('cd .. && mise run bundle') unless [false, 'false'].include?(options[:build])
     code = version_code
     missing = Dir["#{METADATA}/*/"].reject { |dir| File.exist?("#{dir}changelogs/#{code}.txt") }
     UI.user_error!("no changelogs/#{code}.txt in #{missing.join(', ')}") unless missing.empty?
     upload_to_play_store(
-      track: "internal",
+      track: 'internal',
       aab: AAB,
       metadata_path: METADATA,
       skip_upload_apk: true,
@@ -30,11 +30,11 @@ platform :android do
     )
   end
 
-  desc "Promote the latest internal build to the closed (friends), alpha and beta tracks"
+  desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
   lane :promote_all do
     %w[friends alpha beta].each do |track|
       upload_to_play_store(
-        track: "internal",
+        track: 'internal',
         track_promote_to: track,
         skip_upload_changelogs: true,
         skip_upload_metadata: true,
@@ -46,7 +46,7 @@ platform :android do
     # Production stays a manual step in the Play Console.
   end
 
-  desc "Build, upload to internal, then promote through the testing tracks"
+  desc 'Build, upload to internal, then promote through the testing tracks'
   lane :deploy_all do
     deploy_internal
     promote_all
