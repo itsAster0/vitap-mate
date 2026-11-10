@@ -156,6 +156,7 @@ private const val OTP = "OTP"
 private const val NET = "rust.network"
 private const val AUTH = "rust.auth"
 private val ENDS = setOf("done", "failed", "cancelled")
+private val SERVER_ROUTES = setOf("server", "udp")
 
 private class MStep(val label: String, var state: StepState, val startT: Long) {
     var endT: Long? = null
@@ -268,6 +269,9 @@ private fun segment(lines: List<LogLine>, call: String?, label: String): List<MS
                 "captcha answer was rejected" in m -> cur.retries++
             }
             line.src == NET && m.startsWith("response ") -> hitOf(m)?.let { cur.pages += it }
+            // Server and UDP fetch VTOP on the server, so the phone logs no VTOP hits: the route is the hit.
+            m == "route used" && line.fields["route"]?.lowercase() in SERVER_ROUTES ->
+                cur.pages += PageHit(routeName(line.fields.getValue("route")), "200", line.t - cur.startT)
         }
     }
     val close = lines.last().takeIf { it.src.startsWith("core.") && it.msg == "done" && it.outcome != null } ?: return out
