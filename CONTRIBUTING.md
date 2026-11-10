@@ -1,17 +1,8 @@
 # Contributing
 
-Thanks for your interest in contributing.
+Pull requests for new features, bug fixes, security fixes and docs are welcome. Report a vulnerability privately as [SECURITY.md](SECURITY.md) describes, not in an issue.
 
-New features are welcomed.
-
-## What Contributions Are Accepted
-
-- New features
-- Security fixes
-- Bug fixes
-- Documentation improvements
-
-## Development Setup
+## Setup
 
 1. Install [mise](https://mise.jdx.dev), Rust (stable) with `cargo-ndk`, and the Android SDK and NDK.
 2. Run `mise install`.
@@ -19,15 +10,18 @@ New features are welcomed.
 4. Run `./kotlin build`.
 5. Run `./kotlin test -m core`.
 
-See the Development section of the [README](README.md) for running the app and release builds.
+The Development section of the [README](README.md) shows how to run the app on an emulator or a phone.
 
-## Pull Request Guidelines
+## Where code goes
 
-1. Keep changes focused and minimal.
-2. Include clear reproduction steps for bugs.
-3. Use concise commit messages that explain intent.
+Each screen is its own module in `features/<name>/` and depends only on `design`. A feature never imports another one; shared UI goes in `design/`, shared data in `core/`. A new VTOP page needs a parser in `rust/vtop-proto`, a call in `rust/vtop-core` and an export in `rust/vtop-ffi`. `AGENTS.md` has the full table, and `rust/ARCHITECTURE.md` explains the Rust crates and the server.
 
-## Code Style
+## Pull requests
 
-- Follow existing project style and lints.
-- Prefer small, reviewable PRs.
+- Keep one change per pull request, with a small diff.
+- Keep the look of the app the same unless the change is about the look. Use Material 3 Expressive components and theme colours.
+- For a bug, write the steps that show it.
+- Test on an emulator or a phone, not only with a build, and say what you tested.
+- Run `cargo fmt`, `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` in `rust/` when you change Rust.
+- Never log cookies, passwords, OTPs, CSRF tokens or keys.
+- Write commit messages as Conventional Commits (`feat:`, `fix:`, `docs:`), with a subject under 72 characters.
