@@ -14,6 +14,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -49,6 +50,9 @@ import vitapmate.data.OtpPrompt
 import vitapmate.data.SemesterChoice
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Avatar
+import vitapmate.ui.Feature
+import vitapmate.ui.PdfMenu
+import vitapmate.ui.rememberHaptics
 import vitapmate.ui.rememberNow
 import vitapmate.ui.seasonIcon
 import vitapmate.ui.shortSemesterName
@@ -56,9 +60,12 @@ import vitapmate.ui.shortSemesterName
 /** The signed-in username, for the avatar; null while unknown. */
 val LocalUser = staticCompositionLocalOf<String?> { null }
 
+/** "Refreshing attendance" as "Attendance": the spinner next to it already says it is loading, and the bar is short. */
+private fun thing(label: String) = label.removePrefix("Refreshing ").removePrefix("Loading ").replaceFirstChar { it.uppercase() }
+
 /**
- * The left of a tab's app bar: today's date, or what is running ("Refreshing attendance…" with a
- * spinner); tapping opens [ActivitySheet]. After it, a cloud-off icon while offline.
+ * The left of a tab's app bar: today's date, or what is running ("Attendance" with a spinner,
+ * "+2" when more run); tapping opens [ActivitySheet]. After it, a cloud-off icon while offline.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -66,22 +73,23 @@ fun TabBarLead() {
     var activity by rememberSaveable { mutableStateOf(false) }
     val now by rememberNow()
     val running = Activity.running.lastOrNull()
+    val label = running?.let { thing(it.label) + (Activity.running.size - 1).let { more -> if (more > 0) " +$more" else "" } }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             Modifier.clip(MaterialTheme.shapes.large).clickable { activity = true }.padding(horizontal = 8.dp, vertical = 6.dp).testTag("bar.activity"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AnimatedContent(
-                running?.label,
+                label,
                 transitionSpec = { (slideInVertically { it / 2 } + fadeIn()) togetherWith (slideOutVertically { -it / 2 } + fadeOut()) },
                 label = "bar-lead",
-            ) { label ->
+            ) { text ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (label != null) LoadingIndicator(Modifier.size(20.dp))
+                    if (text != null) LoadingIndicator(Modifier.size(20.dp))
                     Text(
-                        if (label != null) "$label…" else remember(now / 60_000) { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date(now)) },
+                        text ?: remember(now / 60_000) { SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date(now)) },
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (label != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        color = if (text != null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -99,13 +107,13 @@ fun TabBarLead() {
 
 /**
  * A pushed feature's title as the activity queue, like [TabBarLead]: [title], or what runs now
- * with a spinner; tapping opens [ActivitySheet]. Takes the bar's text style (large or collapsed).
+ * ("Attendance") with a spinner; tapping opens [ActivitySheet]. Takes the bar's text style (large or collapsed).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ActivityTitle(title: String) {
     var activity by rememberSaveable { mutableStateOf(false) }
-    val running = Activity.running.lastOrNull()?.label
+    val running = Activity.running.lastOrNull()?.label?.let(::thing)
     Box(Modifier.clip(MaterialTheme.shapes.large).clickable { activity = true }.testTag("bar.activity")) {
         AnimatedContent(
             running,
@@ -115,7 +123,7 @@ fun ActivityTitle(title: String) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (label != null) LoadingIndicator(Modifier.size(24.dp))
                 Text(
-                    if (label != null) "$label…" else title,
+                    label ?: title,
                     color = if (label != null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -128,24 +136,41 @@ fun ActivityTitle(title: String) {
 
 /**
  * The account button: the username's first letter in a circle, with a dot when something needs
- * attention (accent: the OTP is waiting, part of signing in; warning: offline or the last refresh failed).
+ * attention (accent: the OTP is waiting, part of signing in; warning: offline or the last refresh
+ * failed). A long press on a [feature] with a PDF offers to share or print it ([PdfMenu]).
  */
 @Composable
-fun AccountButton(onClick: () -> Unit) {
+fun AccountButton(feature: Feature?, onClick: () -> Unit) {
     val tones = AppTheme.tones
     val scheme = MaterialTheme.colorScheme
+    val haptics = rememberHaptics()
+    var menu by remember { mutableStateOf(false) }
+    val pdf = feature?.pdf
     val dot = when {
         OtpPrompt.message != null -> tones.accentTone.base
         Activity.offline || Activity.recent.firstOrNull()?.problem != null -> tones.warning.base
         else -> null
     }
-    IconButton(onClick, Modifier.testTag("header.account")) {
-        Box {
-            Avatar(LocalUser.current?.firstOrNull()?.uppercase().orEmpty(), 32.dp)
-            if (dot != null) {
-                Box(Modifier.align(Alignment.TopEnd).size(10.dp).border(2.dp, scheme.background, CircleShape).padding(2.dp).background(dot, CircleShape))
+    Box {
+        Box(
+            Modifier.size(48.dp).clip(CircleShape)
+                .combinedClickable(
+                    onClickLabel = "Settings",
+                    onLongClickLabel = if (pdf != null) "Share or print as PDF" else null,
+                    onLongClick = pdf?.let { { haptics.tick(); menu = true } },
+                    onClick = onClick,
+                )
+                .testTag("header.account"),
+            Alignment.Center,
+        ) {
+            Box {
+                Avatar(LocalUser.current?.firstOrNull()?.uppercase().orEmpty(), 32.dp)
+                if (dot != null) {
+                    Box(Modifier.align(Alignment.TopEnd).size(10.dp).border(2.dp, scheme.background, CircleShape).padding(2.dp).background(dot, CircleShape))
+                }
             }
         }
+        if (pdf != null) PdfMenu(feature.id, menu, { menu = false }, pdf)
     }
 }
 

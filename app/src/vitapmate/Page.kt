@@ -64,7 +64,7 @@ fun Page(
                     actions = {
                         actions()
                         SemesterButton()
-                        if (tag != SETTINGS) AccountButton { nav.push(Route.Screen(SETTINGS)) }
+                        if (tag != SETTINGS) AccountButton(featureById(tag)) { nav.push(Route.Screen(SETTINGS)) }
                     },
                     scrollBehavior = scroll,
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -86,7 +86,7 @@ fun Page(
                         actions()
                         if (feature) {
                             SemesterButton()
-                            AccountButton { nav.push(Route.Screen(SETTINGS)) }
+                            AccountButton(featureById(tag)) { nav.push(Route.Screen(SETTINGS)) }
                         }
                     },
                     scrollBehavior = scroll,

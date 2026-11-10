@@ -10,4 +10,5 @@ val timetableFeature = Feature(
     label = "Timetable",
     icon = Lucide.CalendarDays,
     actions = { TimetableViewToggleButton() },
+    pdf = ::timetablePdf,
 ) { TimetableScreen() }

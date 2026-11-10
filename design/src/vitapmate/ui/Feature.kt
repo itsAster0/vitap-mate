@@ -1,11 +1,13 @@
 package vitapmate.ui
 
+import android.content.Context
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.vector.ImageVector
+import java.io.File
 
 /**
  * A screen the app can show: in the nav bar, in More, as a route. Each feature module exposes
@@ -30,6 +32,11 @@ data class Feature(
      * tab (the VTOP web view, a full route in the Flutter app).
      */
     val fullScreen: Boolean = false,
+    /**
+     * Makes the page a PDF from what the app has saved (off the main thread; null when there is
+     * nothing yet). A long press on the account button then offers to share or print it ([PdfMenu]).
+     */
+    val pdf: (suspend (context: Context, flow: String) -> File?)? = null,
     val content: @Composable () -> Unit,
 )
 
