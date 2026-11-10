@@ -49,11 +49,61 @@ pub struct AccessKey {
     pub uses: Vec<KeyUse>,
 }
 
+/// Keys another phone answers for: they can be moved to this one ([`Core::move_keys`]).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct KeyPhone {
+    /// The phone's short id; None for phones no longer linked (nothing answers for their keys).
+    pub id: Option<String>,
+    pub label: Option<String>,
+    /// Unix seconds; None for phones no longer linked.
+    pub seen_at: Option<i64>,
+    pub keys: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
 pub struct ConnectedApps {
     /// This phone is one of the account's phones (it made a key, or linked before).
     pub linked: bool,
     pub keys: Vec<AccessKey>,
+    /// The other phones with keys, most keys first; the unlinked ones as one entry.
+    pub elsewhere: Vec<KeyPhone>,
+}
+
+/// The other phones that answer for keys, from the account view's `phones` and `keys`.
+fn elsewhere(view: &Value) -> Vec<KeyPhone> {
+    let list = |key: &str| view[key].as_array().cloned().unwrap_or_default();
+    let phones = list("phones");
+    let count = |phone: Option<&str>| {
+        list("keys")
+            .iter()
+            .filter(|key| match phone {
+                Some(id) => key["phoneId"] == id,
+                None => !phones.iter().any(|p| p["id"] == key["phoneId"]),
+            })
+            .count() as u32
+    };
+    let mut found: Vec<KeyPhone> = phones
+        .iter()
+        .filter(|phone| phone["thisPhone"] != true)
+        .filter_map(|phone| {
+            let id = phone["id"].as_str()?;
+            Some(KeyPhone {
+                id: Some(id.into()),
+                label: phone["label"].as_str().map(str::to_string),
+                seen_at: phone["seenAt"].as_i64(),
+                keys: count(Some(id)),
+            })
+        })
+        .collect();
+    found.push(KeyPhone {
+        id: None,
+        label: None,
+        seen_at: None,
+        keys: count(None),
+    });
+    found.retain(|phone| phone.keys > 0);
+    found.sort_by_key(|phone| std::cmp::Reverse(phone.keys));
+    found
 }
 
 /// The MCP client (Claude and others) whose sign-in page shows a pairing code: asked before the
@@ -188,8 +238,29 @@ impl Core {
                 .map(AccessKey::from)
                 .collect();
             let linked = view["thisPhone"].as_bool().unwrap_or(false);
-            info!(linked, keys = keys.len(), "connected apps");
-            Ok(ConnectedApps { linked, keys })
+            let elsewhere = if linked { elsewhere(&view) } else { vec![] };
+            info!(
+                linked,
+                keys = keys.len(),
+                elsewhere = elsewhere.len(),
+                "connected apps"
+            );
+            Ok(ConnectedApps {
+                linked,
+                keys,
+                elsewhere,
+            })
+        })
+        .await
+    }
+
+    /// Links this phone to the account without making a key (after a reinstall, so the keys
+    /// made before show again).
+    pub async fn link_phone(&self, flow: String) -> Result<(), CoreError> {
+        traced("link_phone", &flow, async {
+            let cookies = self.live_cookies().await?;
+            self.link_with(&self.forwarding_server(), &flow, &cookies)
+                .await
         })
         .await
     }
@@ -234,6 +305,26 @@ impl Core {
                 .map_err(refused)?;
             info!("key revoked");
             Ok(())
+        })
+        .await
+    }
+
+    /// Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
+    /// phones no longer linked; without `from`, only the latter. The number of keys moved.
+    pub async fn move_keys(&self, flow: String, from: Option<String>) -> Result<u32, CoreError> {
+        traced("move_keys", &flow, async {
+            let cookies = self.live_cookies().await?;
+            let mut body = json!({ "session": { "cookies": cookies } });
+            if let Some(from) = from {
+                body["from"] = json!(from);
+            }
+            let answer = self
+                .edge_post(&self.forwarding_server(), "/v1/keys/move", &flow, &body)
+                .await
+                .map_err(refused)?;
+            let moved = answer["moved"].as_u64().unwrap_or(0) as u32;
+            info!(moved, "keys moved");
+            Ok(moved)
         })
         .await
     }
@@ -304,6 +395,20 @@ impl Core {
         Ok(app)
     }
 
+    /// Adds this phone to the account's phones, with the semester picked here.
+    async fn link_with(&self, server: &str, flow: &str, cookies: &str) -> Result<(), CoreError> {
+        let mut link =
+            json!({ "session": { "cookies": cookies }, "label": crate::server::label() });
+        if let Some(semester) = self.read::<String>(crate::SELECTED) {
+            link["semesterId"] = json!(semester);
+        }
+        self.edge_post(server, "/v1/link", flow, &link)
+            .await
+            .map_err(refused)?;
+        info!("phone linked");
+        Ok(())
+    }
+
     async fn create_key_with(
         &self,
         server: &str,
@@ -326,14 +431,7 @@ impl Core {
         let answer = loop {
             match self.edge_post(server, "/v1/keys", flow, &body).await {
                 Err(error) if error.code() == "not_linked" && !linked_now => {
-                    let mut link = json!({ "session": session, "label": crate::server::label() });
-                    if let Some(semester) = self.read::<String>(crate::SELECTED) {
-                        link["semesterId"] = json!(semester);
-                    }
-                    self.edge_post(server, "/v1/link", flow, &link)
-                        .await
-                        .map_err(refused)?;
-                    info!("phone linked");
+                    self.link_with(server, flow, cookies).await?;
                     linked_now = true;
                 }
                 answer => break answer.map_err(refused)?,
@@ -485,6 +583,50 @@ mod tests {
             (KeyKind::Mcp, true, None)
         );
         assert!(keys[1].uses.is_empty());
+    }
+
+    #[test]
+    fn other_phones_with_keys_are_listed() {
+        let view = json!({
+            "phones": [
+                { "id": "me", "label": "Pixel", "seenAt": 9, "thisPhone": true },
+                { "id": "old", "label": "Pixel", "seenAt": 5, "thisPhone": false },
+                { "id": "idle", "label": "Tab", "seenAt": 4, "thisPhone": false },
+            ],
+            "keys": [
+                { "phoneId": "me" }, { "phoneId": "old" }, { "phoneId": "old" }, { "phoneId": "gone" },
+            ],
+        });
+        let found = elsewhere(&view);
+        assert_eq!(found.len(), 2);
+        assert_eq!(
+            (found[0].id.as_deref(), found[0].keys, found[0].seen_at),
+            (Some("old"), 2, Some(5))
+        );
+        assert_eq!((found[1].id.as_deref(), found[1].keys), (None, 1));
+    }
+
+    #[tokio::test]
+    async fn linking_sends_the_session_and_no_key() {
+        let core = core("link");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let server = serve(edge.clone()).await;
+        can(
+            &edge,
+            "/v1/link",
+            200,
+            json!({ "savedCredentials": false, "forwarding": false }),
+        );
+        core.link_with(&server, "f-link", "JSESSIONID=c")
+            .await
+            .unwrap();
+        let edge = edge.lock().unwrap();
+        let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
+        assert_eq!(paths, ["/v1/devices/register", "/v1/link"]);
+        assert_eq!(
+            edge.requests[1].body["session"],
+            json!({ "cookies": "JSESSIONID=c" })
+        );
     }
 
     #[tokio::test]

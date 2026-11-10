@@ -156,6 +156,7 @@ not one of the account's phones), `409 not_linked` (no phone linked yet).
 | `/v1/keys` | `{ session, label?, outings?, pairCode? }` | `201 { id, key, mcpUrl }` (the key is shown once); `409 key_limit`; with `pairCode` the extension that showed the code also gets the key (below) |
 | `/v1/keys/revoke` | `{ session, id }` | `204`; `404 key_not_found` |
 | `/v1/keys/outings` | `{ session, id, outings: bool }` | `204` |
+| `/v1/keys/move` | `{ session, from?: phoneId }` | `{ moved }`; this phone now answers for the keys of phone `from` (which is unlinked) and of phones no longer linked; without `from` only the latter; `404 phone_not_found` |
 | `/v1/account/settings` | `{ session, settings: { alwaysUseVault, phoneWaitSecs: 10\|20\|45, vaultTtlSecs: 86400\|172800\|null } }` | `204` |
 | `/v1/account/semester` | `{ session, semesterId }` | `204` |
 | `/v1/account/remove-phone` | `{ session, id }` (phone id from `/v1/account`) | `204`; `404 phone_not_found` |

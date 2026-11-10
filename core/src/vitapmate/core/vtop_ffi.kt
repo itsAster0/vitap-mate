@@ -972,6 +972,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_create_key(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_link_phone(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_move_keys(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_pair_app(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_revoke_key(
@@ -1217,6 +1221,10 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_connected_apps(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_create_key(`ptr`: Long,`flow`: RustBuffer.ByValue,`outings`: Byte,`pairCode`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_link_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_move_keys(`ptr`: Long,`flow`: RustBuffer.ByValue,`from`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_pair_app(`ptr`: Long,`flow`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,
     ): Long
@@ -1715,6 +1723,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_create_key() and 0xFFFF) != 2814) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_link_phone() and 0xFFFF) != 49712) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_move_keys() and 0xFFFF) != 63121) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_pair_app() and 0xFFFF) != 31779) {
@@ -2869,6 +2883,18 @@ public interface CoreInterface {
      * else for an MCP client. Links this phone first when it is not yet.
      */
     suspend fun `createKey`(`flow`: kotlin.String, `outings`: kotlin.Boolean, `pairCode`: kotlin.String?): NewKey
+    
+    /**
+     * Links this phone to the account without making a key (after a reinstall, so the keys
+     * made before show again).
+     */
+    suspend fun `linkPhone`(`flow`: kotlin.String)
+    
+    /**
+     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
+     * phones no longer linked; without `from`, only the latter. The number of keys moved.
+     */
+    suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?): kotlin.UInt
     
     /**
      * The MCP client behind a pairing code from its sign-in page; None for the extension's codes.
@@ -4604,6 +4630,60 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
         { FfiConverterTypeNewKey.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Links this phone to the account without making a key (after a reinstall, so the keys
+     * made before show again).
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `linkPhone`(`flow`: kotlin.String) {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_link_phone(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_void(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_void(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_void(future) },
+        // lift function
+        { },
+        
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Makes this phone answer for the keys of the phone `from` (which is unlinked) and of
+     * phones no longer linked; without `from`, only the latter. The number of keys moved.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `moveKeys`(`flow`: kotlin.String, `from`: kotlin.String?) : kotlin.UInt {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_move_keys(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterOptionalString.lower(`from`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_u32(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_u32(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_u32(future) },
+        // lift function
+        { FfiConverterUInt.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -8229,6 +8309,11 @@ data class ConnectedApps (
     var `linked`: kotlin.Boolean
     , 
     var `keys`: List<AccessKey>
+    , 
+    /**
+     * The other phones with keys, most keys first; the unlinked ones as one entry.
+     */
+    var `elsewhere`: List<KeyPhone>
     
 ){
     
@@ -8247,17 +8332,20 @@ public object FfiConverterTypeConnectedApps: FfiConverterRustBuffer<ConnectedApp
         return ConnectedApps(
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceTypeAccessKey.read(buf),
+            FfiConverterSequenceTypeKeyPhone.read(buf),
         )
     }
 
     override fun allocationSize(value: ConnectedApps) = (
             FfiConverterBoolean.allocationSize(value.`linked`) +
-            FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`)
+            FfiConverterSequenceTypeAccessKey.allocationSize(value.`keys`) +
+            FfiConverterSequenceTypeKeyPhone.allocationSize(value.`elsewhere`)
     )
 
     override fun write(value: ConnectedApps, buf: ByteBuffer) {
             FfiConverterBoolean.write(value.`linked`, buf)
             FfiConverterSequenceTypeAccessKey.write(value.`keys`, buf)
+            FfiConverterSequenceTypeKeyPhone.write(value.`elsewhere`, buf)
     }
 }
 
@@ -10774,6 +10862,63 @@ public object FfiConverterTypeHttpResponse: FfiConverterRustBuffer<HttpResponse>
 
 
 
+/**
+ * Keys another phone answers for: they can be moved to this one ([`Core::move_keys`]).
+ */
+data class KeyPhone (
+    /**
+     * The phone's short id; None for phones no longer linked (nothing answers for their keys).
+     */
+    var `id`: kotlin.String?
+    , 
+    var `label`: kotlin.String?
+    , 
+    /**
+     * Unix seconds; None for phones no longer linked.
+     */
+    var `seenAt`: kotlin.Long?
+    , 
+    var `keys`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeyPhone: FfiConverterRustBuffer<KeyPhone> {
+    override fun read(buf: ByteBuffer): KeyPhone {
+        return KeyPhone(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalString.read(buf),
+            FfiConverterOptionalLong.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: KeyPhone) = (
+            FfiConverterOptionalString.allocationSize(value.`id`) +
+            FfiConverterOptionalString.allocationSize(value.`label`) +
+            FfiConverterOptionalLong.allocationSize(value.`seenAt`) +
+            FfiConverterUInt.allocationSize(value.`keys`)
+    )
+
+    override fun write(value: KeyPhone, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`id`, buf)
+            FfiConverterOptionalString.write(value.`label`, buf)
+            FfiConverterOptionalLong.write(value.`seenAt`, buf)
+            FfiConverterUInt.write(value.`keys`, buf)
+    }
+}
+
+
+
 data class KeyUse (
     /**
      * Unix seconds.
@@ -11089,7 +11234,8 @@ public object FfiConverterTypeMarks: FfiConverterRustBuffer<Marks> {
  */
 data class MarksCourse (
     /**
-     * `<code>.theory` or `<code>.lab`, as `AttendanceCourse::key`.
+     * `<code>.theory` or `<code>.lab`, as `AttendanceCourse::key`, or `<code>.project` (kind
+     * [`ClassKind::Lab`]).
      */
     var `key`: kotlin.String
     , 
@@ -16779,6 +16925,34 @@ public object FfiConverterSequenceTypeHistoryCourse: FfiConverterRustBuffer<List
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeHistoryCourse.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeKeyPhone: FfiConverterRustBuffer<List<KeyPhone>> {
+    override fun read(buf: ByteBuffer): List<KeyPhone> {
+        val len = buf.getInt()
+        return List<KeyPhone>(len) {
+            FfiConverterTypeKeyPhone.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<KeyPhone>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeKeyPhone.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<KeyPhone>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeKeyPhone.write(it, buf)
         }
     }
 }

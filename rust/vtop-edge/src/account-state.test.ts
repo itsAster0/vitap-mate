@@ -257,6 +257,27 @@ describe("accounts", () => {
     expect(a.phonesForKey("mine")).toEqual([]);
   });
 
+  it("move another phone's keys and unlinked phones' keys to this one", () => {
+    const a = account();
+    a.addPhone(phone("old"));
+    a.addPhone(phone("other"));
+    a.addPhone(phone("new"));
+    a.addKey("k-old", "k", "old", NOW);
+    a.addKey("k-other", "k", "other", NOW);
+    a.addKey("k-gone", "k", "gone", NOW);
+    expect(a.moveKeys(phoneId("nope"), "new")).toBeNull();
+    expect(a.moveKeys(phoneId("new"), "new")).toBeNull();
+    expect(a.moveKeys(phoneId("old"), "new")).toBe(2);
+    expect(a.phonesForKey("k-old")).toEqual(["new"]);
+    expect(a.phonesForKey("k-gone")).toEqual(["new"]);
+    expect(a.phonesForKey("k-other")).toEqual(["other"]);
+    expect(a.phones.map((p) => p.deviceId)).toEqual(["other", "new"]);
+    // Without a phone: only the keys no linked phone answers for.
+    a.addKey("k-lost", "k", "lost", NOW);
+    expect(a.moveKeys(null, "new")).toBe(1);
+    expect(a.phones.length).toBe(2);
+  });
+
   it("reset the rate limit each minute", () => {
     const a = account();
     for (let i = 0; i < ACCOUNT_RATE_PER_MINUTE; i++) expect(a.allow(NOW)).toBe(true);

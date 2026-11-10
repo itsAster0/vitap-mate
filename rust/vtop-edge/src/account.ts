@@ -20,7 +20,7 @@
 // - Phones sign every call (auth.ts); a phone is its device id.
 // - The phone's answer to a request: `POST /v1/session/answer?account=`.
 // - The app, with a live VTOP session: `/v1/link`, `/v1/keys`,
-//   `/v1/keys/revoke`, `/v1/keys/outings`, `/v1/account`, `/v1/account/{
+//   `/v1/keys/revoke`, `/v1/keys/outings`, `/v1/keys/move`, `/v1/account`, `/v1/account/{
 //   forget-credentials,delete,settings,semester,remove-phone,clear-sign-ins}`. And without
 //   one: `/v1/account/credentials-rejected` (VTOP turned the password down
 //   on the phone, so the server must stop trying it too) and `/v1/app/*`.
@@ -119,7 +119,7 @@ async function forwardingMailbox(env: Env, ownerHash: string): Promise<string | 
 /** The routes this module answers at the edge. */
 export function handles(path: string): boolean {
   return (
-    ["/v1/whoami", "/v1/session", "/v1/pair", "/v1/pair/info", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/account"].includes(
+    ["/v1/whoami", "/v1/session", "/v1/pair", "/v1/pair/info", "/v1/link", "/v1/keys", "/v1/keys/revoke", "/v1/keys/outings", "/v1/keys/move", "/v1/account"].includes(
       path,
     ) ||
     path.startsWith("/v1/session/") ||
@@ -132,6 +132,7 @@ const APP_OPS: Record<string, AppOp> = {
   "/v1/keys": "create-key",
   "/v1/keys/revoke": "revoke-key",
   "/v1/keys/outings": "key-outings",
+  "/v1/keys/move": "move-keys",
   "/v1/account": "account",
   "/v1/account/forget-credentials": "forget-credentials",
   "/v1/account/delete": "delete",
@@ -287,6 +288,7 @@ type AppOp =
   | "create-key"
   | "revoke-key"
   | "key-outings"
+  | "move-keys"
   | "account"
   | "forget-credentials"
   | "delete"
@@ -1329,6 +1331,12 @@ export class Account extends DurableObject<Env> {
         }
         this.save(doc);
         return empty();
+      }
+      case "move-keys": {
+        const moved = doc.moveKeys(body.from === undefined ? null : (str(body.from) ?? ""), doc.phones[me!].deviceId);
+        if (moved === null) return error(404, "phone_not_found", "No such phone on this account.");
+        this.save(doc);
+        return Response.json({ moved });
       }
       case "revoke-key": {
         const revoked = doc.revokeKey(str(body.id) ?? "");

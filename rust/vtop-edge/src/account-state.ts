@@ -395,6 +395,22 @@ export class AccountRecord {
     return at < 0 ? null : this.phones.splice(at, 1)[0];
   }
 
+  /** Hands `to` (a linked install) the keys of the phone with short id
+   * `from`, and of phones no longer linked, then unlinks `from`: after a
+   * reinstall the old install can't answer for its keys. Without `from`,
+   * only the unlinked phones' keys. The number moved; null when `from` is
+   * no other phone of this account. */
+  moveKeys(from: string | null, to: string): number | null {
+    const source = from === null ? null : this.phones.find((p) => phoneId(p.deviceId) === from.trim());
+    if (from !== null && (!source || source.deviceId === to)) return null;
+    const moving = this.keys.filter(
+      (key) => key.deviceId === source?.deviceId || !this.phones.some((p) => p.deviceId === key.deviceId),
+    );
+    for (const key of moving) key.deviceId = to;
+    if (source) this.phones = this.phones.filter((p) => p !== source);
+    return moving.length;
+  }
+
   /** The installs a key's session requests go to: the phone that created
    * it, none once that phone is unlinked. */
   phonesForKey(keyHash: string): string[] {
