@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use tracing::{info, warn};
 use vtop_core::client::Hop;
-use vtop_shared::{device_sig, mail_seal};
+use vtop_shared::{device_sig, mail_seal, page_dictionary};
 
 use crate::{Core, CoreError, traced, transport, unix_now};
 
@@ -62,9 +62,11 @@ impl From<EdgeError> for CoreError {
     }
 }
 
-struct Answer {
+pub(crate) struct Answer {
     status: u16,
-    body: Value,
+    pub body: Value,
+    /// A page the engine packed with the page dictionary (`body` is then null).
+    pub packed: Option<Vec<u8>>,
 }
 
 impl Answer {
@@ -120,14 +122,24 @@ async fn send(
     };
     let response = transport.send(hop).await.map_err(|error| offline(&error))?;
     let status = response.status;
+    let packed = response.header("content-type") == Some(page_dictionary::CONTENT_TYPE);
+    let bytes = response.bytes().await.ok();
+    if packed {
+        return Ok(Answer {
+            status,
+            body: Value::Null,
+            packed: bytes,
+        });
+    }
     // 204 has no body.
-    let body = response
-        .bytes()
-        .await
-        .ok()
+    let body = bytes
         .and_then(|bytes| serde_json::from_slice(&bytes).ok())
         .unwrap_or(Value::Null);
-    Ok(Answer { status, body })
+    Ok(Answer {
+        status,
+        body,
+        packed: None,
+    })
 }
 
 /// The vm1 headers; `id` is None for registration, which the new key signs on its own.
@@ -235,6 +247,17 @@ impl Core {
         flow: &str,
         body: &Value,
     ) -> Result<Value, EdgeError> {
+        Ok(self.edge_answer(server, path, flow, body).await?.body)
+    }
+
+    /// As [`Self::edge_post`], with a packed page kept as it came.
+    pub(crate) async fn edge_answer(
+        &self,
+        server: &str,
+        path: &str,
+        flow: &str,
+        body: &Value,
+    ) -> Result<Answer, EdgeError> {
         let bytes = serde_json::to_vec(body).unwrap_or_default();
         for attempt in 0..2 {
             let id = self.device_id(server, flow).await?;
@@ -242,7 +265,7 @@ impl Core {
                 .signed_post(server, path, flow, &bytes, Some(&id))
                 .await?;
             if (200..300).contains(&answer.status) {
-                return Ok(answer.body);
+                return Ok(answer);
             }
             let error = answer.error();
             if error.code() == "unknown_device" && attempt == 0 {

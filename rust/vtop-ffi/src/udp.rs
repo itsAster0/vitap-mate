@@ -17,6 +17,7 @@ use vtop_shared::wire_page::{NEED_SESSION, WirePageRequest, WirePageResponse, se
 use vtop_shared::{device_sig, mail_seal};
 use vtop_wire::client::{self as wire, ClientConfig, WireError};
 
+use crate::route::unpacked;
 use crate::transport::{self, TransportError};
 use crate::{Core, unix_now};
 
@@ -169,8 +170,7 @@ impl Core {
             name: request.name.clone(),
             semester: request.semester.clone(),
             args: request.args.clone(),
-            // Plain JSON back: the app holds no page dictionary.
-            dictionary: None,
+            dictionary: request.dictionary.clone(),
             session_hash: session_hash(&session),
             session: None,
             account: None,
@@ -213,8 +213,11 @@ impl Core {
                 page.session = Some(session.clone());
                 continue;
             }
-            let mut body: Value = serde_json::from_slice(&answer.body)
-                .map_err(|_| format!("unreadable page from UDP (HTTP {})", answer.status))?;
+            let unreadable = || format!("unreadable page from UDP (HTTP {})", answer.status);
+            if answer.packed && answer.status == 200 {
+                return unpacked(&page.name, &answer.body).ok_or_else(unreadable);
+            }
+            let mut body: Value = serde_json::from_slice(&answer.body).map_err(|_| unreadable())?;
             if answer.status != 200 {
                 let code = body["code"].as_str().unwrap_or("unknown");
                 return Err(format!("the UDP gateway answered {} {code}", answer.status));
@@ -341,6 +344,7 @@ mod tests {
                     .and_then(|(n, from)| gateway.receive(&buf[..n], 0, from, Instant::now()));
                 if let Some(new) = new {
                     let page = WirePageRequest::decode(&new.body).unwrap();
+                    assert_eq!(page.dictionary.as_deref(), Some("d1c7"));
                     session = page.session.clone().or(session);
                     let (status, body) = match &session {
                         None => (NEED_SESSION, json!({ "code": "need_session" })),
@@ -389,7 +393,7 @@ mod tests {
             name: "attendance".into(),
             semester: Some("AP1".into()),
             args: Default::default(),
-            dictionary: None,
+            dictionary: Some("d1c7".into()),
         };
         set_udp_network(Arc::new(StdNetwork));
         let page = core.udp_page("0f10d00e", &request).await;

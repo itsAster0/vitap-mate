@@ -21,6 +21,7 @@ use vtop_core::client::{Hop, HopFuture, Transport};
 use vtop_core::config::DEFAULT_BASE_URL;
 use vtop_core::{SessionState, VtopError};
 use vtop_shared::engine::PageFetch;
+use vtop_shared::page_dictionary;
 
 use crate::device::EdgeError;
 use crate::{Core, CoreError, Slot, traced_sync, transport, unix_now};
@@ -319,7 +320,8 @@ impl Core {
                     .iter()
                     .map(|(key, value)| (key.to_string(), value.to_string()))
                     .collect(),
-                dictionary: None,
+                // Built in: the engine packs the page with it (plain JSON if its copy differs).
+                dictionary: Some(page_dictionary::id().to_string()),
             };
             match self.page_on_server(&flow, &request).await {
                 Ok(data) => {
@@ -371,10 +373,14 @@ impl Core {
         let body = serde_json::to_value(request).unwrap_or_default();
         let server = self.forwarding_server();
         let mut answer = self
-            .edge_post(&server, "/v1/vtop/fetch", flow, &body)
+            .edge_answer(&server, "/v1/vtop/fetch", flow, &body)
             .await?;
         used(Route::Server);
-        Ok(answer["data"].take())
+        match answer.packed {
+            Some(packed) => unpacked(&request.name, &packed)
+                .ok_or_else(|| ServerError::Failed(format!("unreadable packed {}", request.name))),
+            None => Ok(answer.body["data"].take()),
+        }
     }
 
     /// Signs in on the server with the saved password, as [`Core::relogin`] does on the phone,
@@ -467,6 +473,12 @@ impl Core {
         }
         Ok(())
     }
+}
+
+/// A page the engine packed with the page dictionary, as its `data`; both server routes
+/// (HTTPS and UDP) get pages this way.
+pub(crate) fn unpacked(name: &str, packed: &[u8]) -> Option<Value> {
+    serde_json::from_slice(&page_dictionary::unpack(name, packed).ok()?).ok()
 }
 
 #[cfg(test)]
