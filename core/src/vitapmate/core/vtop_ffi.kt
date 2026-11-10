@@ -7133,7 +7133,7 @@ public object FfiConverterTypeAccessKey: FfiConverterRustBuffer<AccessKey> {
 
 
 /**
- * One address as a line of text ("Current", "3rd Floor, ..., Guntur, Andhra Pradesh 522006, India").
+ * One address as a line of text ("Current", "2nd Floor, ..., Amaravati, Andhra Pradesh 522000, India").
  */
 data class Address (
     var `title`: kotlin.String

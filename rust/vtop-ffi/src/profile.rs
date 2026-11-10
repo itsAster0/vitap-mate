@@ -60,7 +60,7 @@ pub struct Contact {
     pub kind: ContactKind,
 }
 
-/// One address as a line of text ("Current", "3rd Floor, ..., Guntur, Andhra Pradesh 522006, India").
+/// One address as a line of text ("Current", "2nd Floor, ..., Amaravati, Andhra Pradesh 522000, India").
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct Address {
     pub title: String,
@@ -664,7 +664,7 @@ mod tests {
                             "",
                             vec![
                                 field("STUDENT NAME", "PRIYA SHARMA"),
-                                field("DATE OF BIRTH", "01-JAN-2004"),
+                                field("DATE OF BIRTH", "01-JAN-2000"),
                                 field("MOBILE NUMBER", "9876543210"),
                                 field("AADHAR NUMBER", "123412341234"),
                                 field("NATIVE LANGUAGE", "-"),
@@ -673,10 +673,10 @@ mod tests {
                         group(
                             "CURRENT ADDRESS",
                             vec![
-                                field("STREET", "3RD FLOOR,SAMPLE APARTMENTS"),
-                                field("CITY", "GUNTUR"),
+                                field("STREET", "2ND FLOOR,SAMPLE APARTMENTS"),
+                                field("CITY", "AMARAVATI"),
                                 field("STATE", "ANDHRA PRADESH"),
-                                field("PINCODE", "522006"),
+                                field("PINCODE", "522000"),
                                 field("COUNTRY", "INDIA"),
                                 field("EMAIL", "me@example.com"),
                             ],
@@ -746,7 +746,7 @@ mod tests {
         assert_eq!(p.addresses[0].title, "Current");
         assert_eq!(
             p.addresses[0].text,
-            "3rd Floor, Sample Apartments, Guntur, Andhra Pradesh 522006, India"
+            "2nd Floor, Sample Apartments, Amaravati, Andhra Pradesh 522000, India"
         );
         let father = &p.parents[0];
         assert_eq!(
