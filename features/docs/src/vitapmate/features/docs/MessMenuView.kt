@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import vitapmate.ui.Radii
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -32,6 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -49,7 +49,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +88,7 @@ import vitapmate.ui.EmptyView
 import vitapmate.ui.PressScale
 import vitapmate.ui.Space
 import vitapmate.ui.Surface
+import vitapmate.ui.Tone
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.clock
 import vitapmate.ui.formatDay
@@ -162,7 +165,7 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
                     Text(
                         if (onToday) "Today" else formatDay(day, "EEEE"),
                         Modifier.padding(start = 2.dp, top = Space.lg),
-                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        style = MaterialTheme.typography.headlineMediumEmphasized,
                     )
                     Text(
                         formatDay(day, if (onToday) "EEEE, d MMMM" else "d MMMM"),
@@ -173,6 +176,9 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
                     if (!sheet.days.containsKey(dom)) {
                         EmptyView(Lucide.UtensilsCrossed, "No menu for this day")
                     } else {
+                        // The day's meals as one segmented stack: small inner corners, the ends rounded.
+                        val end = MaterialTheme.shapes.extraLarge.topStart
+                        val inner = CornerSize(8.dp)
                         Meal.entries.forEach { meal ->
                             val status = when {
                                 focusMeal == null -> if (onToday) MealStatus.Past else MealStatus.Normal
@@ -180,7 +186,13 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
                                 meal.ordinal < focusMeal.ordinal -> MealStatus.Past
                                 else -> MealStatus.Normal
                             }
-                            MealCard(meal, sheet.itemsFor(dom, meal), windows.getValue(meal), status, Modifier.padding(bottom = Space.sm + 2.dp))
+                            val shape = RoundedCornerShape(
+                                topStart = if (meal.ordinal == 0) end else inner,
+                                topEnd = if (meal.ordinal == 0) end else inner,
+                                bottomEnd = if (meal.ordinal == Meal.entries.lastIndex) end else inner,
+                                bottomStart = if (meal.ordinal == Meal.entries.lastIndex) end else inner,
+                            )
+                            MealCard(meal, sheet.itemsFor(dom, meal), windows.getValue(meal), status, Modifier.padding(bottom = 3.dp), shape = shape)
                         }
                     }
                 }
@@ -188,7 +200,11 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
         }
         if (sheet.instructions.isNotEmpty()) {
             item {
-                Surface(Modifier.fillMaxWidth().padding(top = Space.xs).testTag("docs.mess.rules"), onPress = { showRules = !showRules }, padding = PaddingValues(Space.md)) {
+                Surface(
+                    Modifier.fillMaxWidth().padding(top = Space.sm).clip(MaterialTheme.shapes.extraLarge).testTag("docs.mess.rules"),
+                    onPress = { showRules = !showRules },
+                    padding = PaddingValues(Space.lg),
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Lucide.ClipboardList, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(Space.md))
@@ -278,7 +294,10 @@ private fun WeekStrip(first: Int, last: Int, today: Int, selected: Int, onSelect
 
 private enum class MealStatus { Normal, Past, Now, Next }
 
-/** A meal: name, serving hours and its dishes; the one on now (or next) on the primary container. */
+/**
+ * A meal: name, serving hours and its dishes; the one on now (or next) is the hero, on the accent
+ * tone with a larger title. [shape] is its place in the day's stack.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MealCard(
@@ -289,42 +308,50 @@ private fun MealCard(
     modifier: Modifier = Modifier,
     framed: Boolean = true,
     whenLabel: String? = null,
+    shape: Shape = RoundedCornerShape(8.dp),
 ) {
     val scheme = MaterialTheme.colorScheme
+    val accent = AppTheme.tones.accentTone
     val live = status == MealStatus.Now || status == MealStatus.Next
+    val hero = live && framed
     val h24 = is24Hour()
-    val container by animateColorAsState(if (live && framed) scheme.primaryContainer else AppTheme.colors.card, spring(stiffness = Spring.StiffnessMediumLow))
-    val content = if (live && framed) scheme.onPrimaryContainer else scheme.onSurface
+    val container by animateColorAsState(if (hero) accent.subtle else AppTheme.colors.card, spring(stiffness = Spring.StiffnessMediumLow))
+    val content = scheme.onSurface
+    val secondary = if (hero) accent.onSubtle else content.copy(alpha = 0.72f)
     val body = @Composable {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(listOfNotNull(whenLabel, meal.label).joinToString(" · "), style = MaterialTheme.typography.titleMediumEmphasized, color = content)
+                    Text(
+                        listOfNotNull(whenLabel, meal.label).joinToString(" · "),
+                        style = if (hero) MaterialTheme.typography.headlineSmallEmphasized else MaterialTheme.typography.titleMediumEmphasized,
+                        color = content,
+                    )
                     Text(
                         "${clock(window.start, h24)} – ${clock(window.end, h24)}",
                         style = MaterialTheme.typography.labelMedium.nums(),
-                        color = content.copy(alpha = 0.72f),
+                        color = secondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (status == MealStatus.Now) ToneBadge("NOW", tone = AppTheme.tones.accentTone, solid = true)
-                if (status == MealStatus.Next) ToneBadge("NEXT", tone = AppTheme.tones.accentTone)
+                if (status == MealStatus.Now) ToneBadge("Now", tone = accent, solid = true)
+                // On the hero the subtle fill would vanish, so Next sits on the inset instead.
+                if (status == MealStatus.Next) ToneBadge("Next", tone = if (hero) Tone(accent.base, scheme.surfaceContainerLowest.copy(alpha = 0.7f), accent.onSubtle) else accent)
             }
             Spacer(Modifier.height(Space.md))
             if (items.isEmpty()) {
-                Text("Nothing listed", style = MaterialTheme.typography.bodyMedium, color = content.copy(alpha = 0.72f))
+                Text("Nothing listed", style = MaterialTheme.typography.bodyMedium, color = secondary)
             } else {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items.forEach { ItemPill(it, live && framed) } }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) { items.forEach { ItemPill(it, hero) } }
             }
         }
     }
     if (!framed) return body()
     val fade by animateFloatAsState(if (status == MealStatus.Past) 0.55f else 1f, spring(stiffness = Spring.StiffnessMediumLow))
-    Surface(
-        modifier.fillMaxWidth().alpha(fade).testTag("docs.mess.meal.${meal.name.lowercase()}"),
-        padding = PaddingValues(Space.lg),
-        color = container,
+    Box(
+        modifier.fillMaxWidth().alpha(fade).background(container, shape).padding(horizontal = 18.dp, vertical = Space.lg)
+            .testTag("docs.mess.meal.${meal.name.lowercase()}"),
     ) { body() }
 }
 
@@ -333,7 +360,7 @@ private fun MealCard(
 private fun ItemPill(item: MessItem, onLive: Boolean) {
     val scheme = MaterialTheme.colorScheme
     Row(
-        Modifier.background(if (onLive) scheme.surfaceContainerLowest.copy(alpha = 0.7f) else scheme.surfaceContainerHigh, RoundedCornerShape(Radii.sm))
+        Modifier.background(if (onLive) scheme.surfaceContainerLowest.copy(alpha = 0.7f) else scheme.surfaceContainerHigh, RoundedCornerShape(10.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

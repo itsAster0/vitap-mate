@@ -33,10 +33,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -93,7 +94,6 @@ import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.LocalOpenDetail
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
-import vitapmate.ui.Surface
 import vitapmate.ui.Tone
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.neutralTone
@@ -193,19 +193,25 @@ internal fun DocsScreen() {
         Modifier.fillMaxSize().testTag("docs.grid"),
         grid,
         PaddingValues(start = Space.sm, end = Space.sm, bottom = bottom + Space.lg),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }, key = "search") { SearchRow(query, { query = it }, sort) }
         item(span = { GridItemSpan(maxLineSpan) }, key = "count") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    if (searching) "${shown.size} of ${all.size} documents" else "${all.size} document${if (all.size == 1) "" else "s"}",
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                FilledTonalButton({ import(false) }, Modifier.testTag("docs.add")) {
+                Column(Modifier.weight(1f).padding(start = Space.xs)) {
+                    Text(
+                        if (searching) "${shown.size} of ${all.size} documents" else "${all.size} document${if (all.size == 1) "" else "s"}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        if (sort == DocSort.RecentlyOpened || sort == DocSort.RecentlyAdded) "${sort.label} first" else sort.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Button({ import(false) }, Modifier.testTag("docs.add")) {
                     Icon(Lucide.FilePlus, null, Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Add")
@@ -247,15 +253,22 @@ private fun SearchRow(query: String, onQuery: (String) -> Unit, sort: DocSort) {
             IconButton({ menu = true }, Modifier.testTag("docs.sort")) { Icon(Lucide.ArrowUpDown, "Sort") }
             DropdownMenu(menu, { menu = false }, Modifier.testTag("docs.sort.menu")) {
                 DocSort.entries.forEach { option ->
+                    val picked = option == sort
                     DropdownMenuItem(
-                        text = { Text(option.label) },
+                        text = { Text(option.label, fontWeight = if (picked) FontWeight.SemiBold else null) },
                         onClick = {
                             menu = false
                             Docs.sort = option
                             scope.logAction("docs.sort", SRC, "sort ${option.name}")
                         },
-                        leadingIcon = { Icon(if (option == sort) Lucide.Check else Lucide.ArrowUpDown, null, Modifier.size(18.dp)) },
-                        modifier = Modifier.testTag("docs.sort.${option.name.lowercase()}"),
+                        leadingIcon = { Icon(if (picked) Lucide.Check else Lucide.ArrowUpDown, null, Modifier.size(18.dp)) },
+                        modifier = Modifier.padding(horizontal = 6.dp).clip(RoundedCornerShape(14.dp))
+                            .background(if (picked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
+                            .testTag("docs.sort.${option.name.lowercase()}"),
+                        colors = if (picked) MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            leadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ) else MenuDefaults.itemColors(),
                     )
                 }
             }
@@ -277,12 +290,12 @@ private fun visualOf(doc: Doc): Pair<Tone, ImageVector> {
     }
 }
 
-private fun kindLabel(doc: Doc) = if (doc.asMessMenu) "MENU" else when (doc.kind) {
+private fun kindLabel(doc: Doc) = if (doc.asMessMenu) "Menu" else when (doc.kind) {
     DocKind.Pdf -> "PDF"
-    DocKind.Image -> "IMAGE"
-    DocKind.Spreadsheet -> "SHEET"
-    DocKind.Text -> "TEXT"
-    DocKind.File -> "FILE"
+    DocKind.Image -> "Image"
+    DocKind.Spreadsheet -> "Sheet"
+    DocKind.Text -> "Text"
+    DocKind.File -> "File"
 }
 
 private fun openedLabel(ms: Long?): String {
@@ -310,61 +323,69 @@ private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit
         delay((index.coerceAtMost(10) * 40).toLong())
         enter.animateTo(1f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow))
     }
-    Surface(
-        modifier.height(140.dp).fillMaxWidth()
+    Column(
+        modifier.height(152.dp).fillMaxWidth()
             .graphicsLayer {
                 alpha = enter.value.coerceIn(0f, 1f)
                 translationY = (1 - enter.value) * 40f
                 scaleX = press
                 scaleY = press
             }
-            .clip(RoundedCornerShape(Radii.lg))
+            .clip(RoundedCornerShape(26.dp))
+            .background(AppTheme.colors.card)
             .combinedClickable(interaction, null, onClick = onOpen, onLongClick = {
                 haptics.longPress()
                 onLongPress()
             })
             .testTag("docs.card.${doc.id}"),
-        padding = PaddingValues(Space.md + 2.dp),
     ) {
-        Column(Modifier.fillMaxSize()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(36.dp).background(tone.subtle, RoundedCornerShape(Radii.sm + 2.dp)), Alignment.Center) {
-                    Icon(icon, null, Modifier.size(18.dp), tint = tone.base)
-                }
-                Spacer(Modifier.weight(1f))
-                ToneBadge(kindLabel(doc))
-            }
+        // A band in the kind's tone, so kinds tell apart across the grid.
+        Row(Modifier.fillMaxWidth().height(66.dp).background(tone.subtle).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(28.dp), tint = tone.base)
             Spacer(Modifier.weight(1f))
-            Text(doc.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
+            ToneBadge(kindLabel(doc), tone = Tone(tone.base, MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), tone.onSubtle))
+        }
+        Column(Modifier.weight(1f).padding(start = 14.dp, top = 10.dp, end = 14.dp, bottom = 14.dp)) {
+            Text(doc.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(Space.xs))
             Text(openedLabel(doc.lastOpenedAt), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
     }
 }
 
-/** "Continue viewing": the last opened document, live in a short window, with Full screen. */
+/**
+ * "Continue viewing": the last opened document in its kind's tone, live in a short window, with
+ * Full screen under it; header and window are one stack.
+ */
 @Composable
 private fun Recent(doc: Doc, onOpen: () -> Unit) {
     val (tone, icon) = visualOf(doc)
-    Surface(Modifier.fillMaxWidth().padding(bottom = Space.xs).testTag("docs.recent"), padding = PaddingValues(0.dp)) {
-        Column {
-            Row(Modifier.padding(start = 14.dp, top = 12.dp, end = 10.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(36.dp).background(tone.subtle, RoundedCornerShape(10.dp)), Alignment.Center) { Icon(icon, null, Modifier.size(19.dp), tint = tone.base) }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Continue viewing", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(doc.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                FilledTonalButton(onOpen, Modifier.testTag("docs.recent.open"), contentPadding = PaddingValues(horizontal = 12.dp)) {
-                    Icon(Lucide.ExternalLink, null, Modifier.size(15.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Full screen")
-                }
+    val inner = RoundedCornerShape(6.dp)
+    Column(
+        Modifier.fillMaxWidth().padding(bottom = Space.xs).clip(MaterialTheme.shapes.extraLarge).testTag("docs.recent"),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Row(Modifier.fillMaxWidth().background(tone.subtle, inner).padding(horizontal = Space.lg, vertical = Space.md), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(46.dp).background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), RoundedCornerShape(15.dp)), Alignment.Center) {
+                Icon(icon, null, Modifier.size(22.dp), tint = tone.base)
             }
-            Box(
-                Modifier.fillMaxWidth().height(210.dp).clip(RoundedCornerShape(bottomStart = Radii.lg, bottomEnd = Radii.lg))
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
-            ) { DocContent(doc, embedded = true) }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Continue viewing", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = tone.onSubtle)
+                Text(doc.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Column(Modifier.fillMaxWidth().background(AppTheme.colors.card, inner)) {
+            Box(Modifier.fillMaxWidth().height(210.dp)) { DocContent(doc, embedded = true) }
+            Button(
+                onOpen,
+                Modifier.fillMaxWidth().padding(start = Space.md, end = Space.md, bottom = Space.md).height(46.dp).testTag("docs.recent.open"),
+                colors = ButtonDefaults.buttonColors(containerColor = tone.base, contentColor = AppTheme.colors.background),
+            ) {
+                Icon(Lucide.ExternalLink, null, Modifier.size(16.dp))
+                Spacer(Modifier.width(Space.sm))
+                Text("Full screen")
+            }
         }
     }
 }

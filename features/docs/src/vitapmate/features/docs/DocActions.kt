@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -65,6 +67,7 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
 import vitapmate.ui.LocalContentPadding
+import vitapmate.ui.Radii
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
 
@@ -157,7 +160,7 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
                     }
                     Action(Lucide.Share2, "Share", "docs.action.share") { close { onDismiss(); act("share") { share(context, doc) } } }
                     Action(Lucide.ExternalLink, "Open with…", "docs.action.open_with") { close { onDismiss(); act("open_with") { openWith(context, doc) } } }
-                    Action(Lucide.Trash2, "Delete", "docs.action.delete", AppTheme.tones.danger.base) { close { dialog = "delete" } }
+                    Action(Lucide.Trash2, "Delete", "docs.action.delete", AppTheme.tones.danger.base, AppTheme.tones.danger.subtle) { close { dialog = "delete" } }
                 }
             }
         }
@@ -188,12 +191,14 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
     }
 }
 
+/** A row in the sheet; a [fill] (Delete's danger tint) sets it apart as a pill. */
 @Composable
-private fun Action(icon: ImageVector, label: String, tag: String, tint: Color = Color.Unspecified, onClick: () -> Unit) {
+private fun Action(icon: ImageVector, label: String, tag: String, tint: Color = Color.Unspecified, fill: Color = Color.Transparent, onClick: () -> Unit) {
+    val pill = if (fill == Color.Transparent) Modifier else Modifier.padding(start = Space.md, top = Space.xs, end = Space.md).clip(RoundedCornerShape(Radii.pill))
     ListItem(
         headlineContent = { Text(label, color = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurface else tint) },
-        modifier = Modifier.testTag(tag).clickable(onClick = onClick).padding(horizontal = Space.sm),
+        modifier = Modifier.testTag(tag).then(pill).clickable(onClick = onClick).padding(horizontal = Space.sm),
         leadingContent = { Icon(icon, null, tint = if (tint == Color.Unspecified) MaterialTheme.colorScheme.onSurfaceVariant else tint) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        colors = ListItemDefaults.colors(containerColor = fill),
     )
 }
