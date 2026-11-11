@@ -3,40 +3,44 @@ package vitapmate.features.calendar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import vitapmate.core.CalendarEvent
 import vitapmate.core.CalendarEventPart
 import vitapmate.core.CalendarMonth
+import vitapmate.ui.AppTheme
 import vitapmate.ui.Dot
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
-import vitapmate.ui.Surface
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.formatDay
 import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
 
-/** The rows touching [month] (a run from a neighbouring month included whole); past ones fade. */
+/**
+ * The rows touching [month] (a run from a neighbouring month included whole) as segments, each led
+ * by its date in the mark's tone; past ones fade.
+ */
 @Composable
 fun MonthEvents(month: CalendarMonth, today: Int, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -51,15 +55,15 @@ fun MonthEvents(month: CalendarMonth, today: Int, modifier: Modifier = Modifier)
         return
     }
     val firstOfMonth = month.days.first().day
-    Surface(modifier.fillMaxWidth(), padding = PaddingValues(0.dp)) {
-        Column {
-            month.events.forEachIndexed { i, event ->
-                if (i > 0) HorizontalDivider(Modifier.padding(start = 64.dp), color = scheme.outlineVariant)
-                EventRow(event, startsBefore = event.first < firstOfMonth, past = event.last < today)
-            }
+    // Segments: the group's outer corners are large, each row's own corners small.
+    Column(modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        month.events.forEach { event ->
+            EventRow(event, startsBefore = event.first < firstOfMonth, past = event.last < today)
         }
     }
 }
+
+private val DATE_WIDTH = 48.dp
 
 @Composable
 private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean) {
@@ -72,18 +76,25 @@ private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean)
         if (range) "${formatDay(event.first, if (sameMonth(event)) "EEE d" else "EEE d MMM")} – ${formatDay(event.last, "EEE d MMM")}" else null,
         if (range && !mixed) "$days days" else null,
     ).joinToString(" · ")
-    Column(Modifier.alpha(if (past) 0.5f else 1f).testTag("calendar.event.${event.firstDate}").padding(horizontal = Space.lg, vertical = Space.md)) {
+    Column(
+        Modifier.fillMaxWidth().alpha(if (past) 0.5f else 1f).background(AppTheme.colors.card, RoundedCornerShape(6.dp))
+            .testTag("calendar.event.${event.firstDate}").padding(horizontal = Space.lg, vertical = Space.md),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.width(36.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.size(DATE_WIDTH, 52.dp).background(tone.subtle, RoundedCornerShape(16.dp)),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 // A run begun last month shows that month, not a weekday.
                 Text(
-                    formatDay(event.first, if (startsBefore) "MMM" else "EEE").uppercase(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = scheme.onSurfaceVariant,
+                    formatDay(event.first, if (startsBefore) "MMM" else "EEE"),
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = tone.onSubtle,
                 )
-                Text(formatDay(event.first, "d"), style = MaterialTheme.typography.titleLarge.nums(fontWeight = FontWeight.SemiBold, color = scheme.onSurface))
+                Text(formatDay(event.first, "d"), style = MaterialTheme.typography.titleLarge.nums(fontWeight = FontWeight.ExtraBold, color = tone.onSubtle, lineHeight = 22.sp))
             }
-            Spacer(Modifier.width(Space.md))
+            Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(event.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty()) {
@@ -91,12 +102,12 @@ private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean)
                 }
             }
             Spacer(Modifier.width(Space.sm))
-            ToneBadge(markLabel(event.mark).uppercase(), tone = tone)
+            ToneBadge(markLabel(event.mark), tone = tone)
         }
         // Days off for different reasons: one row, each reason on its own line.
         if (mixed) {
             Spacer(Modifier.height(Space.sm))
-            Column(Modifier.padding(start = 36.dp + Space.md), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+            Column(Modifier.padding(start = DATE_WIDTH + 14.dp), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
                 event.parts.forEach { PartLine(it) }
             }
         }

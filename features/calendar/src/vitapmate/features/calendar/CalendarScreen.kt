@@ -161,8 +161,8 @@ private fun CalendarContent(cal: AcademicCalendar) {
 @Composable
 private fun CalendarSkeleton() {
     Column(Modifier.fillMaxSize().padding(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.md)) {
-        Skeleton(width = Space.xxl * 6, height = 18.dp)
-        Skeleton(Modifier.fillMaxWidth(), height = 340.dp, radius = Radii.lg)
-        repeat(4) { Skeleton(Modifier.fillMaxWidth(), height = 52.dp) }
+        Skeleton(Modifier.fillMaxWidth(), height = 96.dp, radius = Radii.xl)
+        Skeleton(Modifier.fillMaxWidth(), height = 360.dp, radius = Radii.lg)
+        repeat(4) { Skeleton(Modifier.fillMaxWidth(), height = 76.dp) }
     }
 }
