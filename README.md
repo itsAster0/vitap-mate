@@ -10,7 +10,7 @@ vitapmate is independent of VIT-AP University.
 
 ## Install
 
-Install vitapmate from Google Play (`com.vitap_pal.app`), or download `vitapmate.apk` from the [nightly release](https://github.com/itsAster0/vitap-mate/releases/tag/nightly) and open it on the phone. A push to `main` rebuilds the nightly. It runs on 64-bit ARM phones with Android 9 or newer.
+Install vitapmate from Google Play (`com.vitap_pal.app`), or download `vitapmate.apk` from the [nightly release](https://github.com/itsAster0/vitap-mate/releases/tag/nightly) and open it on the phone (`vitapmate-32bit.apk` on phones running 32-bit Android). A push to `main` rebuilds the nightly. It runs on ARM phones with Android 9 or newer.
 
 ## Features
 

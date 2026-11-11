@@ -37,7 +37,8 @@ settings:
     versionName: "3.0.1"
     namespace: vitapmate
     minSdk: 28
-    abiFilters: [arm64-v8a]
+    # armeabi-v7a: phones on 32-bit Android (mise run rust-android builds both).
+    abiFilters: [arm64-v8a, armeabi-v7a]
     resourcePackaging:
       excludes:
         - META-INF/*.version

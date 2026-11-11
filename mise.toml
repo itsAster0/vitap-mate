@@ -7,11 +7,12 @@ kotlin-toolchain = { version = "0.13.0", bin = "kotlin", checksum_url = "https:/
 ruby = "3.4.12"
 
 [tasks.rust-android]
-description = "Build libvtop_ffi.so (arm64: phones and Apple-silicon emulators) into app/jniLibs and generate the Kotlin bindings"
+description = "Build libvtop_ffi.so (arm64: phones and Apple-silicon emulators; armeabi-v7a: phones on 32-bit Android) into app/jniLibs and generate the Kotlin bindings"
 dir = "rust"
 run = [
-  # API 28 = the app's minSdk (ATrace needs 23+).
-  "cargo ndk -t arm64-v8a -P 28 -o ../app/jniLibs build --release -p vtop-ffi",
+  # API 28 = the app's minSdk (ATrace needs 23+). armeabi-v7a: budget phones with a 64-bit
+  # chip on 32-bit Android (Redmi 9A/9i/9C, Galaxy A13/A03), which Play hides 64-bit-only apps from.
+  "cargo ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs build --release -p vtop-ffi",
   # Bindgen reads the metadata from a host build: the stripped Android .so
   # keeps only dynamic symbols, which bindgen does not read. Same API.
   # The host library is .dylib on macOS, .so on Linux (CI).
@@ -66,29 +67,36 @@ echo "wrote app/keystore.properties (keystore $store)"
 '''
 
 [tasks.release]
-description = "Signed, minified release APK: build/vitapmate-release.apk"
+description = "Signed, minified release APK for 64-bit phones: build/vitapmate-release.apk (--both: also build/vitapmate-release-32bit.apk)"
 depends = ["signing"]
+usage = 'flag "--both" help="Also build build/vitapmate-release-32bit.apk, for phones on 32-bit Android"'
 run = '''
 set -eu
 ./kotlin build -v release
-apk=build/vitapmate-release.apk
 tools="$(ls -d "${ANDROID_HOME:-$HOME/Library/Android/sdk}"/build-tools/* | tail -1)"
 # English only: the app has no translations, but its libraries bring ~80 locales (about 445 KB of
 # resources.arsc). Play's AAB already splits by language; this is for the sideloaded APK.
 tmp="$(mktemp -d)"
 "$tools/aapt2" optimize -c en -o "$tmp/en.apk" build/tasks/_app_buildAndroidRelease/gradle-project-release.apk
-"$tools/zipalign" -P 16 -f 4 "$tmp/en.apk" "$tmp/aligned.apk"
 prop() { sed -n "s/^$1=//p" app/keystore.properties; }
-STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign \
-  --ks "$(prop storeFile)" --ks-key-alias "$(prop keyAlias)" \
-  --ks-pass env:STORE_PASS --key-pass env:KEY_PASS --out "$apk" "$tmp/aligned.apk"
+# The build holds both ABIs (the AAB needs them); each APK keeps one, so neither carries the other's libraries.
+apk() {
+  cp "$tmp/en.apk" "$tmp/$1.apk"
+  zip -qd "$tmp/$1.apk" "lib/$2/*"
+  "$tools/zipalign" -P 16 -f 4 "$tmp/$1.apk" "$tmp/$1-aligned.apk"
+  STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign \
+    --ks "$(prop storeFile)" --ks-key-alias "$(prop keyAlias)" \
+    --ks-pass env:STORE_PASS --key-pass env:KEY_PASS --out "$3" "$tmp/$1-aligned.apk"
+  "$tools/apksigner" verify "$3"
+  echo "$3 (phone: adb install -r $3)"
+}
+apk arm64 armeabi-v7a build/vitapmate-release.apk
+if [ "${usage_both:-false}" = true ]; then apk armv7 arm64-v8a build/vitapmate-release-32bit.apk; fi
 rm -rf "$tmp"
-"$tools/apksigner" verify "$apk"
-echo "$apk (phone: adb install -r $apk)"
 '''
 
 [tasks.bundle]
-description = "Signed, minified release App Bundle for Play: build/vitapmate-release.aab"
+description = "Signed, minified release App Bundle for Play, 64-bit and 32-bit: build/vitapmate-release.aab"
 depends = ["signing"]
 run = '''
 set -eu

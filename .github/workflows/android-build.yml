@@ -54,8 +54,8 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # arm64 for phones, x86_64 for emulators (as `mise run rust-android`).
-          targets: aarch64-linux-android,x86_64-linux-android
+          # arm64 and armeabi-v7a for phones, x86_64 for emulators (as `mise run rust-android`).
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - name: Install cargo-ndk
         uses: taiki-e/install-action@v2
         with:
@@ -112,7 +112,7 @@ jobs:
         run: ./kotlin test -m core
       - name: Build signed release APK
         if: steps.signing.outputs.signed == 'true'
-        run: mise run release
+        run: mise run release --both
       - name: Remove secrets
         if: always()
         run: rm -rf keystore app/keystore.properties .env.json app/res/values/firebase.xml
@@ -121,7 +121,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vitapmate-release-apk
-          path: build/vitapmate-release.apk
+          path: |
+            build/vitapmate-release.apk
+            build/vitapmate-release-32bit.apk
           if-no-files-found: error
           retention-days: 30
       # The README links the `nightly` release; a push to main replaces it.
@@ -131,6 +133,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp build/vitapmate-release.apk vitapmate.apk
+          cp build/vitapmate-release-32bit.apk vitapmate-32bit.apk
           version=$(sed -n 's/^ *versionName: *"\(.*\)".*/\1/p' app/module.yaml)
           {
             echo "Nightly build of vitapmate ${version}, from \`${GITHUB_SHA::7}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
@@ -140,7 +143,7 @@ jobs:
             cat .github/nightly-notes.md
           } > nightly-notes.md
           gh release delete nightly --yes --cleanup-tag || true
-          gh release create nightly vitapmate.apk \
+          gh release create nightly vitapmate.apk vitapmate-32bit.apk \
             --target "$GITHUB_SHA" --prerelease \
             --title "Nightly ${GITHUB_SHA::7}" --notes-file nightly-notes.md
       - name: Upload debug APK

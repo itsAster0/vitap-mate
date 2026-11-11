@@ -101,7 +101,7 @@ mise run rust-android        # after changing rust/vtop-ffi: builds the .so into
 ./kotlin build
 ./kotlin test -m core
 ./kotlin run -d emulator-5554
-mise run release             # signed APK at build/vitapmate-release.apk
+mise run release             # signed 64-bit APK at build/vitapmate-release.apk (--both: also -32bit.apk)
 mise run logs                # also logs-pull, state, ui-dump and trace for the running app over adb
 
 cd rust && cargo fmt && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
@@ -132,8 +132,8 @@ the AAB. To release:
 2. Write `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt` (at most
    500 characters) and add the version to `RELEASES` in
    `app/src/vitapmate/UpdatesScreen.kt`.
-3. Push the tag `v<versionName>`. `android-release.yml` builds the signed APK
-   and AAB and uploads the AAB to the internal track.
+3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
+   (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android
    promote_all` (friends, alpha, beta). Production stays manual.
 

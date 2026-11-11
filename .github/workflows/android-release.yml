@@ -1,7 +1,7 @@
 name: App Release
-# A tag v<versionName> (app/module.yaml) builds the signed APK and AAB and
-# uploads the AAB to the Play internal track. Run by hand to build without
-# uploading, or to upload too.
+# A tag v<versionName> (app/module.yaml) builds the signed AAB (64-bit and
+# 32-bit) and uploads it to the Play internal track. Run by hand to build it
+# without uploading, or to upload too. The APKs come from App Build's nightly.
 on:
   push:
     tags: ["v*"]
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi
       - name: Install cargo-ndk
         uses: taiki-e/install-action@v2
         with:
@@ -85,19 +85,8 @@ jobs:
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > keystore/play-service-account.json
       - name: Write Firebase resources
         run: mise run firebase
-      - name: Build signed APK
-        run: mise run release
       - name: Build signed AAB
         run: mise run bundle
-      - name: Upload APK and AAB
-        uses: actions/upload-artifact@v4
-        with:
-          name: vitapmate-release
-          path: |
-            build/vitapmate-release.apk
-            build/vitapmate-release.aab
-          if-no-files-found: error
-          retention-days: 30
       - name: Install fastlane
         if: startsWith(github.ref, 'refs/tags/') || inputs.upload
         run: bundle install
