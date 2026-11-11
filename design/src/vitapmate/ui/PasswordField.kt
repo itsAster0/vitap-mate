@@ -6,6 +6,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +45,7 @@ fun PasswordField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     shape: Shape = OutlinedTextFieldDefaults.shape,
     initiallyShown: Boolean = false,
+    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
 ) {
     var shown by remember(initiallyShown) { mutableStateOf(initiallyShown) }
     OutlinedTextField(
@@ -65,5 +67,6 @@ fun PasswordField(
         keyboardActions = keyboardActions,
         singleLine = true,
         shape = shape,
+        colors = colors,
     )
 }

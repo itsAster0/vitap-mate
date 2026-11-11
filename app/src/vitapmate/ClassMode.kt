@@ -10,7 +10,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.service.notification.Condition
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -117,7 +116,8 @@ fun ClassModeSetting() {
             Lucide.BellOff,
             "Do Not Disturb turns on when a class starts and off when it ends",
             onClick = { set(!Settings.classMode) },
-            trailing = { Switch(Settings.classMode, { set(it) }) },
+            trailing = { ItemSwitch(Settings.classMode, { set(it) }) },
+            on = Settings.classMode,
         )
         if (Settings.classMode && !granted) GroupItem(
             "Allow Do Not Disturb access",

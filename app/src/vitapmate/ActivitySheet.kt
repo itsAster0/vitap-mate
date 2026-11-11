@@ -17,6 +17,15 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import vitapmate.ui.Radii
+import com.composables.icons.lucide.ChevronRight
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,8 +41,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -68,15 +75,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleMinus
 import com.composables.icons.lucide.History
@@ -141,7 +145,7 @@ fun ActivitySheet(onDismiss: () -> Unit) {
             TextButton({ onDismiss(); nav.push(Route.Screen(ACTIVITY)) }, Modifier.testTag("activity.all")) { Text("See all") }
         }
         val card = MaterialTheme.colorScheme.surfaceContainerHigh
-        LazyColumn(Modifier.heightIn(max = max), contentPadding = PaddingValues(8.dp, 0.dp, 8.dp, 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.heightIn(max = max), contentPadding = PaddingValues(8.dp, 0.dp, 8.dp, 16.dp), verticalArrangement = Arrangement.spacedBy(RUN_GAP)) {
             runItems(runs, SHEET_RUNS, card)
         }
     }
@@ -160,12 +164,12 @@ fun ActivityScreen(showOlder: Boolean = false) {
     Page("Activity", ACTIVITY) { padding ->
         LazyColumn(
             contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(RUN_GAP),
         ) {
             runItems(runs, Int.MAX_VALUE, card)
             if (!older && runs != null) {
                 item(key = "older") {
-                    Box(Modifier.fillMaxWidth().animateItem().padding(vertical = 8.dp), Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().animateItem().padding(vertical = 13.dp), Alignment.Center) {
                         FilledTonalButton({ older = true }, Modifier.testTag("activity.older")) { Text("Show older") }
                     }
                 }
@@ -189,7 +193,13 @@ internal fun rememberAllRuns(older: Boolean): List<Run>? {
 
 private const val SHEET_RUNS = 6
 
-/** Run cards in [container] colour under group headers; at most [limit] finished ones; [inset] at the sides. */
+/** The gap between run cards of a group; lists showing [runItems] space their items by it. */
+internal val RUN_GAP = 3.dp
+
+/**
+ * Run cards in [container] colour under group headers (pills), each group's cards one segmented
+ * block; at most [limit] finished ones; [inset] at the sides.
+ */
 internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Color, inset: Dp = 0.dp, empty: String = "Nothing yet") {
     if (runs == null) return
     if (runs.isEmpty()) {
@@ -198,21 +208,27 @@ internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Col
     }
     val now = System.currentTimeMillis()
     val shown = runs.filter { it.running } + runs.filterNot { it.running }.take(limit)
-    var group: String? = null
-    for (run in shown) {
-        val g = groupOf(run, now)
-        if (g != group) {
-            group = g
-            item(key = "group.$g", contentType = "group") {
-                Text(
-                    g,
-                    Modifier.animateItem().padding(start = inset + 8.dp, top = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    val groups = shown.groupBy { groupOf(it, now) }
+    groups.entries.forEachIndexed { gi, (g, members) ->
+        item(key = "group.$g", contentType = "group") {
+            Text(
+                g,
+                Modifier.animateItem().padding(start = inset + 6.dp, top = if (gi == 0) 2.dp else 13.dp, bottom = 5.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape).padding(horizontal = 12.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
-        item(key = run.id, contentType = "run") { RunCard(run, container, Modifier.animateItem().padding(horizontal = inset)) }
+        members.forEachIndexed { i, run ->
+            // The group's ends round to extraLarge; inner corners stay small.
+            val shape = RoundedCornerShape(
+                topStart = if (i == 0) Radii.xl else 6.dp,
+                topEnd = if (i == 0) Radii.xl else 6.dp,
+                bottomEnd = if (i == members.lastIndex) Radii.xl else 6.dp,
+                bottomStart = if (i == members.lastIndex) Radii.xl else 6.dp,
+            )
+            item(key = run.id, contentType = "run") { RunCard(run, container, shape, Modifier.animateItem().padding(horizontal = inset)) }
+        }
     }
 }
 
@@ -231,14 +247,14 @@ private fun groupOf(run: Run, now: Long): String {
 /** One run: a header row (state, title, what set it off and when) over its one-line step chain; tapped, each step's time and pages. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun RunCard(run: Run, container: Color, modifier: Modifier) {
+private fun RunCard(run: Run, container: Color, shape: Shape, modifier: Modifier) {
     var open by rememberSaveable(run.id) { mutableStateOf(false) }
     val now by rememberNow(if (run.running) 1_000 else 30_000)
-    Surface({ open = !open }, modifier.fillMaxWidth().testTag("activity.${run.id}"), shape = MaterialTheme.shapes.medium, color = container) {
-        Column(Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()).padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Surface({ open = !open }, modifier.fillMaxWidth().testTag("activity.${run.id}"), shape = shape, color = if (run.running) AppTheme.tones.accentTone.subtle else container) {
+        Column(Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()).padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 RunGlyph(run)
-                Text(run.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(run.title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     "${triggerText(run.trigger)} · ${whenText(run.startT, now)}",
                     style = MaterialTheme.typography.labelSmall.nums(),
@@ -246,8 +262,8 @@ private fun RunCard(run: Run, container: Color, modifier: Modifier) {
                     maxLines = 1,
                 )
             }
-            StepLine(run.steps, Modifier.padding(start = 28.dp, top = 4.dp))
-            RouteLine(run.route, run.fallback, Modifier.padding(start = 28.dp, top = 6.dp))
+            StepLine(run.steps, Modifier.padding(start = 50.dp, top = 10.dp))
+            RouteLine(run.route, run.fallback, Modifier.padding(start = 50.dp, top = 8.dp))
             AnimatedVisibility(
                 open,
                 enter = expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) + fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
@@ -259,7 +275,7 @@ private fun RunCard(run: Run, container: Color, modifier: Modifier) {
     }
 }
 
-/** The run's state in 20 dp: a loading indicator while it runs, else a tinted cookie. */
+/** The run's state in 38 dp: a loading indicator while it runs, else a tinted cookie (a circle when neutral). */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RunGlyph(run: Run) {
@@ -269,7 +285,7 @@ private fun RunGlyph(run: Run) {
         transitionSpec = { (scaleIn(pop) + fadeIn()) togetherWith (scaleOut() + fadeOut()) },
         label = "run-glyph",
     ) { running ->
-        if (running) LoadingIndicator(Modifier.size(20.dp))
+        if (running) LoadingIndicator(Modifier.size(38.dp))
         else {
             val look = lookOf(
                 when {
@@ -279,8 +295,9 @@ private fun RunGlyph(run: Run) {
                     else -> StepState.Done
                 },
             )
-            Box(Modifier.size(20.dp).background(look.tone.subtle, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
-                Icon(look.icon, null, Modifier.size(12.dp), tint = look.tone.onSubtle)
+            val neutral = look.tone == neutralTone
+            Box(Modifier.size(38.dp).background(look.tone.subtle, if (neutral) CircleShape else MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
+                Icon(look.icon, null, Modifier.size(18.dp), tint = if (neutral) look.tone.onSubtle else look.tone.base)
             }
         }
     }
@@ -296,28 +313,35 @@ internal fun RouteLine(route: String?, fallback: String?, modifier: Modifier = M
     }
 }
 
-/** "• Timetable (not signed in) › • Sign in › • Timetable" on one line, a coloured dot per step's state. */
+/** Each step as a chip ("• Timetable (not signed in)") with a chevron between, on one line clipped at the end. */
 @Composable
 private fun StepLine(steps: List<RunStep>, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val danger = AppTheme.tones.danger.base
-    val dots = steps.map { dotColor(it.state) }
-    val text = buildAnnotatedString {
-        steps.forEachIndexed { i, s ->
-            if (i > 0) withStyle(SpanStyle(color = scheme.outline)) { append("  ›  ") }
-            appendInlineContent("dot$i", "•")
-            append(" ")
-            val muted = s.state == StepState.Skipped || s.state == StepState.Cached || s.state == StepState.WaitingOtp
-            withStyle(SpanStyle(color = if (muted) scheme.onSurfaceVariant else scheme.onSurface)) {
-                append(s.label + if (s.count > 1) " ×${s.count}" else "")
+    Box(modifier.fillMaxWidth().clipToBounds()) {
+        Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            steps.forEachIndexed { i, s ->
+                if (i > 0) Icon(Lucide.ChevronRight, null, Modifier.size(13.dp), tint = scheme.outline)
+                val muted = s.state == StepState.Skipped || s.state == StepState.Cached || s.state == StepState.WaitingOtp
+                Row(
+                    Modifier.height(25.dp).background(scheme.surfaceContainerHigh, CircleShape).padding(horizontal = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(7.dp)) { Dot(dotColor(s.state), s.state == StepState.Running) }
+                    Text(
+                        buildAnnotatedString {
+                            withStyle(SpanStyle(color = if (muted) scheme.onSurfaceVariant else scheme.onSurface)) { append(s.label + if (s.count > 1) " ×${s.count}" else "") }
+                            noteOf(s)?.let { withStyle(SpanStyle(color = if (s.state == StepState.Failed) danger else scheme.onSurfaceVariant)) { append(" ($it)") } }
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
-            noteOf(s)?.let { withStyle(SpanStyle(color = if (s.state == StepState.Failed) danger else scheme.onSurfaceVariant)) { append(" ($it)") } }
         }
     }
-    val inline = steps.indices.associate { i ->
-        "dot$i" to InlineTextContent(Placeholder(7.sp, 7.sp, PlaceholderVerticalAlign.Center)) { Dot(dots[i], steps[i].state == StepState.Running) }
-    }
-    Text(text, modifier, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, inlineContent = inline)
 }
 
 /** A step's dot; a running one breathes. */
@@ -354,34 +378,46 @@ private fun noteOf(s: RunStep): String? = when (s.state) {
 private fun StepDetails(run: Run, now: Long) {
     val inspector = LocalInspector.current
     val scheme = MaterialTheme.colorScheme
-    Column(Modifier.padding(start = 28.dp, top = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        run.steps.forEach { step ->
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).background(dotColor(step.state), CircleShape))
-                    Spacer(Modifier.width(8.dp))
-                    Text(step.label + if (step.count > 1) " ×${step.count}" else "", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-                    Text(duration((step.endT ?: now) - step.startT), style = MaterialTheme.typography.labelSmall.nums(), color = scheme.onSurfaceVariant)
-                }
-                (step.reason ?: stateText(step.state))?.let {
-                    Text(it, Modifier.padding(start = 15.dp), style = MaterialTheme.typography.labelSmall, color = if (step.state == StepState.Failed) AppTheme.tones.danger.base else scheme.onSurfaceVariant)
-                }
-                step.pages.forEach { hit ->
-                    Row(Modifier.padding(start = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(hit.name, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            listOfNotNull(hit.status.takeUnless { it.startsWith("2") || it.startsWith("3") }, hit.ms?.let(::duration)).joinToString(" · "),
-                            style = MaterialTheme.typography.labelSmall.nums(),
-                            color = scheme.onSurfaceVariant,
-                        )
+    val rail = scheme.outlineVariant
+    Column(Modifier.padding(start = 45.dp, top = 14.dp)) {
+        // The steps on a rail: a 2 dp line through their dots.
+        Column(
+            Modifier.drawBehind { drawLine(rail, Offset(3.5.dp.toPx(), 0f), Offset(3.5.dp.toPx(), size.height), 2.dp.toPx()) },
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            run.steps.forEach { step ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).background(dotColor(step.state), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text(step.label + if (step.count > 1) " ×${step.count}" else "", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                        Spacer(Modifier.width(8.dp))
+                        Text(duration((step.endT ?: now) - step.startT), style = MaterialTheme.typography.labelSmall.nums(), color = scheme.onSurfaceVariant)
+                    }
+                    (step.reason ?: stateText(step.state))?.let {
+                        Text(it, Modifier.padding(start = 15.dp), style = MaterialTheme.typography.labelSmall, color = if (step.state == StepState.Failed) AppTheme.tones.danger.base else scheme.onSurfaceVariant)
+                    }
+                    step.pages.forEach { hit ->
+                        Row(Modifier.padding(start = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(hit.name, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(hit.status.takeUnless { it.startsWith("2") || it.startsWith("3") }, hit.ms?.let(::duration)).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall.nums(),
+                                color = scheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
         }
-        TextButton({ inspector.open(run.id) }, Modifier.align(Alignment.End).testTag("activity.log")) {
-            Icon(Lucide.SquareActivity, null, Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Log", style = MaterialTheme.typography.labelMedium)
+        FilledTonalButton(
+            { inspector.open(run.id) },
+            Modifier.align(Alignment.End).padding(top = 12.dp).height(36.dp).testTag("activity.log"),
+            contentPadding = PaddingValues(horizontal = 16.dp),
+        ) {
+            Icon(Lucide.SquareActivity, null, Modifier.size(15.dp))
+            Spacer(Modifier.width(7.dp))
+            Text("Log", style = MaterialTheme.typography.labelLarge)
         }
     }
 }

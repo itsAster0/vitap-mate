@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- splash_icon.xml for the coloured app icons (white head). Splash icon (API 31+): the mascot's head pops in and settles into its tilt, then blinks. ~720 ms. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/splash_mascot_light">
+  <target android:name="head" android:animation="@animator/splash_head" />
+  <target android:name="tilt" android:animation="@animator/splash_tilt" />
+  <target android:name="eye" android:animation="@animator/splash_blink" />
+</animated-vector>

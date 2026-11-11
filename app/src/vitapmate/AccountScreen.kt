@@ -1,13 +1,18 @@
 package vitapmate
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -16,7 +21,11 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -37,7 +49,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.KeyRound
 import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.User
@@ -59,8 +73,11 @@ import vitapmate.data.orNull
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppTheme
 import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.PasswordField
+import vitapmate.ui.StatusChip
+import vitapmate.ui.heroCookie
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 
@@ -154,60 +171,117 @@ fun AccountScreen() {
         }
     }
 
+    // The fields sit on their segments: no outline at rest, the primary one while typing.
+    val scheme = MaterialTheme.colorScheme
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = Color.Transparent,
+        disabledBorderColor = Color.Transparent,
+        errorBorderColor = Color.Transparent,
+        disabledContainerColor = Color.Transparent,
+    )
+    val circle = @Composable { icon: ImageVector, error: Boolean ->
+        Box(Modifier.size(42.dp).background(if (error) AppTheme.tones.danger.subtle else scheme.secondaryContainer, CircleShape), Alignment.Center) {
+            Icon(icon, null, Modifier.size(20.dp), tint = if (error) AppTheme.tones.danger.base else scheme.onSecondaryContainer)
+        }
+    }
+    val segment = ListItemDefaults.segmentedShapes(1, 3).shape
+    val passwordError = rejected && password == savedPassword
+
     Page("Account", ACCOUNT) { padding ->
         LazyColumn(contentPadding = padding) {
+            if (saved.isNotBlank()) item { AccountHeader(saved, rejected) }
             item {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        username,
-                        { username = it },
-                        Modifier.fillMaxWidth().testTag("account.username").semantics { contentType = ContentType.Username },
-                        enabled = !saving,
-                        label = { Text("Username") },
-                        leadingIcon = { Icon(Lucide.User, null) },
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Ascii,
-                            imeAction = ImeAction.Next,
-                        ),
-                        singleLine = true,
-                        shape = MaterialTheme.shapes.large,
-                    )
-                    PasswordField(
-                        password,
-                        { password = it },
-                        "Password",
-                        "account.password",
-                        Modifier.fillMaxWidth(),
-                        enabled = !saving,
-                        isError = rejected && password == savedPassword,
-                        supportingText = if (rejected) {
-                            { Text("VTOP rejected this password. Enter your current VTOP password.") }
-                        } else {
-                            null
-                        },
-                        initiallyShown = rejected,
-                        leadingIcon = { Icon(Lucide.Lock, null) },
-                        keyboardActions = KeyboardActions(onDone = { save() }),
-                        shape = MaterialTheme.shapes.large,
-                    )
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    // One segmented block of the two fields.
+                    Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                        Box(Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(segment).background(AppTheme.colors.card), Alignment.CenterStart) {
+                            OutlinedTextField(
+                                username,
+                                { username = it },
+                                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).testTag("account.username").semantics { contentType = ContentType.Username },
+                                enabled = !saving,
+                                label = { Text("Username") },
+                                leadingIcon = { circle(Lucide.User, false) },
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.None,
+                                    autoCorrectEnabled = false,
+                                    keyboardType = KeyboardType.Ascii,
+                                    imeAction = ImeAction.Next,
+                                ),
+                                singleLine = true,
+                                shape = MaterialTheme.shapes.large,
+                                colors = fieldColors,
+                            )
+                        }
+                        Box(
+                            Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(segment).background(AppTheme.colors.card)
+                                .then(if (passwordError) Modifier.border(2.dp, scheme.error, segment) else Modifier),
+                            Alignment.CenterStart,
+                        ) {
+                            PasswordField(
+                                password,
+                                { password = it },
+                                "Password",
+                                "account.password",
+                                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                                enabled = !saving,
+                                isError = passwordError,
+                                initiallyShown = rejected,
+                                leadingIcon = { circle(Lucide.Lock, passwordError) },
+                                keyboardActions = KeyboardActions(onDone = { save() }),
+                                shape = MaterialTheme.shapes.large,
+                                colors = fieldColors,
+                            )
+                        }
+                    }
+                    if (rejected) {
+                        Text(
+                            "VTOP rejected this password. Enter your current VTOP password.",
+                            Modifier.padding(start = 20.dp, top = 8.dp, end = 20.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.error,
+                        )
+                    }
                     Button(
                         ::save,
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).heightIn(min = ButtonDefaults.MediumContainerHeight).testTag("account.save"),
+                        modifier = Modifier.fillMaxWidth().padding(top = 22.dp).heightIn(min = 62.dp).testTag("account.save"),
                         enabled = ready,
                         shapes = ButtonDefaults.shapes(),
                     ) {
                         AnimatedContent(saving, contentAlignment = Alignment.Center, label = "account.save") { busy ->
                             if (busy) {
-                                LoadingIndicator(Modifier.size(24.dp).testTag("account.loading"))
+                                LoadingIndicator(Modifier.size(26.dp).testTag("account.loading"))
                             } else {
-                                Text("Save", style = MaterialTheme.typography.titleSmall)
+                                Text("Save", style = MaterialTheme.typography.titleMedium)
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Which account this is ([username]) and its state, in the Settings header's hero style. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AccountHeader(username: String, rejected: Boolean) {
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+            .background(tones.accentTone.subtle).heroCookie().padding(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(78.dp).background(scheme.primaryContainer, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
+            Icon(Lucide.KeyRound, null, Modifier.size(30.dp), tint = scheme.onPrimaryContainer)
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(username, style = MaterialTheme.typography.titleLargeEmphasized, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("The account this phone signs in to VTOP with", style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+            if (rejected) StatusChip("Needs attention", tones.warning, Modifier.padding(top = 6.dp))
+            else StatusChip("Signed in", tones.success, Modifier.padding(top = 6.dp))
         }
     }
 }

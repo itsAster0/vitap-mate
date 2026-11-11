@@ -8,4 +8,20 @@
     <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
     <item name="android:windowSplashScreenAnimationDuration">720</item>
   </style>
+  <!-- The splash for each other app icon (AppIcon.kt sets it, API 33+): its colour behind the mascot. -->
+  <style name="Splash.Orange" parent="AppTheme">
+    <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_orange</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_light</item>
+  </style>
+  <style name="Splash.Green" parent="AppTheme">
+    <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_green</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_light</item>
+  </style>
+  <style name="Splash.Blue" parent="AppTheme">
+    <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_blue</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_light</item>
+  </style>
+  <style name="Splash.White" parent="AppTheme">
+    <item name="android:windowSplashScreenIconBackgroundColor">@color/icon_white</item>
+  </style>
 </resources>

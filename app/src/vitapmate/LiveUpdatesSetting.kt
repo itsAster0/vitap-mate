@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,7 +48,8 @@ fun LiveUpdatesSetting() {
             Lucide.Radio,
             "The class on now and the next one; an outing request until VTOP decides",
             onClick = { set(!Settings.liveUpdates) },
-            trailing = { Switch(Settings.liveUpdates, { set(it) }) },
+            trailing = { ItemSwitch(Settings.liveUpdates, { set(it) }) },
+            on = Settings.liveUpdates,
         )
         if (Settings.liveUpdates && !promotable) GroupItem(
             "Allow Live updates",

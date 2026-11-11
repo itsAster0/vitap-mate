@@ -12,11 +12,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 
 /**
  * A card for one section of a screen: optional [title], [subtitle] and trailing [action] over
- * [content]. Card colour on the page (white in light), large shape, no border; tappable with [onClick].
+ * [content]. Card colour on the page (white in light), large [shape] by default, no border;
+ * tappable with [onClick].
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -26,6 +28,7 @@ fun SectionCard(
     subtitle: String? = null,
     action: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
+    shape: Shape = MaterialTheme.shapes.large,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = CardDefaults.cardColors(containerColor = AppTheme.colors.card)
@@ -43,6 +46,6 @@ fun SectionCard(
             content()
         }
     }
-    if (onClick != null) Card(onClick, modifier, shape = MaterialTheme.shapes.large, colors = colors) { body() }
-    else Card(modifier, MaterialTheme.shapes.large, colors) { body() }
+    if (onClick != null) Card(onClick, modifier, shape = shape, colors = colors) { body() }
+    else Card(modifier, shape, colors) { body() }
 }

@@ -12,7 +12,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -186,7 +185,8 @@ fun ServerScreen() {
                                 if (o.alwaysUseVault) "Without asking a phone first" else "Asks a phone first",
                                 enabled = !saving,
                                 onClick = { setOptions(o.copy(alwaysUseVault = !o.alwaysUseVault)) },
-                                trailing = { Switch(o.alwaysUseVault, { setOptions(o.copy(alwaysUseVault = it)) }, enabled = !saving) },
+                                trailing = { ItemSwitch(o.alwaysUseVault, { setOptions(o.copy(alwaysUseVault = it)) }, enabled = !saving) },
+                                on = o.alwaysUseVault,
                             )
                             GroupSegment(Modifier.testTag("server.option_choices")) {
                                 Column(Modifier.padding(start = 52.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

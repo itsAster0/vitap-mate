@@ -1,8 +1,11 @@
 package vitapmate
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -11,12 +14,12 @@ import androidx.compose.ui.graphics.Color
  * enabled, and Android's own record of that is the setting. The launcher may take a few seconds
  * to redraw, and moves the icon to a free spot on some phones.
  */
-enum class AppIcon(val background: Color, val lightHead: Boolean) {
-    Yellow(Color(0xFFFFD60A), false),
-    Orange(Color(0xFFFF5A1F), true),
-    Green(Color(0xFF00B869), true),
-    Blue(Color(0xFF1A73E8), true),
-    White(Color(0xFFFFFFFF), false),
+enum class AppIcon(val background: Color, val lightHead: Boolean, private val splash: Int) {
+    Yellow(Color(0xFFFFD60A), false, 0),
+    Orange(Color(0xFFFF5A1F), true, R.style.Splash_Orange),
+    Green(Color(0xFF00B869), true, R.style.Splash_Green),
+    Blue(Color(0xFF1A73E8), true, R.style.Splash_Blue),
+    White(Color(0xFFFFFFFF), false, R.style.Splash_White),
     ;
 
     private fun component(context: Context) = ComponentName(context, "vitapmate.Icon$name")
@@ -34,6 +37,15 @@ enum class AppIcon(val background: Color, val lightHead: Boolean) {
                 val state = if (it == icon) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
                 context.packageManager.setComponentEnabledSetting(it.component(context), state, PackageManager.DONT_KILL_APP)
             }
+            generateSequence(context) { (it as? ContextWrapper)?.baseContext }.filterIsInstance<Activity>().firstOrNull()?.let(::syncSplash)
+        }
+
+        /**
+         * Puts the enabled icon's colour behind the splash mascot from the next start on (Android
+         * keeps it). API 33+; older phones keep the yellow.
+         */
+        fun syncSplash(activity: Activity) {
+            if (Build.VERSION.SDK_INT >= 33) activity.splashScreen.setSplashScreenTheme(current(activity).splash)
         }
     }
 }

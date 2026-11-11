@@ -40,7 +40,7 @@ fun SyncHistoryScreen() {
     val card = AppTheme.colors.card
     val h24 = is24Hour()
     Page(BACKGROUND_SYNC, SYNC_HISTORY) { padding ->
-        LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(RUN_GAP)) {
             item("setting") { ListGroup(null) { BackgroundSyncSetting() } }
             item("status") {
                 ListGroup(null) {

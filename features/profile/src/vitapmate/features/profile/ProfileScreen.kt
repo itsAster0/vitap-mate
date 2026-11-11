@@ -83,6 +83,7 @@ fun ProfileScreen() {
                 label = { it.name },
                 icon = { if (it == Tab.Profile) Lucide.CircleUser else Lucide.Users },
                 labelOnSelected = true,
+                badge = { if (it == Tab.Mentor) profile.mentor?.messages?.size ?: 0 else 0 },
                 modifier = Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.sm),
             )
             HorizontalPager(pager, Modifier.weight(1f).testTag("profile.pager"), key = { Tab.entries[it].name }) { i ->

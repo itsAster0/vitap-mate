@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -126,7 +125,8 @@ fun DeveloperScreen() {
                         "dev.enabled",
                         Lucide.Bug,
                         onClick = { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() },
-                        trailing = { Switch(true, { if (!it) { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() } }) },
+                        on = true,
+                        trailing = { ItemSwitch(true, { if (!it) { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() } }) },
                         tone = AppTheme.tones.warning,
                     )
                 }
@@ -147,7 +147,8 @@ fun DeveloperScreen() {
                         Lucide.Scan,
                         "Wi-Fi proxy and user CAs, from the next launch",
                         onClick = { Settings.inspectTraffic = !Settings.inspectTraffic; haptics.toggle(Settings.inspectTraffic) },
-                        trailing = { Switch(Settings.inspectTraffic, { Settings.inspectTraffic = it; haptics.toggle(it) }) },
+                        trailing = { ItemSwitch(Settings.inspectTraffic, { Settings.inspectTraffic = it; haptics.toggle(it) }) },
+                        on = Settings.inspectTraffic,
                     )
                     if (android.os.Build.VERSION.SDK_INT >= 34) GroupItem(
                         "HttpEngine",
@@ -155,7 +156,8 @@ fun DeveloperScreen() {
                         Lucide.Zap,
                         "Android 14+, HTTP/3; from the next launch",
                         onClick = { Settings.httpEngine = !Settings.httpEngine; haptics.toggle(Settings.httpEngine) },
-                        trailing = { Switch(Settings.httpEngine, { Settings.httpEngine = it; haptics.toggle(it) }) },
+                        trailing = { ItemSwitch(Settings.httpEngine, { Settings.httpEngine = it; haptics.toggle(it) }) },
+                        on = Settings.httpEngine,
                     )
                 }
             }
@@ -198,7 +200,8 @@ fun DeveloperScreen() {
                         Lucide.BellRing,
                         "Toasts when automatic refreshes fail",
                         onClick = { Settings.showBackgroundErrors = !Settings.showBackgroundErrors; haptics.toggle(Settings.showBackgroundErrors) },
-                        trailing = { Switch(Settings.showBackgroundErrors, { Settings.showBackgroundErrors = it; haptics.toggle(it) }) },
+                        trailing = { ItemSwitch(Settings.showBackgroundErrors, { Settings.showBackgroundErrors = it; haptics.toggle(it) }) },
+                        on = Settings.showBackgroundErrors,
                     )
                     GroupItem(
                         "Run background sync now",

@@ -1,8 +1,19 @@
 package vitapmate
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -14,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Bug
 import com.composables.icons.lucide.CalendarMinus
@@ -50,6 +62,7 @@ import vitapmate.ui.DownloadFolderDialog
 import vitapmate.ui.rememberHaptics
 
 /** Account (with the semester), appearance (theme, colours, tabs), diagnostics and about. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(onSignedOut: () -> Unit) {
     val nav = LocalNav.current
@@ -59,10 +72,10 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
     val user by produceState<String?>(null, accountVersion) {
         value = orNull { coreFlow("settings.user", Core::signedInUser) }
     }
-    // The name and VTOP's photo from the cached profile, when the Profile page has fetched it.
-    val profile by produceState<Pair<String, String>?>(null) {
+    // The name, VTOP's photo and the registration number from the cached profile, when the Profile page has fetched it.
+    val profile by produceState<Triple<String, String, String>?>(null) {
         value = orNull { coreFlow("settings.profile", Core::cachedProfile) }
-            ?.let { it.name.ifBlank { null }?.to(it.photo) }
+            ?.let { p -> p.name.ifBlank { null }?.let { Triple(it, p.photo, p.registrationNumber) } }
     }
     var confirmSignOut by remember { mutableStateOf(false) }
     var messTimings by remember { mutableStateOf(false) }
@@ -80,7 +93,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
 
     Page("Settings", SETTINGS) { padding ->
         LazyColumn(contentPadding = padding) {
-            item { ProfileHeader(user ?: LocalUser.current, profile?.first, profile?.second) }
+            item { ProfileHeader(user ?: LocalUser.current, profile?.first, profile?.second, profile?.third) }
             item {
                 ListGroup("Account") {
                     GroupItem(
@@ -104,7 +117,8 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         Lucide.RefreshCcw,
                         "Fetch pages on open, when old and when you come back",
                         onClick = { Settings.autoRefresh = !Settings.autoRefresh; haptics.toggle(Settings.autoRefresh) },
-                        trailing = { Switch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
+                        trailing = { ItemSwitch(Settings.autoRefresh, { Settings.autoRefresh = it; haptics.toggle(it) }) },
+                        on = Settings.autoRefresh,
                     )
                     BackgroundSyncRow { nav.push(Route.Screen(SYNC_HISTORY)) }
                 }
@@ -145,7 +159,8 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         Lucide.CalendarMinus,
                         "On attendance and the timetable",
                         onClick = { setSkip(!Settings.showSkipAdvice) },
-                        trailing = { Switch(Settings.showSkipAdvice, { setSkip(it) }) },
+                        trailing = { ItemSwitch(Settings.showSkipAdvice, { setSkip(it) }) },
+                        on = Settings.showSkipAdvice,
                     )
                     GroupItem(
                         "How the numbers work",
@@ -191,8 +206,16 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                 }
             }
             item {
-                ListGroup(null) {
-                    GroupItem("Sign out", "settings.sign_out", Lucide.LogOut, onClick = { confirmSignOut = true }, tone = AppTheme.tones.danger)
+                val danger = AppTheme.tones.danger
+                Button(
+                    { confirmSignOut = true },
+                    Modifier.fillMaxWidth().padding(start = 18.dp, top = 26.dp, end = 18.dp, bottom = 12.dp).height(58.dp).testTag("settings.sign_out"),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = danger.subtle, contentColor = danger.onSubtle),
+                ) {
+                    Icon(Lucide.LogOut, null, Modifier.size(20.dp), tint = danger.base)
+                    Spacer(Modifier.width(10.dp))
+                    Text("Sign out", style = MaterialTheme.typography.titleSmallEmphasized)
                 }
             }
         }

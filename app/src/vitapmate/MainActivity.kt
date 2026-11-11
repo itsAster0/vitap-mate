@@ -11,6 +11,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import vitapmate.data.AppCore
@@ -40,6 +43,8 @@ class MainActivity : ComponentActivity() {
         }
         // The splash leaves as soon as the first frame is drawn (nothing holds it): a quick fade
         // with the icon growing a little, even mid-animation.
+        // An icon picked before the splash followed it.
+        if (savedInstanceState == null) AppIcon.syncSplash(this)
         if (Build.VERSION.SDK_INT >= 31) {
             splashScreen.setOnExitAnimationListener { view ->
                 view.iconView?.animate()?.scaleX(1.15f)?.scaleY(1.15f)?.setDuration(180)?.start()
@@ -60,7 +65,14 @@ class MainActivity : ComponentActivity() {
             }
             val choice = Settings.colorChoice
             AppTheme(dark, if (choice == Settings.WALLPAPER) null else Palette.entries.firstOrNull { it.name == choice } ?: Palette.Default, Settings.pureBlack) {
-                CompositionLocalProvider(LocalOpenRequest provides openRequest) { App() }
+                // Every phone lays out as a 412 dp wide one, within 15% of its own display size;
+                // the font size stays the user's, and tablets keep their own density.
+                val config = LocalConfiguration.current
+                val own = LocalDensity.current
+                // Settings → Appearance → Display size scales that, or (System) leaves the phone's own.
+                val fitted = if (config.smallestScreenWidthDp >= 600) own.density else (own.density * config.smallestScreenWidthDp / 412f).coerceIn(own.density * 0.85f, own.density * 1.15f)
+                val density = if (Settings.displaySize == 0) own else Density(fitted * Settings.displaySize / 100f, own.fontScale)
+                CompositionLocalProvider(LocalOpenRequest provides openRequest, LocalDensity provides density) { App() }
             }
         }
     }

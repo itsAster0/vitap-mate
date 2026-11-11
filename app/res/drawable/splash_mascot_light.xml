@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- splash_mascot.xml with a white head and a dark face, for the coloured app icons (splash_icon_light.xml). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <group android:name="head" android:pivotX="54" android:pivotY="54" android:scaleX="0" android:scaleY="0">
+    <group android:name="tilt" android:pivotX="54" android:pivotY="54" android:rotation="-24">
+      <path android:fillColor="#FFFFFFFF" android:pathData="M43.5,33.5 H64.5 A14.5,14.5 0 0 1 79,48 V60 A14.5,14.5 0 0 1 64.5,74.5 H43.5 A14.5,14.5 0 0 1 29,60 V48 A14.5,14.5 0 0 1 43.5,33.5 Z" />
+      <path android:fillColor="#FF1C1C1F" android:pathData="M60.08,52.31 L60.66,51.59 L61.22,51.01 L61.75,50.55 L62.24,50.22 L62.69,50.01 L63.11,49.89 L63.50,49.85 L63.89,49.89 L64.31,50.01 L64.76,50.22 L65.25,50.55 L65.78,51.01 L66.34,51.59 L66.92,52.31 L67.47,52.74 L68.16,52.84 L68.81,52.58 L69.24,52.03 L69.34,51.34 L69.08,50.69 L68.37,49.82 L67.65,49.05 L66.89,48.41 L66.10,47.88 L65.27,47.48 L64.40,47.24 L63.50,47.15 L62.60,47.24 L61.73,47.48 L60.90,47.88 L60.11,48.41 L59.35,49.05 L58.63,49.82 L57.92,50.69 L57.66,51.34 L57.76,52.03 L58.19,52.58 L58.84,52.84 L59.53,52.74 Z M49.61,60.22 L50.49,61.09 L51.38,61.84 L52.30,62.47 L53.24,62.98 L54.20,63.35 L55.20,63.57 L56.20,63.65 L57.20,63.57 L58.20,63.35 L59.16,62.98 L60.10,62.47 L61.02,61.84 L61.91,61.09 L62.79,60.22 L63.12,59.60 L63.09,58.91 L62.72,58.31 L62.10,57.98 L61.41,58.01 L60.81,58.38 L60.09,59.10 L59.38,59.70 L58.70,60.17 L58.04,60.52 L57.40,60.76 L56.80,60.90 L56.20,60.95 L55.60,60.90 L55.00,60.76 L54.36,60.52 L53.70,60.17 L53.02,59.70 L52.31,59.10 L51.59,58.38 L50.99,58.01 L50.30,57.98 L49.68,58.31 L49.31,58.91 L49.28,59.60 Z" />
+      <group android:name="eye" android:pivotX="44.5" android:pivotY="50.5">
+        <path android:fillColor="#FF1C1C1F" android:pathData="M41.8,50.5 a2.7,4.8 0 1 0 5.4,0 a2.7,4.8 0 1 0 -5.4,0 Z" />
+      </group>
+    </group>
+  </group>
+</vector>

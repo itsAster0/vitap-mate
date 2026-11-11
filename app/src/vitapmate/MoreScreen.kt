@@ -5,10 +5,12 @@ import vitapmate.observability.Log
 import vitapmate.ui.rememberHaptics
 import vitapmate.ui.showToast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
@@ -23,12 +26,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import com.composables.icons.lucide.CloudDownload
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -52,6 +58,7 @@ private const val COLUMNS = 3
  * Every feature as tiles under its section ([featureGroups]), the ones in the bar pinned (tapping
  * one switches to its tab), then Settings, the Inspector and the version.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MoreScreen() {
     val nav = LocalNav.current
@@ -59,7 +66,7 @@ fun MoreScreen() {
     val version = rememberAppVersion()
     Page("More", MORE) { padding ->
         LazyColumn(contentPadding = padding) {
-            featureGroups.forEach { (title, group) ->
+            featureGroups.forEachIndexed { index, (title, group) ->
                 item(title) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -68,13 +75,23 @@ fun MoreScreen() {
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        group.chunked(COLUMNS).forEach { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                row.forEach { f ->
-                                    val pinned = f.id in tabs
-                                    FeatureTile(f, pinned, { if (pinned) nav.goTab(f.id) else nav.push(Route.Screen(f.id)) }, Modifier.weight(1f))
+                        // Each section's own icon shape.
+                        val shape = when (index) {
+                            1 -> MaterialShapes.Sunny.toShape()
+                            2 -> MaterialShapes.Clover4Leaf.toShape()
+                            3 -> RoundedCornerShape(17.dp)
+                            else -> MaterialShapes.Cookie7Sided.toShape()
+                        }
+                        // One segmented block: the clip rounds its ends, tiles keep small corners.
+                        Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                            group.chunked(COLUMNS).forEach { row ->
+                                Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                                    row.forEach { f ->
+                                        val pinned = f.id in tabs
+                                        FeatureTile(f, pinned, shape, { if (pinned) nav.goTab(f.id) else nav.push(Route.Screen(f.id)) }, Modifier.weight(1f).fillMaxHeight())
+                                    }
+                                    repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                                 }
-                                repeat(COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
@@ -90,7 +107,9 @@ fun MoreScreen() {
                         Lucide.CloudDownload,
                         FetchAll.status ?: "Refresh every VTOP page now",
                         onClick = { FetchAll.start(context) },
-                        trailing = { if (FetchAll.running) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) },
+                        trailing = { if (FetchAll.running) LoadingIndicator(Modifier.size(30.dp)) },
+                        on = FetchAll.running,
+                        below = { if (FetchAll.running) LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp)) },
                     )
                     GroupItem("Connected apps", "more.connected_apps", Lucide.Unplug, "Browser extension and AI apps (MCP)", onClick = { nav.push(Route.Screen(CONNECTED_APPS)) }, trailing = { Chevron() })
                     // Settings when it isn't already in the bar.
@@ -104,40 +123,35 @@ fun MoreScreen() {
     }
 }
 
-/** A feature: its icon in a tonal cookie, its label; a pin when it is in the bar. */
+/** A feature: its icon in the section's [shape] (primary when it is in the bar, with a pin), its label. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun FeatureTile(feature: Feature, pinned: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun FeatureTile(feature: Feature, pinned: Boolean, shape: Shape, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val card = AppTheme.colors.card
-    Column(
-        modifier.clip(MaterialTheme.shapes.large).background(card)
+    val tones = AppTheme.tones
+    Box(
+        modifier.clip(ListItemDefaults.segmentedShapes(1, 3).shape).background(AppTheme.colors.card)
             .tappable(onClick, if (pinned) "${feature.label}, in the bar" else feature.label, Role.Button)
-            .padding(horizontal = 8.dp, vertical = 16.dp)
             .testTag("more.${feature.id}"),
-        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box {
-            Box(Modifier.size(52.dp).background(scheme.secondaryContainer, MaterialShapes.Cookie7Sided.toShape()), Alignment.Center) {
-                Icon(feature.icon, null, Modifier.size(24.dp), tint = scheme.onSecondaryContainer)
+        Column(Modifier.fillMaxWidth().padding(start = 4.dp, top = 18.dp, end = 4.dp, bottom = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(54.dp).background(if (pinned) scheme.primary else scheme.secondaryContainer, shape), Alignment.Center) {
+                Icon(feature.icon, null, Modifier.size(24.dp), tint = if (pinned) scheme.onPrimary else scheme.onSecondaryContainer)
             }
-            if (pinned) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).size(20.dp).border(2.dp, card, CircleShape).padding(2.dp).background(scheme.primary, CircleShape),
-                    Alignment.Center,
-                ) {
-                    Icon(Lucide.Pin, null, Modifier.size(9.dp), tint = scheme.onPrimary)
-                }
+            Text(
+                feature.label,
+                Modifier.fillMaxWidth().padding(top = 10.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = scheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
+        if (pinned) {
+            Box(Modifier.align(Alignment.TopEnd).padding(top = 10.dp, end = 12.dp).size(22.dp).background(tones.accentTone.subtle, CircleShape), Alignment.Center) {
+                Icon(Lucide.Pin, null, Modifier.size(11.dp), tint = tones.accent)
             }
         }
-        Text(
-            feature.label,
-            Modifier.fillMaxWidth().padding(top = 10.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = scheme.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-        )
     }
 }
 

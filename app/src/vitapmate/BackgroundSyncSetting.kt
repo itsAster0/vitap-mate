@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,7 +89,8 @@ fun BackgroundSyncSetting() {
         syncSummary(available, on, paused),
         enabled = available,
         onClick = { set(!on) },
-        trailing = { Switch(on, { set(it) }, enabled = available) },
+        trailing = { ItemSwitch(on, { set(it) }, enabled = available) },
+        on = on,
         tone = if (paused != null) AppTheme.tones.warning else null,
     )
     if (!on) return

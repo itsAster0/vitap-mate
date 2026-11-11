@@ -95,6 +95,7 @@ fun InboxRow() {
         Lucide.Bell,
         if (count > 0) "$count new since you last looked" else "What changed on VTOP",
         onClick = { nav.push(Route.Screen(INBOX)) },
+        highlight = count > 0,
         trailing = {
             if (count > 0) {
                 Box(Modifier.size(24.dp).background(MaterialTheme.colorScheme.error, CircleShape), Alignment.Center) {

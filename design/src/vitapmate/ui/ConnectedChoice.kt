@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -34,6 +37,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 
 /** Side padding of the buttons when a label would not fit the default padding. */
@@ -45,7 +50,8 @@ private val TightPadding = 6.dp
  * [iconOnly] the buttons show just the icon (the label is read out) and take only their size.
  * With [labelOnSelected] every button shows its icon and only the selected one adds its label,
  * growing with a spring while the others shrink. Labels never truncate: when space is short the
- * icons drop, then the padding tightens, then the buttons take widths by their labels.
+ * icons drop, then the padding tightens, then the buttons take widths by their labels. [badge]
+ * puts a count (when above 0) in a small accent pill after a button's content.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -60,6 +66,7 @@ fun <T> ConnectedChoice(
     icon: ((T) -> ImageVector)? = null,
     iconOnly: Boolean = false,
     labelOnSelected: Boolean = false,
+    badge: ((T) -> Int)? = null,
 ) {
     val style = MaterialTheme.typography.labelLarge
     val measurer = rememberTextMeasurer()
@@ -76,6 +83,19 @@ fun <T> ConnectedChoice(
         val fits = iconOnly || texts.all { it + sides + (if (icons) iconSpace else 0.dp) <= slot }
         val even = fits || texts.all { it + TightPadding * 2 <= slot }
         val haptics = rememberHaptics()
+        val tones = AppTheme.tones
+        val count = @Composable { option: T ->
+            badge?.invoke(option)?.takeIf { it > 0 }?.let {
+                Text(
+                    "$it",
+                    Modifier.padding(start = ToggleButtonDefaults.IconSpacing).background(tones.accent, CircleShape).widthIn(min = 18.dp).padding(horizontal = 5.dp),
+                    style = MaterialTheme.typography.labelSmall.nums(fontWeight = FontWeight.Bold),
+                    color = tones.onAccent,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                )
+            }
+        }
         if (labelOnSelected && icon != null) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                 options.forEachIndexed { i, option ->
@@ -96,6 +116,7 @@ fun <T> ConnectedChoice(
                         AnimatedVisibility(on, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
                             Text(label(option), Modifier.padding(start = ToggleButtonDefaults.IconSpacing), maxLines = 1, softWrap = false, style = style)
                         }
+                        count(option)
                     }
                 }
             }
@@ -129,6 +150,7 @@ fun <T> ConnectedChoice(
                         Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                     }
                     Text(label(option), maxLines = 1, softWrap = false, overflow = TextOverflow.Visible, style = style)
+                    count(option)
                 }
             }
         }

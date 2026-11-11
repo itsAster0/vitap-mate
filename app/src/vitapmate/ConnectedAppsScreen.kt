@@ -4,6 +4,27 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +47,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
@@ -52,6 +72,9 @@ import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.KeyRound
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.ExternalLink
+import com.composables.icons.lucide.Link
+import com.composables.icons.lucide.Smartphone
+import vitapmate.core.KeyPhone
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Sparkles
@@ -113,6 +136,10 @@ fun ConnectedAppsScreen() {
     var pairing by remember { mutableStateOf(false) }
     var newMcp by remember { mutableStateOf(false) }
     var opened by remember { mutableStateOf<AccessKey?>(null) }
+    val deviceAuth = rememberDeviceAuth()
+    val haptics = rememberHaptics()
+    var busy by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf<KeyPhone?>(null) }
 
     fun load() {
         scope.launch {
@@ -124,23 +151,57 @@ fun ConnectedAppsScreen() {
         }
     }
     LaunchedEffect(Unit) { load() }
+    /** A change to the account's phones behind the screen lock ([title]), then the keys again. */
+    fun change(title: String, name: String, done: String, call: suspend (Core, String) -> Unit) {
+        deviceAuth.confirm(title) {
+            scope.launch {
+                busy = true
+                run(name, call).onSuccess { haptics.confirm(); showToast(done, ""); load() }.onFailure { haptics.reject() }
+                busy = false
+            }
+        }
+    }
 
     Page("Connected apps", CONNECTED_APPS) { padding ->
         LazyColumn(contentPadding = padding) {
             item {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
-                    GroupItem("Pair a browser", "connected_apps.pair", Lucide.Globe, "Scan the code the extension or an AI app's sign-in page shows", onClick = { pairing = true }, trailing = { Chevron() })
-                    GroupItem("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, "For Claude and other AI apps", onClick = { newMcp = true }, trailing = { Chevron() })
+                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                        AddTile("Pair a browser", "connected_apps.pair", Lucide.Scan, MaterialShapes.Cookie9Sided.toShape(), "Scan the code the extension or an AI app's sign-in page shows", true, Modifier.weight(1f)) { pairing = true }
+                        AddTile("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, MaterialShapes.Sunny.toShape(), "For Claude and other AI apps", false, Modifier.weight(1f)) { newMcp = true }
+                    }
                     GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
             }
             val current = apps
             when {
                 current != null -> item {
-                    ListGroup("Keys", footer = "Up to 10 keys. Revoke one you no longer use; it stops working at once.") {
-                        if (current.keys.isEmpty()) GroupItem("No keys yet", "connected_apps.empty", Lucide.KeyRound, "Pair a browser or make an MCP key above")
+                    ListGroup("Keys", footer = "Up to 10 keys. Revoke one you no longer use; it stops working at once.", titleEnd = if (current.linked) "${current.keys.size} of 10" else null) {
+                        // After a reinstall: the server lists the account's keys only to a linked phone.
+                        if (!current.linked) GroupItem(
+                            "Link this phone",
+                            "connected_apps.link",
+                            Lucide.Link,
+                            "Your keys show once this phone is linked to your account",
+                            enabled = !busy,
+                            onClick = { change("Link this phone", "link", "Phone linked") { c, f -> c.linkPhone(f) } },
+                            trailing = { Chevron() },
+                        ) else if (current.keys.isEmpty()) GroupItem("No keys yet", "connected_apps.empty", Lucide.KeyRound, "Pair a browser or make an MCP key above")
                         current.keys.forEach { key ->
-                            GroupItem(key.label, "connected_apps.key.${key.id}", key.kind.icon, keySummary(key), onClick = { opened = key }, trailing = { Chevron() })
+                            GroupItem(key.label, "connected_apps.key.${key.id}", key.kind.icon, onClick = { opened = key }, trailing = { Chevron() }, iconShape = key.kind.shape, below = { KeyTags(key) })
+                        }
+                    }
+                    if (current.elsewhere.isNotEmpty()) ListGroup("On another phone", footer = "A key asks the phone that made it for your VTOP session. After a reinstall, move its keys here.") {
+                        current.elsewhere.forEachIndexed { i, phone ->
+                            GroupItem(
+                                "Move ${keys(phone)} to this phone",
+                                "connected_apps.move.$i",
+                                Lucide.Smartphone,
+                                phone.seenAt?.let { "From ${phone.label ?: "another phone"}, seen ${ago(it)}" } ?: "From a phone that is no longer linked",
+                                enabled = !busy,
+                                onClick = { moving = phone },
+                                trailing = { Chevron() },
+                            )
                         }
                     }
                 }
@@ -150,19 +211,66 @@ fun ConnectedAppsScreen() {
         }
     }
 
+    moving?.let { phone ->
+        AlertDialog(
+            onDismissRequest = { moving = null },
+            title = { Text("Move ${keys(phone)} to this phone?") },
+            text = { Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}." + if (phone.id != null) " ${phone.label ?: "The other phone"} is unlinked from your account; it can link again." else "") },
+            confirmButton = {
+                TextButton({
+                    moving = null
+                    change("Move keys", "move", "Keys moved") { c, f -> c.moveKeys(f, phone.id) }
+                }, Modifier.testTag("connected_apps.move.confirm")) { Text("Move") }
+            },
+            dismissButton = { TextButton({ moving = null }) { Text("Cancel") } },
+        )
+    }
     if (pairing) PairSheet(onDone = { pairing = false; load() }, onDismiss = { pairing = false })
     if (newMcp) NewMcpSheet(onDone = { load() }, onDismiss = { newMcp = false })
     opened?.let { key -> KeySheet(key, onChanged = { opened = null; load() }, onDismiss = { opened = null }) }
 }
 
+private fun keys(phone: KeyPhone) = if (phone.keys == 1u) "1 key" else "${phone.keys} keys"
+
 private val KeyKind.icon get() = if (this == KeyKind.BROWSER) Lucide.Globe else Lucide.Sparkles
 private val KeyKind.label get() = if (this == KeyKind.BROWSER) "Browser" else "MCP"
 
-private fun keySummary(key: AccessKey) = buildList {
-    add(key.kind.label)
-    add(key.lastUsedAt?.let { "used ${ago(it)}" } ?: "never used")
-    if (key.outings) add("outings on")
-}.joinToString(" · ")
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private val KeyKind.shape: Shape @Composable get() = if (this == KeyKind.BROWSER) CircleShape else MaterialShapes.Cookie7Sided.toShape()
+
+/** A key's kind, last use and (in the warning tone) outings, as tags under its label. */
+@Composable
+private fun KeyTags(key: AccessKey) {
+    val scheme = MaterialTheme.colorScheme
+    val tag = @Composable { text: String, fill: Color, color: Color ->
+        Text(text, Modifier.background(fill, CircleShape).padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelMedium, color = color)
+    }
+    Row(Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        tag(key.kind.label, scheme.surfaceContainerHigh, scheme.onSurface)
+        Text(key.lastUsedAt?.let { "used ${ago(it)}" } ?: "never used", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+        if (key.outings) tag("outings on", AppTheme.tones.warning.subtle, AppTheme.tones.warning.base)
+    }
+}
+
+/** One of the two big "Add" segments: [icon] in [shape] at the top, [title] and [text] at the bottom; [primary] fills it. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AddTile(title: String, tag: String, icon: ImageVector, shape: Shape, text: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val content = if (primary) scheme.onPrimary else scheme.onSurface
+    Column(
+        modifier.fillMaxHeight().heightIn(min = 150.dp).clip(ListItemDefaults.segmentedShapes(1, 3).shape).background(if (primary) scheme.primary else AppTheme.colors.card)
+            .clickable(role = Role.Button, onClick = onClick).testTag(tag).padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.size(50.dp).background(if (primary) scheme.onPrimary else scheme.secondaryContainer, shape), Alignment.Center) {
+            Icon(icon, null, Modifier.size(24.dp), tint = if (primary) scheme.primary else scheme.onSecondaryContainer)
+        }
+        Spacer(Modifier.weight(1f).heightIn(min = 14.dp))
+        Text(title, style = MaterialTheme.typography.titleMediumEmphasized, color = content)
+        Text(text, style = MaterialTheme.typography.bodySmall, color = if (primary) content.copy(alpha = 0.72f) else scheme.onSurfaceVariant)
+    }
+}
 
 /** One call as flow `connected_apps.<name>`, off the main thread; a failure is logged and toasted. */
 private suspend fun <T> run(name: String, call: suspend (Core, String) -> T): Result<T> {
@@ -272,7 +380,7 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
     Sheet("connected_apps.pair_sheet", onDismiss) {
         Text("Pair a browser", style = MaterialTheme.typography.titleLarge)
         Note("Open the vitapmate extension in Chrome or Firefox, or connect an AI app such as Claude to $MCP_URL. It shows a QR code and a 10-character code.")
-        Button(if (busy) null else ::scan, Modifier.fillMaxWidth().testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
+        Button(if (busy) null else ::scan, Modifier.fillMaxWidth().height(60.dp).testTag("connected_apps.scan"), prefix = Lucide.Scan) { Text("Scan QR code") }
         OutlinedTextField(
             text,
             { text = it.take(16) },
@@ -284,7 +392,7 @@ private fun PairSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { code?.let(::pair) }),
             singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, letterSpacing = 0.12.em),
             shape = MaterialTheme.shapes.large,
         )
         Button(code?.takeIf { !busy }?.let { { pair(it) } }, Modifier.fillMaxWidth().testTag("connected_apps.pair_confirm"), variant = ButtonVariant.Outline) {
@@ -317,7 +425,8 @@ private fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
                 null,
                 "Let it apply for and cancel outings (it asks you first)",
                 onClick = { outings = !outings; haptics.toggle(outings) },
-                trailing = { Switch(outings, { outings = it; haptics.toggle(it) }) },
+                trailing = { ItemSwitch(outings, { outings = it; haptics.toggle(it) }) },
+                on = outings,
             )
             Button(
                 if (busy) null else {
@@ -338,9 +447,10 @@ private fun NewMcpSheet(onDone: () -> Unit, onDismiss: () -> Unit) {
         } else {
             Copyable("Key", key.key, "connected_apps.mcp_key") { copy(context, "MCP key", key.key) }
             Copyable("MCP URL", key.mcpUrl.ifBlank { MCP_URL }, "connected_apps.mcp_url") { copy(context, "MCP URL", key.mcpUrl.ifBlank { MCP_URL }) }
-            Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Lucide.TriangleAlert, null, tint = AppTheme.tones.warning.base)
-                Note("This key is shown only once. Copy it into your AI app now; if you lose it, revoke it and make another.")
+            val warning = AppTheme.tones.warning
+            Row(Modifier.fillMaxWidth().background(warning.subtle, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Lucide.TriangleAlert, null, Modifier.size(18.dp), tint = warning.base)
+                Text("This key is shown only once. Copy it into your AI app now; if you lose it, revoke it and make another.", style = MaterialTheme.typography.bodyMedium, color = warning.onSubtle)
             }
             Button(onDismiss, Modifier.fillMaxWidth().testTag("connected_apps.mcp_done"), variant = ButtonVariant.Outline) { Text("Done") }
         }
@@ -379,17 +489,27 @@ private fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Uni
     }
 
     Sheet("connected_apps.key_sheet", onDismiss) {
-        Text(key.label, style = MaterialTheme.typography.titleLarge)
-        Note("${key.kind.label} · made ${ago(key.createdAt)}")
-        GroupItem(
-            "Outings",
-            "connected_apps.key_outings",
-            null,
-            "Apply for and cancel outings with this key",
-            enabled = !busy,
-            onClick = { setOutings(!outings) },
-            trailing = { Switch(outings, ::setOutings, enabled = !busy) },
-        )
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(52.dp).background(MaterialTheme.colorScheme.secondaryContainer, key.kind.shape), Alignment.Center) {
+                Icon(key.kind.icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+            Column {
+                Text(key.label, style = MaterialTheme.typography.titleLarge)
+                Note("${key.kind.label} · made ${ago(key.createdAt)}")
+            }
+        }
+        Box(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(horizontal = 14.dp)) {
+            GroupItem(
+                "Outings",
+                "connected_apps.key_outings",
+                null,
+                "Apply for and cancel outings with this key",
+                enabled = !busy,
+                onClick = { setOutings(!outings) },
+                trailing = { ItemSwitch(outings, ::setOutings, enabled = !busy) },
+                on = outings,
+            )
+        }
         Column {
             Text("Last uses", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             if (key.uses.isEmpty()) Note("Not used yet.")
@@ -397,8 +517,17 @@ private fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Uni
                 GroupItem(if (use.via == KeyKind.BROWSER) "Browser extension" else "AI app (MCP)", "connected_apps.use.$i", use.via.icon, trailing = { TrailingValue(ago(use.at)) })
             }
         }
-        Button(if (busy) null else { { confirmRevoke = true } }, Modifier.fillMaxWidth().testTag("connected_apps.revoke"), variant = ButtonVariant.Outline, prefix = Lucide.Trash2) {
-            Text("Revoke", color = MaterialTheme.colorScheme.error)
+        val danger = AppTheme.tones.danger
+        androidx.compose.material3.Button(
+            { confirmRevoke = true },
+            Modifier.fillMaxWidth().height(54.dp).testTag("connected_apps.revoke"),
+            enabled = !busy,
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = danger.subtle, contentColor = danger.onSubtle),
+        ) {
+            Icon(Lucide.Trash2, null, Modifier.size(18.dp), tint = danger.base)
+            Spacer(Modifier.width(10.dp))
+            Text("Revoke", style = MaterialTheme.typography.titleSmallEmphasized)
         }
     }
 

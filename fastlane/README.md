@@ -21,7 +21,7 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane android deploy_internal
 ```
 
-Deploy a new version to the Internal track only
+Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt
 
 ### android promote_all
 
@@ -29,7 +29,7 @@ Deploy a new version to the Internal track only
 [bundle exec] fastlane android promote_all
 ```
 
-Promote latest internal build to closed, open and production
+Promote the latest internal build to the closed (friends), alpha and beta tracks
 
 ### android deploy_all
 
@@ -37,15 +37,7 @@ Promote latest internal build to closed, open and production
 [bundle exec] fastlane android deploy_all
 ```
 
-Build & upload to internal, then promote through all tracks
-
-### android deploy_actions
-
-```sh
-[bundle exec] fastlane android deploy_actions
-```
-
-Build & upload for actions
+Build, upload to internal, then promote through the testing tracks
 
 ----
 

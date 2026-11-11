@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The launcher icons' flat backgrounds (AppIcon.kt); the splash's icon circle is the yellow. -->
+<!-- The launcher icons' flat backgrounds (AppIcon.kt); the splash's icon circle takes the chosen one. -->
 <resources>
   <color name="icon_yellow">#FFD60A</color>
   <color name="icon_orange">#FF5A1F</color>

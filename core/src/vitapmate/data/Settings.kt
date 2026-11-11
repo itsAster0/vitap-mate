@@ -7,6 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.edit
 import kotlin.reflect.KProperty
 
+/** The display sizes offered, in percent of the app's own fit (100); 0 follows the phone's display size. */
+val DISPLAY_SIZES = listOf(0, 90, 100, 110)
+
 /** App settings (SharedPreferences "settings", the Flutter app's keys) as Compose-observable state. */
 object Settings {
     private var prefs: SharedPreferences? = null
@@ -73,6 +76,9 @@ object Settings {
 
     /** Black backgrounds in dark mode (OLED screens). */
     var pureBlack by flag("settings_pure_black", false)
+
+    /** Settings → Appearance → Display size: one of [DISPLAY_SIZES]. */
+    var displaySize by pref("settings_display_size", 100, { k, d -> getInt(k, d).takeIf { it in DISPLAY_SIZES } ?: d }, { k, v -> putInt(k, v) })
 
     /** The student's chosen avatar photo (a file in the app's private files), or null for the initial. */
     var avatarPath by text("settings_avatar_path")
@@ -163,7 +169,7 @@ object Settings {
 
     /** Every value, for the state dump. */
     fun snapshot(): Map<String, Any?> =
-        mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
+        mapOf("showSkipAdvice" to showSkipAdvice, "themeMode" to themeMode.name, "colors" to colorChoice, "pureBlack" to pureBlack, "displaySize" to displaySize, "navTabs" to navTabs, "avatar" to (avatarPath != null)) +
             mapOf("backgroundSync" to backgroundSync, "liveUpdates" to liveUpdates, "classMode" to classMode, "assistant" to assistant, "syncHours" to syncHours, "syncPaused" to (syncPaused != null), "notifyOff" to notifyOff.keys.sorted()) +
             mapOf("autoRefresh" to autoRefresh, "haptics" to haptics, "showBackgroundErrors" to showBackgroundErrors, "inspectTraffic" to inspectTraffic, "httpEngine" to httpEngine) + Tunable.entries.associate { it.key to tunable(it) }
 }

@@ -7,7 +7,6 @@ import androidx.appfunctions.AppFunctionPermissionRequiredException
 import androidx.appfunctions.AppFunctionSerializable
 import androidx.appfunctions.AppFunctionService
 import androidx.appfunctions.AppFunctionServiceEntryPoint
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import com.composables.icons.lucide.Lucide
@@ -146,7 +145,8 @@ fun AssistantSetting() {
             Lucide.Sparkles,
             "Gemini can ask for your classes and attendance",
             onClick = { set(!Settings.assistant) },
-            trailing = { Switch(Settings.assistant, { set(it) }) },
+            trailing = { ItemSwitch(Settings.assistant, { set(it) }) },
+            on = Settings.assistant,
         )
     }
 }
