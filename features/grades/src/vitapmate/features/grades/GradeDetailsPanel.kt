@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -95,18 +96,19 @@ internal fun GradeDetailsPanel(course: GradeCourse, details: GradeDetails?, load
 
 @Composable
 private fun Label(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), modifier, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, modifier, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
 private fun Cutoff(cutoff: GradeCutoff, achieved: Boolean) {
     val scheme = MaterialTheme.colorScheme
     val tone = gradeTone(cutoff.grade)
+    val shape = RoundedCornerShape(if (achieved) 15.dp else 10.dp)
     Box(
         Modifier
-            .background(if (achieved) tone.subtle else Color.Transparent, MaterialTheme.shapes.small)
-            .border(BorderStroke(1.dp, if (achieved) tone.base else scheme.outlineVariant), MaterialTheme.shapes.small)
-            .padding(horizontal = Space.sm, vertical = 4.dp)
+            .background(if (achieved) tone.subtle else Color.Transparent, shape)
+            .border(BorderStroke(1.dp, if (achieved) tone.base else scheme.outlineVariant), shape)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
             .testTag("grades.cutoff.${cutoff.grade}"),
     ) {
         Text(
@@ -137,7 +139,7 @@ private fun MarkRow(mark: GradeMark) {
         }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ProgressBar(((mark.percent ?: 0.0) / 100).toFloat(), mark.band.tone().base, Modifier.weight(1f), height = 4.dp)
+            ProgressBar(((mark.percent ?: 0.0) / 100).toFloat(), mark.band.tone().base, Modifier.weight(1f), height = 8.dp)
             Spacer(Modifier.width(Space.md))
             Text("${mark.weighted.ifEmpty { "–" }} of ${mark.weightage}", style = MaterialTheme.typography.labelMedium.nums(), color = scheme.onSurfaceVariant)
         }

@@ -66,7 +66,6 @@ import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
-import vitapmate.ui.IconButton
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.SectionCard
 import vitapmate.ui.SectionHeader
@@ -120,9 +119,10 @@ internal fun PlannerView(planner: Planner, history: GradeHistory?, list: LazyLis
             end = Space.sm,
             bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg,
         ),
-        verticalArrangement = Arrangement.spacedBy(Space.sm),
+        // The target attaches to the summary, and the course cards form one segmented run, 3 dp apart.
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        item("summary") { PlanSummary(planner, plan, rows.size) }
+        item("summary") { PlanSummary(planner, plan, rows.size, joined = plan.needed != null) }
         if (plan.needed != null) {
             item("target") {
                 TargetCard(plan, Modifier.animateItem()) { target ->
@@ -149,42 +149,46 @@ internal fun PlannerView(planner: Planner, history: GradeHistory?, list: LazyLis
                 onGrade = { g -> planner.update(row.id) { it.copy(grade = g) }; act("grade", mapOf("grade" to g)) },
                 onRemove = { planner.rows.removeAll { it.id == row.id }; act("remove") },
                 Modifier.animateItem(),
+                shape = segment(i, rows.size),
             )
         }
         item("add") {
-            Button({ planner.add(); act("add") }, Modifier.fillMaxWidth().testTag("grades.plan.add"), ButtonVariant.Outline, prefix = Lucide.Plus) { Text("Add course") }
+            Button({ planner.add(); act("add") }, Modifier.padding(top = Space.sm).fillMaxWidth().height(52.dp).testTag("grades.plan.add"), ButtonVariant.Outline, prefix = Lucide.Plus) { Text("Add course") }
         }
     }
 }
 
-/** Semester GPA in a ring in its letter's tone; the CGPA now → after with the change; the base it counts from. */
+/**
+ * Semester GPA in a ring in its letter's tone; the CGPA now → after with the change; the base it
+ * counts from. [joined] squares its foot for the target block under it.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PlanSummary(planner: Planner, plan: GpaPlan, count: Int) {
-    val scheme = MaterialTheme.colorScheme
+private fun PlanSummary(planner: Planner, plan: GpaPlan, count: Int, joined: Boolean) {
+    val muted = AppTheme.tones.accentTone.onSubtle
     val tone = gradeTone(plan.letter)
-    val label = MaterialTheme.typography.labelSmall
+    val label = MaterialTheme.typography.labelMedium
     val ring by animateFloatAsState((plan.semesterGpa / 10).toFloat(), MaterialTheme.motionScheme.defaultSpatialSpec())
-    SectionCard(Modifier.fillMaxWidth().testTag("grades.plan.summary")) {
+    AccentBlock(Modifier.fillMaxWidth().testTag("grades.plan.summary"), attached(0, if (joined) 2 else 1)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(88.dp), Alignment.Center) {
-                CircularWavyProgressIndicator(progress = { ring.coerceIn(0f, 1f) }, Modifier.size(88.dp), color = tone.base, trackColor = tone.subtle)
-                CountUp(plan.semesterGpa, MaterialTheme.typography.titleLargeEmphasized.nums(), Modifier.testTag("grades.plan.gpa"))
+            Box(Modifier.size(104.dp), Alignment.Center) {
+                CircularWavyProgressIndicator(progress = { ring.coerceIn(0f, 1f) }, Modifier.size(104.dp), color = tone.base, trackColor = tone.base.copy(alpha = 0.35f))
+                CountUp(plan.semesterGpa, MaterialTheme.typography.headlineSmallEmphasized.nums(), Modifier.testTag("grades.plan.gpa"))
             }
             Spacer(Modifier.width(Space.lg))
             Column(Modifier.weight(1f)) {
-                Text("SEMESTER GPA", style = label, fontWeight = FontWeight.SemiBold, color = scheme.onSurfaceVariant)
+                Text("Semester GPA", style = label, fontWeight = FontWeight.SemiBold, color = muted)
                 Text("$count ${if (count == 1) "course" else "courses"} · ${plan.credits.creditsLabel()} credits", style = MaterialTheme.typography.bodyMedium)
                 Spacer(Modifier.height(Space.md))
-                Text("PROJECTED CGPA", style = label, fontWeight = FontWeight.SemiBold, color = scheme.onSurfaceVariant)
+                Text("Projected CGPA", style = label, fontWeight = FontWeight.SemiBold, color = muted)
                 val current = plan.current
                 val projected = plan.projected
                 if (current == null || projected == null) {
-                    Text("—", style = MaterialTheme.typography.titleLarge, color = scheme.onSurfaceVariant)
+                    Text("—", style = MaterialTheme.typography.titleLarge, color = muted)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(current.fixed2(), style = MaterialTheme.typography.bodyLarge.nums(), color = scheme.onSurfaceVariant)
-                        Icon(Lucide.ArrowRight, null, Modifier.padding(horizontal = Space.xs).size(14.dp), tint = scheme.onSurfaceVariant)
+                        Text(current.fixed2(), style = MaterialTheme.typography.bodyLarge.nums(), color = muted)
+                        Icon(Lucide.ArrowRight, null, Modifier.padding(horizontal = Space.xs).size(14.dp), tint = muted)
                         CountUp(projected, MaterialTheme.typography.titleLargeEmphasized.nums(), Modifier.testTag("grades.plan.projected"))
                         if (Math.abs(plan.delta) >= 0.005) {
                             Spacer(Modifier.width(Space.sm))
@@ -200,15 +204,15 @@ private fun PlanSummary(planner: Planner, plan: GpaPlan, count: Int) {
             Modifier.fillMaxWidth().tappable({ planner.editBase = !planner.editBase }, "Edit current CGPA and credits", Role.Button).testTag("grades.plan.base"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Lucide.History, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+            Icon(Lucide.History, null, Modifier.size(14.dp), tint = muted)
             Spacer(Modifier.width(6.dp))
             Text(
                 if (plan.current == null) "Current CGPA and credits" else "CGPA ${planner.cgpa} over ${planner.completed.ifEmpty { "0" }} credits",
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,
-                color = scheme.onSurfaceVariant,
+                color = muted,
             )
-            Text(if (planner.editBase) "Done" else "Edit", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppTheme.tones.accentTone.onSubtle)
+            Text(if (planner.editBase) "Done" else "Edit", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = AppTheme.tones.accent)
         }
         val motion = MaterialTheme.motionScheme
         AnimatedVisibility(
@@ -240,20 +244,21 @@ private fun PlanSummary(planner: Planner, plan: GpaPlan, count: Int) {
     }
 }
 
-/** The target CGPA with a stepper of 0.05, and the semester GPA it needs. */
+/** The target CGPA with a stepper of 0.05, and the semester GPA it needs; attached under [PlanSummary]. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TargetCard(plan: GpaPlan, modifier: Modifier, onTarget: (Double) -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val needed = plan.needed ?: return
-    SectionCard(modifier.fillMaxWidth().testTag("grades.plan.target")) {
+    SectionCard(modifier.fillMaxWidth().testTag("grades.plan.target"), shape = attached(1, 2)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("TARGET CGPA", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, color = scheme.onSurfaceVariant)
-            IconButton(Lucide.Minus, if (plan.target > 5) ({ onTarget(plan.target - 0.05) }) else null, "Lower target", Modifier.testTag("grades.plan.target.less"))
-            Text(plan.target.fixed2(), Modifier.width(56.dp), style = MaterialTheme.typography.titleLargeEmphasized.nums(), textAlign = TextAlign.Center)
-            IconButton(Lucide.Plus, if (plan.target < 9.995) ({ onTarget(minOf(10.0, plan.target + 0.05)) }) else null, "Raise target", Modifier.testTag("grades.plan.target.more"))
+            Text("Target CGPA", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = scheme.onSurfaceVariant)
+            StepButton(Lucide.Minus, if (plan.target > 5) ({ onTarget(plan.target - 0.05) }) else null, "Lower target", Modifier.testTag("grades.plan.target.less"))
+            Text(plan.target.fixed2(), Modifier.width(64.dp), style = MaterialTheme.typography.titleLargeEmphasized.nums(), textAlign = TextAlign.Center)
+            StepButton(Lucide.Plus, if (plan.target < 9.995) ({ onTarget(minOf(10.0, plan.target + 0.05)) }) else null, "Raise target", Modifier.testTag("grades.plan.target.more"))
         }
+        Spacer(Modifier.height(6.dp))
         val style = MaterialTheme.typography.bodyMedium.nums()
         when (plan.outlook) {
             TargetOutlook.REACHED -> Text("Already there, whatever you score", style = style, color = tones.success.onSubtle)

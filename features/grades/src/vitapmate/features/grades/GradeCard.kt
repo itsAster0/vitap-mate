@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -37,7 +38,7 @@ import vitapmate.ui.Space
 import vitapmate.ui.nums
 import vitapmate.ui.tappable
 
-/** One course's grade: badge, title, code and type, VTOP's total; tapping toggles its [GradeDetailsPanel]. */
+/** One course's grade: badge, title, code and type, VTOP's total; tapping toggles its [GradeDetailsPanel]. [shape] places it in its run. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun GradeCard(
@@ -49,6 +50,7 @@ internal fun GradeCard(
     onToggle: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.large,
 ) {
     val scheme = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -62,6 +64,7 @@ internal fun GradeCard(
                 stateDescription = if (expanded) "expanded" else "collapsed"
                 contentDescription = "$title, grade ${course.grade.ifEmpty { "none" }}, total ${course.total}"
             },
+        shape = shape,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GradeBadge(course.grade)

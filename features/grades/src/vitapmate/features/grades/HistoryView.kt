@@ -6,17 +6,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.FileX
 import com.composables.icons.lucide.Lucide
@@ -28,6 +32,7 @@ import vitapmate.ui.PageScaffold
 import vitapmate.ui.SectionHeader
 import vitapmate.ui.Space
 import vitapmate.ui.UpdatedFooter
+import vitapmate.ui.nums
 
 /**
  * The grade history (`page.grade_history`): the CGPA card, then every course by exam session with
@@ -61,7 +66,8 @@ internal fun HistoryView(
                 end = Space.sm,
                 bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg,
             ),
-            verticalArrangement = Arrangement.spacedBy(Space.sm),
+            // A session's course cards sit 3 dp apart as one segmented run.
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             item("cgpa") { CgpaCard(history) }
             if (history.courseCount > 0) {
@@ -91,10 +97,21 @@ internal fun HistoryView(
             }
             sessions.forEach { (session, courses) ->
                 item("session.${session.month}") {
-                    SectionHeader(session.label, Modifier.animateItem(), trailing = session.gpa?.let { { Text("GPA ${it.fixed2()}") } })
+                    // The session's GPA in a small pill.
+                    SectionHeader(session.label, Modifier.animateItem(), trailing = session.gpa?.let { gpa ->
+                        {
+                            Text(
+                                "GPA ${gpa.fixed2()}",
+                                Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(11.dp)).padding(horizontal = 10.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelMedium.nums(),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    })
                 }
-                items(courses, key = { it.key }) { course ->
-                    HistoryCourseCard(course, course.key in expanded, { onToggle(course.key) }, Modifier.animateItem())
+                itemsIndexed(courses, key = { _, it -> it.key }) { i, course ->
+                    HistoryCourseCard(course, course.key in expanded, { onToggle(course.key) }, Modifier.animateItem(), segment(i, courses.size))
                 }
             }
             item("updated") { UpdatedFooter() }

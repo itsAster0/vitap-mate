@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -38,10 +39,10 @@ import vitapmate.ui.Space
 import vitapmate.ui.nums
 import vitapmate.ui.tappable
 
-/** One graded course: badge, title, code and category, credits; an embedded course expands to its parts. */
+/** One graded course: badge, title, code and category, credits; an embedded course expands to its parts. [shape] places it in its run. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun HistoryCourseCard(course: HistoryCourse, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+internal fun HistoryCourseCard(course: HistoryCourse, expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, shape: Shape = MaterialTheme.shapes.large) {
     val scheme = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
     val parts = course.components.isNotEmpty()
@@ -54,6 +55,7 @@ internal fun HistoryCourseCard(course: HistoryCourse, expanded: Boolean, onToggl
                 if (parts) stateDescription = if (expanded) "expanded" else "collapsed"
                 contentDescription = "${course.title}, grade ${course.grade}" + (course.credits?.let { ", ${it.creditsLabel()} credits" } ?: "")
             },
+        shape = shape,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             GradeBadge(course.grade)

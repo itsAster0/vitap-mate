@@ -5,11 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.School
 import kotlinx.coroutines.launch
@@ -87,12 +88,13 @@ internal fun SemesterView(
                     end = Space.sm,
                     bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg,
                 ),
-                verticalArrangement = Arrangement.spacedBy(Space.sm),
+                // Course cards sit 3 dp apart as one segmented run.
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 item("summary") {
-                    SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem())
+                    SemesterSummaryCard(grades.courses, summary, onCourse = { i -> scope.launch { list.animateScrollToItem(i + 1) } }, Modifier.animateItem().padding(bottom = Space.sm))
                 }
-                items(grades.courses, key = { it.courseId.ifEmpty { it.code } }) { course ->
+                itemsIndexed(grades.courses, key = { _, it -> it.courseId.ifEmpty { it.code } }) { i, course ->
                     val key = "${grades.semesterId}/${course.courseId}"
                     val open = key in expanded
                     LaunchedEffect(open) { if (open) details.open(grades.semesterId, course.courseId) }
@@ -105,6 +107,7 @@ internal fun SemesterView(
                         onToggle = { onToggle(key) },
                         onRefresh = { scope.launch { details.refresh(grades.semesterId, course.courseId) } },
                         Modifier.animateItem(),
+                        shape = segment(i, grades.courses.size),
                     )
                 }
                 item("updated") { UpdatedFooter() }
