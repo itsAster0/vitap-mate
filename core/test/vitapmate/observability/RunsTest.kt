@@ -180,4 +180,84 @@ class RunsTest {
         assertEquals("Attendance Done → 2 changes notified Done", list[0].chain())
         assertEquals("Background sync (OTP auto-fill isn't set up) Skipped", list[1].chain())
     }
+
+    @Test
+    fun udpCallInFlightIsARunningStep() {
+        // Fetch all over UDP: Semesters answered, Timetable asked and not back yet.
+        val r = runs(
+            """
+            {"ev":"start","flow":"f","msg":"sync.all start","src":"flow","step":"sync.all","t":1000}
+            {"flow":"f","msg":"start","src":"core.fetch_semesters","t":1001}
+            {"flow":"f","msg":"udp fetch","ms":800,"src":"core.fetch_semesters","t":1800}
+            {"flow":"f","msg":"route used","route":"Udp","src":"core.fetch_semesters","t":1801}
+            {"flow":"f","ms":801,"msg":"done","outcome":"ok","src":"core.fetch_semesters","t":1802}
+            {"flow":"f","msg":"start","src":"core.fetch_timetable","t":1900}
+            """,
+        ).single()
+        assertTrue(r.running)
+        assertEquals("Semesters Done → Timetable Running", r.chain())
+    }
+
+    @Test
+    fun liveRunBetweenCallsIsRunning() {
+        val r = runs(
+            """
+            {"ev":"start","flow":"f","msg":"sync.all start","src":"flow","step":"sync.all","t":1000}
+            {"flow":"f","msg":"response vtop.vitap.ac.in/vtop/processViewStudentAttendance 200 90ms","src":"rust.network","t":1100}
+            {"flow":"f","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_attendance","t":1105}
+            """,
+        ).single()
+        assertTrue(r.running)
+        assertEquals("Attendance Done", r.chain())
+        // From an earlier process it was cut off, not running.
+        assertTrue(!runs(
+            """
+            {"ev":"start","flow":"f","msg":"sync.all start","src":"flow","step":"sync.all","t":1000}
+            {"flow":"f","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_attendance","t":1105}
+            {"flow":"f","msg":"response vtop.vitap.ac.in/vtop/processViewStudentAttendance 200 90ms","src":"rust.network","t":1100}
+            """,
+            since = 2000,
+        ).single().running)
+    }
+
+    @Test
+    fun queuedPageWaitsUntilItsLaneStarts() {
+        val waiting = """
+            {"ev":"start","flow":"q","msg":"marks.refresh start","src":"flow","step":"marks.refresh","t":1000}
+            {"flow":"q","msg":"refreshing","src":"ui.marks","state":"refreshing","t":1001,"trigger":"open"}
+            {"flow":"q","msg":"queued","page":"marks","src":"fetch.queue","t":1002}
+            """
+        assertEquals("Marks ($WAITING) Running", runs(waiting).single().chain())
+        val started = waiting.trimIndent() + "\n" + """{"flow":"q","msg":"started","page":"marks","src":"fetch.queue","t":3000}"""
+        assertEquals("Marks Running", runs(started).single().chain())
+        // Fetch all queues its other pages while one step runs: that step didn't wait.
+        val fetchAll = runs(
+            """
+            {"ev":"start","flow":"f","msg":"sync.all start","src":"flow","step":"sync.all","t":1000}
+            {"flow":"f","msg":"queued","page":"marks","src":"fetch.queue","t":1001}
+            {"flow":"f","msg":"start","src":"core.fetch_timetable","t":1002}
+            {"flow":"f","msg":"response vtop.vitap.ac.in/vtop/processViewTimeTable 200 90ms","src":"rust.network","t":1100}
+            {"flow":"f","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_timetable","t":1105}
+            """,
+        ).single()
+        assertEquals("Timetable Done", fetchAll.chain())
+    }
+
+    @Test
+    fun logOrderBeatsAClockSetBack() {
+        // The first run was logged while the clock was a day ahead; the second is newer.
+        val list = runs(
+            """
+            {"ev":"start","flow":"a","msg":"marks.refresh start","src":"flow","step":"marks.refresh","t":90000000}
+            {"flow":"a","msg":"response vtop.vitap.ac.in/vtop/doStudentMarkView 200 90ms","src":"rust.network","t":90000100}
+            {"flow":"a","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_marks","t":90000105}
+            {"ev":"done","flow":"a","msg":"marks.refresh done","outcome":"ok","src":"flow","step":"marks.refresh","t":90000110}
+            {"ev":"start","flow":"b","msg":"exams.refresh start","src":"flow","step":"exams.refresh","t":1000}
+            {"flow":"b","msg":"response vtop.vitap.ac.in/vtop/doSearchExamScheduleForStudent 200 90ms","src":"rust.network","t":1100}
+            {"flow":"b","ms":100,"msg":"done","outcome":"ok","src":"core.fetch_exams","t":1105}
+            {"ev":"done","flow":"b","msg":"exams.refresh done","outcome":"ok","src":"flow","step":"exams.refresh","t":1110}
+            """,
+        )
+        assertEquals(listOf("Exams", "Marks"), list.map { it.title })
+    }
 }

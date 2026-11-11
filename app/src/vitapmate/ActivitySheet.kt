@@ -22,9 +22,11 @@ import com.composables.icons.lucide.ChevronRight
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -187,7 +189,8 @@ internal fun rememberAllRuns(older: Boolean): List<Run>? {
     // Older still: runs saved before the logs rolled over (ActivityHistory).
     val saved by produceState(emptyList<Run>(), older) { if (older) value = withContext(Dispatchers.IO) { ActivityHistory.load() } }
     return remember(logged, saved) {
-        logged?.let { live -> (live + saved.filter { s -> live.none { it.id == s.id } }).sortedByDescending { it.startT } }
+        // Both newest first in the order they happened (not by clock time, which can jump); saved ones are older.
+        logged?.let { live -> live + saved.filter { s -> live.none { it.id == s.id } } }
     }
 }
 
@@ -234,10 +237,11 @@ internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Col
 
 private fun groupOf(run: Run, now: Long): String {
     if (run.running || run.waiting) return "Now"
-    val end = run.endT ?: run.startT
+    // A time ahead of the clock (it was set back since) counts as now.
+    val end = minOf(run.endT ?: run.startT, now)
     val day = epochDayOf(end)
     return when (val days = epochDayOf(now) - day) {
-        0 -> if (now - end < 15 * 60_000) "Now" else "Earlier today"
+        0 -> if (now - end < 15 * 60_000) "Just now" else "Earlier today"
         1 -> "Yesterday"
         in 2..6 -> formatDay(day, "EEEE")
         else -> formatDay(day, "EEE d MMM")
@@ -262,7 +266,7 @@ private fun RunCard(run: Run, container: Color, shape: Shape, modifier: Modifier
                     maxLines = 1,
                 )
             }
-            StepLine(run.steps, Modifier.padding(start = 50.dp, top = 10.dp))
+            StepLine(run.steps, run.running || run.failed, Modifier.padding(start = 50.dp, top = 10.dp))
             RouteLine(run.route, run.fallback, Modifier.padding(start = 50.dp, top = 8.dp))
             AnimatedVisibility(
                 open,
@@ -313,13 +317,19 @@ internal fun RouteLine(route: String?, fallback: String?, modifier: Modifier = M
     }
 }
 
-/** Each step as a chip ("• Timetable (not signed in)") with a chevron between, on one line clipped at the end. */
+/**
+ * Each step as a chip ("• Timetable (not signed in)") with a chevron between, on one line; when
+ * it doesn't fit it shows the start, or with [latest] (running or failed) the last steps.
+ */
 @Composable
-private fun StepLine(steps: List<RunStep>, modifier: Modifier) {
+private fun StepLine(steps: List<RunStep>, latest: Boolean, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val danger = AppTheme.tones.danger.base
-    Box(modifier.fillMaxWidth().clipToBounds()) {
-        Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    val scroll = rememberScrollState()
+    // Follows the chain as steps are added (the width is known only after layout).
+    LaunchedEffect(latest) { if (latest) snapshotFlow { scroll.maxValue }.collect { scroll.animateScrollTo(it) } else scroll.scrollTo(0) }
+    Box(modifier.fillMaxWidth()) {
+        Row(Modifier.horizontalScroll(scroll, enabled = false), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             steps.forEachIndexed { i, s ->
                 if (i > 0) Icon(Lucide.ChevronRight, null, Modifier.size(13.dp), tint = scheme.outline)
                 val muted = s.state == StepState.Skipped || s.state == StepState.Cached || s.state == StepState.WaitingOtp
@@ -370,7 +380,9 @@ private fun noteOf(s: RunStep): String? = when (s.state) {
     StepState.Failed, StepState.Skipped -> s.reason?.lowercase()
     StepState.WaitingOtp -> s.reason?.lowercase() ?: "waiting"
     StepState.Cached -> "saved copy"
-    StepState.Running, StepState.Done -> null
+    // Waiting for a lane.
+    StepState.Running -> s.reason?.let { "waiting" }
+    StepState.Done -> null
 }
 
 /** Each step with its time, and the VTOP pages it fetched. */

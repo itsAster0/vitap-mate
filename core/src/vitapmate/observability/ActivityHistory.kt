@@ -19,13 +19,14 @@ object ActivityHistory {
 
     val bytes: Long get() = file.length()
 
-    /** Saves the finished runs in the log files that are newer than the last saved one. Blocking. */
+    /** Saves the finished runs in the log files that aren't saved yet, oldest first. Blocking. */
     @Synchronized
     fun save() {
-        val last = load().maxOfOrNull { it.startT } ?: 0L
+        // By id, not time: a run stamped while the phone's clock was ahead would hold back every later one.
+        val saved = load().mapTo(HashSet()) { it.id }
         val runs = runsOf(groupFlows(Inspector.read(Int.MAX_VALUE)), Inspector.startedAt)
-            .filter { !it.running && !it.waiting && it.startT > last }
-            .sortedBy { it.startT }
+            .filter { !it.running && !it.waiting && it.id !in saved }
+            .asReversed()
         if (runs.isEmpty()) return
         file.appendText(runs.joinToString("") { encode(it).toString() + "\n" })
         Log.info("activity", "history saved", fields = mapOf("runs" to "${runs.size}", "bytes" to "${file.length()}"))

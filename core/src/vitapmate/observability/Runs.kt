@@ -9,7 +9,9 @@ import androidx.compose.runtime.Immutable
  * log's technical events to these steps:
  *
  * - a `core.<call>` span (Rust, closed with `ms` and `outcome`) that talked to VTOP is a step
- *   named after its page (`fetch_timetable` → "Timetable", `sign_in` → "Sign in");
+ *   named after its page (`fetch_timetable` → "Timetable", `sign_in` → "Sign in"); its `start`
+ *   line shows it running before any answer (Server and UDP log nothing until then);
+ * - `fetch.queue` `queued` marks a page waiting for a lane, until `started`;
  * - `session expired, signing in again` (core) ends that step as not signed in and starts
  *   "Sign in"; `rust.auth` stages end it (`login completed`, `restored session validation
  *   succeeded`), turn it into "OTP" (`security OTP verification is required`) or fail it;
@@ -32,9 +34,11 @@ data class Run(
     val route: String? = null,
     /** "Proxy failed → Direct" when a route failed and the run fell back. */
     val fallback: String? = null,
+    /** A flow of it started in this process and hasn't ended: running even between its calls. */
+    val live: Boolean = false,
 ) {
     val endT: Long? get() = if (running) null else steps.mapNotNull { it.endT }.maxOrNull()
-    val running: Boolean get() = steps.any { it.state == StepState.Running }
+    val running: Boolean get() = steps.any { it.state == StepState.Running } || (live && !waiting)
     val waiting: Boolean get() = steps.lastOrNull()?.state == StepState.WaitingOtp
     val failed: Boolean get() = steps.lastOrNull()?.state == StepState.Failed
 }
@@ -64,14 +68,16 @@ data class PageHit(val name: String, val status: String, val ms: Long?)
 enum class RunTrigger { Opened, Pulled, Retried, Automatic, Returned, AfterOtp, SignedIn, Tapped }
 
 /**
- * Runs in [flows], newest first. A flow that never ended and started before [since] (the
- * process start) was cut off: its running steps show as interrupted.
+ * Runs in [flows] (newest first, in log order: [groupFlows]), newest first. A flow that never
+ * ended and started before [since] (the process start) was cut off: its running steps show as
+ * interrupted.
  */
 fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
     val runs = mutableListOf<MRun>()
     // Background syncs that finished: when, and how many changes they notified (joined below).
     val notified = mutableListOf<Pair<FlowSummary, String>>()
-    for (f in flows.sortedBy { it.startT }) {
+    // Oldest first, in the order the log has them: a phone clock set back later can't reorder runs.
+    for (f in flows.asReversed()) {
         // The prompt this flow answers: OTP steps that started waiting shortly before.
         fun waitingSteps() = runs.flatMap { r -> r.steps.filter { it.state == StepState.WaitingOtp && f.startT - it.startT in 0..OTP_WINDOW_MS }.map { r to it } }
         val name = f.name
@@ -119,6 +125,7 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
                 val run = host ?: MRun(f.id, title, trigger, f.startT, mutableListOf()).also { runs += it }
                 run.steps += steps
                 if (host != null) host.flows += f.id
+                if (f.outcome == null && f.startT >= since) run.live = true
                 routeOf(f.lines)?.let { run.route = it }
                 fallbackOf(f.lines)?.let { run.fallback = it }
                 if (host == null) {
@@ -133,7 +140,7 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
         val label = when (count) { "0" -> "Nothing new"; "1" -> "1 change notified"; else -> "$count changes notified" }
         run.steps += MStep(label, StepState.Done, t).apply { end(StepState.Done, t) }
     }
-    return runs.map { it.freeze() }.sortedByDescending { it.startT }
+    return runs.map { it.freeze() }.asReversed()
 }
 
 /**
@@ -155,6 +162,10 @@ private const val BACKGROUND_SYNC = "Background sync"
 private const val OTP = "OTP"
 private const val NET = "rust.network"
 private const val AUTH = "rust.auth"
+private const val QUEUE = "fetch.queue"
+
+/** A running step's note while its page waits for a lane ([vitapmate.data.PageFetches]). */
+const val WAITING = "Waiting for a free lane"
 private val ENDS = setOf("done", "failed", "cancelled")
 private val SERVER_ROUTES = setOf("server", "udp")
 
@@ -168,6 +179,8 @@ private class MStep(val label: String, var state: StepState, val startT: Long) {
     fun end(state: StepState, t: Long, reason: String? = null) {
         this.state = state
         endT = t
+        // Fetch all queues its other pages during this step: they waited, not it.
+        if (this.reason == WAITING) this.reason = null
         if (reason != null) this.reason = reason
     }
 
@@ -181,6 +194,7 @@ private class MRun(val id: String, val title: String, val trigger: RunTrigger, v
     var fallback: String? = null
     var otpAcceptedAt: Long? = null
     var signedInAt: Long? = null
+    var live = false
 
     fun freeze(): Run {
         // "Class history" × 5: one step.
@@ -191,7 +205,7 @@ private class MRun(val id: String, val title: String, val trigger: RunTrigger, v
                 folded[folded.lastIndex] = last.copy(endT = s.endT ?: last.endT, pages = last.pages + s.pages, count = last.count + 1)
             } else folded += s
         }
-        return Run(id, flows.toList(), title, trigger, startT, folded, route, fallback)
+        return Run(id, flows.toList(), title, trigger, startT, folded, route, fallback, live)
     }
 }
 
@@ -205,7 +219,8 @@ private fun stepsOf(f: FlowSummary, since: Long): List<MStep> {
     var hint: String? = null
     val live = f.outcome == null && f.startT >= since
     fun flush(close: LogLine?) {
-        val call = close?.src?.removePrefix("core.")
+        // Closed, else still in flight (its `start` line, live flows only).
+        val call = (close ?: seg.lastOrNull { live && it.src.startsWith("core.") && it.msg == "start" })?.src?.removePrefix("core.")
         val ui = seg.firstOrNull { it.src.startsWith("ui.") && it.fields["state"] in STARTS }
         // Restoring the saved session (core init) logs auth lines but asks VTOP nothing.
         val vtop = seg.any { it.src == NET || (it.src == AUTH && "login requested" in it.msg) } || call?.startsWith("fetch_") == true || call == "sign_in" ||
@@ -261,6 +276,8 @@ private fun segment(lines: List<LogLine>, call: String?, label: String): List<MS
                 open(SIGN_IN, StepState.Running, line.t).end(StepState.Failed, line.t, "Password rejected")
             }
             m == "attendance detail just fetched" -> cur.cached = true
+            line.src == QUEUE && m == "queued" -> cur.reason = WAITING
+            line.src == QUEUE && m == "started" && cur.reason == WAITING -> cur.reason = null
             line.src == AUTH -> when {
                 "security OTP verification is required" in m -> {
                     if (cur.label == SIGN_IN) cur.end(StepState.Done, line.t) else cur.end(StepState.Skipped, line.t, "Not signed in")

@@ -1230,6 +1230,13 @@ async fn traced<T>(
     work: impl Future<Output = Result<T, CoreError>>,
 ) -> Result<T, CoreError> {
     let span = span(call, flow);
+    // A Server or UDP call logs nothing until its answer is back: this line shows it in flight
+    // (Activity). The OTP prompt's forwarded-mail poll stays quiet.
+    if (call.starts_with("fetch_") || call.starts_with("download_") || call == "sign_in")
+        && !call.contains("forward")
+    {
+        span.in_scope(|| info!("start"));
+    }
     let result = transport::with_flow(flow.to_string(), work.instrument(span.clone())).await;
     close(&span, &result);
     result

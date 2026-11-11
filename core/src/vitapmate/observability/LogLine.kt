@@ -61,7 +61,8 @@ fun parseLogLine(text: String): LogLine? {
 }
 
 /**
- * Groups lines by flow, newest flow first. A flow's name comes from Kotlin's `flow()` start
+ * Groups lines by flow, newest flow first (by where each starts in the log, not its clock time,
+ * which jumps when the phone's clock is changed). A flow's name comes from Kotlin's `flow()` start
  * line (`step`), else its first line's src; its ms and outcome from the `flow()` end line (both
  * null while it runs, or when the end line is missing).
  */
@@ -79,7 +80,7 @@ fun groupFlows(lines: List<LogLine>): List<FlowSummary> {
             outcome = end?.let { it.outcome ?: if (it.fields["ev"] == "done") "ok" else it.fields["ev"] },
             lines = ls,
         )
-    }.sortedByDescending { it.startT }
+    }.asReversed()
 }
 
 private val END_EVENTS = setOf("done", "failed", "cancelled")
