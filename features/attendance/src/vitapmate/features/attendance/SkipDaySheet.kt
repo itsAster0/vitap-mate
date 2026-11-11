@@ -1,15 +1,8 @@
 package vitapmate.features.attendance
 
 import androidx.compose.foundation.background
-import vitapmate.ui.isoWeekday
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.CalendarDays
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
@@ -173,7 +167,18 @@ internal fun SkipDaySheet(courses: List<AttendanceCourse>, outlook: Map<String, 
                             }
                         }
                         if (calendar) {
-                            PlanCalendar(days, stateOf, toggle, Modifier.padding(horizontal = Space.lg))
+                            PlanCalendar(
+                                days,
+                                "attendance.skip_day",
+                                { d -> stateOf(d)?.let { if (it == Mark.Skip) tones.danger else tones.success } },
+                                toggle,
+                                Modifier.padding(horizontal = Space.lg).testTag("attendance.skip_day.month"),
+                                RoundedCornerShape(12.dp),
+                            ) { d, tone ->
+                                stateOf(d)?.let { st ->
+                                    Icon(if (st == Mark.Skip) Lucide.X else Lucide.Check, null, Modifier.size(12.dp).align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp), tint = tone?.base ?: Color.Unspecified)
+                                }
+                            }
                         } else {
                             val week = days.filter { it < days.first() + 7 }
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), contentPadding = PaddingValues(horizontal = Space.lg)) {
@@ -218,72 +223,6 @@ internal fun SkipDaySheet(courses: List<AttendanceCourse>, outlook: Map<String, 
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-            }
-        }
-    }
-}
-
-/**
- * Every month holding [days], Monday first. A class day is a tile: outlined until marked, then
- * filled red (skip) or green (attend) with its icon; tapping it calls [onTap]. Other days are
- * faint and can't be tapped.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlanCalendar(days: List<Int>, stateOf: (Int) -> Mark?, onTap: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val tones = AppTheme.tones
-    val open = days.toSet()
-    val tile = RoundedCornerShape(12.dp)
-    Column(modifier.testTag("attendance.skip_day.month"), verticalArrangement = Arrangement.spacedBy(Space.md)) {
-        for (first in days.map { firstOfMonth(it) }.distinct()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(formatDay(first, "MMMM"), style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth()) {
-                    for (d in listOf("M", "T", "W", "T", "F", "S", "S")) {
-                        Text(d, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, textAlign = TextAlign.Center)
-                    }
-                }
-                val leading = isoWeekday(first) - 1
-                val length = daysInMonth(first)
-                for (week in 0 until (leading + length + 6) / 7) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        for (col in 0 until 7) {
-                            val n = week * 7 + col - leading
-                            val day = first + n
-                            val usable = n in 0 until length && day in open
-                            val state = if (usable) stateOf(day) else null
-                            val tone = if (state == Mark.Skip) tones.danger else tones.success
-                            Box(
-                                Modifier.weight(1f).height(44.dp)
-                                    .then(
-                                        when {
-                                            state != null -> Modifier.background(tone.subtle, tile).border(1.5.dp, tone.base, tile)
-                                            usable -> Modifier.border(1.dp, scheme.outlineVariant, tile)
-                                            else -> Modifier
-                                        },
-                                    )
-                                    .then(if (usable) Modifier.clip(tile).clickable { onTap(day) }.testTag("attendance.skip_day.$day") else Modifier),
-                                Alignment.Center,
-                            ) {
-                                if (n !in 0 until length) return@Box
-                                if (state != null) {
-                                    Icon(if (state == Mark.Skip) Lucide.X else Lucide.Check, null, Modifier.size(12.dp).align(Alignment.TopEnd).padding(top = 4.dp, end = 4.dp), tint = tone.base)
-                                }
-                                Text(
-                                    "${n + 1}",
-                                    style = MaterialTheme.typography.labelLarge.nums(),
-                                    fontWeight = if (usable) FontWeight.Bold else FontWeight.Normal,
-                                    color = when {
-                                        state != null -> tone.onSubtle
-                                        usable -> scheme.onSurface
-                                        else -> scheme.onSurfaceVariant.copy(alpha = 0.4f)
-                                    },
-                                )
-                            }
-                        }
-                    }
                 }
             }
         }

@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,14 +21,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Flame
+import com.composables.icons.lucide.Lucide
 import vitapmate.core.AttendedClass
 import vitapmate.core.ClassStatus
 import vitapmate.ui.AppTheme
@@ -38,7 +42,7 @@ import vitapmate.ui.nums
 
 /**
  * The history at a glance: one bar split into present / on duty / absent (it springs in), the
- * counts in their tones, and "5 in a row · last missed 3 Oct" (or "never missed"). Classes not
+ * counts in their tones, and under a hairline "5 in a row · last missed 3 Oct" (or "never missed"). Classes not
  * posted yet are left out. [classes] are newest first.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -59,14 +63,12 @@ internal fun Insights(classes: List<AttendedClass>) {
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }
     val grow by animateFloatAsState(if (shown) 1f else 0f, MaterialTheme.motionScheme.slowSpatialSpec())
-    SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.insights")) {
-        Box(Modifier.fillMaxWidth().height(10.dp)) {
-            Row(
-                Modifier.fillMaxWidth(grow.coerceIn(0.01f, 1f)).fillMaxHeight().clip(CircleShape),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                for ((count, color) in listOf(present to tones.success.base, onDuty to tones.accentTone.base, absent to tones.danger.base)) {
-                    if (count > 0) Box(Modifier.weight(count.toFloat()).fillMaxHeight().background(color))
+    SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.insights"), shape = MaterialTheme.shapes.extraLargeIncreased) {
+        val parts = listOf(present to tones.success.base, onDuty to tones.accentTone.base, absent to tones.danger.base).filter { it.first > 0 }
+        Box(Modifier.fillMaxWidth().height(18.dp)) {
+            Row(Modifier.fillMaxWidth(grow.coerceIn(0.01f, 1f)).fillMaxHeight(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                parts.forEachIndexed { i, (count, color) ->
+                    Box(Modifier.weight(count.toFloat()).fillMaxHeight().background(color, connected(i, parts.size, 9.dp, 4.dp)))
                 }
             }
         }
@@ -74,7 +76,20 @@ internal fun Insights(classes: List<AttendedClass>) {
             Counts(Modifier.weight(1f), present to "present" to tones.success, onDuty to "on duty" to tones.accentTone)
             Counts(Modifier, absent to "absent" to tones.danger)
         }
-        Text(note, Modifier.padding(top = Space.xs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider(Modifier.padding(top = Space.md), color = MaterialTheme.colorScheme.outlineVariant)
+        Row(Modifier.padding(top = Space.md), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Lucide.Flame, null, Modifier.size(16.dp), tint = tones.success.base)
+            Text(
+                buildAnnotatedString {
+                    val bold = if (streak >= 3) "$streak in a row".length else 0
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append(note.take(bold)) }
+                    append(note.drop(bold))
+                },
+                Modifier.padding(start = Space.sm),
+                style = MaterialTheme.typography.bodySmall.nums(),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

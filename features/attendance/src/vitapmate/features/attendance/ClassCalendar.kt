@@ -11,17 +11,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,9 +58,9 @@ import vitapmate.ui.nums
 /**
  * A course's month calendar (`attendance.detail.calendar`), Monday first. A class day is a tile
  * filled in its worst status's tone (absent first); a day with several classes adds a pip per
- * class in that class's own tone; days without a class are faint, weekends fainter, today outlined in primary.
+ * class in that class's own tone; days without a class are faint, weekends fainter, today ringed in primary.
  * The header counts the month's classes and absences. Pages through the months with classes,
- * opening on the latest.
+ * opening on the latest; a key to the tones sits under the grid.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -76,7 +75,7 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
     var index by rememberSaveable(months.size) { mutableIntStateOf(months.lastIndex) }
     val i = index.coerceIn(0, months.lastIndex)
     val scheme = MaterialTheme.colorScheme
-    SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calendar")) {
+    SectionCard(Modifier.fillMaxWidth().testTag("attendance.detail.calendar"), shape = MaterialTheme.shapes.extraLargeIncreased) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
@@ -86,11 +85,13 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
                 )
                 Tally(months[i], byDay)
             }
-            IconButton({ index = i - 1 }, modifier = Modifier.testTag("attendance.detail.calendar.prev"), enabled = i > 0, shapes = IconButtonDefaults.shapes()) {
-                Icon(Lucide.ChevronLeft, "Previous month", Modifier.size(20.dp))
-            }
-            IconButton({ index = i + 1 }, modifier = Modifier.testTag("attendance.detail.calendar.next"), enabled = i < months.lastIndex, shapes = IconButtonDefaults.shapes()) {
-                Icon(Lucide.ChevronRight, "Next month", Modifier.size(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                FilledTonalIconButton({ index = i - 1 }, Modifier.size(44.dp, 40.dp).testTag("attendance.detail.calendar.prev"), enabled = i > 0, shape = connected(0, 2, 20.dp, 8.dp)) {
+                    Icon(Lucide.ChevronLeft, "Previous month", Modifier.size(20.dp))
+                }
+                FilledTonalIconButton({ index = i + 1 }, Modifier.size(44.dp, 40.dp).testTag("attendance.detail.calendar.next"), enabled = i < months.lastIndex, shape = connected(1, 2, 20.dp, 8.dp)) {
+                    Icon(Lucide.ChevronRight, "Next month", Modifier.size(20.dp))
+                }
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = Space.md, bottom = Space.xs)) {
@@ -115,6 +116,16 @@ internal fun ClassCalendar(classes: List<AttendedClass>) {
             label = "calendar-month",
         ) { first ->
             Month(first, byDay)
+        }
+        // The key to the tiles' tones.
+        FlowRow(Modifier.padding(top = Space.md), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+            for (status in listOf(ClassStatus.PRESENT, ClassStatus.ON_DUTY, ClassStatus.ABSENT, null)) {
+                val (label, tone) = status.look()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(10.dp).background(tone.base, CircleShape))
+                    Text(label, Modifier.padding(start = 5.dp), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                }
+            }
         }
     }
 }
@@ -148,7 +159,7 @@ private fun Month(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
     val leading = isoWeekday(first) - 1
     val length = daysInMonth(first)
     val today = remember { epochDayOf(System.currentTimeMillis()) }
-    val tile = RoundedCornerShape(12.dp)
+    val tile = CircleShape
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (week in 0 until (leading + length + 6) / 7) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -160,10 +171,10 @@ private fun Month(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
                     val tone: Tone? = statuses?.first()?.look()?.second
                     val pips = statuses?.takeIf { it.size > 1 }
                     Box(
-                        Modifier.weight(1f).height(44.dp)
+                        Modifier.weight(1f).height(42.dp)
                             .then(if (inMonth) Modifier.testTag("attendance.detail.calendar.$day") else Modifier)
                             .then(if (tone != null) Modifier.background(tone.subtle, tile) else Modifier)
-                            .then(if (inMonth && day == today) Modifier.border(1.5.dp, scheme.primary, tile) else Modifier),
+                            .then(if (inMonth && day == today) Modifier.border(2.dp, scheme.primary, tile) else Modifier),
                         Alignment.Center,
                     ) {
                         if (!inMonth) return@Box
@@ -171,7 +182,11 @@ private fun Month(first: Int, byDay: Map<Int, List<ClassStatus?>>) {
                             "${n + 1}",
                             Modifier.padding(bottom = if (pips != null) 6.dp else 0.dp),
                             style = MaterialTheme.typography.labelLarge.nums(),
-                            fontWeight = if (tone != null) FontWeight.Bold else FontWeight.Normal,
+                            fontWeight = when {
+                                tone != null -> FontWeight.ExtraBold
+                                day == today -> FontWeight.Bold
+                                else -> FontWeight.Normal
+                            },
                             color = when {
                                 tone != null -> tone.onSubtle
                                 day == today -> scheme.primary
