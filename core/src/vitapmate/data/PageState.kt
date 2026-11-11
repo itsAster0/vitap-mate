@@ -8,14 +8,18 @@ import vitapmate.core.CoreException
 
 /** Every screen's data (from [rememberPage]), as design's `PageScaffold` draws it. */
 sealed interface PageState<out T> {
-    /** Nothing to show yet (no cache; the first fetch runs). */
-    data object Loading : PageState<Nothing>
+    /**
+     * Nothing to show yet (no cache; the first fetch runs). [waiting]: the fetch is queued behind
+     * other pages ("Waiting for Attendance to finish"), set after a moment ([PageFetches]).
+     */
+    data class Loading(val waiting: String? = null) : PageState<Nothing>
 
     /**
-     * [data] (cached or fresh) from [updatedAt] (epoch seconds); [refreshing] while a fetch runs;
-     * [problem] = the last refresh failed and [data] was kept.
+     * [data] (cached or fresh) from [updatedAt] (epoch seconds); [refreshing] while a fetch runs,
+     * [waiting] as in [Loading] while it is queued; [problem] = the last refresh failed and [data]
+     * was kept.
      */
-    data class Ready<T>(val data: T, val updatedAt: Long, val refreshing: Boolean, val problem: Problem?) : PageState<T>
+    data class Ready<T>(val data: T, val updatedAt: Long, val refreshing: Boolean, val problem: Problem?, val waiting: String? = null) : PageState<T>
 
     /** Nothing cached and the fetch failed. */
     data class Failed(val problem: Problem) : PageState<Nothing>

@@ -46,7 +46,8 @@ import vitapmate.data.ProblemKind
  * Every screen's states in one place. [PageState.Loading]: [loading] (a skeleton). [PageState.Ready]:
  * pull to refresh and [content] ([empty] when [isEmpty]); a failed refresh shows as a toast with
  * Retry (the data stays), and the data's age is in [LocalUpdated] for an [UpdatedFooter].
- * [PageState.Failed] (nothing cached): a full-screen [ProblemView]. [onRefresh] runs for pulls and
+ * [PageState.Failed] (nothing cached): a full-screen [ProblemView]. A fetch queued behind other
+ * pages says so in a line on top (`waiting`). [onRefresh] runs for pulls and
  * retries and handles its own errors (they arrive as a new state).
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -73,7 +74,7 @@ fun <T> PageScaffold(
             when (val now = latest) {
                 is PageState.Ready -> now.problem.let { if (it == null) haptics.confirm() else if (it.toasts) haptics.reject() }
                 is PageState.Failed -> if (now.problem.toasts) haptics.reject()
-                PageState.Loading -> {}
+                is PageState.Loading -> {}
             }
         }
     }
@@ -85,7 +86,10 @@ fun <T> PageScaffold(
         contentKey = { it::class },
     ) { s ->
         when (s) {
-            PageState.Loading -> Box(Modifier.fillMaxSize().testTag("page.loading")) { loading() }
+            is PageState.Loading -> Column(Modifier.fillMaxSize().testTag("page.loading")) {
+                Waiting(s.waiting)
+                loading()
+            }
             is PageState.Failed -> ScrollCentered(Modifier.testTag("page.failed")) { ProblemView(s.problem, refresh, busy = busy) }
             is PageState.Ready -> {
                 val ready: @Composable () -> Unit = {
@@ -103,7 +107,10 @@ fun <T> PageScaffold(
                         showToast(p, action)
                     }
                     CompositionLocalProvider(LocalUpdated provides (s.updatedAt to s.refreshing)) {
-                        if (isEmpty(s.data)) ScrollCentered(content = empty) else content(s.data)
+                        Column(Modifier.fillMaxSize()) {
+                            Waiting(s.waiting)
+                            Box(Modifier.weight(1f)) { if (isEmpty(s.data)) ScrollCentered(content = empty) else content(s.data) }
+                        }
                     }
                 }
                 if (pullToRefresh) {
@@ -122,6 +129,17 @@ fun <T> PageScaffold(
                 }
             }
         }
+    }
+}
+
+/** "Waiting for Attendance to finish" above the page while its fetch is queued ([PageState.Loading.waiting]). */
+@Composable
+private fun Waiting(text: String?) {
+    // The last text stays while the line folds away.
+    var last by remember { mutableStateOf(text) }
+    if (text != null) last = text
+    AnimatedVisibility(text != null, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
+        Box(Modifier.fillMaxWidth().padding(vertical = Space.sm), Alignment.Center) { UpdatedLine(0, refreshing = true, busy = last.orEmpty()) }
     }
 }
 

@@ -18,14 +18,18 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.Core
 import vitapmate.core.CoreException
+import vitapmate.core.Route
 import vitapmate.observability.Log
 import vitapmate.observability.StateRegistry
 import vitapmate.observability.flow
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A VTOP page on a screen ([rememberPage]). [state] is the cache, then the fetch's result; every
@@ -43,7 +47,7 @@ class PageHandle<T> internal constructor(
     private val updatedAt: (T) -> Long,
     private val count: (T) -> Int?,
 ) {
-    var state: PageState<T> by mutableStateOf(PageState.Loading)
+    var state: PageState<T> by mutableStateOf(PageState.Loading())
         private set
 
     internal var fetching by mutableStateOf(false)
@@ -77,7 +81,10 @@ class PageHandle<T> internal constructor(
             running?.takeIf { it.first.isActive }?.let { (job, asked) -> asked.user = asked.user || user; job to true }
                 ?: Asked(user).let { asked -> scope.async { fetchNow(flow, trigger, asked) }.also { running = it to asked } }.let { it to false }
         }
-        if (joined) log("join", flow, "trigger" to trigger)
+        if (joined) {
+            if (user) PageFetches.ask(key)
+            log("join", flow, "trigger" to trigger)
+        }
         return job.await()
     }
 
@@ -85,18 +92,24 @@ class PageHandle<T> internal constructor(
         fetching = true
         val before = state
         if (before is PageState.Ready) set(before.copy(refreshing = true), "refreshing", flow, "trigger" to trigger)
-        else set(PageState.Loading, "fetching", flow, "trigger" to trigger)
+        else set(PageState.Loading(), "fetching", flow, "trigger" to trigger)
         // The fetch itself runs in PageFetches: a tab switch doesn't cancel it, and a handle for the
-        // same page and semester (the tab shown again) joins it. Problems name the flow that ran it.
-        val run = PageFetches.start(key, flow) { download(flow) }
+        // same page and semester (the tab shown again) joins it. It may wait for a lane first (shown
+        // as [PageState.Loading.waiting]). Problems name the flow that ran it.
+        val run = PageFetches.start(key, flow, asked.user, hasCache = before is PageState.Ready) { download(flow) }
         if (run.joined) log("join", flow, "trigger" to trigger, "running" to run.flow)
+        val note = scope.launch { noteWaiting(run.started) }
         return try {
             val fresh = run.result.await()
             set(PageState.Ready(fresh, updatedAt(fresh), refreshing = false, problem = null), "fresh", flow)
             null
         } catch (e: CancellationException) {
-            (state as? PageState.Ready)?.let { state = it.copy(refreshing = false) }
+            (state as? PageState.Ready)?.let { state = it.copy(refreshing = false, waiting = null) }
             throw e
+        } catch (_: Dropped) {
+            // Waited off screen past Tunable.QueueDrop: the cached copy stays, no problem.
+            (state as? PageState.Ready)?.let { set(it.copy(refreshing = false, waiting = null), "dropped", flow) }
+            null
         } catch (e: Throwable) {
             val problem = problemOf(e, run.flow).copy(userInitiated = asked.user)
             val now = state
@@ -104,7 +117,31 @@ class PageHandle<T> internal constructor(
             else set(PageState.Failed(problem), "failed", flow, "error" to e.kindName(), "user" to "${asked.user}")
             e
         } finally {
+            note.cancel()
             fetching = false
+        }
+    }
+
+    /** Still waiting for a lane after a moment: says which pages hold them until [started]. */
+    private suspend fun noteWaiting(started: Deferred<Boolean>) {
+        delay(300.milliseconds)
+        if (started.isCompleted) return
+        try {
+            coroutineScope {
+                val names = launch { snapshotFlow { PageFetches.runningPages.toList() }.collect { waiting(waitingFor(it)) } }
+                started.join()
+                names.cancel()
+            }
+        } finally {
+            waiting(null)
+        }
+    }
+
+    private fun waiting(text: String?) {
+        state = when (val s = state) {
+            is PageState.Loading -> s.copy(waiting = text)
+            is PageState.Ready -> s.copy(waiting = text)
+            is PageState.Failed -> s
         }
     }
 
@@ -112,8 +149,16 @@ class PageHandle<T> internal constructor(
     private suspend fun download(flow: String): T {
         val start = System.nanoTime()
         try {
-            val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) { withContext(Dispatchers.IO) { fetch(AppCore.await(), flow) } }
-            StaleSweep.afterFetch((System.nanoTime() - start) / 1_000_000)
+            var udp = false
+            val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) {
+                withContext(Dispatchers.IO) {
+                    val core = AppCore.await()
+                    fetch(core, flow).also { udp = core.routeStatus(flow).lastUsed == Route.UDP }
+                }
+            }
+            val ms = (System.nanoTime() - start) / 1_000_000
+            PageFetches.fetched(flow, ms, udp)
+            StaleSweep.afterFetch(ms)
             // A fetch caches the semester list when there was none.
             if (SemesterChoice.semesters == null) SemesterChoice.readCache(flow)
             return fresh
@@ -142,7 +187,7 @@ class PageHandle<T> internal constructor(
         when (val s = state) {
             is PageState.Ready -> return // a fetch finished first
             // A fetch failed first (e.g. offline): the cache, with its problem.
-            else -> set(PageState.Ready(data, updatedAt(data), refreshing = fetching, problem = (s as? PageState.Failed)?.problem), "cached", flow)
+            else -> set(PageState.Ready(data, updatedAt(data), refreshing = fetching, problem = (s as? PageState.Failed)?.problem, waiting = (s as? PageState.Loading)?.waiting), "cached", flow)
         }
     }
 
@@ -180,6 +225,7 @@ class PageHandle<T> internal constructor(
                 "kind" to s.kindName(),
                 "updatedAt" to (s as? PageState.Ready)?.updatedAt,
                 "refreshing" to ((s as? PageState.Ready)?.refreshing ?: false),
+                "waiting" to ((s as? PageState.Ready)?.waiting ?: (s as? PageState.Loading)?.waiting),
                 "count" to (s as? PageState.Ready)?.let { count(it.data) },
                 "problem" to s.problem()?.kind?.name,
                 "problemFlow" to s.problem()?.flow,
@@ -190,7 +236,7 @@ class PageHandle<T> internal constructor(
 }
 
 private fun PageState<*>.kindName() = when (this) {
-    PageState.Loading -> "Loading"
+    is PageState.Loading -> "Loading"
     is PageState.Ready -> "Ready"
     is PageState.Failed -> "Failed"
 }
@@ -198,10 +244,17 @@ private fun PageState<*>.kindName() = when (this) {
 private fun PageState<*>.problem() = when (this) {
     is PageState.Ready -> problem
     is PageState.Failed -> problem
-    PageState.Loading -> null
+    is PageState.Loading -> null
 }
 
 private fun Throwable.kindName() = this::class.simpleName ?: "Throwable"
+
+/** "Waiting for Attendance to finish" behind the page ids holding the lanes; null with none. */
+private fun waitingFor(pages: List<String>) = when (pages.size) {
+    0 -> null
+    1 -> "Waiting for ${pages[0].replace('_', ' ').replaceFirstChar { it.uppercase() }} to finish"
+    else -> "Waiting for other pages to finish"
+}
 
 /**
  * The page [id] (also its log src `ui.<id>` and flows `<id>.open` / `<id>.refresh`): the cached
@@ -209,7 +262,9 @@ private fun Throwable.kindName() = this::class.simpleName ?: "Throwable"
  * ([Settings.autoRefresh]) also when the page was not fetched yet in this screen's saved state,
  * when the data is older than [Tunable.PageMaxAge] (6 h; on open or when the app comes back), and after the OTP prompt
  * is answered. [item] tells apart pages of one [id] (a course's history: its key). Fetches outlive
- * the screen ([PageFetches]): one shown again while its fetch runs joins it.
+ * the screen ([PageFetches]): one shown again while its fetch runs or waits joins it. They share a
+ * few lanes, this page first while it is on screen; queued a moment, the state says which page it
+ * waits for. An automatic fetch left waiting off screen too long is dropped (the cache stays).
  * The lambdas get the flow id to pass as the first argument of the `Core` call, e.g.
  * `rememberPage("attendance", { c, f -> c.cachedAttendance(f) }, { c, f -> c.fetchAttendance(f) }, { it.updatedAt }) { it.courses.size }`.
  */
@@ -258,9 +313,9 @@ fun <T> rememberPage(
         if (Foreground.resumes != resumesAtStart && Settings.autoRefresh && page.isStale()) page.refresh("resume", user = false)
     }
     DisposableEffect(page) {
-        StaleSweep.shown(id, true)
+        PageFetches.shown(id, true)
         onDispose {
-            StaleSweep.shown(id, false)
+            PageFetches.shown(id, false)
             page.report(onScreen = false)
         }
     }

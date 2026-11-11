@@ -127,9 +127,11 @@ object ExamDayRefresh {
  * The Flutter app's open-app stale refresher: after a quick page fetch (the session is live and
  * the network good), at most every 15 min, while the app is shown and Auto Refresh is on, pages
  * not on screen that are older than 12 h are fetched one at a time (attendance, then the calendar
- * when a day old, timetable, marks, exams, the semester list, histories behind their summary). It waits
- * while anything else talks to VTOP and stops at the first failure or slow page, so it never
- * competes with the student; an OTP it runs into is not prompted (the student's next fetch asks).
+ * when a day old, timetable, marks, exams, the semester list, histories behind their summary). It
+ * doesn't start on a slow link ([PageFetches.slowLink]), waits while anything else talks to VTOP,
+ * takes [PageFetches]' lanes at the lowest priority (a page the student opens goes first) and
+ * stops at the first failure, slow or dropped page, so it never competes with the student; an OTP
+ * it runs into is not prompted (the student's next fetch asks).
  * Times are [Tunable]s (Settings → Developer): [Tunable.SweepQuick], [Tunable.SweepCooldown],
  * [Tunable.SweepMaxAge], [Tunable.SlowPage] (Flutter's background page timeout).
  * Flow `sync.stale`, log src `sync.stale`.
@@ -142,18 +144,10 @@ object StaleSweep {
     private var job: Job? = null
     private var lastRun = 0L
 
-    /** Page ids on screen; they refresh themselves. */
-    private val onScreen = mutableMapOf<String, Int>()
-
-    internal fun shown(id: String, on: Boolean) {
-        onScreen[id] = (onScreen[id] ?: 0) + if (on) 1 else -1
-        if (onScreen[id]!! <= 0) onScreen.remove(id)
-    }
-
     /** A page fetch of [ms] succeeded. */
     internal fun afterFetch(ms: Long) {
         val now = System.currentTimeMillis()
-        if (ms > Settings.tunable(Tunable.SweepQuick) * 1000L || !Settings.autoRefresh || !Foreground.shown) return
+        if (ms > Settings.tunable(Tunable.SweepQuick) * 1000L || PageFetches.slowLink || !Settings.autoRefresh || !Foreground.shown) return
         if (job?.isActive == true || now - lastRun < Settings.tunable(Tunable.SweepCooldown) * 60_000L) return
         lastRun = now
         job = scope.launch { sweep() }
@@ -165,23 +159,28 @@ object StaleSweep {
         val core = AppCore.await()
         var fetched = 0
         suspend fun step(id: String, label: String, updatedAt: (Core) -> Long?, fetch: suspend (Core) -> Unit) {
-            if (id in onScreen) return
+            // Pages on screen refresh themselves.
+            if (PageFetches.isShown(id)) return
             val at = withContext(Dispatchers.IO) { updatedAt(core) }
             if (at != null && System.currentTimeMillis() / 1000 - at < Settings.tunable(Tunable.SweepMaxAge) * 3600L) return
             snapshotFlow { Activity.running.isEmpty() }.first { it }
             delay(QUIET_MS.milliseconds)
             if (!Settings.autoRefresh || !Foreground.shown) throw Stop("app left or auto refresh off")
-            val start = System.nanoTime()
-            try {
-                Activity.track(label, f) { withContext(Dispatchers.IO) { fetch(core) } }
+            val ms = try {
+                PageFetches.start("$id/stale/", f, user = false, hasCache = at != null, background = true) {
+                    val start = System.nanoTime()
+                    Activity.track(label, f) { withContext(Dispatchers.IO) { fetch(core) } }
+                    (System.nanoTime() - start) / 1_000_000
+                }.result.await()
             } catch (e: CancellationException) {
                 throw e
+            } catch (_: Dropped) {
+                throw Stop("$id waited too long")
             } catch (e: Exception) {
                 BackgroundProblems.report(e, f)
                 throw Stop("$id failed: ${e::class.simpleName}")
             }
             fetched++
-            val ms = (System.nanoTime() - start) / 1_000_000
             Log.info("sync.stale", "fetched $id", f, mapOf("page" to id, "ms" to "$ms", "age_s" to "${at?.let { System.currentTimeMillis() / 1000 - it }}"))
             if (ms > Settings.tunable(Tunable.SlowPage) * 1000L) throw Stop("network is slow (${ms} ms page)")
         }
@@ -193,7 +192,7 @@ object StaleSweep {
             step("exams", "Refreshing exams", { it.cachedExams(f)?.updatedAt }) { it.fetchExams(f) }
             step("semesters", "Loading semesters", { it.cachedSemesters(f)?.updatedAt }) { it.fetchSemesters(f) }
             SemesterChoice.readCache(f)
-            if ("attendance" !in onScreen) {
+            if (!PageFetches.isShown("attendance")) {
                 for (key in withContext(Dispatchers.IO) { core.mismatchedAttendanceDetails(f) }) {
                     step("history.$key", "Refreshing class history", { null }) { it.fetchAttendanceDetail(f, key) }
                 }

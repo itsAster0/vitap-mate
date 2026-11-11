@@ -43,10 +43,10 @@ fun UpdatedFooter(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().padding(vertical = Space.md), Alignment.Center) { UpdatedLine(updatedAt, refreshing = false) }
 }
 
-/** "Updated 3 hr ago" ([updatedAt] in epoch seconds), or "Updating…" with a small indicator while [refreshing]. */
+/** "Updated 3 hr ago" ([updatedAt] in epoch seconds), or [busy] ("Updating…") with a small indicator while [refreshing]. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun UpdatedLine(updatedAt: Long, refreshing: Boolean, modifier: Modifier = Modifier) {
+fun UpdatedLine(updatedAt: Long, refreshing: Boolean, modifier: Modifier = Modifier, busy: String = "Updating…") {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -61,7 +61,7 @@ fun UpdatedLine(updatedAt: Long, refreshing: Boolean, modifier: Modifier = Modif
         }
         Text(
             when {
-                refreshing -> "Updating…"
+                refreshing -> busy
                 updatedAt > 0 -> "Updated ${relativeTime(updatedAt * 1000, now)}"
                 else -> ""
             },

@@ -236,6 +236,9 @@ fun DeveloperScreen() {
                     tunable(Tunable.SweepCooldown, Lucide.Clock)
                     tunable(Tunable.SweepQuick, Lucide.Clock)
                     tunable(Tunable.SlowPage, Lucide.Clock)
+                    tunable(Tunable.FetchLanes, Lucide.Zap)
+                    tunable(Tunable.SlowFetch, Lucide.Clock)
+                    tunable(Tunable.QueueDrop, Lucide.Hourglass)
                     GroupItem("Reset times", "dev.reset_times", Lucide.RotateCw, "Every number on this page back to its default", onClick = {
                         Tunable.entries.forEach { Settings.setTunable(it, null) }
                         Log.info("ui.dev", "tunables reset")
