@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget's message badge icon (Lucide calendar); tinted in code. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="22dp"
+    android:height="22dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:pathData="M5,5h14a2,2 0,0 1,2 2v12a2,2 0,0 1,-2 2h-14a2,2 0,0 1,-2 -2v-12a2,2 0,0 1,2 -2zM3,10h18M8,3v4M16,3v4"
+      android:strokeColor="#FF000000"
+      android:strokeWidth="2"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round" />
+</vector>

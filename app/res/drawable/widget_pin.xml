@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget's room pin (Lucide map-pin); tinted in code. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="13dp"
+    android:height="13dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:pathData="M20,10c0,5 -8,12 -8,12s-8,-7 -8,-12a8,8 0,0 1,16 0M15,10a3,3 0,1 1,-6 0a3,3 0,1 1,6 0"
+      android:strokeColor="#FF000000"
+      android:strokeWidth="2"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round" />
+</vector>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TimetableWidget: 1 row shows the next class, 2+ rows add today's classes; redrawn every 30 min. -->
+<!-- TimetableWidget (Glance): 1 row shows the next class, 2+ rows add its day's classes; redrawn every 30 min. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
     android:minHeight="40dp"
@@ -10,5 +10,5 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/widget_timetable"
+    android:initialLayout="@layout/glance_default_loading_layout"
     android:description="@string/widget_timetable_description" />

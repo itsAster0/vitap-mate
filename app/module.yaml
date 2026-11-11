@@ -19,6 +19,8 @@ dependencies:
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
   # Background sync (Settings → Background sync): periodic, survives reboots and Doze.
   - androidx.work:work-runtime:2.11.2
+  # The home-screen timetable widget (TimetableWidget), drawn with Compose.
+  - androidx.glance:glance-appwidget:1.2.0
   # Push from the edge (session requests, the event log); configured by `mise run firebase`.
   - com.google.firebase:firebase-messaging:26.0.1
   # Settings → Connected apps → Pair a browser: Play services' QR scanner (its own UI, no CAMERA permission).
