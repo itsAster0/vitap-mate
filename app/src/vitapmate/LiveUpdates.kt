@@ -146,8 +146,8 @@ object LiveUpdates {
         channel(manager)
         val ms = System.currentTimeMillis()
         val now = istMinute(ms)
-        fun slot(start: Int, name: String, room: String) = ClassSlot(0, start, start + 50, "", name, vitapmate.core.ClassKind.THEORY, room, "", "", "", null)
-        post(app, manager, slot(now - 25, "Data Structures", "AB1 204"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB 312"), ms, now)
+        fun slot(start: Int, name: String, block: String, room: String, code: String) = ClassSlot(0, start, start + 50, "", name, vitapmate.core.ClassKind.THEORY, room, block, code, "", null)
+        post(app, manager, slot(now - 25, "Data Structures", "AB1", "204", "A1"), true, now - 25, now + 25, slot(now + 35, "Operating Systems", "CB", "312", "B1"), ms, now)
         postOuting(app, manager, "preview", OutingRequest("preview", vitapmate.core.OutingKind.GENERAL, "Vijayawada", "Shopping", "Approved", OutingStanding.APPROVED, "APPROVED", listOf(vitapmate.core.OutingWhen("Out", "Sat 14 Nov, 9:00 AM")), "IN 4 DAYS", null, null))
     }
 
@@ -166,9 +166,10 @@ object LiveUpdates {
         if (Build.VERSION.SDK_INT < 36) return
         val h24 = DateFormat.is24HourFormat(context)
         val text = listOfNotNull(
-            slot.room.ifEmpty { null },
+            place(slot),
+            slot.slot.ifEmpty { null },
             "${clock(slot.start, h24)} – ${clock(slot.end, h24)}",
-            then?.let { "then ${it.name} at ${clock(it.start, h24)}" },
+            then?.let { "then ${it.name} at ${clock(it.start, h24)}" + (place(it)?.let { p -> " in $p" } ?: "") },
         ).joinToString(" · ")
         val style = Notification.ProgressStyle()
             .setProgressSegments(listOf(Notification.ProgressStyle.Segment((to - from).coerceAtLeast(1))))
@@ -180,7 +181,7 @@ object LiveUpdates {
             .setContentText(text)
             .setSubText(if (live) "Class on now" else "Next class")
             .setStyle(style)
-            .setShortCriticalText(slot.room.ifEmpty { clock(slot.start, h24) })
+            .setShortCriticalText(place(slot) ?: clock(slot.start, h24))
             .setWhen(atMinute(ms, to))
             .setShowWhen(true)
             .setUsesChronometer(true)
@@ -195,6 +196,9 @@ object LiveUpdates {
             .build()
         manager.notify(CLASS_ID, n)
     }
+
+    /** "CB 312": the block, then the room; null when VTOP lists neither. */
+    private fun place(slot: ClassSlot): String? = listOf(slot.block, slot.room).filter { it.isNotBlank() }.joinToString(" ").ifEmpty { null }
 
     /** An outing request: pending (half the bar), approved or rejected (all of it, in Android 17's safe or danger colour). */
     private fun postOuting(context: Context, manager: NotificationManager, key: String, r: OutingRequest) {
