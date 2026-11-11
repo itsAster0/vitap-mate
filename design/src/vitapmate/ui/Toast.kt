@@ -3,6 +3,8 @@ package vitapmate.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -14,11 +16,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -28,21 +32,32 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarVisuals
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,8 +68,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleAlert
-import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.TriangleAlert
@@ -85,6 +100,9 @@ class ToastVisuals(
     override val withDismissAction = false
     override val duration = if (action != null) SnackbarDuration.Long else SnackbarDuration.Short
 }
+
+/** How long a toast shows, in ms: [ToastHost] dismisses it then and its badge's ring drains over it. */
+private val SnackbarVisuals.lifetime get() = if (duration == SnackbarDuration.Long) 8_000 else 4_000
 
 private val toasts = MutableSharedFlow<ToastVisuals>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -126,7 +144,7 @@ fun ToastHost() {
     val current = host.currentSnackbarData
     LaunchedEffect(current) {
         val data = current ?: return@LaunchedEffect
-        delay(if (data.visuals.duration == SnackbarDuration.Long) 8_000 else 4_000)
+        delay(data.visuals.lifetime.toLong())
         data.dismiss()
     }
     val insets = WindowInsets.safeDrawing
@@ -169,7 +187,7 @@ private fun ToastCard(data: SnackbarData) {
     }
     val icon = toast?.icon ?: when (kind) {
         ToastTone.Neutral -> Lucide.Info
-        ToastTone.Success -> Lucide.CircleCheck
+        ToastTone.Success -> Lucide.Check
         ToastTone.Warning -> Lucide.TriangleAlert
         ToastTone.Error -> Lucide.CircleAlert
     }
@@ -177,6 +195,19 @@ private fun ToastCard(data: SnackbarData) {
     val drag = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val spring = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
+    // The badge springs in; its ring drains over the toast's lifetime.
+    val pop = remember(data) { Animatable(0f) }
+    val left = remember(data) { Animatable(1f) }
+    LaunchedEffect(data) {
+        launch { pop.animateTo(1f, spring) }
+        left.animateTo(0f, tween(data.visuals.lifetime, easing = LinearEasing))
+    }
+    val shape = when (kind) {
+        ToastTone.Neutral -> MaterialShapes.Circle
+        ToastTone.Success -> MaterialShapes.Cookie9Sided
+        ToastTone.Warning -> MaterialShapes.Pentagon
+        ToastTone.Error -> MaterialShapes.SoftBurst
+    }.toShape()
     Surface(
         Modifier.padding(horizontal = Space.page).widthIn(max = 560.dp).testTag("toast")
             .graphicsLayer {
@@ -196,22 +227,55 @@ private fun ToastCard(data: SnackbarData) {
         shadowElevation = 6.dp,
     ) {
         Row(
-            Modifier.padding(start = Space.md, end = if (toast?.action != null) Space.sm else Space.lg, top = Space.md, bottom = Space.md),
+            Modifier.padding(start = 8.dp, end = if (toast?.action != null) 10.dp else Space.lg, top = 8.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(Space.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(36.dp).background(tone.subtle, CircleShape), Alignment.Center) {
-                Icon(icon, null, Modifier.size(20.dp), tint = tone.base)
+            Box(
+                Modifier.size(48.dp).drawWithCache {
+                    // The badge's outline around it, drawn from its top clockwise for the time left.
+                    val width = 2.dp.toPx()
+                    val ring = Path().apply { addOutline(shape.createOutline(Size(size.width - width, size.height - width), layoutDirection, this@drawWithCache)) }
+                    val measure = PathMeasure().apply { setPath(ring, true) }
+                    val length = measure.length
+                    val top = (0 until 72).minBy { measure.getPosition(length * it / 72).y } * length / 72
+                    val clockwise = measure.getPosition((top + length / 36) % length).x > measure.getPosition(top).x
+                    val stroke = Stroke(width, cap = StrokeCap.Round)
+                    val rest = Path()
+                    onDrawBehind {
+                        translate(width / 2, width / 2) {
+                            drawPath(ring, tone.base.copy(alpha = 0.18f), style = stroke)
+                            val l = length * left.value
+                            val from = if (clockwise) top else (top - l + length) % length
+                            rest.reset()
+                            measure.getSegment(from, minOf(from + l, length), rest)
+                            if (from + l > length) measure.getSegment(0f, from + l - length, rest, false)
+                            drawPath(rest, tone.base, style = stroke)
+                        }
+                    }
+                },
+                Alignment.Center,
+            ) {
+                Box(
+                    Modifier.size(40.dp)
+                        .graphicsLayer {
+                            scaleX = 0.3f + 0.7f * pop.value
+                            scaleY = scaleX
+                            rotationZ = -90f * (1f - pop.value)
+                        }
+                        .background(tone.base, shape),
+                    Alignment.Center,
+                ) { Icon(icon, null, Modifier.size(20.dp), tint = scheme.surfaceContainerHighest) }
             }
             Column(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 toast?.let {
-                    Text(it.title, Modifier.testTag("toast.title"), style = MaterialTheme.typography.titleSmallEmphasized, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(it.title, Modifier.testTag("toast.title"), style = MaterialTheme.typography.titleMediumEmphasized, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (data.visuals.message.isNotBlank()) {
                     Text(
                         data.visuals.message,
                         Modifier.testTag("toast.description"),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = scheme.onSurfaceVariant,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
@@ -219,7 +283,13 @@ private fun ToastCard(data: SnackbarData) {
                 }
             }
             toast?.action?.let { (label, run) ->
-                TextButton({ data.dismiss(); run() }, Modifier.testTag("toast.action")) { Text(label, style = MaterialTheme.typography.labelLargeEmphasized) }
+                FilledTonalButton(
+                    { data.dismiss(); run() },
+                    Modifier.height(40.dp).testTag("toast.action"),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.filledTonalButtonColors(containerColor = tone.subtle, contentColor = tone.onSubtle),
+                    contentPadding = PaddingValues(horizontal = 18.dp),
+                ) { Text(label, style = MaterialTheme.typography.labelLargeEmphasized) }
             }
         }
     }
