@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,7 +28,7 @@ fun Skeleton(modifier: Modifier = Modifier, width: Dp? = null, height: Dp = 14.d
         0f, 1f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), "pulse",
     )
     Box(
-        modifier.then(if (width != null) Modifier.width(width) else Modifier).height(height).drawBehind {
+        modifier.then(if (width != null) Modifier.width(width) else Modifier.fillMaxWidth()).height(height).drawBehind {
             // Read in the draw phase, so the pulse doesn't recompose.
             val c = lerp(scheme.surfaceContainerHigh, scheme.surfaceContainerHighest, pulse)
             drawRoundRect(c, cornerRadius = CornerRadius(radius.toPx()))
