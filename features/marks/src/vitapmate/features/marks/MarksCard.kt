@@ -78,7 +78,7 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
                 Text(name, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Spacer(Modifier.height(Space.xs))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically) {
-                    KindChip(course.isLab)
+                    KindChip(course.isLab, project = course.isProject)
                     Text(course.code, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
                 }
             }

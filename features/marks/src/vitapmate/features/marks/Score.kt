@@ -35,6 +35,7 @@ internal val Assessment.scoreLabel: String
     get() = scored?.let { "${it.marks()} / ${max.marks()}" } ?: if (band == ScoreBand.ABSENT) "Absent" else "Not posted"
 
 internal val MarksCourse.isLab get() = kind == ClassKind.LAB
+internal val MarksCourse.isProject get() = key.endsWith(".project")
 
 /** Weightage of the course's 100 not assessed yet. */
 internal val MarksCourse.toCome get() = (100.0 - maxWeighted).coerceAtLeast(0.0)

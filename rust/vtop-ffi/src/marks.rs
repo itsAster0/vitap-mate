@@ -50,7 +50,8 @@ pub struct Marks {
 /// One course's marks: theory and lab of an embedded course are two.
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
 pub struct MarksCourse {
-    /// `<code>.theory` or `<code>.lab`, as `AttendanceCourse::key`.
+    /// `<code>.theory` or `<code>.lab`, as `AttendanceCourse::key`, or `<code>.project` (kind
+    /// [`ClassKind::Lab`]).
     pub key: String,
     pub code: String,
     pub name: String,
@@ -192,9 +193,16 @@ impl Marks {
 impl MarksCourse {
     fn new(record: MarksRecord, seen: &HashMap<String, i64>) -> Self {
         let kind_text = record.coursetype.trim().to_lowercase();
-        let lab = kind_text.ends_with("lab") || kind_text.ends_with("lab only");
+        // A project ("Embedded Project", "Project") is lab work, keyed apart from its course's lab.
+        let project = kind_text.contains("project");
+        let lab = project || kind_text.ends_with("lab") || kind_text.ends_with("lab only");
         let code = record.coursecode.trim().to_string();
-        let key = format!("{code}.{}", if lab { "lab" } else { "theory" });
+        let part = match (project, lab) {
+            (true, _) => "project",
+            (_, true) => "lab",
+            _ => "theory",
+        };
+        let key = format!("{code}.{part}");
         let assessments: Vec<Assessment> = record
             .marks
             .iter()
@@ -419,12 +427,22 @@ mod tests {
                     ],
                 ),
                 record("SWE2009", "Embedded Lab", vec![]),
+                record("SWE2009", "Embedded Project", vec![]),
                 record("CSE4007", "Lab Only", vec![]),
             ]),
             &HashMap::new(),
         );
         let keys: Vec<_> = marks.courses.iter().map(|c| c.key.as_str()).collect();
-        assert_eq!(keys, ["SWE2009.theory", "SWE2009.lab", "CSE4007.lab"]);
+        assert_eq!(
+            keys,
+            [
+                "SWE2009.theory",
+                "SWE2009.lab",
+                "SWE2009.project",
+                "CSE4007.lab"
+            ]
+        );
+        assert_eq!(marks.courses[2].kind, ClassKind::Lab);
         let theory = &marks.courses[0];
         assert_eq!((theory.weighted, theory.max_weighted), (37.3, 40.0));
         assert_eq!(theory.band, ScoreBand::Strong);
