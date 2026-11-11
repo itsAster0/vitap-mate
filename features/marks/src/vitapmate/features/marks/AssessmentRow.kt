@@ -72,7 +72,7 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
             }
             Spacer(Modifier.width(Space.sm))
             val scored = assessment.scored
-            if (scored != null) {
+            if (scored != null && assessment.band != ScoreBand.ABSENT) {
                 Text(
                     buildAnnotatedString {
                         withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(scored.marks()) }

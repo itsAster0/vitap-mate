@@ -30,9 +30,9 @@ internal fun Double.marks(): String =
 /** "86%". */
 internal fun Double.percentLabel(): String = "${BigDecimal.valueOf(this).setScale(0, RoundingMode.HALF_UP).toPlainString()}%"
 
-/** "32 / 50", or "Not posted" / "Absent". */
+/** "Absent" when VTOP's status says so (even with a 0 posted), else "32 / 50" or "Not posted". */
 internal val Assessment.scoreLabel: String
-    get() = scored?.let { "${it.marks()} / ${max.marks()}" } ?: if (band == ScoreBand.ABSENT) "Absent" else "Not posted"
+    get() = if (band == ScoreBand.ABSENT) "Absent" else scored?.let { "${it.marks()} / ${max.marks()}" } ?: "Not posted"
 
 internal val MarksCourse.isLab get() = kind == ClassKind.LAB
 internal val MarksCourse.isProject get() = key.endsWith(".project")
