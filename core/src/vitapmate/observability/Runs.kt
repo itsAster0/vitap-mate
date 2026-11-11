@@ -242,7 +242,12 @@ private fun stepsOf(f: FlowSummary, since: Long): List<MStep> {
 private fun segment(lines: List<LogLine>, call: String?, label: String): List<MStep> {
     val out = mutableListOf<MStep>()
     val page = label != SIGN_IN
-    var cur = MStep(label, StepState.Running, lines.first().t).also { out += it }
+    val close = lines.last().takeIf { it.src.startsWith("core.") && it.msg == "done" && it.outcome != null }
+    // A Server or UDP call logs nothing until its answer is back, so its first line is not its start: the span's is.
+    val start = minOf(lines.first().t, close?.ms?.let { close.t - it } ?: Long.MAX_VALUE)
+    // The UDP round trip as Rust timed it.
+    var udpMs: Long? = null
+    var cur = MStep(label, StepState.Running, start).also { out += it }
     fun open(l: String, state: StepState, t: Long) = MStep(l, state, t).also { out += it; cur = it }
     for (line in lines) {
         val m = line.msg
@@ -270,11 +275,12 @@ private fun segment(lines: List<LogLine>, call: String?, label: String): List<MS
             }
             line.src == NET && m.startsWith("response ") -> hitOf(m)?.let { cur.pages += it }
             // Server and UDP fetch VTOP on the server, so the phone logs no VTOP hits: the route is the hit.
+            m == "udp fetch" -> udpMs = line.ms
             m == "route used" && line.fields["route"]?.lowercase() in SERVER_ROUTES ->
-                cur.pages += PageHit(routeName(line.fields.getValue("route")), "200", line.t - cur.startT)
+                cur.pages += PageHit(routeName(line.fields.getValue("route")), "200", udpMs ?: (line.t - cur.startT))
         }
     }
-    val close = lines.last().takeIf { it.src.startsWith("core.") && it.msg == "done" && it.outcome != null } ?: return out
+    if (close == null) return out
     when (val o = close.outcome) {
         "ok" -> if (cur.state == StepState.Running) {
             cur.end(if (page && (cur.cached || cur.pages.isEmpty())) StepState.Cached else StepState.Done, close.t)

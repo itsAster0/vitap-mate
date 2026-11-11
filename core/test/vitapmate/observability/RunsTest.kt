@@ -29,6 +29,23 @@ class RunsTest {
     }
 
     @Test
+    fun udpStepTakesTheFetchTime() {
+        // Real lines from the emulator: the call's first line comes when the answer is back.
+        val r = runs(
+            """
+            {"ev":"start","flow":"08616937","l":"info","msg":"semesters.refresh start","src":"flow","step":"semesters.refresh","t":1000}
+            {"down":793,"flow":"08616937","handshake":false,"l":"info","ms":543,"msg":"udp fetch","page":"semesters","retries":0,"src":"core.fetch_semesters","t":1545,"up":424}
+            {"flow":"08616937","l":"info","msg":"route used","route":"Udp","src":"core.fetch_semesters","t":1545}
+            {"flow":"08616937","l":"info","ms":544,"msg":"done","outcome":"ok","src":"core.fetch_semesters","t":1546}
+            {"ev":"done","flow":"08616937","l":"info","ms":"561","msg":"semesters.refresh done","outcome":"ok","src":"flow","step":"semesters.refresh","t":1561}
+            """,
+        ).single()
+        val step = r.steps.single()
+        assertEquals(544L, step.ms)
+        assertEquals(PageHit("UDP", "200", 543), step.pages.single())
+    }
+
+    @Test
     fun signedInRefreshIsOneStep() {
         // Real lines from the emulator.
         val r = runs(
