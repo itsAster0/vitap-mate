@@ -65,6 +65,33 @@ describe("mail", () => {
     });
   });
 
+  it("reads a Workspace forwarding confirmation with only a link", async () => {
+    const body = [
+      "student@vitapstudent.ac.in has requested to automatically forward mail to your email",
+      "To allow, click the link below:",
+      "https://mail.google.com/mail/vf-%5BANGjdJ8%5D-xyz789",
+    ].join("\r\n");
+    const mail = raw(
+      "forwarding-noreply@google.com",
+      "(VIT-AP University Forwarding Confirmation - Receive Mail from student@vitapstudent.ac.in",
+      body,
+      "text/plain",
+    );
+    expect(await payloadFor(mail, 1)).toEqual({
+      kind: "gmail_confirm",
+      code: null,
+      link: "https://mail.google.com/mail/vf-%5BANGjdJ8%5D-xyz789",
+      requester: "student@vitapstudent.ac.in",
+      sentAt: 1792231200,
+    });
+  });
+
+  it("ignores confirm links outside google.com", async () => {
+    const body = "Click https://mail.google.com.evil.example/mail/vf-abc or https://evilgoogle.com/mail/vf-abc";
+    const mail = raw("forwarding-noreply@google.com", "Forwarding Confirmation", body, "text/plain");
+    expect(await payloadFor(mail, 1)).toBeNull();
+  });
+
   it("drops other senders and mail without a code", async () => {
     expect(await payloadFor(raw("spam@example.com", "OTP 123456", "123456", "text/plain"), 1)).toBeNull();
     expect(await payloadFor(raw("noreply.sdc@vitap.ac.in", "Hello", "no code here", "text/plain"), 1)).toBeNull();

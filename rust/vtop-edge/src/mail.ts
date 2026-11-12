@@ -7,7 +7,9 @@ import PostalMime, { type RawEmail } from "postal-mime";
 
 export const VTOP_SENDER = "noreply.sdc@vitap.ac.in";
 export const GMAIL_FORWARDING_SENDER = "forwarding-noreply@google.com";
-const CONFIRM_LINK = "https://mail-settings.google.com/mail/vf-";
+// Gmail sends mail-settings.google.com; Workspace accounts (VIT-AP's) send
+// another google.com host and no code, so match any google.com host.
+const CONFIRM_LINK = /https?:\/\/(?:[a-z0-9-]+\.)*google\.com\/mail\/vf-[^\s"'<>]+/i;
 
 /** The plaintext sealed for the phone; the app reads it as JSON. */
 export type Payload =
@@ -63,10 +65,7 @@ function digitsAfter(text: string, label: string): string | null {
 }
 
 function confirmLink(text: string): string | null {
-  const start = text.indexOf(CONFIRM_LINK);
-  if (start < 0) return null;
-  const link = /^[^\s"'<>]*/.exec(text.slice(start))![0];
-  return link.length > CONFIRM_LINK.length ? link : null;
+  return CONFIRM_LINK.exec(text)?.[0] ?? null;
 }
 
 function requester(subject: string): string | null {
@@ -135,6 +134,7 @@ export async function dropShape(raw: RawEmail): Promise<string> {
     htmlLen: html.length,
     vfInText: text.includes("/mail/vf-"),
     vfInHtml: html.includes("/mail/vf-"),
+    vfHostsText: [...new Set([...text.matchAll(/([a-z]+:\/\/[a-z0-9.-]*)\/mail\/vf-/gi)].map((m) => m[1]))].slice(0, 4),
     linkHosts: [...new Set([...html.matchAll(/https?:\/\/([a-z0-9.-]+)\/[a-z]*\/?(vf|[a-z]{0,6})/gi)].map((m) => `${m[1]}/${m[2]}`))].slice(0, 8),
     codeLabelText: around(text, "code"),
     codeLabelHtml: around(plain, "code"),
