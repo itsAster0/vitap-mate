@@ -51,6 +51,8 @@ class MainActivity : ComponentActivity() {
                 view.animate().alpha(0f).setDuration(180).withEndAction(view::remove).start()
             }
         }
+        // Before the first frame (Android 15 is edge-to-edge anyway); the bars' icons follow the theme below.
+        SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT).let { enableEdgeToEdge(it, it) }
         setContent {
             val dark = when (Settings.themeMode) {
                 ThemeMode.System -> isSystemInDarkTheme()
