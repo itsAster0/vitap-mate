@@ -63,7 +63,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import vitapmate.core.AccessKey
 import vitapmate.core.Core
-import vitapmate.core.GmailGrant
 import vitapmate.core.CoreException
 import vitapmate.core.ServerOptions
 import vitapmate.core.ServerStatus
@@ -165,7 +164,7 @@ fun ServerScreen() {
                     if (s.linked) item {
                         ListGroup("Kept on the server", footer = "Sessions and passwords are sealed; only the server's sign-in engine can open them.") {
                             val savePassword = {
-                                val gmail = Gmail.account?.takeIf { !it.needsReconnect && OtpAutofill.inUse() != null }
+                                val gmail = OtpAutofill.serverGrant()
                                 ask(
                                     "Let the server sign in for you?",
                                     "The server keeps your VTOP password sealed, so connected apps get a session while your phone is off. It reads the sign-in code from your " +
@@ -174,7 +173,7 @@ fun ServerScreen() {
                                     "save_password",
                                     "The server keeps your password.",
                                 ) { c, f ->
-                                    c.saveServerPassword(f, gmail?.let { GmailGrant(it.refreshToken, it.client.id, it.client.secret, it.deleteAfterReading) })
+                                    c.saveServerPassword(f, gmail)
                                     true
                                 }
                             }
@@ -200,7 +199,7 @@ fun ServerScreen() {
                                             shapes = ButtonDefaults.shapes(),
                                         ) { Text("Forget") }
                                     } else {
-                                        Button(onClick = savePassword, modifier = Modifier.padding(top = 10.dp), shapes = ButtonDefaults.shapes()) { Text("Let the server sign in") }
+                                        Button(onClick = savePassword, modifier = Modifier.padding(top = 10.dp).testTag("server.save_password"), shapes = ButtonDefaults.shapes()) { Text("Allow") }
                                     }
                                 }
                             }

@@ -27,7 +27,7 @@ use serde_json::json;
 use vtop_core::SessionState;
 use vtop_shared::account::account_id;
 use vtop_shared::engine::{
-    GmailGrant, LoginDone, LoginOutcome, LoginStart, OtpAwait, SealVault, SealedVault,
+    GmailGrant, LoginDone, LoginOutcome, LoginStart, OtpAwait, OtpMethod, SealVault, SealedVault,
     SessionCheck, SessionChecked, SessionStatus, LOGIN_DONE, OTP_AWAIT,
 };
 use vtop_shared::mail_seal;
@@ -213,6 +213,10 @@ pub struct Vault {
     /// Vaults from the old bridge carry one too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gmail: Option<GmailGrant>,
+    /// The OTP auto-fill picked on the phone: Gmail goes straight to Gmail, even with a
+    /// forwarding address the student never set up in their mail.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub otp: Option<OtpMethod>,
 }
 
 fn bad_request(message: &str) -> ApiError {
@@ -341,6 +345,7 @@ pub async fn seal(
         username,
         password: body.password,
         gmail: body.gmail.and_then(GmailGrant::usable),
+        otp: body.otp,
     };
     let sealed_vault = state
         .accounts_sealer()
@@ -393,7 +398,13 @@ async fn sign_in(
     else {
         return LoginOutcome::VaultUnusable;
     };
-    // Forwarding comes first; Gmail only for students without it.
+    // Gmail when the phone picked it; else forwarding first, Gmail only
+    // for students without it.
+    if vault.otp == Some(OtpMethod::Gmail) {
+        if let Some(grant) = vault.gmail.clone().and_then(GmailGrant::usable) {
+            return sign_in_with_gmail(state, account, vault, grant).await;
+        }
+    }
     let codes = ForwardedCodes::new(edge, owner_hash(&state.config.vault_key, account));
     match codes.register().await {
         Ok(()) => {}
@@ -1020,6 +1031,41 @@ mod tests {
         .await;
         assert!(matches!(outcome, LoginOutcome::Ok { .. }));
         assert_eq!(gmail.calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn gmail_picked_on_the_phone_skips_forwarding() {
+        let edge = Arc::new(FakeEdge {
+            code: Some("123456"),
+            ..FakeEdge::default()
+        });
+        let gmail = Arc::new(FakeRefresher::default());
+        let login = Arc::new(FakeLogin::answering(Err(LoginError::InvalidCredentials)));
+        let (app, state) = engine_app_with(
+            edge.clone(),
+            login.clone(),
+            gmail.clone(),
+            vtop_core::VtopConfig::default(),
+        );
+        let (_, body) = post(
+            &app,
+            "/engine/seal",
+            RELAY,
+            json!({"account": REG, "username": "student123", "password": "pw", "otp": "gmail",
+                "gmail": {"refreshToken": "r", "clientId": "c"}}),
+        )
+        .await;
+        let vault = body["sealedVault"].as_str().unwrap();
+        assert_eq!(opened(&state, vault).otp, Some(OtpMethod::Gmail));
+        post(
+            &app,
+            "/engine/login",
+            RELAY,
+            json!({"account": REG, "sealedVault": vault, "requestId": "r"}),
+        )
+        .await;
+        assert!(wait_for_done(&edge).await.outcome == LoginOutcome::InvalidCredentials);
+        assert_eq!(gmail.calls.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

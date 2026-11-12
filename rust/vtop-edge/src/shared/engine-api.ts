@@ -49,7 +49,11 @@ export interface SealVault {
   /** Gmail access, so the engine can read the OTP itself when the student
    * has no forwarding address. */
   gmail?: GmailGrant;
+  /** The OTP auto-fill picked on the phone; Gmail skips forwarding. */
+  otp?: OtpMethod;
 }
+
+export type OtpMethod = "forwarding" | "gmail";
 
 /** A Gmail refresh token and the OAuth client it was issued to: the app's
  * own on phones (no secret), the student's own on desktop. */

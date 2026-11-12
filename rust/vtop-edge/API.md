@@ -131,7 +131,7 @@ calling device is not on it.
 | Route | Request | Response |
 |---|---|---|
 | `/v1/mail-otp/register` | `{}` | `201 { id, address }` with this device as the only member |
-| `/v1/mail-otp/inbox` | `{ id }` | `{ sealed, receivedAt }` or `{ sealed: null }` (boxes live 5 min) |
+| `/v1/mail-otp/inbox` | `{ id }` | `{ sealed, receivedAt, confirmation, lastOtpAt }`; `sealed: null` without a box (boxes live 5 min); `confirmation` is Gmail's latest forwarding confirmation sealed to this device (kept until an OTP arrives), else `null`; `lastOtpAt` is when the latest OTP was sent, or `null` |
 | `/v1/mail-otp/owner` | `{ id, session: { cookies } }` | `204`; ties the address to the VTOP student; `409 address_exists`, `401 session_invalid`, `503 vtop_unreachable` |
 | `/v1/mail-otp/reclaim` | `{ session: { cookies } }` | `200 { id, address }`: this device joins the student's address |
 | `/v1/mail-otp/devices` | `{ id }` | `{ devices: [{ deviceId, label, addedAt, seenAt, thisDevice }] }` |
@@ -170,8 +170,12 @@ not one of the account's phones), `409 not_linked` (no phone linked yet).
 | `/v1/session/answer?account=<regno>` | `{ requestId, cookies: [{ name, value, domain }] , credentials?: { username, password, gmail? } }` or `{ requestId, error }` | `{ ok: true, late? }`; `403 not_asked` unless this device was asked, `403 account_mismatch`, `401 session_invalid`, `404 request_not_found` |
 
 `credentials` (on `/v1/link` and answers) is `{ username, password, gmail?:
-{ refreshToken, clientId, clientSecret?, deleteAfterReading? } }`; it is
-sealed by the engine and kept only with forwarding or Gmail set up.
+{ refreshToken, clientId, clientSecret?, deleteAfterReading? }, otp?:
+"forwarding" | "gmail" }`; it is sealed by the engine and kept only when the
+server can read the code that way (`otp` is the phone's OTP auto-fill; without
+it, forwarding or Gmail). With `otp: "gmail"` the engine reads Gmail even when a
+forwarding address exists. The phone sends it again when its OTP auto-fill
+changes.
 
 The answer route is the `callbackUrl` of a `vtop_cookie_request` event; sign
 it with that exact path and query.

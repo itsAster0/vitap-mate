@@ -204,6 +204,16 @@ describe("Gmail access with credentials", () => {
     expect(after.vaultGmail).toBe(true);
   });
 
+  it("passes on the OTP method the phone picked", async () => {
+    const gmail = { refreshToken: "r", clientId: "c" };
+    const { sealed } = await answerWith({ username: "student", password: "pw", gmail, otp: "gmail" });
+    expect(sealed).toEqual([
+      { account: "22BCE0001", username: "student", password: "pw", gmail: { ...gmail, deleteAfterReading: false }, otp: "gmail" },
+    ]);
+    // Gmail picked without its access: nothing to read the code with.
+    expect((await answerWith({ username: "student", password: "pw", otp: "gmail" })).sealed).toEqual([]);
+  });
+
   it("is required when there is no forwarding address", async () => {
     const { sealed, after } = await answerWith({ username: "student", password: "pw" });
     expect(sealed).toEqual([]);

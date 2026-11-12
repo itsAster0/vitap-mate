@@ -13,6 +13,8 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -38,6 +40,9 @@ import vitapmate.ui.Space
 fun OtpAutofillSheet(onDismiss: () -> Unit) {
     val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val selected = OtpAutofill.selected()
+    // On close, the server hears of a new pick or Gmail grant, for its saved password.
+    val opened = remember { OtpAutofill.serverKey() }
+    DisposableEffect(Unit) { onDispose { if (OtpAutofill.serverKey() != opened) OtpAutofill.tellServer() } }
     OpenHaptic()
     ModalBottomSheet(
         onDismiss,

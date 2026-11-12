@@ -82,6 +82,7 @@ import {
   SEAL,
   SESSION,
   type GmailGrant,
+  type OtpMethod,
   type SealVault,
   type SealedVault,
   type SessionCheck,
@@ -646,14 +647,21 @@ interface Credentials {
   username: string;
   password: string;
   gmail: GmailGrant | null;
+  /** The OTP auto-fill picked on the phone; null from older phones. */
+  otp: OtpMethod | null;
 }
 
-/** `username`, `password` and any Gmail access of a body's `credentials`,
- * if it has them. */
+/** `username`, `password`, any Gmail access and the OTP method of a body's
+ * `credentials`, if it has them. */
 function credentialsOf(raw: unknown): Credentials | null {
   if (raw === null || typeof raw !== "object") return null;
-  const { username, password, gmail } = raw as Record<string, unknown>;
-  return { username: str(username) ?? "", password: str(password) ?? "", gmail: gmailGrantOf(gmail) };
+  const { username, password, gmail, otp } = raw as Record<string, unknown>;
+  return {
+    username: str(username) ?? "",
+    password: str(password) ?? "",
+    gmail: gmailGrantOf(gmail),
+    otp: otp === "gmail" || otp === "forwarding" ? otp : null,
+  };
 }
 
 /** Gmail access the phone sent with its credentials, if usable. */
@@ -1175,8 +1183,9 @@ export class Account extends DurableObject<Env> {
     return Response.json({ ok: true, late });
   }
 
-  /** Seals and keeps credentials, only for students with forwarding set
-   * up or Gmail access sent along; true when kept. */
+  /** Seals and keeps credentials, only when the server can read the code:
+   * Gmail access sent along or a forwarding address, as the phone picked
+   * (either one from older phones); true when kept. */
   private async keepCredentials(
     doc: AccountRecord,
     ownerHash: string,
@@ -1184,10 +1193,14 @@ export class Account extends DurableObject<Env> {
     credentials: Credentials,
     at: number,
   ): Promise<boolean> {
-    const { password, gmail } = credentials;
+    const { password, gmail, otp } = credentials;
     if (!password || !ownerHash) return false;
-    if (gmail === null && (await forwardingMailbox(this.env, ownerHash)) === null) {
-      console.log("account: credentials not kept: no forwarding address or Gmail access");
+    const readable =
+      otp === "gmail"
+        ? gmail !== null
+        : (otp === null && gmail !== null) || (await forwardingMailbox(this.env, ownerHash)) !== null;
+    if (!readable) {
+      console.log(`account: credentials not kept: the server can't read the code (${otp ?? "any"})`);
       return false;
     }
     try {
@@ -1196,6 +1209,7 @@ export class Account extends DurableObject<Env> {
         username,
         password,
         ...(gmail !== null ? { gmail } : {}),
+        ...(otp !== null ? { otp } : {}),
       } satisfies SealVault);
       doc.saveVault(sealed.sealedVault, at, gmail !== null);
       return true;

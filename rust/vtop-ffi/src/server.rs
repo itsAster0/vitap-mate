@@ -277,6 +277,31 @@ impl Core {
         .await
     }
 
+    /// Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
+    /// none for forwarding), only when the server already keeps one; false when it keeps none.
+    pub async fn resend_server_password(
+        &self,
+        flow: String,
+        gmail: Option<GmailGrant>,
+    ) -> Result<bool, CoreError> {
+        traced("resend_server_password", &flow, async {
+            let cookies = self.live_cookies().await?;
+            let server = self.forwarding_server();
+            let body = json!({ "session": { "cookies": cookies } });
+            let account = self
+                .edge_post(&server, "/v1/account", &flow, &body)
+                .await
+                .map_err(refused)?;
+            if account["savedCredentials"] != json!(true) {
+                return Ok(false);
+            }
+            self.save_password_with(&server, &flow, &cookies, gmail)
+                .await
+                .map(|()| true)
+        })
+        .await
+    }
+
     /// Drops the sealed password; the server can then no longer sign in by itself.
     pub async fn forget_server_password(&self, flow: String) -> Result<(), CoreError> {
         let path = "/v1/account/forget-credentials";
@@ -557,7 +582,13 @@ impl Core {
         let account = self
             .read::<crate::Account>(crate::ACCOUNT)
             .ok_or(CoreError::NotSignedIn)?;
-        let mut credentials = json!({ "username": account.username, "password": account.password });
+        let otp = if gmail.is_some() {
+            "gmail"
+        } else {
+            "forwarding"
+        };
+        let mut credentials =
+            json!({ "username": account.username, "password": account.password, "otp": otp });
         if let Some(grant) = gmail {
             credentials["gmail"] = json!({
                 "refreshToken": grant.refresh_token,
@@ -840,6 +871,7 @@ mod tests {
             .unwrap()
             .body;
         assert_eq!(sent["credentials"]["username"], "22BCE0001");
+        assert_eq!(sent["credentials"]["otp"], "gmail");
         assert_eq!(
             sent["credentials"]["gmail"]["clientId"],
             "c.apps.googleusercontent.com"

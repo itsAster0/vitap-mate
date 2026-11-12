@@ -1,16 +1,21 @@
 package vitapmate.features.login
 
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.core.CoreException
+import vitapmate.core.GmailGrant
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.observability.Log
+import vitapmate.observability.flow
 
 /**
  * One OTP auto-fill at a time: the student picks mail forwarding or Gmail ([Settings.otpSource])
@@ -28,6 +33,40 @@ object OtpAutofill {
 
     /** The one the OTP prompt reads, or null when the pick isn't set up (or needs reconnecting). [MailForwarding.load] first. */
     fun inUse(): OtpSource? = selected().takeIf(::ready)
+
+    /** Gmail access for the server's saved password while Gmail is in use; null means forwarding. */
+    fun serverGrant(): GmailGrant? = Gmail.account?.takeIf { inUse() == OtpSource.Gmail }
+        ?.let { GmailGrant(it.refreshToken, it.client.id, it.client.secret, it.deleteAfterReading) }
+
+    /** What the server would need to hear about: the auto-fill in use and Gmail's grant. Holds the token; never log it. */
+    internal fun serverKey(): Any? = when (inUse()) {
+        null -> null
+        OtpSource.Forwarding -> OtpSource.Forwarding
+        OtpSource.Gmail -> Gmail.account?.let { it.refreshToken to it.deleteAfterReading }
+    }
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Tells the server the auto-fill now in use (Gmail with its grant, or forwarding), so its saved
+     * password signs in the same way. Only when the server keeps a password and the pick is set up.
+     */
+    internal fun tellServer() {
+        if (inUse() == null) return
+        val grant = serverGrant()
+        scope.launch {
+            try {
+                flow("otp_autofill.server") { f ->
+                    val sent = AppCore.await().resendServerPassword(f, grant)
+                    Log.info("ui.otp_autofill", if (sent) "server told the otp method" else "server keeps no password", f)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                // Logged by flow(); the server keeps the old method until the next change.
+            }
+        }
+    }
 
     /**
      * How long a code stays good, in seconds. Assumed: VTOP's mail and pages don't say; the OTP

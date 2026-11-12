@@ -1026,6 +1026,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_remove_phone(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_resend_server_password(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_save_server_password(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_send_server_semester(
@@ -1275,6 +1277,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_core_remove_forwarding_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_remove_phone(`ptr`: Long,`flow`: RustBuffer.ByValue,`id`: RustBuffer.ByValue,
+    ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_resend_server_password(`ptr`: Long,`flow`: RustBuffer.ByValue,`gmail`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_save_server_password(`ptr`: Long,`flow`: RustBuffer.ByValue,`gmail`: RustBuffer.ByValue,
     ): Long
@@ -1804,6 +1808,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 46557) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 55780) {
@@ -3015,6 +3022,12 @@ public interface CoreInterface {
      * Removes a linked phone (an id from [`ServerStatus::phones`]).
      */
     suspend fun `removePhone`(`flow`: kotlin.String, `id`: kotlin.String)
+    
+    /**
+     * Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
+     * none for forwarding), only when the server already keeps one; false when it keeps none.
+     */
+    suspend fun `resendServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?): kotlin.Boolean
     
     /**
      * Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
@@ -5277,6 +5290,33 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         // lift function
         { },
         
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+    /**
+     * Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
+     * none for forwarding), only when the server already keeps one; false when it keeps none.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `resendServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?) : kotlin.Boolean {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_resend_server_password(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterOptionalTypeGmailGrant.lower(`gmail`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_i8(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_i8(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_i8(future) },
+        // lift function
+        { FfiConverterBoolean.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )

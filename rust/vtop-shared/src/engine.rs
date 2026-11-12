@@ -89,6 +89,17 @@ pub struct SealVault {
     /// student has no forwarding address.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gmail: Option<GmailGrant>,
+    /// The OTP auto-fill picked on the phone; none from older phones.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub otp: Option<OtpMethod>,
+}
+
+/// Where the engine reads the sign-in code: the forwarding address or Gmail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OtpMethod {
+    Forwarding,
+    Gmail,
 }
 
 /// A Gmail refresh token and the OAuth client it was issued to: the app's
