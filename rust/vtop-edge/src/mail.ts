@@ -108,3 +108,36 @@ export async function payloadFor(raw: RawEmail, now: number): Promise<Payload | 
       return null;
   }
 }
+
+/** TEMPORARY: the layout of a dropped mail from Gmail's forwarding sender,
+ * to fix the parser for Workspace accounts. Digits and addresses are masked;
+ * no code, link or body text is kept. */
+export async function dropShape(raw: RawEmail): Promise<string> {
+  let message;
+  try {
+    message = await PostalMime.parse(raw);
+  } catch {
+    return "unparsable";
+  }
+  const mask = (t: string) => t.replace(/[^\s@<>"]+@[^\s@<>"]+/g, "<addr>").replace(/[0-9]/g, "9");
+  const text = message.text ?? "";
+  const html = message.html ?? "";
+  const plain = htmlToText(html);
+  const around = (t: string, label: string) => {
+    const i = asciiLower(t).indexOf(label);
+    return i < 0 ? null : mask(t.slice(Math.max(0, i - 20), i + 40)).replace(/\s+/g, " ");
+  };
+  return JSON.stringify({
+    from: mask(message.from?.address ?? message.from?.group?.[0]?.address ?? "") === "<addr>" ? asciiLower(message.from?.address ?? "").split("@")[1] : "none",
+    fromIsGmail: asciiLower(message.from?.address ?? "") === GMAIL_FORWARDING_SENDER,
+    subject: mask(message.subject ?? ""),
+    textLen: text.length,
+    htmlLen: html.length,
+    vfInText: text.includes("/mail/vf-"),
+    vfInHtml: html.includes("/mail/vf-"),
+    linkHosts: [...new Set([...html.matchAll(/https?:\/\/([a-z0-9.-]+)\/[a-z]*\/?(vf|[a-z]{0,6})/gi)].map((m) => `${m[1]}/${m[2]}`))].slice(0, 8),
+    codeLabelText: around(text, "code"),
+    codeLabelHtml: around(plain, "code"),
+    confirmHtml: around(plain, "confirm"),
+  });
+}

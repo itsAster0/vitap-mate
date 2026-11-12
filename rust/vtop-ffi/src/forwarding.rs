@@ -41,7 +41,7 @@ pub enum ForwardingState {
     Off,
     /// An address, but no mail has reached it yet (Gmail not set up).
     Waiting,
-    /// Mail reached the address (or it was joined from the student's other phone).
+    /// Mail reached the address: Gmail's confirmation or an OTP.
     On,
 }
 
@@ -81,7 +81,7 @@ struct Saved {
     address: String,
     #[serde(default)]
     owner_claimed: bool,
-    /// Mail arrived, or the address was joined (Gmail already forwards to it).
+    /// Mail arrived: Gmail's confirmation, or an OTP (now or, as the edge says, before).
     #[serde(default)]
     ready: bool,
     #[serde(default)]
@@ -90,6 +90,20 @@ struct Saved {
     last_otp_at: Option<i64>,
     #[serde(default)]
     confirmation: Option<GmailConfirmation>,
+}
+
+impl Saved {
+    /// Gmail's confirmation is only for setting up: once an OTP sent after it came, forwarding
+    /// works and it goes, as on the edge.
+    fn drop_stale_confirmation(&mut self) {
+        if self
+            .confirmation
+            .as_ref()
+            .is_some_and(|c| self.last_otp_at >= Some(c.sent_at))
+        {
+            self.confirmation = None;
+        }
+    }
 }
 
 /// What a box holds (the edge's `Payload` in `vtop-edge/src/mail.ts`).
@@ -212,7 +226,9 @@ impl Core {
                 id: string(&body, "id")?,
                 address: string(&body, "address")?,
                 owner_claimed: reclaimed,
-                ready: reclaimed,
+                // Even a joined address may never have been confirmed in Gmail: the next pull
+                // brings Gmail's confirmation or the latest OTP, which tells.
+                ready: false,
                 last_mail_at: None,
                 last_otp_at: None,
                 confirmation: None,
@@ -349,11 +365,22 @@ impl Core {
             }
             Err(error) => return Err(error.into()),
         };
+        let seal_secret = &self.device().seal_secret;
+        // Kept by the edge since setup, for a phone that joined after Gmail sent it.
+        if let Some(sealed) = inbox["confirmation"].as_str().filter(|s| !s.is_empty())
+            && let Some(confirmation) = open(seal_secret, &saved.id, sealed)
+        {
+            debug!("gmail confirmation kept on the edge");
+            self.record(&saved.id, &confirmation);
+        }
+        if let Some(at) = inbox["lastOtpAt"].as_i64() {
+            self.record_otp_at(&saved.id, at);
+        }
         let Some(sealed) = inbox["sealed"].as_str().filter(|s| !s.is_empty()) else {
             debug!("inbox empty");
             return Ok(None);
         };
-        let Some(payload) = open(&self.device().seal_secret, &saved.id, sealed) else {
+        let Some(payload) = open(seal_secret, &saved.id, sealed) else {
             return Ok(None);
         };
         info!(
@@ -363,6 +390,22 @@ impl Core {
         );
         self.record(&saved.id, &payload);
         Ok(Some(payload))
+    }
+
+    /// Notes that an OTP sent at `at` reached the address `id` (if it is still this phone's).
+    fn record_otp_at(&self, id: &str, at: i64) {
+        let _lock = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(mut saved) = self.read::<Saved>(FILE).filter(|saved| saved.id == id) else {
+            return;
+        };
+        let before = saved.clone();
+        saved.ready = true;
+        saved.last_otp_at = saved.last_otp_at.max(Some(at));
+        saved.last_mail_at = saved.last_mail_at.max(Some(at));
+        saved.drop_stale_confirmation();
+        if saved != before {
+            self.write(FILE, &saved);
+        }
     }
 
     /// Notes that `payload` reached the address `id` (if it is still this phone's).
@@ -377,6 +420,8 @@ impl Core {
         saved.last_mail_at = saved.last_mail_at.max(Some(sent_at));
         match payload {
             Payload::Otp { .. } => saved.last_otp_at = saved.last_otp_at.max(Some(sent_at)),
+            // Older than an OTP that already came: forwarding works, so it isn't shown again.
+            Payload::GmailConfirm { sent_at, .. } if saved.last_otp_at >= Some(*sent_at) => {}
             Payload::GmailConfirm {
                 code,
                 link,
@@ -391,6 +436,7 @@ impl Core {
                 });
             }
         }
+        saved.drop_stale_confirmation();
         if saved != before {
             self.write(FILE, &saved);
         }
@@ -712,6 +758,63 @@ pub(crate) mod tests {
             .count();
         assert_eq!(registers, 1);
         assert!(edge.requests.iter().all(|r| r.signed));
+    }
+
+    #[tokio::test]
+    async fn check_shows_the_confirmation_the_edge_kept() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-kept-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        fs::write(dir.join(SERVER_FILE), serve(edge.clone()).await + "\n").unwrap();
+        let core = Core {
+            dir: dir.clone(),
+            cache: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        core.set_up_forwarding("f".into()).await.unwrap();
+        // Gmail's mail came before this install joined: no box, only the kept confirmation.
+        let kept = {
+            let edge = edge.lock().unwrap();
+            let payload = json!({ "kind": "gmail_confirm", "code": "981234567", "link": null, "requester": null, "sentAt": 1_700_000_000 });
+            mail_seal::seal(
+                edge.seal_key.as_deref().unwrap(),
+                ID,
+                payload.to_string().as_bytes(),
+            )
+            .unwrap()
+        };
+        let inbox = "/v1/mail-otp/inbox".to_string();
+        edge.lock().unwrap().canned.insert(
+            inbox.clone(),
+            [(
+                200,
+                json!({ "sealed": null, "confirmation": kept, "lastOtpAt": null }),
+            )]
+            .into(),
+        );
+        let checked = core.check_forwarding("f".into()).await.unwrap();
+        assert_eq!(checked.state, ForwardingState::On);
+        assert_eq!(
+            checked.confirmation.unwrap().code.as_deref(),
+            Some("981234567")
+        );
+        assert_eq!(checked.last_otp_at, None);
+
+        // An OTP forwarded to the address before shows it works.
+        edge.lock().unwrap().canned.insert(
+            inbox,
+            [(
+                200,
+                json!({ "sealed": null, "confirmation": null, "lastOtpAt": 1_700_000_100 }),
+            )]
+            .into(),
+        );
+        let checked = core.check_forwarding("f".into()).await.unwrap();
+        assert_eq!(checked.last_otp_at, Some(1_700_000_100));
+        // and Gmail's confirmation goes, here as on the edge.
+        assert!(checked.confirmation.is_none());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[tokio::test]

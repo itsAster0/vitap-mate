@@ -50,7 +50,9 @@ import {
   variable,
 } from "./common";
 import type { DeviceChanges } from "./device";
-import { type Payload, payloadFor } from "./mail";
+import { GMAIL_FORWARDING_SENDER, type Payload, dropShape, payloadFor } from "./mail";
+
+const asciiEq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 import { MAIL_OWNER, type OtpAwait } from "./shared/engine-api";
 import { isPublicKey, seal } from "./shared/mail-seal";
 import {
@@ -333,7 +335,18 @@ async function mailInbox(deviceId: string, body: MailBody, env: Env): Promise<Re
   const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const box = freshSealed(mine.doc.members[mine.index], now());
-  return Response.json(box ? { sealed: box.sealed, receivedAt: box.at } : { sealed: null });
+  const { confirmation: plaintext, lastOtpAt } = await mailboxStub(env, mine.doc.id).setup();
+  // Sealed now to this install, which may have joined after Gmail sent it.
+  let confirmation: string | null = null;
+  if (plaintext !== null) {
+    const key = (await deviceStub(env, deviceId).info())?.sealKey;
+    if (key !== undefined) confirmation = seal(key, mine.doc.id, new TextEncoder().encode(plaintext));
+  }
+  return Response.json({
+    ...(box ? { sealed: box.sealed, receivedAt: box.at } : { sealed: null }),
+    confirmation,
+    lastOtpAt,
+  });
 }
 
 /** Ties the mailbox to the student whose session comes with it, so a new
@@ -487,12 +500,16 @@ async function email(message: ForwardableEmailMessage, env: Env): Promise<void> 
     message.setReject("Unknown address");
     return;
   }
-  const payload = await payloadFor(message.raw, now());
+  // Read once: the stream can't be read twice (TEMPORARY, for dropShape).
+  const raw = await new Response(message.raw).arrayBuffer();
+  const payload = await payloadFor(raw, now());
   if (!payload) {
     console.log("mail-otp: dropped a mail for a mailbox");
+    if (asciiEq(message.from, GMAIL_FORWARDING_SENDER)) console.log(`mail-otp: dropped shape ${await dropShape(raw)}`);
     return;
   }
-  const plaintext = new TextEncoder().encode(JSON.stringify(payload));
+  const json = JSON.stringify(payload);
+  const plaintext = new TextEncoder().encode(json);
   // Sealed once per install, each to its own key; an install no longer
   // registered is skipped.
   const sealed = await Promise.all(
@@ -503,7 +520,8 @@ async function email(message: ForwardableEmailMessage, env: Env): Promise<void> 
     }),
   );
   const boxes = sealed.flat();
-  if (!(await mailboxStub(env, id).deliver(boxes))) throw new Error("deliver failed: no mailbox");
+  const mail = { kind: payload.kind, sentAt: payload.sentAt, plaintext: json };
+  if (!(await mailboxStub(env, id).deliver(boxes, mail))) throw new Error("deliver failed: no mailbox");
   // The code is stored now. What follows is best effort: an error here must
   // not make the mail server send it again (a second push for the same
   // code).

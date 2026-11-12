@@ -15,6 +15,11 @@ import type { OtpAwaited } from "./shared/engine-api";
 import * as sql from "./sql";
 import { type MailboxDoc, type Waiter, WAITER_TTL_SECS, clearExpired, nextExpiry } from "./state";
 
+/** Storage keys beside the tables (no schema bump): Gmail's latest
+ * forwarding confirmation, and when the latest OTP was sent. */
+const CONFIRMATION = "gmail_confirm";
+const LAST_OTP_AT = "last_otp_at";
+
 /** The longest one wait lasts. */
 const MAX_WAIT_SECS = 30;
 
@@ -102,10 +107,21 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   /** One box per install, each sealed to its own key; false when there is
-   * no address. */
-  async deliver(boxes: Array<{ deviceId: string; sealed: string }>): Promise<boolean> {
+   * no address. Gmail's confirmation (`plaintext` of a `gmail_confirm`) is
+   * also kept, so a phone that joins later can still show it; an OTP drops
+   * it, as forwarding then works, and is noted. */
+  async deliver(
+    boxes: Array<{ deviceId: string; sealed: string }>,
+    mail: { kind: string; sentAt: number; plaintext: string },
+  ): Promise<boolean> {
     const doc = await this.doc();
     if (!doc) return false;
+    if (mail.kind === "gmail_confirm") {
+      await this.ctx.storage.put(CONFIRMATION, mail.plaintext);
+    } else {
+      await this.ctx.storage.put(LAST_OTP_AT, mail.sentAt);
+      await this.ctx.storage.delete(CONFIRMATION);
+    }
     const at = now();
     for (const delivered of boxes) {
       const member = doc.members.find((m) => m.deviceId === delivered.deviceId);
@@ -117,6 +133,14 @@ export class Mailbox extends DurableObject<Env> {
     doc.updatedAt = at;
     await this.save(doc);
     return true;
+  }
+
+  /** Gmail's latest confirmation (the plaintext payload) until an OTP
+   * arrived, and when the latest OTP was sent. */
+  async setup(): Promise<{ confirmation: string | null; lastOtpAt: number | null }> {
+    const confirmation = (await this.ctx.storage.get<string>(CONFIRMATION)) ?? null;
+    const lastOtpAt = (await this.ctx.storage.get<number>(LAST_OTP_AT)) ?? null;
+    return { confirmation, lastOtpAt };
   }
 
   /** Wipes the address, tables and all. */

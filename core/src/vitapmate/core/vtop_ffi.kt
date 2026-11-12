@@ -14259,7 +14259,7 @@ enum class ForwardingState {
      */
     WAITING,
     /**
-     * Mail reached the address (or it was joined from the student's other phone).
+     * Mail reached the address: Gmail's confirmation or an OTP.
      */
     ON;
 
