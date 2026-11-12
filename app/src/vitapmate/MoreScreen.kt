@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
@@ -49,6 +50,7 @@ import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Pin
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Feature
+import vitapmate.ui.heroCookie
 import vitapmate.ui.tappable
 
 /** Tiles per row in More's feature grid. */
@@ -64,8 +66,33 @@ fun MoreScreen() {
     val nav = LocalNav.current
     val tabs = navTabs
     val version = rememberAppVersion()
+    val unseen = rememberUnseenChanges()
     Page("More", MORE) { padding ->
         LazyColumn(contentPadding = padding) {
+            // New changes since the last visit: opens the inbox, as the Changes row does.
+            if (unseen > 0) item("changes.new") {
+                val tones = AppTheme.tones
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+                        .background(tones.accentTone.subtle).heroCookie()
+                        .tappable({ nav.push(Route.Screen(INBOX)) }, "$unseen new changes", Role.Button)
+                        .padding(horizontal = 16.dp, vertical = 14.dp).testTag("more.changes_card"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(44.dp).background(tones.accent, MaterialShapes.Sunny.toShape()), Alignment.Center) {
+                        Icon(Lucide.Bell, null, Modifier.size(20.dp), tint = tones.onAccent)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(if (unseen == 1) "1 new change" else "$unseen new changes", style = MaterialTheme.typography.titleMediumEmphasized, color = MaterialTheme.colorScheme.onSurface)
+                        Text("since you last looked", style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+                    }
+                    Box(Modifier.size(24.dp).background(MaterialTheme.colorScheme.error, CircleShape), Alignment.Center) {
+                        Text(if (unseen > 9) "9+" else "$unseen", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onError)
+                    }
+                    Icon(Lucide.ChevronRight, null, tint = tones.accentTone.onSubtle)
+                }
+            }
             featureGroups.forEachIndexed { index, (title, group) ->
                 item(title) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -100,7 +127,7 @@ fun MoreScreen() {
             item("app") {
                 ListGroup("App") {
                     val context = LocalContext.current
-                    InboxRow()
+                    InboxRow(unseen)
                     GroupItem(
                         "Fetch all",
                         "more.fetch_all",

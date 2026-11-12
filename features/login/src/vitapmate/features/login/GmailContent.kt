@@ -277,7 +277,7 @@ private fun Setup() {
         color = scheme.onSurfaceVariant,
     )
     steps.forEachIndexed { i, (title, link, body) -> Step(i + 1, title, link, "Open in Google Cloud", tag = "gmail") { body } }
-    Step(7, "Connect", null, null, tag = "gmail") {
+    Step(7, "Connect", null, null, tag = "gmail", last = true) {
         "Import the JSON, tap Connect Google and choose your @vitapstudent.ac.in account. On \"Google hasn't verified this app\", check the name is yours, then Continue. Tick the Gmail permission, tap Continue, then come back to Vitap Mate: Android pauses the app while you're in the browser, so Google's page keeps loading until you do."
     }
     connecting.problem?.let { Callout(Lucide.TriangleAlert, AppTheme.tones.danger, it) }

@@ -3,7 +3,20 @@ package vitapmate
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import vitapmate.ui.StatTile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,7 +29,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -68,7 +80,13 @@ fun FlowScreen(flow: String) {
             LazyColumn(contentPadding = padding) {
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Flow $flow · ${lines.size} lines${summary?.ms?.let { " · $it ms" }.orEmpty()}${summary?.outcome?.let { " · $it" }.orEmpty()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Flow $flow", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        // Lines, time taken and outcome; a tile whose value isn't known yet is left out.
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StatTile("${lines.size}", "Lines", Modifier.weight(1f))
+                            summary?.ms?.let { StatTile("$it ms", "Took", Modifier.weight(1f)) }
+                            summary?.outcome?.let { StatTile(it, "Outcome", Modifier.weight(1f), tone = outcomeTone(it)) }
+                        }
                         RouteLine(routeOf(lines), fallbackOf(lines))
                         LevelChips(min, "inspector.flow.level") { min = it }
                     }
@@ -79,35 +97,52 @@ fun FlowScreen(flow: String) {
     }
 }
 
+/** One line: a coloured edge by level, its time and source above the level and message, then its fields. */
 @Composable
 private fun LineRow(line: LogLine, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     val route = line.msg == "route used" || line.msg.startsWith("route failed")
-    val color = when (line.level.lowercase()) {
+    val level = line.level.lowercase()
+    val color = when (level) {
         "error" -> scheme.error
         "warn" -> AppTheme.palette.warning.base
         "debug" -> scheme.onSurfaceVariant
         // The route switch's lines ("route used") stand out in the timeline.
         else -> if (route) scheme.primary else scheme.onSurface
     }
+    val edge = when {
+        level == "error" -> scheme.error
+        level == "warn" -> AppTheme.palette.warning.base
+        route -> scheme.primary
+        else -> scheme.outlineVariant
+    }
     val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 16.sp)
-    Column(modifier.padding(horizontal = 16.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(clock(line.t), style = mono, color = scheme.onSurfaceVariant)
-            Text(line.level.uppercase(), style = mono, color = color)
-            Surface(shape = RoundedCornerShape(6.dp), color = scheme.surfaceContainerHighest) {
-                Text(line.src, Modifier.padding(horizontal = 6.dp), style = mono, color = scheme.onSurfaceVariant, maxLines = 1)
-            }
-        }
-        Text(line.msg, style = mono, color = color)
-        if (line.fields.isNotEmpty()) {
+    val small = mono.copy(fontSize = 10.5.sp, lineHeight = 14.sp)
+    Row(
+        modifier.padding(horizontal = 16.dp, vertical = 2.dp).fillMaxWidth().height(IntrinsicSize.Min).clip(RoundedCornerShape(4.dp))
+            .background(if (route) AppTheme.tones.accentTone.subtle else AppTheme.colors.card),
+    ) {
+        Box(Modifier.width(3.dp).fillMaxHeight().background(edge))
+        Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("${clock(line.t)} · ${line.src}", style = small, color = scheme.onSurfaceVariant, maxLines = 1)
             Text(
-                line.fields.entries.joinToString("  ") { (k, v) -> "$k=$v" },
-                Modifier.horizontalScroll(rememberScrollState()),
+                buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(line.level.uppercase()) }
+                    append(" ")
+                    append(line.msg)
+                },
                 style = mono,
-                color = scheme.onSurfaceVariant,
-                softWrap = false,
+                color = color,
             )
+            if (line.fields.isNotEmpty()) {
+                Text(
+                    line.fields.entries.joinToString("  ") { (k, v) -> "$k=$v" },
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    style = mono,
+                    color = scheme.onSurfaceVariant,
+                    softWrap = false,
+                )
+            }
         }
     }
 }

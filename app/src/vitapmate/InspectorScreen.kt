@@ -1,7 +1,16 @@
 package vitapmate
 
 import vitapmate.ui.rememberHaptics
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import com.composables.icons.lucide.Ban
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.LoaderCircle
+import vitapmate.ui.nums
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -81,12 +90,37 @@ fun InspectorScreen() {
             }
             items(shown, key = { it.id }) { f ->
                 Box(Modifier.padding(horizontal = 20.dp)) {
+                val tone = outcomeTone(f.outcome)
                 GroupItem(
                     f.name,
                     "inspector.flow.${f.id}",
-                    supporting = "${clock(f.startT)} · ${f.id}${f.ms?.let { " · $it ms" }.orEmpty()}",
+                    supporting = "${clock(f.startT)} · ${f.id}",
                     onClick = { nav.push(Route.FlowLog(f.id)) },
-                    trailing = { OutcomeChip(f.outcome) },
+                    // The outcome as a mark; its chip stays for anything but ok, which the tick says.
+                    lead = {
+                        Box(Modifier.size(34.dp).background(tone.subtle, CircleShape), Alignment.Center) {
+                            val icon = when (f.outcome) {
+                                null -> Lucide.LoaderCircle
+                                "ok" -> Lucide.Check
+                                "cancelled" -> Lucide.Ban
+                                else -> Lucide.X
+                            }
+                            Icon(icon, f.outcome ?: "running", Modifier.size(16.dp), tint = tone.base)
+                        }
+                    },
+                    below = if (f.outcome == "ok") null else ({ Box(Modifier.padding(top = 4.dp)) { OutcomeChip(f.outcome) } }),
+                    // How long it took, so slow flows stand out.
+                    trailing = f.ms?.let { ms ->
+                        {
+                            Box(
+                                Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 30.dp)
+                                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(12.dp)).padding(horizontal = 8.dp),
+                                Alignment.Center,
+                            ) {
+                                Text("$ms ms", style = MaterialTheme.typography.labelMedium.nums(), color = MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1)
+                            }
+                        }
+                    },
                 )
                 }
             }

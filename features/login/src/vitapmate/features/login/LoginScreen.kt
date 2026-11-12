@@ -3,6 +3,18 @@ package vitapmate.features.login
 import vitapmate.ui.rememberHaptics
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.icons.lucide.CalendarDays
+import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.Info
+import vitapmate.ui.AppTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -89,6 +101,7 @@ import vitapmate.ui.Space
 @Composable
 fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSignedIn: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val cardColor = AppTheme.colors.card
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val passwordFocus = remember { FocusRequester() }
@@ -168,6 +181,23 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
         }
     }
 
+    // The fields sit on their segments (Account's look): no outline at rest, the primary one while typing.
+    val tones = AppTheme.tones
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedBorderColor = Color.Transparent,
+        disabledBorderColor = Color.Transparent,
+        errorBorderColor = Color.Transparent,
+        disabledContainerColor = Color.Transparent,
+    )
+    val circle = @Composable { icon: ImageVector, error: Boolean ->
+        Box(Modifier.size(42.dp).background(if (error) tones.danger.subtle else scheme.secondaryContainer, CircleShape), Alignment.Center) {
+            Icon(icon, null, Modifier.size(20.dp), tint = if (error) tones.danger.base else scheme.onSecondaryContainer)
+        }
+    }
+    val segment = ListItemDefaults.segmentedShapes(1, 3).shape
+    fun segmentModifier(error: Boolean) = Modifier.fillMaxWidth().heightIn(min = 68.dp).clip(segment).background(cardColor)
+        .then(if (error) Modifier.border(2.dp, scheme.error, segment) else Modifier)
+
     BoxWithConstraints(Modifier.fillMaxSize().background(scheme.background).imePadding().testTag("screen.login")) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).fillMaxWidth().heightIn(min = maxHeight).systemBarsPadding()
@@ -176,8 +206,17 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
             verticalArrangement = Arrangement.Center,
         ) {
             Column(Modifier.widthIn(max = 420.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(Modifier.size(88.dp).background(scheme.primaryContainer, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
-                    Icon(Lucide.GraduationCap, null, Modifier.size(40.dp), tint = scheme.onPrimaryContainer)
+                // The mark with two small companions: a calendar and a tick.
+                Box(Modifier.size(width = 148.dp, height = 104.dp)) {
+                    Box(Modifier.align(Alignment.Center).size(88.dp).background(scheme.primaryContainer, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
+                        Icon(Lucide.GraduationCap, null, Modifier.size(40.dp), tint = scheme.onPrimaryContainer)
+                    }
+                    Box(Modifier.align(Alignment.BottomStart).size(44.dp).background(tones.accentTone.subtle, MaterialShapes.Cookie6Sided.toShape()), Alignment.Center) {
+                        Icon(Lucide.CalendarDays, null, Modifier.size(20.dp), tint = tones.accentTone.base)
+                    }
+                    Box(Modifier.align(Alignment.TopEnd).size(40.dp).background(tones.success.subtle, MaterialShapes.Cookie4Sided.toShape()), Alignment.Center) {
+                        Icon(Lucide.Check, null, Modifier.size(18.dp), tint = tones.success.base)
+                    }
                 }
                 Spacer(Modifier.height(Space.xl))
                 Text("Vitap Mate", style = MaterialTheme.typography.headlineLargeEmphasized)
@@ -194,6 +233,9 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                         ProblemBanner(it, { problem = null }, Modifier.padding(bottom = Space.lg), onRetry = ::submit, onSignIn = null)
                     }
                 }
+                // One segmented block of the two fields, as on the Account page.
+                Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                Box(segmentModifier(usernameError != null || rejected), Alignment.CenterStart) {
                 OutlinedTextField(
                     username,
                     {
@@ -201,10 +243,10 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                         usernameError = null
                         rejected = false
                     },
-                    Modifier.fillMaxWidth().testTag("login.username").semantics { contentType = ContentType.Username },
+                    Modifier.fillMaxWidth().padding(4.dp).testTag("login.username").semantics { contentType = ContentType.Username },
                     enabled = !signingIn,
                     label = { Text("Username") },
-                    leadingIcon = { Icon(Lucide.User, null) },
+                    leadingIcon = { circle(Lucide.User, usernameError != null || rejected) },
                     supportingText = usernameError?.let { { Text(it, Modifier.testTag("login.username.error")) } },
                     isError = usernameError != null || rejected,
                     keyboardOptions = KeyboardOptions(
@@ -216,8 +258,10 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     keyboardActions = KeyboardActions(onNext = { passwordFocus.requestFocus() }),
                     singleLine = true,
                     shape = MaterialTheme.shapes.large,
+                    colors = fieldColors,
                 )
-                Spacer(Modifier.height(Space.sm))
+                }
+                Box(segmentModifier(passwordError != null), Alignment.CenterStart) {
                 PasswordField(
                     password,
                     {
@@ -227,14 +271,17 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     },
                     "Password",
                     "login.password",
-                    Modifier.fillMaxWidth().focusRequester(passwordFocus),
+                    Modifier.fillMaxWidth().padding(4.dp).focusRequester(passwordFocus),
                     enabled = !signingIn,
                     isError = passwordError != null,
-                    leadingIcon = { Icon(Lucide.Lock, null) },
+                    leadingIcon = { circle(Lucide.Lock, passwordError != null) },
                     supportingText = passwordError?.let { { Text(it, Modifier.testTag("login.password.error")) } },
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     shape = MaterialTheme.shapes.large,
+                    colors = fieldColors,
                 )
+                }
+                }
                 Spacer(Modifier.height(Space.xl))
                 Button(
                     ::submit,
@@ -251,12 +298,17 @@ fun LoginScreen(core: suspend () -> CoreInterface = { AppCore.await() }, onSigne
                     }
                 }
                 Spacer(Modifier.height(Space.lg))
-                Text(
-                    "Trouble signing in? Check that you can sign in on the VTOP website, then try again here.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
+                Row(
+                    Modifier.fillMaxWidth().background(scheme.surfaceContainerHighest, MaterialTheme.shapes.large).padding(Space.md),
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm),
+                ) {
+                    Icon(Lucide.Info, null, Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
+                    Text(
+                        "Trouble signing in? Check that you can sign in on the VTOP website, then try again here.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }

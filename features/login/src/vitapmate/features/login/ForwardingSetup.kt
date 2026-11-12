@@ -9,10 +9,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.font.FontWeight
+import com.composables.icons.lucide.Check
+import vitapmate.ui.heroCookie
+import vitapmate.ui.neutralTone
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +48,6 @@ import vitapmate.core.Forwarding
 import vitapmate.core.ForwardingState
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
-import vitapmate.ui.ButtonVariant
 import vitapmate.ui.Dot
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
@@ -57,28 +66,36 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
     val tones = AppTheme.tones
     val context = LocalContext.current
     val address = status.address.orEmpty()
+    val accent = tones.accentTone
+    val on = status.state == ForwardingState.ON
     Column(
-        Modifier.fillMaxWidth().background(scheme.surfaceContainerHighest, MaterialTheme.shapes.large).padding(start = Space.lg, top = Space.md, bottom = Space.md, end = Space.xs),
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(accent.subtle).heroCookie()
+            .padding(start = Space.lg, top = Space.md, bottom = Space.lg, end = Space.xs),
     ) {
-        Text("Your address", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+        Text("Your address", style = MaterialTheme.typography.labelMedium, color = accent.onSubtle)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(address, Modifier.weight(1f).testTag("forwarding.address"), style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace))
-            IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address") }
+            Text(
+                address,
+                Modifier.weight(1f).testTag("forwarding.address"),
+                style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold),
+                color = scheme.onSurface,
+            )
+            IconButton({ copy(context, "Forwarding address", address) }, Modifier.testTag("forwarding.copy")) { Icon(Lucide.Copy, "Copy the address", tint = accent.onSubtle) }
         }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
-        val on = status.state == ForwardingState.ON
-        Dot(size = 8.dp, color = if (on) tones.success.base else tones.warning.base)
-        Text(
-            when {
-                status.lastOtpAt != null -> "Working · last OTP ${ago(status.lastOtpAt!!)}"
-                on -> "Ready · no OTP forwarded yet"
-                else -> "Waiting for Gmail's confirmation mail…"
-            },
-            Modifier.testTag("forwarding.status"),
-            style = MaterialTheme.typography.bodyMedium,
-            color = scheme.onSurfaceVariant,
-        )
+        // Waiting in the warning tone, ready in the neutral one, working in success.
+        val (label, tone) = when {
+            status.lastOtpAt != null -> "Working · last OTP ${ago(status.lastOtpAt!!)}" to tones.success
+            on -> "Ready · no OTP forwarded yet" to neutralTone
+            else -> "Waiting for Gmail's confirmation mail…" to tones.warning
+        }
+        Row(
+            Modifier.padding(top = Space.xs).background(tone.subtle, CircleShape).padding(horizontal = Space.sm, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Space.xs),
+        ) {
+            Dot(size = 8.dp, color = if (on) tones.success.base else tones.warning.base)
+            Text(label, Modifier.testTag("forwarding.status"), style = MaterialTheme.typography.labelMedium, color = tone.onSubtle)
+        }
     }
     status.confirmation?.let { confirm ->
         Callout(Lucide.MailCheck, tones.success, confirm.requester?.let { "Gmail's confirmation for $it arrived." } ?: "Gmail's confirmation arrived.") {
@@ -94,14 +111,19 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             }
         }
     }
-    Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings") {
+    // Ticks only for what the app can tell: Gmail's confirmation (or forwarding on) means steps 1
+    // and 2 are done, a forwarded OTP means the filter works too.
+    val added = on || status.confirmation != null
+    val filtered = status.lastOtpAt != null
+    fun state(done: Boolean, current: Boolean) = if (done) StepState.Done else if (current) StepState.Current else StepState.Plain
+    Step(1, "Add the address in Gmail", GMAIL_FORWARDING, "Open forwarding settings", state = state(added, true)) {
         "In the Gmail where VTOP's mail arrives (usually @vitapstudent.ac.in): Add a forwarding address, paste yours, then Next → Proceed → OK. " +
             "On a phone, open the link in Chrome with ⋮ → Desktop site. Leave \"Disable forwarding\" selected."
     }
-    Step(2, "Confirm it", null, null) {
+    Step(2, "Confirm it", null, null, state = state(added, false)) {
         "Gmail's confirmation mail comes here, not to your inbox. Tap Check, then Confirm in Gmail or type the code into Gmail's Verify box."
     }
-    Step(3, "Create the filter", GMAIL_FILTERS, "Open filters") {
+    Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
         "Create a new filter with From ${status.sender}, tick Forward it to and pick your vtop-otp address, then Create filter."
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -120,22 +142,64 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
             if (checking) LoadingIndicator(Modifier.size(20.dp))
             Text(if (checking) "Checking…" else "Check")
         }
-        Button(if (MailForwarding.busy != null) null else onOff, Modifier.weight(1f).testTag("forwarding.off"), variant = ButtonVariant.Outline) {
-            Text(if (MailForwarding.busy == "off") "Turning off…" else "Turn off", color = scheme.error)
+        // Turn off in the danger tint, beside Check.
+        androidx.compose.material3.Button(
+            onClick = onOff,
+            modifier = Modifier.weight(1f).defaultMinSize(minHeight = 44.dp).testTag("forwarding.off"),
+            enabled = MailForwarding.busy == null,
+            shapes = ButtonDefaults.shapes(),
+            colors = ButtonDefaults.buttonColors(containerColor = tones.danger.subtle, contentColor = tones.danger.onSubtle),
+        ) {
+            Text(if (MailForwarding.busy == "off") "Turning off…" else "Turn off")
         }
     }
 }
 
-/** One setup step: a number in a circle, a title, what to do, and a link to the page; test tags `<tag>.step<n>`. */
+/** How far a setup step is, when the app can tell: [Done] shows a tick, [Current] a filled number. */
+internal enum class StepState { Done, Current, Plain }
+
+/**
+ * One setup step on a rail: a number mark (a tick once [state] is done), a title, what to do,
+ * and a link to the page; the rail runs on to the next step unless [last]. Test tags `<tag>.step<n>`.
+ */
 @Composable
-internal fun Step(number: Int, title: String, link: String?, linkLabel: String?, tag: String = "forwarding", body: () -> String) {
+internal fun Step(
+    number: Int,
+    title: String,
+    link: String?,
+    linkLabel: String?,
+    tag: String = "forwarding",
+    state: StepState = StepState.Plain,
+    last: Boolean = false,
+    body: () -> String,
+) {
     val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
     val uri = LocalUriHandler.current
-    Row(horizontalArrangement = Arrangement.spacedBy(Space.md), modifier = Modifier.testTag("$tag.step$number")) {
-        Box(Modifier.size(28.dp).background(scheme.primaryContainer, CircleShape), Alignment.Center) {
-            Text("$number", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimaryContainer)
+    val rail = scheme.surfaceContainerHighest
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(Space.md),
+        modifier = Modifier.testTag("$tag.step$number").drawBehind {
+            // From under the mark down through the gap to the next step.
+            if (!last) {
+                val x = 15.dp.toPx()
+                drawLine(rail, Offset(x, 32.dp.toPx()), Offset(x, size.height + Space.lg.toPx()), 2.dp.toPx())
+            }
+        },
+    ) {
+        val (fill, shape) = when (state) {
+            StepState.Done -> tones.success.base to CircleShape
+            StepState.Current -> scheme.primary to RoundedCornerShape(10.dp)
+            StepState.Plain -> scheme.secondaryContainer to CircleShape
         }
-        Column(Modifier.weight(1f)) {
+        Box(Modifier.size(30.dp).background(fill, shape), Alignment.Center) {
+            when (state) {
+                StepState.Done -> Icon(Lucide.Check, "Done", Modifier.size(16.dp), tint = scheme.surface)
+                StepState.Current -> Text("$number", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimary)
+                StepState.Plain -> Text("$number", style = MaterialTheme.typography.labelLarge, color = scheme.onSecondaryContainer)
+            }
+        }
+        Column(Modifier.weight(1f).padding(top = 4.dp)) {
             Text(title, style = MaterialTheme.typography.titleSmall)
             Text(body(), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
             if (link != null && linkLabel != null) {

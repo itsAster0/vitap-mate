@@ -11,7 +11,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
+import androidx.graphics.shapes.RoundedPolygon
+import vitapmate.ui.Dot
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -82,13 +90,18 @@ private object Unseen {
     }
 }
 
-/** More → Changes: the unread count beside it; opens the inbox. */
+/** The unread count, read again after each VTOP run finishes (More's card and Changes row). */
 @Composable
-fun InboxRow() {
-    val nav = LocalNav.current
+fun rememberUnseenChanges(): Int {
     val last = Activity.recent.firstOrNull()?.flow
     LaunchedEffect(last) { Unseen.read() }
-    val count = Unseen.count
+    return Unseen.count
+}
+
+/** More → Changes: the unread [count] beside it; opens the inbox. */
+@Composable
+fun InboxRow(count: Int) {
+    val nav = LocalNav.current
     GroupItem(
         "Changes",
         "more.inbox",
@@ -112,6 +125,7 @@ fun InboxRow() {
  * What changed on VTOP, newest first, grouped by day; the ones new since the last visit stand
  * out. Opening it marks them seen. Tapping one opens its page. Clear empties the list.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun InboxScreen() {
     val nav = LocalNav.current
@@ -148,14 +162,24 @@ fun InboxScreen() {
         val newIds = list.take(fresh).map { it.id }.toSet()
         LazyColumn(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
         ) {
+            item("summary") {
+                Text(
+                    if (newIds.isEmpty()) "${list.size} in all, none new" else "${newIds.size} new · ${list.size} in all",
+                    Modifier.padding(top = 4.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape).padding(horizontal = 12.dp, vertical = 4.dp)
+                        .testTag("inbox.summary"),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             list.groupBy { formatDay(epochDayOf(it.atMs), "EEEE, d MMMM") }.forEach { (day, items) ->
                 item("day.$day") {
-                    Text(day, Modifier.padding(start = 4.dp, top = 8.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    Text(day, Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
                 }
-                items(items, key = { it.id }) { change ->
-                    ChangeRow(change, change.id in newIds) {
+                // A day's rows join into one block.
+                itemsIndexed(items, key = { _, it -> it.id }) { i, change ->
+                    ChangeRow(change, change.id in newIds, ListItemDefaults.segmentedShapes(i, items.size).shape) {
                         scope.logAction("inbox.open_change", "ui.inbox", "open ${change.kind.name.lowercase()}")
                         val target = pageOf(change.kind)
                         if (target in navTabs) nav.goTab(target) else nav.push(Route.Screen(target))
@@ -166,9 +190,13 @@ fun InboxScreen() {
     }
 }
 
-/** One change: its kind's icon, title and body, the time; tinted when new since the last visit. */
+/**
+ * One change: its kind's icon in the kind's shape, title and body, the time; tinted, with a dot,
+ * when new since the last visit. [shape] is its place in the day's block.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ChangeRow(change: Change, new: Boolean, onClick: () -> Unit) {
+private fun ChangeRow(change: Change, new: Boolean, shape: Shape, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val tones = AppTheme.tones
     val tone = when {
@@ -178,23 +206,37 @@ private fun ChangeRow(change: Change, new: Boolean, onClick: () -> Unit) {
     }
     Row(
         Modifier.fillMaxWidth()
-            .background(if (new) tones.accentTone.subtle.copy(alpha = 0.5f) else AppTheme.colors.card, MaterialTheme.shapes.large)
+            .clip(shape)
+            .background(if (new) tones.accentTone.subtle.copy(alpha = 0.5f) else AppTheme.colors.card)
             .tappable(onClick, change.title)
             .padding(12.dp)
             .testTag("inbox.change"),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(Modifier.size(36.dp).background(tone?.subtle ?: scheme.surfaceContainerHighest, CircleShape), Alignment.Center) {
+        Box(Modifier.size(36.dp).background(tone?.subtle ?: scheme.surfaceContainerHighest, shapeOf(change.kind).toShape()), Alignment.Center) {
             Icon(iconOf(change.kind), null, Modifier.size(18.dp), tint = tone?.base ?: scheme.onSurfaceVariant)
         }
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(change.title, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                Row(Modifier.weight(1f).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(change.title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleSmall)
+                    if (new) Dot(Modifier.padding(start = 6.dp).testTag("inbox.change.new"), size = 8.dp, color = tones.accent)
+                }
                 Text(clock(minuteOf(change.atMs), is24Hour()), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
             }
             Text(change.body, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
         }
     }
+}
+
+/** Each kind's own shape for its icon. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun shapeOf(kind: ChangeKind): RoundedPolygon = when (kind) {
+    ChangeKind.ATTENDANCE -> MaterialShapes.Cookie9Sided
+    ChangeKind.MARKS -> MaterialShapes.Sunny
+    ChangeKind.TIMETABLE -> MaterialShapes.Clover4Leaf
+    ChangeKind.EXAMS -> MaterialShapes.Cookie7Sided
+    ChangeKind.GRADES -> MaterialShapes.SoftBurst
 }
 
 private fun iconOf(kind: ChangeKind): ImageVector = when (kind) {

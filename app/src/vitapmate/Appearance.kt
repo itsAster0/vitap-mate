@@ -228,15 +228,7 @@ fun AppearanceGroup() {
             navTabs.mapNotNull { featureById(it)?.label }.joinToString(", "),
             onClick = { nav.push(Route.Tabs) },
             trailing = { Chevron() },
-            below = {
-                // A small copy of the bar.
-                Row(
-                    Modifier.padding(top = 7.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(14.dp)).padding(horizontal = 10.dp, vertical = 5.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    navTabs.forEach { id -> featureById(id)?.let { Icon(it.icon, null, Modifier.size(15.dp), tint = MaterialTheme.colorScheme.onSurface) } }
-                }
-            },
+            below = { BarPreview(Modifier.padding(top = 7.dp)) },
         )
     }
 }

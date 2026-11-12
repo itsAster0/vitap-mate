@@ -1,7 +1,23 @@
 package vitapmate.features.docs
 
 import vitapmate.ui.OpenHaptic
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.ui.draw.clip
+import com.composables.icons.lucide.Coffee
+import com.composables.icons.lucide.Cookie
+import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Moon
+import com.composables.icons.lucide.Soup
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,6 +25,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -54,7 +71,7 @@ fun messTimingsSummary(): String {
 }
 
 /** Settings → Mess Timings: each meal's serving hours, which mark the meal on now in the mess menu. */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MessTimingsSheet(onDismiss: () -> Unit) {
     val sheet = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
@@ -62,6 +79,7 @@ fun MessTimingsSheet(onDismiss: () -> Unit) {
     val h24 = is24Hour()
     var picking by remember { mutableStateOf<Pair<Meal, Boolean>?>(null) }
     val windows = MessTimings.windows
+    val scheme = MaterialTheme.colorScheme
     fun log(what: String) = scope.logAction("settings.mess_timings", "ui.settings", "mess timings $what")
 
     OpenHaptic()
@@ -69,15 +87,31 @@ fun MessTimingsSheet(onDismiss: () -> Unit) {
         CompositionLocalProvider(LocalContentPadding provides PaddingValues()) {
             Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = Space.xl).padding(bottom = Space.md)) {
                 Text("Mess Timings", Modifier.padding(bottom = Space.lg), style = MaterialTheme.typography.headlineSmallEmphasized)
-                Meal.entries.forEach { meal ->
-                    Row(Modifier.padding(bottom = Space.sm + 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(meal.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                        TimeButton(clock(windows.getValue(meal).start, h24), "settings.mess_timings.${meal.name.lowercase()}.start") { picking = meal to true }
-                        Text("–", Modifier.padding(horizontal = Space.sm), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        TimeButton(clock(windows.getValue(meal).end, h24), "settings.mess_timings.${meal.name.lowercase()}.end") { picking = meal to false }
+                // One joined block: each meal with its icon and its start – end as a joined pair.
+                Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                    Meal.entries.forEach { meal ->
+                        Row(
+                            Modifier.fillMaxWidth().clip(ListItemDefaults.segmentedShapes(1, 3).shape).background(scheme.surfaceContainerHigh).padding(horizontal = Space.md, vertical = Space.sm + 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val icon = when (meal) {
+                                Meal.Breakfast -> Lucide.Coffee
+                                Meal.Lunch -> Lucide.Soup
+                                Meal.Snacks -> Lucide.Cookie
+                                Meal.Dinner -> Lucide.Moon
+                            }
+                            Box(Modifier.size(40.dp).background(scheme.secondaryContainer, CircleShape), Alignment.Center) {
+                                Icon(icon, null, Modifier.size(20.dp), tint = scheme.onSecondaryContainer)
+                            }
+                            Text(meal.label, Modifier.weight(1f).padding(horizontal = Space.md), style = MaterialTheme.typography.bodyLarge)
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                TimeButton(clock(windows.getValue(meal).start, h24), "settings.mess_timings.${meal.name.lowercase()}.start", start = true) { picking = meal to true }
+                                TimeButton(clock(windows.getValue(meal).end, h24), "settings.mess_timings.${meal.name.lowercase()}.end", start = false) { picking = meal to false }
+                            }
+                        }
                     }
                 }
-                OutlinedButton({ MessTimings.reset(); log("reset") }, Modifier.fillMaxWidth().padding(top = Space.sm).testTag("settings.mess_timings.reset")) {
+                OutlinedButton({ MessTimings.reset(); log("reset") }, Modifier.fillMaxWidth().padding(top = Space.lg).testTag("settings.mess_timings.reset")) {
                     Text("Reset to VIT-AP timings")
                 }
             }
@@ -108,9 +142,18 @@ fun MessTimingsSheet(onDismiss: () -> Unit) {
     }
 }
 
+/** One end of a meal's joined start – end pair: the [start] one rounds its outer left side, the end one its right. */
 @Composable
-private fun TimeButton(label: String, tag: String, onClick: () -> Unit) {
-    OutlinedButton(onClick, Modifier.width(112.dp).testTag(tag), contentPadding = PaddingValues(horizontal = Space.sm)) {
-        Text(label, style = MaterialTheme.typography.bodyMedium.nums())
+private fun TimeButton(label: String, tag: String, start: Boolean, onClick: () -> Unit) {
+    val outer = 20.dp
+    val inner = 6.dp
+    FilledTonalButton(
+        onClick,
+        Modifier.width(96.dp).testTag(tag),
+        shape = if (start) RoundedCornerShape(outer, inner, inner, outer) else RoundedCornerShape(inner, outer, outer, inner),
+        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        contentPadding = PaddingValues(horizontal = Space.xs),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge.nums(), maxLines = 1)
     }
 }

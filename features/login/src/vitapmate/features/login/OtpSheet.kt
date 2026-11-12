@@ -65,6 +65,8 @@ import com.composables.icons.lucide.MailCheck
 import kotlinx.coroutines.launch
 import vitapmate.observability.logAction
 import vitapmate.ui.AppTheme
+import vitapmate.ui.ProgressBar
+import vitapmate.ui.StatusChip
 import vitapmate.ui.Space
 import vitapmate.ui.nums
 
@@ -134,11 +136,7 @@ internal fun OtpSheet(challenge: OtpChallenge, onSubmit: () -> Unit, onResend: (
                 textAlign = TextAlign.Center,
             )
             challenge.source?.let {
-                Row(Modifier.padding(top = Space.sm).testTag("otp.source"), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Lucide.Forward, null, Modifier.size(16.dp), tint = AppTheme.tones.success.base)
-                    Spacer(Modifier.size(Space.xs))
-                    Text(it, style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
-                }
+                StatusChip(it, AppTheme.tones.success, Modifier.padding(top = Space.sm).testTag("otp.source"), icon = Lucide.Forward)
             }
             Spacer(Modifier.height(Space.xl))
             OtpField(
@@ -161,6 +159,8 @@ internal fun OtpSheet(challenge: OtpChallenge, onSubmit: () -> Unit, onResend: (
                 )
             }
             Spacer(Modifier.height(Space.md))
+            ProgressBar(challenge.remaining / OtpAutofill.LIFETIME_S.toFloat(), scheme.primary, Modifier.testTag("otp.timeleft"))
+            Spacer(Modifier.height(Space.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (challenge.remaining > 0) "Expires in ${clock(challenge.remaining)}" else "Code expired",

@@ -148,11 +148,12 @@ object TimetableWidget : GlanceAppWidget() {
         val now = agenda.nextDay == null && next.start <= agenda.now
         val label = agenda.nextDay ?: if (now) "Now" else "Next"
         val range = "${clock(next.start, h24)} – ${clock(next.end, h24)}"
-        val block = if (now) c.primary else c.primaryContainer
-        val fg = if (now) c.onPrimary else c.onPrimaryContainer
-        // Inverted on the solid Now block.
-        val accent = if (now) c.onPrimary else c.primary
-        val onAccent = if (now) c.primary else c.onPrimary
+        // The class on now or next in a filled block; its label, room and end inverted on it.
+        val block = c.primary
+        val fg = c.onPrimary
+        val accent = c.onPrimary
+        val onAccent = c.primary
+        val ends = if (now) "ends ${clock(next.end, h24)}" else null
         if (size.height < TALL_DP.dp) {
             Row(root.background(block).padding(start = if (badge) 8.dp else 14.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (badge) Cookie(accent) {
@@ -165,7 +166,7 @@ object TimetableWidget : GlanceAppWidget() {
                 Column {
                     Text("$label · $range", style = TextStyle(fg, 12.sp, FontWeight.Medium), maxLines = 1)
                     Text(next.name, style = TextStyle(fg, 16.5.sp, FontWeight.Bold), maxLines = 1)
-                    Room(next.room, 12.sp, fg)
+                    Chips(next.room, ends, 11.5.sp, c.primaryContainer, c.onPrimaryContainer)
                 }
             }
             return@GlanceTheme
@@ -182,7 +183,7 @@ object TimetableWidget : GlanceAppWidget() {
                     Text(range, GlanceModifier.padding(start = 8.dp), TextStyle(fg, 12.5.sp, FontWeight.Medium), maxLines = 1)
                 }
                 Text(next.name, GlanceModifier.padding(top = 3.dp), TextStyle(fg, 20.sp, FontWeight.Bold), maxLines = 1)
-                Room(next.room, 12.5.sp, fg)
+                Chips(next.room, ends, 12.sp, c.primaryContainer, c.onPrimaryContainer)
             }
             Text(agenda.nextDay ?: "Today", GlanceModifier.padding(start = 10.dp, end = 10.dp, top = 9.dp, bottom = 5.dp), TextStyle(c.onSurfaceVariant, 12.5.sp, FontWeight.Medium))
             val rows = agenda.day.take(MAX_ROWS)
@@ -203,14 +204,16 @@ object TimetableWidget : GlanceAppWidget() {
                             (if (cur) tinted(c.primary).padding(start = 3.dp) else GlanceModifier).fillMaxSize(),
                         ) {
                             Row(tinted(c.surfaceVariant).fillMaxSize().padding(start = if (cur) 9.dp else 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(clock(s.start, h24), GlanceModifier.width(66.dp), TextStyle(if (cur) c.primary else c.onSurfaceVariant, 12.sp, FontWeight.Medium), maxLines = 1)
+                                // Classes already over drawn fainter, the one on now or next bold.
+                                val muted = if (past) c.outline else c.onSurfaceVariant
+                                Text(clock(s.start, h24), GlanceModifier.width(66.dp), TextStyle(if (cur) c.primary else muted, 12.sp, if (cur) FontWeight.Bold else FontWeight.Medium), maxLines = 1)
                                 Text(
                                     s.name,
                                     GlanceModifier.defaultWeight(),
-                                    TextStyle(if (past) c.onSurfaceVariant else c.onSurface, 13.5.sp, if (past) FontWeight.Normal else FontWeight.Medium),
+                                    TextStyle(if (past) c.outline else c.onSurface, 13.5.sp, if (cur) FontWeight.Bold else if (past) FontWeight.Normal else FontWeight.Medium),
                                     maxLines = 1,
                                 )
-                                if (s.room.isNotEmpty()) Text(s.room, GlanceModifier.padding(start = 10.dp), TextStyle(c.onSurfaceVariant, 12.sp), maxLines = 1)
+                                if (s.room.isNotEmpty()) Text(s.room, GlanceModifier.padding(start = 10.dp), TextStyle(muted, 12.sp, if (cur) FontWeight.Bold else FontWeight.Normal), maxLines = 1)
                             }
                         }
                     }
@@ -229,13 +232,22 @@ object TimetableWidget : GlanceAppWidget() {
         Spacer(GlanceModifier.width(10.dp))
     }
 
-    /** The room with a pin, hidden when empty. */
+    /** The room with a pin (hidden when empty) and [ends] ("ends 2:50 PM", while a class is on), as chips in [fill]. */
     @Composable
-    private fun Room(room: String, size: TextUnit, color: ColorProvider) {
-        if (room.isEmpty()) return
-        Row(GlanceModifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(ImageProvider(R.drawable.widget_pin), null, GlanceModifier.size(13.dp), colorFilter = ColorFilter.tint(color))
-            Text(room, GlanceModifier.padding(start = 4.dp), TextStyle(color, size), maxLines = 1)
+    private fun Chips(room: String, ends: String?, size: TextUnit, fill: ColorProvider, color: ColorProvider) {
+        if (room.isEmpty() && ends == null) return
+        val chip = GlanceModifier.cornerRadius(10.dp).background(fill).padding(horizontal = 7.dp, vertical = 2.dp)
+        Row(GlanceModifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (room.isNotEmpty()) {
+                Row(chip, verticalAlignment = Alignment.CenterVertically) {
+                    Image(ImageProvider(R.drawable.widget_pin), null, GlanceModifier.size(12.dp), colorFilter = ColorFilter.tint(color))
+                    Text(room, GlanceModifier.padding(start = 4.dp), TextStyle(color, size, FontWeight.Medium), maxLines = 1)
+                }
+            }
+            if (ends != null) {
+                if (room.isNotEmpty()) Spacer(GlanceModifier.width(5.dp))
+                Text(ends, chip, TextStyle(color, size, FontWeight.Medium), maxLines = 1)
+            }
         }
     }
 }
