@@ -1,6 +1,8 @@
 package vitapmate.features.outing
 
 import vitapmate.ui.rememberHaptics
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +13,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
@@ -26,8 +30,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -41,6 +52,8 @@ import vitapmate.core.OutingResult
 import vitapmate.core.checkGeneralOuting
 import vitapmate.core.generalOutingTimes
 import vitapmate.core.generalReturnLastDay
+import vitapmate.ui.AppTheme
+import vitapmate.ui.Radii
 import vitapmate.ui.Space
 import vitapmate.ui.clock
 import vitapmate.ui.formatDay
@@ -111,13 +124,26 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
         MomentRow(leaving, check.leaving != null, h24, "outing.leaving", { picking = Picking.LeaveDate }, { picking = Picking.LeaveTime })
         // Timing problems show at once: they come from the pickers, not typing.
         FieldError(check.leaving, Modifier.testTag("outing.leaving.error"))
-        Spacer(Modifier.height(Space.md))
+        // How long away, as a pill on a dashed line between the two moments.
+        check.away?.let {
+            val line = MaterialTheme.colorScheme.outlineVariant
+            val dashed = Modifier.height(2.dp).drawBehind {
+                drawLine(line, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), size.height, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())))
+            }
+            Row(Modifier.fillMaxWidth().padding(vertical = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f).then(dashed))
+                Text(
+                    it,
+                    Modifier.padding(horizontal = Space.sm).background(AppTheme.tones.accentTone.subtle, RoundedCornerShape(Radii.pill)).padding(horizontal = Space.md, vertical = Space.xs).testTag("outing.away"),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.W600),
+                    color = AppTheme.tones.accentTone.onSubtle,
+                )
+                Box(Modifier.weight(1f).then(dashed))
+            }
+        } ?: Spacer(Modifier.height(Space.md))
         FieldLabel("Back by", form.inWindow)
         MomentRow(returning, check.returning != null, h24, "outing.returning", { picking = Picking.BackDate }, { picking = Picking.BackTime })
         FieldError(check.returning, Modifier.testTag("outing.returning.error"))
-        check.away?.let {
-            Text(it, Modifier.padding(top = Space.sm, start = 2.dp).testTag("outing.away"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
     }
 
     when (val p = picking) {
@@ -181,12 +207,15 @@ internal fun GeneralSheet(form: GeneralOuting, onDismiss: () -> Unit, onMaybeSen
     }
 }
 
+/** A moment's date and time as one joined pair: small inner corners, large outer ones. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MomentRow(moment: OutingMoment, error: Boolean, h24: Boolean, tag: String, onDate: () -> Unit, onTime: () -> Unit) {
-    Row(Modifier.fillMaxWidth()) {
-        PickerField(Lucide.Calendar, formatDay(moment.day, "EEE d MMM"), error, onDate, Modifier.weight(3f).testTag("$tag.date"))
-        Spacer(Modifier.width(Space.sm))
-        PickerField(Lucide.Clock, clock(moment.minute, h24), error, onTime, Modifier.weight(2f).testTag("$tag.time"))
+    val inner = ListItemDefaults.segmentedShapes(1, 3).shape
+    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large)) {
+        PickerField(Lucide.Calendar, formatDay(moment.day, "EEE d MMM"), error, onDate, Modifier.weight(3f).testTag("$tag.date"), inner)
+        Spacer(Modifier.width(ListItemDefaults.SegmentedGap))
+        PickerField(Lucide.Clock, clock(moment.minute, h24), error, onTime, Modifier.weight(2f).testTag("$tag.time"), inner)
     }
 }
 

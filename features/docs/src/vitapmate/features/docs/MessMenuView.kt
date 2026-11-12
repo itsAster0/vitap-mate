@@ -62,7 +62,11 @@ import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.ChevronUp
 import com.composables.icons.lucide.ClipboardList
+import com.composables.icons.lucide.Coffee
+import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Moon
+import com.composables.icons.lucide.Soup
 import com.composables.icons.lucide.UtensilsCrossed
 import java.util.Calendar
 import java.util.TimeZone
@@ -86,12 +90,14 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.PressScale
+import vitapmate.ui.ProgressBar
 import vitapmate.ui.Space
 import vitapmate.ui.Surface
 import vitapmate.ui.Tone
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.clock
 import vitapmate.ui.formatDay
+import vitapmate.ui.formatMinutes
 import vitapmate.ui.is24Hour
 import vitapmate.ui.isoWeekday
 import vitapmate.ui.nums
@@ -192,7 +198,7 @@ internal fun MessMenuView(doc: Doc, compact: Boolean, onFailed: (Throwable) -> U
                                 bottomEnd = if (meal.ordinal == Meal.entries.lastIndex) end else inner,
                                 bottomStart = if (meal.ordinal == Meal.entries.lastIndex) end else inner,
                             )
-                            MealCard(meal, sheet.itemsFor(dom, meal), windows.getValue(meal), status, Modifier.padding(bottom = 3.dp), shape = shape)
+                            MealCard(meal, sheet.itemsFor(dom, meal), windows.getValue(meal), status, minute, Modifier.padding(bottom = 3.dp), shape = shape)
                         }
                     }
                 }
@@ -245,6 +251,7 @@ private fun UpNext(sheet: MessSheet, year: Int, month: Int, today: Int, minute: 
             sheet.itemsFor(cal.get(Calendar.DAY_OF_MONTH), meal),
             window,
             if (day == today && minute >= window.start) MealStatus.Now else MealStatus.Next,
+            minute,
             framed = false,
             whenLabel = "Tomorrow".takeIf { day != today },
         )
@@ -295,8 +302,9 @@ private fun WeekStrip(first: Int, last: Int, today: Int, selected: Int, onSelect
 private enum class MealStatus { Normal, Past, Now, Next }
 
 /**
- * A meal: name, serving hours and its dishes; the one on now (or next) is the hero, on the accent
- * tone with a larger title. [shape] is its place in the day's stack.
+ * A meal: its icon (framed only), name, serving hours and its dishes; the one on now (or next) is
+ * the hero, on the accent tone with a larger title, and while on ([minute] in its window) a bar
+ * and how long is left. [shape] is its place in the day's stack.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -305,6 +313,7 @@ private fun MealCard(
     items: List<MessItem>,
     window: MealWindow,
     status: MealStatus,
+    minute: Int,
     modifier: Modifier = Modifier,
     framed: Boolean = true,
     whenLabel: String? = null,
@@ -321,6 +330,18 @@ private fun MealCard(
     val body = @Composable {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (framed) {
+                    val icon = when (meal) {
+                        Meal.Breakfast -> Lucide.Coffee
+                        Meal.Lunch -> Lucide.Soup
+                        Meal.Snacks -> Lucide.Cookie
+                        Meal.Dinner -> Lucide.Moon
+                    }
+                    Box(Modifier.size(40.dp).background(if (hero) AppTheme.colors.card else scheme.surfaceContainerHigh, CircleShape), Alignment.Center) {
+                        Icon(icon, null, Modifier.size(20.dp), tint = if (hero) accent.base else scheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(Space.md))
+                }
                 Column(Modifier.weight(1f)) {
                     Text(
                         listOfNotNull(whenLabel, meal.label).joinToString(" · "),
@@ -338,6 +359,15 @@ private fun MealCard(
                 if (status == MealStatus.Now) ToneBadge("Now", tone = accent, solid = true)
                 // On the hero the subtle fill would vanish, so Next sits on the inset instead.
                 if (status == MealStatus.Next) ToneBadge("Next", tone = if (hero) Tone(accent.base, scheme.surfaceContainerLowest.copy(alpha = 0.7f), accent.onSubtle) else accent)
+            }
+            if (hero && status == MealStatus.Now && window.end > window.start) {
+                ProgressBar((minute - window.start).toFloat() / (window.end - window.start), AppTheme.tones.accent, Modifier.padding(top = Space.md))
+                Text(
+                    "Ends in ${formatMinutes((window.end - minute).coerceAtLeast(0))}",
+                    Modifier.padding(top = 6.dp),
+                    style = MaterialTheme.typography.labelMedium.nums(),
+                    color = secondary,
+                )
             }
             Spacer(Modifier.height(Space.md))
             if (items.isEmpty()) {

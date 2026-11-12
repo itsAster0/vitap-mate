@@ -14,6 +14,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -309,7 +313,7 @@ private fun openedLabel(ms: Long?): String {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit, onLongPress: () -> Unit) {
     val (tone, icon) = visualOf(doc)
@@ -339,9 +343,17 @@ private fun DocCard(doc: Doc, index: Int, modifier: Modifier, onOpen: () -> Unit
             })
             .testTag("docs.card.${doc.id}"),
     ) {
-        // A band in the kind's tone, so kinds tell apart across the grid.
+        // A band in the kind's tone, so kinds tell apart across the grid; the icon in a shape
+        // (its own for the mess menu and for images).
         Row(Modifier.fillMaxWidth().height(66.dp).background(tone.subtle).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(28.dp), tint = tone.base)
+            val shape = when {
+                doc.asMessMenu -> MaterialShapes.Cookie9Sided.toShape()
+                doc.kind == DocKind.Image -> MaterialShapes.Cookie7Sided.toShape()
+                else -> CircleShape
+            }
+            Box(Modifier.size(42.dp).background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), shape), Alignment.Center) {
+                Icon(icon, null, Modifier.size(22.dp), tint = tone.base)
+            }
             Spacer(Modifier.weight(1f))
             ToneBadge(kindLabel(doc), tone = Tone(tone.base, MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f), tone.onSubtle))
         }

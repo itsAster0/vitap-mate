@@ -14,22 +14,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import vitapmate.ui.Space
 import vitapmate.ui.nums
 
-/** Looks like a field; tapping it opens a picker. */
+/** Looks like a filled field in [shape] (outlined in red on an [error]); tapping it opens a picker. */
 @Composable
-internal fun PickerField(icon: ImageVector, text: String, error: Boolean, onPress: () -> Unit, modifier: Modifier = Modifier) {
+internal fun PickerField(icon: ImageVector, text: String, error: Boolean, onPress: () -> Unit, modifier: Modifier, shape: Shape) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = onPress,
         modifier = modifier.height(48.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = scheme.surface,
-        border = BorderStroke(1.dp, if (error) scheme.error else scheme.outlineVariant),
+        shape = shape,
+        color = scheme.surfaceContainerHigh,
+        border = if (error) BorderStroke(2.dp, scheme.error) else null,
     ) {
         Row(Modifier.padding(horizontal = Space.md), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(16.dp), tint = scheme.onSurfaceVariant)

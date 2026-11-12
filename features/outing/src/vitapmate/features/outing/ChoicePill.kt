@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import vitapmate.ui.Space
 import vitapmate.ui.nums
 
-/** A selectable pill (a day, a slot, a place); [caption] above the label (e.g. SUN). */
+/** A selectable pill (a day, a slot, a place), fully round once picked; [caption] above the label (e.g. SUN). */
 @Composable
 internal fun ChoicePill(label: String, selected: Boolean, onPress: () -> Unit, modifier: Modifier = Modifier, caption: String? = null) {
     val scheme = MaterialTheme.colorScheme
@@ -28,7 +29,7 @@ internal fun ChoicePill(label: String, selected: Boolean, onPress: () -> Unit, m
         selected = selected,
         onClick = onPress,
         modifier = modifier.heightIn(min = 44.dp),
-        shape = MaterialTheme.shapes.medium,
+        shape = if (selected) RoundedCornerShape(50) else MaterialTheme.shapes.large,
         color = fill,
         contentColor = fg,
     ) {
