@@ -124,6 +124,10 @@ fun runsOf(flows: List<FlowSummary>, since: Long = 0): List<Run> {
                 }
                 val run = host ?: MRun(f.id, title, trigger, f.startT, mutableListOf()).also { runs += it }
                 run.steps += steps
+                // Background sync's auto-fill gave up on the OTP: why, on its step.
+                f.lines.lastOrNull { it.src == "sync" && it.msg.startsWith(NOT_SOLVED) }?.let { l ->
+                    steps.filter { it.state == StepState.WaitingOtp }.forEach { it.end(StepState.Skipped, l.t, l.msg.removePrefix(NOT_SOLVED)) }
+                }
                 if (host != null) host.flows += f.id
                 if (f.outcome == null && f.startT >= since) run.live = true
                 routeOf(f.lines)?.let { run.route = it }
@@ -160,6 +164,7 @@ private const val FOLLOW_SIGN_IN_MS = 20_000L
 private const val SIGN_IN = "Sign in"
 private const val BACKGROUND_SYNC = "Background sync"
 private const val OTP = "OTP"
+private const val NOT_SOLVED = "otp not solved: "
 private const val NET = "rust.network"
 private const val AUTH = "rust.auth"
 private const val QUEUE = "fetch.queue"

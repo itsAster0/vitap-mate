@@ -103,9 +103,11 @@ pub enum CoreError {
         reason: String,
     },
     InvalidCredentials,
-    /// A re-login during a fetch wants the emailed OTP.
+    /// A re-login during a fetch wants the emailed OTP, mailed at `issued_at` (unix seconds;
+    /// None when unknown).
     OtpRequired {
         reason: String,
+        issued_at: Option<u64>,
     },
     /// `submit_otp` got a wrong or expired code; VTOP's text.
     OtpRejected {
@@ -128,7 +130,7 @@ impl std::fmt::Display for CoreError {
             Self::NotSignedIn => formatter.write_str("not signed in"),
             Self::SemesterNeeded => formatter.write_str("no semester picked"),
             Self::VtopUnavailable { reason }
-            | Self::OtpRequired { reason }
+            | Self::OtpRequired { reason, .. }
             | Self::OtpRejected { reason }
             | Self::Other { reason } => formatter.write_str(reason),
         }
@@ -159,7 +161,10 @@ impl From<VtopError> for CoreError {
             VtopError::NetworkError => Self::Offline,
             VtopError::VtopUnavailable(reason) => Self::VtopUnavailable { reason },
             VtopError::InvalidCredentials => Self::InvalidCredentials,
-            VtopError::OTPRequired(reason, _) => Self::OtpRequired { reason },
+            VtopError::OTPRequired(reason, issued_at) => Self::OtpRequired {
+                reason,
+                issued_at: Some(issued_at),
+            },
             error => Self::Other {
                 reason: error.to_string(),
             },
@@ -986,8 +991,11 @@ impl Core {
             return Err(CoreError::NotSignedIn);
         }
         if let Some(message) = &session.otp {
+            // The challenge still open (no new mail): its issue time, so auto-fill knows how
+            // long its code is good.
             return Err(CoreError::OtpRequired {
                 reason: message.clone(),
+                issued_at: session.client.session_state().otp_issued_at,
             });
         }
         if session.account.rejected {

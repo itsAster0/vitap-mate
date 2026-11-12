@@ -14031,14 +14031,17 @@ sealed class CoreException: kotlin.Exception() {
     }
     
     /**
-     * A re-login during a fetch wants the emailed OTP.
+     * A re-login during a fetch wants the emailed OTP, mailed at `issued_at` (unix seconds;
+     * None when unknown).
      */
     class OtpRequired(
         
-        val `reason`: kotlin.String
+        val `reason`: kotlin.String, 
+        
+        val `issuedAt`: kotlin.ULong?
         ) : CoreException() {
         override val message
-            get() = "reason=${ `reason` }"
+            get() = "reason=${ `reason` }, issuedAt=${ `issuedAt` }"
     }
     
     /**
@@ -14102,6 +14105,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             3 -> CoreException.InvalidCredentials()
             4 -> CoreException.OtpRequired(
                 FfiConverterString.read(buf),
+                FfiConverterOptionalULong.read(buf),
                 )
             5 -> CoreException.OtpRejected(
                 FfiConverterString.read(buf),
@@ -14134,6 +14138,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
                 + FfiConverterString.allocationSize(value.`reason`)
+                + FfiConverterOptionalULong.allocationSize(value.`issuedAt`)
             )
             is CoreException.OtpRejected -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
@@ -14174,6 +14179,7 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
             is CoreException.OtpRequired -> {
                 buf.putInt(4)
                 FfiConverterString.write(value.`reason`, buf)
+                FfiConverterOptionalULong.write(value.`issuedAt`, buf)
                 Unit
             }
             is CoreException.OtpRejected -> {

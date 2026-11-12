@@ -190,12 +190,20 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
                 Log.info("sync", "skipped: ${Settings.syncPaused}", f)
                 return@flow
             }
-            val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS) { _, id ->
-                val why = OtpAutofill.solve(id)
-                if (why != null) Settings.syncPaused = why
+            val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS) { e, id ->
+                val why = OtpAutofill.solve(id, e.issuedAt?.toLong())
+                if (why == OtpAutofill.NO_CODE) {
+                    // VTOP mails late at times: one miss is only this run's outcome; two runs in a row pause sync.
+                    val misses = prefs.getInt(MISSES, 0) + 1
+                    prefs.edit().putInt(MISSES, misses).apply()
+                    if (misses >= 2) Settings.syncPaused = why
+                } else if (why != null) Settings.syncPaused = why
                 why == null
             }
-            if (result.outcome == VtopSync.Outcome.Done) Settings.syncPaused = null
+            if (result.outcome == VtopSync.Outcome.Done) {
+                Settings.syncPaused = null
+                prefs.edit().remove(MISSES).apply()
+            }
             TimetableWidget.refresh(app)
             // New changes since the last notification, of the kinds switched on.
             val since = prefs.getLong("notified_ms", System.currentTimeMillis() - 86_400_000L)
@@ -214,5 +222,8 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     private companion object {
         /** Each page's limit: short, so a slow VTOP ends the run instead of draining battery. */
         const val PAGE_TIMEOUT_MS = 20_000L
+
+        /** Runs in a row whose OTP code never came ([OtpAutofill.NO_CODE]). */
+        const val MISSES = "otp_misses"
     }
 }

@@ -23,7 +23,7 @@ import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
 
-private const val TIMEOUT_S = 180
+private const val TIMEOUT_S = OtpAutofill.LIFETIME_S
 private const val DEFAULT_MESSAGE = "VTOP sent a 6-digit code to your registered email."
 private const val EXPIRED_MESSAGE = "The code expired. Ask for a new one to continue."
 

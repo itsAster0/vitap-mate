@@ -136,7 +136,8 @@ object Settings {
 
     /**
      * Why background sync is paused ("Gmail needs reconnecting"), set when a background run
-     * couldn't finish the OTP and cleared by the next good run; null when it isn't.
+     * couldn't finish the OTP (no code coming only after two runs in a row) and cleared by the
+     * next good run; null when it isn't.
      */
     var syncPaused by text("settings_sync_paused")
 

@@ -119,6 +119,21 @@ class RunsTest {
     }
 
     @Test
+    fun backgroundAutofillMissShowsWhyOnTheOtpStep() {
+        val r = runs(
+            """
+            {"ev":"start","flow":"p","msg":"sync.background.pages start","src":"flow","step":"sync.background.pages","t":1000}
+            {"flow":"p","ms":1,"msg":"done","outcome":"OtpRequired","src":"core.fetch_semesters","t":1001}
+            {"flow":"p","msg":"otp not solved: No code came in time","src":"sync","t":400000}
+            {"ev":"done","flow":"p","msg":"sync.background.pages done","outcome":"ok","src":"flow","step":"sync.background.pages","t":400001}
+            """,
+        ).single()
+        assertEquals("Background sync", r.title)
+        assertEquals("OTP (No code came in time) Skipped", r.steps.last().let { "${it.label} (${it.reason}) ${it.state}" })
+        assertEquals(false, r.waiting)
+    }
+
+    @Test
     fun sweepFailuresLocalCallsAndCutOffFlows() {
         val list = runs(
             """

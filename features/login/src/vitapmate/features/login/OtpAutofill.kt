@@ -30,63 +30,90 @@ object OtpAutofill {
     fun inUse(): OtpSource? = selected().takeIf(::ready)
 
     /**
-     * Gets VTOP's pending OTP accepted with nobody watching (background sync): pulls the code
-     * from the auto-fill in use every few seconds for up to [waitMs] and submits it; a code VTOP
-     * turns down is skipped. Null when it worked, else why not ("Gmail needs reconnecting"), so
-     * the caller can stop quietly and show it in Settings. Never logs the code.
+     * How long a code stays good, in seconds. Assumed: VTOP's mail and pages don't say; the OTP
+     * prompt counts down from it too.
      */
-    suspend fun solve(flow: String, waitMs: Long = 120_000): String? {
+    const val LIFETIME_S = 180
+
+    /** [solve]'s answer when no code came, even after a resend. */
+    const val NO_CODE = "No code came in time"
+
+    /**
+     * Gets VTOP's pending OTP accepted with nobody watching (background sync): pulls the code
+     * from the auto-fill in use every few seconds until it expires ([LIFETIME_S] after
+     * [issuedAt], VTOP's unix seconds; unknown: from now) and submits it; a code VTOP turns down
+     * is skipped. VTOP mails late at times: when none came, asks once for a new code and waits
+     * its full lifetime too. Null when it worked, else why not ("Gmail needs reconnecting",
+     * [NO_CODE]), so the caller can stop quietly and show it. Never logs the code.
+     */
+    suspend fun solve(flow: String, issuedAt: Long?): String? {
         MailForwarding.load("sync")
         val source = inUse() ?: return if (selected() == OtpSource.Gmail) "Gmail needs reconnecting" else "OTP auto-fill isn't set up"
         val core = AppCore.await()
-        // VTOP mailed the code just now; a minute's slack for the phone's clock.
-        val since = System.currentTimeMillis() / 1000 - 60
+        var issued = issuedAt ?: (System.currentTimeMillis() / 1000)
         // Codes already submitted, and Gmail messages already read.
         val tried = mutableSetOf<String>()
         val read = mutableSetOf<String>()
         var gmail: Gmail.Otp? = null
-        var why: String? = "No code came in time"
-        withTimeoutOrNull(waitMs) {
-            while (true) {
-                val code = try {
-                    withContext(Dispatchers.IO) {
-                        when (source) {
-                            OtpSource.Forwarding -> core.fetchForwardedOtp(flow, since)
-                            OtpSource.Gmail -> Gmail.findOtp(since, read, flow)?.also { gmail = it; read += it.messageId }?.code
-                        }
-                    }
+        var why: String? = NO_CODE
+        for (round in 0..1) {
+            if (round == 1) {
+                try {
+                    withContext(Dispatchers.IO) { core.resendOtp(flow) }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Gmail.GmailException) {
-                    if (e.code != "offline" && e.code != "unreachable") {
-                        why = if (Gmail.account?.needsReconnect == true) "Gmail needs reconnecting" else "Gmail refused: ${e.code}"
-                        return@withTimeoutOrNull
-                    }
-                    null
                 } catch (e: Throwable) {
-                    Log.warn("sync", "otp pull failed: ${e::class.simpleName}", flow)
-                    null
+                    Log.warn("sync", "otp resend failed: ${e::class.simpleName}", flow)
+                    break
                 }
-                if (code != null && code !in tried) {
-                    tried += code
-                    try {
-                        withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
-                        Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
-                        gmail?.let { Gmail.tidyUp(it, flow) }
-                        why = null
-                        return@withTimeoutOrNull
+                Log.info("sync", "otp resent", flow)
+                issued = System.currentTimeMillis() / 1000
+            }
+            // Mail since the code was issued; with the source's own slack, about a minute for the clocks.
+            val since = issued - 30
+            withTimeoutOrNull(((issued + LIFETIME_S) * 1000 - System.currentTimeMillis()).coerceAtLeast(0)) {
+                while (true) {
+                    val code = try {
+                        withContext(Dispatchers.IO) {
+                            when (source) {
+                                OtpSource.Forwarding -> core.fetchForwardedOtp(flow, since)
+                                OtpSource.Gmail -> Gmail.findOtp(since, read, flow)?.also { gmail = it; read += it.messageId }?.code
+                            }
+                        }
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (e: CoreException.OtpRejected) {
-                        Log.info("sync", "otp turned down", flow)
+                    } catch (e: Gmail.GmailException) {
+                        if (e.code != "offline" && e.code != "unreachable") {
+                            why = if (Gmail.account?.needsReconnect == true) "Gmail needs reconnecting" else "Gmail refused: ${e.code}"
+                            return@withTimeoutOrNull
+                        }
+                        null
                     } catch (e: Throwable) {
-                        why = "VTOP didn't take the code"
-                        Log.warn("sync", "otp submit failed: ${e::class.simpleName}", flow)
-                        return@withTimeoutOrNull
+                        Log.warn("sync", "otp pull failed: ${e::class.simpleName}", flow)
+                        null
                     }
+                    if (code != null && code !in tried) {
+                        tried += code
+                        try {
+                            withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
+                            Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
+                            gmail?.let { Gmail.tidyUp(it, flow) }
+                            why = null
+                            return@withTimeoutOrNull
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: CoreException.OtpRejected) {
+                            Log.info("sync", "otp turned down", flow)
+                        } catch (e: Throwable) {
+                            why = "VTOP didn't take the code"
+                            Log.warn("sync", "otp submit failed: ${e::class.simpleName}", flow)
+                            return@withTimeoutOrNull
+                        }
+                    }
+                    delay(3_000)
                 }
-                delay(3_000)
             }
+            if (why != NO_CODE) break
         }
         why?.let { Log.info("sync", "otp not solved: $it", flow) }
         return why

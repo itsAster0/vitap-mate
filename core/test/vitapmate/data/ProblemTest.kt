@@ -15,7 +15,7 @@ class ProblemTest {
         assertEquals(ProblemKind.VtopDown, kind(CoreException.VtopUnavailable("VTOP returned 502")))
         assertEquals(ProblemKind.SignInNeeded, kind(CoreException.InvalidCredentials()))
         assertEquals(ProblemKind.SignInNeeded, kind(CoreException.NotSignedIn()))
-        assertEquals(ProblemKind.OtpNeeded, kind(CoreException.OtpRequired("otp sent")))
+        assertEquals(ProblemKind.OtpNeeded, kind(CoreException.OtpRequired("otp sent", null)))
         assertEquals(ProblemKind.OtpRejected, kind(CoreException.OtpRejected("Invalid OTP")))
         assertEquals(ProblemKind.SemesterNeeded, kind(CoreException.SemesterNeeded()))
         assertEquals(ProblemKind.Unexpected, kind(CoreException.Other("parse error")))
@@ -49,7 +49,7 @@ class ProblemTest {
     @Test
     fun onlyUserInitiatedProblemsToastUnlessBackgroundErrorsAreOn() {
         val offline = problemOf(CoreException.Offline(), "f")
-        val otp = problemOf(CoreException.OtpRequired("otp sent"), "f")
+        val otp = problemOf(CoreException.OtpRequired("otp sent", null), "f")
         try {
             Settings.showBackgroundErrors = false
             assertTrue(offline.toasts)
