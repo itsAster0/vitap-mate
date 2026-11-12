@@ -1,10 +1,16 @@
 # The UDP gateway alone (vtop-gateway), for the VPS (deployed by vtop-edge/alchemy.run.ts),
 # with this folder as context. The engine runs elsewhere (Railway); the
-# gateway reaches it at ENGINE_URL.
+# gateway reaches it at ENGINE_URL. alchemy.run.ts builds it on nest, an
+# x86_64 machine, so rustc runs natively.
 FROM rust:1.98-slim-bookworm AS build
 WORKDIR /src
 COPY . .
-RUN cargo build --locked --profile server --package vtop-gateway --bin vtop-gateway \
+# The cargo registry and target/ live in BuildKit cache mounts on the builder,
+# so a rebuild recompiles only what changed.
+RUN --mount=type=cache,id=gateway-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=gateway-cargo-git,target=/usr/local/cargo/git \
+    --mount=type=cache,id=gateway-target,target=/src/target \
+    cargo build --locked --profile server --package vtop-gateway --bin vtop-gateway \
     && cp target/server/vtop-gateway /vtop-gateway
 
 FROM debian:bookworm-slim

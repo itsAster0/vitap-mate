@@ -6,9 +6,10 @@
 //   and secrets (wrangler.toml is kept for `wrangler dev` and the tests).
 // - Engine: Railway `engine-v2` in the `vitapmate` project, built from
 //   ../Dockerfile.engine.
-// - Gateway: the UDP gateway on the Oracle VPS (robin), built here for x86,
-//   pushed to GHCR (public) and run over SSH as the `vitapmate-gateway`
-//   container. GATEWAY_SSH is the Docker host, e.g. ssh://rocky@robin.
+// - Gateway: the UDP gateway on the Oracle VPS (robin), built on nest (x86_64,
+//   over NetBird; GATEWAY_BUILDER), pushed to GHCR (public) and run over SSH as
+//   the `vitapmate-gateway` container. GATEWAY_SSH is the Docker host, e.g.
+//   ssh://rocky@robin.
 //
 // Not here: the Email Routing rule otp@vmate.aster0.dev → vmate-edge (made in
 // the dashboard; subdomains have no catch-all).
@@ -84,7 +85,12 @@ export const Gateway = Effect.gen(function* () {
     name: "robin",
     docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault("ssh://rocky@robin"))}`,
   });
+  const builder = yield* Docker.Context("Builder", {
+    name: "nest",
+    docker: `host=${yield* Config.String("GATEWAY_BUILDER").pipe(Config.withDefault("ssh://root@nest.netbird.cloud"))}`,
+  });
   const image = yield* Docker.Image("GatewayImage", {
+    context: builder,
     // With the host, or Alchemy pushes the bare name to Docker Hub.
     name: "ghcr.io/itsaster0/vitapmate-gateway",
     registry: {
