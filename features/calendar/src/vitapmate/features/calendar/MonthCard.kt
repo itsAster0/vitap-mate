@@ -128,7 +128,7 @@ fun MonthCard(
             }
             val day = month.days.firstOrNull { it.day == selected }
             AnimatedVisibility(day != null, enter = expandVertically(motion.defaultSpatialSpec()) + fadeIn(), exit = shrinkVertically(motion.fastSpatialSpec()) + fadeOut()) {
-                day?.let { DayLine(it, Modifier.padding(top = Space.sm)) }
+                day?.let { DayLine(it, today, Modifier.padding(top = Space.sm)) }
             }
             Spacer(Modifier.height(Space.md))
             Legend()

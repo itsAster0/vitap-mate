@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,8 +30,10 @@ import vitapmate.observability.logAction
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.EmptyView
 import vitapmate.ui.PageScaffold
+import vitapmate.ui.Pips
 import vitapmate.ui.ScrollToTopOnReselect
 import vitapmate.ui.Space
+import vitapmate.ui.nums
 import vitapmate.ui.rememberNow
 import vitapmate.ui.rememberSyncedPager
 
@@ -101,6 +105,19 @@ fun ExamsScreen() {
                     label = { it },
                     modifier = Modifier.padding(start = Space.sm, top = Space.xs, end = Space.sm, bottom = Space.sm),
                 )
+            }
+            // How far through the shown exam: one segment per dated paper, written ones filled.
+            val shown = groups[pager.targetPage.coerceIn(0, groups.lastIndex)].papers.filter { it.day != null }
+            if (shown.isNotEmpty()) {
+                val written = shown.count { it.done(today, minute) }
+                Column(Modifier.padding(start = Space.lg, end = Space.lg, bottom = Space.sm).testTag("exams.progress")) {
+                    Text(
+                        "${shown.size - written} to go · $written written",
+                        style = MaterialTheme.typography.labelLarge.nums(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Pips(written, shown.size, Modifier.padding(top = Space.xs))
+                }
             }
             HorizontalPager(pager, Modifier.weight(1f).testTag("exams.pager"), key = { groups[it].name }) { i ->
                 val g = groups[i]

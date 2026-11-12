@@ -30,7 +30,7 @@ import vitapmate.core.ScoreBand
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun WeightBar(course: MarksCourse, modifier: Modifier = Modifier, thickness: Dp = 8.dp) {
+internal fun WeightBar(course: MarksCourse, modifier: Modifier = Modifier, thickness: Dp = 12.dp) {
     val parts = course.assessments.mapNotNull { a ->
         val weight = a.weightage ?: return@mapNotNull null
         if (a.reevaluation || (a.scored == null && a.band != ScoreBand.ABSENT)) return@mapNotNull null

@@ -1,6 +1,5 @@
 package vitapmate.features.exams
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -9,13 +8,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import vitapmate.core.ExamGroup
 import vitapmate.core.ScheduledPaper
 import vitapmate.ui.LocalContentPadding
@@ -74,10 +75,13 @@ internal fun ExamTimeline(
             end = Space.sm,
             bottom = LocalContentPadding.current.calculateBottomPadding() + Space.lg,
         ),
-        verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
-        items(lines, key = { it.key }) { line ->
-            val item = Modifier.animateItem()
+        // Written papers that stay folded, by line: consecutive ones join into one block.
+        val folded = lines.map { it is Line.Paper && it.paper.done(today, minute) && "${group.name}/${it.paper.key}" !in expanded }
+        itemsIndexed(lines, key = { _, it -> it.key }) { i, line ->
+            val joinedAbove = folded[i] && folded.getOrElse(i - 1) { false }
+            val joinedBelow = folded[i] && folded.getOrElse(i + 1) { false }
+            val item = Modifier.animateItem().padding(top = if (i == 0) 0.dp else if (joinedAbove) 2.dp else Space.sm)
             when (line) {
                 is Line.Header -> DayHeader(line.day, today, line.count, item)
                 is Line.Gap -> GapRow(line.days, item)
@@ -93,13 +97,19 @@ internal fun ExamTimeline(
                         open = !done || "${group.name}/${paper.key}" in expanded,
                         onToggle = { onToggle(paper) },
                         item.testTag("exams.paper.${group.name.tagKey()}.${paper.key}"),
+                        shape = RoundedCornerShape(
+                            topStart = if (joinedAbove) 4.dp else 16.dp,
+                            topEnd = if (joinedAbove) 4.dp else 16.dp,
+                            bottomEnd = if (joinedBelow) 4.dp else 16.dp,
+                            bottomStart = if (joinedBelow) 4.dp else 16.dp,
+                        ),
                     )
                 }
             }
         }
         if (undated.isNotEmpty()) {
             item("undated") {
-                Column(Modifier.animateItem().testTag("exams.undated")) {
+                Column(Modifier.animateItem().padding(top = Space.sm).testTag("exams.undated")) {
                     SectionHeader("Date not announced", trailing = { Text("${undated.size} ${if (undated.size == 1) "course" else "courses"}") })
                     SectionCard {
                         undated.forEachIndexed { i, paper ->
@@ -111,7 +121,7 @@ internal fun ExamTimeline(
             }
         }
         item("updated") {
-            Spacer(Modifier.height(Space.xs))
+            Spacer(Modifier.height(Space.xs + Space.sm))
             UpdatedFooter()
         }
     }

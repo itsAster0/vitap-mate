@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarDays
+import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -166,6 +167,7 @@ private fun DateChips(today: Int, day: Int, onSelect: (Int) -> Unit, onPick: () 
                         maxLines = 1,
                     )
                 },
+                leadingIcon = if (d == day) ({ Icon(Lucide.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
                 modifier = Modifier.testTag("biometric.day.$ago"),
             )
         }

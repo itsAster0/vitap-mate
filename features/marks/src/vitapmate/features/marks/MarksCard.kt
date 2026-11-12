@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -38,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import com.composables.icons.lucide.User
 import vitapmate.core.MarksCourse
 import vitapmate.ui.KindChip
 import vitapmate.ui.SectionCard
@@ -89,7 +92,7 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
                         append(course.weighted.marks())
                         withStyle(SpanStyle(color = scheme.onSurfaceVariant)) { append(" / ${course.maxWeighted.marks()}") }
                     },
-                    style = MaterialTheme.typography.headlineSmallEmphasized.nums(),
+                    style = MaterialTheme.typography.headlineMediumEmphasized.nums(),
                     maxLines = 1,
                 )
                 course.percent?.let {
@@ -133,27 +136,33 @@ internal fun MarksCard(course: MarksCourse, expanded: Boolean, onToggle: () -> U
     }
 }
 
-/** Faculty and slot, a row per assessment, then their weighted total. */
+/** In an inset container: faculty and slot, a row per assessment, then their weighted total as a strip at the foot. */
 @Composable
 private fun Assessments(course: MarksCourse) {
     val scheme = MaterialTheme.colorScheme
-    Column(Modifier.padding(top = Space.md)) {
-        HorizontalDivider(color = scheme.outlineVariant)
-        Text(
-            listOf(course.faculty, course.slot).filter { it.isNotBlank() }.joinToString(" · "),
-            Modifier.padding(top = Space.md),
-            style = MaterialTheme.typography.labelLarge,
-            color = scheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        course.assessments.forEachIndexed { i, assessment ->
-            if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.6f))
-            AssessmentRow(assessment, latest = i == course.latest, Modifier.testTag("marks.course.${course.key}.assessment.$i"))
+    Column(Modifier.padding(top = Space.md).clip(MaterialTheme.shapes.large).background(scheme.surfaceContainerHigh)) {
+        Column(Modifier.padding(start = Space.md, top = Space.md, end = Space.md)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Lucide.User, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+                Spacer(Modifier.width(Space.xs))
+                Text(
+                    listOf(course.faculty, course.slot).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            course.assessments.forEachIndexed { i, assessment ->
+                if (i > 0) HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.6f))
+                AssessmentRow(assessment, latest = i == course.latest, Modifier.testTag("marks.course.${course.key}.assessment.$i"))
+            }
         }
         if (course.assessments.isNotEmpty()) {
-            HorizontalDivider(color = scheme.outlineVariant)
-            Row(Modifier.fillMaxWidth().padding(top = Space.md).testTag("marks.course.${course.key}.total"), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                Modifier.fillMaxWidth().background(scheme.surfaceContainerHighest).padding(horizontal = Space.md, vertical = Space.md).testTag("marks.course.${course.key}.total"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text("Total", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
                 Text(
                     "${course.maxWeighted.marks()}% → ${course.weighted.marks()}",

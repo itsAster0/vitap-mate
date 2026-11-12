@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,7 +35,7 @@ import vitapmate.ui.StatusChip
 import vitapmate.ui.nums
 
 /**
- * One assessment: its band's square, title and chips, scored / max; a small bar of the score
+ * One assessment: what it adds to the total (its band's square without a weightage), title and chips, scored / max; a small bar of the score
  * with weightage → what it adds to the total; VTOP's remark.
  */
 @Composable
@@ -53,7 +54,14 @@ internal fun AssessmentRow(assessment: Assessment, latest: Boolean, modifier: Mo
         },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).background(tone.base, RoundedCornerShape(3.dp)))
+            // What it adds to the total, in its band's tone; the band's square without a weightage.
+            if (weight != null) {
+                Box(Modifier.widthIn(min = 48.dp).height(30.dp).background(tone.subtle, RoundedCornerShape(10.dp)).padding(horizontal = 6.dp), Alignment.Center) {
+                    Text(assessment.weighted?.let { "+${it.marks()}" } ?: "–", style = MaterialTheme.typography.labelMedium.nums(), color = tone.onSubtle, maxLines = 1)
+                }
+            } else {
+                Box(Modifier.size(10.dp).background(tone.base, RoundedCornerShape(3.dp)))
+            }
             Spacer(Modifier.width(Space.sm))
             Text(
                 assessment.title,

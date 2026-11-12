@@ -32,6 +32,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.Dot
 import vitapmate.ui.Radii
 import vitapmate.ui.Space
+import vitapmate.ui.StatusChip
 import vitapmate.ui.ToneBadge
 import vitapmate.ui.formatDay
 import vitapmate.ui.neutralTone
@@ -55,10 +56,12 @@ fun MonthEvents(month: CalendarMonth, today: Int, modifier: Modifier = Modifier)
         return
     }
     val firstOfMonth = month.days.first().day
+    // The first event not over yet, when this month holds it.
+    val next = month.events.firstOrNull { it.last >= today }
     // Segments: the group's outer corners are large, each row's own corners small.
     Column(modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         month.events.forEach { event ->
-            EventRow(event, startsBefore = event.first < firstOfMonth, past = event.last < today)
+            EventRow(event, startsBefore = event.first < firstOfMonth, past = event.last < today, today = today.takeIf { event == next })
         }
     }
 }
@@ -66,7 +69,7 @@ fun MonthEvents(month: CalendarMonth, today: Int, modifier: Modifier = Modifier)
 private val DATE_WIDTH = 48.dp
 
 @Composable
-private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean) {
+private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean, today: Int?) {
     val scheme = MaterialTheme.colorScheme
     val tone = markTone(event.mark) ?: neutralTone
     val days = event.last - event.first + 1
@@ -99,6 +102,21 @@ private fun EventRow(event: CalendarEvent, startsBefore: Boolean, past: Boolean)
                 Text(event.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (subtitle.isNotEmpty()) {
                     Text(subtitle, Modifier.padding(top = 2.dp), style = MaterialTheme.typography.bodySmall.nums(color = scheme.onSurfaceVariant))
+                }
+                // The next event (given [today]): how soon, or "Now" once it has begun.
+                today?.let {
+                    val inDays = event.first - it
+                    StatusChip(
+                        when {
+                            inDays < 0 -> "Now"
+                            inDays == 0 -> "Next · today"
+                            inDays == 1 -> "Next · in 1 day"
+                            else -> "Next · in $inDays days"
+                        },
+                        tone,
+                        Modifier.padding(top = Space.xs).testTag("calendar.next"),
+                        solid = true,
+                    )
                 }
             }
             Spacer(Modifier.width(Space.sm))

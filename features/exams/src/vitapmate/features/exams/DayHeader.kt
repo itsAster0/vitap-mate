@@ -1,10 +1,16 @@
 package vitapmate.features.exams
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -16,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import vitapmate.ui.AppTheme
 import vitapmate.ui.StatusChip
 import vitapmate.ui.Space
+import vitapmate.ui.Tone
 import vitapmate.ui.formatDay
 import vitapmate.ui.nums
 
@@ -34,10 +41,26 @@ internal fun DayHeader(day: Int, today: Int, count: Int, modifier: Modifier = Mo
         modifier.fillMaxWidth().padding(start = 2.dp, top = Space.md, end = 2.dp, bottom = Space.xs).testTag("exams.day.$day"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        DateBlock(day, tone)
+        Spacer(Modifier.width(Space.md))
         Text(formatDay(day, "EEE d MMM").uppercase(), style = MaterialTheme.typography.titleSmallEmphasized.nums())
         Spacer(Modifier.width(Space.sm))
         StatusChip(label, tone)
         Spacer(Modifier.weight(1f))
         if (count > 1) Text("$count exams", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+    }
+}
+
+/** The weekday over the day number in [tone]'s fill (a day header, a written paper). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun DateBlock(day: Int, tone: Tone, modifier: Modifier = Modifier) {
+    Column(
+        modifier.widthIn(min = 46.dp).heightIn(min = 50.dp).background(tone.subtle, RoundedCornerShape(16.dp)).padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(formatDay(day, "EEE").uppercase(), style = MaterialTheme.typography.labelSmall, color = tone.onSubtle)
+        Text(formatDay(day, "d"), style = MaterialTheme.typography.titleMediumEmphasized.nums(), color = tone.onSubtle)
     }
 }
