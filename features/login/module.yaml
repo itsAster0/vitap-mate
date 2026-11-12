@@ -5,6 +5,8 @@ product:
 
 dependencies:
   - //design
+  # The forwarding guide's Gmail screenshots (composeResources/drawable).
+  - $compose.components.resources
 
 settings:
   android:

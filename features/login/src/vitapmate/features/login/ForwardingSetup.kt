@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
+import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.Check
 import vitapmate.ui.heroCookie
 import vitapmate.ui.neutralTone
@@ -30,7 +31,12 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -124,8 +130,15 @@ internal fun ForwardingSetup(status: Forwarding, onCheck: () -> Unit, onOff: () 
         "Gmail's confirmation mail comes here, not to your inbox. Tap Check, then Confirm in Gmail or type the code into Gmail's Verify box."
     }
     Step(3, "Create the filter", GMAIL_FILTERS, "Open filters", state = state(filtered, added), last = true) {
-        "Create a new filter with From ${status.sender}, tick Forward it to and pick your vtop-otp address, then Create filter."
+        "Reload Gmail first. Then create a new filter with From ${status.sender}, tick Forward it to and pick your address, then Create filter."
     }
+    var guide by remember { mutableStateOf(false) }
+    OutlinedButton({ guide = true }, Modifier.fillMaxWidth().testTag("forwarding.guide.open")) {
+        Icon(Lucide.BookOpen, null, Modifier.size(18.dp))
+        Spacer(Modifier.size(Space.sm))
+        Text("Step-by-step guide with screenshots")
+    }
+    if (guide) ForwardingGuide(status.sender) { guide = false }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("From", Modifier.padding(start = 40.dp, end = Space.sm), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
         Text(status.sender, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace))
