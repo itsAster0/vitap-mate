@@ -3,6 +3,10 @@ package vitapmate.features.outing
 import vitapmate.ui.rememberHaptics
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -87,14 +91,15 @@ internal fun WeekendSheet(form: WeekendOuting, onDismiss: () -> Unit, onMaybeSen
         FieldError(shown(check.day))
         Spacer(Modifier.height(Space.md))
         FieldLabel("Time slot")
-        FlowRow(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(Space.sm),
-            verticalArrangement = Arrangement.spacedBy(Space.sm),
-            maxItemsInEachRow = 2,
-        ) {
-            form.slots.forEachIndexed { i, s ->
-                ChoicePill(s.label, s.value == slot, { slot = s.value }, Modifier.weight(1f).testTag("outing.slot.$i"))
+        // Two a row, as tall as the taller one, so a slot can wrap (after the dash, never inside a time).
+        Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+            form.slots.withIndex().chunked(2).forEach { row ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    row.forEach { (i, s) ->
+                        ChoicePill(s.label.replace(" AM", "\u00A0AM").replace(" PM", "\u00A0PM"), s.value == slot, { slot = s.value }, Modifier.weight(1f).fillMaxHeight().testTag("outing.slot.$i"), lines = 2)
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
             }
         }
         Spacer(Modifier.height(Space.md))
