@@ -1,6 +1,20 @@
 package vitapmate
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,14 +37,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CalendarRange
 import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.History
-import com.composables.icons.lucide.KeyRound
 import com.composables.icons.lucide.Lock
-import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.LogOut
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Mail
@@ -62,6 +78,10 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
+import vitapmate.ui.Pips
+import vitapmate.ui.StatusChip
+import vitapmate.ui.heroCookie
+import vitapmate.ui.neutralTone
 import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
 import vitapmate.ui.rememberHaptics
@@ -141,38 +161,49 @@ fun ServerScreen() {
                     }
                 }
                 s != null -> {
-                    item {
-                        ListGroup("Account", footer = if (s.linked) null else "This phone isn't linked to your server account, so the server shows it only what applies to this phone. It links when you add a connected app.") {
-                            GroupItem(s.registrationNumber, "server.account", Lucide.User, s.createdAt?.let { "On vmate.aster0.dev since ${ago(it)}" } ?: "vmate.aster0.dev")
-                            if (s.linked) GroupItem("Semester for connected apps", "server.semester", Lucide.CalendarRange, s.semesterId ?: "The newest")
-                            s.credentialsRejectedAt?.let {
-                                GroupItem("VTOP rejected the saved password", "server.rejected", Lucide.TriangleAlert, ago(it), tone = AppTheme.tones.warning)
-                            }
-                        }
-                    }
+                    item { AccountHero(s) }
                     if (s.linked) item {
                         ListGroup("Kept on the server", footer = "Sessions and passwords are sealed; only the server's sign-in engine can open them.") {
-                            GroupItem("VTOP session", "server.session", Lucide.Cookie, sessionText(s), trailing = trash("server.clear_session", "Clear", s.sessionSavedAt != null) {
-                                ask("Clear the session?", "The server drops the VTOP session it keeps. Connected apps get a fresh one on their next request.", "Clear", "clear_session", "The server's session is cleared.") { c, f -> c.clearServerSession(f); true }
-                            })
-                            GroupItem("Password", "server.password", Lucide.Lock, passwordText(s), onClick = if (s.vaultSavedAt != null) null else {
-                                {
-                                    val gmail = Gmail.account?.takeIf { !it.needsReconnect && OtpAutofill.inUse() != null }
-                                    ask(
-                                        "Let the server sign in for you?",
-                                        "The server keeps your VTOP password sealed, so connected apps get a session while your phone is off. It reads the sign-in code from your " +
-                                            (if (gmail != null) "Gmail" else "forwarding address") + ". Only its sign-in engine can open the password, and you can forget it here any time.",
-                                        "Allow",
-                                        "save_password",
-                                        "The server keeps your password.",
-                                    ) { c, f ->
-                                        c.saveServerPassword(f, gmail?.let { GmailGrant(it.refreshToken, it.client.id, it.client.secret, it.deleteAfterReading) })
-                                        true
+                            val savePassword = {
+                                val gmail = Gmail.account?.takeIf { !it.needsReconnect && OtpAutofill.inUse() != null }
+                                ask(
+                                    "Let the server sign in for you?",
+                                    "The server keeps your VTOP password sealed, so connected apps get a session while your phone is off. It reads the sign-in code from your " +
+                                        (if (gmail != null) "Gmail" else "forwarding address") + ". Only its sign-in engine can open the password, and you can forget it here any time.",
+                                    "Allow",
+                                    "save_password",
+                                    "The server keeps your password.",
+                                ) { c, f ->
+                                    c.saveServerPassword(f, gmail?.let { GmailGrant(it.refreshToken, it.client.id, it.client.secret, it.deleteAfterReading) })
+                                    true
+                                }
+                            }
+                            Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                                Tile("VTOP session", "server.session", Lucide.Cookie, CircleShape, sessionText(s), false, Modifier.weight(1f)) {
+                                    FilledTonalButton(
+                                        onClick = {
+                                            ask("Clear the session?", "The server drops the VTOP session it keeps. Connected apps get a fresh one on their next request.", "Clear", "clear_session", "The server's session is cleared.") { c, f -> c.clearServerSession(f); true }
+                                        },
+                                        modifier = Modifier.padding(top = 10.dp).testTag("server.clear_session"),
+                                        enabled = s.sessionSavedAt != null,
+                                        shapes = ButtonDefaults.shapes(),
+                                    ) { Text("Clear") }
+                                }
+                                val kept = s.vaultSavedAt != null
+                                Tile("Password", "server.password", Lucide.Lock, MaterialShapes.Cookie7Sided.toShape(), passwordText(s), false, Modifier.weight(1f), onClick = if (kept) null else savePassword) {
+                                    if (kept) {
+                                        FilledTonalButton(
+                                            onClick = {
+                                                ask("Forget the saved password?", "The server drops your sealed VTOP password${if (s.vaultGmail) " and Gmail access" else ""}. It can then no longer sign in by itself: connected apps work only while a phone answers.", "Forget", "forget_password", "The server no longer keeps your password.") { c, f -> c.forgetServerPassword(f); true }
+                                            },
+                                            modifier = Modifier.padding(top = 10.dp).testTag("server.forget_password"),
+                                            shapes = ButtonDefaults.shapes(),
+                                        ) { Text("Forget") }
+                                    } else {
+                                        Button(onClick = savePassword, modifier = Modifier.padding(top = 10.dp), shapes = ButtonDefaults.shapes()) { Text("Let the server sign in") }
                                     }
                                 }
-                            }, trailing = trash("server.forget_password", "Forget", s.vaultSavedAt != null) {
-                                ask("Forget the saved password?", "The server drops your sealed VTOP password${if (s.vaultGmail) " and Gmail access" else ""}. It can then no longer sign in by itself: connected apps work only while a phone answers.", "Forget", "forget_password", "The server no longer keeps your password.") { c, f -> c.forgetServerPassword(f); true }
-                            })
+                            }
                         }
                     }
                     if (s.linked) item {
@@ -189,7 +220,7 @@ fun ServerScreen() {
                                 on = o.alwaysUseVault,
                             )
                             GroupSegment(Modifier.testTag("server.option_choices")) {
-                                Column(Modifier.padding(start = 52.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (!o.alwaysUseVault) {
                                         Label("Wait for the phone before signing in")
                                         ConnectedChoice(PHONE_WAITS, o.phoneWaitSecs, { if (!saving) setOptions(o.copy(phoneWaitSecs = it)) }, tag = "server.phone_wait", key = { "$it" }, label = { "$it s" })
@@ -203,7 +234,7 @@ fun ServerScreen() {
                     if (s.phones.isNotEmpty()) item {
                         ListGroup("Linked phones", footer = "Linked phones are asked for VTOP sessions. A removed phone links again when it adds a connected app.") {
                             s.phones.forEach { phone ->
-                                GroupItem(phone.label ?: "Phone", "server.phone.${phone.id}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = trash("server.phone.${phone.id}.remove", "Remove") {
+                                GroupItem(phone.label ?: "Phone", "server.phone.${phone.id}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), below = phoneChip(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = trash("server.phone.${phone.id}.remove", "Remove") {
                                     ask("Remove ${phone.label ?: "this phone"}?", "It is unlinked from your account and no longer asked for VTOP sessions. Keys it made stop getting sessions from it.", "Remove", "remove_phone", "It is no longer linked.") { c, f -> c.removePhone(f, phone.id); true }
                                 })
                             }
@@ -212,7 +243,7 @@ fun ServerScreen() {
                     item {
                         ListGroup("Access keys", footer = if (s.linked) null else "Keys show here once this phone is linked.") {
                             s.keys.forEach { key ->
-                                GroupItem(key.label, "server.key.${key.id}", Lucide.KeyRound, keyText(key), trailing = trash("server.key.${key.id}.revoke", "Revoke") {
+                                GroupItem(key.label, "server.key.${key.id}", key.kind.icon, keyText(key), iconShape = key.kind.shape, trailing = trash("server.key.${key.id}.revoke", "Revoke") {
                                     ask("Revoke ${key.label}?", "The app using this key loses access to your VTOP account at once.", "Revoke", "revoke_key", "The key no longer works.") { c, f -> c.revokeKey(f, key.id); true }
                                 })
                             }
@@ -229,9 +260,20 @@ fun ServerScreen() {
                             if (mailbox == null) {
                                 GroupItem(if (s.forwarding) "On another phone" else "No forwarding address", "server.mail", Lucide.Mail)
                             } else {
-                                GroupItem(mailbox.address, "server.mail", Lucide.Mail, "${mailbox.phones.size} of 5 phones")
+                                GroupSegment(Modifier.testTag("server.mail")) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(40.dp).background(MaterialTheme.colorScheme.secondaryContainer, CircleShape), Alignment.Center) {
+                                            Icon(Lucide.Mail, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                                        }
+                                        Column(Modifier.weight(1f)) {
+                                            Text(mailbox.address, style = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace), color = MaterialTheme.colorScheme.onSurface)
+                                            Text("${mailbox.phones.size} of 5 phones", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                    Pips(mailbox.phones.size, 5, Modifier.padding(top = 12.dp))
+                                }
                                 mailbox.phones.forEach { phone ->
-                                    GroupItem(phone.label ?: "Phone", "server.mail.${phone.id.take(8)}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = if (phone.thisPhone) null else trash("server.mail.${phone.id.take(8)}.remove", "Remove") {
+                                    GroupItem(phone.label ?: "Phone", "server.mail.${phone.id.take(8)}", Lucide.Smartphone, phoneText(phone.thisPhone, phone.seenAt, phone.addedAt), below = phoneChip(phone.thisPhone, phone.seenAt, phone.addedAt), trailing = if (phone.thisPhone) null else trash("server.mail.${phone.id.take(8)}.remove", "Remove") {
                                         ask("Take ${phone.label ?: "this phone"} off the address?", "It stops getting forwarded OTPs. The address keeps working on the other phones.", "Remove", "remove_mail_phone", "It no longer gets forwarded OTPs.") { c, f -> c.removeForwardingPhone(f, phone.id); true }
                                     })
                                 }
@@ -247,13 +289,12 @@ fun ServerScreen() {
                     if (s.linked && s.signIns.isNotEmpty()) item {
                         ListGroup("Last sign-ins") {
                             s.signIns.forEachIndexed { i, signIn ->
-                                GroupItem(
+                                TimelineItem(
                                     "${if (signIn.ok) "Signed in" else "Failed"} on ${if (signIn.byServer) "the server" else "a phone"}",
                                     "server.sign_in.$i",
-                                    Lucide.LogIn,
+                                    ago(signIn.at),
                                     signIn.reason,
-                                    trailing = { TrailingValue(ago(signIn.at)) },
-                                    tone = if (signIn.ok) null else AppTheme.tones.warning,
+                                    failed = !signIn.ok,
                                 )
                             }
                             val off = "clear_sign_ins" in unsupported
@@ -270,10 +311,12 @@ fun ServerScreen() {
                                 d.id?.let { "Id $it…" } ?: "Not registered",
                                 d.registeredAt?.let { "registered ${ago(it)}" },
                             ).joinToString(" · "))
-                            GroupItem("Push notifications", "server.device.push", Lucide.Server, listOfNotNull(
-                                if (d.pushToken) "Token set" else "No token",
-                                d.events?.let { "$it events waiting (kept 24 h)" },
-                            ).joinToString(" · "))
+                            GroupItem("Push notifications", "server.device.push", Lucide.Server, below = {
+                                Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    if (d.pushToken) StatusChip("Token set", AppTheme.tones.success) else StatusChip("No token", neutralTone)
+                                    d.events?.let { Text("$it events waiting (kept 24 h)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                }
+                            })
                             GroupItem("Remove this phone from the server", "server.device.remove", Lucide.Unplug, if (off) "Needs a server update" else "Its keys, push token and events", enabled = d.id != null && !off, tone = AppTheme.tones.danger, onClick = {
                                 ask(
                                     "Remove this phone from the server?",
@@ -286,8 +329,9 @@ fun ServerScreen() {
                         }
                     }
                     if (s.linked) item {
-                        ListGroup(null) {
-                            GroupItem("Delete everything", "server.delete", Lucide.Trash2, "Your account, keys, phones, session, password and history", tone = AppTheme.tones.danger, onClick = {
+                        val danger = AppTheme.tones.danger
+                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, top = 14.dp, end = 18.dp, bottom = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Button({
                                 ask(
                                     "Delete everything on the server?",
                                     "The server deletes your account: every access key stops working, every phone is unlinked, and the saved session, password, options and sign-in history go. The forwarding address and this phone's registration stay; remove them above. Your data on this phone stays.",
@@ -295,7 +339,18 @@ fun ServerScreen() {
                                     "delete",
                                     "The server keeps no account for you now.",
                                 ) { c, f -> c.deleteServerAccount(f); true }
-                            })
+                            }, Modifier.fillMaxWidth().height(58.dp).testTag("server.delete"), shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = danger.subtle, contentColor = danger.onSubtle)) {
+                                Icon(Lucide.Trash2, null, Modifier.size(20.dp), tint = danger.base)
+                                Spacer(Modifier.width(10.dp))
+                                Text("Delete everything", style = MaterialTheme.typography.titleSmallEmphasized)
+                            }
+                            Text(
+                                "Your account, keys, phones, session, password and history",
+                                Modifier.padding(top = 8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
                         }
                     }
                 }
@@ -354,8 +409,66 @@ private fun passwordText(s: ServerStatus): String {
     return listOfNotNull("Saved ${ago(saved)}", "with Gmail access".takeIf { s.vaultGmail }, expires).joinToString(" · ")
 }
 
+/** A phone's dates; null for this phone, whose row shows them after a chip ([phoneChip]). */
 private fun phoneText(thisPhone: Boolean, seenAt: Long, addedAt: Long) =
-    listOfNotNull("This phone".takeIf { thisPhone }, "seen ${ago(seenAt)}", "added ${ago(addedAt)}").joinToString(" · ")
+    if (thisPhone) null else "seen ${ago(seenAt)} · added ${ago(addedAt)}"
+
+/** "This phone" as an accent chip, then the dates; null for other phones. */
+private fun phoneChip(thisPhone: Boolean, seenAt: Long, addedAt: Long): (@Composable () -> Unit)? = if (!thisPhone) null else {
+    {
+        Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            StatusChip("This phone", AppTheme.tones.accentTone, solid = true)
+            Text("seen ${ago(seenAt)} · added ${ago(addedAt)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/** The account as a hero (Account's header style): who, since when, linked or not, its semester and a rejected password. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun AccountHero(s: ServerStatus) {
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+            .background(tones.accentTone.subtle).heroCookie().padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(Modifier.testTag("server.account"), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(56.dp).background(AppTheme.colors.card, MaterialShapes.Cookie9Sided.toShape()), Alignment.Center) {
+                Icon(Lucide.User, null, Modifier.size(24.dp), tint = scheme.onSurface)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(s.registrationNumber, style = MaterialTheme.typography.titleLargeEmphasized, color = scheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(s.createdAt?.let { "On vmate.aster0.dev since ${ago(it)}" } ?: "vmate.aster0.dev", style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+            }
+        }
+        if (s.linked) StatusChip("Linked", tones.success) else StatusChip("Not linked", neutralTone)
+        s.credentialsRejectedAt?.let {
+            Row(Modifier.testTag("server.rejected"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                StatusChip("VTOP rejected the saved password", tones.warning, Modifier.weight(1f, fill = false), Lucide.TriangleAlert)
+                Text(ago(it), style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+            }
+        }
+        if (s.linked) {
+            Row(
+                Modifier.fillMaxWidth().background(AppTheme.colors.card, MaterialTheme.shapes.large).padding(horizontal = 12.dp, vertical = 10.dp).testTag("server.semester"),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Lucide.CalendarRange, null, Modifier.size(18.dp), tint = scheme.onSurfaceVariant)
+                Text("Semester for connected apps", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurface)
+                Text(s.semesterId ?: "The newest", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+            }
+        } else {
+            Text(
+                "This phone isn't linked to your server account, so the server shows it only what applies to this phone. It links when you add a connected app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = tones.accentTone.onSubtle,
+            )
+        }
+    }
+}
 
 private fun keyText(key: AccessKey) =
     listOfNotNull("Made ${ago(key.createdAt)}", key.lastUsedAt?.let { "last used ${ago(it)}" } ?: "never used").joinToString(" · ")

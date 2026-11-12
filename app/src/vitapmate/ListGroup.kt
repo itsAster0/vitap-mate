@@ -2,6 +2,7 @@ package vitapmate
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -29,11 +30,11 @@ internal val LocalInGroup = staticCompositionLocalOf { false }
 /**
  * A titled section of segmented rows (More, Settings): the title in the primary colour, then
  * [GroupItem]s and [GroupSegment]s as one rounded group with small gaps, then an optional note.
- * [titleEnd] is a short note at the title's end (a count).
+ * [titleEnd] is a short note at the title's end (a count); [belowTitle] sits under the title (a meter).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun ListGroup(title: String?, modifier: Modifier = Modifier, footer: String? = null, titleEnd: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun ListGroup(title: String?, modifier: Modifier = Modifier, footer: String? = null, titleEnd: String? = null, belowTitle: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
         title?.let {
             Row(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -46,6 +47,7 @@ fun ListGroup(title: String?, modifier: Modifier = Modifier, footer: String? = n
                 titleEnd?.let { end -> Text(end, style = MaterialTheme.typography.labelMedium.nums(), color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
+        belowTitle?.let { Box(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) { it() } }
         // The outer clip rounds the group's ends; each row keeps the small inner corners.
         Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
             CompositionLocalProvider(LocalInGroup provides true) { content() }

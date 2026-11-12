@@ -44,7 +44,7 @@ import vitapmate.ui.Tone
  * has no container. [tone] colours the icon and title (e.g. warning). [on] is the row's switch
  * ([ItemSwitch]) state: when on, the icon's circle morphs into a primary squircle (a [tone]
  * keeps its colours, so a warning still reads as one). [below] sits
- * under the supporting text.
+ * under the supporting text. [lead] replaces the icon (e.g. a value badge).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -61,6 +61,7 @@ fun GroupItem(
     below: (@Composable () -> Unit)? = null,
     highlight: Boolean = false,
     iconShape: Shape? = null,
+    lead: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
@@ -78,7 +79,7 @@ fun GroupItem(
             }
         }
     }
-    val leading: (@Composable () -> Unit)? = icon?.let {
+    val leading: (@Composable () -> Unit)? = lead ?: icon?.let {
         {
             val lit = on && tone == null
             val corner by animateDpAsState(if (lit) 14.dp else 20.dp, motion.defaultSpatialSpec())

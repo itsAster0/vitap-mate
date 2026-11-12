@@ -1,6 +1,24 @@
 package vitapmate
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -12,22 +30,41 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.Radio
+import com.composables.icons.lucide.School
 import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Smartphone
+import com.composables.icons.lucide.TriangleAlert
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.core.Route as VtopRoute
+import vitapmate.core.SkippedRoute
 import vitapmate.core.RouteStatus
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.features.login.ago
 import vitapmate.observability.logAction
+import vitapmate.ui.AppTheme
+import vitapmate.ui.Dot
+import vitapmate.ui.StatusChip
+import vitapmate.ui.heroCookie
+import vitapmate.ui.neutralTone
 import vitapmate.ui.rememberHaptics
 
 /** Route id of Settings → Connection. */
@@ -42,7 +79,7 @@ private val CHOICES = listOf(
     RouteChoice(VtopRoute.UDP, "Server fetch over UDP", Lucide.Radio, "Server fetch over vitapmate's UDP link, for slow or lossy networks"),
 )
 
-private fun VtopRoute.title() = CHOICES.first { it.route == this }.title
+fun VtopRoute.title() = CHOICES.first { it.route == this }.title
 
 /**
  * How the app reaches VTOP (Rust's `route.rs`): the chosen route, which one the last answer came
@@ -79,6 +116,7 @@ fun ConnectionScreen() {
 
     Page("Connection", CONNECTION) { padding ->
         LazyColumn(contentPadding = padding) {
+            status?.let { current -> item { RouteHero(current) } }
             item {
                 ListGroup(
                     "How the app reaches VTOP",
@@ -86,6 +124,8 @@ fun ConnectionScreen() {
                 ) {
                     CHOICES.forEach { choice ->
                         val selected = status?.chosen == choice.route
+                        val skip = status?.skipped?.firstOrNull { it.route == choice.route }
+                        val signsIn = choice.route == VtopRoute.SERVER || choice.route == VtopRoute.UDP
                         GroupItem(
                             choice.title,
                             "connection.${choice.route.name.lowercase()}",
@@ -93,23 +133,17 @@ fun ConnectionScreen() {
                             choice.summary,
                             onClick = { if (!selected) pick(choice.route) },
                             trailing = { RadioButton(selected, { if (!selected) pick(choice.route) }) },
+                            below = if (skip == null && !signsIn) null else {
+                                {
+                                    if (signsIn) {
+                                        StatusChip("Server signs in", if (selected) AppTheme.tones.accentTone else neutralTone, Modifier.padding(top = 6.dp), solid = selected)
+                                    }
+                                    skip?.let { SkipNote(it) }
+                                }
+                            },
+                            highlight = selected,
+                            iconShape = if (selected) RoundedCornerShape(14.dp) else null,
                         )
-                    }
-                }
-            }
-            status?.let { current ->
-                item {
-                    ListGroup("Last refresh") {
-                        val used = current.lastUsed
-                        val at = current.lastUsedAt
-                        GroupItem(
-                            if (used != null && at != null) "${used.title()}, ${ago(at)}" else "Nothing fetched since the app opened",
-                            "connection.last_used",
-                        )
-                        current.skipped.forEach { skip ->
-                            val until = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(skip.until * 1000))
-                            GroupItem("${skip.route.title()} skipped until $until", "connection.skipped.${skip.route.name.lowercase()}", supporting = skip.reason)
-                        }
                     }
                 }
             }
@@ -130,5 +164,103 @@ fun ConnectionScreen() {
             confirmButton = { TextButton({ asking = null; choose(route) }) { Text("Use ${route.title()}") } },
             dismissButton = { TextButton({ asking = null }) { Text("Cancel") } },
         )
+    }
+}
+
+/** The chosen route as a path (phone, server, VTOP) and the last refresh, in the hero style. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RouteHero(status: RouteStatus) {
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    val route = status.chosen
+    val (first, second) = when (route) {
+        VtopRoute.DIRECT -> null to null
+        VtopRoute.PROXY -> "6× smaller" to null
+        VtopRoute.SERVER -> "data only" to "fetches"
+        VtopRoute.UDP -> "UDP" to "fetches"
+    }
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+            .background(tones.accentTone.subtle).heroCookie().padding(18.dp).testTag("connection.hero"),
+    ) {
+        Text("Chosen route", style = MaterialTheme.typography.labelLarge, color = tones.accentTone.onSubtle)
+        Text(route.title(), style = MaterialTheme.typography.headlineSmallEmphasized, color = scheme.onSurface)
+        Row(Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+            PathNode(Lucide.Smartphone, "This phone", CircleShape)
+            PathLink(first, dashed = route == VtopRoute.UDP)
+            PathNode(Lucide.Server, "vitapmate server", MaterialShapes.Cookie7Sided.toShape(), dim = route == VtopRoute.DIRECT)
+            PathLink(second)
+            PathNode(Lucide.School, "VTOP", CircleShape)
+        }
+        val used = status.lastUsed
+        val at = status.lastUsedAt
+        Row(
+            Modifier.fillMaxWidth().background(AppTheme.colors.card, MaterialTheme.shapes.large).padding(horizontal = 12.dp, vertical = 10.dp).testTag("connection.last_used"),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Dot(size = 8.dp, color = if (used != null && at != null) tones.success.base else scheme.outlineVariant)
+            Text(
+                if (used != null && at != null) "Last refresh: ${used.title()}, ${ago(at)}" else "Nothing fetched since the app opened",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.onSurface,
+            )
+        }
+    }
+}
+
+/** A stop on [RouteHero]'s path; [dim] when the route skips it. */
+@Composable
+private fun PathNode(icon: ImageVector, label: String, shape: Shape, dim: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    val alpha = if (dim) 0.38f else 1f
+    Column(Modifier.width(64.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        // Opaque even when dim, so the link behind it stays hidden.
+        Box(Modifier.size(40.dp).background(AppTheme.colors.card, shape), Alignment.Center) {
+            Icon(icon, null, Modifier.size(20.dp), tint = scheme.onSurface.copy(alpha = alpha))
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = AppTheme.tones.accentTone.onSubtle.copy(alpha = alpha), textAlign = TextAlign.Center)
+    }
+}
+
+/** The line between two [PathNode]s at their icons' height, with an optional [label] under it. */
+@Composable
+private fun RowScope.PathLink(label: String?, dashed: Boolean = false) {
+    val accent = AppTheme.tones.accent
+    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier.fillMaxWidth().height(40.dp).drawBehind {
+                val y = size.height / 2
+                val stroke = 3.dp.toPx()
+                drawLine(
+                    accent,
+                    Offset(-4.dp.toPx(), y),
+                    Offset(size.width + 4.dp.toPx(), y),
+                    stroke,
+                    StrokeCap.Round,
+                    if (dashed) PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())) else null,
+                )
+            },
+        )
+        label?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = accent, maxLines = 1) }
+    }
+}
+
+/** A skipped route's warning on its row: until when, and why. */
+@Composable
+private fun SkipNote(skip: SkippedRoute) {
+    val warning = AppTheme.tones.warning
+    val until = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(skip.until * 1000))
+    Row(
+        Modifier.padding(top = 8.dp).fillMaxWidth().background(warning.subtle, RoundedCornerShape(14.dp)).padding(horizontal = 11.dp, vertical = 9.dp)
+            .testTag("connection.skipped.${skip.route.name.lowercase()}"),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        Icon(Lucide.TriangleAlert, null, Modifier.size(16.dp).padding(top = 1.dp), tint = warning.base)
+        Column {
+            Text("Skipped until $until", style = MaterialTheme.typography.labelLarge, color = warning.onSubtle)
+            Text(skip.reason, style = MaterialTheme.typography.bodySmall, color = warning.onSubtle)
+        }
     }
 }

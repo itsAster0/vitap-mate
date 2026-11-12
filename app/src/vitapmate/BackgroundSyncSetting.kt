@@ -7,7 +7,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Icon
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
@@ -17,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -45,7 +49,7 @@ fun BackgroundSyncRow(onClick: () -> Unit) {
     LaunchedEffect(Unit) { MailForwarding.load("settings") }
     val available = BackgroundSync.available()
     val on = Settings.backgroundSync && available
-    val paused = Settings.syncPaused?.takeIf { on }
+    val paused = syncPaused()
     GroupItem(
         "Background sync",
         "settings.background_sync",
@@ -57,6 +61,9 @@ fun BackgroundSyncRow(onClick: () -> Unit) {
     )
 }
 
+/** Why background sync is paused, while it is on (also in Settings' "Needs you"); null otherwise. */
+fun syncPaused(): String? = Settings.syncPaused?.takeIf { Settings.backgroundSync && BackgroundSync.available() }
+
 private fun syncSummary(available: Boolean, on: Boolean, paused: String?): String = when {
     !available -> "Needs OTP auto-fill: set it up in Settings → Account"
     paused != null -> "Paused: $paused"
@@ -64,8 +71,12 @@ private fun syncSummary(available: Boolean, on: Boolean, paused: String?): Strin
     else -> "Check VTOP in the background and tell you what changed"
 }
 
+/**
+ * One status card: the switch row, then [details] (how the last run went, when the next is due) given
+ * whether sync is on; the accent tone when on, warning when paused, neutral when off or unavailable.
+ */
 @Composable
-fun BackgroundSyncSetting() {
+fun BackgroundSyncSetting(details: @Composable ColumnScope.(on: Boolean) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { MailForwarding.load("settings") }
@@ -82,21 +93,30 @@ fun BackgroundSyncSetting() {
         scope.logAction("settings.background_sync", "ui.settings", "background sync ${if (value) "on" else "off"}", mapOf("hours" to "${Settings.syncHours}"))
     }
     val paused = Settings.syncPaused?.takeIf { on }
-    GroupItem(
-        "Background sync",
-        "sync.toggle",
-        Lucide.RefreshCw,
-        syncSummary(available, on, paused),
-        enabled = available,
-        onClick = { set(!on) },
-        trailing = { ItemSwitch(on, { set(it) }, enabled = available) },
-        on = on,
-        tone = if (paused != null) AppTheme.tones.warning else null,
-    )
+    val tones = AppTheme.tones
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+            .background(if (paused != null) tones.warning.subtle else if (on) tones.accentTone.subtle else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 16.dp),
+    ) {
+        GroupItem(
+            "Background sync",
+            "sync.toggle",
+            Lucide.RefreshCw,
+            syncSummary(available, on, paused),
+            enabled = available,
+            onClick = { set(!on) },
+            trailing = { ItemSwitch(on, { set(it) }, enabled = available) },
+            on = on,
+            tone = if (paused != null) AppTheme.tones.warning else null,
+        )
+        details(on)
+    }
     if (!on) return
-    // Under the title (icon 40 dp + 12 dp gap): how often, and which changes notify.
+    // How often, and which changes notify.
+    ListGroup(null) {
     GroupSegment(Modifier.testTag("settings.sync_options")) {
-        Column(Modifier.padding(start = 52.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Check every", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ConnectedChoice(
                 SYNC_HOURS,
@@ -126,5 +146,6 @@ fun BackgroundSyncSetting() {
                 }
             }
         }
+    }
     }
 }

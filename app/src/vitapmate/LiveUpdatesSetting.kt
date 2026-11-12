@@ -1,6 +1,7 @@
 package vitapmate
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,13 +57,17 @@ fun LiveUpdatesSetting() {
             "settings.live_updates.allow",
             Lucide.ExternalLink,
             "Android shows them as plain notifications until you allow it",
-            onClick = {
-                context.startActivity(
-                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
-                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
-                )
-            },
+            onClick = { allowLiveUpdates(context) },
             tone = AppTheme.tones.warning,
         )
     }
 }
+
+/** Live updates on, but Android doesn't promote them yet (the "Allow Live updates" row). */
+fun liveUpdatesBlocked(context: Context): Boolean = LiveUpdates.supported() && Settings.liveUpdates && !LiveUpdates.promotable(context)
+
+/** Opens Android's setting that lets the app's notifications show as Live updates. */
+fun allowLiveUpdates(context: Context) = context.startActivity(
+    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)
+        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName),
+)

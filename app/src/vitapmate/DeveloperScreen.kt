@@ -5,12 +5,28 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toShape
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,9 +38,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -32,10 +49,8 @@ import com.composables.icons.lucide.CalendarRange
 import com.composables.icons.lucide.CalendarX
 import com.composables.icons.lucide.CircleMinus
 import com.composables.icons.lucide.ClipboardList
-import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.Database
-import com.composables.icons.lucide.Hourglass
 import com.composables.icons.lucide.KeySquare
 import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.Bug
@@ -43,14 +58,12 @@ import com.composables.icons.lucide.FlaskConical
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Radio
 import com.composables.icons.lucide.RefreshCw
-import com.composables.icons.lucide.Mail
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.RotateCw
 import com.composables.icons.lucide.Scan
 import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.SquareActivity
-import com.composables.icons.lucide.Timer
 import com.composables.icons.lucide.Trash
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Zap
@@ -70,6 +83,9 @@ import vitapmate.observability.Log
 import vitapmate.observability.flow
 import vitapmate.ui.AppTheme
 import vitapmate.ui.PasswordField
+import vitapmate.ui.StatusChip
+import vitapmate.ui.neutralTone
+import vitapmate.ui.nums
 import vitapmate.ui.ToastTone
 import vitapmate.ui.showToast
 
@@ -85,6 +101,7 @@ private class Confirm(val title: String, val body: String, val action: String, v
  * times, saved data and mail forwarding. Actions are flows `dev.*` (log src `ui.dev`); clearing
  * never signs out: the saved account signs in again on the next fetch.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DeveloperScreen() {
     val nav = LocalNav.current
@@ -105,36 +122,57 @@ fun DeveloperScreen() {
             ?: showToast("Didn't work", "See flow $name in the Inspector.", tone = ToastTone.Error)
     }
 
+    /** A number: its value in a badge in place of an icon, filled with a "Default …" chip when it differs. */
     @Composable
-    fun tunable(t: Tunable, icon: ImageVector) = GroupItem(
-        t.title,
-        "dev.${t.key.removePrefix("dev_")}",
-        icon,
-        t.note,
-        onClick = { editing = t },
-        trailing = { TrailingValue(if (t == Tunable.SessionReuse && Settings.tunable(t) == 0) "Any age" else "${Settings.tunable(t)} ${t.unit}") },
+    fun tunable(t: Tunable) {
+        val v = Settings.tunable(t)
+        val changed = v != t.default
+        val scheme = MaterialTheme.colorScheme
+        GroupItem(
+            t.title,
+            "dev.${t.key.removePrefix("dev_")}",
+            supporting = t.note,
+            onClick = { editing = t },
+            lead = {
+                Box(
+                    Modifier.size(64.dp, 40.dp).background(if (changed) scheme.primary else scheme.secondaryContainer, RoundedCornerShape(14.dp)).padding(horizontal = 4.dp),
+                    Alignment.Center,
+                ) {
+                    Text(valueText(t, v), style = MaterialTheme.typography.labelMedium.nums(), color = if (changed) scheme.onPrimary else scheme.onSecondaryContainer, maxLines = 1)
+                }
+            },
+            below = if (changed) ({ StatusChip("Default ${valueText(t, t.default)}", neutralTone, Modifier.padding(top = 6.dp)) }) else null,
+        )
+    }
+    val refreshTimes = listOf(
+        Tunable.PageMaxAge, Tunable.JustFetched, Tunable.CalendarMaxAge, Tunable.SweepMaxAge, Tunable.SweepCooldown,
+        Tunable.SweepQuick, Tunable.SlowPage, Tunable.FetchLanes, Tunable.SlowFetch, Tunable.QueueDrop,
     )
 
     Page("Developer", DEVELOPER) { padding ->
         LazyColumn(contentPadding = padding) {
             item {
                 // As on Android: on from tapping the version 7 times, off here (and Developer leaves Settings).
-                ListGroup(null) {
-                    GroupItem(
-                        "Developer options",
-                        "dev.enabled",
-                        Lucide.Bug,
-                        onClick = { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() },
-                        on = true,
-                        trailing = { ItemSwitch(true, { if (!it) { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() } }) },
-                        tone = AppTheme.tones.warning,
-                    )
+                val warning = AppTheme.tones.warning
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge).background(warning.subtle)
+                        .clickable { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() }.testTag("dev.enabled").padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(40.dp).background(warning.base, RoundedCornerShape(14.dp)), Alignment.Center) {
+                        Icon(Lucide.Bug, null, Modifier.size(20.dp), tint = warning.subtle)
+                    }
+                    Text("Developer options", Modifier.weight(1f), style = MaterialTheme.typography.titleMediumEmphasized, color = warning.onSubtle)
+                    ItemSwitch(true, { if (!it) { Settings.developerEnabled = false; haptics.toggle(false); nav.pop() } })
                 }
             }
             item {
                 ListGroup("What happened") {
-                    GroupItem("Inspector", "dev.inspector", Lucide.SquareActivity, "Flows with their Kotlin and Rust lines", onClick = { nav.push(Route.Screen(INSPECTOR)) }, trailing = { Chevron() })
-                    GroupItem("Share logs", "dev.share_logs", Lucide.Share2, "The log file, through the share sheet", onClick = { scope.launch { shareLogs(context) } })
+                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                        Tile("Inspector", "dev.inspector", Lucide.SquareActivity, MaterialShapes.Cookie9Sided.toShape(), "Flows with their Kotlin and Rust lines", true, Modifier.weight(1f), onClick = { nav.push(Route.Screen(INSPECTOR)) })
+                        Tile("Share logs", "dev.share_logs", Lucide.Share2, CircleShape, "The log file, through the share sheet", false, Modifier.weight(1f), onClick = { scope.launch { shareLogs(context) } })
+                    }
                     if (debuggable) {
                         GroupItem("Write state dump", "dev.state_dump", Lucide.ClipboardList, "files/state.json, as the vitapmate.DUMP broadcast", onClick = {
                             context.sendBroadcast(Intent("vitapmate.DUMP").setPackage(context.packageName))
@@ -164,9 +202,9 @@ fun DeveloperScreen() {
             item {
                 ListGroup("Session") {
                     GroupItem("Set credentials without checking", "dev.set_account", Lucide.KeySquare, "Replace the saved ones; VTOP isn't asked", onClick = { setAccount = true })
-                    tunable(Tunable.SessionReuse, Lucide.Timer)
-                    tunable(Tunable.VtopTimeout, Lucide.Hourglass)
-                    tunable(Tunable.SessionAnswer, Lucide.Hourglass)
+                    tunable(Tunable.SessionReuse)
+                    tunable(Tunable.VtopTimeout)
+                    tunable(Tunable.SessionAnswer)
                     GroupItem("Copy saved cookies", "dev.copy_cookies", Lucide.Cookie, "Cookie-Editor JSON, for a browser", onClick = {
                         scope.launch {
                             val json = dev("dev.copy_cookies") { c, f -> c.devCookieEditorJson(f).orEmpty() }
@@ -180,7 +218,7 @@ fun DeveloperScreen() {
                             }
                         }
                     })
-                    GroupItem("Clear session", "dev.clear_session", Lucide.Unplug, "Drop VTOP's cookies; the next fetch signs in again", onClick = {
+                    GroupItem("Clear session", "dev.clear_session", Lucide.Unplug, "Drop VTOP's cookies; the next fetch signs in again", tone = AppTheme.tones.danger, onClick = {
                         confirm = Confirm("Clear the session?", "The saved VTOP session is dropped. Your account stays; the next fetch signs in again, and VTOP may ask for an OTP.", "Clear") {
                             if (OtpPrompt.message != null) OtpPrompt.cancel()
                             dev("dev.clear_session") { c, f -> c.devClearSession(f) }?.let {
@@ -229,16 +267,12 @@ fun DeveloperScreen() {
                         enabled = Settings.liveUpdates,
                         onClick = { LiveUpdates.preview(context) },
                     )
-                    tunable(Tunable.PageMaxAge, Lucide.Clock)
-                    tunable(Tunable.JustFetched, Lucide.Clock)
-                    tunable(Tunable.CalendarMaxAge, Lucide.Clock)
-                    tunable(Tunable.SweepMaxAge, Lucide.Clock)
-                    tunable(Tunable.SweepCooldown, Lucide.Clock)
-                    tunable(Tunable.SweepQuick, Lucide.Clock)
-                    tunable(Tunable.SlowPage, Lucide.Clock)
-                    tunable(Tunable.FetchLanes, Lucide.Zap)
-                    tunable(Tunable.SlowFetch, Lucide.Clock)
-                    tunable(Tunable.QueueDrop, Lucide.Hourglass)
+                }
+            }
+            item {
+                val changed = refreshTimes.count { Settings.tunable(it) != it.default }
+                ListGroup("Refresh times", titleEnd = if (changed > 0) "$changed changed" else null) {
+                    refreshTimes.forEach { tunable(it) }
                     GroupItem("Reset times", "dev.reset_times", Lucide.RotateCw, "Every number on this page back to its default", onClick = {
                         Tunable.entries.forEach { Settings.setTunable(it, null) }
                         Log.info("ui.dev", "tunables reset")
@@ -248,32 +282,33 @@ fun DeveloperScreen() {
             }
             item {
                 ListGroup("Saved data", footer = "Pages fetch again when they open. You stay signed in.") {
-                    GroupItem("Clear this semester's cache", "dev.clear_semester", Lucide.Database, "Its pages, class histories and marks seen", onClick = {
+                    GroupItem("Clear this semester's cache", "dev.clear_semester", Lucide.Database, "Its pages, class histories and marks seen", tone = AppTheme.tones.danger, onClick = {
                         confirm = Confirm("Clear this semester's cache?", "Every saved page of the semester shown is removed from this phone, with class histories and when marks were first seen.", "Clear") {
                             clearCache(CacheScope.SEMESTER, "This semester's pages fetch again.")
                         }
                     })
-                    GroupItem("Clear all cached pages", "dev.clear_all", Lucide.Trash, "Every semester, the profile and grade history", onClick = {
+                    GroupItem("Clear all cached pages", "dev.clear_all", Lucide.Trash, "Every semester, the profile and grade history", tone = AppTheme.tones.danger, onClick = {
                         confirm = Confirm("Clear all cached pages?", "Every saved page of every semester, the profile and the grade history are removed from this phone. The semester list and your pick stay.", "Clear") {
                             clearCache(CacheScope.ALL, "Pages fetch again when they open.")
                         }
                     })
-                    GroupItem("Reset semester", "dev.reset_semester", Lucide.CalendarRange, "Ask which semester to show again", onClick = {
+                    GroupItem("Reset semester", "dev.reset_semester", Lucide.CalendarRange, "Ask which semester to show again", tone = AppTheme.tones.danger, onClick = {
                         confirm = Confirm("Reset the semester?", "The app forgets which semester it shows and asks again. Saved pages stay.", "Reset") {
                             dev("dev.reset_semester") { c, f -> c.devResetSemester(f).also { SemesterChoice.readCache(f) } }?.let {
                                 showToast("Semester reset", "Choose the semester to show.")
                             } ?: showToast("Didn't work", "See flow dev.reset_semester in the Inspector.", tone = ToastTone.Error)
                         }
                     })
-                    GroupItem("Drop latest history entry", "dev.drop_history", Lucide.CalendarX, "Every course, saved until the next refresh", onClick = {
+                    val helper = MaterialShapes.Cookie7Sided.toShape()
+                    GroupItem("Drop latest history entry", "dev.drop_history", Lucide.CalendarX, "Every course, saved until the next refresh", iconShape = helper, onClick = {
                         act("dev.drop_history", { "History trimmed" to "Dropped the latest entry from $it courses." }) { c, f -> "${c.devDropLatestHistory(f)}" }
                     })
-                    GroupItem("Clear attendance", "dev.clear_attendance", Lucide.CircleMinus, "Show it as not posted, until the next refresh", onClick = {
+                    GroupItem("Clear attendance", "dev.clear_attendance", Lucide.CircleMinus, "Show it as not posted, until the next refresh", iconShape = helper, onClick = {
                         act("dev.clear_attendance", { if (it == "true") "Attendance cleared" to "Refresh to bring it back." else "No attendance saved" to "Nothing to clear." }) { c, f ->
                             "${c.devClearAttendance(f)}"
                         }
                     })
-                    GroupItem("Simulate VTOP changes", "dev.simulate_changes", Lucide.FlaskConical, "Roll back one class, one score, one slot and one exam; the next fetch finds them", onClick = {
+                    GroupItem("Simulate VTOP changes", "dev.simulate_changes", Lucide.FlaskConical, "Roll back one class, one score, one slot and one exam; the next fetch finds them", iconShape = helper, onClick = {
                         act("dev.simulate_changes", { n -> "Rolled back $n pages" to "Fetch all (More) or a background run now records them in Changes." }) { c, f ->
                             "${c.devSimulateChanges(f)}"
                         }
@@ -283,7 +318,7 @@ fun DeveloperScreen() {
             item {
                 ListGroup("Mail forwarding") {
                     GroupItem("Forwarding server", "dev.forwarding_server", Lucide.Server, server ?: "…", onClick = { editServer = true })
-                    tunable(Tunable.OtpPoll, Lucide.Mail)
+                    tunable(Tunable.OtpPoll)
                 }
             }
         }
@@ -343,6 +378,9 @@ fun DeveloperScreen() {
         }
     }
 }
+
+/** A [Tunable]'s value as its row shows it; session reuse 0 is "Any age". */
+private fun valueText(t: Tunable, v: Int) = if (t == Tunable.SessionReuse && v == 0) "Any age" else "$v ${t.unit}"
 
 /** Clears cached pages: running fetches stop (they'd save again) and open pages read nothing, so they fetch. */
 private suspend fun clearCache(scope: CacheScope, done: String) {

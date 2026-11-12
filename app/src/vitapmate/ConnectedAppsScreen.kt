@@ -4,12 +4,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -21,8 +18,6 @@ import androidx.compose.material3.toShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.foundation.layout.Arrangement
@@ -104,6 +99,7 @@ import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
 import vitapmate.ui.OpenHaptic
+import vitapmate.ui.Pips
 import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
 import vitapmate.ui.rememberHaptics
@@ -167,8 +163,8 @@ fun ConnectedAppsScreen() {
             item {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                        AddTile("Pair a browser", "connected_apps.pair", Lucide.Scan, MaterialShapes.Cookie9Sided.toShape(), "Scan the code the extension or an AI app's sign-in page shows", true, Modifier.weight(1f)) { pairing = true }
-                        AddTile("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, MaterialShapes.Sunny.toShape(), "For Claude and other AI apps", false, Modifier.weight(1f)) { newMcp = true }
+                        Tile("Pair a browser", "connected_apps.pair", Lucide.Scan, MaterialShapes.Cookie9Sided.toShape(), "Scan the code the extension or an AI app's sign-in page shows", true, Modifier.weight(1f), onClick = { pairing = true })
+                        Tile("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, MaterialShapes.Sunny.toShape(), "For Claude and other AI apps", false, Modifier.weight(1f), onClick = { newMcp = true })
                     }
                     GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
@@ -176,7 +172,7 @@ fun ConnectedAppsScreen() {
             val current = apps
             when {
                 current != null -> item {
-                    ListGroup("Keys", footer = "Up to 10 keys. Revoke one you no longer use; it stops working at once.", titleEnd = if (current.linked) "${current.keys.size} of 10" else null) {
+                    ListGroup("Keys", footer = "Up to 10 keys. Revoke one you no longer use; it stops working at once.", titleEnd = if (current.linked) "${current.keys.size} of 10" else null, belowTitle = if (current.linked) ({ Pips(current.keys.size, 10) }) else null) {
                         // After a reinstall: the server lists the account's keys only to a linked phone.
                         if (!current.linked) GroupItem(
                             "Link this phone",
@@ -193,15 +189,23 @@ fun ConnectedAppsScreen() {
                     }
                     if (current.elsewhere.isNotEmpty()) ListGroup("On another phone", footer = "A key asks the phone that made it for your VTOP session. After a reinstall, move its keys here.") {
                         current.elsewhere.forEachIndexed { i, phone ->
-                            GroupItem(
-                                "Move ${keys(phone)} to this phone",
-                                "connected_apps.move.$i",
-                                Lucide.Smartphone,
-                                phone.seenAt?.let { "From ${phone.label ?: "another phone"}, seen ${ago(it)}" } ?: "From a phone that is no longer linked",
-                                enabled = !busy,
-                                onClick = { moving = phone },
-                                trailing = { Chevron() },
-                            )
+                            val accent = AppTheme.tones.accentTone
+                            Column(Modifier.fillMaxWidth().clip(ListItemDefaults.segmentedShapes(1, 3).shape).background(accent.subtle).padding(16.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Box(Modifier.size(40.dp).background(AppTheme.colors.card, CircleShape), Alignment.Center) {
+                                        Icon(Lucide.Smartphone, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Move ${keys(phone)} to this phone", style = MaterialTheme.typography.titleMediumEmphasized, color = MaterialTheme.colorScheme.onSurface)
+                                        Text(
+                                            phone.seenAt?.let { "From ${phone.label ?: "another phone"}, seen ${ago(it)}" } ?: "From a phone that is no longer linked",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = accent.onSubtle,
+                                        )
+                                    }
+                                }
+                                androidx.compose.material3.Button(onClick = { moving = phone }, modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(48.dp).testTag("connected_apps.move.$i"), enabled = !busy, shapes = ButtonDefaults.shapes()) { Text("Move") }
+                            }
                         }
                     }
                 }
@@ -232,11 +236,11 @@ fun ConnectedAppsScreen() {
 
 private fun keys(phone: KeyPhone) = if (phone.keys == 1u) "1 key" else "${phone.keys} keys"
 
-private val KeyKind.icon get() = if (this == KeyKind.BROWSER) Lucide.Globe else Lucide.Sparkles
+internal val KeyKind.icon get() = if (this == KeyKind.BROWSER) Lucide.Globe else Lucide.Sparkles
 private val KeyKind.label get() = if (this == KeyKind.BROWSER) "Browser" else "MCP"
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private val KeyKind.shape: Shape @Composable get() = if (this == KeyKind.BROWSER) CircleShape else MaterialShapes.Cookie7Sided.toShape()
+internal val KeyKind.shape: Shape @Composable get() = if (this == KeyKind.BROWSER) CircleShape else MaterialShapes.Cookie7Sided.toShape()
 
 /** A key's kind, last use and (in the warning tone) outings, as tags under its label. */
 @Composable
@@ -249,26 +253,6 @@ private fun KeyTags(key: AccessKey) {
         tag(key.kind.label, scheme.surfaceContainerHigh, scheme.onSurface)
         Text(key.lastUsedAt?.let { "used ${ago(it)}" } ?: "never used", style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
         if (key.outings) tag("outings on", AppTheme.tones.warning.subtle, AppTheme.tones.warning.base)
-    }
-}
-
-/** One of the two big "Add" segments: [icon] in [shape] at the top, [title] and [text] at the bottom; [primary] fills it. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun AddTile(title: String, tag: String, icon: ImageVector, shape: Shape, text: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val content = if (primary) scheme.onPrimary else scheme.onSurface
-    Column(
-        modifier.fillMaxHeight().heightIn(min = 150.dp).clip(ListItemDefaults.segmentedShapes(1, 3).shape).background(if (primary) scheme.primary else AppTheme.colors.card)
-            .clickable(role = Role.Button, onClick = onClick).testTag(tag).padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(Modifier.size(50.dp).background(if (primary) scheme.onPrimary else scheme.secondaryContainer, shape), Alignment.Center) {
-            Icon(icon, null, Modifier.size(24.dp), tint = if (primary) scheme.primary else scheme.onSecondaryContainer)
-        }
-        Spacer(Modifier.weight(1f).heightIn(min = 14.dp))
-        Text(title, style = MaterialTheme.typography.titleMediumEmphasized, color = content)
-        Text(text, style = MaterialTheme.typography.bodySmall, color = if (primary) content.copy(alpha = 0.72f) else scheme.onSurfaceVariant)
     }
 }
 
@@ -513,8 +497,10 @@ private fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Uni
         Column {
             Text("Last uses", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
             if (key.uses.isEmpty()) Note("Not used yet.")
-            key.uses.forEachIndexed { i, use ->
-                GroupItem(if (use.via == KeyKind.BROWSER) "Browser extension" else "AI app (MCP)", "connected_apps.use.$i", use.via.icon, trailing = { TrailingValue(ago(use.at)) })
+            else Column(Modifier.padding(top = 8.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(vertical = 4.dp)) {
+                key.uses.forEachIndexed { i, use ->
+                    TimelineItem(if (use.via == KeyKind.BROWSER) "Browser extension" else "AI app (MCP)", "connected_apps.use.$i", ago(use.at))
+                }
             }
         }
         val danger = AppTheme.tones.danger

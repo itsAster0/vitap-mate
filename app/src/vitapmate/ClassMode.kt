@@ -48,6 +48,12 @@ object ClassMode {
     /** Whether the student gave the app Do Not Disturb access. */
     fun granted(context: Context): Boolean = context.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
 
+    /** On, but without Do Not Disturb access (the "Allow Do Not Disturb access" row). */
+    fun blocked(context: Context): Boolean = supported() && Settings.classMode && !granted(context)
+
+    /** Opens Android's Do Not Disturb access setting. */
+    fun allow(context: Context) = context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+
     /** Brings the rule and its alarm in step with the setting and the cached timetable. */
     suspend fun refresh(context: Context, flowName: String) {
         if (!supported()) return
@@ -102,7 +108,7 @@ fun ClassModeSetting() {
     // Read again on return from the system setting, and the rule with it.
     val granted = remember(Foreground.resumes) { ClassMode.granted(context) }
     LaunchedEffect(Foreground.resumes) { ClassMode.refresh(context, "classmode.settings") }
-    val allow = { context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
+    val allow = { ClassMode.allow(context) }
     val set = { on: Boolean ->
         Settings.classMode = on
         haptics.toggle(on)

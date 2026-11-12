@@ -1,22 +1,53 @@
 package vitapmate
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Github
 import com.composables.icons.lucide.Instagram
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Sparkles
+import vitapmate.ui.AppTheme
+import vitapmate.ui.ConnectedChoice
+import vitapmate.ui.StatusChip
+import vitapmate.ui.heroCookie
 
 /** Route id of More → About. */
 const val UPDATES = "updates"
@@ -97,37 +128,115 @@ private val RELEASES = listOf(
 )
 
 /** About: what's new in each version (newest first, by section), what the app does, and who builds the app with links to GitHub and Instagram (open in the browser). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UpdatesScreen() {
     val uri = LocalUriHandler.current
     val version = rememberAppVersion()
-    val open = @Composable { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+    val scheme = MaterialTheme.colorScheme
+    val tones = AppTheme.tones
+    var section by rememberSaveable { mutableStateOf(RELEASES.first().sections.first().first) }
+    var feature by rememberSaveable { mutableStateOf(FEATURES.first().first) }
     Page("About", UPDATES) { padding ->
         LazyColumn(contentPadding = padding) {
             item {
-                ListGroup("vitapmate", footer = "Unofficial client for VIT-AP's VTOP.") {
-                    GroupItem("Version", "updates.version", Lucide.Sparkles, onClick = rememberDeveloperTaps(), trailing = { version?.let { TrailingValue(it) } })
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clip(MaterialTheme.shapes.extraLarge)
+                        .background(tones.accentTone.subtle).heroCookie().padding(18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(64.dp).background(scheme.primary, RoundedCornerShape(22.dp)), Alignment.Center) {
+                        Icon(painterResource(R.drawable.ic_notification), null, Modifier.size(36.dp), tint = scheme.onPrimary)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("vitapmate", style = MaterialTheme.typography.titleLargeEmphasized, color = scheme.onSurface)
+                        Text("Unofficial client for VIT-AP's VTOP.", style = MaterialTheme.typography.bodyMedium, color = tones.accentTone.onSubtle)
+                        // The version is the 7-tap target that turns Developer on.
+                        StatusChip(
+                            version?.let { "Version $it" } ?: "Version",
+                            tones.accentTone,
+                            Modifier.padding(top = 8.dp).clip(MaterialTheme.shapes.small).clickable(onClick = rememberDeveloperTaps()).testTag("updates.version"),
+                            Lucide.Sparkles,
+                            solid = true,
+                        )
+                    }
                 }
             }
             RELEASES.forEachIndexed { i, release ->
                 item(release.version) {
-                    ListGroup(if (i == 0) "What's new in ${release.version}" else release.version) {
-                        GroupSegment(Modifier.testTag("updates.release.${release.version}")) {
-                            Text(release.summary, style = MaterialTheme.typography.bodyMedium)
+                    if (i == 0) {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            GroupTitle("What's new in ${release.version}")
+                            Text(
+                                release.summary,
+                                Modifier.fillMaxWidth().clip(MaterialTheme.shapes.extraLarge).background(tones.accentTone.subtle).testTag("updates.release.${release.version}").padding(16.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = tones.accentTone.onSubtle,
+                            )
+                            ConnectedChoice(
+                                release.sections.map { it.first },
+                                section,
+                                { section = it },
+                                tag = "updates.section",
+                                key = { it },
+                                label = { title -> "$title · ${release.sections.first { it.first == title }.second.size}" },
+                                modifier = Modifier.padding(top = 10.dp),
+                            )
+                            NoteSegments(release.sections.first { it.first == section }.second, Modifier.padding(top = 10.dp))
                         }
-                        release.sections.forEach { (title, notes) -> Notes(title, notes) }
+                    } else {
+                        ListGroup(release.version) {
+                            GroupSegment(Modifier.testTag("updates.release.${release.version}")) {
+                                Text(release.summary, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            release.sections.forEach { (title, notes) -> Notes(title, notes) }
+                        }
                     }
                 }
             }
             item("features") {
-                ListGroup("What's in the app") {
-                    FEATURES.forEach { (title, notes) -> Notes(title, notes, Modifier.testTag("updates.features.$title")) }
+                Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
+                    GroupTitle("What's in the app", Modifier.padding(horizontal = 16.dp))
+                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(FEATURES) { (title, _) ->
+                            FilterChip(title == feature, { feature = title }, { Text(title) }, Modifier.testTag("updates.feature_chip.$title"))
+                        }
+                    }
+                    NoteSegments(FEATURES.first { it.first == feature }.second, Modifier.padding(start = 16.dp, top = 6.dp, end = 16.dp).testTag("updates.features.$feature"))
                 }
             }
             item {
                 ListGroup("Credits", footer = "Built by Aster0.") {
-                    GroupItem("Source code", "updates.github", Lucide.Github, "github.com/itsKryxen/vitap-mate", onClick = { uri.openUri(GITHUB) }, trailing = open)
-                    GroupItem("Instagram", "updates.instagram", Lucide.Instagram, "@itsaster0", onClick = { uri.openUri(INSTAGRAM) }, trailing = open)
+                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+                        Tile("Source code", "updates.github", Lucide.Github, CircleShape, "github.com/itsKryxen/vitap-mate", false, Modifier.weight(1f), onClick = { uri.openUri(GITHUB) })
+                        Tile("Instagram", "updates.instagram", Lucide.Instagram, MaterialShapes.Cookie7Sided.toShape(), "@itsaster0", false, Modifier.weight(1f), onClick = { uri.openUri(INSTAGRAM) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** A section title in [ListGroup]'s style, for sections laid out by hand. */
+@Composable
+private fun GroupTitle(text: String, modifier: Modifier = Modifier) = Text(
+    text,
+    modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp).semantics { heading() },
+    style = MaterialTheme.typography.titleSmall,
+    color = MaterialTheme.colorScheme.primary,
+)
+
+/** Notes as one rounded group of segments, each with a small accent marker. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun NoteSegments(notes: List<String>, modifier: Modifier = Modifier) {
+    Column(modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+        notes.forEach { note ->
+            GroupSegment {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(Modifier.padding(top = 6.dp).size(8.dp).background(AppTheme.tones.accent, RoundedCornerShape(3.dp)))
+                    Text(note, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

@@ -29,7 +29,6 @@ fun OtpAutofillSetting() {
     val picked = OtpAutofill.selected()
     val forwarding = MailForwarding.status
     val account = Gmail.account
-    val days = account?.daysLeft
     var warn = false
     val hint = when (picked) {
         OtpSource.Forwarding -> when (forwarding?.state) {
@@ -38,12 +37,7 @@ fun OtpAutofillSetting() {
             ForwardingState.WAITING -> "Mail forwarding · finish setting up in Gmail"
             ForwardingState.ON -> "Mail forwarding" + (forwarding.lastOtpAt?.let { " · last OTP ${ago(it)}" } ?: "")
         }
-        OtpSource.Gmail -> when {
-            account == null -> "Gmail · not connected yet"
-            account.needsReconnect -> "Gmail · reconnect needed".also { warn = true }
-            days != null && days <= 2 -> "Gmail · reconnect in ${if (days == 0L) "<1" else "$days"} d".also { warn = true }
-            else -> "Gmail · ${account.email}"
-        }
+        OtpSource.Gmail -> otpWarning()?.also { warn = true } ?: if (account == null) "Gmail · not connected yet" else "Gmail · ${account.email}"
     }
     GroupItem(
         "OTP auto-fill",
@@ -55,4 +49,16 @@ fun OtpAutofillSetting() {
         tone = if (warn) AppTheme.tones.warning else null,
     )
     if (open) OtpAutofillSheet { open = false }
+}
+
+/** Gmail's grant ended or ends within 2 days (the row's warning, also in Settings' "Needs you"); null otherwise. */
+fun otpWarning(): String? {
+    if (OtpAutofill.selected() != OtpSource.Gmail) return null
+    val account = Gmail.account ?: return null
+    val days = account.daysLeft
+    return when {
+        account.needsReconnect -> "Gmail · reconnect needed"
+        days != null && days <= 2 -> "Gmail · reconnect in ${if (days == 0L) "<1" else "$days"} d"
+        else -> null
+    }
 }

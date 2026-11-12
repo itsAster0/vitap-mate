@@ -214,8 +214,16 @@ internal fun LazyListScope.runItems(runs: List<Run>?, limit: Int, container: Col
     val groups = shown.groupBy { groupOf(it, now) }
     groups.entries.forEachIndexed { gi, (g, members) ->
         item(key = "group.$g", contentType = "group") {
+            val failed = members.count { it.failed && !it.running }
             Text(
-                g,
+                buildAnnotatedString {
+                    append(g)
+                    // How many runs it holds, and how many failed ("Earlier today · 3 · 1 failed").
+                    if (g != "Now") withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                        append(" · ${members.size}")
+                        if (failed > 0) append(" · $failed failed")
+                    }
+                },
                 Modifier.animateItem().padding(start = inset + 6.dp, top = if (gi == 0) 2.dp else 13.dp, bottom = 5.dp)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape).padding(horizontal = 12.dp, vertical = 4.dp),
                 style = MaterialTheme.typography.labelLarge,
@@ -254,7 +262,7 @@ private fun groupOf(run: Run, now: Long): String {
 private fun RunCard(run: Run, container: Color, shape: Shape, modifier: Modifier) {
     var open by rememberSaveable(run.id) { mutableStateOf(false) }
     val now by rememberNow(if (run.running) 1_000 else 30_000)
-    Surface({ open = !open }, modifier.fillMaxWidth().testTag("activity.${run.id}"), shape = shape, color = if (run.running) AppTheme.tones.accentTone.subtle else container) {
+    Surface({ open = !open }, modifier.fillMaxWidth().testTag("activity.${run.id}"), shape = shape, color = if (run.running) AppTheme.tones.accentTone.subtle else if (run.failed) AppTheme.tones.danger.subtle else container) {
         Column(Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()).padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 RunGlyph(run)
@@ -391,7 +399,8 @@ private fun StepDetails(run: Run, now: Long) {
     val inspector = LocalInspector.current
     val scheme = MaterialTheme.colorScheme
     val rail = scheme.outlineVariant
-    Column(Modifier.padding(start = 45.dp, top = 14.dp)) {
+    // In an inset container, so the steps read as one block under the chain.
+    Column(Modifier.padding(start = 45.dp, top = 12.dp).fillMaxWidth().background(scheme.surfaceContainerHighest, RoundedCornerShape(18.dp)).padding(12.dp)) {
         // The steps on a rail: a 2 dp line through their dots.
         Column(
             Modifier.drawBehind { drawLine(rail, Offset(3.5.dp.toPx(), 0f), Offset(3.5.dp.toPx(), size.height), 2.dp.toPx()) },
