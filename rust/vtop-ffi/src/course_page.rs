@@ -105,7 +105,7 @@ pub struct Material {
     pub path: String,
 }
 
-/// A course page file for Android's DownloadManager, which fetches it straight from VTOP: the
+/// A course page file or outing pass for Android's DownloadManager, which fetches it straight from VTOP: the
 /// URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
 /// VTOP's name for it (else a name from the link) and its type ("application/pdf").
 #[derive(Clone, PartialEq, uniffi::Record)]
@@ -329,7 +329,7 @@ impl Core {
 }
 
 /// `link` with VTOP's name, else `fallback`; its type without parameters.
-fn file_link(link: vtop_core::client::FileLink, fallback: &str) -> FileLink {
+pub(crate) fn file_link(link: vtop_core::client::FileLink, fallback: &str) -> FileLink {
     let mime = link
         .content_type
         .split(';')
@@ -764,6 +764,8 @@ mod tests {
     }
 
     /// Answers every request with `head` and `body`; returns the base URL.
+    /// Answers a `HEAD` with `head` (and, as a server may, the body); anything else gets 405,
+    /// so a link is only ever made from a `HEAD`.
     async fn serve(head: &'static str, body: Vec<u8>) -> String {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -774,6 +776,12 @@ mod tests {
                 tokio::spawn(async move {
                     let mut buffer = vec![0u8; 16 * 1024];
                     if socket.read(&mut buffer).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if !buffer.starts_with(b"HEAD ") {
+                        let refused =
+                            "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\n\r\n";
+                        let _ = socket.write_all(refused.as_bytes()).await;
                         return;
                     }
                     let head = format!(

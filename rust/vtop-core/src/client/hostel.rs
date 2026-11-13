@@ -2,7 +2,7 @@
 //! `vtop-proto` outing machines. Apply and cancel are sent once, never
 //! retried.
 
-use super::VtopClient;
+use super::{FileLink, VtopClient};
 use crate::error::VtopResult;
 use crate::inputs::OutingPassId;
 use crate::machine::OnePost;
@@ -76,6 +76,17 @@ impl VtopClient {
         let signed = self.signed("get_outing_pass").await?;
         let machine = OnePost::reading(outing::pass(&signed, kind, id), outing::read_pass);
         self.run("get_outing_pass", machine).await
+    }
+
+    /// [`Self::outing_pass`] for a downloader outside this client (Android's
+    /// DownloadManager), as [`Self::course_page_file_link`].
+    pub async fn outing_pass_link(
+        &self,
+        kind: OutingKind,
+        id: &OutingPassId,
+    ) -> VtopResult<FileLink> {
+        let signed = self.signed("get_outing_pass").await?;
+        self.file_link(outing::pass(&signed, kind, id)).await
     }
 
     /// [`Self::outing_pass`] written to the file `to` (the app's transport

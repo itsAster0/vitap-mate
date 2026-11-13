@@ -3,7 +3,7 @@
 
 use log::warn;
 use vtop_proto::course_pages::{self, file_head, plain_id};
-use vtop_proto::http::Request;
+use vtop_proto::http::{Method, Request};
 
 use super::{network_error, send_error, HopResponse, VtopClient, NETWORK};
 use crate::error::{VtopError, VtopResult};
@@ -90,7 +90,7 @@ impl VtopClient {
 
     /// [`Self::course_page_file`] for a downloader outside this client
     /// (Android's DownloadManager, straight to VTOP): signs in if needed,
-    /// then asks VTOP for the file's name and type (the body is dropped),
+    /// then asks VTOP for the file's name and type with a `HEAD`,
     /// so the downloader can save it under that name.
     pub async fn course_page_file_link(&self, path: &CourseFilePath) -> VtopResult<FileLink> {
         let signed = self.signed("get_course_page_file").await?;
@@ -115,12 +115,11 @@ impl VtopClient {
         .await
     }
 
-    async fn file_link(&self, request: Request) -> VtopResult<FileLink> {
+    pub(super) async fn file_link(&self, request: Request) -> VtopResult<FileLink> {
         let url = request.url.clone();
         let (_, info) = self
-            .send_course_file("get_course_page_file_info", request)
+            .send_course_file("get_course_page_file_info", request, true)
             .await?;
-        // The response drops with its body unread, closing the stream.
         let cookie = self.cookie_header().ok_or(VtopError::SessionExpired)?;
         Ok(FileLink {
             url,
@@ -131,16 +130,15 @@ impl VtopClient {
     }
 
     /// The name and type of what a course page link points at, without
-    /// downloading it: the body is dropped once the headers arrive. Lets
+    /// downloading it (a `HEAD`). Lets
     /// the system download manager save it under a proper name.
     pub async fn course_page_file_info(&self, path: &CourseFilePath) -> VtopResult<CourseFileInfo> {
         let signed = self.signed("get_course_page_file_info").await?;
         let request = course_pages::file(&signed, path, vtop_proto::now_unix());
         let (_, info) = self
-            .send_course_file("get_course_page_file_info", request)
+            .send_course_file("get_course_page_file_info", request, true)
             .await?;
         Ok(info)
-        // The response drops with its body unread, closing the stream.
     }
 
     /// [`Self::course_page_file_info`] for the class's course plan.
@@ -154,7 +152,7 @@ impl VtopClient {
         let request =
             course_pages::course_plan(&signed, semester, class_id, vtop_proto::now_unix());
         let (_, info) = self
-            .send_course_file("get_course_page_file_info", request)
+            .send_course_file("get_course_page_file_info", request, true)
             .await?;
         Ok(info)
     }
@@ -166,7 +164,7 @@ impl VtopClient {
         context: &str,
         request: Request,
     ) -> VtopResult<CourseFileDownload> {
-        let (response, info) = self.send_course_file(context, request).await?;
+        let (response, info) = self.send_course_file(context, request, false).await?;
         Ok(CourseFileDownload {
             file_name: info.file_name(),
             content_type: info.content_type,
@@ -174,16 +172,21 @@ impl VtopClient {
         })
     }
 
-    /// Sends a download `GET` (redirects followed, no retry) and checks its
-    /// status and headers with [`file_head`]; the body is not read. The
-    /// query carries the CSRF token, so it is never logged.
+    /// Sends a download `GET` (redirects followed, no retry), or with
+    /// `head_only` a `HEAD`, and checks its status and headers with
+    /// [`file_head`]; the body is not read. The query carries the CSRF
+    /// token, so it is never logged.
     async fn send_course_file(
         &self,
         context: &str,
-        request: Request,
+        mut request: Request,
+        head_only: bool,
     ) -> VtopResult<(HopResponse, CourseFileInfo)> {
+        if head_only {
+            request.method = Method::Head;
+        }
         let path = request.url.split('?').next().unwrap_or_default();
-        Self::log_request(context, "GET", path);
+        Self::log_request(context, if head_only { "HEAD" } else { "GET" }, path);
         let response = self
             .send_request(request)
             .await

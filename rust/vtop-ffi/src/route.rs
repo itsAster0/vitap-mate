@@ -176,7 +176,7 @@ impl Core {
 }
 
 /// Sends VTOP's hops through the edge's `/vtop/` while the proxy route is on, else (or when the
-/// edge fails) straight to VTOP.
+/// edge fails) straight to VTOP; downloads always go straight to VTOP.
 #[derive(Debug)]
 pub(crate) struct Routed(pub(crate) Arc<dyn Transport>);
 
@@ -213,7 +213,9 @@ impl Transport for Routed {
             if !Self::is_vtop(&hop) {
                 return self.0.send(hop).await;
             }
-            if active(Route::Proxy) {
+            // Downloads go straight to VTOP, as Android's DownloadManager does.
+            let download = hop.method == "HEAD" || hop.download_to.is_some();
+            if !download && active(Route::Proxy) {
                 let edge = state().server.trim_end_matches('/').to_string();
                 let mut proxied = copy(&hop);
                 proxied.url = reorigin(&hop.url, DEFAULT_BASE_URL, &edge);

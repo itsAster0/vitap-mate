@@ -359,6 +359,7 @@ impl VtopClient {
             let method = match request.method {
                 Method::Get => "GET",
                 Method::Post => "POST",
+                Method::Head => "HEAD",
             };
             Self::log_request(&format!("{context}.send"), method, &request.url);
             let response = if request.retry {
@@ -405,6 +406,7 @@ impl VtopClient {
         let mut method = match request.method {
             Method::Get => "GET",
             Method::Post => "POST",
+            Method::Head => "HEAD",
         };
         let (mut url, mut headers, mut body) = (request.url, request.headers, request.body);
         let mut hops = 0;
@@ -442,7 +444,7 @@ impl VtopClient {
             }
 
             // 307/308 would need the original body again; VTOP only uses
-            // 301/302/303, which continue as a GET.
+            // 301/302/303, which continue as a GET (a HEAD stays a HEAD).
             let next = (matches!(response.status, 301..=303) && hops < MAX_REDIRECTS)
                 .then(|| response.header("location"))
                 .flatten()
@@ -461,7 +463,8 @@ impl VtopClient {
                 return Ok(response);
             };
             hops += 1;
-            (method, url, headers, body) = ("GET", next, Vec::new(), Vec::new());
+            let method_next = if method == "HEAD" { "HEAD" } else { "GET" };
+            (method, url, headers, body) = (method_next, next, Vec::new(), Vec::new());
         }
     }
 

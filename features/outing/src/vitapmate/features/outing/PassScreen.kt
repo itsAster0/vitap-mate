@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.FileX
@@ -60,6 +61,7 @@ import vitapmate.ui.Space
 internal fun PassScreen(item: String) {
     val kind = if (item.substringBefore(':') == OutingKind.WEEKEND.key) OutingKind.WEEKEND else OutingKind.GENERAL
     val passId = item.substringAfter(':')
+    val context = LocalContext.current
     var pages by remember { mutableStateOf<List<Bitmap>?>(null) }
     var failure by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -69,7 +71,7 @@ internal fun PassScreen(item: String) {
             failure = null
             try {
                 pages = flow("outing.pass") { id ->
-                    val doc = passDoc(kind, passId, id)
+                    val doc = passDoc(context, kind, passId, id)
                     Docs.opened(doc.id)
                     withContext(Dispatchers.IO) { render(Docs.open(doc), widthPx) }
                         .also { Log.info("ui.outing", "pass shown", id, mapOf("kind" to kind.key, "pages" to "${it.size}")) }

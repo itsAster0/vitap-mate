@@ -13,6 +13,9 @@ const BOUNDARY: &str = "vitapmate-7d1f0c9a5b3e";
 pub enum Method {
     Get,
     Post,
+    /// A `GET`'s head only: a file's name and type for a downloader
+    /// elsewhere.
+    Head,
 }
 
 /// One request. `Debug` shows only the method and the URL without its

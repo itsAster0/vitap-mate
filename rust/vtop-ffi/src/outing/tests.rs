@@ -471,8 +471,13 @@ impl MockVtop {
                         let path = request.split_whitespace().nth(1).unwrap_or("/").to_string();
                         *mock.hits.lock().unwrap().entry(path.clone()).or_default() += 1;
                         let (status, body) = respond(&path);
+                        let kind = if body.starts_with("%PDF") {
+                            "application/pdf"
+                        } else {
+                            "text/html"
+                        };
                         let response = format!(
-                            "HTTP/1.1 {status}\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{body}",
+                            "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\r\n{body}",
                             body.len()
                         );
                         if socket.write_all(response.as_bytes()).await.is_err() {
@@ -632,19 +637,21 @@ async fn weekend_cancel_and_pass() {
     assert!(matches!(refused, Err(CoreError::Other { .. })));
     assert_eq!(mock.hits("/vtop/hostel/saveOutingForm"), 0);
 
-    // The pass is downloaded once, then read from disk.
-    let path = core
-        .outing_pass("f".into(), OutingKind::Weekend, "W9".into())
+    // The pass is a link for DownloadManager, under the app's name for it.
+    let link = core
+        .outing_pass_link("f".into(), OutingKind::Weekend, "W9".into())
         .await
         .unwrap();
-    assert!(path.ends_with("pages/outing_passes/W9.pdf"));
-    assert!(fs::read(&path).unwrap().starts_with(b"%PDF"));
-    core.outing_pass("f".into(), OutingKind::Weekend, "W9".into())
-        .await
-        .unwrap();
-    assert_eq!(mock.hits("/vtop/hostel/downloadOutingForm/W9"), 1);
+    assert!(
+        link.url.contains("/vtop/hostel/downloadOutingForm/W9?") && link.url.contains("_csrf=")
+    );
+    assert!(!link.cookie.is_empty());
+    assert_eq!(
+        (link.name.as_str(), link.mime.as_str()),
+        ("Outing pass W9.pdf", "application/pdf")
+    );
 
-    // Signing out drops the cached lists and passes.
+    // Signing out drops the cached lists.
     core.sign_out("f".into());
     assert!(!dir.join(PAGES).exists());
     let _ = fs::remove_dir_all(&dir);

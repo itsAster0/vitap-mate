@@ -1000,7 +1000,7 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_weekend_outing(
     ): Int
-    external fun uniffi_vtop_ffi_checksum_method_core_outing_pass(
+    external fun uniffi_vtop_ffi_checksum_method_core_outing_pass_link(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_profile(
     ): Int
@@ -1252,7 +1252,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_weekend_outing(`ptr`: Long,`flow`: RustBuffer.ByValue,
     ): Long
-    external fun uniffi_vtop_ffi_fn_method_core_outing_pass(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`passId`: RustBuffer.ByValue,
+    external fun uniffi_vtop_ffi_fn_method_core_outing_pass_link(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`passId`: RustBuffer.ByValue,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_cached_profile(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1771,7 +1771,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_weekend_outing() and 0xFFFF) != 40883) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_outing_pass() and 0xFFFF) != 45359) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_outing_pass_link() and 0xFFFF) != 1262) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_profile() and 0xFFFF) != 48897) {
@@ -2957,10 +2957,11 @@ public interface CoreInterface {
     suspend fun `fetchWeekendOuting`(`flow`: kotlin.String): WeekendOuting
     
     /**
-     * The path of an accepted request's PDF pass in `pages/outing_passes/`,
-     * downloaded unless already there (the app moves it into Docs).
+     * An accepted request's PDF pass as a [`FileLink`] for Android's
+     * DownloadManager, named "Outing pass <id>.pdf"; signs in first if
+     * needed.
      */
-    suspend fun `outingPass`(`flow`: kotlin.String, `kind`: OutingKind, `passId`: kotlin.String): kotlin.String
+    suspend fun `outingPassLink`(`flow`: kotlin.String, `kind`: OutingKind, `passId`: kotlin.String): FileLink
     
     /**
      * The signed-in account's cached profile and mentor.
@@ -4983,15 +4984,16 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The path of an accepted request's PDF pass in `pages/outing_passes/`,
-     * downloaded unless already there (the app moves it into Docs).
+     * An accepted request's PDF pass as a [`FileLink`] for Android's
+     * DownloadManager, named "Outing pass <id>.pdf"; signs in first if
+     * needed.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
-    override suspend fun `outingPass`(`flow`: kotlin.String, `kind`: OutingKind, `passId`: kotlin.String) : kotlin.String {
+    override suspend fun `outingPassLink`(`flow`: kotlin.String, `kind`: OutingKind, `passId`: kotlin.String) : FileLink {
         return uniffiRustCallAsync(
         callWithHandle { uniffiHandle ->
-            UniffiLib.uniffi_vtop_ffi_fn_method_core_outing_pass(
+            UniffiLib.uniffi_vtop_ffi_fn_method_core_outing_pass_link(
                 uniffiHandle,
                 
         FfiConverterString.lower(`flow`),
@@ -5003,7 +5005,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
         { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
         // lift function
-        { FfiConverterString.lift(it) },
+        { FfiConverterTypeFileLink.lift(it) },
         // Error FFI converter
         CoreException.ErrorHandler,
     )
@@ -9410,7 +9412,7 @@ public object FfiConverterTypeFieldGroup: FfiConverterRustBuffer<FieldGroup> {
 
 
 /**
- * A course page file for Android's DownloadManager, which fetches it straight from VTOP: the
+ * A course page file or outing pass for Android's DownloadManager, which fetches it straight from VTOP: the
  * URL (its CSRF token in the query) and the `Cookie` header, both secrets that are never logged;
  * VTOP's name for it (else a name from the link) and its type ("application/pdf").
  */

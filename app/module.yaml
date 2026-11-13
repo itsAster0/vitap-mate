@@ -33,7 +33,7 @@ settings:
   android:
     signing: enabled
     applicationId: com.vitap_pal.app
-    versionCode: 3000200
+    versionCode: 3000201
     versionName: "3.0.2"
     namespace: vitapmate
     minSdk: 28

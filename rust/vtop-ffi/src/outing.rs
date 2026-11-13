@@ -21,15 +21,13 @@ use vtop_core::types::{
 };
 use vtop_core::{VtopError, VtopResult};
 
+use crate::course_page::{FileLink, file_link};
 use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
 /// Outings are not per semester; under `pages/` so signing out drops them.
 const GENERAL: &str = "outing_general.json";
 const WEEKEND: &str = "outing_weekend.json";
-/// Downloaded passes, `pages/outing_passes/<pass id>.pdf`, so a pass opens
-/// offline at the gate.
-const PASSES: &str = "outing_passes";
 
 /// VTOP's general outing page refuses a leaving time less than this far off
 /// (minutes).
@@ -380,40 +378,28 @@ impl Core {
         .await
     }
 
-    /// The path of an accepted request's PDF pass in `pages/outing_passes/`,
-    /// downloaded unless already there (the app moves it into Docs).
-    pub async fn outing_pass(
+    /// An accepted request's PDF pass as a [`FileLink`] for Android's
+    /// DownloadManager, named "Outing pass <id>.pdf"; signs in first if
+    /// needed.
+    pub async fn outing_pass_link(
         &self,
         flow: String,
         kind: OutingKind,
         pass_id: String,
-    ) -> Result<String, CoreError> {
-        traced("outing_pass", &flow, async {
+    ) -> Result<FileLink, CoreError> {
+        traced("outing_pass_link", &flow, async {
             let id = OutingPassId::parse(&pass_id)?;
-            let dir = self.at(PAGES).join(PASSES);
-            let path = dir.join(format!("{}.pdf", id.as_str()));
-            if fs::metadata(&path).is_ok_and(|meta| meta.len() > 0) {
-                info!(?kind, "outing pass saved already");
-                return Ok(path.to_string_lossy().into_owned());
-            }
             let vtop_kind = match kind {
                 OutingKind::General => VtopOutingKind::General,
                 OutingKind::Weekend => VtopOutingKind::Weekend,
             };
-            fs::create_dir_all(&dir)?;
-            // The transport writes it to a temporary file, renamed once it proved a PDF.
-            let temp = path.with_extension("tmp");
-            let size = async {
-                signed_in!(self, |client| client
-                    .save_outing_pass(vtop_kind, &id, &temp))
-            }
-            .await
-            .inspect_err(|_| {
-                let _ = fs::remove_file(&temp);
-            })?;
-            fs::rename(&temp, &path)?;
-            info!(?kind, bytes = size, "outing pass downloaded");
-            Ok(path.to_string_lossy().into_owned())
+            let link = async { signed_in!(self, |client| client.outing_pass_link(vtop_kind, &id)) }
+                .await?;
+            info!(?kind, "outing pass link ready");
+            Ok(FileLink {
+                name: format!("Outing pass {}.pdf", id.as_str()),
+                ..file_link(link, "outing-pass")
+            })
         })
         .await
     }

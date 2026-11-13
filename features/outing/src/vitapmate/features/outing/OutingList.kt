@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import com.composables.icons.lucide.DoorOpen
 import com.composables.icons.lucide.Lucide
@@ -100,6 +101,7 @@ internal fun failureOf(e: Throwable, flow: String): String =
 @Composable
 private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> Summary, onApply: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val openDetail = LocalOpenDetail.current
     // Request keys with a cancel or pass on its way; the row stays as it is until VTOP answers.
     var cancelling by remember { mutableStateOf(setOf<String>()) }
@@ -155,7 +157,7 @@ private fun <T> Requests(kind: OutingKind, page: PageHandle<T>, summary: (T) -> 
                                 try {
                                     flow("outing.pass") { id ->
                                         Log.info("ui.outing", "pass", id, mapOf("kind" to kind.key))
-                                        passDoc(kind, passId, id)
+                                        passDoc(context, kind, passId, id)
                                     }
                                     openDetail.open("${kind.key}:$passId", "Outing pass")
                                 } catch (e: CancellationException) {
