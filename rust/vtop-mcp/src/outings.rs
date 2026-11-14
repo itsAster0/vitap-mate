@@ -235,12 +235,6 @@ fn check_general_dates(
     if returns <= leaves {
         return Err(invalid("return must be after leaving"));
     }
-    if form.max_days_away > 0 && back > out + i64::from(form.max_days_away) {
-        return Err(invalid(format!(
-            "return date can be at most {} days after leaving",
-            form.max_days_away
-        )));
-    }
     Ok(())
 }
 

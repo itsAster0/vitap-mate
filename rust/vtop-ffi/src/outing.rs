@@ -141,7 +141,7 @@ pub struct GeneralOuting {
     /// "MH-2 · Room 911" while open.
     pub hostel: Option<String>,
     pub rules: GeneralOutingRules,
-    /// Apply, Leave, Back by, Longest trip.
+    /// Apply, Leave, Back by.
     pub facts: Vec<OutingFact>,
     /// "6:00 AM – 10:00 PM", for the fields.
     pub out_window: Option<String>,
@@ -545,10 +545,6 @@ impl GeneralOuting {
         if let Some((_, latest)) = back {
             facts.push(fact("Back by", short_clock(latest)));
         }
-        facts.push(fact(
-            "Longest trip",
-            format!("{} days", rules.max_days_away),
-        ));
         let mut requests: Vec<(i64, OutingRequest)> = data
             .records
             .iter()

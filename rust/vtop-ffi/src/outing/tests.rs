@@ -110,8 +110,7 @@ fn general_requests_are_dated_labelled_and_sorted() {
         [
             ("Apply", "24 h – 30 days ahead"),
             ("Leave", "6 AM – 10 PM"),
-            ("Back by", "8 PM"),
-            ("Longest trip", "15 days")
+            ("Back by", "8 PM")
         ]
     );
 
