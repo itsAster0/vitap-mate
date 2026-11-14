@@ -116,9 +116,9 @@ private const val MCP_URL = "https://vmate.aster0.dev/mcp"
 
 /**
  * Connected apps (Rust's `keys.rs`): the access keys of the browser extension and AI apps (MCP),
- * each with its last uses, outings switch and revoke; "Pair a browser" (scan the extension's QR
- * code or type its code) and "New MCP key" (shown once). Making a key asks for the screen lock
- * and links this phone to the server account the first time. Flows `connected_apps.*`, lines
+ * each with its last uses, outings switch and revoke; "Pair a browser" (scan the extension's or
+ * the AI app's QR code or type its code), "Copy MCP link" and "Make a key by hand" (shown once).
+ * Making a key asks for the screen lock and links this phone to the server account the first time. Flows `connected_apps.*`, lines
  * `ui.connected_apps`; keys, codes and cookies are never logged.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -126,6 +126,7 @@ private const val MCP_URL = "https://vmate.aster0.dev/mcp"
 fun ConnectedAppsScreen() {
     val scope = rememberCoroutineScope()
     val uri = LocalUriHandler.current
+    val context = LocalContext.current
     var apps by remember { mutableStateOf<ConnectedApps?>(null) }
     var problem by remember { mutableStateOf<Problem?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -164,8 +165,9 @@ fun ConnectedAppsScreen() {
                 ListGroup("Add", footer = "The browser extension signs you in to VTOP in Chrome or Firefox; AI apps such as Claude read your VTOP data over MCP. Neither sees your password.") {
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                         Tile("Pair a browser", "connected_apps.pair", Lucide.Scan, MaterialShapes.Cookie9Sided.toShape(), "Scan the code the extension or an AI app's sign-in page shows", true, Modifier.weight(1f), onClick = { pairing = true })
-                        Tile("New MCP key", "connected_apps.new_mcp", Lucide.Sparkles, MaterialShapes.Sunny.toShape(), "For Claude and other AI apps", false, Modifier.weight(1f), onClick = { newMcp = true })
+                        Tile("Copy MCP link", "connected_apps.copy_mcp", Lucide.Copy, MaterialShapes.Sunny.toShape(), "Add it to Claude or another AI app, then pair the code it shows", false, Modifier.weight(1f), onClick = { copy(context, "MCP link", MCP_URL) })
                     }
+                    GroupItem("Make a key by hand", "connected_apps.new_mcp", Lucide.KeyRound, "For AI apps that take a key instead of signing in", onClick = { newMcp = true }, trailing = { Chevron() })
                     GroupItem("Get the extension", "connected_apps.get_extension", Lucide.Download, "Chrome zip and Firefox add-on, from GitHub", onClick = { uri.openUri(EXTENSION_URL) }, trailing = { Icon(Lucide.ExternalLink, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
             }
@@ -182,7 +184,7 @@ fun ConnectedAppsScreen() {
                             enabled = !busy,
                             onClick = { change("Link this phone", "link", "Phone linked") { c, f -> c.linkPhone(f) } },
                             trailing = { Chevron() },
-                        ) else if (current.keys.isEmpty()) GroupItem("No keys yet", "connected_apps.empty", Lucide.KeyRound, "Pair a browser or make an MCP key above")
+                        ) else if (current.keys.isEmpty()) GroupItem("No keys yet", "connected_apps.empty", Lucide.KeyRound, "Pair a browser or an AI app above")
                         current.keys.forEach { key ->
                             GroupItem(key.label, "connected_apps.key.${key.id}", key.kind.icon, onClick = { opened = key }, trailing = { Chevron() }, iconShape = key.kind.shape, below = { KeyTags(key) })
                         }
