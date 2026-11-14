@@ -146,8 +146,10 @@ class PageHandle<T> internal constructor(
     }
 
     /** One fetch of the page, with what follows from it once (however many handles wait for it). */
-    private suspend fun download(flow: String): T {
+    private suspend fun download(flow: String, retried: Boolean = false): T {
         val start = System.nanoTime()
+        val otpRound = OtpPrompt.generation
+        val otpAsks = OtpPrompt.asks
         try {
             var udp = false
             val fresh = Activity.track("Refreshing ${id.replace('_', ' ')}", flow) {
@@ -161,11 +163,16 @@ class PageHandle<T> internal constructor(
             StaleSweep.afterFetch(ms)
             // A fetch caches the semester list when there was none.
             if (SemesterChoice.semesters == null) SemesterChoice.readCache(flow)
+            OtpPrompt.signedIn(otpAsks, flow)
             return fresh
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            askedOtp(e)
+            // A code was accepted while this fetch ran: VTOP is signed in now, so fetch again
+            // instead of asking for another code.
+            if (OtpPrompt.generation != otpRound) {
+                if (e is CoreException.OtpRequired && !retried) return download(flow, retried = true)
+            } else askedOtp(e)
             // No pick (any more): SemesterChoice.selected turns null and the app shows the picker.
             if (e is CoreException.SemesterNeeded) SemesterChoice.readCache(flow)
             throw e
@@ -332,8 +339,24 @@ object OtpPrompt {
     var generation by mutableIntStateOf(0)
         private set
 
+    /** Times the prompt was asked for, so a fetch can tell it opened before the fetch began. */
+    var asks = 0
+        private set
+
     fun ask(message: String) {
+        asks++
         this.message = message
+    }
+
+    /**
+     * A live fetch got through while the prompt was open since before it started ([asksAtStart]):
+     * VTOP got signed in another way (another route, the server, background auto-fill), so the
+     * prompt closes as if the code was accepted and open pages fetch again.
+     */
+    fun signedIn(asksAtStart: Int, flow: String) {
+        if (message == null || asks != asksAtStart) return
+        Log.info("ui.otp", "signed in meanwhile, prompt closed", flow)
+        done()
     }
 
     /** [ask]s, then waits for the prompt to close; true when the code was accepted ([done]). */

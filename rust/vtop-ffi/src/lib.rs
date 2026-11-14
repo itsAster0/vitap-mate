@@ -280,9 +280,16 @@ macro_rules! signed_in {
         let first = {
             let session = slot.read().await;
             let $client = &session.client;
-            match $call.await {
-                Err(VtopError::SessionExpired) => Err(session.logins),
-                result => Ok(result?),
+            if session.otp.is_some() {
+                // Waiting for the OTP: a call now would check the session with VTOP, which
+                // bounces to the login page and wipes the challenge the code is for.
+                // `relogin` answers with the open challenge instead.
+                Err(session.logins)
+            } else {
+                match $call.await {
+                    Err(VtopError::SessionExpired) => Err(session.logins),
+                    result => Ok(result?),
+                }
             }
         };
         let data = match first {
@@ -440,6 +447,9 @@ impl Core {
                 return self.server_otp(&slot, Some(code.trim()), &flow).await;
             }
             let mut session = slot.write().await;
+            if session.client.session_state().otp_issued_at.is_none() {
+                return self.fresh_challenge(&slot, &mut session).await;
+            }
             session
                 .client
                 .submit_security_otp(code.trim())
@@ -464,6 +474,13 @@ impl Core {
                 return self.server_otp(&slot, None, &flow).await;
             }
             let mut session = slot.write().await;
+            if session.client.session_state().otp_issued_at.is_none() {
+                // Signing in afresh mails the new code.
+                return match self.fresh_challenge(&slot, &mut session).await {
+                    Err(CoreError::OtpRejected { .. }) => Ok(()),
+                    result => result,
+                };
+            }
             Ok(session.client.resend_security_otp().await?)
         })
         .await
@@ -979,6 +996,35 @@ impl Core {
     fn read_page<T: DeserializeOwned>(&self, file: &str) -> Option<T> {
         let list = self.read::<SemesterData>(SEMESTERS)?;
         self.read(&format!("{PAGES}/{}/{file}", self.pick(&list)?))
+    }
+
+    /// The client has no OTP challenge left to take a code for (the app restarted, or a call
+    /// dropped it): signs in afresh. Ok when VTOP lets it in without a code; when VTOP mails a
+    /// new one, `OtpRejected` saying so, so the prompt stays open and auto-fill takes the new
+    /// code instead of failing on a challenge that is gone.
+    async fn fresh_challenge(
+        &self,
+        slot: &Arc<Slot>,
+        session: &mut Session,
+    ) -> Result<(), CoreError> {
+        warn!("no otp challenge left to answer; signing in again");
+        session.restart()?;
+        match session.client.login().await {
+            Ok(()) => {
+                session.logins += 1;
+                obs::set_regno(session.client.registration_number().ok());
+                self.save(slot, session);
+                Ok(())
+            }
+            Err(VtopError::OTPRequired(message, _)) => {
+                session.otp = Some(message);
+                Err(CoreError::OtpRejected {
+                    reason: "That sign-in had ended. VTOP sent a new code; use the newest email."
+                        .into(),
+                })
+            }
+            Err(error) => Err(error.into()),
+        }
     }
 
     async fn relogin(&self, slot: &Arc<Slot>, seen: u64) -> Result<(), CoreError> {

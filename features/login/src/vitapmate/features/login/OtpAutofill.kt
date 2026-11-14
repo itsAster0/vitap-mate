@@ -12,6 +12,7 @@ import vitapmate.core.CoreException
 import vitapmate.core.GmailGrant
 import vitapmate.data.AppCore
 import vitapmate.data.Gmail
+import vitapmate.data.OtpPrompt
 import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.observability.Log
@@ -136,6 +137,8 @@ object OtpAutofill {
                         try {
                             withContext(Dispatchers.IO) { core.submitOtp(flow, code) }
                             Log.info("sync", "otp accepted", flow, mapOf("source" to source.name.lowercase()))
+                            // The app's prompt for the same sign-in, if open, has nothing left to do.
+                            if (OtpPrompt.message != null) withContext(Dispatchers.Main) { OtpPrompt.done() }
                             gmail?.let { Gmail.tidyUp(it, flow) }
                             why = null
                             return@withTimeoutOrNull

@@ -481,6 +481,19 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
         session.otp = Some("Additional verification is required.".into());
         session.logins = 3;
     }
+    // Calls that need VTOP's session (Connected apps) answer with the open challenge too,
+    // without checking the session with VTOP, which would wipe the challenge.
+    assert_eq!(
+        core.session_cookies().await,
+        Err(CoreError::OtpRequired {
+            reason: "Additional verification is required.".into(),
+            issued_at: Some(7),
+        })
+    );
+    assert_eq!(
+        slot.read().await.client.session_state().cookies,
+        "JSESSIONID=pre"
+    );
     // Until then a re-login answers with the open challenge and when VTOP mailed its code.
     assert_eq!(
         core.relogin(&slot, 3).await,
