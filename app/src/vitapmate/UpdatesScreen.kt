@@ -52,7 +52,7 @@ import vitapmate.ui.heroCookie
 /** Route id of More → About. */
 const val UPDATES = "updates"
 
-private const val GITHUB = "https://github.com/itsKryxen/vitap-mate"
+private const val GITHUB = "https://github.com/itsAster0/vitap-mate"
 private const val INSTAGRAM = "https://www.instagram.com/itsaster0/"
 
 /** One version's notes: a line on what it is, then what changed, by section. */
@@ -209,7 +209,7 @@ fun UpdatesScreen() {
             item {
                 ListGroup("Credits", footer = "Built by Aster0.") {
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                        Tile("Source code", "updates.github", Lucide.Github, CircleShape, "github.com/itsKryxen/vitap-mate", false, Modifier.weight(1f), onClick = { uri.openUri(GITHUB) })
+                        Tile("Source code", "updates.github", Lucide.Github, CircleShape, "github.com/itsAster0/vitap-mate", false, Modifier.weight(1f), onClick = { uri.openUri(GITHUB) })
                         Tile("Instagram", "updates.instagram", Lucide.Instagram, MaterialShapes.Cookie7Sided.toShape(), "@itsaster0", false, Modifier.weight(1f), onClick = { uri.openUri(INSTAGRAM) })
                     }
                 }
