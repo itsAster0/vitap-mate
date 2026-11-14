@@ -90,6 +90,8 @@ fun App() {
             toLogin()
         }
     }
+    // Update priority 5: nothing of the app until it's updated.
+    if (PlayUpdate.blocked) return UpdateRequired()
     CompositionLocalProvider(
         LocalNav provides nav,
         LocalInspector provides InspectorOpener { nav.push(Route.FlowLog(it)) },
@@ -124,6 +126,7 @@ fun App() {
                 },
             )
             FetchOtpOverlay()
+            UpdatePillHost()
             ToastHost()
             DownloadFolderPrompt()
         }

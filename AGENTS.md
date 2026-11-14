@@ -137,6 +137,12 @@ the AAB. To release:
 4. Promote in the Play Console, or with `bundle exec fastlane android
    promote_all` (friends, alpha, beta). Production stays manual.
 
+How hard the app asks to update is the release's in-app update priority, set
+per versionCode in `UPDATE_PRIORITIES` in `fastlane/Fastfile` (add a line in the
+release commit), `DEFAULT_UPDATE_PRIORITY` (3) when not listed: 0–1 nothing, 2 a pill above the nav bar, 3 Play's flexible
+dialog on start, 4 Play's full-screen update (can be closed), 5 the app's own
+blocking screen (`app/src/vitapmate/PlayUpdate.kt`). Promotions reuse it.
+
 From a laptop, with the keystore and `keystore/play-service-account.json` in
 place: `bundle install`, then `bundle exec fastlane android deploy_internal`.
 

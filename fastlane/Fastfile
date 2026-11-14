@@ -3,12 +3,22 @@ default_platform(:android)
 # Paths are from the repo root (fastlane runs there); `sh` runs in fastlane/.
 AAB = 'build/vitapmate-release.aab'.freeze
 METADATA = 'fastlane/metadata/android'.freeze
-UPDATE_PRIORITY = 3
+# Play's in-app update priority (0-5, see PlayUpdate.kt): the default, then any release that differs, by versionCode.
+DEFAULT_UPDATE_PRIORITY = 3
+UPDATE_PRIORITIES = {
+  # 3001000 => 5,
+}.freeze
 
 # The versionCode the AAB is built with, from app/module.yaml.
 def version_code
   File.read(File.expand_path('../app/module.yaml', __dir__))[/^\s*versionCode:\s*(\d+)/, 1] or
     UI.user_error!('no versionCode in app/module.yaml')
+end
+
+def update_priority
+  UPDATE_PRIORITIES.fetch(version_code.to_i, DEFAULT_UPDATE_PRIORITY).tap do |p|
+    UI.user_error!("update priority must be 0 to 5, not #{p}") unless (0..5).cover?(p)
+  end
 end
 
 platform :android do
@@ -26,7 +36,7 @@ platform :android do
       skip_upload_metadata: true,
       skip_upload_images: true,
       skip_upload_screenshots: true,
-      in_app_update_priority: UPDATE_PRIORITY
+      in_app_update_priority: update_priority
     )
   end
 
@@ -40,7 +50,7 @@ platform :android do
         skip_upload_metadata: true,
         skip_upload_images: true,
         skip_upload_screenshots: true,
-        in_app_update_priority: UPDATE_PRIORITY
+        in_app_update_priority: update_priority
       )
     end
     # Production stays a manual step in the Play Console.

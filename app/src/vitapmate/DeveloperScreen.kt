@@ -51,6 +51,7 @@ import com.composables.icons.lucide.CircleMinus
 import com.composables.icons.lucide.ClipboardList
 import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.Database
+import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.KeySquare
 import com.composables.icons.lucide.BellRing
 import com.composables.icons.lucide.Bug
@@ -111,6 +112,7 @@ fun DeveloperScreen() {
     var editing by remember { mutableStateOf<Tunable?>(null) }
     var editServer by remember { mutableStateOf(false) }
     var setAccount by remember { mutableStateOf(false) }
+    var previewUpdate by remember { mutableStateOf(false) }
     val haptics = rememberHaptics()
     var serverRead by remember { mutableIntStateOf(0) }
     val server by produceState<String?>(null, serverRead) { value = dev("dev.server") { c, f -> c.devForwardingServer(f) } }
@@ -267,6 +269,7 @@ fun DeveloperScreen() {
                         enabled = Settings.liveUpdates,
                         onClick = { LiveUpdates.preview(context) },
                     )
+                    GroupItem("Preview an update", "dev.update_preview", Lucide.Download, "The update pill (on the tabs) or the level 5 screen, without Play", onClick = { previewUpdate = true })
                 }
             }
             item {
@@ -355,6 +358,23 @@ fun DeveloperScreen() {
             Log.info("ui.dev", "tunable set", fields = mapOf("key" to t.key, "value" to it))
         }
     }
+    if (previewUpdate) AlertDialog(
+        onDismissRequest = { previewUpdate = false },
+        title = { Text("Preview an update") },
+        text = {
+            Column {
+                Text("Levels 3 and 4 are Google Play's own dialogs and show only for a real update.")
+                listOf(
+                    "Level 2: Update runs a fake download" to { PlayUpdate.preview(UpdatePill.Available) },
+                    "Update ready (end of levels 2 and 3)" to { PlayUpdate.preview(UpdatePill.Ready) },
+                    "Level 5: update required" to { PlayUpdate.preview(null, blocked = true) },
+                ).forEachIndexed { i, (label, run) ->
+                    TextButton({ previewUpdate = false; run() }, Modifier.fillMaxWidth().padding(top = if (i == 0) 12.dp else 0.dp).testTag("dev.update_preview.$i")) { Text(label) }
+                }
+            }
+        },
+        confirmButton = { TextButton({ previewUpdate = false }) { Text("Close") } },
+    )
     if (setAccount) CredentialsDialog({ setAccount = false }) { username, password ->
         scope.launch {
             dev("dev.set_account") { c, f -> c.devSetAccount(f, username, password) }?.let {

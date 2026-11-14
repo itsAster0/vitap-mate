@@ -99,6 +99,11 @@ class MainActivity : ComponentActivity() {
         Foreground.started()
     }
 
+    override fun onResume() {
+        super.onResume()
+        PlayUpdate.resume(this)
+    }
+
     override fun onStop() {
         super.onStop()
         Foreground.stopped()
