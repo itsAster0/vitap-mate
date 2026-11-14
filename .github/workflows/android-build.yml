@@ -106,7 +106,35 @@ jobs:
           # app/keystore.properties, so the build below finds the signing config.
           mise run signing
           echo "signed=true" >> "$GITHUB_OUTPUT"
+      # The Kotlin Toolchain's downloads (its runtime, JDKs, Android tools, Gradle
+      # and Maven libraries), so a run doesn't fetch them again.
+      - name: Cache Kotlin Toolchain downloads
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/JetBrains/Kotlin
+            !~/.cache/JetBrains/Kotlin/telemetry
+            ~/.gradle/caches
+            ~/.gradle/wrapper/dists
+            !~/.gradle/caches/**/*.lock
+          key: kotlin-deps-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml') }}
+          restore-keys: kotlin-deps-${{ runner.os }}-
+      # Incremental build state from the last run, so only changed modules compile.
+      - name: Cache Kotlin build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build
+            !build/logs
+            !build/*.apk
+            !build/*.apk.idsig
+            !build/*.aab
+          key: kotlin-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: kotlin-build-${{ runner.os }}-
+      # The signed release below compiles the app itself; the debug build is
+      # only for runs without the keystore (forks and their pull requests).
       - name: Build app
+        if: steps.signing.outputs.signed != 'true'
         run: ./kotlin build
       - name: Test core
         run: ./kotlin test -m core
