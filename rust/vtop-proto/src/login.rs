@@ -7,7 +7,6 @@ use crate::error::{VtopError, VtopResult};
 use crate::http::{Request, Response, url_encode};
 use crate::inputs::RegistrationNumber;
 use crate::machine::{Machine, Step, is_login_url};
-use crate::now_unix;
 use crate::parser::page;
 
 /// Login attempts before giving up on CAPTCHAs the solver gets wrong.
@@ -129,7 +128,9 @@ impl Login {
                 let answer = (self.solve)(&captcha).map_err(VtopError::ConfigurationError)?;
                 self.stage = Stage::Credentials;
                 self.attempts += 1;
-                self.issued_at = now_unix();
+                // VTOP's clock just before the POST that makes it mail the OTP, so the code's
+                // mail (dated by VTOP too) can be told from an earlier sign-in's.
+                self.issued_at = response.server_time();
                 let body = format!(
                     "_csrf={}&username={}&password={}&captchaStr={}",
                     self.csrf,

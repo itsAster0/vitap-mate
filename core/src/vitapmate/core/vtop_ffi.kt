@@ -1687,7 +1687,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_check_forwarding() and 0xFFFF) != 46282) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 1695) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_forwarded_otp() and 0xFFFF) != 52947) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_forwarding_status() and 0xFFFF) != 52114) {
@@ -2808,7 +2808,8 @@ public interface CoreInterface {
     suspend fun `checkForwarding`(`flow`: kotlin.String): Forwarding
     
     /**
-     * The forwarded OTP sent since `since` (unix seconds), if one is in the inbox; for the OTP
+     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
+     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
      * prompt, which calls it every few seconds. Never logs the code.
      */
     suspend fun `fetchForwardedOtp`(`flow`: kotlin.String, `since`: kotlin.Long): kotlin.String?
@@ -4313,7 +4314,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * The forwarded OTP sent since `since` (unix seconds), if one is in the inbox; for the OTP
+     * The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
+     * sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
      * prompt, which calls it every few seconds. Never logs the code.
      */
     @Throws(CoreException::class)
@@ -9558,7 +9560,7 @@ data class GeneralOuting (
     var `rules`: GeneralOutingRules
     , 
     /**
-     * Apply, Leave, Back by, Longest trip.
+     * Apply, Leave, Back by.
      */
     var `facts`: List<OutingFact>
     , 

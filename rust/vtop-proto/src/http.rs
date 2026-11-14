@@ -125,6 +125,14 @@ impl Response {
             .map(|(_, value)| value.as_str())
     }
 
+    /// When the server sent this, by its `Date` header (VTOP's clock, not the phone's); now
+    /// when it has none.
+    pub fn server_time(&self) -> u64 {
+        self.header("date")
+            .and_then(parse_http_date)
+            .unwrap_or_else(crate::now_unix)
+    }
+
     /// Every `Set-Cookie` value, in order.
     pub fn set_cookies(&self) -> impl Iterator<Item = &str> {
         self.headers
@@ -214,6 +222,29 @@ pub fn http_date(unix: u64) -> String {
         secs / 60 % 60,
         secs % 60
     )
+}
+
+/// An HTTP date, `Sun, 06 Nov 1994 08:49:37 GMT`, as unix seconds ([`http_date`] backwards).
+pub fn parse_http_date(text: &str) -> Option<u64> {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let mut parts = text.split_whitespace().skip(1);
+    let day: i64 = parts.next()?.parse().ok()?;
+    let month = parts.next()?;
+    let month = MONTHS.iter().position(|m| *m == month)? as i64 + 1;
+    let year: i64 = parts.next()?.parse().ok()?;
+    let mut clock = parts.next()?.split(':').map(|n| n.parse::<i64>().ok());
+    let (hour, minute, second) = (clock.next()??, clock.next()??, clock.next()??);
+    // Days from civil (Howard Hinnant), days since 1970-01-01.
+    let y = year - i64::from(month <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (month + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    u64::try_from(days * 86_400 + hour * 3600 + minute * 60 + second).ok()
 }
 
 /// An absolute URL's scheme, host (no port, lower case) and path (no query
@@ -338,7 +369,9 @@ mod tests {
                 std::time::UNIX_EPOCH + std::time::Duration::from_secs(unix),
             );
             assert_eq!(http_date(unix), expected, "{unix}");
+            assert_eq!(parse_http_date(&expected), Some(unix), "{unix}");
         }
+        assert_eq!(parse_http_date("not a date"), None);
     }
 
     #[test]

@@ -273,7 +273,7 @@ impl ResendOtp {
         }
     }
 
-    fn send(&self) -> Step<()> {
+    fn send(&self) -> Step<u64> {
         Step::Send(otp_post(
             &self.base_url,
             RESEND_PATHS[self.path],
@@ -283,14 +283,15 @@ impl ResendOtp {
 }
 
 impl Machine for ResendOtp {
-    type Output = ();
+    /// When VTOP mailed the new code, by its clock.
+    type Output = u64;
 
-    fn start(&mut self) -> Step<()> {
+    fn start(&mut self) -> Step<u64> {
         self.path = 0;
         self.send()
     }
 
-    fn feed(&mut self, response: Response) -> Step<()> {
+    fn feed(&mut self, response: Response) -> Step<u64> {
         const FAILED: &str = "Failed to resend OTP. Please try again.";
         if response.status == 404 {
             self.path += 1;
@@ -306,14 +307,14 @@ impl Machine for ResendOtp {
                 reply.status.as_deref(),
                 Some("SUCCESS" | "SENT" | "VALID" | "OK")
             ) {
-                return Step::Done(Ok(()));
+                return Step::Done(Ok(response.server_time()));
             }
             return Step::Done(Err(failed(reply.message, FAILED)));
         }
         let lower = text.to_lowercase();
         if (200..300).contains(&response.status) && lower.contains("otp") && lower.contains("sent")
         {
-            return Step::Done(Ok(()));
+            return Step::Done(Ok(response.server_time()));
         }
         Step::Done(Err(failed(None, FAILED)))
     }
@@ -468,10 +469,11 @@ mod tests {
             panic!()
         };
         assert!(second.url.ends_with("/vtop/resendSecurityOTP"));
-        assert!(matches!(
-            machine.feed(answer(200, &second.url, r#"{"status":"sent"}"#)),
-            Step::Done(Ok(()))
-        ));
+        // When VTOP mailed it, by VTOP's clock.
+        let mut sent = answer(200, &second.url, r#"{"status":"sent"}"#);
+        sent.headers
+            .push(("Date".into(), "Sat, 14 Nov 2026 15:24:48 GMT".into()));
+        assert!(matches!(machine.feed(sent), Step::Done(Ok(1_794_669_888))));
         let mut machine = ResendOtp::new("https://vtop.example", "c");
         machine.start();
         assert!(matches!(

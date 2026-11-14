@@ -66,7 +66,11 @@ impl VtopClient {
     pub async fn resend_security_otp(&mut self) -> VtopResult<()> {
         let csrf = self.otp_pending()?;
         let machine = ResendOtp::new(&self.config.base_url, &csrf);
-        self.run("resend_security_otp", machine).await?;
+        let issued_at_unix_seconds = self.run("resend_security_otp", machine).await?;
+        // The new code's mail is dated from now: an older one is turned down by auto-fill.
+        self.state().auth_stage = AuthStage::AwaitingOtp {
+            issued_at_unix_seconds,
+        };
         log::info!(target: super::AUTH, "OTP resend request completed successfully");
         Ok(())
     }

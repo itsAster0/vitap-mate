@@ -29,7 +29,10 @@ pub(crate) const SERVER_FILE: &str = "forwarding_server";
 const DEFAULT_SERVER: &str = "https://vmate.aster0.dev";
 /// VTOP's OTP sender: the Gmail filter's From.
 pub const VTOP_SENDER: &str = "noreply.sdc@vitap.ac.in";
-/// VTOP's clock and the mail's `Date:` may differ a little.
+/// The sign-in's time (VTOP's `Date:` just before it mailed the code) and the mail's `Date:`,
+/// both VTOP's clock in whole seconds: an earlier sign-in's code is older than this.
+const VTOP_SLACK_SECS: i64 = 3;
+/// With no challenge to go by, the caller's time is the phone's clock, which may be off.
 const CLOCK_SKEW_SECS: i64 = 60;
 
 /// Serialises read-modify-write of [`FILE`].
@@ -138,13 +141,13 @@ impl Payload {
         }
     }
 
-    /// A six-digit OTP sent no earlier than `since` (minus the clock skew).
-    fn otp_since(&self, since: i64) -> Option<&str> {
+    /// A six-digit OTP sent no earlier than `since` (minus `slack`).
+    fn otp_since(&self, since: i64, slack: i64) -> Option<&str> {
         match self {
             Self::Otp { code, sent_at }
                 if code.len() == 6
                     && code.bytes().all(|b| b.is_ascii_digit())
-                    && *sent_at >= since - CLOCK_SKEW_SECS =>
+                    && *sent_at >= since - slack =>
             {
                 Some(code)
             }
@@ -264,7 +267,8 @@ impl Core {
         .await
     }
 
-    /// The forwarded OTP sent since `since` (unix seconds), if one is in the inbox; for the OTP
+    /// The forwarded OTP for the pending challenge (sent after VTOP's time for it), else one
+    /// sent since `since` (unix seconds, the phone's clock), if one is in the inbox; for the OTP
     /// prompt, which calls it every few seconds. Never logs the code.
     pub async fn fetch_forwarded_otp(
         &self,
@@ -272,8 +276,16 @@ impl Core {
         since: i64,
     ) -> Result<Option<String>, CoreError> {
         traced("fetch_forwarded_otp", &flow, async {
+            let pending = match self.current() {
+                Ok(slot) => slot.read().await.client.session_state().otp_issued_at,
+                Err(_) => None,
+            };
+            let (since, slack) = match pending {
+                Some(issued_at) => (issued_at as i64, VTOP_SLACK_SECS),
+                None => (since, CLOCK_SKEW_SECS),
+            };
             let payload = self.pull(&flow).await?;
-            let code = payload.as_ref().and_then(|p| p.otp_since(since));
+            let code = payload.as_ref().and_then(|p| p.otp_since(since, slack));
             info!(found = code.is_some(), "forwarded otp");
             Ok(code.map(str::to_string))
         })
@@ -912,18 +924,27 @@ pub(crate) mod tests {
     fn otps_are_six_digits_and_recent() {
         let otp = |text: &str| serde_json::from_str::<Payload>(text).unwrap();
         let fresh = otp(r#"{"kind":"otp","code":"401295","sentAt":1000}"#);
-        assert_eq!(fresh.otp_since(1000), Some("401295"));
-        assert_eq!(fresh.otp_since(1000 + CLOCK_SKEW_SECS), Some("401295"));
-        assert_eq!(fresh.otp_since(1001 + CLOCK_SKEW_SECS), None);
+        assert_eq!(fresh.otp_since(1000, 0), Some("401295"));
+        assert_eq!(fresh.otp_since(1003, VTOP_SLACK_SECS), Some("401295"));
+        // An earlier sign-in's code, a few seconds before this challenge.
+        assert_eq!(fresh.otp_since(1006, VTOP_SLACK_SECS), None);
         assert_eq!(
-            otp(r#"{"kind":"otp","code":"40129a","sentAt":1000}"#).otp_since(0),
+            fresh.otp_since(1000 + CLOCK_SKEW_SECS, CLOCK_SKEW_SECS),
+            Some("401295")
+        );
+        assert_eq!(
+            fresh.otp_since(1001 + CLOCK_SKEW_SECS, CLOCK_SKEW_SECS),
+            None
+        );
+        assert_eq!(
+            otp(r#"{"kind":"otp","code":"40129a","sentAt":1000}"#).otp_since(0, 0),
             None
         );
         let confirm = otp(
             r#"{"kind":"gmail_confirm","code":null,"link":"https://mail-settings.google.com/mail/vf-x","requester":null,"sentAt":5}"#,
         );
         assert_eq!(
-            (confirm.kind(), confirm.otp_since(0)),
+            (confirm.kind(), confirm.otp_since(0, 0)),
             ("gmail_confirm", None)
         );
         assert!(serde_json::from_str::<Payload>(r#"{"kind":"other","sentAt":1}"#).is_err());
