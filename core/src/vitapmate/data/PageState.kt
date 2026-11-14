@@ -36,7 +36,7 @@ data class Problem(val kind: ProblemKind, val title: String, val message: String
 /** Whether [this] shows as a toast: never for an OTP or semester prompt (they have their own UI). */
 val Problem.toasts: Boolean get() = kind !in NoToast && (userInitiated || Settings.showBackgroundErrors)
 
-private val NoToast = setOf(ProblemKind.SemesterNeeded, ProblemKind.OtpNeeded, ProblemKind.OtpRejected)
+private val NoToast = setOf(ProblemKind.SemesterNeeded, ProblemKind.OtpNeeded, ProblemKind.OtpRejected, ProblemKind.ConsentDenied)
 
 /**
  * Failures of automatic work that has no screen of its own (calendar and exam-day refreshes, the
@@ -50,8 +50,11 @@ object BackgroundProblems {
     }
 }
 
-/** [SemesterNeeded]: no semester picked yet; the app shows the picker instead of a toast. */
-enum class ProblemKind { Offline, VtopDown, SignInNeeded, OtpNeeded, OtpRejected, SemesterNeeded, Unexpected }
+/**
+ * [SemesterNeeded]: no semester picked yet; the app shows the picker instead of a toast.
+ * [ConsentDenied]: the student cancelled sending their VTOP cookie; no toast, only the problem view.
+ */
+enum class ProblemKind { Offline, VtopDown, SignInNeeded, OtpNeeded, OtpRejected, SemesterNeeded, ConsentDenied, Unexpected }
 
 /** Opens the Inspector at a flow; the app provides it, any "Details" button calls it. */
 fun interface InspectorOpener {
@@ -111,6 +114,7 @@ fun problemOf(e: Throwable, flow: String): Problem {
             "Pick the semester to show in Settings → Account → Semester.",
             retryable = false,
         )
+        is CoreException.ConsentDenied -> p(ProblemKind.ConsentDenied, "Not Sent", "Not sent: your VTOP cookie stays on the phone.")
         is CoreException.Other -> p(ProblemKind.Unexpected, "VTOP Problem", UNEXPECTED)
         else -> p(ProblemKind.Unexpected, "Something Went Wrong", UNEXPECTED)
     }

@@ -16,5 +16,16 @@ class ForegroundTest {
         assertFalse(Foreground.shown)
         Foreground.started()
         assertEquals(start + 1, Foreground.resumes)
+        Foreground.stopped()
+    }
+
+    @Test
+    fun anOldActivityStoppingAfterANewOneStartedLeavesTheAppShown() {
+        Foreground.started()
+        Foreground.started() // a second MainActivity, e.g. opened from the launcher
+        Foreground.stopped() // the first one's onStop comes after the second's onStart
+        assertTrue(Foreground.shown)
+        Foreground.stopped()
+        assertFalse(Foreground.shown)
     }
 }

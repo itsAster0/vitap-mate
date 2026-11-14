@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::{info, warn};
 
+use crate::consent::CookieKind;
 use crate::device::EdgeError;
 use crate::{Core, CoreError, dev, traced};
 
@@ -226,7 +227,7 @@ impl Core {
     /// The account's access keys and whether this phone is linked to it.
     pub async fn connected_apps(&self, flow: String) -> Result<ConnectedApps, CoreError> {
         traced("connected_apps", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self.live_cookies(&flow, "Load your connected apps").await?;
             let body = json!({ "session": { "cookies": cookies } });
             let view = self
                 .edge_post(&self.forwarding_server(), "/v1/account", &flow, &body)
@@ -258,7 +259,9 @@ impl Core {
     /// made before show again).
     pub async fn link_phone(&self, flow: String) -> Result<(), CoreError> {
         traced("link_phone", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self
+                .live_cookies(&flow, "Link this phone to your account")
+                .await?;
             self.link_with(&self.forwarding_server(), &flow, &cookies)
                 .await
         })
@@ -274,7 +277,7 @@ impl Core {
         pair_code: Option<String>,
     ) -> Result<NewKey, CoreError> {
         traced("create_key", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self.live_cookies(&flow, "Make an access key").await?;
             self.create_key_with(
                 &self.forwarding_server(),
                 &flow,
@@ -298,7 +301,7 @@ impl Core {
 
     pub async fn revoke_key(&self, flow: String, id: String) -> Result<(), CoreError> {
         traced("revoke_key", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self.live_cookies(&flow, "Revoke an access key").await?;
             let body = json!({ "session": { "cookies": cookies }, "id": id });
             self.edge_post(&self.forwarding_server(), "/v1/keys/revoke", &flow, &body)
                 .await
@@ -313,7 +316,7 @@ impl Core {
     /// phones no longer linked; without `from`, only the latter. The number of keys moved.
     pub async fn move_keys(&self, flow: String, from: Option<String>) -> Result<u32, CoreError> {
         traced("move_keys", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self.live_cookies(&flow, "Move keys to this phone").await?;
             let mut body = json!({ "session": { "cookies": cookies } });
             if let Some(from) = from {
                 body["from"] = json!(from);
@@ -336,7 +339,9 @@ impl Core {
         outings: bool,
     ) -> Result<(), CoreError> {
         traced("set_key_outings", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self
+                .live_cookies(&flow, "Change a key's outing access")
+                .await?;
             let body = json!({ "session": { "cookies": cookies }, "id": id, "outings": outings });
             self.edge_post(&self.forwarding_server(), "/v1/keys/outings", &flow, &body)
                 .await
@@ -349,7 +354,8 @@ impl Core {
 
     /// Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
     /// signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-    /// e.g. timed out) only that is sent. A failure here is sent too, then returned.
+    /// e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
+    /// the student on screen saying yes: from the background it is always the error.
     pub async fn answer_session_request(
         &self,
         flow: String,
@@ -359,9 +365,15 @@ impl Core {
     ) -> Result<(), CoreError> {
         traced("answer_session_request", &flow, async {
             let server = self.forwarding_server();
+            answer_path(&server, &callback_url)?; // Before the dialog: never ask for elsewhere.
             let session = match error {
                 Some(error) => Err(CoreError::Other { reason: error }),
-                None => self.live_cookies().await,
+                None => {
+                    let action = "Give a connected app your VTOP session";
+                    self.session_cookies(&flow, CookieKind::Handover, action, true)
+                        .await
+                        .and_then(|cookies| cookies.ok_or(CoreError::NotSignedIn))
+                }
             };
             self.answer_with(&server, &flow, &request_id, &callback_url, session)
                 .await
@@ -371,9 +383,12 @@ impl Core {
 }
 
 impl Core {
-    /// The live VTOP session's cookie header (checked with VTOP, signed in again if needed).
-    pub(crate) async fn live_cookies(&self) -> Result<String, CoreError> {
-        self.session_cookies().await?.ok_or(CoreError::NotSignedIn)
+    /// The live VTOP session's cookie header (checked with VTOP, signed in again if needed),
+    /// once the student allowed it for `action` ([`CookieKind::Account`]).
+    pub(crate) async fn live_cookies(&self, flow: &str, action: &str) -> Result<String, CoreError> {
+        self.session_cookies(flow, CookieKind::Account, action, true)
+            .await?
+            .ok_or(CoreError::NotSignedIn)
     }
 
     async fn pair_app_with(
@@ -464,15 +479,7 @@ impl Core {
         callback_url: &str,
         session: Result<String, CoreError>,
     ) -> Result<(), CoreError> {
-        let path = callback_url
-            .strip_prefix(server.trim_end_matches('/'))
-            .filter(|path| path.starts_with(ANSWER_PATH))
-            .ok_or_else(|| {
-                warn!("session request for another server");
-                CoreError::Other {
-                    reason: "The session request names another server.".into(),
-                }
-            })?;
+        let path = answer_path(server, callback_url)?;
         let (body, failed) = match session {
             Ok(cookies) => (
                 json!({ "requestId": request_id, "cookies": cookie_list(&cookies) }),
@@ -484,6 +491,9 @@ impl Core {
                     CoreError::Offline => "The phone is offline.".to_string(),
                     CoreError::OtpRequired { .. } => "The phone needs an OTP to sign in.".into(),
                     CoreError::InvalidCredentials => "VTOP rejected the phone's password.".into(),
+                    CoreError::ConsentDenied => {
+                        "The student hasn't allowed it on the phone.".into()
+                    }
                     error => format!("The phone couldn't get a session: {error}"),
                 };
                 (
@@ -505,12 +515,26 @@ impl Core {
     }
 }
 
+/// The answer path of `callback_url` on `server`; a callback anywhere else is refused.
+fn answer_path<'a>(server: &str, callback_url: &'a str) -> Result<&'a str, CoreError> {
+    callback_url
+        .strip_prefix(server.trim_end_matches('/'))
+        .filter(|path| path.starts_with(ANSWER_PATH))
+        .ok_or_else(|| {
+            warn!("session request for another server");
+            CoreError::Other {
+                reason: "The session request names another server.".into(),
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
     use std::sync::{Arc, Mutex};
 
     use super::*;
+    use crate::consent;
     use crate::forwarding::tests::{Edge, serve};
 
     fn core(name: &str) -> Core {
@@ -735,6 +759,71 @@ mod tests {
             .await;
         assert!(reason(bad).starts_with("Check the code"));
         assert_eq!(edge.lock().unwrap().requests[1].body["label"], "MCP");
+    }
+
+    #[tokio::test]
+    async fn account_calls_ask_before_reading_the_session() {
+        let core = core("consent");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        fs::write(
+            core.at(crate::forwarding::SERVER_FILE),
+            serve(edge.clone()).await,
+        )
+        .unwrap();
+        consent::tests::signed_in(&core);
+        let gate = consent::tests::no();
+        let apps = core.connected_apps("f".into()).await;
+        assert_eq!(apps.unwrap_err(), CoreError::ConsentDenied);
+        let key = core.create_key("f2".into(), false, None).await;
+        assert_eq!(key.unwrap_err(), CoreError::ConsentDenied);
+        assert_eq!(gate.asks(), 2);
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn handover_for_another_server_never_asks() {
+        let core = core("handover-elsewhere");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        fs::write(
+            core.at(crate::forwarding::SERVER_FILE),
+            serve(edge.clone()).await,
+        )
+        .unwrap();
+        consent::tests::signed_in(&core);
+        let gate = consent::tests::yes();
+        let callback = "https://evil.example/v1/session/answer?account=x";
+        let answered = core
+            .answer_session_request("f".into(), "r1".into(), callback.into(), None)
+            .await;
+        assert!(matches!(answered, Err(CoreError::Other { .. })));
+        assert_eq!(gate.asks(), 0);
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn handover_unattended_answers_with_error_not_cookies() {
+        let core = core("handover");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let server = serve(edge.clone()).await;
+        fs::write(core.at(crate::forwarding::SERVER_FILE), &server).unwrap();
+        let path = "/v1/session/answer?account=22bce0001";
+        can(&edge, path, 200, json!({ "ok": true }));
+        consent::tests::signed_in(&core);
+        // In the pocket, even with "don't ask again" ticked.
+        let gate = consent::tests::install(false, false);
+        consent::tests::remember(CookieKind::Handover);
+        let answered = core
+            .answer_session_request("f".into(), "r1".into(), format!("{server}{path}"), None)
+            .await;
+        assert_eq!(answered, Err(CoreError::ConsentDenied));
+        assert_eq!(gate.asks(), 0);
+        let edge = edge.lock().unwrap();
+        let answer = &edge.requests.iter().find(|r| r.path == path).unwrap().body;
+        assert_eq!(
+            answer,
+            &json!({ "requestId": "r1", "error": "The student hasn't allowed it on the phone." })
+        );
+        assert!(answer.get("cookies").is_none());
     }
 
     #[tokio::test]

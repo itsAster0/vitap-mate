@@ -194,6 +194,7 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     SessionReuse("dev_session_reuse_min", "VTOP session reuse", "min", 0, 0..10_080, "A saved session older than this signs in again at launch; 0: any age"),
     OtpPoll("dev_otp_poll_s", "Forwarded OTP check", "s", 2, 1..30, "How often the OTP prompt checks forwarded mail"),
     SessionAnswer("dev_session_answer_s", "Session request timeout", "s", 15, 3..60, "How long the phone tries to answer a browser's or AI app's session request"),
+    CookieAsk("dev_cookie_ask_s", "Cookie consent wait", "s", 60, 10..300, "How long the 'send your VTOP cookie?' dialog waits before it counts as Cancel"),
 }
 
 /** The background sync intervals on offer, in hours. */

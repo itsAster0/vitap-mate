@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStarted
 import kotlinx.coroutines.launch
 import vitapmate.data.AppCore
 import vitapmate.data.Foreground
@@ -74,7 +75,10 @@ class MainActivity : ComponentActivity() {
                 // Settings → Appearance → Display size scales that, or (System) leaves the phone's own.
                 val fitted = if (config.smallestScreenWidthDp >= 600) own.density else (own.density * config.smallestScreenWidthDp / 412f).coerceIn(own.density * 0.85f, own.density * 1.15f)
                 val density = if (Settings.displaySize == 0) own else Density(fitted * Settings.displaySize / 100f, own.fontScale)
-                CompositionLocalProvider(LocalOpenRequest provides openRequest, LocalDensity provides density) { App() }
+                CompositionLocalProvider(LocalOpenRequest provides openRequest, LocalDensity provides density) {
+                    App()
+                    CookieConsentDialog()
+                }
             }
         }
     }
@@ -86,12 +90,26 @@ class MainActivity : ComponentActivity() {
 
     /** A change notification ([OPEN_INBOX]) or a launcher shortcut (a feature id) was tapped: the shell opens it. */
     private fun opened(intent: Intent?) {
-        intent?.getStringExtra(OPEN)?.let { openRequest.screen = it }
+        val open = intent?.getStringExtra(OPEN) ?: return
+        // A connected app's session request from the notification: asked once the app shows.
+        if (open == OPEN_SESSION_REQUEST) {
+            val requestId = intent.getStringExtra(ITEM) ?: return
+            val callbackUrl = intent.getStringExtra(Push.CALLBACK) ?: return
+            intent.removeExtra(OPEN)
+            lifecycleScope.launch {
+                lifecycle.withStarted {}
+                Push.answer(applicationContext, requestId, callbackUrl, tapped = true)
+            }
+            return
+        }
+        openRequest.screen = open
     }
 
     companion object {
         const val OPEN = "open"
         const val OPEN_INBOX = "inbox"
+        const val OPEN_SESSION_REQUEST = "session_request"
+        const val ITEM = "item"
     }
 
     override fun onStart() {

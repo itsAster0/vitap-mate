@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.AtSign
+import com.composables.icons.lucide.CircleAlert
 import com.composables.icons.lucide.Forward
 import com.composables.icons.lucide.Funnel
 import com.composables.icons.lucide.Lock
@@ -49,6 +50,9 @@ internal fun ForwardingIntro(onSetUp: () -> Unit) {
         style = MaterialTheme.typography.bodySmall,
         color = scheme.onSurfaceVariant,
     )
+    MailForwarding.error?.let { (title, message) ->
+        Box(Modifier.testTag("forwarding.error")) { Callout(Lucide.CircleAlert, AppTheme.tones.danger, "$title. $message") }
+    }
     val busy = MailForwarding.busy == "setup"
     Button(if (busy) null else onSetUp, Modifier.fillMaxWidth().testTag("forwarding.setup"), prefix = if (busy) null else Lucide.Forward) {
         if (busy) LoadingIndicator(Modifier.size(20.dp))

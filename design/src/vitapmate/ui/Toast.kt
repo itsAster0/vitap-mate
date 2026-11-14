@@ -123,7 +123,7 @@ fun showToast(problem: Problem, action: Pair<String, () -> Unit>? = null) {
     if (!problem.toasts) return
     val tone = when (problem.kind) {
         ProblemKind.Offline, ProblemKind.VtopDown -> ToastTone.Warning
-        ProblemKind.SignInNeeded, ProblemKind.SemesterNeeded, ProblemKind.OtpNeeded -> ToastTone.Neutral
+        ProblemKind.SignInNeeded, ProblemKind.SemesterNeeded, ProblemKind.OtpNeeded, ProblemKind.ConsentDenied -> ToastTone.Neutral
         ProblemKind.OtpRejected, ProblemKind.Unexpected -> ToastTone.Error
     }
     showToast(problem.title, problem.message, action, tone, problem.kind.icon)

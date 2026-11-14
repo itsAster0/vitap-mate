@@ -5,6 +5,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.CalendarRange
 import com.composables.icons.lucide.CloudOff
+import com.composables.icons.lucide.Cookie
 import com.composables.icons.lucide.KeyRound
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
@@ -17,7 +18,7 @@ import vitapmate.data.ProblemKind
 @Composable
 internal fun ProblemKind.look(): Pair<ImageVector, Tone> = AppTheme.tones.let { t ->
     icon to when (this) {
-        ProblemKind.Offline -> neutralTone
+        ProblemKind.Offline, ProblemKind.ConsentDenied -> neutralTone
         ProblemKind.VtopDown -> t.warning
         ProblemKind.SignInNeeded, ProblemKind.OtpNeeded, ProblemKind.SemesterNeeded -> t.accentTone
         ProblemKind.OtpRejected, ProblemKind.Unexpected -> t.danger
@@ -32,6 +33,7 @@ internal val ProblemKind.icon: ImageVector get() = when (this) {
     ProblemKind.OtpNeeded -> Lucide.MailCheck
     ProblemKind.OtpRejected -> Lucide.ShieldX
     ProblemKind.SemesterNeeded -> Lucide.CalendarRange
+    ProblemKind.ConsentDenied -> Lucide.Cookie
     ProblemKind.Unexpected -> Lucide.TriangleAlert
 }
 

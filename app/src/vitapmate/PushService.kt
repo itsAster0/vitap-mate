@@ -1,6 +1,16 @@
 package vitapmate
 
+import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -11,6 +21,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import vitapmate.data.AppCore
+import vitapmate.data.Foreground
 import vitapmate.data.Settings
 import vitapmate.data.Tunable
 import vitapmate.observability.Log
@@ -18,7 +29,7 @@ import vitapmate.observability.flow
 
 /**
  * FCM: a new token goes to the edge with this phone's device (signed, see `device_sig`); a
- * `vtop_cookie_request` is answered at once ([Push.answer]); other messages are nudges to read the
+ * `vtop_cookie_request` is asked on screen ([Push.answer]); other messages are nudges to read the
  * phone's event log. Tokens and message contents are never logged.
  * Log src `push`.
  */
@@ -42,7 +53,7 @@ class PushService : FirebaseMessagingService() {
         // Developer timeout; when that runs out the edge is told so instead.
         Settings.load(applicationContext)
         AppCore.start(applicationContext)
-        runBlocking { Push.answer(requestId, callbackUrl) }
+        runBlocking { Push.answer(applicationContext, requestId, callbackUrl) }
     }
 }
 
@@ -56,16 +67,49 @@ object Push {
 
     /**
      * Answers a key's session request (`vtop_cookie_request`) with this phone's live VTOP session,
-     * signing in again if it expired, within [Tunable.SessionAnswer]; never shown to the student.
+     * signing in again if it expired, within [Tunable.SessionAnswer] plus the time the student has
+     * to answer the cookie dialog ([Tunable.CookieAsk]). Only on screen: with the app away (and
+     * not [tapped] from [asked]'s notification) nothing is sent, and the edge's wait runs out.
      * Flow `push.session_request`; no cookies in the log.
      */
-    suspend fun answer(requestId: String, callbackUrl: String) = flow("push.session_request") { f ->
-        val limit = Settings.tunable(Tunable.SessionAnswer) * 1000L
+    suspend fun answer(context: Context, requestId: String, callbackUrl: String, tapped: Boolean = false) = flow("push.session_request") { f ->
+        if (!tapped && !Foreground.shown) {
+            asked(context, requestId, callbackUrl)
+            Log.info("push", "session request asked by notification", f)
+            return@flow
+        }
+        val limit = (Settings.tunable(Tunable.SessionAnswer) + Settings.tunable(Tunable.CookieAsk)) * 1000L
         val result = runCatching {
             withTimeoutOrNull(limit) { withContext(Dispatchers.IO) { AppCore.await().answerSessionRequest(f, requestId, callbackUrl, null) } }
                 ?: withContext(Dispatchers.IO) { AppCore.await().answerSessionRequest(f, requestId, callbackUrl, "The phone took too long to sign in to VTOP.") }
         }
         Log.info("push", "session request", f, mapOf("answered" to "${result.isSuccess}", "error" to (result.exceptionOrNull()?.let { it::class.simpleName } ?: "-")))
+    }
+
+    private const val ASKED = "connected_apps"
+    const val CALLBACK = "callback"
+
+    /** A session request while the app is away: tapping opens the app, which asks ([answer]). */
+    private fun asked(context: Context, requestId: String, callbackUrl: String) {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+        context.getSystemService(NotificationManager::class.java)
+            .createNotificationChannel(NotificationChannel(ASKED, "Connected apps", NotificationManager.IMPORTANCE_HIGH).apply { description = "When a browser extension or AI app asks for your VTOP session" })
+        val open = PendingIntent.getActivity(
+            context, ASKED.hashCode(),
+            Intent(context, MainActivity::class.java).putExtra(MainActivity.OPEN, MainActivity.OPEN_SESSION_REQUEST)
+                .putExtra(MainActivity.ITEM, requestId).putExtra(CALLBACK, callbackUrl)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        val n = NotificationCompat.Builder(context, ASKED)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("An app wants your VTOP data")
+            .setContentText("Tap to allow")
+            .setContentIntent(open)
+            .setTimeoutAfter(60_000)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(ASKED.hashCode(), n)
     }
 
     internal fun send(context: Context, token: String) {

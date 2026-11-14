@@ -15,6 +15,7 @@ import vitapmate.core.Core
 import vitapmate.core.DevConfig
 import vitapmate.core.devConfigure
 import vitapmate.core.obsInit
+import vitapmate.core.setCookieGate
 import vitapmate.core.setDeviceLabel
 import vitapmate.core.setHttpTransport
 import vitapmate.core.setSharedCookies
@@ -66,6 +67,7 @@ object AppCore {
                 setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
                 Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "okhttp"))
                 setUdpNetwork(VtopUdp(app))
+                setCookieGate(CookieConsent)
                 setSharedCookies(VtopCookies)
                 setDeviceLabel(if (Build.MODEL.startsWith(Build.MANUFACTURER, ignoreCase = true)) Build.MODEL else "${Build.MANUFACTURER} ${Build.MODEL}")
                 runBlocking { flow("core_init") { Core(it, dir, app.cacheDir.path) } }

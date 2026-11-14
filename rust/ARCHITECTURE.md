@@ -79,6 +79,20 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   (`udp.rs`, a Kotlin `DatagramSocket` in `VtopUdp.kt`). A route that fails is
   skipped for 5 minutes and the request goes on to Direct. The log line
   `route used` names the route each call took.
+- **Cookie consent** (`vtop-ffi/src/consent.rs`). Every path that sends the
+  VTOP session (or the saved password) to our servers calls `consent::allowed`
+  first: Proxy, Server and Udp, the server OTP, Connected apps, the Server page,
+  mail forwarding and a connected app's session request. Kotlin's
+  `CookieConsent` (the `CookieGate`) shows a dialog with what
+  goes where and why: Send, Cancel and "Don't ask again" per kind (route,
+  account, handover; kept in `consent.json`, dropped on
+  sign-out or another student). It fails closed: no gate, an empty flow, the
+  app not shown or a background flow (`flow(name, unattended = true)`: the
+  open-app sweep and background sync) is a no, even with the tick. A no on a
+  route fetches Direct without the 5-minute skip; elsewhere it is
+  `ConsentDenied`. Calls nobody started (the semester push)
+  never ask and send only with the tick. A session request while the
+  app is away only posts a notification; tapping it opens the app and asks.
 
 The edge also serves `POST /v1/app/status` (signed by the phone, with the
 registration number, no VTOP cookies): the sealed session's and password's ages,

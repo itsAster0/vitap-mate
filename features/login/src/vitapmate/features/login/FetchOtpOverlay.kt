@@ -8,6 +8,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 import vitapmate.data.AppCore
 import vitapmate.data.OtpPrompt
+import vitapmate.data.ProblemKind
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.logAction
@@ -37,7 +38,9 @@ fun FetchOtpOverlay() {
                 } catch (e: Throwable) {
                     Log.warn("ui.otp", "otp failed: ${e::class.simpleName}", challenge.lastFlow)
                     OtpPrompt.cancel()
-                    problemOf(e, challenge.lastFlow).let { showToast(it.title, it.message, tone = ToastTone.Error) }
+                    // Cancel on the cookie dialog was the student's choice: nothing to say.
+                    problemOf(e, challenge.lastFlow).takeIf { it.kind != ProblemKind.ConsentDenied }
+                        ?.let { showToast(it.title, it.message, tone = ToastTone.Error) }
                 }
             }
         },

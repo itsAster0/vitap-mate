@@ -24,7 +24,8 @@ import vitapmate.observability.flow
  * OTP, [otp] must get it accepted (background: auto-fill alone; Fetch all: the prompt), asked once
  * however many pages need it, and returns false to stop the whole run. [everything] adds the pages background sync
  * leaves out (profile, course page, outings). Rust records what changed on each fetch (the
- * change inbox). Flow [flowName], log src `sync`.
+ * change inbox). Flow [flowName] ([unattended] for background sync: no VTOP session leaves the
+ * phone, so a Server or Proxy route fetches Direct), log src `sync`.
  */
 object VtopSync {
     /** How a run ended. */
@@ -37,8 +38,9 @@ object VtopSync {
         label: String,
         everything: Boolean,
         pageTimeoutMs: Long,
+        unattended: Boolean = false,
         otp: suspend (CoreException.OtpRequired, String) -> Boolean,
-    ): Result = flow(flowName) { f ->
+    ): Result = flow(flowName, unattended) { f ->
         val core = try {
             AppCore.await()
         } catch (e: CancellationException) {

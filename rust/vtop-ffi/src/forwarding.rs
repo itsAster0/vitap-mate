@@ -19,6 +19,7 @@ use tracing::{debug, info, warn};
 use vtop_core::{VtopClient, VtopError};
 use vtop_shared::mail_seal;
 
+use crate::consent::{self, CookieKind};
 use crate::{Core, CoreError, traced, traced_sync};
 
 pub(crate) const FILE: &str = "forwarding.json";
@@ -199,22 +200,22 @@ impl Core {
                 return Ok(self.forwarding_view());
             }
             let server = self.forwarding_server();
-            let cookies = match self.session_cookies().await {
-                Ok(cookies) => cookies,
-                Err(CoreError::NotSignedIn) => None,
-                Err(error) => return Err(error),
-            };
+            let action = "Set up mail forwarding";
+            // An address made without the student's session is never tied to them: their next
+            // phone could not join it and the server could not sign in with it.
+            let cookies = self
+                .session_cookies(&flow, CookieKind::Account, action, true)
+                .await?
+                .ok_or(CoreError::NotSignedIn)?;
             let mut joined = None;
-            if let Some(cookies) = &cookies {
-                let reclaim = json!({ "session": { "cookies": cookies } });
-                match self
-                    .edge_post(&server, "/v1/mail-otp/reclaim", &flow, &reclaim)
-                    .await
-                {
-                    Ok(body) => joined = Some(body),
-                    Err(error) if error.code() == GONE => info!("no address yet: making one"),
-                    Err(error) => return Err(error.into()),
-                }
+            let reclaim = json!({ "session": { "cookies": cookies } });
+            match self
+                .edge_post(&server, "/v1/mail-otp/reclaim", &flow, &reclaim)
+                .await
+            {
+                Ok(body) => joined = Some(body),
+                Err(error) if error.code() == GONE => info!("no address yet: making one"),
+                Err(error) => return Err(error.into()),
             }
             let reclaimed = joined.is_some();
             let body = match joined {
@@ -239,7 +240,7 @@ impl Core {
             self.write(FILE, &saved);
             info!(reclaimed, "forwarding address set up");
             // Best effort: lets the student's next phone join it, and the server sign in with it.
-            if let (false, Some(cookies)) = (reclaimed, cookies) {
+            if !reclaimed {
                 let owner = json!({ "id": saved.id, "session": { "cookies": cookies } });
                 match self
                     .edge_post(&server, "/v1/mail-otp/owner", &flow, &owner)
@@ -347,8 +348,20 @@ impl Core {
     }
 
     /// The signed-in VTOP session's cookies, after VTOP confirmed it (signing in again when it
-    /// had expired), so the edge can tell whose session it is.
-    pub(crate) async fn session_cookies(&self) -> Result<Option<String>, CoreError> {
+    /// had expired), so the edge can tell whose session it is. Only once the student allowed it
+    /// for `action` ([`consent::allowed`], before any VTOP hit); else `ConsentDenied`.
+    pub(crate) async fn session_cookies(
+        &self,
+        flow: &str,
+        kind: CookieKind,
+        action: &str,
+        ask: bool,
+    ) -> Result<Option<String>, CoreError> {
+        self.current()?;
+        let server = consent::host(&self.forwarding_server());
+        if !consent::allowed(flow, kind, action, &server, ask).await {
+            return Err(CoreError::ConsentDenied);
+        }
         let cookies = |client: &VtopClient| client.export_persisted_session(0).cookies;
         signed_in!(self, |client| async {
             client.verify_session().await.map(|_| cookies(client))
@@ -559,6 +572,8 @@ pub(crate) mod tests {
                 edge.seal_key = body["sealKey"].as_str().map(str::to_string);
                 (201, json!({ "deviceId": DEVICE_ID }))
             }
+            "/v1/mail-otp/reclaim" => gone,
+            "/v1/mail-otp/owner" => (204, Value::Null),
             "/v1/mail-otp/register" => {
                 let address = format!("otp+{ID}@vmate.aster0.dev");
                 (201, json!({ "id": ID, "address": address }))
@@ -599,6 +614,16 @@ pub(crate) mod tests {
                     }
                 };
                 let path = head.split(' ').nth(1).unwrap().to_string();
+                if path.starts_with("/vtop/") {
+                    // VTOP itself, for the session check: signed in.
+                    let page = r#"<html><input name="_csrf" value="csrf-1"><input type="hidden" name="authorizedIDX" value="22BCE0001"></html>"#;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{page}",
+                        page.len()
+                    );
+                    socket.write_all(response.as_bytes()).await.unwrap();
+                    continue;
+                }
                 let flow = header(&head, "x-request-id")
                     .unwrap_or_default()
                     .to_string();
@@ -637,6 +662,43 @@ pub(crate) mod tests {
         url
     }
 
+    /// A core signed in to VTOP at `base` (the mock edge also answers VTOP's session check).
+    fn signed_in(dir: &std::path::Path, base: String) -> Core {
+        use vtop_core::sync::RwLock;
+        use vtop_core::{SessionState, VtopClient, VtopConfig};
+        let client = VtopClient::builder()
+            .config(VtopConfig {
+                base_url: base,
+                ..VtopConfig::default()
+            })
+            .with_session(&SessionState {
+                cookies: "JSESSIONID=abc".into(),
+                csrf_token: Some("csrf-1".into()),
+                registration_number: Some("22BCE0001".into()),
+                otp_issued_at: None,
+                logged_in_at: None,
+            })
+            .unwrap();
+        let session = crate::Session {
+            client,
+            cookies: crate::cookies::SessionCookies::new(),
+            account: crate::Account {
+                username: "22BCE0001".into(),
+                password: "pw".into(),
+                rejected: false,
+                registration_number: None,
+            },
+            logins: 0,
+            otp: None,
+            server_otp: false,
+        };
+        Core {
+            dir: dir.to_path_buf(),
+            cache: dir.to_path_buf(),
+            slot: Mutex::new(Some(Arc::new(RwLock::new(session)))),
+        }
+    }
+
     /// Seals `payload` the way the edge does: to the registered seal key, for mailbox [`ID`].
     fn seal(edge: &Arc<Mutex<Edge>>, payload: Value) {
         let mut edge = edge.lock().unwrap();
@@ -657,13 +719,11 @@ pub(crate) mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let edge = Arc::new(Mutex::new(Edge::default()));
-        fs::write(dir.join(SERVER_FILE), serve(edge.clone()).await + "\n").unwrap();
-        // Not signed in: a new address, no owner claim.
-        let core = Core {
-            dir: dir.clone(),
-            cache: dir.clone(),
-            slot: Mutex::new(None),
-        };
+        let url = serve(edge.clone()).await;
+        fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+        // No address to join yet: a new one, then claimed for the student.
+        let core = signed_in(&dir, url);
+        let _gate = consent::tests::yes();
         assert_eq!(
             core.forwarding_status("f".into()).state,
             ForwardingState::Off
@@ -681,7 +741,15 @@ pub(crate) mod tests {
         {
             let edge = edge.lock().unwrap();
             let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
-            assert_eq!(paths, ["/v1/devices/register", "/v1/mail-otp/register"]);
+            assert_eq!(
+                paths,
+                [
+                    "/v1/devices/register",
+                    "/v1/mail-otp/reclaim",
+                    "/v1/mail-otp/register",
+                    "/v1/mail-otp/owner"
+                ]
+            );
             assert!(edge.requests.iter().all(|r| r.flow == "f-setup"));
             let register = &edge.requests[0].body;
             assert_eq!(
@@ -691,11 +759,13 @@ pub(crate) mod tests {
             assert!(mail_seal::is_public_key(
                 register["sealKey"].as_str().unwrap()
             ));
-            assert_eq!(edge.requests[1].body, json!({}));
+            assert!(edge.requests[1].body["session"]["cookies"].is_string());
+            assert_eq!(edge.requests[2].body, json!({}));
+            assert_eq!(edge.requests[3].body["id"], json!(ID));
         }
         // Set up already: nothing is sent.
         core.set_up_forwarding("f".into()).await.unwrap();
-        assert_eq!(edge.lock().unwrap().requests.len(), 2);
+        assert_eq!(edge.lock().unwrap().requests.len(), 4);
 
         // Nothing forwarded yet.
         let checked = core.check_forwarding("f".into()).await.unwrap();
@@ -773,17 +843,37 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn check_shows_the_confirmation_the_edge_kept() {
-        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-kept-{}", std::process::id()));
+    async fn forwarding_setup_denied_sends_nothing() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-deny-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let edge = Arc::new(Mutex::new(Edge::default()));
-        fs::write(dir.join(SERVER_FILE), serve(edge.clone()).await + "\n").unwrap();
+        fs::write(dir.join(SERVER_FILE), serve(edge.clone()).await).unwrap();
         let core = Core {
             dir: dir.clone(),
             cache: dir.clone(),
             slot: Mutex::new(None),
         };
+        consent::tests::signed_in(&core);
+        let gate = consent::tests::no();
+        let set_up = core.set_up_forwarding("f".into()).await;
+        assert_eq!(set_up, Err(CoreError::ConsentDenied));
+        assert_eq!(gate.asks(), 1);
+        assert!(edge.lock().unwrap().requests.is_empty());
+        assert!(!dir.join(FILE).exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn check_shows_the_confirmation_the_edge_kept() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-kept-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        let url = serve(edge.clone()).await;
+        fs::write(dir.join(SERVER_FILE), url.clone() + "\n").unwrap();
+        let core = signed_in(&dir, url);
+        let _gate = consent::tests::yes();
         core.set_up_forwarding("f".into()).await.unwrap();
         // Gmail's mail came before this install joined: no box, only the kept confirmation.
         let kept = {
@@ -882,6 +972,23 @@ pub(crate) mod tests {
             core.forwarding_status("f".into()).state,
             ForwardingState::Off
         );
+    }
+
+    #[tokio::test]
+    async fn set_up_needs_a_vtop_sign_in() {
+        let dir = std::env::temp_dir().join(format!("vtop-ffi-fwd-nosign-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let core = Core {
+            dir: dir.clone(),
+            cache: dir.clone(),
+            slot: Mutex::new(None),
+        };
+        assert_eq!(
+            core.set_up_forwarding("f".into()).await,
+            Err(CoreError::NotSignedIn)
+        );
+        assert!(!dir.join(FILE).exists());
     }
 
     #[tokio::test]

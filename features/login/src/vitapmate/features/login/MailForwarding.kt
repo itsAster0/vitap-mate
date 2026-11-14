@@ -34,6 +34,10 @@ object MailForwarding {
     var busy by mutableStateOf<String?>(null)
         private set
 
+    /** The last action's failure (title, message), shown in the sheet, which covers the toasts. */
+    var error by mutableStateOf<Pair<String, String>?>(null)
+        internal set
+
     val isOn get() = status?.state?.let { it != ForwardingState.OFF } ?: false
 
     /** Reads the saved status (no network). */
@@ -79,6 +83,7 @@ object MailForwarding {
     private suspend fun run(name: String, quiet: Boolean = false, call: suspend (String) -> Forwarding): Forwarding? {
         if (busy != null) return null
         busy = name
+        error = null
         report()
         var flowId = ""
         return try {
@@ -91,7 +96,7 @@ object MailForwarding {
         } catch (e: Throwable) {
             Log.warn("ui.forwarding", "$name failed: ${e::class.simpleName}", flowId)
             askedOtp(e)
-            if (!quiet) problem(e).let { (title, message) -> showToast(title, message) }
+            if (!quiet) problem(e).let { error = it; showToast(it.first, it.second) }
             load("after_$name")
             null
         } finally {
@@ -130,6 +135,7 @@ object MailForwarding {
         is CoreException.Offline -> "Couldn't reach the server" to "Check your connection and try again."
         is CoreException.OtpRequired -> "Verify your sign-in" to "VTOP wants the OTP first; enter it, then try again."
         is CoreException.NotSignedIn -> "Sign-in needed" to "Sign in to VTOP, then try again."
+        is CoreException.ConsentDenied -> "Not sent" to "Your VTOP cookie stayed on the phone, so no address was made."
         is CoreException.VtopUnavailable -> "VTOP is down" to "Try again in a few minutes."
         is CoreException.Other -> "Mail forwarding" to e.reason
         else -> "Something went wrong" to "Try again; if it keeps happening, share the log from the Inspector."

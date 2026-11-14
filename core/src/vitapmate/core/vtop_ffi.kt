@@ -659,6 +659,12 @@ internal open class UniffiForeignFutureResultVoid(
 internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
     fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
+internal interface UniffiCallbackInterfaceCookieGateMethod0 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiOutReturn`: ByteByReference,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceCookieGateMethod1 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,)
+}
 internal interface UniffiCallbackInterfaceSharedCookiesMethod0 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`url`: RustBuffer.ByValue,`uniffiOutReturn`: RustBuffer,uniffiCallStatus: UniffiRustCallStatus,)
 }
@@ -688,6 +694,28 @@ internal interface UniffiCallbackInterfaceUdpSocketMethod1 : com.sun.jna.Callbac
 }
 internal interface UniffiCallbackInterfaceUdpSocketMethod2 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "attended", "ask")
+internal open class UniffiVTableCallbackInterfaceCookieGate(
+    @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+    @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+    @JvmField internal var `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
+    @JvmField internal var `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
+) : Structure() {
+    class UniffiByValue(
+        `uniffiFree`: UniffiCallbackInterfaceFree? = null,
+        `uniffiClone`: UniffiCallbackInterfaceClone? = null,
+        `attended`: UniffiCallbackInterfaceCookieGateMethod0? = null,
+        `ask`: UniffiCallbackInterfaceCookieGateMethod1? = null,
+    ): UniffiVTableCallbackInterfaceCookieGate(`uniffiFree`,`uniffiClone`,`attended`,`ask`,), Structure.ByValue
+
+   internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceCookieGate) {
+        `uniffiFree` = other.`uniffiFree`
+        `uniffiClone` = other.`uniffiClone`
+        `attended` = other.`attended`
+        `ask` = other.`ask`
+    }
+
 }
 @Structure.FieldOrder("uniffiFree", "uniffiClone", "cookie", "setCookies", "clear", "flush")
 internal open class UniffiVTableCallbackInterfaceSharedCookies(
@@ -808,6 +836,8 @@ internal object IntegrityCheckingUniffiLib {
     }
 
     internal fun ensureInitialized() = Unit
+    external fun uniffi_vtop_ffi_checksum_func_set_cookie_gate(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_func_set_shared_cookies(
     ): Int
     external fun uniffi_vtop_ffi_checksum_func_dev_configure(
@@ -903,6 +933,10 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_vtop_ffi_checksum_method_core_trim_changes(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_unseen_changes(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_cached_course_page(
     ): Int
@@ -1038,6 +1072,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_web_session(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_cookiegate_attended(
+    ): Int
+    external fun uniffi_vtop_ffi_checksum_method_cookiegate_ask(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_sharedcookies_cookie(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_sharedcookies_set_cookies(
@@ -1076,6 +1114,7 @@ internal object UniffiLib {
 
     init {
         Native.register(UniffiLib::class.java, findLibraryName(componentName = "vtop_ffi"))
+        uniffiCallbackInterfaceCookieGate.register(this)
         uniffiCallbackInterfaceHttpTransport.register(this)
         uniffiCallbackInterfaceSharedCookies.register(this)
         uniffiCallbackInterfaceUdpNetwork.register(this)
@@ -1156,6 +1195,10 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_unseen_changes(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Int
+    external fun uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_page(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_vtop_ffi_fn_method_core_cached_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1290,6 +1333,16 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_web_session(`ptr`: Long,`flow`: RustBuffer.ByValue,`force`: Byte,
     ): Long
+    external fun uniffi_vtop_ffi_fn_clone_cookiegate(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_vtop_ffi_fn_free_cookiegate(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_init_callback_vtable_cookiegate(`vtable`: UniffiVTableCallbackInterfaceCookieGate,
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_attended(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_vtop_ffi_fn_method_cookiegate_ask(`ptr`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,
+    ): Long
     external fun uniffi_vtop_ffi_fn_clone_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_vtop_ffi_fn_free_sharedcookies(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1333,6 +1386,8 @@ internal object UniffiLib {
     external fun uniffi_vtop_ffi_fn_method_udpsocket_receive(`ptr`: Long,`timeoutMs`: Int,
     ): Long
     external fun uniffi_vtop_ffi_fn_method_udpsocket_shutdown(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_vtop_ffi_fn_func_set_cookie_gate(`gate`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_vtop_ffi_fn_func_set_shared_cookies(`cookies`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1483,6 +1538,9 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if ((lib.uniffi_vtop_ffi_checksum_func_set_cookie_gate() and 0xFFFF) != 18921) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_func_set_shared_cookies() and 0xFFFF) != 39215) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1627,6 +1685,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_unseen_changes() and 0xFFFF) != 3681) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_cookie_consent_remembered() and 0xFFFF) != 46212) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_reset_cookie_consent() and 0xFFFF) != 35319) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_cached_course_page() and 0xFFFF) != 62516) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1720,7 +1784,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_planner_courses() and 0xFFFF) != 6197) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 33475) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_answer_session_request() and 0xFFFF) != 35015) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_connected_apps() and 0xFFFF) != 26142) {
@@ -1810,13 +1874,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_remove_phone() and 0xFFFF) != 19137) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 46557) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_resend_server_password() and 0xFFFF) != 12038) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_save_server_password() and 0xFFFF) != 55780) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 59799) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_send_server_semester() and 0xFFFF) != 64971) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_server_status() and 0xFFFF) != 63686) {
@@ -1826,6 +1890,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_web_session() and 0xFFFF) != 60390) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_attended() and 0xFFFF) != 55580) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_cookiegate_ask() and 0xFFFF) != 53295) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_sharedcookies_cookie() and 0xFFFF) != 56315) {
@@ -2515,6 +2585,403 @@ public object FfiConverterByteArray: FfiConverterRustBuffer<ByteArray> {
 //
 
 
+/**
+ * Kotlin: whether a flow has the student on screen, and the dialog.
+ */
+public interface CookieGate {
+    
+    /**
+     * The app is shown and `flow` is not a background run.
+     */
+    fun `attended`(`flow`: kotlin.String): kotlin.Boolean
+    
+    /**
+     * Shows the dialog: `action` is the why ("Set up mail forwarding"), `server` the host it goes
+     * to. A timeout or the app leaving the screen answers no.
+     */
+    suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `action`: kotlin.String, `server`: kotlin.String): CookieAnswer
+    
+    companion object
+}
+
+/**
+ * Kotlin: whether a flow has the student on screen, and the dialog.
+ */
+open class CookieGateImpl: Disposable, AutoCloseable, CookieGate
+{
+
+    @Suppress("UNUSED_PARAMETER")
+    /**
+     * @suppress
+     */
+    constructor(withHandle: UniffiWithHandle, handle: Long) {
+        this.handle = handle
+        this.cleanable = UniffiLib.CLEANER.register(this, UniffiCleanAction(handle))
+    }
+
+    /**
+     * @suppress
+     *
+     * This constructor can be used to instantiate a fake object. Only used for tests. Any
+     * attempt to actually use an object constructed this way will fail as there is no
+     * connected Rust object.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    constructor(noHandle: NoHandle) {
+        this.handle = 0
+        this.cleanable = null
+    }
+
+    protected val handle: Long
+    protected val cleanable: UniffiCleaner.Cleanable?
+
+    private val wasDestroyed = AtomicBoolean(false)
+    private val callCounter = AtomicLong(1)
+
+    /**
+     * Whether the current object has been destroyed and its reference is gone in the Rust side.
+     */
+    val uniffiIsDestroyed: Boolean get() = wasDestroyed.get()
+
+    override fun destroy() {
+        // Only allow a single call to this method.
+        // TODO: maybe we should log a warning if called more than once?
+        if (this.wasDestroyed.compareAndSet(false, true)) {
+            // This decrement always matches the initial count of 1 given at creation time.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    @Synchronized
+    override fun close() {
+        this.destroy()
+    }
+
+    internal inline fun <R> callWithHandle(block: (handle: Long) -> R): R {
+        // Check and increment the call counter, to keep the object alive.
+        // This needs a compare-and-set retry loop in case of concurrent updates.
+        do {
+            val c = this.callCounter.get()
+            if (c == 0L) {
+                throw IllegalStateException("${this.javaClass.simpleName} object has already been destroyed")
+            }
+            if (c == Long.MAX_VALUE) {
+                throw IllegalStateException("${this.javaClass.simpleName} call counter would overflow")
+            }
+        } while (! this.callCounter.compareAndSet(c, c + 1L))
+        // Now we can safely do the method call without the handle being freed concurrently.
+        try {
+            return block(this.uniffiCloneHandle())
+        } finally {
+            // This decrement always matches the increment we performed above.
+            if (this.callCounter.decrementAndGet() == 0L) {
+                cleanable?.clean()
+            }
+        }
+    }
+
+    // Use a static inner class instead of a closure so as not to accidentally
+    // capture `this` as part of the cleanable's action.
+    private class UniffiCleanAction(private val handle: Long) : Runnable {
+        override fun run() {
+            if (handle == 0.toLong()) {
+                // Fake object created with `NoHandle`, don't try to free.
+                return;
+            }
+            uniffiRustCall { status ->
+                UniffiLib.uniffi_vtop_ffi_fn_free_cookiegate(handle, status)
+            }
+        }
+    }
+
+    /**
+     * @suppress
+     */
+    fun uniffiCloneHandle(): Long {
+        if (handle == 0.toLong()) {
+            throw InternalException("uniffiCloneHandle() called on NoHandle object");
+        }
+        return uniffiRustCall() { status ->
+            UniffiLib.uniffi_vtop_ffi_fn_clone_cookiegate(handle, status)
+        }
+    }
+
+    
+    /**
+     * The app is shown and `flow` is not a background run.
+     */override fun `attended`(`flow`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_attended(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Shows the dialog: `action` is the why ("Set up mail forwarding"), `server` the host it goes
+     * to. A timeout or the app leaving the screen answers no.
+     */
+    @Throws(CoreException::class)
+    @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
+    override suspend fun `ask`(`flow`: kotlin.String, `kind`: CookieKind, `action`: kotlin.String, `server`: kotlin.String) : CookieAnswer {
+        return uniffiRustCallAsync(
+        callWithHandle { uniffiHandle ->
+            UniffiLib.uniffi_vtop_ffi_fn_method_cookiegate_ask(
+                uniffiHandle,
+                
+        FfiConverterString.lower(`flow`),
+        FfiConverterTypeCookieKind.lower(`kind`),
+        FfiConverterString.lower(`action`),
+        FfiConverterString.lower(`server`),
+            )
+        },
+        { future, callback, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_poll_rust_buffer(future, callback, continuation) },
+        { future, continuation -> UniffiLib.ffi_vtop_ffi_rust_future_complete_rust_buffer(future, continuation) },
+        { future -> UniffiLib.ffi_vtop_ffi_rust_future_free_rust_buffer(future) },
+        // lift function
+        { FfiConverterTypeCookieAnswer.lift(it) },
+        // Error FFI converter
+        CoreException.ErrorHandler,
+    )
+    }
+
+    
+
+    
+
+
+    
+    
+    /**
+     * @suppress
+     */
+    companion object
+    
+}
+
+
+
+// Put the implementation in an object so we don't pollute the top-level namespace
+internal object uniffiCallbackInterfaceCookieGate {
+    internal object `attended`: UniffiCallbackInterfaceCookieGateMethod0 {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`uniffiOutReturn`: ByteByReference,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`attended`(
+                    FfiConverterString.lift(`flow`),
+                )
+            }
+            val writeReturn = { value: kotlin.Boolean -> uniffiOutReturn.setValue(FfiConverterBoolean.lower(value)) }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+    internal object `ask`: UniffiCallbackInterfaceCookieGateMethod1 {
+        override fun callback(`uniffiHandle`: Long,`flow`: RustBuffer.ByValue,`kind`: RustBuffer.ByValue,`action`: RustBuffer.ByValue,`server`: RustBuffer.ByValue,`uniffiFutureCallback`: UniffiForeignFutureCompleteRustBuffer,`uniffiCallbackData`: Long,`uniffiOutDroppedCallback`: UniffiForeignFutureDroppedCallbackStruct,) {
+            val uniffiObj = FfiConverterTypeCookieGate.handleMap.get(uniffiHandle)
+            val makeCall = suspend { ->
+                uniffiObj.`ask`(
+                    FfiConverterString.lift(`flow`),
+                    FfiConverterTypeCookieKind.lift(`kind`),
+                    FfiConverterString.lift(`action`),
+                    FfiConverterString.lift(`server`),
+                )
+            }
+            val uniffiHandleSuccess = { returnValue: CookieAnswer ->
+                val uniffiResult = UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                    FfiConverterTypeCookieAnswer.lower(returnValue),
+                    UniffiRustCallStatus.ByValue()
+                )
+                uniffiResult.write()
+                uniffiFutureCallback.callback(uniffiCallbackData, uniffiResult)
+            }
+            val uniffiHandleError = { callStatus: UniffiRustCallStatus.ByValue ->
+                uniffiFutureCallback.callback(
+                    uniffiCallbackData,
+                    UniffiForeignFutureResultRustBuffer.UniffiByValue(
+                        RustBuffer.ByValue(),
+                        callStatus,
+                    ),
+                )
+            }
+            uniffiTraitInterfaceCallAsyncWithError(
+                makeCall,
+                uniffiHandleSuccess,
+                uniffiHandleError,
+                { e: CoreException -> FfiConverterTypeCoreError.lower(e) },
+                uniffiOutDroppedCallback
+            )
+        }
+    }
+
+    internal object uniffiFree: UniffiCallbackInterfaceFree {
+        override fun callback(handle: Long) {
+            FfiConverterTypeCookieGate.handleMap.remove(handle)
+        }
+    }
+
+    internal object uniffiClone: UniffiCallbackInterfaceClone {
+        override fun callback(handle: Long): Long {
+            return FfiConverterTypeCookieGate.handleMap.clone(handle)
+        }
+    }
+
+    internal var vtable = UniffiVTableCallbackInterfaceCookieGate.UniffiByValue(
+        uniffiFree,
+        uniffiClone,
+        `attended`,
+        `ask`,
+    )
+
+    // Registers the foreign callback with the Rust side.
+    // This method is generated for each callback interface.
+    internal fun register(lib: UniffiLib) {
+        lib.uniffi_vtop_ffi_fn_init_callback_vtable_cookiegate(vtable)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCookieGate: FfiConverter<CookieGate, Long> {
+    internal val handleMap = UniffiHandleMap<CookieGate>()
+
+    override fun lower(value: CookieGate): Long {
+        if (value is CookieGateImpl) {
+             // Rust-implemented object.  Clone the handle and return it
+            return value.uniffiCloneHandle()
+         } else {
+            // Kotlin object, generate a new vtable handle and return that.
+            return handleMap.insert(value)
+         }
+    }
+
+    override fun lift(value: Long): CookieGate {
+        if ((value and 1.toLong()) == 0.toLong()) {
+            // Rust-generated handle, construct a new class that uses the handle to implement the
+            // interface
+            return CookieGateImpl(UniffiWithHandle, value)
+        } else {
+            // Kotlin-generated handle, get the object from the handle map
+            return handleMap.remove(value)
+        }
+    }
+
+    override fun read(buf: ByteBuffer): CookieGate {
+        return lift(buf.getLong())
+    }
+
+    override fun allocationSize(value: CookieGate) = 8UL
+
+    override fun write(value: CookieGate, buf: ByteBuffer) {
+        buf.putLong(lower(value))
+    }
+}
+
+
+// This template implements a class for working with a Rust struct via a handle
+// to the live Rust struct on the other side of the FFI.
+//
+// There's some subtlety here, because we have to be careful not to operate on a Rust
+// struct after it has been dropped, and because we must expose a public API for freeing
+// theq Kotlin wrapper object in lieu of reliable finalizers. The core requirements are:
+//
+//   * Each instance holds an opaque handle to the underlying Rust struct.
+//     Method calls need to read this handle from the object's state and pass it in to
+//     the Rust FFI.
+//
+//   * When an instance is no longer needed, its handle should be passed to a
+//     special destructor function provided by the Rust FFI, which will drop the
+//     underlying Rust struct.
+//
+//   * Given an instance, calling code is expected to call the special
+//     `destroy` method in order to free it after use, either by calling it explicitly
+//     or by using a higher-level helper like the `use` method. Failing to do so risks
+//     leaking the underlying Rust struct.
+//
+//   * We can't assume that calling code will do the right thing, and must be prepared
+//     to handle Kotlin method calls executing concurrently with or even after a call to
+//     `destroy`, and to handle multiple (possibly concurrent!) calls to `destroy`.
+//
+//   * We must never allow Rust code to operate on the underlying Rust struct after
+//     the destructor has been called, and must never call the destructor more than once.
+//     Doing so may trigger memory unsafety.
+//
+//   * To mitigate many of the risks of leaking memory and use-after-free unsafety, a `Cleaner`
+//     is implemented to call the destructor when the Kotlin object becomes unreachable.
+//     This is done in a background thread. This is not a panacea, and client code should be aware that
+//      1. the thread may starve if some there are objects that have poorly performing
+//     `drop` methods or do significant work in their `drop` methods.
+//      2. the thread is shared across the whole library. This can be tuned by using `android_cleaner = true`,
+//         or `android = true` in the [`kotlin` section of the `uniffi.toml` file](https://mozilla.github.io/uniffi-rs/kotlin/configuration.html).
+//
+// If we try to implement this with mutual exclusion on access to the handle, there is the
+// possibility of a race between a method call and a concurrent call to `destroy`:
+//
+//    * Thread A starts a method call, reads the value of the handle, but is interrupted
+//      before it can pass the handle over the FFI to Rust.
+//    * Thread B calls `destroy` and frees the underlying Rust struct.
+//    * Thread A resumes, passing the already-read handle value to Rust and triggering
+//      a use-after-free.
+//
+// One possible solution would be to use a `ReadWriteLock`, with each method call taking
+// a read lock (and thus allowed to run concurrently) and the special `destroy` method
+// taking a write lock (and thus blocking on live method calls). However, we aim not to
+// generate methods with any hidden blocking semantics, and a `destroy` method that might
+// block if called incorrectly seems to meet that bar.
+//
+// So, we achieve our goals by giving each instance an associated `AtomicLong` counter to track
+// the number of in-flight method calls, and an `AtomicBoolean` flag to indicate whether `destroy`
+// has been called. These are updated according to the following rules:
+//
+//    * The initial value of the counter is 1, indicating a live object with no in-flight calls.
+//      The initial value for the flag is false.
+//
+//    * At the start of each method call, we atomically check the counter.
+//      If it is 0 then the underlying Rust struct has already been destroyed and the call is aborted.
+//      If it is nonzero them we atomically increment it by 1 and proceed with the method call.
+//
+//    * At the end of each method call, we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+//    * When `destroy` is called, we atomically flip the flag from false to true.
+//      If the flag was already true we silently fail.
+//      Otherwise we atomically decrement and check the counter.
+//      If it has reached zero then we destroy the underlying Rust struct.
+//
+// Astute readers may observe that this all sounds very similar to the way that Rust's `Arc<T>` works,
+// and indeed it is, with the addition of a flag to guard against multiple calls to `destroy`.
+//
+// The overall effect is that the underlying Rust struct is destroyed only when `destroy` has been
+// called *and* all in-flight method calls have completed, avoiding violating any of the expectations
+// of the underlying Rust code.
+//
+// This makes a cleaner a better alternative to _not_ calling `destroy()` as
+// and when the object is finished with, but the abstraction is not perfect: if the Rust object's `drop`
+// method is slow, and/or there are many objects to cleanup, and it's on a low end Android device, then the cleaner
+// thread may be starved, and the app will leak memory.
+//
+// In this case, `destroy`ing manually may be a better solution.
+//
+// The cleaner can live side by side with the manual calling of `destroy`. In the order of responsiveness, uniffi objects
+// with Rust peers are reclaimed:
+//
+// 1. By calling the `destroy` method of the object, which calls `rustObject.free()`. If that doesn't happen:
+// 2. When the object becomes unreachable, AND the Cleaner thread gets to call `rustObject.free()`. If the thread is starved then:
+// 3. The memory is reclaimed when the process terminates.
+//
+// [1] https://stackoverflow.com/questions/24376768/can-java-finalize-an-object-when-it-is-still-in-scope/24380219
+//
+
+
 public interface CoreInterface {
     
     /**
@@ -2685,6 +3152,16 @@ public interface CoreInterface {
      * How many changes came after the inbox was last seen.
      */
     fun `unseenChanges`(`flow`: kotlin.String): kotlin.UInt
+    
+    /**
+     * The kinds the student ticked "don't ask again" for.
+     */
+    fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind>
+    
+    /**
+     * Asks every time again.
+     */
+    fun `resetCookieConsent`(`flow`: kotlin.String)
     
     /**
      * The selected semester's cached course list.
@@ -2877,7 +3354,8 @@ public interface CoreInterface {
     /**
      * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
      * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned.
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
+     * the student on screen saying yes: from the background it is always the error.
      */
     suspend fun `answerSessionRequest`(`flow`: kotlin.String, `requestId`: kotlin.String, `callbackUrl`: kotlin.String, `error`: kotlin.String?)
     
@@ -3027,7 +3505,8 @@ public interface CoreInterface {
     
     /**
      * Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
-     * none for forwarding), only when the server already keeps one; false when it keeps none.
+     * none for forwarding), only when the server already keeps one; false when it keeps none,
+     * or (it runs unasked) the student hasn't ticked "don't ask again" for [`CookieKind::Account`].
      */
     suspend fun `resendServerPassword`(`flow`: kotlin.String, `gmail`: GmailGrant?): kotlin.Boolean
     
@@ -3040,7 +3519,8 @@ public interface CoreInterface {
     
     /**
      * Tells the server the semester picked here, so connected apps read the same one. Does
-     * nothing while no semester is picked; fails with `not_linked` before a key is made.
+     * nothing while no semester is picked, or (it runs unasked) until the student ticked
+     * "don't ask again" for [`CookieKind::Account`]; fails with `not_linked` before a key is made.
      */
     suspend fun `sendServerSemester`(`flow`: kotlin.String)
     
@@ -3856,6 +4336,40 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
+     * The kinds the student ticked "don't ask again" for.
+     */override fun `cookieConsentRemembered`(`flow`: kotlin.String): List<CookieKind> {
+            return FfiConverterSequenceTypeCookieKind.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_cookie_consent_remembered(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * Asks every time again.
+     */
+    @Throws(CoreException::class)override fun `resetCookieConsent`(`flow`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(CoreException) { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_reset_cookie_consent(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * The selected semester's cached course list.
      */override fun `cachedCoursePage`(`flow`: kotlin.String): CoursePage? {
             return FfiConverterOptionalTypeCoursePage.lift(
@@ -4571,7 +5085,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     /**
      * Answers a `vtop_cookie_request` (push or event log): this phone's live VTOP session,
      * signing in again when it had expired, or why it can't. With `error` (the caller gave up,
-     * e.g. timed out) only that is sent. A failure here is sent too, then returned.
+     * e.g. timed out) only that is sent. A failure here is sent too, then returned. Only with
+     * the student on screen saying yes: from the background it is always the error.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -5302,7 +5817,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
-     * none for forwarding), only when the server already keeps one; false when it keeps none.
+     * none for forwarding), only when the server already keeps one; false when it keeps none,
+     * or (it runs unasked) the student hasn't ticked "don't ask again" for [`CookieKind::Account`].
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -5358,7 +5874,8 @@ open class Core: Disposable, AutoCloseable, CoreInterface
     
     /**
      * Tells the server the semester picked here, so connected apps read the same one. Does
-     * nothing while no semester is picked; fails with `not_linked` before a key is made.
+     * nothing while no semester is picked, or (it runs unasked) until the student ticked
+     * "don't ask again" for [`CookieKind::Account`]; fails with `not_linked` before a key is made.
      */
     @Throws(CoreException::class)
     @Suppress("ASSIGNED_BUT_NEVER_ACCESSED_VARIABLE")
@@ -8433,6 +8950,47 @@ public object FfiConverterTypeContact: FfiConverterRustBuffer<Contact> {
             FfiConverterString.write(value.`label`, buf)
             FfiConverterString.write(value.`value`, buf)
             FfiConverterTypeContactKind.write(value.`kind`, buf)
+    }
+}
+
+
+
+data class CookieAnswer (
+    var `send`: kotlin.Boolean
+    , 
+    /**
+     * Don't ask again for this kind.
+     */
+    var `remember`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCookieAnswer: FfiConverterRustBuffer<CookieAnswer> {
+    override fun read(buf: ByteBuffer): CookieAnswer {
+        return CookieAnswer(
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CookieAnswer) = (
+            FfiConverterBoolean.allocationSize(value.`send`) +
+            FfiConverterBoolean.allocationSize(value.`remember`)
+    )
+
+    override fun write(value: CookieAnswer, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`send`, buf)
+            FfiConverterBoolean.write(value.`remember`, buf)
     }
 }
 
@@ -14046,6 +14604,53 @@ public object FfiConverterTypeContactKind: FfiConverterRustBuffer<ContactKind> {
 
 
 
+/**
+ * Why the session would leave the phone; each is remembered on its own.
+ */
+
+enum class CookieKind {
+    
+    /**
+     * The Server, UDP or Proxy route fetching VTOP.
+     */
+    ROUTE,
+    /**
+     * The server checking who the student is (Server page, Connected apps, forwarding).
+     */
+    ACCOUNT,
+    /**
+     * A connected app asking for a live session.
+     */
+    HANDOVER;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCookieKind: FfiConverterRustBuffer<CookieKind> {
+    override fun read(buf: ByteBuffer) = try {
+        CookieKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: CookieKind) = 4UL
+
+    override fun write(value: CookieKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 
 /**
@@ -14115,6 +14720,15 @@ sealed class CoreException: kotlin.Exception() {
             get() = ""
     }
     
+    /**
+     * The student said no (or wasn't there to ask): the VTOP session stayed on the phone.
+     */
+    class ConsentDenied(
+        ) : CoreException() {
+        override val message
+            get() = ""
+    }
+    
     class Other(
         
         val `reason`: kotlin.String
@@ -14156,7 +14770,8 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 )
             6 -> CoreException.NotSignedIn()
             7 -> CoreException.SemesterNeeded()
-            8 -> CoreException.Other(
+            8 -> CoreException.ConsentDenied()
+            9 -> CoreException.Other(
                 FfiConverterString.read(buf),
                 )
             else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
@@ -14194,6 +14809,10 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 4UL
             )
             is CoreException.SemesterNeeded -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+            )
+            is CoreException.ConsentDenied -> (
                 // Add the size for the Int that specifies the variant plus the size needed for all fields
                 4UL
             )
@@ -14239,8 +14858,12 @@ public object FfiConverterTypeCoreError : FfiConverterRustBuffer<CoreException> 
                 buf.putInt(7)
                 Unit
             }
-            is CoreException.Other -> {
+            is CoreException.ConsentDenied -> {
                 buf.putInt(8)
+                Unit
+            }
+            is CoreException.Other -> {
+                buf.putInt(9)
                 FfiConverterString.write(value.`reason`, buf)
                 Unit
             }
@@ -17657,6 +18280,34 @@ public object FfiConverterSequenceTypeTimetableDay: FfiConverterRustBuffer<List<
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeCookieKind: FfiConverterRustBuffer<List<CookieKind>> {
+    override fun read(buf: ByteBuffer): List<CookieKind> {
+        val len = buf.getInt()
+        return List<CookieKind>(len) {
+            FfiConverterTypeCookieKind.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CookieKind>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCookieKind.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CookieKind>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCookieKind.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceOptionalDouble: FfiConverterRustBuffer<List<kotlin.Double?>> {
     override fun read(buf: ByteBuffer): List<kotlin.Double?> {
         val len = buf.getInt()
@@ -17724,6 +18375,19 @@ public object FfiConverterMapStringString: FfiConverterRustBuffer<Map<kotlin.Str
 
 
 
+
+        /**
+         * Asks `gate` before any VTOP session leaves the phone; call before [`crate::Core::new`].
+         */ fun `setCookieGate`(`gate`: CookieGate)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_func_set_cookie_gate(
+    
+        
+        FfiConverterTypeCookieGate.lower(`gate`),_status)
+}
+    
+    
 
         /**
          * Keeps VTOP cookies in `cookies` (the web view's store); call before [`crate::Core::new`].

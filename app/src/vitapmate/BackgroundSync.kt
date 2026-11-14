@@ -183,14 +183,14 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
         AppCore.start(app)
         if (!Settings.backgroundSync) return Result.success()
         val prefs = app.getSharedPreferences("sync", Context.MODE_PRIVATE)
-        flow("sync.background") { f ->
+        flow("sync.background", unattended = true) { f ->
             MailForwarding.load("sync")
             if (!BackgroundSync.available()) {
                 Settings.syncPaused = if (OtpAutofill.selected().name == "Gmail") "Gmail needs reconnecting" else "OTP auto-fill isn't set up"
                 Log.info("sync", "skipped: ${Settings.syncPaused}", f)
                 return@flow
             }
-            val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS) { e, id ->
+            val result = VtopSync.run("sync.background.pages", "Background sync", everything = false, pageTimeoutMs = PAGE_TIMEOUT_MS, unattended = true) { e, id ->
                 val why = OtpAutofill.solve(id, e.issuedAt?.toLong())
                 if (why == OtpAutofill.NO_CODE) {
                     // VTOP mails late at times: one miss is only this run's outcome; two runs in a row pause sync.

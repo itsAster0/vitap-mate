@@ -8,7 +8,9 @@
 //! - UDP: the server route over vm1 ([`Core::udp_page`]), then over HTTPS.
 //!
 //! A route that fails is skipped for [`SKIP_S`] and the request goes on to the next, finally
-//! Direct; the student never has to change the setting to get their data.
+//! Direct; the student never has to change the setting to get their data. Proxy, Server and UDP
+//! send the VTOP session, so each asks first ([`consent::allowed`]); a no (and every background
+//! run) goes Direct and is not skipped, so the next fetch the student watches asks again.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -23,6 +25,7 @@ use vtop_core::{SessionState, VtopError};
 use vtop_shared::engine::PageFetch;
 use vtop_shared::page_dictionary;
 
+use crate::consent::{self, CookieKind};
 use crate::device::EdgeError;
 use crate::{Core, CoreError, Slot, traced_sync, transport, unix_now};
 
@@ -86,16 +89,34 @@ struct State {
     logged: Option<(Option<u64>, Route)>,
 }
 
-static STATE: Mutex<State> = Mutex::new(State {
+const NONE: State = State {
     chosen: Route::Direct,
     server: String::new(),
     skipped: BTreeMap::new(),
     last: None,
     logged: None,
-});
+};
 
+#[cfg(not(test))]
 fn state() -> std::sync::MutexGuard<'static, State> {
+    static STATE: Mutex<State> = Mutex::new(NONE);
     STATE.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Per test thread, so a test's route doesn't reach the others running at once.
+#[cfg(test)]
+fn state() -> std::sync::MutexGuard<'static, State> {
+    thread_local!(static STATE: &'static Mutex<State> = Box::leak(Box::new(Mutex::new(NONE))));
+    STATE
+        .with(|state| *state)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+}
+
+/// Whether the student lets `action` send the session over a route: to the edge's host.
+async fn consented(flow: &str, action: &str) -> bool {
+    let server = consent::host(&state().server);
+    consent::allowed(flow, CookieKind::Route, action, &server, true).await
 }
 
 /// Whether `route` should be tried now: the chosen one covers it (UDP falls back to the HTTPS
@@ -215,7 +236,12 @@ impl Transport for Routed {
             }
             // Downloads go straight to VTOP, as Android's DownloadManager does.
             let download = hop.method == "HEAD" || hop.download_to.is_some();
-            if !download && active(Route::Proxy) {
+            // The dialog may be waited on inside the caller's session lock (hops run under it),
+            // for at most `CookieAsk`; Kotlin's `ask` calls no Rust, so it can't deadlock.
+            if !download
+                && active(Route::Proxy)
+                && consented(&transport::flow(), "Reach VTOP through the proxy").await
+            {
                 let edge = state().server.trim_end_matches('/').to_string();
                 let mut proxied = copy(&hop);
                 proxied.url = reorigin(&hop.url, DEFAULT_BASE_URL, &edge);
@@ -294,7 +320,8 @@ impl From<EdgeError> for ServerError {
 
 impl Core {
     /// Page `name` from the server (UDP first when chosen), signing in there again once when the
-    /// session expired; None when the route is off or the server failed (the phone fetches).
+    /// session expired; None when the route is off, the student said no, or the server failed
+    /// (the phone fetches).
     pub(crate) async fn server_page<T: DeserializeOwned>(
         &self,
         name: &str,
@@ -306,6 +333,13 @@ impl Core {
         }
         let slot = self.current().ok()?;
         let flow = transport::flow();
+        let action = format!("Fetch {name} through the server");
+        // Decided once and before the loop, never across the lock: a code that goes in meanwhile
+        // can't let the session (or, on expiry, the password) go out unasked.
+        let otp = slot.read().await.otp.is_some();
+        if otp || !consented(&flow, &action).await {
+            return None;
+        }
         for attempt in 0..2 {
             let (session, seen) = {
                 let session = slot.read().await;
@@ -445,6 +479,9 @@ impl Core {
         code: Option<&str>,
         flow: &str,
     ) -> Result<(), CoreError> {
+        if !consented(flow, "Send the OTP through the server").await {
+            return Err(CoreError::ConsentDenied);
+        }
         let mut session = slot.write().await;
         let mut body = json!({ "session": session.client.session_state() });
         let path = match code {
@@ -485,7 +522,164 @@ pub(crate) fn unpacked(name: &str, packed: &[u8]) -> Option<Value> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use serde_json::Value;
+    use vtop_core::client::HopResponse;
+
     use super::*;
+    use crate::forwarding::tests::{Edge, serve};
+
+    /// A signed-in core on `route`, its server the test edge.
+    async fn core_on(name: &str, route: Route) -> (Core, Arc<Mutex<Edge>>) {
+        let dir =
+            std::env::temp_dir().join(format!("vtop-ffi-route-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        fs::write(
+            dir.join(crate::forwarding::SERVER_FILE),
+            serve(edge.clone()).await,
+        )
+        .unwrap();
+        let core = Core {
+            cache: dir.clone(),
+            dir,
+            slot: Mutex::new(None),
+        };
+        consent::tests::signed_in(&core);
+        core.set_route("f".into(), route).unwrap();
+        load(&core);
+        (core, edge)
+    }
+
+    /// Page `attendance` on `route` with the student saying no.
+    async fn denied(name: &str, route: Route) -> (Core, Arc<Mutex<Edge>>) {
+        let (core, edge) = core_on(name, route).await;
+        let gate = consent::tests::no();
+        let page = transport::with_flow(
+            "f".into(),
+            core.server_page::<Value>("attendance", Some("AP1"), &[]),
+        )
+        .await;
+        assert!(page.is_none(), "the phone fetches");
+        assert_eq!(gate.asks(), 1);
+        (core, edge)
+    }
+
+    #[tokio::test]
+    async fn server_route_falls_back_to_direct_when_denied() {
+        let (_core, edge) = denied("server", Route::Server).await;
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn denied_route_is_not_skipped() {
+        let (core, _edge) = denied("skip", Route::Server).await;
+        let status = core.route_status("f".into());
+        assert_eq!(status.chosen, Route::Server);
+        assert!(status.skipped.is_empty());
+        assert!(active(Route::Server));
+    }
+
+    #[tokio::test]
+    async fn udp_never_sends_the_session_when_denied() {
+        // No `/v1/udp` for the gateway either.
+        let (_core, edge) = denied("udp", Route::Udp).await;
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn relogin_password_never_leaves_when_denied() {
+        let (_core, edge) = denied("relogin", Route::Server).await;
+        let edge = edge.lock().unwrap();
+        assert!(!edge.requests.iter().any(|r| r.path == "/v1/vtop/login"));
+    }
+
+    #[tokio::test]
+    async fn otp_pending_sends_nothing_and_cleared_otp_still_asks() {
+        let (core, edge) = core_on("otp-race", Route::Server).await;
+        let gate = consent::tests::no();
+        let slot = core.current().unwrap();
+        slot.write().await.otp = Some("code".into());
+        let fetch = || {
+            transport::with_flow(
+                "f".into(),
+                core.server_page::<Value>("attendance", Some("AP1"), &[]),
+            )
+        };
+        assert!(fetch().await.is_none());
+        assert_eq!(gate.asks(), 0, "nothing to send while the code is pending");
+        slot.write().await.otp = None; // Another flow's code went in.
+        assert!(fetch().await.is_none());
+        assert_eq!(gate.asks(), 1, "the send after it is asked about");
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn server_otp_denied_is_consent_denied() {
+        let (core, edge) = core_on("otp", Route::Server).await;
+        let gate = consent::tests::no();
+        let slot = core.current().unwrap();
+        let sent = core.server_otp(&slot, Some("123456"), "f").await;
+        assert_eq!(sent, Err(CoreError::ConsentDenied));
+        assert_eq!(gate.asks(), 1);
+        assert!(edge.lock().unwrap().requests.is_empty());
+    }
+
+    /// Answers every hop with 200 and keeps its URL.
+    #[derive(Debug, Default)]
+    struct Hops(Mutex<Vec<String>>);
+
+    impl Transport for Hops {
+        fn send(&self, hop: Hop) -> HopFuture<'_> {
+            self.0.lock().unwrap().push(hop.url.clone());
+            Box::pin(async move { Ok(HopResponse::whole(200, Vec::new(), hop.url, Vec::new())) })
+        }
+    }
+
+    /// Three VTOP hops in one flow through the proxy route; the URLs they went to.
+    async fn three_hops(gate: &consent::tests::TestGate) -> Vec<String> {
+        {
+            let mut state = state();
+            (state.chosen, state.server) = (Route::Proxy, "https://edge.test".into());
+        }
+        let hops = Arc::new(Hops::default());
+        let routed = Routed(hops.clone());
+        transport::with_flow("f".into(), async {
+            for _ in 0..3 {
+                let hop = Hop {
+                    method: "GET".into(),
+                    url: format!("{DEFAULT_BASE_URL}/vtop/content"),
+                    headers: Vec::new(),
+                    body: Vec::new(),
+                    timeout: std::time::Duration::from_secs(1),
+                    connect_timeout: std::time::Duration::from_secs(1),
+                    download_to: None,
+                };
+                routed.send(hop).await.unwrap();
+            }
+        })
+        .await;
+        assert_eq!(gate.asks(), 1);
+        hops.0.lock().unwrap().clone()
+    }
+
+    #[tokio::test]
+    async fn proxy_asks_once_per_flow() {
+        let urls = three_hops(&consent::tests::yes()).await;
+        assert!(
+            urls.iter()
+                .all(|url| url.starts_with("https://edge.test/vtop/"))
+        );
+    }
+
+    #[tokio::test]
+    async fn proxy_denied_goes_straight_to_vtop() {
+        let urls = three_hops(&consent::tests::no()).await;
+        assert!(urls.iter().all(|url| url.starts_with(DEFAULT_BASE_URL)));
+        assert!(state().skipped.is_empty());
+    }
 
     #[test]
     fn origins_swap_only_at_the_start() {

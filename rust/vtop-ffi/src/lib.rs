@@ -3,6 +3,7 @@
 
 mod calendar;
 mod changes;
+mod consent;
 mod cookies;
 mod dev;
 mod device;
@@ -36,6 +37,7 @@ pub use biometric::{BiometricDay, Punch, PunchKind};
 pub use calendar::{
     AcademicCalendar, CalendarDay, CalendarEvent, CalendarEventPart, CalendarKind, CalendarMonth,
 };
+pub use consent::{CookieAnswer, CookieGate, CookieKind, set_cookie_gate};
 pub use cookies::{SharedCookies, set_shared_cookies};
 pub use course_page::{
     CourseGroup, CoursePage, CoursePart, CoursePlan, CourseSection, CourseView, FileLink, Lecture,
@@ -117,6 +119,8 @@ pub enum CoreError {
     /// No semester picked yet (or VTOP no longer lists the pick): the
     /// student picks one from [`Core::fetch_semesters`] first.
     SemesterNeeded,
+    /// The student said no (or wasn't there to ask): the VTOP session stayed on the phone.
+    ConsentDenied,
     Other {
         reason: String,
     },
@@ -129,6 +133,9 @@ impl std::fmt::Display for CoreError {
             Self::InvalidCredentials => formatter.write_str("invalid credentials"),
             Self::NotSignedIn => formatter.write_str("not signed in"),
             Self::SemesterNeeded => formatter.write_str("no semester picked"),
+            Self::ConsentDenied => {
+                formatter.write_str("Not sent: your VTOP cookie stays on the phone.")
+            }
             Self::VtopUnavailable { reason }
             | Self::OtpRequired { reason, .. }
             | Self::OtpRejected { reason }
@@ -150,6 +157,7 @@ impl CoreError {
             Self::OtpRejected { .. } => "OtpRejected",
             Self::NotSignedIn => "NotSignedIn",
             Self::SemesterNeeded => "SemesterNeeded",
+            Self::ConsentDenied => "ConsentDenied",
             Self::Other { .. } => "Other",
         }
     }
@@ -168,6 +176,14 @@ impl From<VtopError> for CoreError {
             error => Self::Other {
                 reason: error.to_string(),
             },
+        }
+    }
+}
+
+impl From<uniffi::UnexpectedUniFFICallbackError> for CoreError {
+    fn from(error: uniffi::UnexpectedUniFFICallbackError) -> Self {
+        Self::Other {
+            reason: error.reason,
         }
     }
 }
@@ -353,6 +369,7 @@ impl Core {
             fs::create_dir_all(&core.dir)?;
             fs::create_dir_all(&core.cache)?;
             route::load(&core);
+            consent::load(&core);
             let Some(account) = core.read::<Account>(ACCOUNT) else {
                 return Ok(());
             };
@@ -515,6 +532,7 @@ impl Core {
                 SELECTED,
                 forwarding::FILE,
                 changes::FILE,
+                consent::FILE,
             ]);
             obs::set_regno(None);
             Ok(())
@@ -1080,7 +1098,13 @@ impl Core {
             .is_some_and(|saved| saved.username != session.account.username)
         {
             info!("another account signed in: cached pages and forwarding address dropped");
-            self.forget(&[SEMESTERS, SELECTED, forwarding::FILE, changes::FILE]);
+            self.forget(&[
+                SEMESTERS,
+                SELECTED,
+                forwarding::FILE,
+                changes::FILE,
+                consent::FILE,
+            ]);
         }
         let saved_at_ms = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -1157,6 +1181,9 @@ impl Core {
         let _forwarding = forwarding::FILE_LOCK
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
+        if files.contains(&consent::FILE) {
+            consent::forget();
+        }
         for file in files {
             match fs::remove_file(self.at(file)) {
                 Err(error) if error.kind() != std::io::ErrorKind::NotFound => {

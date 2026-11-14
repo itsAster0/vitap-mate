@@ -23,20 +23,23 @@ import kotlin.time.Duration.Companion.milliseconds
 object Foreground {
     var resumes by mutableIntStateOf(0)
         private set
-    var shown = false
-        private set
+    /** Activities started and not stopped: a new MainActivity can start before the old one stops. */
+    @Volatile private var started = 0
+    val shown get() = started > 0
     private var left = false
 
     /** From the activity's `onStart`. */
     fun started() {
-        shown = true
+        started++
         if (left) resumes++
     }
 
     /** From the activity's `onStop`. */
     fun stopped() {
-        shown = false
+        started = (started - 1).coerceAtLeast(0)
+        if (shown) return
         left = true
+        CookieConsent.left()
     }
 }
 
@@ -58,7 +61,7 @@ object CalendarRefresh {
      * [anyway] (after an attendance refresh, as in Flutter). Failures log ([BackgroundProblems]).
      */
     suspend fun ifOld(semester: String, src: String, anyway: Boolean = false): Boolean = lock.withLock {
-        flow("$src.calendar") { id ->
+        flow("$src.calendar", unattended = src == "sync") { id ->
             withContext(Dispatchers.IO) {
                 val core = AppCore.await()
                 val saved = core.cachedCalendar(id)
@@ -155,7 +158,7 @@ object StaleSweep {
 
     private class Stop(val reason: String) : Exception(reason)
 
-    private suspend fun sweep() = flow("sync.stale") { f ->
+    private suspend fun sweep() = flow("sync.stale", unattended = true) { f ->
         val core = AppCore.await()
         var fetched = 0
         suspend fun step(id: String, label: String, updatedAt: (Core) -> Long?, fetch: suspend (Core) -> Unit) {

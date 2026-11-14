@@ -59,6 +59,7 @@ internal fun ForwardingContent() {
     val status = MailForwarding.status
     var confirmOff by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
+        MailForwarding.error = null
         flow("forwarding.open") { Log.info("ui.forwarding", "open", it, mapOf("state" to "${status?.state}")) }
         MailForwarding.load("open")
     }

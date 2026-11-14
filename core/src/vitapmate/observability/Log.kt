@@ -17,8 +17,8 @@ object Log {
         try {
             logEvent(level, src, flow, msg, fields)
         } catch (e: Throwable) {
-            // The native library isn't loaded (or failed to): logcat only.
-            android.util.Log.println(android.util.Log.WARN, "vitapmate", "$level $src ${flow.orEmpty()} $msg $fields ($e)")
+            // The native library isn't loaded (or failed to): logcat only (none in JVM tests).
+            runCatching { android.util.Log.println(android.util.Log.WARN, "vitapmate", "$level $src ${flow.orEmpty()} $msg $fields ($e)") }
         }
     }
 

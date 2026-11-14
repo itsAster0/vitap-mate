@@ -76,6 +76,9 @@ keystore/             release keystore (gitignored; never read or print it)
   Settings → Developer (`Tunable` in `core/src/vitapmate/data/Settings.kt`).
 - VTOP writes (outing apply and cancel) show a result only after VTOP confirms
   it.
+- A send of the VTOP session to our servers goes through `consent::allowed`
+  (`rust/vtop-ffi/src/consent.rs`); background flows are
+  `flow(name, unattended = true)` and never send it.
 - Rust follows the Google Rust style guide. New crates use edition 2024.
 
 ## Setup

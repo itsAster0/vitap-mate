@@ -55,8 +55,10 @@ export const Edge = Cloudflare.Worker("Edge", {
   workersDev: false,
   observability: {
     enabled: true,
-    logs: { enabled: true, invocationLogs: true },
-    traces: { enabled: true, headSamplingRate: 1 },
+    // The Worker's own log lines only, and 1 request in 20 traced: stored spans and log
+    // events count toward Observability usage.
+    logs: { enabled: true, invocationLogs: false },
+    traces: { enabled: true, headSamplingRate: 0.05 },
   },
   env: {
     DEVICE: Cloudflare.DurableObject("DEVICE", { className: "Device" }),

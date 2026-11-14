@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::info;
 
+use crate::consent::CookieKind;
 use crate::device::EdgeError;
 use crate::keys::{AccessKey, KeyView, refused};
 use crate::{Core, CoreError, traced};
@@ -229,7 +230,9 @@ impl Core {
     /// install's registration.
     pub async fn server_status(&self, flow: String) -> Result<ServerStatus, CoreError> {
         traced("server_status", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let cookies = self
+                .live_cookies(&flow, "Load what the server keeps for you")
+                .await?;
             self.status_with(&self.forwarding_server(), &flow, &cookies)
                 .await
         })
@@ -239,26 +242,34 @@ impl Core {
     /// Removes a linked phone (an id from [`ServerStatus::phones`]).
     pub async fn remove_phone(&self, flow: String, id: String) -> Result<(), CoreError> {
         let path = "/v1/account/remove-phone";
-        self.account_op("remove_phone", flow, path, json!({ "id": id }))
-            .await
-            .map(drop)
+        let action = "Remove a phone from your account";
+        self.account_op(
+            "remove_phone",
+            Some(action),
+            flow,
+            path,
+            json!({ "id": id }),
+        )
+        .await
+        .map(drop)
     }
 
     /// Tells the server the semester picked here, so connected apps read the same one. Does
-    /// nothing while no semester is picked; fails with `not_linked` before a key is made.
+    /// nothing while no semester is picked, or (it runs unasked) until the student ticked
+    /// "don't ask again" for [`CookieKind::Account`]; fails with `not_linked` before a key is made.
     pub async fn send_server_semester(&self, flow: String) -> Result<(), CoreError> {
         let Some(semester) = self.read::<String>(crate::SELECTED) else {
             return Ok(());
         };
         let path = "/v1/account/semester";
-        self.account_op(
-            "send_server_semester",
-            flow,
-            path,
-            json!({ "semesterId": semester }),
-        )
-        .await
-        .map(drop)
+        let body = json!({ "semesterId": semester });
+        match self
+            .account_op("send_server_semester", None, flow, path, body)
+            .await
+        {
+            Err(CoreError::ConsentDenied) => Ok(()),
+            result => result.map(drop),
+        }
     }
 
     /// Hands the server this phone's VTOP password, sealed, so it signs in for connected apps
@@ -270,7 +281,8 @@ impl Core {
         gmail: Option<GmailGrant>,
     ) -> Result<(), CoreError> {
         traced("save_server_password", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let action = "Save your password on the server (it gets your password too)";
+            let cookies = self.live_cookies(&flow, action).await?;
             self.save_password_with(&self.forwarding_server(), &flow, &cookies, gmail)
                 .await
         })
@@ -278,14 +290,22 @@ impl Core {
     }
 
     /// Sends the password again with the OTP auto-fill now in use ([`GmailGrant`] for Gmail,
-    /// none for forwarding), only when the server already keeps one; false when it keeps none.
+    /// none for forwarding), only when the server already keeps one; false when it keeps none,
+    /// or (it runs unasked) the student hasn't ticked "don't ask again" for [`CookieKind::Account`].
     pub async fn resend_server_password(
         &self,
         flow: String,
         gmail: Option<GmailGrant>,
     ) -> Result<bool, CoreError> {
         traced("resend_server_password", &flow, async {
-            let cookies = self.live_cookies().await?;
+            let action = "Send your password to the server again";
+            let cookies = match self
+                .session_cookies(&flow, CookieKind::Account, action, false)
+                .await
+            {
+                Err(CoreError::ConsentDenied) => return Ok(false),
+                cookies => cookies?.ok_or(CoreError::NotSignedIn)?,
+            };
             let server = self.forwarding_server();
             let body = json!({ "session": { "cookies": cookies } });
             let account = self
@@ -305,16 +325,24 @@ impl Core {
     /// Drops the sealed password; the server can then no longer sign in by itself.
     pub async fn forget_server_password(&self, flow: String) -> Result<(), CoreError> {
         let path = "/v1/account/forget-credentials";
-        self.account_op("forget_server_password", flow, path, json!({}))
-            .await
-            .map(drop)
+        let action = "Drop your password from the server";
+        self.account_op(
+            "forget_server_password",
+            Some(action),
+            flow,
+            path,
+            json!({}),
+        )
+        .await
+        .map(drop)
     }
 
     /// Deletes the account on the server: phones, keys, saved session and password, options and
     /// sign-ins. Not the forwarding address, nor this phone's registration.
     pub async fn delete_server_account(&self, flow: String) -> Result<(), CoreError> {
         let path = "/v1/account/delete";
-        self.account_op("delete_server_account", flow, path, json!({}))
+        let action = "Delete your account on the server";
+        self.account_op("delete_server_account", Some(action), flow, path, json!({}))
             .await
             .map(drop)
     }
@@ -331,7 +359,8 @@ impl Core {
             "vaultTtlSecs": options.vault_ttl_secs,
         } });
         let path = "/v1/account/settings";
-        self.account_op("set_server_options", flow, path, settings)
+        let action = "Change the server's options";
+        self.account_op("set_server_options", Some(action), flow, path, settings)
             .await
             .map(drop)
     }
@@ -339,7 +368,8 @@ impl Core {
     /// Drops the sign-in history; false when the server doesn't offer it yet.
     pub async fn clear_server_sign_ins(&self, flow: String) -> Result<bool, CoreError> {
         let path = "/v1/account/clear-sign-ins";
-        self.account_op("clear_server_sign_ins", flow, path, json!({}))
+        let action = "Clear the server's sign-in history";
+        self.account_op("clear_server_sign_ins", Some(action), flow, path, json!({}))
             .await
     }
 
@@ -546,17 +576,24 @@ impl Core {
         })
     }
 
-    /// A `/v1/account/*` call with the live session added to `body`; false when the server has
-    /// no such route yet.
+    /// A `/v1/account/*` call with the live session added to `body`, once the student allowed
+    /// it for `action` (asked: `Some`, else only when remembered); false when the server has no
+    /// such route yet.
     async fn account_op(
         &self,
         name: &str,
+        action: Option<&str>,
         flow: String,
         path: &str,
         mut body: Value,
     ) -> Result<bool, CoreError> {
         traced(name, &flow, async {
-            body["session"] = json!({ "cookies": self.live_cookies().await? });
+            let (why, ask) = (action.unwrap_or(name), action.is_some());
+            let cookies = self
+                .session_cookies(&flow, CookieKind::Account, why, ask)
+                .await?
+                .ok_or(CoreError::NotSignedIn)?;
+            body["session"] = json!({ "cookies": cookies });
             let answer = self
                 .edge_post(&self.forwarding_server(), path, &flow, &body)
                 .await;
@@ -655,6 +692,25 @@ mod tests {
     fn mailbox(core: &Core, server: &str) {
         let saved = json!({ "server": server, "id": "k3f9x2ab7q", "address": "otp+k3f9x2ab7q@vmate.aster0.dev" });
         fs::write(core.at(crate::forwarding::FILE), saved.to_string()).unwrap();
+    }
+
+    #[tokio::test]
+    async fn semester_push_is_quiet() {
+        let core = core("semester");
+        let edge = Arc::new(Mutex::new(Edge::default()));
+        fs::write(
+            core.at(crate::forwarding::SERVER_FILE),
+            serve(edge.clone()).await,
+        )
+        .unwrap();
+        fs::write(core.at(crate::SELECTED), r#""AP2026""#).unwrap();
+        crate::consent::tests::signed_in(&core);
+        let gate = crate::consent::tests::yes();
+        assert_eq!(core.send_server_semester("f".into()).await, Ok(()));
+        let resent = core.resend_server_password("f".into(), None).await;
+        assert_eq!(resent, Ok(false));
+        assert_eq!(gate.asks(), 0);
+        assert!(edge.lock().unwrap().requests.is_empty());
     }
 
     #[tokio::test]

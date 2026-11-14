@@ -207,6 +207,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         onClick = { nav.push(Route.Screen(SERVER)) },
                         trailing = { Chevron() },
                     )
+                    CookieConsentSetting()
                 }
             }
             item {

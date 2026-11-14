@@ -483,8 +483,10 @@ async fn a_cancelled_otp_makes_the_next_relogin_start_fresh() {
     }
     // Calls that need VTOP's session (Connected apps) answer with the open challenge too,
     // without checking the session with VTOP, which would wipe the challenge.
+    let _gate = consent::tests::yes();
     assert_eq!(
-        core.session_cookies().await,
+        core.session_cookies("f", consent::CookieKind::Account, "Test", true)
+            .await,
         Err(CoreError::OtpRequired {
             reason: "Additional verification is required.".into(),
             issued_at: Some(7),
