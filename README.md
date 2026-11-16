@@ -24,7 +24,7 @@ Install vitapmate from Google Play (`com.vitap_pal.app`), or download `vitapmate
 - Docs, with the files in your download folder and the mess menu
 - A home-screen widget with the next class and today's timetable, and launcher shortcuts
 - Live updates on the lock screen for the class on now and your outing requests, on Android 16 and later
-- In class mode, which turns on Do Not Disturb during classes
+- In class mode, which turns on Do Not Disturb during classes and exams
 - Timetable and attendance for assistants through Android's app functions, on Android 16 and later
 - The timetable and grade history as a PDF to share or print
 - VTOP inside the app, already signed in

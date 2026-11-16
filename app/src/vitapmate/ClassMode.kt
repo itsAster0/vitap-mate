@@ -36,9 +36,10 @@ import vitapmate.ui.rememberHaptics
 
 /**
  * Settings → In class (Android 10+, off by default): a Do Not Disturb rule of the app's own
- * ("In class", priority only) that is on while a class from the cached timetable is on. An
- * inexact alarm ([LiveUpdateReceiver]) flips it at each class's start and end, so it can be a few
- * minutes late; the student can change or remove the rule in Android's Modes. Flows `classmode.*`.
+ * ("In class", priority only) that is on while a class from the cached timetable is on, or an
+ * exam from the cached schedule (from its reporting time to its end). An inexact alarm
+ * ([LiveUpdateReceiver]) flips it at each start and end, so it can be a few minutes late; the
+ * student can change or remove the rule in Android's Modes. Flows `classmode.*`.
  */
 object ClassMode {
     private val CONDITION: Uri = Uri.parse("condition://vitapmate/class")
@@ -72,19 +73,25 @@ object ClassMode {
             val ms = System.currentTimeMillis()
             val today = istDay(ms)
             val now = istMinute(ms)
-            // Days from today with their classes; null without a cached timetable.
-            val days = runCatching {
+            // The classes and exams of the next 8 days, by day and start.
+            val quiet = runCatching {
                 withContext(Dispatchers.IO) {
                     val c = AppCore.await()
-                    c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).map { d -> d.day to meeting(d).map { it.slot }.sortedBy { it.start } } }
+                    val classes = c.cachedTimetable(f)?.let { c.timetableDays(f, today, 8).flatMap { d -> meeting(d).map { Quiet(d.day, it.slot.start, it.slot.end, it.slot.name) } } }.orEmpty()
+                    val exams = c.cachedExams(f)?.groups.orEmpty().flatMap { g ->
+                        g.papers.mapNotNull { p ->
+                            val day = p.day?.takeIf { it in today until today + 8 } ?: return@mapNotNull null
+                            val start = p.start ?: return@mapNotNull null
+                            Quiet(day, p.reporting?.coerceAtMost(start) ?: start, p.end ?: (start + 180), "${g.name}, ${p.name}")
+                        }
+                    }
+                    (classes + exams).sortedWith(compareBy({ it.day }, { it.start }))
                 }
-            }.onFailure { Log.warn("classmode", "timetable unavailable: ${it::class.simpleName}", f) }.getOrNull()
-            val todays = days?.firstOrNull { it.first == today }?.second.orEmpty()
-            val current = todays.firstOrNull { it.start <= now && now < it.end }
+            }.onFailure { Log.warn("classmode", "timetable unavailable: ${it::class.simpleName}", f) }.getOrNull().orEmpty()
+            val todays = quiet.filter { it.day == today }
+            val current = todays.filter { it.start <= now && now < it.end }.maxByOrNull { it.end }
             // Minutes from today's midnight to the next flip.
-            val wake = current?.end
-                ?: todays.firstOrNull { it.start > now }?.start
-                ?: days?.firstOrNull { it.first > today && it.second.isNotEmpty() }?.let { (it.first - today) * 1440 + it.second.first().start }
+            val wake = current?.end ?: quiet.firstOrNull { it.day > today || it.start > now }?.let { (it.day - today) * 1440 + it.start }
             val rule = id ?: manager.addAutomaticZenRule(
                 AutomaticZenRule("In class", null, ComponentName(app, MainActivity::class.java), CONDITION, null, NotificationManager.INTERRUPTION_FILTER_PRIORITY, true),
             )
@@ -94,6 +101,9 @@ object ClassMode {
         }
     }
 }
+
+/** A class or exam on [day] (days since 1970), from [start] to [end] (minutes since midnight). */
+private data class Quiet(val day: Int, val start: Int, val end: Int, val name: String)
 
 /**
  * Settings → In class: the switch, and while Android hasn't given the app Do Not Disturb access a
@@ -115,12 +125,12 @@ fun ClassModeSetting() {
         if (on && !granted) allow() else scope.launch { ClassMode.refresh(context, "classmode.settings") }
         scope.logAction("settings.class_mode", "ui.settings", "class mode ${if (on) "on" else "off"}")
     }
-    ListGroup("In class", footer = "From the timetable the app has saved. It can switch a few minutes late.") {
+    ListGroup("In class", footer = "From the timetable and exam schedule the app has saved. It can switch a few minutes late.") {
         GroupItem(
-            "Silence during classes",
+            "Silence during classes and exams",
             "settings.class_mode",
             Lucide.BellOff,
-            "Do Not Disturb turns on when a class starts and off when it ends",
+            "Do Not Disturb is on during each class, and for an exam from reporting time until it ends",
             onClick = { set(!Settings.classMode) },
             trailing = { ItemSwitch(Settings.classMode, { set(it) }) },
             on = Settings.classMode,
