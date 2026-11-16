@@ -47,6 +47,9 @@ pub fn obs_init(data_dir: String) {
             .with(tracing_subscriber::filter::LevelFilter::INFO)
             .with(Pipeline)
             .try_init();
+        // The release build unwinds, so UniFFI hands Kotlin an exception for the one call;
+        // this keeps the message and file:line in app.jsonl.
+        std::panic::set_hook(Box::new(|info| tracing::error!(target: "panic", "{info}")));
     });
     let mut log = locked(&LOG);
     if log.is_some() {
