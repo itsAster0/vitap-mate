@@ -4,7 +4,7 @@ default_platform(:android)
 AAB = 'build/vitapmate-release.aab'.freeze
 METADATA = 'fastlane/metadata/android'.freeze
 # Play's in-app update priority (0-5, see PlayUpdate.kt): the default, then any release that differs, by versionCode.
-DEFAULT_UPDATE_PRIORITY = 3
+DEFAULT_UPDATE_PRIORITY = 2
 UPDATE_PRIORITIES = {
   # 3001000 => 5,
 }.freeze
@@ -42,7 +42,7 @@ platform :android do
 
   desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
   lane :promote_all do
-    %w[friends alpha beta].each do |track|
+    %w[friends alpha beta production].each do |track|
       upload_to_play_store(
         track: 'internal',
         track_promote_to: track,

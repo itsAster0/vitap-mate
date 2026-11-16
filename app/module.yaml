@@ -14,11 +14,10 @@ dependencies:
   - //features/profile
   - //features/biometric
   - //features/vtop
+  - //features/wrapped
   - androidx.activity:activity-compose:1.13.0
   # Typed back stack and predictive back for the shell (Compose Multiplatform build).
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
-  # Background sync (Settings → Background sync): periodic, survives reboots and Doze.
-  - androidx.work:work-runtime:2.11.2
   # Push from the edge (session requests, the event log); configured by `mise run firebase`.
   - com.google.firebase:firebase-messaging:26.0.1
   # Settings → Connected apps → Pair a browser: Play services' QR scanner (its own UI, no CAMERA permission).
@@ -31,8 +30,8 @@ settings:
   android:
     signing: enabled
     applicationId: com.vitap_pal.app
-    versionCode: 3000300
-    versionName: "3.0.3"
+    versionCode: 3000410
+    versionName: "3.0.4"
     namespace: vitapmate
     minSdk: 28
     # armeabi-v7a: phones on 32-bit Android (mise run rust-android builds both).

@@ -49,11 +49,44 @@
         {
           "text": "The app asks before your VTOP cookie leaves the phone and says where it goes. Settings lets you turn the question back on.",
           "since": 3000300
+        },
+        {
+          "text": "Semester Wrapped: after a semester's last class, More shows that semester as a story you can tap through and share as images, with Hide grades for the shared copy.",
+          "since": 3000400
         }
       ]
     }
   ],
   "releases": [
+    {
+      "version": "3.0.4",
+      "code": 3000410,
+      "summary": "3.0.4 adds Semester Wrapped, a shareable story of your semester, and lists exams in the order they happen.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "Semester Wrapped: once a semester's classes are over, the top of More opens a story of that semester. Tap through attendance, your longest streak, the courses you never missed, your room and faculty, marks, GPA and CGPA, outings and campus times, then share any slide or the summary card as an image.",
+            "Hide grades leaves your marks and grades out of the shared image. The story on your phone still shows them.",
+            "Campus times for Wrapped come from VTOP only when you tap Fetch. They load in the background with a notification you can stop."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "Exams are listed in the order they happen, so a CAT shows before the FAT.",
+            "Background sync also saves the last few days of biometric entries.",
+            "Silence during classes (Settings → In class) also covers exams, from reporting time until each one ends."
+          ]
+        },
+        {
+          "title": "Fixed",
+          "items": [
+            "The app could close by itself right after opening."
+          ]
+        }
+      ]
+    },
     {
       "version": "3.0.3",
       "code": 3000300,

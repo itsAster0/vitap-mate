@@ -1,0 +1,5 @@
+3.0.4
+• Semester Wrapped: once a semester's classes end, More shows your semester as a story you can tap through and share
+• Attendance, streaks, your room and faculty, marks, GPA, outings and campus times, on one summary card
+• Campus times for Wrapped fetch from VTOP only when you ask
+• Exams are listed in the order they happen
