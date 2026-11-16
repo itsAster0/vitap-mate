@@ -50,6 +50,9 @@ object AppCore {
         Docs.init(app)
         Gmail.init(app)
         val dir = context.filesDir.path
+        // Its state list is made here, on the main thread: made on core-init (setCookieGate)
+        // while the first frame composes, the shell's dialog can't read it and the app crashes.
+        CookieConsent.pending.size
         thread(name = "core-init") {
             runCatching {
                 // Logs, the change inbox and Activity history live in the cache folder, which
