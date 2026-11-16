@@ -181,7 +181,7 @@ private fun Overview(detail: AttendanceDetail) {
         verticalArrangement = Arrangement.spacedBy(Space.lg),
     ) {
         item("hero") { Hero(course) }
-        if (detail.classes.any { it.status != null }) item("insights") { Insights(detail.classes) }
+        if (detail.classes.any { it.status != null }) item("insights") { Insights(detail) }
         if (detail.classes.isNotEmpty()) item("calendar") { ClassCalendar(detail.classes) }
         classHistory(detail.classes)
         item("updated") { UpdatedFooter() }
@@ -229,7 +229,7 @@ private fun Hero(course: AttendanceCourse) {
                     maxLines = 1,
                 )
                 Column(Modifier.weight(1f).padding(start = Space.md, bottom = Space.sm), horizontalAlignment = Alignment.End) {
-                    (course.debarLine() ?: course.advice(showSkip = true))?.let {
+                    (course.debarLine ?: course.advice(showSkip = true))?.let {
                         Text(it, style = MaterialTheme.typography.titleSmallEmphasized.nums(fontWeight = FontWeight.Bold), color = ink, textAlign = TextAlign.End)
                     }
                     Text(standing.label, style = MaterialTheme.typography.labelMedium, color = ink.copy(alpha = 0.8f), textAlign = TextAlign.End)

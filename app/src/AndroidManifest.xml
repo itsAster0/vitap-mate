@@ -99,6 +99,8 @@
     </activity-alias>
     <!-- A change notification's "Mark as seen" (BackgroundSync.kt). -->
     <receiver android:name="vitapmate.SeenReceiver" android:exported="false" />
+    <!-- Stop on Wrapped's campus-times notification (BiometricFetch.kt); WorkManager's own cancel intent needs SystemForegroundService, removed below. -->
+    <receiver android:name="vitapmate.data.BiometricFetchStop" android:exported="false" />
     <!-- Live updates' class alarm and In class's, and re-arming them after a reboot or an update (LiveUpdates.kt). -->
     <receiver android:name="vitapmate.LiveUpdateReceiver" android:exported="false">
       <intent-filter>

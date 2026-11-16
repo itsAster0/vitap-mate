@@ -16,6 +16,7 @@ import vitapmate.features.outing.outingFeature
 import vitapmate.features.profile.profileFeature
 import vitapmate.features.timetable.timetableFeature
 import vitapmate.features.vtop.vtopFeature
+import vitapmate.features.wrapped.wrappedFeature
 import vitapmate.ui.Feature
 
 /** More's sections, three features to a row. */
@@ -28,9 +29,10 @@ val featureGroups: List<Pair<String, List<Feature>>> = listOf(
 
 /**
  * Every feature, in the order More and Settings list them. The one place a feature is listed:
- * its id is its route, its settings key and its log src (`ui.<id>`).
+ * its id is its route, its settings key and its log src (`ui.<id>`). Wrapped is opened only by
+ * its route (More's card), so it is in no group.
  */
-val features: List<Feature> = featureGroups.flatMap { it.second }
+val features: List<Feature> = featureGroups.flatMap { it.second } + wrappedFeature
 
 /** Screens the shell itself provides; they can be tabs too. Their content is drawn by [Shell]. */
 const val MORE = "more"

@@ -17,3 +17,4 @@ modules:
   - features/profile
   - features/timetable
   - features/vtop
+  - features/wrapped

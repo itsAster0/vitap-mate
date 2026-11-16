@@ -112,11 +112,14 @@ pub struct AttendanceCourse {
     pub safe: bool,
     pub can_skip: i32,
     pub must_attend: i32,
-    /// "Can skip 3", "Attend 2", "Don't skip" or "No classes yet".
+    /// "Can skip 3", "Attend 2 labs", "Don't skip" or "No classes yet".
     pub advice: String,
     pub debarred: bool,
     /// What VTOP's debar status says, when it debars.
     pub debar: Option<Debar>,
+    /// The debarment in one line: "Debarred for CAT-II · Permitted · Clear
+    /// for FAT", or "… · Clear for FAT at 3 more" while below 75%.
+    pub debar_line: Option<String>,
 }
 
 /// A debarment, which holds for one exam: attendance is checked again
@@ -153,6 +156,27 @@ impl Debar {
             next_exam,
         })
     }
+
+    /// [`AttendanceCourse::debar_line`] for a course standing at `plan`.
+    fn line(&self, plan: &Standing, lab: bool) -> String {
+        let mut parts = vec![if self.exam.trim().is_empty() {
+            "Debarred".to_string()
+        } else {
+            format!("Debarred for {}", self.exam)
+        }];
+        if self.permitted {
+            parts.push("Permitted".to_string());
+        }
+        if let Some(next) = &self.next_exam {
+            parts.push(if plan.safe {
+                format!("Clear for {next}")
+            } else {
+                let n = plan.must_attend;
+                format!("Clear for {next} at {n}{} more", labs(lab, n))
+            });
+        }
+        parts.join(" · ")
+    }
 }
 
 /// One course's class-by-class attendance.
@@ -164,6 +188,15 @@ pub struct AttendanceDetail {
     pub updated_at: i64,
     /// Newest first; a lab session is one class.
     pub classes: Vec<AttendedClass>,
+    /// Posted classes by status.
+    pub present: i32,
+    pub on_duty: i32,
+    pub absent: i32,
+    /// Present or on duty in a row, back from the newest posted class;
+    /// only an absence breaks it, and a cancelled class is skipped.
+    pub streak: i32,
+    /// The day of the newest absence.
+    pub last_missed: Option<i32>,
     /// Until the next exam (when one comes before the last class day), then
     /// until the semester's end; none without a saved academic calendar.
     pub plans: Vec<AttendancePlan>,
@@ -596,7 +629,8 @@ struct Standing {
 /// The standing for `attended` of `total` classes. VTOP's `reported`
 /// percentage decides safe or not (it is what debars); the counts only say
 /// by how much, and never contradict it.
-fn standing(attended: i32, total: i32, reported: Option<f64>) -> Standing {
+/// `lab` names the unit in the advice ("Attend 2 labs").
+fn standing(attended: i32, total: i32, reported: Option<f64>, lab: bool) -> Standing {
     let (a, t) = (i64::from(attended), i64::from(total));
     let by_counts = t == 0 || a as f64 / t as f64 * 100.0 >= THRESHOLD;
     let safe = match reported {
@@ -615,9 +649,9 @@ fn standing(attended: i32, total: i32, reported: Option<f64>) -> Standing {
     };
     let advice = match () {
         _ if t == 0 => "No classes yet".to_string(),
-        _ if !safe => format!("Attend {must_attend}"),
+        _ if !safe => format!("Attend {must_attend}{}", labs(lab, must_attend)),
         _ if can_skip == 0 => "Don't skip".to_string(),
-        _ => format!("Can skip {can_skip}"),
+        _ => format!("Can skip {can_skip}{}", labs(lab, can_skip)),
     };
     Standing {
         safe,
@@ -625,6 +659,42 @@ fn standing(attended: i32, total: i32, reported: Option<f64>) -> Standing {
         must_attend,
         advice,
     }
+}
+
+/// " lab" / " labs" after a count for labs, which count in sessions;
+/// nothing for theory.
+fn labs(lab: bool, n: i32) -> &'static str {
+    match (lab, n) {
+        (false, _) => "",
+        (true, 1) => " lab",
+        (true, _) => " labs",
+    }
+}
+
+/// The longest run of present or on duty in `classes` (day, start, status),
+/// by time; only an absence breaks it, and classes not posted yet or
+/// cancelled neither extend nor break it. Its length, first day and last day.
+pub(crate) fn longest_run(
+    classes: &[(i32, Option<i32>, Option<ClassStatus>)],
+) -> Option<(i32, i32, i32)> {
+    let mut classes = classes.to_vec();
+    classes.sort_by_key(|&(day, start, _)| (day, start));
+    let (mut best, mut run) = (None, None);
+    for (day, _, status) in classes {
+        match status {
+            None | Some(ClassStatus::Other) => {}
+            Some(ClassStatus::Present | ClassStatus::OnDuty) => {
+                let (length, first, _) = run.unwrap_or((0, day, day));
+                let next = (length + 1, first, day);
+                run = Some(next);
+                if best.is_none_or(|(most, _, _)| next.0 > most) {
+                    best = Some(next);
+                }
+            }
+            Some(ClassStatus::Absent) => run = None,
+        }
+    }
+    best
 }
 
 /// The total VTOP's whole-number `reported` percentage of `attended` is
@@ -833,9 +903,9 @@ impl From<AttendanceData> for Attendance {
             // Labs meet in two-period sessions VTOP counts twice; an odd total
             // rounds up and an odd attended count down.
             let plan = if lab {
-                standing(attended / 2, (counted + 1) / 2, reported)
+                standing(attended / 2, (counted + 1) / 2, reported, true)
             } else {
-                standing(attended, counted, reported)
+                standing(attended, counted, reported, false)
             };
             let computed = if counted == 0 {
                 0.0
@@ -844,6 +914,7 @@ impl From<AttendanceData> for Attendance {
             };
             let (code, name) = split_course_name(&record.course_name, &record.course_code);
             let debar = Debar::parse(&record.debar_status);
+            let debar_line = debar.as_ref().map(|debar| debar.line(&plan, lab));
             AttendanceCourse {
                 key: format!("{code}.{}", if lab { "lab" } else { "theory" }),
                 code,
@@ -865,6 +936,7 @@ impl From<AttendanceData> for Attendance {
                 advice: plan.advice,
                 debarred: debar.is_some(),
                 debar,
+                debar_line,
                 course_id: record.course_id,
                 course_type: record.course_type,
             }
@@ -909,9 +981,22 @@ impl AttendanceDetail {
             })
             .collect();
         classes.sort_by_key(|class| (std::cmp::Reverse(class.day), std::cmp::Reverse(class.start)));
+        let posted = || classes.iter().filter_map(|class| class.status);
+        let count = |status| posted().filter(|&posted| posted == status).count() as i32;
         Self {
             course,
             updated_at: data.update_time as i64,
+            present: count(ClassStatus::Present),
+            on_duty: count(ClassStatus::OnDuty),
+            absent: count(ClassStatus::Absent),
+            streak: posted()
+                .filter(|&status| status != ClassStatus::Other)
+                .take_while(|status| matches!(status, ClassStatus::Present | ClassStatus::OnDuty))
+                .count() as i32,
+            last_missed: classes
+                .iter()
+                .find(|class| class.status == Some(ClassStatus::Absent))
+                .map(|class| class.day),
             classes,
             plans,
         }
@@ -1073,7 +1158,7 @@ mod tests {
     // Cases from test/attendance_standing_test.dart.
     #[test]
     fn safe_course_reports_skips() {
-        let s = standing(22, 24, None);
+        let s = standing(22, 24, None, false);
         assert!(s.safe);
         assert_eq!(s.can_skip, 5);
         assert_eq!(s.advice, "Can skip 5");
@@ -1081,7 +1166,7 @@ mod tests {
 
     #[test]
     fn short_course_reports_classes_needed() {
-        let s = standing(6, 10, None);
+        let s = standing(6, 10, None, false);
         assert!(!s.safe);
         assert_eq!(s.must_attend, 6);
         assert_eq!(s.advice, "Attend 6");
@@ -1089,7 +1174,7 @@ mod tests {
 
     #[test]
     fn exactly_on_the_line_cannot_skip() {
-        let s = standing(3, 4, None);
+        let s = standing(3, 4, None, false);
         assert!(s.safe);
         assert_eq!(s.can_skip, 0);
         assert_eq!(s.advice, "Don't skip");
@@ -1097,7 +1182,7 @@ mod tests {
 
     #[test]
     fn no_classes_yet() {
-        let s = standing(0, 0, None);
+        let s = standing(0, 0, None, false);
         assert!(s.safe);
         assert_eq!(s.advice, "No classes yet");
     }
@@ -1196,10 +1281,10 @@ mod tests {
         assert!(short.must_attend >= 1);
         assert!(short.advice.starts_with("Attend"));
         // VTOP's 74.5 rounds to 75: safe.
-        let s = standing(149, 200, Some(75.0));
+        let s = standing(149, 200, Some(75.0), false);
         assert!(s.safe && s.must_attend == 0);
         // No percentage from VTOP: the counts decide.
-        let s = standing(6, 10, None);
+        let s = standing(6, 10, None, false);
         assert_eq!((s.safe, s.must_attend), (false, 6));
     }
 
@@ -1468,6 +1553,133 @@ mod tests {
                 .collect::<Vec<_>>(),
             [Some(ClassStatus::OnDuty), None, Some(ClassStatus::Present)]
         );
+    }
+
+    use ClassStatus::{Absent as A, OnDuty as OD, Present as P};
+
+    #[test]
+    fn advice_names_labs() {
+        // Labs count in sessions: 9 of 10, then 2 of 3.
+        let c = courses(vec![
+            record("ELA", "18", "20", "90%"),
+            record("ELA", "4", "6", "67%"),
+            record("ETH", "18", "20", "90%"),
+        ]);
+        let advice: Vec<_> = c.iter().map(|course| course.advice.as_str()).collect();
+        assert_eq!(advice, ["Can skip 2 labs", "Attend 1 lab", "Can skip 4"]);
+    }
+
+    #[test]
+    fn debar_line_matches_kotlin() {
+        let debarred = |status: &str, percent: &str| {
+            let mut r = record("ETH", "6", "9", percent);
+            r.debar_status = status.into();
+            courses(vec![r]).remove(0)
+        };
+        let c = debarred("CAT - II : Debarred & Permitted", "67%");
+        assert_eq!(
+            c.debar_line.as_deref(),
+            Some("Debarred for CAT-II · Permitted · Clear for FAT at 3 more")
+        );
+        let c = debarred("CAT - I : Debarred", "80%");
+        assert_eq!(
+            c.debar_line.as_deref(),
+            Some("Debarred for CAT-I · Clear for CAT-II")
+        );
+        assert_eq!(debarred("-", "67%").debar_line, None);
+    }
+
+    /// A history of `statuses`, newest first, one class a day.
+    fn detail(statuses: &[Option<ClassStatus>]) -> AttendanceDetail {
+        let records = statuses
+            .iter()
+            .enumerate()
+            .map(|(i, status)| raw::FullAttendanceRecord {
+                serial: "1".into(),
+                date: format!("{:02}-11-2025", 20 - i),
+                slot: "A1".into(),
+                day_time: "WED / 08:00-08:50".into(),
+                status: match status {
+                    Some(P) => "Present",
+                    Some(OD) => "On Duty",
+                    Some(A) => "Absent",
+                    Some(ClassStatus::Other) => "Cancelled",
+                    None => "Not Posted",
+                }
+                .into(),
+                remark: String::new(),
+            })
+            .collect();
+        AttendanceDetail::new(
+            courses(vec![record("ETH", "4", "5", "80%")]).remove(0),
+            FullAttendanceData {
+                records,
+                semester_id: "AP2025262".into(),
+                update_time: 9,
+                course_id: "AM_SWE1002_00200".into(),
+                course_type: "ETH".into(),
+            },
+            Vec::new(),
+        )
+    }
+
+    /// The day of the `i`th class (newest first) in [`detail`].
+    fn day_of(i: usize) -> i32 {
+        history_day(&format!("{:02}-11-2025", 20 - i)).unwrap()
+    }
+
+    #[test]
+    fn detail_counts_and_streak() {
+        let d = detail(&[Some(P), Some(OD), Some(P), Some(A), Some(P), None]);
+        assert_eq!((d.present, d.on_duty, d.absent, d.streak), (3, 1, 1, 3));
+        assert_eq!(d.last_missed, Some(day_of(3)));
+        let d = detail(&[None, Some(A), Some(P)]);
+        assert_eq!((d.streak, d.last_missed), (0, Some(day_of(1))));
+        assert_eq!(detail(&[Some(P)]).last_missed, None);
+    }
+
+    #[test]
+    fn longest_run_skips_unposted_and_orders_by_time() {
+        let run = longest_run(&[
+            (4, Some(480), Some(P)),
+            (1, Some(540), None),
+            (3, Some(480), Some(A)),
+            (2, Some(480), Some(OD)),
+            (1, Some(480), Some(P)),
+        ]);
+        assert_eq!(run, Some((2, 1, 2)));
+        assert_eq!(longest_run(&[(1, None, Some(A)), (2, None, None)]), None);
+    }
+
+    #[test]
+    fn cancelled_classes_neither_extend_nor_break_a_run() {
+        let run = longest_run(&[
+            (1, Some(480), Some(P)),
+            (2, Some(480), Some(ClassStatus::Other)),
+            (3, Some(480), Some(OD)),
+            (4, Some(480), Some(A)),
+        ]);
+        assert_eq!(run, Some((2, 1, 3)));
+        let d = detail(&[Some(P), Some(ClassStatus::Other), Some(P), Some(A)]);
+        assert_eq!(d.streak, 2);
+    }
+
+    #[test]
+    fn held_classes_never_read_no_classes_yet() {
+        // VTOP's total counts classes held but not posted; nothing posted is still "Attend".
+        for (kind, total) in [("ETH", "2"), ("ETH", "1"), ("ELA", "2"), ("ELA", "1")] {
+            for percent in ["", "0", "0%"] {
+                let course = courses(vec![record(kind, "0", total, percent)]).remove(0);
+                assert!(course.counted > 0, "{kind} {total} {percent}");
+                assert!(
+                    course.advice.starts_with("Attend"),
+                    "{kind} {total} {percent}: {}",
+                    course.advice
+                );
+            }
+        }
+        let none = courses(vec![record("ETH", "0", "0", "")]).remove(0);
+        assert_eq!(none.advice, "No classes yet");
     }
 
     #[test]

@@ -35,6 +35,8 @@ object Settings {
 
     private fun text(key: String) = pref<String?>(key, null, { k, d -> getString(k, d) }, { k, v -> putString(k, v) })
 
+    private fun ids(key: String) = pref<Set<String>>(key, emptySet(), { k, d -> getStringSet(k, d)?.toSet() ?: d }, { k, v -> putStringSet(k, v) })
+
     /** An enum saved as its lowercase name. */
     private fun <T : Enum<*>?> choice(key: String, default: T, entries: List<T & Any>) =
         pref(key, default, { k, d -> entries.firstOrNull { it.name.lowercase() == getString(k, null) } ?: d }, { k, v -> putString(k, v?.name?.lowercase()) })
@@ -125,11 +127,17 @@ object Settings {
     /** Live updates (Android 16+): the class on now and outing requests as promoted notifications; off by default. */
     var liveUpdates by flag("settings_live_updates", false)
 
-    /** In class: Do Not Disturb while a class is on (ClassMode); off by default. */
+    /** In class: Do Not Disturb while a class or exam is on (ClassMode); off by default. */
     var classMode by flag("settings_class_mode", false)
 
     /** Assistant (Android 16+): the saved timetable and attendance for Android's app functions; off by default. */
     var assistant by flag("settings_assistant", false)
+
+    /** Semester ids whose Wrapped was opened. */
+    var wrappedSeen by ids("settings_wrapped_seen")
+
+    /** Semester ids whose Wrapped share images hide grades and marks. */
+    var wrappedHideGrades by ids("settings_wrapped_hide_grades")
 
     /** Hours between background syncs, one of [SYNC_HOURS]. */
     var syncHours by pref("settings_sync_hours", SYNC_HOURS_DEFAULT, { k, d -> getInt(k, d).takeIf { it in SYNC_HOURS } ?: d }, { k, v -> putInt(k, v) })
@@ -195,6 +203,10 @@ enum class Tunable(val key: String, val title: String, val unit: String, val def
     OtpPoll("dev_otp_poll_s", "Forwarded OTP check", "s", 2, 1..30, "How often the OTP prompt checks forwarded mail"),
     SessionAnswer("dev_session_answer_s", "Session request timeout", "s", 15, 3..60, "How long the phone tries to answer a browser's or AI app's session request"),
     CookieAsk("dev_cookie_ask_s", "Cookie consent wait", "s", 60, 10..300, "How long the 'send your VTOP cookie?' dialog waits before it counts as Cancel"),
+    SyncBiometricDays("dev_sync_bio_days", "Biometric days per sync", "days", 3, 0..7, "Recent days not final in the cache, newest first; 0 turns it off"),
+    CampusFetchGap("dev_campus_gap_s", "Campus fetch gap", "s", 3, 0..30, "Pause between biometric days in the Wrapped fetch"),
+    CampusFetchAtOnce("dev_campus_at_once", "Campus fetch at once", "days", 2, 1..3, "Biometric days the Wrapped fetch asks VTOP for at the same time"),
+    WrappedRefetch("dev_wrapped_refetch_h", "Wrapped refetch age", "h", 12, 1..168, "Pages with nothing posted yet fetch again for Wrapped when this old"),
 }
 
 /** The background sync intervals on offer, in hours. */

@@ -626,3 +626,168 @@ async fn clearing_the_session_empties_the_shared_store() {
     );
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// Answers VTOP's sign-in pages (landing, CAPTCHA, credentials) and counts the credential
+/// posts; with `otp`, the post lands on VTOP's OTP page.
+async fn login_vtop(otp: bool) -> (String, Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let logins = Arc::new(AtomicUsize::new(0));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let captcha = format!(
+        r#"<img class="form-control img-fluid bg-light border-0" src="data:image/jpeg;base64,{}">"#,
+        base64(include_bytes!("../../vtop-proto/tests/captchas/1.jpg"))
+    );
+    let count = logins.clone();
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let (count, captcha) = (count.clone(), captcha.clone());
+            tokio::spawn(async move {
+                let mut buffer = vec![0u8; 16 * 1024];
+                while let Ok(read) = socket.read(&mut buffer).await {
+                    if read == 0 {
+                        return;
+                    }
+                    let request = String::from_utf8_lossy(&buffer[..read]).to_string();
+                    let mut line = request.split_whitespace();
+                    let (method, path) = (line.next().unwrap_or(""), line.next().unwrap_or("/"));
+                    let (status, location, body) = match (method, path) {
+                        (_, "/vtop/open/page") => (
+                            "200 OK",
+                            "",
+                            r#"<input name="_csrf" value="c1">"#.to_string(),
+                        ),
+                        (_, "/vtop/prelogin/setup") => ("200 OK", "", captcha.clone()),
+                        ("POST", "/vtop/login") => {
+                            count.fetch_add(1, Ordering::SeqCst);
+                            if otp {
+                                ("302 Found", "/vtop/login/error", String::new())
+                            } else {
+                                ("200 OK", "", r#"<input name="_csrf" value="c2"><input type="hidden" name="authorizedIDX" value="22BCE0001">"#.to_string())
+                            }
+                        }
+                        (_, "/vtop/login/error") => (
+                            "200 OK",
+                            "",
+                            r#"<input name="_csrf" value="c3">OTP sent to your registered email."#
+                                .to_string(),
+                        ),
+                        _ => ("404 Not Found", "", String::new()),
+                    };
+                    let location = if location.is_empty() {
+                        String::new()
+                    } else {
+                        format!("Location: {location}\r\n")
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status}\r\n{location}Content-Type: text/html\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    );
+                    if socket.write_all(response.as_bytes()).await.is_err() {
+                        return;
+                    }
+                }
+            });
+        }
+    });
+    (base, logins)
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    for chunk in bytes.chunks(3) {
+        let n = chunk.iter().fold(0u32, |n, &b| n << 8 | b as u32) << (8 * (3 - chunk.len()));
+        for i in 0..=chunk.len() {
+            out.push(ALPHABET[(n >> (18 - 6 * i) & 63) as usize] as char);
+        }
+    }
+    out
+}
+
+/// A core on `base`'s VTOP whose session signed in `age` seconds ago.
+fn core_signed_in_ago(base: String, name: &str, age: u64) -> (Core, Arc<Slot>, PathBuf) {
+    use vtop_core::{SessionState, VtopClient, VtopConfig};
+
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-fresh-{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let client = VtopClient::builder()
+        .config(VtopConfig {
+            base_url: base,
+            ..VtopConfig::default()
+        })
+        .with_credentials(
+            Username::parse("22BCE0001").unwrap(),
+            Password::parse("pw").unwrap(),
+        )
+        .unwrap();
+    client
+        .resume_session(&SessionState {
+            cookies: String::new(),
+            csrf_token: Some("csrf".into()),
+            registration_number: Some("22BCE0001".into()),
+            otp_issued_at: None,
+            logged_in_at: Some(unix_now() as u64 - age),
+        })
+        .unwrap();
+    let slot = Arc::new(RwLock::new(Session {
+        client,
+        cookies: cookies::SessionCookies::new(),
+        account: Account {
+            username: "22BCE0001".into(),
+            password: "pw".into(),
+            rejected: false,
+            registration_number: None,
+        },
+        logins: 0,
+        otp: None,
+        server_otp: false,
+    }));
+    let core = Core {
+        dir: dir.clone(),
+        cache: dir.clone(),
+        slot: Mutex::new(Some(slot.clone())),
+    };
+    (core, slot, dir)
+}
+
+#[tokio::test]
+async fn fresh_session_skips_sign_in() {
+    let (base, logins) = login_vtop(false).await;
+    let (core, slot, dir) = core_signed_in_ago(base, "skip", 60);
+    core.ensure_fresh_session("f".into(), 900).await.unwrap();
+    assert_eq!(logins.load(std::sync::atomic::Ordering::SeqCst), 0);
+    assert_eq!(slot.read().await.logins, 0);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn stale_session_signs_in_again() {
+    let (base, logins) = login_vtop(false).await;
+    let (core, slot, dir) = core_signed_in_ago(base, "stale", 1000);
+    let before = unix_now() as u64;
+    core.ensure_fresh_session("f".into(), 900).await.unwrap();
+    assert_eq!(logins.load(std::sync::atomic::Ordering::SeqCst), 1);
+    let session = slot.read().await;
+    assert_eq!(session.logins, 1);
+    assert!(session.client.session_state().logged_in_at.unwrap() >= before);
+    drop(session);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[tokio::test]
+async fn stale_session_needing_otp_returns_otp_required() {
+    let (base, logins) = login_vtop(true).await;
+    let (core, slot, dir) = core_signed_in_ago(base, "otp", 1000);
+    let result = core.ensure_fresh_session("f".into(), 900).await;
+    assert!(
+        matches!(result, Err(CoreError::OtpRequired { .. })),
+        "{result:?}"
+    );
+    assert_eq!(logins.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(slot.read().await.otp.is_some());
+    let _ = fs::remove_dir_all(&dir);
+}

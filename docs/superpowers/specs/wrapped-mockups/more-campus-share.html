@@ -1,0 +1,168 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px 14px}
+.cell{min-width:0}
+.cap{font:600 13px/1.3 var(--font-sans);color:var(--foreground);margin:8px 2px 0}
+.cap small{display:block;font-weight:400;color:var(--muted-foreground);font-size:12px;margin-top:2px}
+h3.sec{font:700 15px/1.3 var(--font-sans);color:var(--foreground);margin:26px 0 12px}
+h3.sec:first-child{margin-top:0}
+.phone{--bg:#121414;--on:#E3E2E2;--onv:#C6C6C9;--card:#1E2020;--hi:#2A2B2B;--line:#3A3B3B;
+ width:360px;height:640px;zoom:var(--z,.62);position:relative;overflow:hidden;border-radius:36px;background:var(--s,var(--bg));color:var(--o,var(--on));
+ font-family:Inter,system-ui,sans-serif;font-feature-settings:"tnum","cv11";letter-spacing:-.01em}
+.phone *{box-sizing:border-box;margin:0}
+.phone.light{--bg:#FBF9F9;--on:#1B1C1C;--onv:#46464A;--card:#FFFFFF;--hi:#EFEDED;--line:#DAD9D9}
+.t-accent{--b:#C3C0FF;--s:#3A394D;--o:#E2DFFF;--k:#1D00A5}
+.t-success{--b:#5FDDA8;--s:#2A4035;--o:#7DF9C2;--k:#003825}
+.t-warning{--b:#FFB694;--s:#503529;--o:#FFDBCC;--k:#571F00}
+.t-danger{--b:#FFB2BC;--s:#4F3438;--o:#FFD9DD;--k:#670023}
+.t-lab{--b:#69D7DD;--s:#273F41;--o:#87F3F9;--k:#003739}
+.light .t-accent,.light.t-accent{--b:#4D44E3;--s:#F2EFFF;--o:#1D00A5;--k:#FFFFFF}
+.light .t-success,.light.t-success{--b:#006C4B;--s:#BEFFDC;--o:#003825;--k:#FFFFFF}
+.light .t-warning,.light.t-warning{--b:#A14002;--s:#FFEDE6;--o:#571F00;--k:#FFFFFF}
+.light .t-lab,.light.t-lab{--b:#00696E;--s:#BFFCFF;--o:#003739;--k:#FFFFFF}
+.bars{position:absolute;top:14px;left:16px;right:16px;display:flex;gap:3px;z-index:5}
+.bars i{flex:1;height:3px;border-radius:3px;background:color-mix(in srgb,var(--o,var(--on)) 28%,transparent)}
+.bars i.on{background:var(--o,var(--on))}
+.top{position:absolute;top:28px;left:24px;right:24px;display:flex;justify-content:space-between;font-size:13px;font-weight:600;opacity:.85;z-index:5}
+.shape{position:absolute;fill:var(--b)}
+.num{position:absolute;display:grid;place-items:center;color:var(--k);font-weight:800;letter-spacing:-.05em;line-height:1}
+.txt{position:absolute;left:24px;right:24px}
+.h{font-size:34px;line-height:1.05;font-weight:800;letter-spacing:-.035em}
+.p{font-size:16px;line-height:1.4;font-weight:500;margin-top:10px;color:color-mix(in srgb,var(--o,var(--on)) 82%,transparent)}
+.share{position:absolute;right:20px;bottom:22px;height:56px;padding:0 24px 0 20px;border-radius:28px;background:var(--b,var(--on));color:var(--k,var(--bg));
+ font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px;z-index:6}
+.share svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sw{position:absolute;left:24px;bottom:22px;height:56px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;z-index:6}
+.sw b{width:52px;height:32px;border-radius:16px;border:2px solid color-mix(in srgb,var(--o,var(--on)) 60%,transparent);position:relative;display:block}
+.sw b::after{content:"";position:absolute;left:6px;top:6px;width:16px;height:16px;border-radius:50%;background:color-mix(in srgb,var(--o,var(--on)) 70%,transparent)}
+.sw.on b{background:var(--b);border-color:var(--b)}.sw.on b::after{left:24px;top:2px;width:24px;height:24px;background:var(--k)}
+.chip{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:16px;font-size:13px;font-weight:600;background:color-mix(in srgb,var(--o,var(--on)) 14%,transparent)}
+.foot{position:absolute;left:24px;right:24px;bottom:22px;font-size:11px;font-weight:500}
+.foot b{display:block;font-size:17px;font-weight:800;letter-spacing:-.03em;margin-bottom:2px}.foot span{opacity:.75}
+</style>
+<script>
+addEventListener('DOMContentLoaded',()=>{
+ document.querySelectorAll('svg[data-n]').forEach(s=>{const n=+s.dataset.n,d=+s.dataset.d;let p='';
+  for(let i=0;i<=240;i++){const t=i/240*Math.PI*2,r=50*(1-d*(1-Math.cos(n*t))/2);p+=(i?'L':'M')+(50+r*Math.cos(t)).toFixed(2)+' '+(50+r*Math.sin(t)).toFixed(2)}
+  s.setAttribute('viewBox','0 0 100 100');s.innerHTML='<path d="'+p+'Z"/>'});
+ document.querySelectorAll('.bars').forEach(b=>{const k=+b.dataset.i;for(let i=1;i<=11;i++){const e=document.createElement('i');if(i<=k)e.className='on';b.append(e)}});
+ const fit=()=>document.querySelectorAll('.cell').forEach(c=>c.style.setProperty('--z',c.clientWidth/360));
+ fit();new ResizeObserver(fit).observe(document.body);
+});
+</script>
+</head><body>
+<h3 class="sec">Where it opens, on More</h3>
+<div class="grid">
+<div class="cell"><div class="phone">
+ <div class="txt" style="top:44px;font-size:30px;font-weight:800;letter-spacing:-.04em">More</div>
+ <div class="txt t-accent" style="top:100px;left:16px;right:16px;height:168px;border-radius:36px;background:var(--s);color:var(--o);overflow:hidden">
+  <svg class="shape" data-n="9" data-d=".12" style="width:170px;left:196px;top:38px"></svg>
+  <svg class="shape" data-n="8" data-d=".3" style="width:70px;left:168px;top:16px;fill:#5FDDA8"></svg>
+  <div class="shape" style="width:84px;height:32px;border-radius:16px;left:214px;top:122px;background:#FFB694;transform:rotate(-16deg)"></div>
+  <div style="position:absolute;left:20px;top:22px;width:170px;font-size:25px;line-height:1.05;font-weight:800;letter-spacing:-.04em">Your Fall 2026-27, wrapped</div>
+  <div style="position:absolute;left:20px;bottom:18px;font-size:13px;font-weight:600">12 Jul – 14 Nov · tap to see</div></div>
+ <div class="txt t-accent" style="top:280px;left:16px;right:16px;height:72px;border-radius:28px;background:var(--s);color:var(--o);display:flex;align-items:center;gap:12px;padding:0 16px">
+  <div style="position:relative;width:44px;height:44px"><svg class="shape" data-n="8" data-d=".24" style="width:44px;left:0;top:0"></svg></div>
+  <div style="flex:1"><div style="font-size:17px;font-weight:700;color:var(--on)">3 new changes</div><div style="font-size:13px">since you last looked</div></div>
+  <div style="width:24px;height:24px;border-radius:50%;background:#FFB4AB;color:#690005;font-size:12px;font-weight:700;display:grid;place-items:center">3</div><span style="font-size:20px">›</span></div>
+ <div class="txt" style="top:372px;font-size:13px;font-weight:600;color:var(--onv)">Academics</div>
+ <div class="txt rows" style="top:398px;left:16px;right:16px"><div>Marks</div><div>Grades</div><div>Exams</div><div>Academic calendar</div></div>
+ <style>.rows>div{height:54px;background:var(--card);margin-bottom:3px;border-radius:6px;padding:0 18px;display:flex;align-items:center;font-size:16px;font-weight:600}.rows>div:first-child{border-radius:24px 24px 6px 6px}.rows>div:last-child{border-radius:6px 6px 24px 24px}</style>
+</div><div class="cap">More, before the first open<small>Wrapped card above the changes card. Shown once the semester's last class day has passed</small></div></div>
+
+<div class="cell"><div class="phone">
+ <div class="txt" style="top:44px;font-size:30px;font-weight:800;letter-spacing:-.04em">More</div>
+ <div class="txt t-accent" style="top:100px;left:16px;right:16px;height:60px;border-radius:30px;background:var(--s);color:var(--o);display:flex;align-items:center;gap:12px;padding:0 18px 0 10px">
+  <div style="position:relative;width:40px;height:40px"><svg class="shape" data-n="9" data-d=".12" style="width:40px;left:0;top:0"></svg></div>
+  <div style="flex:1;font-size:16px;font-weight:700">Fall 2026-27 wrapped</div><span style="font-size:20px">›</span></div>
+ <div class="txt" style="top:182px;font-size:13px;font-weight:600;color:var(--onv)">Academics</div>
+ <div class="txt rows" style="top:208px;left:16px;right:16px"><div>Marks</div><div>Grades</div><div>Exams</div><div>Academic calendar</div></div>
+ <div class="txt" style="top:452px;font-size:13px;font-weight:600;color:var(--onv)">Campus</div>
+ <div class="txt rows" style="top:478px;left:16px;right:16px"><div>Outings</div><div>Biometric</div><div>Docs</div></div>
+</div><div class="cap">More, after the first open<small>Shrinks to one row and stays until the semester is switched</small></div></div>
+
+<div class="cell"><div class="phone light t-success"><div class="bars" data-i="2"></div><div class="top"><span>Fall 2026-27</span></div>
+ <svg class="shape" data-n="12" data-d=".09" style="width:330px;left:66px;top:74px"></svg>
+ <div class="num" style="width:330px;height:330px;left:66px;top:74px;font-size:120px"><span>92<span style="font-size:.45em;vertical-align:.7em;margin-left:.04em">%</span></span></div>
+ <div class="txt" style="top:430px"><div class="h">You showed up.</div><div class="p">412 of 448 classes attended, across all 7 courses</div></div>
+ <div class="share"><svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>Share</div>
+</div><div class="cap">Light theme<small>Same slide from the light tones. Every palette (Graphite, Indigo, Ocean, Violet, wallpaper) recolours it</small></div></div>
+</div>
+
+<h3 class="sec">Campus times, the other states</h3>
+<div class="grid">
+<div class="cell"><div class="phone t-lab"><div class="bars" data-i="10"></div><div class="top"><span>Fall 2026-27</span></div>
+ <svg style="position:absolute;left:24px;top:96px;width:312px;height:176px" viewBox="0 0 312 176"><path d="M16 160A140 140 0 0 1 296 160" fill="none" stroke="#69D7DD" stroke-opacity=".25" stroke-width="20" stroke-linecap="round" stroke-dasharray="2 34"/></svg>
+ <div class="txt" style="top:300px"><div class="h">Add campus times</div><div class="p">Your earliest entry, latest return and days on campus. 118 days to fetch from VTOP, one day at a time.</div></div>
+ <div style="position:absolute;left:24px;bottom:22px;height:56px;padding:0 28px;border-radius:28px;background:var(--b);color:var(--k);font-size:16px;font-weight:700;display:grid;place-items:center">Fetch</div>
+</div><div class="cap">Nothing cached<small>Only the offer. Nothing is fetched until Fetch is tapped. No Share, since there's no fact</small></div></div>
+
+<div class="cell"><div class="phone t-lab"><div class="bars" data-i="10"></div><div class="top"><span>Fall 2026-27</span></div>
+ <svg style="position:absolute;left:24px;top:76px;width:312px;height:176px" viewBox="0 0 312 176"><path d="M16 160A140 140 0 0 1 296 160" fill="none" stroke="#69D7DD" stroke-opacity=".25" stroke-width="20" stroke-linecap="round"/><path d="M34 100A140 140 0 0 1 288 118" fill="none" stroke="#69D7DD" stroke-width="20" stroke-linecap="round"/></svg>
+ <div class="txt" style="top:150px;text-align:center"><div style="font-size:84px;font-weight:800;letter-spacing:-.06em;line-height:1;color:var(--b)">96</div><div style="font-size:16px;font-weight:700;margin-top:2px">days on campus</div></div>
+ <div class="txt" style="top:292px;display:flex;justify-content:space-between">
+  <div><div style="font-size:30px;font-weight:800;letter-spacing:-.04em">7:12 AM</div><div style="font-size:13px;font-weight:600;opacity:.8">earliest entry</div></div>
+  <div style="text-align:right"><div style="font-size:30px;font-weight:800;letter-spacing:-.04em">9:48 PM</div><div style="font-size:13px;font-weight:600;opacity:.8">latest return</div></div></div>
+ <div class="txt" style="top:378px"><span class="chip">from 96 of 118 days</span></div>
+ <div class="txt" style="top:432px;padding:16px 20px;border-radius:28px;background:#12141499">
+  <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700"><span>Fetching campus times</span><span>8 of 22 days</span></div>
+  <div style="height:10px;border-radius:5px;margin-top:12px;background:color-mix(in srgb,var(--o) 20%,transparent);display:flex;gap:4px"><div style="width:36%;border-radius:5px;background:var(--b)"></div><div style="width:10px;border-radius:5px;background:var(--b)"></div></div>
+  <div style="font-size:12px;font-weight:500;opacity:.75;margin-top:10px">Keeps going if you leave. Stop it from the notification.</div></div>
+ <div class="share"><svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>Share</div>
+</div><div class="cap">Fetching<small>The Fetch row turns into progress. Facts update when it finishes</small></div></div>
+
+<div class="cell"><div class="phone" style="background:#0A0B0B">
+ <div class="txt" style="top:40px;text-align:center;font-size:54px;font-weight:300;letter-spacing:-.03em">4:20</div>
+ <div class="txt" style="top:108px;text-align:center;font-size:13px;color:var(--onv)">Mon, 16 Nov</div>
+ <div class="txt note" style="top:160px;left:12px;right:12px">
+  <div class="who">vitapmate · now</div><div class="tt">Fetching campus times · 34 of 118 days</div>
+  <div style="height:4px;border-radius:2px;background:var(--line);margin:10px 0 12px"><div style="width:29%;height:100%;border-radius:2px;background:#C3C0FF"></div></div>
+  <div style="font-size:14px;font-weight:700;color:#C3C0FF">Stop</div></div>
+ <div class="txt note" style="top:316px;left:12px;right:12px">
+  <div class="who">vitapmate · 2 min ago</div><div class="tt">Open vitapmate to sign in and continue</div>
+  <div style="font-size:13px;color:var(--onv);margin-top:4px">Campus times stopped at 34 of 118 days. VTOP needs a new sign-in.</div></div>
+ <style>.note{background:var(--card);border-radius:28px;padding:16px 18px}.note .who{font-size:12px;color:var(--onv);margin-bottom:6px}.note .tt{font-size:15px;font-weight:700}</style>
+</div><div class="cap">Notifications<small>Top: progress with Stop. Bottom: VTOP asked for an OTP, so the job stopped; tapping opens Wrapped to resume</small></div></div>
+</div>
+
+<h3 class="sec">What gets shared, 1080 × 1920</h3>
+<div class="grid">
+<div class="cell"><div class="phone t-success" style="border-radius:0">
+ <div class="top" style="top:24px"><span>Aarav's Fall 2026-27</span></div>
+ <svg class="shape" data-n="12" data-d=".09" style="width:330px;left:66px;top:74px"></svg>
+ <div class="num" style="width:330px;height:330px;left:66px;top:74px;font-size:120px"><span>92<span style="font-size:.45em;vertical-align:.7em;margin-left:.04em">%</span></span></div>
+ <div class="txt" style="top:430px"><div class="h">You showed up.</div><div class="p">412 of 448 classes attended, across all 7 courses</div></div>
+ <div class="foot"><b>vitapmate</b><span>play.google.com/store/apps/details?id=com.vitap_pal.app</span></div>
+</div><div class="cap">A shared slide<small>No progress bar or buttons. First name, never the registration number. vitapmate and the Play link at the foot</small></div></div>
+
+<div class="cell"><div class="phone" style="border-radius:0">
+ <div class="txt" style="top:26px;font-size:24px;font-weight:800;letter-spacing:-.04em">Aarav's Fall 2026-27</div>
+ <div class="txt" style="top:58px;font-size:12px;font-weight:500;color:var(--onv)">12 Jul to 14 Nov, 7 courses</div>
+ <div class="txt sum" style="top:88px;left:16px;right:16px;display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+  <div class="t-success k" style="grid-column:span 4;min-height:104px"><b style="font-size:54px">92%</b><span>attendance, 412 of 448 classes</span></div>
+  <div class="t-warning" style="grid-column:span 2;min-height:104px"><b style="font-size:40px">31</b><span>in a row<br>4 Aug to 2 Sep</span></div>
+  <div class="t-accent" style="grid-column:span 3"><b>368 h</b><span>412 classes<br>busiest on Tuesday</span></div>
+  <div class="t-danger" style="grid-column:span 3"><b>Wed</b><span>worst day, 4 of 9 misses<br>8 AM classes: 78%</span></div>
+  <div class="t-success" style="grid-column:span 3"><b style="font-size:15px">Operating Systems</b><span>most attended, 98%</span></div>
+  <div class="t-lab" style="grid-column:span 3"><b style="font-size:15px">Discrete Mathematics</b><span>least attended, 81%</span></div>
+  <div class="t-warning" style="grid-column:span 3"><b>7 trips</b><span>5 leaves, 2 weekends<br>Guntur most, longest 8 days</span></div>
+  <div class="t-lab" style="grid-column:span 3"><b>96 days</b><span>on campus, of 118<br>7:12 AM to 9:48 PM</span></div>
+ </div>
+ <style>.sum>div{background:var(--s);color:var(--o);border-radius:20px;padding:10px 12px;min-height:74px}.sum b{display:block;font-size:26px;font-weight:800;letter-spacing:-.04em;line-height:1.1;color:var(--b)}.sum span{display:block;font-size:10.5px;line-height:1.3;font-weight:500;margin-top:3px}.sum .k{background:var(--b);color:var(--k)}.sum .k b{color:var(--k)}</style>
+ <div class="foot"><b>vitapmate</b><span>play.google.com/store/apps/details?id=com.vitap_pal.app</span></div>
+</div><div class="cap">Shared summary with Hide grades on<small>GPA and best CAT are gone and the tiles close up. In the app the student still sees them</small></div></div>
+
+<div class="cell"><div class="phone t-accent"><div class="bars" data-i="1"></div>
+ <div class="txt" style="top:64px"><div class="h">Before grades are out</div><div class="p">The story skips what it can't fill. No blank slides, no "N/A".</div></div>
+ <div class="txt" style="top:236px;display:grid;gap:8px;font-size:15px;font-weight:600">
+  <span class="chip" style="height:40px;border-radius:20px">1 to 7. Opening to Marks</span>
+  <span class="chip" style="height:40px;border-radius:20px;opacity:.4;text-decoration:line-through">8. Grades, not posted yet</span>
+  <span class="chip" style="height:40px;border-radius:20px">9. Outings</span>
+  <span class="chip" style="height:40px;border-radius:20px">10. Campus</span>
+  <span class="chip" style="height:40px;border-radius:20px">11. Summary, without the GPA tile</span></div>
+ <div class="txt" style="bottom:30px;font-size:13px;font-weight:500;opacity:.8">The progress bar shows one segment per slide that exists, so it has 10 here.</div>
+</div><div class="cap">Skipped slides<small>How the order changes when a fact is missing</small></div></div>
+</div>
+</body></html>

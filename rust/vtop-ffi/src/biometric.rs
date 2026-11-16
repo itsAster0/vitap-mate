@@ -127,7 +127,7 @@ impl Core {
 }
 
 impl Core {
-    fn cached_day(&self, day: i32) -> Option<BiometricData> {
+    pub(crate) fn cached_day(&self, day: i32) -> Option<BiometricData> {
         self.read(&format!("{PAGES}/{DIR}/{day}.json"))
     }
 
@@ -182,7 +182,7 @@ fn is_complete(day: i32, data: &BiometricData) -> bool {
 }
 
 impl BiometricDay {
-    fn new(day: i32, data: &BiometricData) -> Self {
+    pub(crate) fn new(day: i32, data: &BiometricData) -> Self {
         let mut punches: Vec<(i32, Punch)> = data
             .records
             .iter()

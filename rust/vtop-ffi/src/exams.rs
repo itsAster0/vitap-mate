@@ -19,8 +19,9 @@ pub struct Exams {
     pub semester_id: String,
     /// Unix seconds.
     pub updated_at: i64,
-    /// CAT-I, CAT-II, FAT, then any other, whatever VTOP's order; only exams
-    /// with papers.
+    /// The exam that happens first, first: by its first paper's day and
+    /// start; exams not dated yet last, CAT-I, CAT-II, ..., FAT among them.
+    /// Only exams with papers.
     pub groups: Vec<ExamGroup>,
     /// The group to open on: the first with a paper to come or not dated
     /// yet, else the last with dates (as of now in India).
@@ -161,7 +162,15 @@ impl Exams {
                 }
             })
             .collect();
-        groups.sort_by_key(|group| rank(&group.name));
+        // VTOP lists the FAT before the CAT in some semesters (freshers').
+        groups.sort_by_key(|group| {
+            let first = group.papers.first().filter(|paper| paper.day.is_some());
+            (
+                first.and_then(|paper| paper.day).unwrap_or(i32::MAX),
+                first.and_then(|paper| paper.start).unwrap_or(i32::MAX),
+                rank(&group.name),
+            )
+        });
         let opens = opens(&groups, now);
         Self {
             semester_id: data.semester_id,
@@ -172,8 +181,12 @@ impl Exams {
     }
 }
 
-/// CAT-I, CAT-II, ... first, then FAT, then anything else.
+/// CAT (a semester's only one) or CAT-I, CAT-II, ... first, then FAT, then
+/// anything else.
 fn rank(name: &str) -> i32 {
+    if name == "CAT" {
+        return 1;
+    }
     match name.strip_prefix("CAT-") {
         Some(roman) => ["I", "II", "III", "IV"]
             .iter()
@@ -366,6 +379,61 @@ mod tests {
         assert_eq!(Exams::new(data(vec![]), (0, 0)).opens, 0);
     }
 
+    /// Fall 2024-25 (freshers'): one CAT, which VTOP lists after the FAT.
+    #[test]
+    fn exams_in_date_order() {
+        let exams = Exams::new(
+            data(vec![
+                (
+                    "FAT",
+                    vec![
+                        record("ECE1005", "ETH", "06-Jan-2025", "10:00 AM - 01:00 PM"),
+                        record("CHY1008", "ETH", "03-Jan-2025", "10:00 AM - 01:00 PM"),
+                    ],
+                ),
+                (
+                    "CAT",
+                    vec![
+                        record("ENG1006", "ETH", "15-Nov-2024", "02:00 PM - 03:30 PM"),
+                        record("STS0101", "TH", "15-Nov-2024", "10:00 AM - 11:00 AM"),
+                        record("CHY1008", "ETH", "11-Nov-2024", "10:00 AM - 11:30 AM"),
+                    ],
+                ),
+            ]),
+            (day("2026-11-17"), 0),
+        );
+        let names: Vec<_> = exams.groups.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, ["CAT", "FAT"]);
+        let cat: Vec<_> = exams.groups[0]
+            .papers
+            .iter()
+            .map(|p| p.code.as_str())
+            .collect();
+        assert_eq!(cat, ["CHY1008", "STS0101", "ENG1006"]);
+        assert_eq!(exams.groups[1].papers[0].code, "CHY1008");
+        // All over: opens on the last, the FAT.
+        assert_eq!(exams.opens, 1);
+
+        // Dated exams by date, whatever their names; undated ones last, CATs first.
+        let exams = Exams::new(
+            data(vec![
+                ("FAT", vec![record("A", "TH", "-", "-")]),
+                ("CAT2", vec![record("A", "TH", "-", "-")]),
+                (
+                    "CAT1",
+                    vec![record("A", "TH", "10-Aug-2026", "02:00 PM - 03:30 PM")],
+                ),
+                (
+                    "Mid-Term",
+                    vec![record("A", "TH", "10-Aug-2026", "09:30 AM - 11:00 AM")],
+                ),
+            ]),
+            (0, 0),
+        );
+        let names: Vec<_> = exams.groups.iter().map(|g| g.name.as_str()).collect();
+        assert_eq!(names, ["Mid-Term", "CAT-I", "CAT-II", "FAT"]);
+    }
+
     #[test]
     fn seats_and_dashes() {
         assert_eq!(seat("r12c3"), "R12 · C3");
@@ -374,6 +442,7 @@ mod tests {
         assert_eq!(value(" - "), "");
         assert_eq!(rank("CAT-III"), 3);
         assert!(rank("FAT") < rank("Lab"));
+        assert!(rank("CAT") < rank("FAT"));
     }
 
     #[test]

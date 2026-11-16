@@ -1,0 +1,188 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:22px 14px}
+.cell{min-width:0}
+.cap{font:600 13px/1.3 var(--font-sans);color:var(--foreground);margin:8px 2px 0}
+.cap small{display:block;font-weight:400;color:var(--muted-foreground);font-size:12px;margin-top:2px}
+h3.sec{font:700 15px/1.3 var(--font-sans);color:var(--foreground);margin:26px 0 12px}
+h3.sec:first-child{margin-top:0}
+.phone{--bg:#121414;--on:#E3E2E2;--onv:#C6C6C9;--card:#1E2020;--hi:#2A2B2B;--line:#3A3B3B;
+ width:360px;height:640px;zoom:var(--z,.62);position:relative;overflow:hidden;border-radius:36px;background:var(--s,var(--bg));color:var(--o,var(--on));
+ font-family:Inter,system-ui,sans-serif;font-feature-settings:"tnum","cv11";letter-spacing:-.01em}
+.phone *{box-sizing:border-box;margin:0}
+.phone.light{--bg:#FBF9F9;--on:#1B1C1C;--onv:#46464A;--card:#FFFFFF;--hi:#EFEDED;--line:#DAD9D9}
+.t-accent{--b:#C3C0FF;--s:#3A394D;--o:#E2DFFF;--k:#1D00A5}
+.t-success{--b:#5FDDA8;--s:#2A4035;--o:#7DF9C2;--k:#003825}
+.t-warning{--b:#FFB694;--s:#503529;--o:#FFDBCC;--k:#571F00}
+.t-danger{--b:#FFB2BC;--s:#4F3438;--o:#FFD9DD;--k:#670023}
+.t-lab{--b:#69D7DD;--s:#273F41;--o:#87F3F9;--k:#003739}
+.light .t-accent,.light.t-accent{--b:#4D44E3;--s:#F2EFFF;--o:#1D00A5;--k:#FFFFFF}
+.light .t-success,.light.t-success{--b:#006C4B;--s:#BEFFDC;--o:#003825;--k:#FFFFFF}
+.light .t-warning,.light.t-warning{--b:#A14002;--s:#FFEDE6;--o:#571F00;--k:#FFFFFF}
+.light .t-lab,.light.t-lab{--b:#00696E;--s:#BFFCFF;--o:#003739;--k:#FFFFFF}
+.bars{position:absolute;top:14px;left:16px;right:16px;display:flex;gap:3px;z-index:5}
+.bars i{flex:1;height:3px;border-radius:3px;background:color-mix(in srgb,var(--o,var(--on)) 28%,transparent)}
+.bars i.on{background:var(--o,var(--on))}
+.top{position:absolute;top:28px;left:24px;right:24px;display:flex;justify-content:space-between;font-size:13px;font-weight:600;opacity:.85;z-index:5}
+.shape{position:absolute;fill:var(--b)}
+.num{position:absolute;display:grid;place-items:center;color:var(--k);font-weight:800;letter-spacing:-.05em;line-height:1}
+.txt{position:absolute;left:24px;right:24px}
+.h{font-size:34px;line-height:1.05;font-weight:800;letter-spacing:-.035em}
+.p{font-size:16px;line-height:1.4;font-weight:500;margin-top:10px;color:color-mix(in srgb,var(--o,var(--on)) 82%,transparent)}
+.share{position:absolute;right:20px;bottom:22px;height:56px;padding:0 24px 0 20px;border-radius:28px;background:var(--b,var(--on));color:var(--k,var(--bg));
+ font-size:16px;font-weight:700;display:flex;align-items:center;gap:10px;z-index:6}
+.share svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.sw{position:absolute;left:24px;bottom:22px;height:56px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600;z-index:6}
+.sw b{width:52px;height:32px;border-radius:16px;border:2px solid color-mix(in srgb,var(--o,var(--on)) 60%,transparent);position:relative;display:block}
+.sw b::after{content:"";position:absolute;left:6px;top:6px;width:16px;height:16px;border-radius:50%;background:color-mix(in srgb,var(--o,var(--on)) 70%,transparent)}
+.sw.on b{background:var(--b);border-color:var(--b)}.sw.on b::after{left:24px;top:2px;width:24px;height:24px;background:var(--k)}
+.chip{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:16px;font-size:13px;font-weight:600;background:color-mix(in srgb,var(--o,var(--on)) 14%,transparent)}
+.foot{position:absolute;left:24px;right:24px;bottom:22px;font-size:11px;font-weight:500}
+.foot b{display:block;font-size:17px;font-weight:800;letter-spacing:-.03em;margin-bottom:2px}.foot span{opacity:.75}
+.lab{font-size:14px;font-weight:600;opacity:.8}
+.mini{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mini>div{padding:12px 14px;border-radius:22px;background:#12141499;font-size:12px;font-weight:600;line-height:1.3}
+.mini b{display:block;font-size:22px;font-weight:800;letter-spacing:-.04em;color:var(--b);line-height:1.15}
+.big{font-weight:800;letter-spacing:-.06em;line-height:1;color:var(--b)}
+.sum>div{background:var(--s);color:var(--o);border-radius:18px;padding:8px 11px;min-height:60px}.sum b{display:block;font-size:22px;font-weight:800;letter-spacing:-.04em;line-height:1.1;color:var(--b)}.sum span{display:block;font-size:10px;line-height:1.25;font-weight:500;margin-top:2px}.sum .k{background:var(--b);color:var(--k)}.sum .k b{color:var(--k)}
+</style>
+<script>
+addEventListener('DOMContentLoaded',()=>{
+ document.querySelectorAll('svg[data-n]').forEach(s=>{const n=+s.dataset.n,d=+s.dataset.d;let p='';
+  for(let i=0;i<=240;i++){const t=i/240*Math.PI*2,r=50*(1-d*(1-Math.cos(n*t))/2);p+=(i?'L':'M')+(50+r*Math.cos(t)).toFixed(2)+' '+(50+r*Math.sin(t)).toFixed(2)}
+  s.setAttribute('viewBox','0 0 100 100');s.innerHTML='<path d="'+p+'Z"/>'});
+ document.querySelectorAll('.phone[data-i]').forEach(p=>{p.insertAdjacentHTML('afterbegin','<div class="bars" data-i="'+p.dataset.i+'"></div>'+(p.dataset.i>1&&p.dataset.i<19?'<div class="top"><span>Fall 2026-27</span></div>':''));
+  const c=p.querySelector('.over')||p;
+  if(!('noshare' in p.dataset))c.insertAdjacentHTML('beforeend','<div class="share"><svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>Share</div>');
+  if('hide' in p.dataset)c.insertAdjacentHTML('beforeend','<div class="sw"><b></b>Hide grades</div>')});
+ document.querySelectorAll('.bars').forEach(b=>{const k=+b.dataset.i;for(let i=1;i<=19;i++){const e=document.createElement('i');if(i<=k)e.className='on';b.append(e)}});
+ const fit=()=>document.querySelectorAll('.cell').forEach(c=>c.style.setProperty('--z',c.clientWidth/360));
+ fit();new ResizeObserver(fit).observe(document.body);
+});
+</script>
+</head><body>
+<div class="grid">
+<div class="cell"><div class="phone t-accent" data-i="1" data-noshare>
+ <svg class="shape" data-n="9" data-d=".12" style="width:330px;left:176px;top:336px"></svg>
+ <svg class="shape" data-n="8" data-d=".3" style="width:130px;left:88px;top:400px;fill:#5FDDA8"></svg>
+ <div class="shape" style="width:150px;height:58px;border-radius:29px;left:196px;top:300px;background:#FFB694;transform:rotate(-18deg)"></div>
+ <div class="txt" style="top:64px"><div class="p" style="margin:0 0 14px;font-size:18px">Aarav, this was</div>
+  <div style="font-size:62px;line-height:.94;font-weight:800;letter-spacing:-.05em">Your Fall<br>2026-27,<br>wrapped</div></div>
+ <div class="txt" style="bottom:28px;font-size:15px;font-weight:600;line-height:1.5">12 Jul to 14 Nov<br>7 courses<br>118 class days<br>14 holidays</div>
+</div><div class="cap">1. Opening<small>Now with class days and holidays</small></div></div>
+
+<div class="cell"><div class="phone t-success" data-i="2">
+ <svg class="shape" data-n="12" data-d=".09" style="width:330px;left:66px;top:64px"></svg>
+ <div class="num" style="width:330px;height:330px;left:66px;top:64px;font-size:120px"><span>92<span style="font-size:.45em;vertical-align:.7em;margin-left:.04em">%</span></span></div>
+ <div class="txt" style="top:410px"><div class="h">You showed up.</div><div class="p">412 of 448 classes attended, across all 7 courses</div><div class="chip" style="margin-top:14px">6 of them on OD</div></div>
+</div><div class="cap">2. Attendance<small>Now with classes on OD</small></div></div>
+
+<div class="cell"><div class="phone t-warning" data-i="3">
+ <div class="txt big" style="top:56px;font-size:160px">31</div>
+ <div class="txt" style="top:214px"><div class="h">classes in a row</div><div class="p">Your longest run without a miss, 4 Aug to 2 Sep</div></div>
+ <div class="txt" id="dots" style="top:340px;display:flex;flex-wrap:wrap;gap:7px"></div>
+ <div class="txt" style="top:472px"><div style="font-size:15px;font-weight:700;margin-bottom:8px">9 perfect weeks</div><div id="wk" style="display:flex;gap:5px"></div></div>
+ <script>{const q=document.currentScript.parentNode,d=q.querySelector('#dots'),w=q.querySelector('#wk');for(let i=0;i<31;i++)d.insertAdjacentHTML('beforeend','<i style="width:'+(i%5==4?40:22)+'px;height:22px;border-radius:11px;background:var(--b);opacity:'+(.45+.55*i/30)+'"></i>');
+ [1,1,0,1,1,1,0,0,1,1,0,1,0,1,0,1,0].forEach(v=>w.insertAdjacentHTML('beforeend','<i style="width:13px;height:26px;border-radius:7px;background:'+(v?'var(--b)':'color-mix(in srgb,var(--o) 22%,transparent)')+'"></i>'))}</script>
+</div><div class="cap">3. Streak<small>Now with perfect weeks, one bar per week of the semester</small></div></div>
+
+<div class="cell"><div class="phone t-lab" data-i="4">
+ <div class="txt big" style="top:60px;font-size:118px">100%</div>
+ <div class="txt" style="top:186px"><div class="h">Never missed, in 2 courses</div></div>
+ <div class="shape" style="width:300px;height:76px;border-radius:38px;left:20px;top:312px;background:var(--b);transform:rotate(-5deg)"></div>
+ <div class="num" style="width:300px;height:76px;left:20px;top:312px;font-size:23px;letter-spacing:-.03em;transform:rotate(-5deg)">Operating Systems</div>
+ <div class="shape" style="width:290px;height:76px;border-radius:38px;left:50px;top:402px;background:color-mix(in srgb,var(--b) 55%,var(--s));transform:rotate(4deg)"></div>
+ <div class="num" style="width:290px;height:76px;left:50px;top:402px;font-size:23px;letter-spacing:-.03em;color:var(--o);transform:rotate(4deg)">Compiler Design Lab</div>
+</div><div class="cap">4. Never missed (new)<small>Courses at 100%, by name. Skipped when there are none</small></div></div>
+
+<div class="cell"><div class="phone t-accent" data-i="5">
+ <div class="txt" style="top:62px"><div class="h">The comeback</div><div class="p">Down to 71% in September. You finished at 92%.</div></div>
+ <svg style="position:absolute;left:0;top:200px;width:360px;height:300px" viewBox="0 0 360 300"><path d="M30 90C80 100 100 215 150 222S250 110 318 52" fill="none" stroke="#C3C0FF" stroke-opacity=".3" stroke-width="16" stroke-linecap="round"/><path d="M150 222C200 228 250 110 318 52" fill="none" stroke="#C3C0FF" stroke-width="16" stroke-linecap="round"/><circle cx="150" cy="222" r="15" fill="#3A394D" stroke="#C3C0FF" stroke-width="7"/></svg>
+ <svg class="shape" data-n="8" data-d=".28" style="width:104px;left:262px;top:196px"></svg>
+ <div class="num" style="width:104px;height:104px;left:262px;top:196px;font-size:28px">92%</div>
+ <div style="position:absolute;left:112px;top:446px;font-size:26px;font-weight:800;letter-spacing:-.04em">71%<div style="font-size:12px;font-weight:600;letter-spacing:0;opacity:.8">September</div></div>
+</div><div class="cap">5. Comeback (new)<small>Lowest point against the final %. Shown only when the gap is 5 points or more</small></div></div>
+
+<div class="cell"><div class="phone t-danger" data-i="6">
+ <div class="txt" style="top:58px"><div class="h" style="font-size:30px">Wednesday was your worst day</div><div class="p">4 of your 9 misses</div></div>
+ <div class="txt" style="top:186px;height:150px;display:flex;align-items:flex-end;gap:10px;font-size:13px;font-weight:700;text-align:center">
+  <div style="flex:1"><div style="height:34px;border-radius:17px;background:color-mix(in srgb,var(--o) 22%,transparent);margin-bottom:6px"></div>M</div>
+  <div style="flex:1"><div style="height:62px;border-radius:17px;background:color-mix(in srgb,var(--o) 22%,transparent);margin-bottom:6px"></div>T</div>
+  <div style="flex:1;color:var(--b)"><div style="height:122px;border-radius:17px;background:var(--b);margin-bottom:6px;color:var(--k);font-size:22px;padding-top:8px">4</div>W</div>
+  <div style="flex:1"><div style="height:34px;border-radius:17px;background:color-mix(in srgb,var(--o) 22%,transparent);margin-bottom:6px"></div>T</div>
+  <div style="flex:1"><div style="height:34px;border-radius:17px;background:color-mix(in srgb,var(--o) 22%,transparent);margin-bottom:6px"></div>F</div>
+  <div style="flex:1"><div style="height:8px;border-radius:4px;background:color-mix(in srgb,var(--o) 22%,transparent);margin-bottom:6px"></div>S</div></div>
+ <div class="txt" style="top:358px;padding:14px 20px;border-radius:28px;background:#12141499;display:flex;align-items:center;gap:16px">
+  <div class="big" style="font-size:44px">78%</div><div style="font-size:15px;font-weight:600;line-height:1.3">of your 8 AM classes attended</div></div>
+ <div class="txt mini" style="top:450px"><div><b>23 days</b>started at the first slot</div><div><b>17 days</b>ended at the last slot</div></div>
+</div><div class="cap">6. Habits<small>Now with first-slot and last-slot days</small></div></div>
+
+<div class="cell"><div class="phone t-success" data-i="7">
+ <div class="t-lab" style="position:absolute;inset:0;background:var(--s);clip-path:polygon(0 56%,100% 44%,100% 100%,0 100%)"></div>
+ <div class="txt" style="top:70px;right:130px"><div class="lab">Most attended</div><div class="h" style="margin-top:8px;font-size:32px">Operating Systems</div></div>
+ <svg class="shape" data-n="7" data-d=".12" style="width:128px;left:214px;top:150px"></svg>
+ <div class="num" style="width:128px;height:128px;left:214px;top:150px;font-size:33px">100%</div>
+ <div class="t-lab over" style="position:absolute;inset:0;color:var(--o)">
+  <div class="shape" style="width:132px;height:72px;border-radius:36px;left:22px;top:356px;background:var(--b);transform:rotate(-6deg)"></div>
+  <div class="num" style="width:132px;height:72px;left:22px;top:356px;font-size:38px;transform:rotate(-6deg)">81%</div>
+  <div class="txt" style="top:446px"><div class="lab">Least attended</div><div class="h" style="margin-top:8px;font-size:32px">Discrete Mathematics</div></div></div>
+</div><div class="cap">7. Courses<small>Unchanged</small></div></div>
+
+<div class="cell"><div class="phone t-accent" data-i="8">
+ <div class="shape" style="width:380px;height:160px;border-radius:80px;left:-30px;top:76px;background:var(--b);transform:rotate(-9deg)"></div>
+ <div class="num" style="width:380px;height:160px;left:-30px;top:76px;font-size:116px;transform:rotate(-9deg)">368</div>
+ <div class="txt" style="top:270px"><div class="h">hours in class</div><div class="p">412 classes sat through</div></div>
+ <div class="txt" style="top:368px;display:flex;gap:4px;height:44px;font-size:14px;font-weight:800">
+  <div style="flex:284;border-radius:22px 8px 8px 22px;background:var(--b);color:var(--k);display:grid;place-items:center">Theory 284 h</div>
+  <div class="t-lab" style="flex:84;border-radius:8px 22px 22px 8px;background:var(--b);color:var(--k);display:grid;place-items:center">Labs 84 h</div></div>
+ <div class="txt" style="top:436px;display:flex;align-items:center;justify-content:space-between">
+  <i style="width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--o) 24%,transparent)"></i>
+  <i style="width:58px;height:58px;border-radius:50%;background:var(--b);display:grid;place-items:center;color:var(--k);font:800 15px Inter;font-style:normal">Tue</i>
+  <i style="width:34px;height:34px;border-radius:50%;background:color-mix(in srgb,var(--o) 24%,transparent)"></i>
+  <i style="width:38px;height:38px;border-radius:50%;background:color-mix(in srgb,var(--o) 24%,transparent)"></i>
+  <i style="width:30px;height:30px;border-radius:50%;background:color-mix(in srgb,var(--o) 24%,transparent)"></i>
+  <i style="width:16px;height:16px;border-radius:50%;background:color-mix(in srgb,var(--o) 24%,transparent)"></i></div>
+ <div class="txt" style="top:508px;font-size:15px;font-weight:600">Tuesday was your busiest day</div>
+</div><div class="cap">8. Time<small>Now with lab hours against theory hours</small></div></div>
+
+<div class="cell"><div class="phone t-warning" data-i="9">
+ <div class="txt" style="top:62px"><div class="lab">Your room</div></div>
+ <div class="shape" style="width:312px;height:150px;border-radius:44px 44px 44px 12px;left:24px;top:90px;background:var(--b)"></div>
+ <div class="num" style="width:312px;height:150px;left:24px;top:90px;font-size:60px">AB1-205</div>
+ <div class="txt" style="top:254px"><div class="p" style="margin:0">84 hours in this room, more than any other</div></div>
+ <div class="txt" style="top:340px"><div class="lab">Your faculty</div></div>
+ <svg class="shape" data-n="9" data-d=".12" style="width:112px;left:24px;top:370px;fill:color-mix(in srgb,var(--b) 55%,var(--s))"></svg>
+ <div class="num" style="width:112px;height:112px;left:24px;top:370px;font-size:34px;color:var(--o)">MN</div>
+ <div style="position:absolute;left:152px;right:24px;top:388px"><div class="h" style="font-size:26px">Prof. Meera Nair</div><div class="p" style="margin-top:6px">62 classes together</div></div>
+</div><div class="cap">9. Places and people (new)<small>The room with the most hours, the faculty with the most classes</small></div></div>
+
+<div class="cell"><div class="phone t-lab" data-i="10" data-hide>
+ <svg class="shape" data-n="10" data-d=".26" style="width:240px;left:-44px;top:60px"></svg>
+ <div class="num" style="width:240px;height:240px;left:-44px;top:60px;font-size:68px">94%</div>
+ <div style="position:absolute;left:208px;right:16px;top:132px"><div class="h" style="font-size:24px">Your best CAT</div><div class="p" style="font-size:13px;margin-top:6px">CAT-2 in Computer Networks</div></div>
+ <div class="txt mini" style="top:332px;grid-template-columns:1fr"><div style="display:flex;align-items:center;gap:14px"><b style="font-size:34px">91%</b><span>Best course by marks<br><span style="font-size:15px;font-weight:700">Computer Networks</span></span></div>
+  <div style="display:flex;align-items:center;gap:14px"><b style="font-size:34px">+9</b><span>points from CAT-1 to CAT-2, on average<br><span style="font-size:15px;font-weight:700">Most in Discrete Mathematics</span></span></div></div>
+</div><div class="cap">10. Marks<small>Now with best course by marks and the CAT-1 to CAT-2 change</small></div></div>
+
+<div class="cell"><div class="phone t-danger" data-i="11">
+ <div class="txt" style="top:58px;display:flex;align-items:baseline;gap:14px"><span class="big" style="font-size:140px">21</span><span class="h">exams<br>sat</span></div>
+ <svg class="shape" data-n="8" data-d=".28" style="width:176px;left:14px;top:226px"></svg>
+ <div class="num" style="width:176px;height:176px;left:14px;top:226px;font-size:30px;letter-spacing:-.03em">14 CATs</div>
+ <svg class="shape" data-n="6" data-d=".12" style="width:150px;left:186px;top:296px;fill:color-mix(in srgb,var(--b) 55%,var(--s))"></svg>
+ <div class="num" style="width:150px;height:150px;left:186px;top:296px;font-size:28px;letter-spacing:-.03em;color:var(--o)">7 FATs</div>
+ <div class="txt" style="top:470px"><div class="lab">Most of them in</div><div class="h" style="font-size:30px;margin-top:4px">AB2-104</div></div>
+</div><div class="cap">11. Exams (new)<small>CATs and FATs sat, the venue used most</small></div></div>
+
+<div class="cell"><div class="phone t-success" data-i="12" data-hide>
+ <svg class="shape" data-n="4" data-d=".3" style="width:290px;left:35px;top:52px;transform:rotate(45deg)"></svg>
+ <div class="num" style="width:290px;height:290px;left:35px;top:52px;font-size:88px">8.74</div>
+ <div class="txt" style="top:352px"><div class="h">Semester GPA</div></div>
+ <div class="txt" style="top:404px;display:flex;gap:4px;height:48px;font-size:16px;font-weight:800;color:var(--k)">
+  <div style="flex:2;border-radius:24px 8px 8px 24px;background:var(--b);display:grid;place-items:center">S ×2</div>
+  <div style="flex:3;border-radius:8px;background:color-mix(in srgb,var(--b) 72%,var(--s));display:grid;place-items:center">A ×3</div>
+  <div style="flex:2;border-radius:8px 24px 24px 8px;background:color-mix(in srgb,var(--b) 46%,var(--s));display:grid;place-items:center;color:var(--o)">B ×2</div></div>
+ <div class="txt" style="top:470px"><span class="chip">2 S grades, your most in a semester</span></div>
+</div><div class="cap">12. Grades<small>Now with the S-grade record, shown only when it beats every earlier semester</small></div></div>
+</div>
+</body></html>

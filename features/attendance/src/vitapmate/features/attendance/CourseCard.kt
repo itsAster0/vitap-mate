@@ -80,7 +80,7 @@ internal fun CourseCard(
     val advice = course.advice(showSkipAdvice)
     val name = course.name.ifBlank { course.code }
     val (attended, held) = course.sessions
-    val debarLine = course.debarLine()
+    val debarLine = course.debarLine
     SectionCard(
         modifier.fillMaxWidth()
             .tappable(onClick, name, Role.Button, pressedScale = 0.98f)

@@ -113,6 +113,10 @@ object VtopSync {
                 add("calendar" to { it.fetchCalendar(f) })
                 SemesterChoice.selected?.let { semester -> add("grades" to { it.fetchGrades(f, semester) }) }
                 add("grade_history" to { it.fetchGradeHistory(f) })
+                // Recent biometric days not final yet, so campus times build up over the semester.
+                val today = Math.floorDiv(System.currentTimeMillis() + 19_800_000L, DAY_MS).toInt() // India
+                val complete = withContext(Dispatchers.IO) { core.cachedBiometricRange(f, today - 13, today) }.filter { it.complete }.mapTo(HashSet()) { it.day }
+                for (day in biometricDays(today, complete, Settings.tunable(Tunable.SyncBiometricDays))) add("biometric.$day" to { it.fetchBiometricRange(f, day, day) })
                 if (everything) {
                     add("profile" to { it.fetchProfile(f) })
                     add("course_page" to { it.fetchCoursePage(f) })
@@ -132,6 +136,10 @@ object VtopSync {
         Log.info("sync", "done", f, mapOf("fetched" to "$fetched", "failed" to "$failed"))
         Result(Outcome.Done, fetched.get(), failed.get())
     }
+
+    /** The newest [n] of the 14 days to [today] not in [complete], newest first; today always counts. */
+    internal fun biometricDays(today: Int, complete: Set<Int>, n: Int): List<Int> =
+        (today downTo today - 13).filter { it == today || it !in complete }.take(n)
 
     private fun pendingOuting(core: Core, f: String) =
         (core.cachedGeneralOuting(f)?.requests.orEmpty() + core.cachedWeekendOuting(f)?.requests.orEmpty()).any { it.standing == OutingStanding.PENDING && it.highlight != null }

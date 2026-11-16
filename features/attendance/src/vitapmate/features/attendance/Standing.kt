@@ -55,27 +55,13 @@ internal val AttendanceCourse.sessions: Pair<Int, Int>
  */
 internal fun AttendanceCourse.advice(showSkip: Boolean): String? = when {
     total == 0 -> null
-    !safe -> "Attend $mustAttend${labs(mustAttend)}"
+    !safe -> advice
     !showSkip -> null
-    canSkip == 0 -> "Don't skip"
-    else -> "Can skip $canSkip${labs(canSkip)}"
+    else -> advice
 }
 
 /** " lab" / " labs" after a count for labs, which count in sessions; nothing for theory. */
 internal fun AttendanceCourse.labs(n: Int) = if (!isLab) "" else if (n == 1) " lab" else " labs"
-
-/**
- * One line for a debarment, which holds for one exam: "Debarred for CAT-2 · Permitted · Clear
- * for FAT", or "… · Clear for FAT at 3 more" while below 75%. Null when not debarred.
- */
-internal fun AttendanceCourse.debarLine(): String? {
-    val debar = debar ?: return null
-    return listOfNotNull(
-        if (debar.exam.isBlank()) "Debarred" else "Debarred for ${debar.exam}",
-        "Permitted".takeIf { debar.permitted },
-        debar.nextExam?.let { next -> if (safe) "Clear for $next" else "Clear for $next at $mustAttend${labs(mustAttend)} more" },
-    ).joinToString(" · ")
-}
 
 /**
  * The percentage VTOP would show (it rounds up: 31 of 34 is 92%) after attending [attend] and

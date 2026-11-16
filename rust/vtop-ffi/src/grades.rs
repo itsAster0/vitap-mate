@@ -802,7 +802,7 @@ fn component_label(kind: &str) -> String {
 }
 
 /// S 10 ... E 5, F and N 0; none for P and anything else.
-fn grade_points(grade: &str) -> Option<f64> {
+pub(crate) fn grade_points(grade: &str) -> Option<f64> {
     Some(match grade.trim().to_uppercase().as_str() {
         "S" => 10.0,
         "A" => 9.0,
@@ -836,7 +836,7 @@ fn session_gpa<'a>(records: impl Iterator<Item = &'a GradeHistoryRecord>) -> Opt
 
 /// How many of each grade, S to F, N, P, then others in first-seen order;
 /// blanks and "-" left out.
-fn counts<'a>(grades: impl Iterator<Item = &'a str>) -> Vec<GradeCount> {
+pub(crate) fn counts<'a>(grades: impl Iterator<Item = &'a str>) -> Vec<GradeCount> {
     let mut found: Vec<GradeCount> = Vec::new();
     for grade in grades {
         let grade = grade.trim().to_uppercase();

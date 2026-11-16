@@ -31,8 +31,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Flame
 import com.composables.icons.lucide.Lucide
-import vitapmate.core.AttendedClass
-import vitapmate.core.ClassStatus
+import vitapmate.core.AttendanceDetail
 import vitapmate.ui.AppTheme
 import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
@@ -43,22 +42,19 @@ import vitapmate.ui.nums
 /**
  * The history at a glance: one bar split into present / on duty / absent (it springs in), the
  * counts in their tones, and under a hairline "5 in a row · last missed 3 Oct" (or "never missed"). Classes not
- * posted yet are left out. [classes] are newest first.
+ * posted yet are left out; Rust counts them.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun Insights(classes: List<AttendedClass>) {
-    val posted = classes.filter { it.status != null }
-    if (posted.isEmpty()) return
+internal fun Insights(detail: AttendanceDetail) {
     val tones = AppTheme.tones
-    val present = posted.count { it.status == ClassStatus.PRESENT }
-    val onDuty = posted.count { it.status == ClassStatus.ON_DUTY }
-    val absent = posted.count { it.status == ClassStatus.ABSENT }
-    val streak = posted.takeWhile { it.status == ClassStatus.PRESENT || it.status == ClassStatus.ON_DUTY }.size
-    val lastMissed = posted.firstOrNull { it.status == ClassStatus.ABSENT }
+    val present = detail.present
+    val onDuty = detail.onDuty
+    val absent = detail.absent
+    val streak = detail.streak
     val note = listOfNotNull(
         "$streak in a row".takeIf { streak >= 3 },
-        lastMissed?.let { "last missed ${formatDay(it.day, "d MMM")}" } ?: "never missed",
+        detail.lastMissed?.let { "last missed ${formatDay(it, "d MMM")}" } ?: "never missed",
     ).joinToString(" · ").replaceFirstChar { it.uppercase() }
     var shown by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { shown = true }

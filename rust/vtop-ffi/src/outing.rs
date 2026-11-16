@@ -26,8 +26,8 @@ use crate::route::page;
 use crate::{Core, CoreError, PAGES, records, traced, traced_sync};
 
 /// Outings are not per semester; under `pages/` so signing out drops them.
-const GENERAL: &str = "outing_general.json";
-const WEEKEND: &str = "outing_weekend.json";
+pub(crate) const GENERAL: &str = "outing_general.json";
+pub(crate) const WEEKEND: &str = "outing_weekend.json";
 
 /// VTOP's general outing page refuses a leaving time less than this far off
 /// (minutes).
@@ -790,7 +790,7 @@ fn weekend_request(
     (day.map_or(0, |d| i64::from(d) * 1440), request)
 }
 
-fn standing(status: &str) -> OutingStanding {
+pub(crate) fn standing(status: &str) -> OutingStanding {
     let t = status.to_lowercase();
     if t.contains("accepted") || t.contains("approved") {
         OutingStanding::Approved

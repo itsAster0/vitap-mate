@@ -343,6 +343,7 @@ mod route;
 mod server;
 mod udp;
 mod web;
+mod wrapped;
 
 #[derive(uniffi::Object)]
 pub struct Core {
@@ -516,6 +517,30 @@ impl Core {
                 info!("pending otp dropped");
             }
             Ok(())
+        })
+        .await
+    }
+
+    /// Signs in again when the session signed in over `max_age_secs` ago (or when that is
+    /// unknown), so a long fetch starts on a fresh one; a newer session asks VTOP nothing.
+    /// `OtpRequired` when VTOP wants the emailed code.
+    pub async fn ensure_fresh_session(
+        &self,
+        flow: String,
+        max_age_secs: u64,
+    ) -> Result<(), CoreError> {
+        traced("ensure_fresh_session", &flow, async {
+            let slot = self.current()?;
+            let mut session = slot.write().await;
+            let age = session
+                .client
+                .logged_in_at()
+                .map(|at| (unix_now() as u64).saturating_sub(at));
+            if age.is_some_and(|age| age <= max_age_secs) {
+                return Ok(());
+            }
+            info!(age, max_age_secs, "session older than asked");
+            self.sign_in_again(&slot, &mut session).await
         })
         .await
     }
@@ -1052,6 +1077,17 @@ impl Core {
         if session.logins != seen {
             return Ok(()); // Another call already signed in again.
         }
+        info!("session expired");
+        self.sign_in_again(slot, &mut session).await
+    }
+
+    /// Signs `session` in again with the saved password; an open OTP challenge or a
+    /// rejected password answers without asking VTOP.
+    async fn sign_in_again(
+        &self,
+        slot: &Arc<Slot>,
+        session: &mut Session,
+    ) -> Result<(), CoreError> {
         if !self.is_current(slot) {
             // Replaced or signed out meanwhile: its cookies are gone; never sign it in.
             return Err(CoreError::NotSignedIn);
@@ -1065,10 +1101,10 @@ impl Core {
             });
         }
         if session.account.rejected {
-            info!("session expired; the saved password was rejected, not signing in again");
+            info!("the saved password was rejected, not signing in again");
             return Err(CoreError::InvalidCredentials);
         }
-        info!("session expired, signing in again");
+        info!("signing in again");
         if let Err(error) = session.client.login().await {
             match &error {
                 VtopError::OTPRequired(message, _) => session.otp = Some(message.clone()),
@@ -1085,7 +1121,7 @@ impl Core {
             return Err(error.into());
         }
         session.logins += 1;
-        self.save(slot, &session);
+        self.save(slot, session);
         Ok(())
     }
 

@@ -413,6 +413,21 @@ impl SemesterCalendar {
         }
     }
 
+    /// Every class day, in date order.
+    pub(crate) fn class_days(&self) -> Vec<i32> {
+        self.instructional.iter().copied().collect()
+    }
+
+    /// Weekday holidays (Sundays left out), in date order.
+    pub(crate) fn holidays(&self) -> &[i32] {
+        &self.holidays
+    }
+
+    /// The last listed day (after the exams).
+    pub(crate) fn last_listed_day(&self) -> Option<i32> {
+        self.entries.keys().next_back().copied()
+    }
+
     pub(crate) fn first_class_day(&self) -> Option<i32> {
         self.instructional.first().copied()
     }
