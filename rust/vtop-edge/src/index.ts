@@ -26,6 +26,7 @@
 
 import * as account from "./account";
 import * as oauth from "./oauth";
+import { tokenInvalid, verifyToken } from "./account-token";
 import { type Signed, base64Url, checkSignature, deviceIdFor, signed } from "./auth";
 import { eventStream } from "./event-stream";
 import { isVtopPath, proxyVtop } from "./vtop-proxy";
@@ -246,16 +247,29 @@ export function withCors(response: Response, origin: string | null, env: Env): R
   return out;
 }
 
-/** Whose VTOP session this is, as the engine's owner hash; or the error
- * reply. */
-async function sessionOwner(env: Env, body: MailBody): Promise<{ owner: string } | { reply: Response }> {
+/** The student a mail-otp call comes from, as the engine's owner hash: by
+ * the VTOP session it sends, or by an account token instead (no VTOP call);
+ * or the error reply. `account` is set when the engine named the student,
+ * so the reply can carry a token. */
+type Owner = { owner: string; account?: string } | { reply: Response };
+
+async function sessionOwner(env: Env, deviceId: string, body: MailBody): Promise<Owner> {
+  const token = str(body.accountToken);
+  if (token !== undefined) {
+    const claims = verifyToken(env, token, deviceId, now());
+    if (claims instanceof Response) return { reply: claims };
+    const owner = await account.tokenOwner(env, claims);
+    return owner === null ? { reply: tokenInvalid() } : { owner };
+  }
   const session = body.session as Record<string, unknown> | undefined;
   const cookies = str(session?.cookies)?.trim();
   if (!cookies) return { reply: badRequest("session.cookies is required.") };
   const response = await enginePost(env, MAIL_OWNER, { cookies });
   switch (response.status) {
-    case 200:
-      return { owner: (await response.json<{ ownerHash: string }>()).ownerHash };
+    case 200: {
+      const { ownerHash, registrationNumber } = await response.json<{ ownerHash: string; registrationNumber?: string }>();
+      return { owner: ownerHash, account: registrationNumber };
+    }
     case 401:
       return { reply: error(401, "session_invalid", "VTOP does not accept this session; sign in again.") };
     default:
@@ -289,10 +303,14 @@ async function mailDelete(deviceId: string, body: MailBody, env: Env): Promise<R
     doc.members.splice(index, 1);
     doc.updatedAt = now();
     await mailboxStub(env, doc.id).save(doc);
+    if (doc.ownerHash !== null) await account.revokeTokens(env, doc.ownerHash, [deviceId]);
     console.log("mail-otp: a device left a mailbox");
     return empty();
   }
-  if (doc.ownerHash !== null) await ownerStub(env, doc.ownerHash).remove(doc.id);
+  if (doc.ownerHash !== null) {
+    await account.revokeTokens(env, doc.ownerHash, doc.members.map((m) => m.deviceId));
+    await ownerStub(env, doc.ownerHash).remove(doc.id);
+  }
   await mailboxStub(env, doc.id).remove();
   console.log("mail-otp: deleted a mailbox");
   return empty();
@@ -327,6 +345,7 @@ async function mailRemoveDevice(deviceId: string, body: MailBody, env: Env): Pro
   doc.members.splice(position, 1);
   doc.updatedAt = now();
   await mailboxStub(env, doc.id).save(doc);
+  if (doc.ownerHash !== null) await account.revokeTokens(env, doc.ownerHash, [target]);
   console.log("mail-otp: a device was removed from a mailbox");
   return empty();
 }
@@ -355,7 +374,7 @@ async function mailOwner(deviceId: string, body: MailBody, env: Env): Promise<Re
   const mine = await owned(env, deviceId, body);
   if (!mine) return unknownMailbox();
   const { doc } = mine;
-  const session = await sessionOwner(env, body);
+  const session = await sessionOwner(env, deviceId, body);
   if ("reply" in session) return session.reply;
   const { owner } = session;
   // The student already has another live address: that is the one their
@@ -369,13 +388,20 @@ async function mailOwner(deviceId: string, body: MailBody, env: Env): Promise<Re
   doc.updatedAt = now();
   await mailboxStub(env, doc.id).save(doc);
   await ownerStub(env, owner).put(doc.id);
-  return empty();
+  return issued(env, session, deviceId, empty());
+}
+
+/** `reply` with an account token for this install when the engine named
+ * the student, whether or not it is one of their linked phones. */
+function issued(env: Env, session: { owner: string; account?: string }, deviceId: string, reply: Response): Promise<Response> {
+  if (session.account === undefined) return Promise.resolve(reply);
+  return account.withAccountToken(env, reply, session.account, deviceId, session.owner);
 }
 
 /** Adds this install to the student's own address (their VTOP session
  * says whose). The other installs keep getting OTPs. */
 async function mailReclaim(deviceId: string, body: MailBody, env: Env): Promise<Response> {
-  const session = await sessionOwner(env, body);
+  const session = await sessionOwner(env, deviceId, body);
   if ("reply" in session) return session.reply;
   const id = await ownerStub(env, session.owner).get();
   if (id === null) return unknownMailbox();
@@ -386,7 +412,7 @@ async function mailReclaim(deviceId: string, body: MailBody, env: Env): Promise<
   doc.updatedAt = at;
   await mailboxStub(env, doc.id).save(doc);
   console.log("mail-otp: a device joined a mailbox");
-  return mailboxReply(env, doc.id, 200);
+  return issued(env, session, deviceId, mailboxReply(env, doc.id, 200));
 }
 
 const MAIL_ROUTES: Record<string, (deviceId: string, body: MailBody, env: Env) => Promise<Response>> = {

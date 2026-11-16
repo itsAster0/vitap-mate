@@ -54,6 +54,7 @@ import {
   validCookies,
 } from "./account-state";
 import { type Signed, signed } from "./auth";
+import { type AccountClaims, issueToken, tokenInvalid, verifyToken, withToken } from "./account-token";
 import { oauthStub, pairInfo } from "./oauth";
 import { PAIR_TTL_SECS, claim, pairCode, pairStub } from "./pair";
 import {
@@ -72,6 +73,7 @@ import {
   now,
   ownerStub,
   str,
+  studentStub,
   variable,
 } from "./common";
 import type { DeviceInfo, EventBody } from "./device";
@@ -199,9 +201,16 @@ async function withKey(
   return then(accountStub(env, account), keyHash);
 }
 
-/** Asks the engine whose live VTOP session the app sent, then hands the
- * call to that student's account. */
+/** Asks the engine whose live VTOP session the app sent (or reads the
+ * account token sent instead, account-token.ts), then hands the call to
+ * that student's account. */
 async function withSession(env: Env, op: AppOp, body: Record<string, unknown>, device: DeviceInfo): Promise<Response> {
+  const token = str(body.accountToken);
+  if (token !== undefined) {
+    const claims = verifyToken(env, token, device.id, now());
+    if (claims instanceof Response) return claims;
+    return accountStub(env, accountId(claims.sub)).app(op, { checked: null, token: claims, mailboxId: null, body, device });
+  }
   const session = body.session as Record<string, unknown> | undefined;
   const cookies = str(session?.cookies)?.trim();
   if (!cookies) return badRequest("session.cookies is required.");
@@ -242,8 +251,40 @@ export async function appCall(auth: Signed, env: Env, op: "status" | "session-cl
   }
 }
 
-/** Takes an install off a student's phones, as it deletes itself
- * (`/v1/devices/delete`); nothing when it is not one of them. */
+/** The owner hash of the student in a mail-otp call's verified token
+ * (`claims`), or null when their account turns it down. */
+export async function tokenOwner(env: Env, claims: AccountClaims): Promise<string | null> {
+  return accountStub(env, accountId(claims.sub)).tokenOwner(claims.dev, claims.iat);
+}
+
+/** Revokes the tokens of installs `deviceIds` with the student of owner
+ * hash `ownerHash`, as they leave the student's forwarding address. Best
+ * effort: a failure is logged, never the mail route's. */
+export async function revokeTokens(env: Env, ownerHash: string, deviceIds: string[]): Promise<void> {
+  try {
+    const account = await studentStub(env, ownerHash).get();
+    if (account !== null && isAccountId(account)) await accountStub(env, account).revokeTokens(deviceIds);
+  } catch (e) {
+    console.log(`account: revoking tokens failed: ${e}`);
+  }
+}
+
+/** `response` with an account token for install `deviceId` of student
+ * `registrationNumber` (owner hash `ownerHash`), after a cookie check. */
+export async function withAccountToken(
+  env: Env,
+  response: Response,
+  registrationNumber: string,
+  deviceId: string,
+  ownerHash: string,
+): Promise<Response> {
+  const account = accountId(registrationNumber);
+  if (!response.ok || !isAccountId(account)) return response;
+  return withToken(response, await accountStub(env, account).issueToken(account, deviceId, ownerHash));
+}
+
+/** Takes an install off a student's phones and revokes its token, as it
+ * deletes itself (`/v1/devices/delete`). */
 export async function forgetPhone(env: Env, registrationNumber: string, deviceId: string): Promise<void> {
   const account = accountId(registrationNumber);
   if (isAccountId(account)) await accountStub(env, account).forgetPhone(deviceId);
@@ -299,10 +340,12 @@ type AppOp =
   | "clear-sign-ins";
 
 /** An app call: whose session came with it (none for
- * `credentials-rejected`), the student's forwarding address, the body and
- * the install that signed it. */
+ * `credentials-rejected` and with a token), the verified account token sent
+ * instead, the student's forwarding address, the body and the install that
+ * signed it. */
 interface AppCall {
   checked: SessionChecked | null;
+  token?: AccountClaims;
   mailboxId: string | null;
   body: Record<string, unknown>;
   device: DeviceInfo;
@@ -363,6 +406,13 @@ CREATE TABLE key_uses (key_hash TEXT NOT NULL, at INTEGER NOT NULL, via TEXT NOT
 
 export function prepareAccountDb(db: SqlStorage): void {
   sql.prepare(db, SCHEMA);
+  // Account tokens (account-token.ts), on every install the student showed
+  // a VTOP cookie from, linked or not: the student's mailbox owner hash, for
+  // calls that bring a token instead of the session, and the `iat` of each
+  // install's one live token. Made on first use, so objects of schema 2
+  // keep their data.
+  db.exec("CREATE TABLE IF NOT EXISTS owner (hash TEXT NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS tokens (device_id TEXT PRIMARY KEY, issued_at INTEGER NOT NULL)");
 }
 
 type Value = string | number | null;
@@ -1098,8 +1148,10 @@ export class Account extends DurableObject<Env> {
     }
   }
 
-  /** Unlinks the install, which is deleting itself; its keys stay. */
+  /** Unlinks the install, which is deleting itself, and revokes its token;
+   * its keys stay. */
   async forgetPhone(deviceId: string): Promise<void> {
+    await this.revokeTokens([deviceId]);
     const doc = this.doc();
     const index = doc?.phoneIndex(deviceId) ?? null;
     if (doc === null || index === null) return;
@@ -1224,7 +1276,6 @@ export class Account extends DurableObject<Env> {
   async app(op: AppOp, call: AppCall): Promise<Response> {
     const at = now();
     const existing = this.doc();
-    const body = call.body;
     const thisPhone = existing?.phoneIndex(call.device.id) ?? null;
 
     if (op === "credentials-rejected") {
@@ -1235,15 +1286,41 @@ export class Account extends DurableObject<Env> {
       return empty();
     }
 
-    const checked = call.checked;
+    let { checked, mailboxId } = call;
+    if (call.token) {
+      // As if the engine had named the student: no VTOP call.
+      const ownerHash = await this.tokenOwner(call.device.id, call.token.iat);
+      if (ownerHash === null) return tokenInvalid();
+      console.log("account: account token used");
+      checked = { status: "valid", registrationNumber: accountId(call.token.sub), ownerHash };
+      mailboxId = await forwardingMailbox(this.env, ownerHash);
+    }
     if (!checked) return badRequest("session.cookies is required.");
-    if (existing && existing.mailboxId !== call.mailboxId) {
-      existing.mailboxId = call.mailboxId;
+    const id = accountId(checked.registrationNumber ?? "");
+    const response = await this.sessionApp(op, existing, thisPhone, checked, mailboxId, call, at);
+    // A deleted account keeps no tokens.
+    if (call.token || !response.ok || op === "delete") return response;
+    return withToken(response, await this.issueToken(id, call.device.id, checked.ownerHash ?? ""));
+  }
+
+  /** An app call for the student `checked` names. */
+  private async sessionApp(
+    op: AppOp,
+    existing: AccountRecord | null,
+    thisPhone: number | null,
+    checked: SessionChecked,
+    mailboxId: string | null,
+    call: AppCall,
+    at: number,
+  ): Promise<Response> {
+    const body = call.body;
+    if (existing && existing.mailboxId !== mailboxId) {
+      existing.mailboxId = mailboxId;
       this.save(existing);
     }
     const id = accountId(checked.registrationNumber ?? "");
     const linked = existing?.linked() ?? false;
-    const forwarding = call.mailboxId !== null;
+    const forwarding = mailboxId !== null;
 
     switch (op) {
       case "link":
@@ -1267,6 +1344,40 @@ export class Account extends DurableObject<Env> {
     }
     if (linked && thisPhone === null) return notLinked();
     return this.linkedOp(op, existing ?? new AccountRecord(id, at), thisPhone, body, at);
+  }
+
+  /** A token for install `deviceId` of student `id`, linked or not (after a
+   * real cookie check only). It replaces the install's earlier one, and the
+   * student's owner hash is kept for the calls that bring it instead. */
+  async issueToken(id: string, deviceId: string, ownerHash: string): Promise<{ token: string; expiresAt: number } | null> {
+    if (!isAccountId(id) || !ownerHash) return null;
+    const at = now();
+    const issued = issueToken(this.env, id, deviceId, at);
+    if (issued === null) return null;
+    this.db.exec("DELETE FROM owner");
+    this.db.exec("INSERT INTO owner (hash) VALUES (?)", ownerHash);
+    this.db.exec("INSERT OR REPLACE INTO tokens (device_id, issued_at) VALUES (?, ?)", deviceId, at);
+    await studentStub(this.env, ownerHash).put(id);
+    console.log("account: account token issued");
+    return issued;
+  }
+
+  /** The student's owner hash while the token issued at `iat` to install
+   * `deviceId` is that install's live one: not revoked, nor replaced. */
+  async tokenOwner(deviceId: string, iat: number): Promise<string | null> {
+    const token = sql.first(this.db, "SELECT 1 FROM tokens WHERE device_id = ? AND issued_at = ?", deviceId, iat);
+    const row = sql.first(this.db, "SELECT hash FROM owner LIMIT 1");
+    const ownerHash = row && sql.text(row, "hash");
+    if (!token || !ownerHash) {
+      console.log("account: account token revoked");
+      return null;
+    }
+    return ownerHash;
+  }
+
+  /** Revokes the tokens of installs `deviceIds`. */
+  async revokeTokens(deviceIds: string[]): Promise<void> {
+    for (const deviceId of deviceIds) this.db.exec("DELETE FROM tokens WHERE device_id = ?", deviceId);
   }
 
   /** Links this install, next to any phones linked already; linking it
@@ -1347,8 +1458,10 @@ export class Account extends DurableObject<Env> {
         return empty();
       }
       case "move-keys": {
+        const before = doc.phones.map((p) => p.deviceId);
         const moved = doc.moveKeys(body.from === undefined ? null : (str(body.from) ?? ""), doc.phones[me!].deviceId);
         if (moved === null) return error(404, "phone_not_found", "No such phone on this account.");
+        await this.revokeTokens(before.filter((d) => doc.phoneIndex(d) === null));
         this.save(doc);
         return Response.json({ moved });
       }
@@ -1359,12 +1472,13 @@ export class Account extends DurableObject<Env> {
         this.save(doc);
         return empty();
       }
-      case "remove-phone":
-        if (!doc.removePhone(str(body.id) ?? "")) {
-          return error(404, "phone_not_found", "No such phone on this account.");
-        }
+      case "remove-phone": {
+        const removed = doc.removePhone(str(body.id) ?? "");
+        if (!removed) return error(404, "phone_not_found", "No such phone on this account.");
+        await this.revokeTokens([removed.deviceId]);
         this.save(doc);
         return empty();
+      }
       case "clear-sign-ins":
         doc.signIns = [];
         this.save(doc);
@@ -1384,13 +1498,18 @@ export class Account extends DurableObject<Env> {
         this.save(doc);
         return empty();
       }
-      case "delete":
+      case "delete": {
         for (const key of doc.keys) await keyIndex(this.env, key.hash).remove(doc.id);
+        // Its tokens go with the rest of its storage.
+        const owner = sql.first(this.db, "SELECT hash FROM owner LIMIT 1");
+        const ownerHash = owner && sql.text(owner, "hash");
+        if (ownerHash) await studentStub(this.env, ownerHash).remove(doc.id);
         await this.ctx.storage.deleteAll();
         await this.ctx.storage.deleteAlarm();
         this.ready = false;
         console.log("account: deleted at the user's request");
         return empty();
+      }
       default:
         return error(404, "not_found", "No such route.");
     }

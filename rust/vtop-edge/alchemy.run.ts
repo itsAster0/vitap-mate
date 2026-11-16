@@ -81,6 +81,7 @@ export const Edge = Cloudflare.Worker("Edge", {
     ALLOWED_ORIGINS: "",
     FALLBACK_FORWARD: "",
     INTERNAL_TOKEN: internalToken,
+    ACCOUNT_TOKEN_SECRET: Config.Redacted("ACCOUNT_TOKEN_SECRET"),
     FIREBASE_CREDENTIALS_JSON: Config.Redacted("FIREBASE_CREDENTIALS_JSON"),
   },
 }).pipe(adopt(true));

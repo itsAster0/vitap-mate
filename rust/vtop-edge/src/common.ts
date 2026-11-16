@@ -28,6 +28,8 @@ export interface Env {
   /** Shared with the engine and the UDP gateway: sent on every call to the
    * engine and required on `/internal/*`. */
   INTERNAL_TOKEN: string;
+  /** Signs account tokens (account-token.ts); without it none are issued. */
+  ACCOUNT_TOKEN_SECRET: string;
 }
 
 /** Unix seconds. */
@@ -154,6 +156,12 @@ export function deviceStub(env: Env, id: string) {
 /** The forwarding-address index entry of a student (`owner:<hash>`). */
 export function ownerStub(env: Env, ownerHash: string) {
   return env.INDEX.getByName(`owner:${ownerHash}`);
+}
+
+/** Whose owner hash it is (`student:<hash>` holds the account id), kept
+ * when the account issues a token, so the mail-otp routes can revoke it. */
+export function studentStub(env: Env, ownerHash: string) {
+  return env.INDEX.getByName(`student:${ownerHash}`);
 }
 
 /** The most a compressed request body may expand to. */

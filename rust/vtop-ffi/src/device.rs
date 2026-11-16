@@ -67,6 +67,8 @@ pub(crate) struct Answer {
     pub body: Value,
     /// A page the engine packed with the page dictionary (`body` is then null).
     pub packed: Option<Vec<u8>>,
+    /// An account token the edge issued, with its end in unix ms ([`crate::account_token`]).
+    pub(crate) account_token: Option<(String, i64)>,
 }
 
 impl Answer {
@@ -123,12 +125,17 @@ async fn send(
     let response = transport.send(hop).await.map_err(|error| offline(&error))?;
     let status = response.status;
     let packed = response.header("content-type") == Some(page_dictionary::CONTENT_TYPE);
+    let account_token = response
+        .header("x-vm-account-token")
+        .zip(response.header("x-vm-account-token-expires-at"))
+        .and_then(|(token, at)| Some((token.to_string(), at.parse().ok()?)));
     let bytes = response.bytes().await.ok();
     if packed {
         return Ok(Answer {
             status,
             body: Value::Null,
             packed: bytes,
+            account_token,
         });
     }
     // 204 has no body.
@@ -139,6 +146,7 @@ async fn send(
         status,
         body,
         packed: None,
+        account_token,
     })
 }
 

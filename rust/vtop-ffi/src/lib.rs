@@ -331,6 +331,7 @@ macro_rules! signed_in {
 }
 
 // After `signed_in!`, which it uses.
+mod account_token;
 mod biometric;
 mod course_page;
 mod forwarding;
@@ -533,6 +534,7 @@ impl Core {
                 forwarding::FILE,
                 changes::FILE,
                 consent::FILE,
+                account_token::FILE,
             ]);
             obs::set_regno(None);
             Ok(())
@@ -1104,6 +1106,7 @@ impl Core {
                 forwarding::FILE,
                 changes::FILE,
                 consent::FILE,
+                account_token::FILE,
             ]);
         }
         let saved_at_ms = SystemTime::now()

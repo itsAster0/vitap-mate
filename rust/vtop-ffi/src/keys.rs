@@ -227,11 +227,17 @@ impl Core {
     /// The account's access keys and whether this phone is linked to it.
     pub async fn connected_apps(&self, flow: String) -> Result<ConnectedApps, CoreError> {
         traced("connected_apps", &flow, async {
-            let cookies = self.live_cookies(&flow, "Load your connected apps").await?;
-            let body = json!({ "session": { "cookies": cookies } });
+            let action = "Load your connected apps";
             let view = self
-                .edge_post(&self.forwarding_server(), "/v1/account", &flow, &body)
-                .await
+                .account_post(
+                    &self.forwarding_server(),
+                    "/v1/account",
+                    &flow,
+                    action,
+                    true,
+                    json!({}),
+                )
+                .await?
                 .map_err(refused)?;
             let keys: Vec<AccessKey> = serde_json::from_value::<Vec<KeyView>>(view["keys"].clone())
                 .unwrap_or_default()
@@ -259,10 +265,8 @@ impl Core {
     /// made before show again).
     pub async fn link_phone(&self, flow: String) -> Result<(), CoreError> {
         traced("link_phone", &flow, async {
-            let cookies = self
-                .live_cookies(&flow, "Link this phone to your account")
-                .await?;
-            self.link_with(&self.forwarding_server(), &flow, &cookies)
+            let action = "Link this phone to your account";
+            self.link_with(&self.forwarding_server(), &flow, action)
                 .await
         })
         .await
@@ -277,11 +281,10 @@ impl Core {
         pair_code: Option<String>,
     ) -> Result<NewKey, CoreError> {
         traced("create_key", &flow, async {
-            let cookies = self.live_cookies(&flow, "Make an access key").await?;
             self.create_key_with(
                 &self.forwarding_server(),
                 &flow,
-                &cookies,
+                "Make an access key",
                 outings,
                 pair_code,
             )
@@ -301,10 +304,10 @@ impl Core {
 
     pub async fn revoke_key(&self, flow: String, id: String) -> Result<(), CoreError> {
         traced("revoke_key", &flow, async {
-            let cookies = self.live_cookies(&flow, "Revoke an access key").await?;
-            let body = json!({ "session": { "cookies": cookies }, "id": id });
-            self.edge_post(&self.forwarding_server(), "/v1/keys/revoke", &flow, &body)
-                .await
+            let (path, action) = ("/v1/keys/revoke", "Revoke an access key");
+            let body = json!({ "id": id });
+            self.account_post(&self.forwarding_server(), path, &flow, action, true, body)
+                .await?
                 .map_err(refused)?;
             info!("key revoked");
             Ok(())
@@ -316,14 +319,14 @@ impl Core {
     /// phones no longer linked; without `from`, only the latter. The number of keys moved.
     pub async fn move_keys(&self, flow: String, from: Option<String>) -> Result<u32, CoreError> {
         traced("move_keys", &flow, async {
-            let cookies = self.live_cookies(&flow, "Move keys to this phone").await?;
-            let mut body = json!({ "session": { "cookies": cookies } });
+            let (path, action) = ("/v1/keys/move", "Move keys to this phone");
+            let mut body = json!({});
             if let Some(from) = from {
                 body["from"] = json!(from);
             }
             let answer = self
-                .edge_post(&self.forwarding_server(), "/v1/keys/move", &flow, &body)
-                .await
+                .account_post(&self.forwarding_server(), path, &flow, action, true, body)
+                .await?
                 .map_err(refused)?;
             let moved = answer["moved"].as_u64().unwrap_or(0) as u32;
             info!(moved, "keys moved");
@@ -339,12 +342,10 @@ impl Core {
         outings: bool,
     ) -> Result<(), CoreError> {
         traced("set_key_outings", &flow, async {
-            let cookies = self
-                .live_cookies(&flow, "Change a key's outing access")
-                .await?;
-            let body = json!({ "session": { "cookies": cookies }, "id": id, "outings": outings });
-            self.edge_post(&self.forwarding_server(), "/v1/keys/outings", &flow, &body)
-                .await
+            let (path, action) = ("/v1/keys/outings", "Change a key's outing access");
+            let body = json!({ "id": id, "outings": outings });
+            self.account_post(&self.forwarding_server(), path, &flow, action, true, body)
+                .await?
                 .map_err(refused)?;
             info!(outings, "key outings");
             Ok(())
@@ -411,14 +412,13 @@ impl Core {
     }
 
     /// Adds this phone to the account's phones, with the semester picked here.
-    async fn link_with(&self, server: &str, flow: &str, cookies: &str) -> Result<(), CoreError> {
-        let mut link =
-            json!({ "session": { "cookies": cookies }, "label": crate::server::label() });
+    async fn link_with(&self, server: &str, flow: &str, action: &str) -> Result<(), CoreError> {
+        let mut link = json!({ "label": crate::server::label() });
         if let Some(semester) = self.read::<String>(crate::SELECTED) {
             link["semesterId"] = json!(semester);
         }
-        self.edge_post(server, "/v1/link", flow, &link)
-            .await
+        self.account_post(server, "/v1/link", flow, action, true, link)
+            .await?
             .map_err(refused)?;
         info!("phone linked");
         Ok(())
@@ -428,14 +428,12 @@ impl Core {
         &self,
         server: &str,
         flow: &str,
-        cookies: &str,
+        action: &str,
         outings: bool,
         pair_code: Option<String>,
     ) -> Result<NewKey, CoreError> {
-        let session = json!({ "cookies": cookies });
         let paired = pair_code.is_some();
         let mut body = json!({
-            "session": session,
             "label": if paired { BROWSER_LABEL } else { MCP_LABEL },
             "outings": outings,
         });
@@ -444,9 +442,10 @@ impl Core {
         }
         let mut linked_now = false;
         let answer = loop {
-            match self.edge_post(server, "/v1/keys", flow, &body).await {
+            let made = self.account_post(server, "/v1/keys", flow, action, true, body.clone());
+            match made.await? {
                 Err(error) if error.code() == "not_linked" && !linked_now => {
-                    self.link_with(server, flow, cookies).await?;
+                    self.link_with(server, flow, action).await?;
                     linked_now = true;
                 }
                 answer => break answer.map_err(refused)?,
@@ -535,7 +534,7 @@ mod tests {
 
     use super::*;
     use crate::consent;
-    use crate::forwarding::tests::{Edge, serve};
+    use crate::forwarding::tests::{Edge, serve, signed_in};
 
     fn core(name: &str) -> Core {
         let dir = std::env::temp_dir().join(format!("vtop-ffi-keys-{name}-{}", std::process::id()));
@@ -632,32 +631,34 @@ mod tests {
 
     #[tokio::test]
     async fn linking_sends_the_session_and_no_key() {
-        let core = core("link");
         let edge = Arc::new(Mutex::new(Edge::default()));
         let server = serve(edge.clone()).await;
+        let core = signed_in(&core("link").dir, server.clone());
+        let _gate = consent::tests::yes();
         can(
             &edge,
             "/v1/link",
             200,
             json!({ "savedCredentials": false, "forwarding": false }),
         );
-        core.link_with(&server, "f-link", "JSESSIONID=c")
-            .await
-            .unwrap();
+        core.link_with(&server, "f-link", "Link").await.unwrap();
         let edge = edge.lock().unwrap();
         let paths: Vec<&str> = edge.requests.iter().map(|r| r.path.as_str()).collect();
         assert_eq!(paths, ["/v1/devices/register", "/v1/link"]);
+        let cookies = &edge.requests[1].body["session"]["cookies"];
+        assert!(cookies.as_str().is_some_and(|c| c.contains("JSESSIONID=")));
         assert_eq!(
-            edge.requests[1].body["session"],
-            json!({ "cookies": "JSESSIONID=c" })
+            edge.requests[1].body,
+            json!({ "session": { "cookies": cookies }, "label": "vitapmate" })
         );
     }
 
     #[tokio::test]
     async fn a_first_key_links_the_phone_then_is_made() {
-        let core = core("create");
         let edge = Arc::new(Mutex::new(Edge::default()));
         let server = serve(edge.clone()).await;
+        let core = signed_in(&core("create").dir, server.clone());
+        let _gate = consent::tests::yes();
         let not_linked = json!({ "code": "not_linked", "error": "Link first." });
         can(&edge, "/v1/keys", 409, not_linked);
         let made = json!({ "id": "ab12cd34", "key": "vtm_secret", "mcpUrl": "https://vmate.aster0.dev/mcp" });
@@ -672,7 +673,7 @@ mod tests {
             .create_key_with(
                 &server,
                 "f-key",
-                "JSESSIONID=c",
+                "Make an access key",
                 true,
                 Some("ABCDE12345".into()),
             )
@@ -689,13 +690,15 @@ mod tests {
             ["/v1/devices/register", "/v1/keys", "/v1/link", "/v1/keys"]
         );
         assert!(edge.requests.iter().all(|r| r.signed && r.flow == "f-key"));
+        let cookies = &edge.requests[1].body["session"]["cookies"];
+        assert!(cookies.is_string());
         assert_eq!(
             edge.requests[1].body,
-            json!({ "session": { "cookies": "JSESSIONID=c" }, "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
+            json!({ "session": { "cookies": cookies }, "label": "Browser", "outings": true, "pairCode": "ABCDE12345" })
         );
         assert_eq!(
             edge.requests[2].body,
-            json!({ "session": { "cookies": "JSESSIONID=c" }, "label": "vitapmate" })
+            json!({ "session": { "cookies": cookies }, "label": "vitapmate" })
         );
     }
 
@@ -733,9 +736,10 @@ mod tests {
 
     #[tokio::test]
     async fn refusals_read_as_what_to_do() {
-        let core = core("refused");
         let edge = Arc::new(Mutex::new(Edge::default()));
         let server = serve(edge.clone()).await;
+        let core = signed_in(&core("refused").dir, server.clone());
+        let _gate = consent::tests::yes();
         can(
             &edge,
             "/v1/keys",
@@ -752,10 +756,10 @@ mod tests {
             Err(CoreError::Other { reason }) => reason,
             other => panic!("{other:?}"),
         };
-        let full = core.create_key_with(&server, "f", "c=1", false, None).await;
+        let full = core.create_key_with(&server, "f", "Key", false, None).await;
         assert!(reason(full).starts_with("Revoke a key first"));
         let bad = core
-            .create_key_with(&server, "f", "c=1", false, Some("ABCDE12345".into()))
+            .create_key_with(&server, "f", "Key", false, Some("ABCDE12345".into()))
             .await;
         assert!(reason(bad).starts_with("Check the code"));
         assert_eq!(edge.lock().unwrap().requests[1].body["label"], "MCP");

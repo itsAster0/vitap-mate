@@ -201,18 +201,18 @@ impl Core {
             }
             let server = self.forwarding_server();
             let action = "Set up mail forwarding";
-            // An address made without the student's session is never tied to them: their next
-            // phone could not join it and the server could not sign in with it.
-            let cookies = self
-                .session_cookies(&flow, CookieKind::Account, action, true)
-                .await?
-                .ok_or(CoreError::NotSignedIn)?;
+            // An address made without the student's session (or account token) is never tied to
+            // them: their next phone could not join it and the server could not sign in with it.
             let mut joined = None;
-            let reclaim = json!({ "session": { "cookies": cookies } });
-            match self
-                .edge_post(&server, "/v1/mail-otp/reclaim", &flow, &reclaim)
-                .await
-            {
+            let reclaim = self.account_post(
+                &server,
+                "/v1/mail-otp/reclaim",
+                &flow,
+                action,
+                true,
+                json!({}),
+            );
+            match reclaim.await? {
                 Ok(body) => joined = Some(body),
                 Err(error) if error.code() == GONE => info!("no address yet: making one"),
                 Err(error) => return Err(error.into()),
@@ -241,16 +241,18 @@ impl Core {
             info!(reclaimed, "forwarding address set up");
             // Best effort: lets the student's next phone join it, and the server sign in with it.
             if !reclaimed {
-                let owner = json!({ "id": saved.id, "session": { "cookies": cookies } });
+                let owner = json!({ "id": saved.id });
+                let path = "/v1/mail-otp/owner";
                 match self
-                    .edge_post(&server, "/v1/mail-otp/owner", &flow, &owner)
+                    .account_post(&server, path, &flow, action, true, owner)
                     .await
                 {
-                    Ok(_) => {
+                    Ok(Ok(_)) => {
                         saved.owner_claimed = true;
                         self.write(FILE, &saved);
                     }
-                    Err(error) => warn!(code = error.code(), "owner not claimed"),
+                    Ok(Err(error)) => warn!(code = error.code(), "owner not claimed"),
+                    Err(error) => warn!(%error, "owner not claimed"),
                 }
             }
             Ok(self.forwarding_view())
@@ -524,6 +526,8 @@ pub(crate) mod tests {
         seal_key: Option<String>,
         sealed: Option<String>,
         gone: bool,
+        /// An account token to issue on answers to calls that send the session.
+        pub(crate) issue: Option<String>,
     }
 
     const ID: &str = "k3f9x2ab7q";
@@ -628,7 +632,7 @@ pub(crate) mod tests {
                     .unwrap_or_default()
                     .to_string();
                 let json: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
-                let (status, reply) = {
+                let (status, reply, issued) = {
                     let mut edge = edge.lock().unwrap();
                     let signed = verify(&edge, &path, &head, &body, &json);
                     let reply = if signed {
@@ -639,13 +643,22 @@ pub(crate) mod tests {
                             json!({ "code": "bad_signature", "error": "Bad signature." }),
                         )
                     };
+                    let issued = match &edge.issue {
+                        Some(token) if json.get("session").is_some() && reply.0 < 300 => {
+                            let at = (now() + 14 * 86_400) * 1000;
+                            format!(
+                                "x-vm-account-token: {token}\r\nx-vm-account-token-expires-at: {at}\r\n"
+                            )
+                        }
+                        _ => String::new(),
+                    };
                     edge.requests.push(Request {
                         path,
                         flow,
                         body: json,
                         signed,
                     });
-                    reply
+                    (reply.0, reply.1, issued)
                 };
                 let text = if reply.is_null() {
                     String::new()
@@ -653,7 +666,7 @@ pub(crate) mod tests {
                     reply.to_string()
                 };
                 let response = format!(
-                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{text}",
+                    "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n{issued}content-length: {}\r\nconnection: close\r\n\r\n{text}",
                     text.len()
                 );
                 socket.write_all(response.as_bytes()).await.unwrap();
@@ -663,7 +676,7 @@ pub(crate) mod tests {
     }
 
     /// A core signed in to VTOP at `base` (the mock edge also answers VTOP's session check).
-    fn signed_in(dir: &std::path::Path, base: String) -> Core {
+    pub(crate) fn signed_in(dir: &std::path::Path, base: String) -> Core {
         use vtop_core::sync::RwLock;
         use vtop_core::{SessionState, VtopClient, VtopConfig};
         let client = VtopClient::builder()

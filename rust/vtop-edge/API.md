@@ -104,7 +104,7 @@ version: each app shows only what it has.
 ```json
 { "schema": 1,
   "features": [ { "title": "Classes",
-                  "items": ["…", { "text": "…", "since": 3001000 }] } ],
+                  "items": ["…", { "text": "…", "since": 3000300 }] } ],
   "releases": [ { "version": "3.0.0", "code": 3000000, "summary": "…",
                   "sections": [ { "title": "New", "items": ["…"] } ] } ] }
 ```
@@ -195,11 +195,15 @@ calling device is not on it.
 |---|---|---|
 | `/v1/mail-otp/register` | `{}` | `201 { id, address }` with this device as the only member |
 | `/v1/mail-otp/inbox` | `{ id }` | `{ sealed, receivedAt, confirmation, lastOtpAt }`; `sealed: null` without a box (boxes live 5 min); `confirmation` is Gmail's latest forwarding confirmation sealed to this device (kept until an OTP arrives), else `null`; `lastOtpAt` is when the latest OTP was sent, or `null` |
-| `/v1/mail-otp/owner` | `{ id, session: { cookies } }` | `204`; ties the address to the VTOP student; `409 address_exists`, `401 session_invalid`, `503 vtop_unreachable` |
-| `/v1/mail-otp/reclaim` | `{ session: { cookies } }` | `200 { id, address }`: this device joins the student's address |
+| `/v1/mail-otp/owner` | `{ id, session: { cookies } }` or `{ id, accountToken }` | `204`; ties the address to the VTOP student; `409 address_exists`, `401 session_invalid`, `503 vtop_unreachable`; token errors as in [Account tokens](#account-tokens) |
+| `/v1/mail-otp/reclaim` | `{ session: { cookies } }` or `{ accountToken }` | `200 { id, address }`: this device joins the student's address |
 | `/v1/mail-otp/devices` | `{ id }` | `{ devices: [{ deviceId, label, addedAt, seenAt, thisDevice }] }` |
-| `/v1/mail-otp/devices/remove` | `{ id, removeDevice }` | `204`; `404 unknown_device` |
-| `/v1/mail-otp/delete` | `{ id, everywhere? }` | `204`; leaves the address, or deletes it when last or `everywhere: true` |
+| `/v1/mail-otp/devices/remove` | `{ id, removeDevice }` | `204`; `404 unknown_device`; revokes the removed device's account token |
+| `/v1/mail-otp/delete` | `{ id, everywhere? }` | `204`; leaves the address, or deletes it when last or `everywhere: true`; revokes the account token of this device (with `everywhere`, of every device on the address) |
+
+`owner` and `reclaim` take an account token in place of the session, and
+after a session check issue one to this device like the account routes do
+([Account tokens](#account-tokens)), whether or not it is a linked phone.
 
 Up to 5 devices per address. Mail is sealed per device to its current
 `sealKey` and delivered as a `mail_otp` event and to `/inbox`.
@@ -208,9 +212,47 @@ Up to 5 devices per address. Mail is sealed per device to its current
 
 All `POST`, signed. Routes that send `session` need the phone's live VTOP
 session (`{ cookies: "<Cookie header>" }`); the engine says whose it is.
-Errors common to those: `400` without `session.cookies`, `401
-session_invalid`, `503 vtop_unreachable`, `403 not_linked` (this device is
-not one of the account's phones), `409 not_linked` (no phone linked yet).
+Instead of `session` they take `accountToken` (below), which needs no
+engine or VTOP call; with both, the token is used. Errors common to those:
+`400` without `session.cookies` (or a token), `401 session_invalid`, `503
+vtop_unreachable`, `403 not_linked` (this device is not one of the
+account's phones), `409 not_linked` (no phone linked yet).
+
+### Account tokens
+
+A token says who the student is, for any device that showed their VTOP
+session, linked or not. Every success that checked the session with the
+engine (the routes below and `/v1/mail-otp/owner` and `/reclaim`) carries a
+new one for the calling device in two headers (`/v1/account/delete` none):
+
+- `x-vm-account-token`: a compact JWT, HS256 with `ACCOUNT_TOKEN_SECRET`.
+  Header `{ alg: "HS256", typ: "JWT" }`; claims `sub` (registration number),
+  `dev` (device id of the signed request), `iat`, `exp = iat + 14 days`
+  (unix seconds).
+- `x-vm-account-token-expires-at`: `exp` in unix milliseconds.
+
+Status and body stay as they were. A call made with a token never gets
+another: after 14 days the phone sends the session once more. The
+student's `Account` object keeps one row per device, the `iat` of its live
+token, and issuing replaces it. The edge accepts a token when its signature
+holds, it is unexpired, `dev` is the device that signed the request, and
+the device's row has that `iat`; so a newer token kills the older one.
+Revoking deletes the row: removing a phone, `/v1/keys/move` unlinking it,
+`/v1/devices/delete`, `/v1/mail-otp/devices/remove` and `/v1/mail-otp/delete`
+(as in the table above), and `/v1/account/delete` (every device). The
+account also keeps the student's owner hash, for the mail-otp routes, and
+the index entry `student:<owner hash>` names the account, so those routes
+can revoke. A student who never linked a phone thus has an `Account` with
+only these rows.
+
+A token proves only who the student is: routes that need a linked phone
+answer `403 not_linked` or `409 not_linked` to an unlinked device with a
+valid token, as they do with its session. Errors:
+
+| Status | `code` | When |
+|---|---|---|
+| 401 | `token_invalid` | bad signature or shape, another device's, or revoked (as above); the phone drops it and sends the session |
+| 401 | `token_expired` | past `exp` |
 
 | Route | Request | Response |
 |---|---|---|
@@ -350,7 +392,8 @@ All need `Authorization: Bearer <INTERNAL_TOKEN>`, else `401 unauthorized`.
 Every call carries `Authorization: Bearer <INTERNAL_TOKEN>`:
 `POST /engine/session`, `/engine/seal`, `/engine/login` (answers `202`, then
 reports to `/internal/accounts/login-done`), `/internal/mail-otp/owner`
-(`{ cookies }` → `{ ownerHash }`, `401` if VTOP refuses), and the
+(`{ cookies }` → `{ ownerHash, registrationNumber }`, `401` if VTOP
+refuses; an engine without `registrationNumber` means no token), and the
 `/engine/fetch`, `/engine/vtop-login*` routes above. `/mcp` keeps the
 client's header instead.
 
@@ -358,4 +401,5 @@ client's header instead.
 
 Vars: `MAIL_DOMAIN`, `ENGINE_URL`, `FCM_URL`, `PUBLIC_URL`,
 `ALLOWED_ORIGINS`, `FALLBACK_FORWARD`. Secrets: `FIREBASE_CREDENTIALS_JSON`,
-`INTERNAL_TOKEN`.
+`INTERNAL_TOKEN`, `ACCOUNT_TOKEN_SECRET` (signs account tokens; unset, none
+are issued and every token is `token_invalid`; changing it voids them all).

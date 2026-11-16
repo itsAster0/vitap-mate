@@ -517,7 +517,8 @@ pub struct SessionBody {
 }
 
 /// Whose a live session is, as the owner hash the edge files forwarding
-/// addresses under. The session is used for this check only.
+/// addresses under, and the registration number (the edge's account tokens
+/// name it). The session is used for this check only.
 pub async fn owner_check(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -533,10 +534,14 @@ pub async fn owner_check(
         .registration_number(&cookies_only(&body.cookies))
         .await
     {
-        Ok(account) => Ok(Json(
-            json!({ "ownerHash": owner_hash(&state.config.vault_key, &account_id(&account)) }),
-        )
-        .into_response()),
+        Ok(account) => {
+            let account = account_id(&account);
+            Ok(Json(json!({
+                "ownerHash": owner_hash(&state.config.vault_key, &account),
+                "registrationNumber": account,
+            }))
+            .into_response())
+        }
         Err(VerifyError::Expired) => Err(ApiError::new(
             StatusCode::UNAUTHORIZED,
             "session_invalid",
@@ -903,6 +908,7 @@ mod tests {
             body["ownerHash"],
             owner_hash(&state.config.vault_key, "23ABC4567")
         );
+        assert_eq!(body["registrationNumber"], "23ABC4567");
         let (status, _) = post(
             &app,
             "/internal/mail-otp/owner",

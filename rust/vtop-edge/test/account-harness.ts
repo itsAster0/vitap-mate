@@ -20,7 +20,11 @@ export function accountObject(
     engine(new URL(url).pathname, JSON.parse(init.body as string)),
   );
   const env = { ENGINE_URL: "http://engine", INTERNAL_TOKEN: "s", ...vars } as unknown as Env;
-  const ctx = { storage: { sql: db } } as unknown as DurableObjectState;
+  const deleteAll = async () => {
+    const tables = db.exec<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table'").toArray();
+    for (const { name } of tables) db.exec(`DROP TABLE "${name}"`);
+  };
+  const ctx = { storage: { sql: db, deleteAll, deleteAlarm: async () => {} } } as unknown as DurableObjectState;
   const account = new Account(ctx, env);
   return {
     account,

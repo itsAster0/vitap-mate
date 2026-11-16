@@ -1,7 +1,8 @@
 //! The Server page (Settings → Account): what the edge keeps for this student and the phones
 //! linked to the account (`rust/vtop-edge/API.md`, "Accounts — phones"). `/v1/account` sends the
-//! live VTOP session; `/v1/app/*` names the account by registration number. Every call is signed
-//! as this install ([`Core::edge_post`]); cookies are never logged.
+//! account token or the live VTOP session ([`crate::account_token`]); `/v1/app/*` names the
+//! account by registration number. Every call is signed as this install ([`Core::edge_post`]);
+//! cookies are never logged.
 
 use std::sync::OnceLock;
 
@@ -230,10 +231,8 @@ impl Core {
     /// install's registration.
     pub async fn server_status(&self, flow: String) -> Result<ServerStatus, CoreError> {
         traced("server_status", &flow, async {
-            let cookies = self
-                .live_cookies(&flow, "Load what the server keeps for you")
-                .await?;
-            self.status_with(&self.forwarding_server(), &flow, &cookies)
+            let action = "Load what the server keeps for you";
+            self.status_with(&self.forwarding_server(), &flow, action)
                 .await
         })
         .await
@@ -342,9 +341,11 @@ impl Core {
     pub async fn delete_server_account(&self, flow: String) -> Result<(), CoreError> {
         let path = "/v1/account/delete";
         let action = "Delete your account on the server";
-        self.account_op("delete_server_account", Some(action), flow, path, json!({}))
-            .await
-            .map(drop)
+        let deleted = self.account_op("delete_server_account", Some(action), flow, path, json!({}));
+        if deleted.await? {
+            self.forget_account_token();
+        }
+        Ok(())
     }
 
     /// Sets how the server serves sessions (see [`ServerOptions`]).
@@ -448,6 +449,7 @@ impl Core {
                 return Ok(false);
             }
             self.forget_device_id(&server);
+            self.forget_account_token();
             if let Some(id) = mailbox {
                 self.forget_forwarding(&id);
             }
@@ -465,12 +467,11 @@ impl Core {
         &self,
         server: &str,
         flow: &str,
-        cookies: &str,
+        action: &str,
     ) -> Result<ServerStatus, CoreError> {
-        let body = json!({ "session": { "cookies": cookies } });
         let account = self
-            .edge_post(server, "/v1/account", flow, &body)
-            .await
+            .account_post(server, "/v1/account", flow, action, true, json!({}))
+            .await?
             .map_err(refused)?;
         let account: AccountView = serde_json::from_value(account).map_err(unexpected)?;
         // Older servers lack it: the phone's own view then.
@@ -576,28 +577,22 @@ impl Core {
         })
     }
 
-    /// A `/v1/account/*` call with the live session added to `body`, once the student allowed
-    /// it for `action` (asked: `Some`, else only when remembered); false when the server has no
-    /// such route yet.
+    /// A `/v1/account/*` call with the account token or the live session added to `body`, the
+    /// session once the student allowed it for `action` (asked: `Some`, else only when
+    /// remembered); false when the server has no such route yet.
     async fn account_op(
         &self,
         name: &str,
         action: Option<&str>,
         flow: String,
         path: &str,
-        mut body: Value,
+        body: Value,
     ) -> Result<bool, CoreError> {
         traced(name, &flow, async {
             let (why, ask) = (action.unwrap_or(name), action.is_some());
-            let cookies = self
-                .session_cookies(&flow, CookieKind::Account, why, ask)
-                .await?
-                .ok_or(CoreError::NotSignedIn)?;
-            body["session"] = json!({ "cookies": cookies });
-            let answer = self
-                .edge_post(&self.forwarding_server(), path, &flow, &body)
-                .await;
-            let done = supported(answer, path)?;
+            let server = self.forwarding_server();
+            let answer = self.account_post(&server, path, &flow, why, ask, body);
+            let done = supported(answer.await?, path)?;
             if done {
                 info!(path, "server account changed");
             }
@@ -661,7 +656,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
-    use crate::forwarding::tests::{DEVICE_ID, Edge, serve};
+    use crate::forwarding::tests::{DEVICE_ID, Edge, serve, signed_in};
 
     fn core(name: &str) -> Core {
         let dir =
@@ -744,10 +739,9 @@ mod tests {
         can(&edge, "/v1/devices/info", 200, info);
         can(&edge, "/v1/app/status", 200, status);
         can(&edge, "/v1/mail-otp/devices", 200, devices);
-        let status = core
-            .status_with(&server, "f-s", "JSESSIONID=c")
-            .await
-            .unwrap();
+        let core = signed_in(&core.dir, server.clone());
+        let _gate = crate::consent::tests::yes();
+        let status = core.status_with(&server, "f-s", "Load").await.unwrap();
         assert!(status.linked && status.forwarding);
         assert_eq!(
             (
@@ -836,7 +830,9 @@ mod tests {
             200,
             json!({ "registrationNumber": "22BCE0001", "thisPhone": false }),
         );
-        let status = core.status_with(&server, "f", "c=1").await.unwrap();
+        let core = signed_in(&core.dir, server.clone());
+        let _gate = crate::consent::tests::yes();
+        let status = core.status_with(&server, "f", "Load").await.unwrap();
         assert!(!status.linked && status.mailbox.is_none());
         assert_eq!(
             (status.created_at, status.options.clone()),

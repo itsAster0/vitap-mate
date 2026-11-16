@@ -93,6 +93,19 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
   `ConsentDenied`. Calls nobody started (the semester push)
   never ask and send only with the tick. A session request while the
   app is away only posts a notification; tapping it opens the app and asks.
+- **Account token** (`vtop-ffi/src/account_token.rs`, API.md "Account
+  tokens"). After the edge checks the session for an account call
+  (Connected apps, the Server page, mail forwarding), linked phone or not, it
+  answers with a 14-day token naming the student and this install; the
+  student's `Account` object keeps the live token per install and revokes it
+  when the install leaves the account or the forwarding address. It proves
+  who the student is, not that the phone is linked. The app
+  keeps it (`account_token.json`) and sends it in place of the session, so
+  those calls skip the VTOP check and the consent dialog; a refused or
+  expiring token is dropped and the session goes once more. Calls that also
+  send the password, a connected app's session and the routes keep sending
+  the session. Dropped on sign-out, another student, and deleting the
+  server account or this install.
 
 The edge also serves `POST /v1/app/status` (signed by the phone, with the
 registration number, no VTOP cookies): the sealed session's and password's ages,
