@@ -45,11 +45,42 @@
         "In class mode turns on Do Not Disturb while a class is on.",
         "Assistants that support Android's app functions can read your timetable and attendance, on Android 16 and later.",
         "Connected apps pairs the browser extension and makes keys for Claude and other AI apps (MCP).",
-        "Share or print the timetable and grade history as a PDF. Long-press the round button with your initial on either page."
+        "Share or print the timetable and grade history as a PDF. Long-press the round button with your initial on either page.",
+        {
+          "text": "The app asks before your VTOP cookie leaves the phone and says where it goes. Settings lets you turn the question back on.",
+          "since": 3000300
+        }
       ]
     }
   ],
   "releases": [
+    {
+      "version": "3.0.3",
+      "code": 3000300,
+      "summary": "3.0.3 asks before your VTOP cookie leaves the phone, is about 1.9 MB smaller, and makes OTP auto-fill through a forwarding address more reliable.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "Before your VTOP cookie goes to the vitapmate server, the app asks first and says where it goes and what it is used for. Tick Don't ask again for each kind, or turn it back on in Settings.",
+            "Checking your server account no longer sends your VTOP cookie every time. Once VTOP confirms it, this phone stays confirmed for two weeks.",
+            "Connected apps has a button to copy the MCP link, and Make a key by hand for AI apps that take a key instead of signing in.",
+            "After the day's last class, the timetable card shows the day as a track of the classes you had.",
+            "How strongly the app asks you to update now depends on the release: a small pill, Play's update dialog or a full-screen prompt for important fixes."
+          ]
+        },
+        {
+          "title": "Improved",
+          "items": [
+            "The app is about 1.9 MB smaller and starts with less to load.",
+            "The forwarding guide and these notes now load when you open them and stay saved on your phone, so they can be corrected without an app update.",
+            "OTP auto-fill through a forwarding address matches codes by VTOP's clock and keeps waiting while a code is on its way.",
+            "Outing no longer limits the longest trip to 15 days. VTOP decides what it allows.",
+            "The source code link in About opens the right GitHub page."
+          ]
+        }
+      ]
+    },
     {
       "version": "3.0.0",
       "code": 3000000,

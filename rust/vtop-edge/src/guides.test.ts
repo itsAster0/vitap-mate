@@ -25,10 +25,10 @@ type Updates = {
   releases: { version: string; code: number; summary: string; sections: Section[] }[];
 };
 
-/** A versionCode (`M m pp bbb`, from 3000000) for "x.y.z": what `app/module.yaml` gives it. */
+/** The versionCode of "x.y.z" before its build number, as `app/module.yaml` gives them (3.0.2 → 3000200, build 201 → 3000201). */
 const codeOf = (version: string) => {
   const [major, minor, patch] = version.split(".").map(Number);
-  return major * 1_000_000 + minor * 100_000 + patch * 1_000;
+  return major * 1_000_000 + minor * 10_000 + patch * 100;
 };
 
 const read = <T>(name: string): T => JSON.parse(readFileSync(GUIDES + name, "utf8")) as T;
@@ -105,8 +105,8 @@ describe("guides/updates.json", () => {
     const codes = updates.releases.map((r) => r.code);
     for (const release of updates.releases) {
       expect(Number.isInteger(release.code)).toBe(true);
-      // The patch's build digits (bbb) may be set; the version must match the rest.
-      expect(release.code - (release.code % 1_000)).toBe(codeOf(release.version));
+      // The build digits may be set; the version must match the rest.
+      expect(release.code - (release.code % 100)).toBe(codeOf(release.version));
     }
     expect([...codes].sort((a, b) => b - a)).toEqual(codes);
     expect(new Set(codes).size).toBe(codes.length);

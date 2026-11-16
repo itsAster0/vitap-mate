@@ -1,0 +1,8 @@
+3.0.3
+• Asks before your VTOP cookie leaves the phone, with Don't ask again
+• Server account checks no longer resend your cookie every time
+• About 1.9 MB smaller
+• More reliable OTP auto-fill through forwarding
+• Copy the MCP link and make keys by hand in Connected apps
+• Timetable shows the day's classes as a track once they're over
+• Outing: no 15-day limit on the longest trip
