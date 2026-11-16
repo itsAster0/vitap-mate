@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -31,7 +30,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +50,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.composables.icons.lucide.LogIn
+import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -64,6 +64,7 @@ import vitapmate.data.askedOtp
 import vitapmate.data.problemOf
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.ProblemView
 import vitapmate.ui.Space
 
@@ -333,15 +334,14 @@ internal fun VtopScreen() {
     }
 
     if (askRelogin) {
-        AlertDialog(
-            onDismissRequest = { askRelogin = false },
-            title = { Text("Login expired") },
-            text = { Text("VTOP could not restore your session. Try signing in again?") },
-            confirmButton = {
-                TextButton({ askRelogin = false; relogin() }, Modifier.testTag("vtop.relogin.confirm")) { Text("Try again") }
-            },
-            dismissButton = { TextButton({ askRelogin = false }) { Text("Cancel") } },
-            modifier = Modifier.testTag("vtop.relogin.dialog"),
-        )
+        AppDialog(
+            { askRelogin = false },
+            "Login expired",
+            "Try again",
+            { askRelogin = false; relogin() },
+            Modifier.testTag("vtop.relogin.dialog"),
+            icon = Lucide.LogIn,
+            confirmTag = "vtop.relogin.confirm",
+        ) { Text("VTOP could not restore your session. Try signing in again?") }
     }
 }

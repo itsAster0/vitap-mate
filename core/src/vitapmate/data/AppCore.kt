@@ -30,7 +30,7 @@ import vitapmate.observability.flow
 suspend fun <T> coreFlow(name: String, block: suspend (Core, String) -> T): T =
     flow(name) { id -> withContext(Dispatchers.IO) { block(AppCore.await(), id) } }
 
-/** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio, hands Rust OkHttp and the cookie store). */
+/** The one process-wide [Core], created off the main thread at app start (loads the .so, starts tokio, hands Rust the HTTP transport and the cookie store). */
 object AppCore {
     private val core = CompletableDeferred<Core>()
 
@@ -65,7 +65,7 @@ object AppCore {
                 devConfigure(DevConfig(Settings.tunable(Tunable.SessionReuse).toUInt(), Settings.tunable(Tunable.VtopTimeout).toUInt()))
                 val engine = Settings.httpEngine && !Settings.inspectTraffic && Build.VERSION.SDK_INT >= 34
                 setHttpTransport(if (engine) VtopHttpEngine(app) else inspectedHttp(app))
-                Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "okhttp"))
+                Log.info("core", "http transport", fields = mapOf("stack" to if (engine) "httpengine" else "urlconnection"))
                 setUdpNetwork(VtopUdp(app))
                 setCookieGate(CookieConsent)
                 setSharedCookies(VtopCookies)
@@ -85,7 +85,7 @@ object AppCore {
     }
 
     /**
-     * OkHttp for VTOP; with Developer → Inspect Traffic on (from the next launch), through the
+     * [VtopHttp] for VTOP; with Developer → Inspect Traffic on (from the next launch), through the
      * Wi-Fi proxy and trusting the user-installed CAs (the Flutter app's `trafficInspection`).
      * [Settings] must be loaded.
      */

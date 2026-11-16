@@ -68,7 +68,7 @@ class VtopHttpEngine(context: Context) : HttpTransport {
             if (protocols.put(host, info.negotiatedProtocol) != info.negotiatedProtocol) {
                 Log.info("http", "engine protocol", fields = mapOf("host" to host, "protocol" to info.negotiatedProtocol))
             }
-            // As OkHttp: the body is already decoded, so its encoding and length go.
+            // As VtopHttp: the body is already decoded, so its encoding and length go.
             val decoded = whole && info.headers.asList.any { it.key.equals("content-encoding", true) }
             val headers = info.headers.asList
                 .filterNot { decoded && (it.key.equals("content-encoding", true) || it.key.equals("content-length", true)) }

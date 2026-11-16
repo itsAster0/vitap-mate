@@ -6,10 +6,11 @@
 //   and secrets (wrangler.toml is kept for `wrangler dev` and the tests).
 // - Engine: Railway `engine-v2` in the `vitapmate` project, built from
 //   ../Dockerfile.engine.
-// - Gateway: the UDP gateway on the Oracle VPS (robin), built on nest (x86_64,
+// - Gateway: the UDP gateway on the Linode fedora-in-maa (Chennai), built on nest (x86_64,
 //   over NetBird; GATEWAY_BUILDER), pushed to GHCR (public) and run over SSH as
 //   the `vitapmate-gateway` container. GATEWAY_SSH is the Docker host, e.g.
-//   ssh://rocky@robin.
+//   ssh://root@172.232.115.40. Caddy holds UDP 443 there and nginx 50000-50200,
+//   so the gateway takes 3478-3481 (open in the Linode and host firewalls).
 //
 // Not here: the Email Routing rule otp@vmate.aster0.dev → vmate-edge (made in
 // the dashboard; subdomains have no catch-all).
@@ -53,6 +54,11 @@ export const Edge = Cloudflare.Worker("Edge", {
   compatibility: { date: "2026-10-01" },
   domain: DOMAIN,
   workersDev: false,
+  // Public help content (guides/, served under /guides/ by Static Assets). A
+  // request matching a file never runs the Worker, so it skips auth and the
+  // Durable Objects; any other path falls through to the Worker's router.
+  // Cache-Control is in guides/_headers.
+  assets: { directory: "./guides", base: "/guides" },
   observability: {
     enabled: true,
     // The Worker's own log lines only, and 1 request in 20 traced: stored spans and log
@@ -79,13 +85,13 @@ export const Edge = Cloudflare.Worker("Edge", {
   },
 }).pipe(adopt(true));
 
-/** Where the gateway's files live on robin: its Noise keys (./data) and resolvers. */
-const GATEWAY_DIR = "/home/rocky/vitapmate-gateway";
+/** Where the gateway's files live on the Linode: its Noise keys (./data) and resolvers. */
+const GATEWAY_DIR = "/root/vitapmate-gateway";
 
 export const Gateway = Effect.gen(function* () {
-  const robin = yield* Docker.Context("Robin", {
-    name: "robin",
-    docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault("ssh://rocky@robin"))}`,
+  const host = yield* Docker.Context("Linode", {
+    name: "fedora-in-maa",
+    docker: `host=${yield* Config.String("GATEWAY_SSH").pipe(Config.withDefault("ssh://root@172.232.115.40"))}`,
   });
   const builder = yield* Docker.Context("Builder", {
     name: "nest",
@@ -103,7 +109,7 @@ export const Gateway = Effect.gen(function* () {
     build: { context: "..", dockerfile: "Dockerfile.gateway", platform: "linux/amd64" },
   });
   return yield* Docker.Container("Gateway", {
-    context: robin,
+    context: host,
     name: "vitapmate-gateway",
     image,
     // The gateway sees each phone's real address (its Noise sessions are keyed
@@ -117,9 +123,9 @@ export const Gateway = Effect.gen(function* () {
       ENGINE_URL,
       EDGE_URL: `https://${DOMAIN}`,
       INTERNAL_TOKEN: yield* internalToken,
-      UDP_HOST: "140.245.225.49",
+      UDP_HOST: "172.232.115.40",
       BIND: "0.0.0.0",
-      UDP_PORTS: "3478,51820,8443",
+      UDP_PORTS: "3478,3479,3480,3481",
       RUST_LOG: "warn,vtop_gateway=info",
     },
     start: true,

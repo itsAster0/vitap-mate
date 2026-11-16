@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -24,7 +23,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -65,6 +63,7 @@ import vitapmate.data.Docs
 import vitapmate.data.MessMenuFormatException
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.LocalContentPadding
 import vitapmate.ui.Radii
@@ -170,23 +169,31 @@ internal fun DocActions(doc: Doc, scope: CoroutineScope, onDismiss: () -> Unit) 
             var name by remember { mutableStateOf(TextFieldValue(doc.name, TextRange(0, doc.name.length))) }
             val focus = remember { FocusRequester() }
             LaunchedEffect(Unit) { focus.requestFocus() }
-            AlertDialog(
-                onDismissRequest = onDismiss,
-            modifier = Modifier.semantics { testTagsAsResourceId = true },
-                title = { Text("Rename document") },
-                text = { OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth().focusRequester(focus).testTag("docs.rename.field"), singleLine = true) },
-                confirmButton = {
-                    TextButton({ onDismiss(); act("rename") { Docs.rename(doc.id, name.text) } }, Modifier.testTag("docs.rename.save"), enabled = name.text.isNotBlank()) { Text("Save") }
-                },
-                dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-            )
+            AppDialog(
+                onDismiss,
+                "Rename document",
+                "Save",
+                { onDismiss(); act("rename") { Docs.rename(doc.id, name.text) } },
+                confirmEnabled = name.text.isNotBlank(),
+                confirmTag = "docs.rename.save",
+            ) {
+                OutlinedTextField(
+                    name,
+                    { name = it },
+                    Modifier.fillMaxWidth().focusRequester(focus).testTag("docs.rename.field"),
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    singleLine = true,
+                )
+            }
         }
-        "delete" -> AlertDialog(
-            onDismissRequest = onDismiss,
-            modifier = Modifier.semantics { testTagsAsResourceId = true },
-            title = { Text("Delete \"${doc.name}\"?") },
-            confirmButton = { TextButton({ onDismiss(); act("delete") { Docs.remove(doc.id) } }, Modifier.testTag("docs.delete.confirm")) { Text("Delete") } },
-            dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
+        "delete" -> AppDialog(
+            onDismiss,
+            "Delete \"${doc.name}\"?",
+            "Delete",
+            { onDismiss(); act("delete") { Docs.remove(doc.id) } },
+            icon = Lucide.Trash2,
+            danger = true,
+            confirmTag = "docs.delete.confirm",
         )
     }
 }

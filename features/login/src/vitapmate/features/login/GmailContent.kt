@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -22,7 +21,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -48,6 +46,7 @@ import com.composables.icons.lucide.LogIn
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import com.composables.icons.lucide.TriangleAlert
+import com.composables.icons.lucide.Unplug
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -60,6 +59,7 @@ import vitapmate.data.OtpSource
 import vitapmate.data.Settings
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
@@ -130,21 +130,18 @@ internal fun GmailContent() {
     if (account != null) Connected(account) { confirmOff = true } else Setup()
     if (confirmOff) {
         val scope = rememberCoroutineScope()
-        AlertDialog(
-            onDismissRequest = { confirmOff = false },
-            title = { Text("Disconnect Gmail?") },
-            text = { Text("OTPs are no longer read from your Gmail, and the app's access to it is revoked.") },
-            confirmButton = {
-                TextButton(
-                    {
-                        confirmOff = false
-                        scope.launch { flow("gmail.disconnect") { Gmail.disconnect(it) } }
-                    },
-                    Modifier.testTag("gmail.off.confirm"),
-                ) { Text("Disconnect", color = MaterialTheme.colorScheme.error) }
+        AppDialog(
+            { confirmOff = false },
+            "Disconnect Gmail?",
+            "Disconnect",
+            {
+                confirmOff = false
+                scope.launch { flow("gmail.disconnect") { Gmail.disconnect(it) } }
             },
-            dismissButton = { TextButton({ confirmOff = false }) { Text("Cancel") } },
-        )
+            icon = Lucide.Unplug,
+            danger = true,
+            confirmTag = "gmail.off.confirm",
+        ) { Text("OTPs are no longer read from your Gmail, and the app's access to it is revoked.") }
     }
 }
 

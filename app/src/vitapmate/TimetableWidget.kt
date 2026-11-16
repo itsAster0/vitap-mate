@@ -1,48 +1,28 @@
 package vitapmate
 
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.appwidget.AppWidgetProviderInfo
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.os.Build
+import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.format.DateFormat
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.glance.ColorFilter
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
-import androidx.glance.Image
-import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
-import androidx.glance.LocalSize
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.action.actionStartActivity
-import androidx.glance.appwidget.appWidgetBackground
-import androidx.glance.appwidget.cornerRadius
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
-import androidx.glance.background
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Box
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
-import androidx.glance.layout.height
-import androidx.glance.layout.padding
-import androidx.glance.layout.size
-import androidx.glance.layout.width
-import androidx.glance.text.FontWeight
-import androidx.glance.text.Text
-import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
+import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
+import android.util.SizeF
+import android.util.TypedValue
+import android.view.View
+import android.widget.RemoteViews
+import androidx.annotation.ColorRes
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import vitapmate.core.ClassKind
 import vitapmate.core.ClassSlot
 import vitapmate.data.AppCore
@@ -56,13 +36,13 @@ import vitapmate.ui.clock
 import vitapmate.ui.dayLabel
 
 /**
- * Home-screen widget from the cached timetable only (no network), drawn with Glance in the
- * wallpaper's colours: the class on now or next, and at 2+ rows high that class's day (today's
- * classes, or the next class day's once today's are over). Refreshed every 30 min
- * (res/xml/timetable_widget.xml), after a background sync run and when the app goes to the
- * background. Flow `widget.timetable`.
+ * Home-screen widget from the cached timetable only (no network), drawn with RemoteViews
+ * (res/layout/widget_*.xml) in the wallpaper's colours (res/values/widget.xml, with night and v31
+ * copies): the class on now or next, and at 2+ rows high that class's day (today's classes, or the
+ * next class day's once today's are over). Refreshed every 30 min (res/xml/timetable_widget.xml), after a background
+ * sync run and when the app goes to the background. Flow `widget.timetable`.
  */
-object TimetableWidget : GlanceAppWidget() {
+object TimetableWidget {
     /** Below this height (dp) only the class on now or next shows. */
     private const val TALL_DP = 120
 
@@ -73,36 +53,41 @@ object TimetableWidget : GlanceAppWidget() {
     private const val MAX_ROWS = 8
 
     /** Set once the picker's preview is published; renamed when the widget's look changes, so it publishes again. */
-    private const val PREVIEW_SET = "preview_set_glance"
+    private const val PREVIEW_SET = "preview_set_views"
 
     /** The class on now or next and its day's classes (minutes since midnight, India time); [nextDay] names a later day. */
     private class Agenda(val now: Int, val day: List<ClassSlot>, val next: ClassSlot?, val nextDay: String?)
 
-    override val sizeMode = SizeMode.Exact
-
-    /** The picker draws the preview at the widget's 3×2 drop size. */
-    override val previewSizeMode = SizeMode.Responsive(setOf(DpSize(250.dp, 180.dp)))
-
     /** Redraws the placed widgets; on Android 15+ also publishes the picker's preview, once per install. */
     suspend fun refresh(context: Context) {
-        updateAll(context)
+        val manager = AppWidgetManager.getInstance(context)
+        val provider = ComponentName(context, TimetableWidgetReceiver::class.java)
+        val ids = manager.getAppWidgetIds(provider)
+        val h24 = DateFormat.is24HourFormat(context)
+        if (ids.isNotEmpty()) {
+            val agenda = load(context)
+            ids.forEach { manager.updateAppWidget(it, sized(context, manager.getAppWidgetOptions(it)) { w, h -> draw(context, agenda, h24, w, h) }) }
+        }
         val prefs = context.getSharedPreferences("widget", Context.MODE_PRIVATE)
         if (Build.VERSION.SDK_INT < 35 || prefs.getBoolean(PREVIEW_SET, false)) return
-        if (GlanceAppWidgetManager(context).setWidgetPreviews(TimetableWidgetReceiver::class) == GlanceAppWidgetManager.SET_WIDGET_PREVIEWS_RESULT_SUCCESS) {
-            prefs.edit().putBoolean(PREVIEW_SET, true).apply()
-        }
-    }
-
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val agenda = load(context)
-        val h24 = DateFormat.is24HourFormat(context)
-        provideContent { Widget(agenda, h24) }
-    }
-
-    override suspend fun providePreview(context: Context, widgetCategory: Int) {
         fun slot(start: Int, name: String, room: String) = ClassSlot(0, start, start + 50, "", name, ClassKind.THEORY, room, "", "", "", null)
         val today = listOf(slot(540, "Data Structures", "AB1 204"), slot(600, "Operating Systems", "CB 312"), slot(840, "Computer Networks", "AB2 107"))
-        provideContent { Widget(Agenda(560, today, today[0], null), h24 = false) }
+        // The picker draws the preview at the widget's 3×2 drop size.
+        val preview = draw(context, Agenda(560, today, today[0], null), h24 = false, 250f, 180f)
+        if (manager.setWidgetPreview(provider, AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN, preview)) prefs.edit().putBoolean(PREVIEW_SET, true).apply()
+    }
+
+    /** One drawing per size the launcher gives (Android 12+), else landscape and portrait from the min and max sizes. */
+    private fun sized(context: Context, options: Bundle, draw: (Float, Float) -> RemoteViews): RemoteViews {
+        if (Build.VERSION.SDK_INT >= 31) {
+            @Suppress("DEPRECATION") // The typed overload is Android 13+.
+            val sizes = options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+            if (!sizes.isNullOrEmpty()) return RemoteViews(sizes.associateWith { draw(it.width, it.height) })
+        }
+        fun dp(key: String) = options.getInt(key).toFloat()
+        val landscape = draw(dp(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH), dp(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT))
+        val portrait = draw(dp(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH), dp(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT))
+        return RemoteViews(landscape, portrait)
     }
 
     private suspend fun load(context: Context): Agenda? {
@@ -125,134 +110,124 @@ object TimetableWidget : GlanceAppWidget() {
         }.onFailure { Log.warn("widget", "timetable unavailable: ${it::class.simpleName}") }.getOrNull()
     }
 
-    @Composable
-    private fun Widget(agenda: Agenda?, h24: Boolean) = GlanceTheme {
-        val c = GlanceTheme.colors
-        val size = LocalSize.current
-        val open = Intent(LocalContext.current, MainActivity::class.java).putExtra("open", "timetable")
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val root = GlanceModifier.fillMaxSize().appWidgetBackground().cornerRadius(android.R.dimen.system_app_widget_background_radius)
-            .clickable(actionStartActivity(open))
-        val badge = size.width >= BADGE_DP.dp
+    /** The widget at [width] × [height] dp. */
+    private fun draw(context: Context, agenda: Agenda?, h24: Boolean, width: Float, height: Float): RemoteViews {
+        val px = context.resources.displayMetrics.density
+        fun Int.dp() = (this * px).toInt()
+        val badge = width >= BADGE_DP
         val next = agenda?.next
+        val layout = when {
+            next == null -> R.layout.widget_message
+            height < TALL_DP -> R.layout.widget_short
+            else -> R.layout.widget_tall
+        }
+        val v = RemoteViews(context.packageName, layout)
+        val open = Intent(context, MainActivity::class.java).putExtra("open", "timetable")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        v.setOnClickPendingIntent(android.R.id.background, PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+        if (layout != R.layout.widget_tall) {
+            v.setViewVisibility(R.id.widget_badge, if (badge) View.VISIBLE else View.GONE)
+            v.setViewPadding(android.R.id.background, (if (badge) 8 else 14).dp(), 0, 14.dp(), 0)
+        }
         if (next == null) {
-            Row(root.background(c.widgetBackground).padding(start = if (badge) 8.dp else 14.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (badge) Cookie(c.primaryContainer) {
-                    Image(ImageProvider(R.drawable.widget_calendar), null, GlanceModifier.size(22.dp), colorFilter = ColorFilter.tint(c.onPrimaryContainer))
-                }
-                val text = if (agenda == null) "Open Vitap Mate to load your timetable" else "No classes coming up"
-                Text(text, style = TextStyle(c.onSurface, 14.5.sp, FontWeight.Medium), maxLines = 2)
-            }
-            return@GlanceTheme
+            v.setTextViewText(R.id.widget_text, if (agenda == null) "Open Vitap Mate to load your timetable" else "No classes coming up")
+            return v
         }
         val now = agenda.nextDay == null && next.start <= agenda.now
         val label = agenda.nextDay ?: if (now) "Now" else "Next"
         val range = "${clock(next.start, h24)} – ${clock(next.end, h24)}"
-        // The class on now or next in a filled block; its label, room and end inverted on it.
-        val block = c.primary
-        val fg = c.onPrimary
-        val accent = c.onPrimary
-        val onAccent = c.primary
         val ends = if (now) "ends ${clock(next.end, h24)}" else null
-        if (size.height < TALL_DP.dp) {
-            Row(root.background(block).padding(start = if (badge) 8.dp else 14.dp, end = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (badge) Cookie(accent) {
-                    val (time, half) = clock(next.start, h24).split(" ").let { it[0] to it.getOrNull(1) }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(time, style = TextStyle(onAccent, 14.sp, FontWeight.Bold), maxLines = 1)
-                        if (half != null) Text(half, style = TextStyle(onAccent, 9.5.sp, FontWeight.Medium), maxLines = 1)
-                    }
-                }
-                Column {
-                    Text("$label · $range", style = TextStyle(fg, 12.sp, FontWeight.Medium), maxLines = 1)
-                    Text(next.name, style = TextStyle(fg, 16.5.sp, FontWeight.Bold), maxLines = 1)
-                    Chips(next.room, ends, 11.5.sp, c.primaryContainer, c.onPrimaryContainer)
-                }
-            }
-            return@GlanceTheme
+        v.setTextViewText(R.id.widget_name, next.name)
+        chips(v, next.room, ends, if (layout == R.layout.widget_short) 11.5f else 12f)
+        if (layout == R.layout.widget_short) {
+            val (time, half) = clock(next.start, h24).split(" ").let { it[0] to it.getOrNull(1) }
+            v.setTextViewText(R.id.widget_time, time)
+            v.setViewVisibility(R.id.widget_half, if (half != null) View.VISIBLE else View.GONE)
+            v.setTextViewText(R.id.widget_half, half.orEmpty())
+            v.setTextViewText(R.id.widget_label, "$label · $range")
+            return v
         }
-        Column(root.background(c.widgetBackground).padding(8.dp)) {
-            Column(GlanceModifier.fillMaxWidth().cornerRadius(22.dp).background(block).padding(horizontal = 14.dp, vertical = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        label,
-                        GlanceModifier.cornerRadius(12.dp).background(accent).padding(horizontal = 9.dp, vertical = 3.dp),
-                        TextStyle(onAccent, 11.5.sp, FontWeight.Bold),
-                        maxLines = 1,
-                    )
-                    Text(range, GlanceModifier.padding(start = 8.dp), TextStyle(fg, 12.5.sp, FontWeight.Medium), maxLines = 1)
-                }
-                Text(next.name, GlanceModifier.padding(top = 3.dp), TextStyle(fg, 20.sp, FontWeight.Bold), maxLines = 1)
-                Chips(next.room, ends, 12.sp, c.primaryContainer, c.onPrimaryContainer)
+        v.setTextViewText(R.id.widget_label, label)
+        v.setTextViewText(R.id.widget_range, range)
+        v.setTextViewText(R.id.widget_day, agenda.nextDay ?: "Today")
+        val rows = agenda.day.take(MAX_ROWS)
+        v.removeAllViews(R.id.widget_rows)
+        rows.forEachIndexed { i, s ->
+            val row = RemoteViews(context.packageName, R.layout.widget_row)
+            val shape = when {
+                rows.size == 1 -> R.drawable.widget_row_single
+                i == 0 -> R.drawable.widget_row_first
+                i == rows.lastIndex -> R.drawable.widget_row_last
+                else -> R.drawable.widget_row_mid
             }
-            Text(agenda.nextDay ?: "Today", GlanceModifier.padding(start = 10.dp, end = 10.dp, top = 9.dp, bottom = 5.dp), TextStyle(c.onSurfaceVariant, 12.5.sp, FontWeight.Medium))
-            val rows = agenda.day.take(MAX_ROWS)
-            Column(GlanceModifier.fillMaxWidth()) {
-                rows.forEachIndexed { i, s ->
-                    val shape = when {
-                        rows.size == 1 -> R.drawable.widget_row_single
-                        i == 0 -> R.drawable.widget_row_first
-                        i == rows.lastIndex -> R.drawable.widget_row_last
-                        else -> R.drawable.widget_row_mid
-                    }
-                    fun tinted(color: ColorProvider) = GlanceModifier.background(ImageProvider(shape), colorFilter = ColorFilter.tint(color))
-                    val cur = s == next
-                    val past = agenda.nextDay == null && s.end <= agenda.now
-                    // The hero's class: the row over an accent copy of itself, 3 dp in, leaves the accent edge.
-                    Box(GlanceModifier.fillMaxWidth().height(if (i == 0) 31.dp else 33.dp).padding(top = if (i == 0) 0.dp else 2.dp)) {
-                        Row(
-                            (if (cur) tinted(c.primary).padding(start = 3.dp) else GlanceModifier).fillMaxSize(),
-                        ) {
-                            Row(tinted(c.surfaceVariant).fillMaxSize().padding(start = if (cur) 9.dp else 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                // Classes already over drawn fainter, the one on now or next bold.
-                                val muted = if (past) c.outline else c.onSurfaceVariant
-                                Text(clock(s.start, h24), GlanceModifier.width(66.dp), TextStyle(if (cur) c.primary else muted, 12.sp, if (cur) FontWeight.Bold else FontWeight.Medium), maxLines = 1)
-                                Text(
-                                    s.name,
-                                    GlanceModifier.defaultWeight(),
-                                    TextStyle(if (past) c.outline else c.onSurface, 13.5.sp, if (cur) FontWeight.Bold else if (past) FontWeight.Normal else FontWeight.Medium),
-                                    maxLines = 1,
-                                )
-                                if (s.room.isNotEmpty()) Text(s.room, GlanceModifier.padding(start = 10.dp), TextStyle(muted, 12.sp, if (cur) FontWeight.Bold else FontWeight.Normal), maxLines = 1)
-                            }
-                        }
-                    }
-                }
+            val cur = s == next
+            val past = agenda.nextDay == null && s.end <= agenda.now
+            if (i == 0) row.setViewPadding(R.id.widget_row, 0, 0, 0, 0)
+            row.setImageViewResource(R.id.widget_row_fill, shape)
+            if (cur) {
+                row.setImageViewResource(R.id.widget_row_edge, shape)
+                row.setViewVisibility(R.id.widget_row_edge, View.VISIBLE)
+                row.setViewPadding(R.id.widget_row_body, 3.dp(), 0, 0, 0)
+                row.setViewPadding(R.id.widget_row_text, 9.dp(), 0, 12.dp(), 0)
             }
+            // Classes already over drawn fainter, the one on now or next bold.
+            val muted = if (past) R.color.widget_outline else R.color.widget_on_surface_variant
+            row.setTextViewText(R.id.widget_row_time, weighted(clock(s.start, h24), if (cur) BOLD else MEDIUM))
+            row.color(context, R.id.widget_row_time, if (cur) R.color.widget_primary else muted)
+            row.setTextViewText(R.id.widget_row_name, weighted(s.name, if (cur) BOLD else if (past) NORMAL else MEDIUM))
+            row.color(context, R.id.widget_row_name, if (past) R.color.widget_outline else R.color.widget_on_surface)
+            row.setViewVisibility(R.id.widget_row_room, if (s.room.isNotEmpty()) View.VISIBLE else View.GONE)
+            row.setTextViewText(R.id.widget_row_room, weighted(s.room, if (cur) BOLD else NORMAL))
+            row.color(context, R.id.widget_row_room, muted)
+            v.addView(R.id.widget_rows, row)
+        }
+        return v
+    }
+
+    /** The room with a pin (hidden when empty) and [ends] ("ends 2:50 PM", while a class is on), as chips at [size] sp. */
+    private fun chips(v: RemoteViews, room: String, ends: String?, size: Float) {
+        v.setViewVisibility(R.id.widget_chips, if (room.isEmpty() && ends == null) View.GONE else View.VISIBLE)
+        v.setViewVisibility(R.id.widget_room_chip, if (room.isNotEmpty()) View.VISIBLE else View.GONE)
+        v.setViewVisibility(R.id.widget_chip_gap, if (room.isNotEmpty() && ends != null) View.VISIBLE else View.GONE)
+        v.setViewVisibility(R.id.widget_ends, if (ends != null) View.VISIBLE else View.GONE)
+        v.setTextViewText(R.id.widget_room, room)
+        v.setTextViewText(R.id.widget_ends, ends.orEmpty())
+        v.setTextViewTextSize(R.id.widget_room, TypedValue.COMPLEX_UNIT_SP, size)
+        v.setTextViewTextSize(R.id.widget_ends, TypedValue.COMPLEX_UNIT_SP, size)
+    }
+
+    private const val NORMAL = 0
+    private const val MEDIUM = 1
+    private const val BOLD = 2
+
+    /** [text] in a font weight that changes with the row's state (a layout's fixed weights are in its XML). */
+    private fun weighted(text: String, weight: Int): CharSequence = SpannableString(text).apply {
+        when (weight) {
+            BOLD -> setSpan(StyleSpan(Typeface.BOLD), 0, length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            MEDIUM -> setSpan(TypefaceSpan("sans-serif-medium"), 0, length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
         }
     }
 
-    /** The 54 dp scalloped badge in [fill], with [content] on it. */
-    @Composable
-    private fun Cookie(fill: ColorProvider, content: @Composable () -> Unit) {
-        Box(
-            GlanceModifier.size(54.dp).background(ImageProvider(R.drawable.widget_cookie), colorFilter = ColorFilter.tint(fill)),
-            contentAlignment = Alignment.Center,
-        ) { content() }
-        Spacer(GlanceModifier.width(10.dp))
-    }
-
-    /** The room with a pin (hidden when empty) and [ends] ("ends 2:50 PM", while a class is on), as chips in [fill]. */
-    @Composable
-    private fun Chips(room: String, ends: String?, size: TextUnit, fill: ColorProvider, color: ColorProvider) {
-        if (room.isEmpty() && ends == null) return
-        val chip = GlanceModifier.cornerRadius(10.dp).background(fill).padding(horizontal = 7.dp, vertical = 2.dp)
-        Row(GlanceModifier.padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (room.isNotEmpty()) {
-                Row(chip, verticalAlignment = Alignment.CenterVertically) {
-                    Image(ImageProvider(R.drawable.widget_pin), null, GlanceModifier.size(12.dp), colorFilter = ColorFilter.tint(color))
-                    Text(room, GlanceModifier.padding(start = 4.dp), TextStyle(color, size, FontWeight.Medium), maxLines = 1)
-                }
-            }
-            if (ends != null) {
-                if (room.isNotEmpty()) Spacer(GlanceModifier.width(5.dp))
-                Text(ends, chip, TextStyle(color, size, FontWeight.Medium), maxLines = 1)
-            }
-        }
+    /** [id]'s text colour from [color]; resolved by the launcher on Android 12+, so it follows light and dark mode. */
+    private fun RemoteViews.color(context: Context, id: Int, @ColorRes color: Int) {
+        if (Build.VERSION.SDK_INT >= 31) setColor(id, "setTextColor", color) else setTextColor(id, context.getColor(color))
     }
 }
 
-/** Registered in the app's manifest with res/xml/timetable_widget.xml. */
-class TimetableWidgetReceiver : GlanceAppWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = TimetableWidget
+/** Registered in the app's manifest with res/xml/timetable_widget.xml; draws off the main thread. */
+class TimetableWidgetReceiver : AppWidgetProvider() {
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) = redraw(context)
+
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, id: Int, options: Bundle) = redraw(context)
+
+    private fun redraw(context: Context) {
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                TimetableWidget.refresh(context.applicationContext)
+            } finally {
+                pending.finish()
+            }
+        }
+    }
 }

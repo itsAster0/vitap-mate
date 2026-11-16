@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "title": "Set up forwarding",
+  "subtitle": "About 2 minutes in Gmail, once",
+  "blocks": [
+    {
+      "type": "callout",
+      "icon": "mail-check",
+      "tone": "lab",
+      "text": "Do this in Gmail on a computer, or in Chrome's desktop site. The Gmail app has no forwarding settings."
+    },
+    {
+      "type": "step",
+      "title": "Add your address in Gmail",
+      "body": "Copy your address from the app. In the Gmail where VTOP's mail arrives, open Settings → See all settings → Forwarding and POP/IMAP, tap Add a forwarding address, paste it, then Next → Proceed → OK. On a phone, use Chrome with ⋮ → Desktop site.",
+      "image": "forwarding/1-add.webp"
+    },
+    {
+      "type": "step",
+      "title": "Confirm it",
+      "body": "Gmail now shows Verify next to your address. Its confirmation mail comes to the app, not your inbox: tap Check, then Confirm in Gmail, or type the code into Gmail's Verify box. Leave \"Disable forwarding\" selected, so only the filter forwards mail.",
+      "image": "forwarding/2-verify.webp"
+    },
+    {
+      "type": "step",
+      "title": "Reload Gmail",
+      "body": "After confirming, reload the Gmail page before you make the filter. Without a reload, the filter has no address to forward to and shows only Add forwarding address, like this.",
+      "callout": {
+        "icon": "refresh-cw",
+        "tone": "warning",
+        "text": "Reload first, or Gmail won't list your address in the filter."
+      },
+      "image": "forwarding/4-noreload.webp",
+      "caption": "Before reloading: no address to pick"
+    },
+    {
+      "type": "step",
+      "title": "Create the filter",
+      "body": "Open Filters and Blocked Addresses → Create a new filter. Put {sender} in From, then tap Create filter.",
+      "image": "forwarding/3-from.webp"
+    },
+    {
+      "type": "step",
+      "title": "Forward it to your address",
+      "body": "Tick Forward it to and pick your address. Mark as read keeps the OTP mails out of your unread count. Then tap Create filter.",
+      "image": "forwarding/5-forward.webp"
+    },
+    {
+      "type": "step",
+      "title": "Done",
+      "body": "The filter shows in the list. Back in the app, tap Check: the next VTOP OTP fills in by itself. Mail sent before the filter isn't forwarded.",
+      "image": "forwarding/6-done.webp"
+    }
+  ]
+}

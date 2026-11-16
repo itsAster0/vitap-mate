@@ -12,7 +12,19 @@ dir = "rust"
 run = [
   # API 28 = the app's minSdk (ATrace needs 23+). armeabi-v7a: budget phones with a 64-bit
   # chip on 32-bit Android (Redmi 9A/9i/9C, Galaxy A13/A03), which Play hides 64-bit-only apps from.
-  "cargo ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs build --release -p vtop-ffi",
+  # The .so builds std from source on a pinned nightly (needs rust-src), smaller by
+  # building std for size and dropping panic messages, file:line:col in panics and
+  # derived Debug fields (`shallow` keeps the variant names; `none` would blank the logs,
+  # since obs.rs formats every tracing field, the message too, with {:?}). Unwind tables stay.
+  # The flags are per Android target and live only in this step: host builds and the
+  # server stay on stable.
+  "rustup run nightly-2026-11-01 rustc --version >/dev/null 2>&1 || rustup toolchain install nightly-2026-11-01 --profile minimal --component rust-src --target aarch64-linux-android,armv7-linux-androideabi",
+  '''
+  f="-Zlocation-detail=none -Zfmt-debug=shallow -Zunstable-options -Cpanic=immediate-abort"
+  CARGO_TARGET_AARCH64_LINUX_ANDROID_RUSTFLAGS="$f" CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_RUSTFLAGS="$f" \
+    cargo +nightly-2026-11-01 ndk -t arm64-v8a -t armeabi-v7a -P 28 -o ../app/jniLibs \
+    build --release -p vtop-ffi -Zbuild-std=std,panic_abort
+  ''',
   # Bindgen reads the metadata from a host build: the stripped Android .so
   # keeps only dynamic symbols, which bindgen does not read. Same API.
   # The host library is .dylib on macOS, .so on Linux (CI).
@@ -82,7 +94,8 @@ prop() { sed -n "s/^$1=//p" app/keystore.properties; }
 # The build holds both ABIs (the AAB needs them); each APK keeps one, so neither carries the other's libraries.
 apk() {
   cp "$tmp/en.apk" "$tmp/$1.apk"
-  zip -qd "$tmp/$1.apk" "lib/$2/*"
+  # The build's own v1 (JAR) signature: minSdk 28 needs only the v2+ signature apksigner adds.
+  zip -qd "$tmp/$1.apk" "lib/$2/*" 'META-INF/MANIFEST.MF' 'META-INF/*.SF' 'META-INF/*.RSA'
   "$tools/zipalign" -P 16 -f 4 "$tmp/$1.apk" "$tmp/$1-aligned.apk"
   STORE_PASS="$(prop storePassword)" KEY_PASS="$(prop keyPassword)" "$tools/apksigner" sign \
     --ks "$(prop storeFile)" --ks-key-alias "$(prop keyAlias)" \

@@ -31,7 +31,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -43,7 +42,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,6 +93,7 @@ import vitapmate.data.problemOf
 import vitapmate.features.login.ago
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Button
 import vitapmate.ui.ButtonVariant
@@ -218,18 +217,17 @@ fun ConnectedAppsScreen() {
     }
 
     moving?.let { phone ->
-        AlertDialog(
-            onDismissRequest = { moving = null },
-            title = { Text("Move ${keys(phone)} to this phone?") },
-            text = { Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}." + if (phone.id != null) " ${phone.label ?: "The other phone"} is unlinked from your account; it can link again." else "") },
-            confirmButton = {
-                TextButton({
-                    moving = null
-                    change("Move keys", "move", "Keys moved") { c, f -> c.moveKeys(f, phone.id) }
-                }, Modifier.testTag("connected_apps.move.confirm")) { Text("Move") }
+        AppDialog(
+            { moving = null },
+            "Move ${keys(phone)} to this phone?",
+            "Move",
+            {
+                moving = null
+                change("Move keys", "move", "Keys moved") { c, f -> c.moveKeys(f, phone.id) }
             },
-            dismissButton = { TextButton({ moving = null }) { Text("Cancel") } },
-        )
+            icon = Lucide.Smartphone,
+            confirmTag = "connected_apps.move.confirm",
+        ) { Text("This phone will answer for ${if (phone.keys == 1u) "it" else "them"}." + if (phone.id != null) " ${phone.label ?: "The other phone"} is unlinked from your account; it can link again." else "") }
     }
     if (pairing) PairSheet(onDone = { pairing = false; load() }, onDismiss = { pairing = false })
     if (newMcp) NewMcpSheet(onDone = { load() }, onDismiss = { newMcp = false })
@@ -520,28 +518,25 @@ private fun KeySheet(key: AccessKey, onChanged: () -> Unit, onDismiss: () -> Uni
     }
 
     if (confirmRevoke) {
-        AlertDialog(
-            onDismissRequest = { confirmRevoke = false },
-            title = { Text("Revoke ${key.label}?") },
-            text = { Text("It stops working at once. To use it again, pair the browser or make a new key.") },
-            confirmButton = {
-                TextButton(
-                    {
-                        confirmRevoke = false
-                        scope.launch {
-                            busy = true
-                            run("revoke") { c, f -> c.revokeKey(f, key.id) }.onSuccess {
-                                haptics.confirm()
-                                showToast("Key revoked", "${key.label} no longer works.")
-                                onChanged()
-                            }
-                            busy = false
-                        }
-                    },
-                    Modifier.testTag("connected_apps.revoke.confirm"),
-                ) { Text("Revoke", color = MaterialTheme.colorScheme.error) }
+        AppDialog(
+            { confirmRevoke = false },
+            "Revoke ${key.label}?",
+            "Revoke",
+            {
+                confirmRevoke = false
+                scope.launch {
+                    busy = true
+                    run("revoke") { c, f -> c.revokeKey(f, key.id) }.onSuccess {
+                        haptics.confirm()
+                        showToast("Key revoked", "${key.label} no longer works.")
+                        onChanged()
+                    }
+                    busy = false
+                }
             },
-            dismissButton = { TextButton({ confirmRevoke = false }) { Text("Cancel") } },
-        )
+            icon = Lucide.Trash2,
+            danger = true,
+            confirmTag = "connected_apps.revoke.confirm",
+        ) { Text("It stops working at once. To use it again, pair the browser or make a new key.") }
     }
 }

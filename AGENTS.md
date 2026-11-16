@@ -31,7 +31,7 @@ rust/                 Cargo workspace
   vtop-core/          VTOP client that runs vtop-proto's machines over a Transport
   vtop-shared/        formats the app, engine and edge share (device_sig, mail_seal, page_dictionary)
   vtop-wire/          vm1, Noise IK over UDP for slow, lossy links
-  vtop-gateway/       UDP gateway on the Oracle VPS robin
+  vtop-gateway/       UDP gateway on the Linode fedora-in-maa
   vtop-bridge/        the engine: sign-in, CAPTCHA, fetch and parse; Railway service engine-v2
   vtop-mcp/           MCP tools the engine serves behind the edge's /mcp
   vtop-edge/          Cloudflare Worker and Durable Objects (TypeScript), all server state
@@ -115,10 +115,10 @@ cd extension && bun run test && bun run build
 Deploy only when asked, and only from a laptop: CI builds the app and the
 extension but deploys nothing. `bun run deploy` in `rust/vtop-edge/` deploys the
 edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway `engine-v2`,
-`Dockerfile.engine`) and the UDP gateway (pushed to GHCR, run on robin as the
+`Dockerfile.engine`) and the UDP gateway (pushed to GHCR, run on the Linode as the
 container `vitapmate-gateway`) from `alchemy.run.ts`, with the values in its
 `.env.example`. The gateway needs `GHCR_TOKEN` (a GitHub token with
-`write:packages`) and `GATEWAY_SSH=ssh://rocky@robin`; `SKIP_GATEWAY=1` deploys
+`write:packages`) and `GATEWAY_SSH=ssh://root@172.232.115.40`; `SKIP_GATEWAY=1` deploys
 without it. The README lists the CI workflows.
 
 Never print or commit `.env*` files (`extension/.env` is the one tracked
@@ -133,8 +133,10 @@ the AAB. To release:
 1. Raise `versionCode` and `versionName` in `app/module.yaml`. Codes follow
    `M m pp bbb` from 3000000 (3.0.0); Play refuses a code it has seen.
 2. Write `fastlane/metadata/android/en-GB/changelogs/<versionCode>.txt` (at most
-   500 characters) and add the version to `RELEASES` in
-   `app/src/vitapmate/UpdatesScreen.kt`.
+   500 characters) and add the version with its `code` to `releases` (newest
+   first) in `rust/vtop-edge/guides/updates.json`; give features it adds
+   `"since": <versionCode>`, so older apps leave them out. Then `bun run
+   deploy` there.
 3. Push the tag `v<versionName>`. `android-release.yml` builds the signed AAB
    (64-bit and 32-bit) and uploads it to the internal track.
 4. Promote in the Play Console, or with `bundle exec fastlane android

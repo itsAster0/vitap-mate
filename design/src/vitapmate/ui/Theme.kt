@@ -95,7 +95,6 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), palette: Palette? = Palette.
         else dynamicDarkColorScheme(context).let { if (pureBlack) it.copy(background = Color.Black, surface = Color.Black, surfaceContainerLowest = Color.Black) else it }
         else -> remember(dark, chosen, pureBlack) { appColorScheme(dark, chosen, pureBlack) }
     }
-    val accent = if (wallpaper) scheme.primary else chosen.accent
     val inter = rememberInter()
     val type = remember(inter) { AppType(inter) }
     val typography = remember(inter) { appTypography(inter) }
@@ -103,7 +102,7 @@ fun AppTheme(dark: Boolean = isSystemInDarkTheme(), palette: Palette? = Palette.
     MaterialExpressiveTheme(scheme, MotionScheme.expressive(), AppShapes, typography) {
         CompositionLocalProvider(
             LocalColors provides remember(scheme, dark) { AppColors.of(scheme, dark) },
-            LocalPalette provides remember(scheme, dark, accent) { AppPalette.of(scheme, dark, accent) },
+            LocalPalette provides remember(scheme, dark, chosen, wallpaper) { if (wallpaper) AppPalette.wallpaper(scheme, dark, context) else AppPalette.of(scheme, dark, chosen) },
             LocalType provides type,
             LocalSnackbar provides snackbar,
             LocalContentColor provides scheme.onBackground,

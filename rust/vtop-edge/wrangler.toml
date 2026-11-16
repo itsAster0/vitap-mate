@@ -1,6 +1,7 @@
 # The Cloudflare edge, in TypeScript.
 # Deployed with Alchemy (alchemy.run.ts: `bun run deploy`); this file is kept
-# for `wrangler dev` and the tests. Keep the two in step.
+# for `wrangler dev` and the tests. Keep the two in step. (Not mirrored: the
+# guides/ static assets, which Alchemy serves under /guides/ with `base`.)
 # Secrets (wrangler secret put):
 #   FIREBASE_CREDENTIALS_JSON  service account for FCM (same as the engine)
 #   INTERNAL_TOKEN             shared with the engine and the UDP gateway:

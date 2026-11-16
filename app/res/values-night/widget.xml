@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget's colours (dark, below Android 12: Material 3 baseline), as Glance's GlanceTheme had them. -->
+<resources>
+  <color name="widget_primary">#ffd0bcff</color>
+  <color name="widget_on_primary">#ff381e72</color>
+  <color name="widget_primary_container">#ff4f378b</color>
+  <color name="widget_on_primary_container">#ffeaddff</color>
+  <color name="widget_surface_variant">#ff49454f</color>
+  <color name="widget_on_surface_variant">#ffcac4d0</color>
+  <color name="widget_on_surface">#ffe6e1e5</color>
+  <color name="widget_outline">#ff938f99</color>
+  <color name="widget_background">#ff20333d</color>
+</resources>

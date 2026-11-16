@@ -12,7 +12,9 @@ dependencies:
   - com.composables:icons-lucide-cmp:2.2.1: exported
   # The Photo Picker for the avatar (already the app's; no storage permission).
   - androidx.activity:activity-compose:1.13.0
-  # Material colour schemes and tonal palettes from seed colours (HCT).
+
+test-dependencies:
+  # ColorTablesTest works out ColorTables.kt with it; the app doesn't ship it.
   - com.materialkolor:material-kolor:5.0.1
 
 settings:

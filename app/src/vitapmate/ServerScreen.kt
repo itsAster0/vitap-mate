@@ -20,14 +20,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,6 +73,7 @@ import vitapmate.features.login.OtpAutofill
 import vitapmate.features.login.ago
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.ConnectedChoice
 import vitapmate.ui.Pips
@@ -360,32 +359,29 @@ fun ServerScreen() {
     }
 
     pending?.let { p ->
-        AlertDialog(
-            onDismissRequest = { pending = null },
-            title = { Text(p.title) },
-            text = { Text(p.text) },
-            confirmButton = {
-                TextButton(
-                    {
-                        pending = null
-                        scope.launch {
-                            run(p.name, p.call).onSuccess { done ->
-                                if (!done) {
-                                    unsupported = unsupported + p.name
-                                    showToast("Server", "The server doesn't offer this yet.")
-                                    return@onSuccess
-                                }
-                                haptics.confirm()
-                                showToast("Server", p.done)
-                                if (p.name == "remove_device") { removed = true; status = null } else load()
-                            }.onFailure { haptics.reject() }
+        AppDialog(
+            { pending = null },
+            p.title,
+            p.confirm,
+            {
+                pending = null
+                scope.launch {
+                    run(p.name, p.call).onSuccess { done ->
+                        if (!done) {
+                            unsupported = unsupported + p.name
+                            showToast("Server", "The server doesn't offer this yet.")
+                            return@onSuccess
                         }
-                    },
-                    Modifier.testTag("server.confirm"),
-                ) { Text(p.confirm, color = MaterialTheme.colorScheme.error) }
+                        haptics.confirm()
+                        showToast("Server", p.done)
+                        if (p.name == "remove_device") { removed = true; status = null } else load()
+                    }.onFailure { haptics.reject() }
+                }
             },
-            dismissButton = { TextButton({ pending = null }) { Text("Cancel") } },
-        )
+            icon = Lucide.TriangleAlert,
+            danger = true,
+            confirmTag = "server.confirm",
+        ) { Text(p.text) }
     }
 }
 

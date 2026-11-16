@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -44,76 +48,80 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.ArrowLeft
+import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MailCheck
 import com.composables.icons.lucide.RefreshCw
+import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.X
-import login.generated.resources.Res
-import login.generated.resources.forwarding_guide_1_add
-import login.generated.resources.forwarding_guide_2_verify
-import login.generated.resources.forwarding_guide_3_from
-import login.generated.resources.forwarding_guide_4_noreload
-import login.generated.resources.forwarding_guide_5_forward
-import login.generated.resources.forwarding_guide_6_done
-import org.jetbrains.compose.resources.DrawableResource
-import org.jetbrains.compose.resources.painterResource
 import vitapmate.ui.AppTheme
+import org.json.JSONObject
 import vitapmate.ui.AppTopBar
+import vitapmate.ui.ProblemView
+import vitapmate.ui.Tone
+import vitapmate.ui.Tones
+import vitapmate.ui.rememberGuide
+import vitapmate.ui.rememberGuideImage
 import vitapmate.ui.Space
 
-/** One guide step: what to do, then Gmail's screen for it (the student's address blurred). */
-private class GuideStep(val title: String, val body: String, val shot: DrawableResource, val caption: String? = null)
+/** A note in a [tone] ("lab", "warning", ...) with an [icon] ("mail-check", ...), as the edge names them. */
+private class Note(val icon: String, val tone: String, val text: String)
+
+/** One guide step: what to do, maybe a [note], then Gmail's screen for it (the student's address blurred). */
+private class GuideStep(val title: String, val body: String, val note: Note?, val shot: String?, val caption: String?)
+
+/** `guides/forwarding.json` on the edge: notes and steps in order; `{sender}` stands for VTOP's OTP sender. */
+private class Forwarding(val title: String, val subtitle: String, val blocks: List<Any>)
+
+private fun JSONObject.note() = Note(getString("icon"), getString("tone"), getString("text"))
+
+private fun JSONObject.string(key: String) = optString(key).takeIf { has(key) && !isNull(key) }
+
+private fun forwarding(json: JSONObject, sender: String): Forwarding {
+    val blocks = json.getJSONArray("blocks")
+    // Block types this app doesn't know are skipped (API.md).
+    return Forwarding(json.getString("title"), json.getString("subtitle"), (0 until blocks.length()).map(blocks::getJSONObject).mapNotNull { b ->
+        when (b.getString("type")) {
+            "callout" -> b.note()
+            "step" -> GuideStep(b.getString("title"), b.getString("body").replace("{sender}", sender), b.optJSONObject("callout")?.note(), b.string("image"), b.string("caption"))
+            else -> null
+        }
+    })
+}
+
+private fun icon(name: String): ImageVector = when (name) {
+    "mail-check" -> Lucide.MailCheck
+    "refresh-cw" -> Lucide.RefreshCw
+    "triangle-alert" -> Lucide.TriangleAlert
+    else -> Lucide.Info
+}
+
+private fun Tones.named(name: String): Tone = when (name) {
+    "lab" -> lab
+    "warning" -> warning
+    "success" -> success
+    "danger" -> danger
+    else -> accentTone
+}
 
 /**
  * Mail forwarding, step by step with Gmail's screens: a full-screen page over the OTP auto-fill
- * sheet. [sender] is VTOP's OTP sender for the filter. Test tag `forwarding.guide`.
+ * sheet, its text and screenshots read from the edge ([rememberGuide]). [sender] is VTOP's OTP
+ * sender for the filter. Test tag `forwarding.guide`.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ForwardingGuide(sender: String, onClose: () -> Unit) {
-    val steps = listOf(
-        GuideStep(
-            "Add your address in Gmail",
-            "Copy your address from the app. In the Gmail where VTOP's mail arrives, open Settings → See all settings → Forwarding and POP/IMAP, " +
-                "tap Add a forwarding address, paste it, then Next → Proceed → OK. On a phone, use Chrome with ⋮ → Desktop site.",
-            Res.drawable.forwarding_guide_1_add,
-        ),
-        GuideStep(
-            "Confirm it",
-            "Gmail now shows Verify next to your address. Its confirmation mail comes to the app, not your inbox: tap Check, then Confirm in Gmail, " +
-                "or type the code into Gmail's Verify box. Leave \"Disable forwarding\" selected, so only the filter forwards mail.",
-            Res.drawable.forwarding_guide_2_verify,
-        ),
-        GuideStep(
-            "Reload Gmail",
-            "After confirming, reload the Gmail page before you make the filter. Without a reload, the filter has no address to forward to and shows only Add forwarding address, like this.",
-            Res.drawable.forwarding_guide_4_noreload,
-            "Before reloading: no address to pick",
-        ),
-        GuideStep(
-            "Create the filter",
-            "Open Filters and Blocked Addresses → Create a new filter. Put $sender in From, then tap Create filter.",
-            Res.drawable.forwarding_guide_3_from,
-        ),
-        GuideStep(
-            "Forward it to your address",
-            "Tick Forward it to and pick your address. Mark as read keeps the OTP mails out of your unread count. Then tap Create filter.",
-            Res.drawable.forwarding_guide_5_forward,
-        ),
-        GuideStep(
-            "Done",
-            "The filter shows in the list. Back in the app, tap Check: the next VTOP OTP fills in by itself. Mail sent before the filter isn't forwarded.",
-            Res.drawable.forwarding_guide_6_done,
-        ),
-    )
+    val guide = rememberGuide("forwarding.json") { forwarding(it, sender) }
+    val tones = AppTheme.tones
     Dialog(onClose, DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
         Scaffold(
             Modifier.fillMaxSize().nestedScroll(scroll.nestedScrollConnection).testTag("forwarding.guide"),
             topBar = {
                 AppTopBar(
-                    "Set up forwarding",
-                    subtitle = "About 2 minutes in Gmail, once",
+                    guide.value?.title ?: "Set up forwarding",
+                    subtitle = guide.value?.subtitle,
                     scrollBehavior = scroll,
                     navigationIcon = { IconButton(onClose, Modifier.testTag("forwarding.guide.close")) { Icon(Lucide.ArrowLeft, "Back") } },
                 )
@@ -129,15 +137,25 @@ internal fun ForwardingGuide(sender: String, onClose: () -> Unit) {
                 ),
                 verticalArrangement = Arrangement.spacedBy(Space.lg),
             ) {
-                item {
-                    Callout(Lucide.MailCheck, AppTheme.tones.lab, "Do this in Gmail on a computer, or in Chrome's desktop site. The Gmail app has no forwarding settings.")
+                val value = guide.value
+                if (value == null) {
+                    item {
+                        Box(Modifier.fillMaxWidth().padding(Space.xl), Alignment.Center) {
+                            guide.problem?.let { ProblemView(it, guide.retry.takeIf { _ -> it.retryable }) } ?: LoadingIndicator()
+                        }
+                    }
+                    return@LazyColumn
                 }
-                steps.forEachIndexed { i, step ->
+                val numbers = value.blocks.runningFold(0) { n, b -> if (b is GuideStep) n + 1 else n }.drop(1)
+                value.blocks.forEachIndexed { i, block ->
                     item(key = i) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                            Step(i + 1, step.title, null, null, tag = "forwarding.guide", last = true) { step.body }
-                            if (i == 2) Callout(Lucide.RefreshCw, AppTheme.tones.warning, "Reload first, or Gmail won't list your address in the filter.")
-                            Screenshot(step.shot, step.caption)
+                        if (block is Note) Callout(icon(block.icon), tones.named(block.tone), block.text)
+                        if (block is GuideStep) {
+                            Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                                Step(numbers[i], block.title, null, null, tag = "forwarding.guide", last = true) { block.body }
+                                block.note?.let { Callout(icon(it.icon), tones.named(it.tone), it.text) }
+                                block.shot?.let { Screenshot(it, block.caption) }
+                            }
                         }
                     }
                 }
@@ -147,13 +165,14 @@ internal fun ForwardingGuide(sender: String, onClose: () -> Unit) {
 }
 
 @Composable
-private fun Screenshot(shot: DrawableResource, caption: String?) {
+private fun Screenshot(path: String, caption: String?) {
+    val shot = rememberGuideImage(path) ?: return
     val scheme = MaterialTheme.colorScheme
     val shape = MaterialTheme.shapes.large
     var open by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(start = 42.dp), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
         Image(
-            painterResource(shot),
+            shot,
             caption ?: "Gmail screen for this step",
             Modifier.fillMaxWidth().clip(shape).border(1.dp, scheme.outlineVariant, shape)
                 .clickable(onClickLabel = "Open the screenshot") { open = true }.testTag("forwarding.guide.shot"),
@@ -166,13 +185,13 @@ private fun Screenshot(shot: DrawableResource, caption: String?) {
 
 /** A screenshot full screen: pinch to zoom and drag to pan, double tap to zoom in or back out. */
 @Composable
-private fun ShotViewer(shot: DrawableResource, onClose: () -> Unit) {
+private fun ShotViewer(shot: ImageBitmap, onClose: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     Dialog(onClose, DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim).testTag("forwarding.guide.viewer")) {
             Image(
-                painterResource(shot),
+                shot,
                 "Screenshot",
                 Modifier.fillMaxSize()
                     .pointerInput(Unit) {

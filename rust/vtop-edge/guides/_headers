@@ -1,0 +1,4 @@
+# Static Assets header rules (not uploaded as a file). Phones keep a copy and
+# revalidate with the asset ETag (If-None-Match → 304).
+/guides/*
+  Cache-Control: public, max-age=3600

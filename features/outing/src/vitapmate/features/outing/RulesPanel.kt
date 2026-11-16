@@ -37,9 +37,10 @@ import vitapmate.ui.heroCookie
 import vitapmate.ui.nums
 
 /**
- * The form's rules as a header card (the accent fill while open): the facts in joined tiles, two
- * a row (a small label over a short value), and a full-width New request. While VTOP takes no
- * applications: a neutral card saying so, with VTOP's [notice], and the button off.
+ * The form's rules as a header card (the accent fill while open): the facts as a joined block
+ * (a small label over a short value, two to a row, an odd last one filling its row), and a full-width New
+ * request. While VTOP takes no applications: a neutral card saying so, with VTOP's [notice], and
+ * the button off.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -68,20 +69,20 @@ internal fun RulesPanel(open: Boolean, notice: String, facts: List<OutingFact>, 
             Spacer(Modifier.height(Space.md))
         }
         if (facts.isNotEmpty()) {
+            // Two to a row; an odd last one fills its row.
             Column(Modifier.clip(MaterialTheme.shapes.large), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                 facts.chunked(2).forEach { row ->
                     Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                         row.forEach { fact ->
                             Column(
                                 Modifier.weight(1f).fillMaxHeight()
-                                    .background(AppTheme.colors.card, ListItemDefaults.segmentedShapes(1, 3).shape)
-                                    .padding(horizontal = Space.md, vertical = 10.dp),
+                                    .background(AppTheme.colors.card, MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
                             ) {
                                 Text(fact.label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
                                 Text(fact.value, style = MaterialTheme.typography.titleSmall.nums())
                             }
                         }
-                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
             }

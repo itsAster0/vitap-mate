@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
@@ -19,17 +20,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.BookOpen
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.FlaskConical
-import com.composables.icons.lucide.GraduationCap
 import com.composables.icons.lucide.Lucide
 import vitapmate.core.CourseGroup
 import vitapmate.core.CoursePart
@@ -38,18 +40,30 @@ import vitapmate.ui.SectionCard
 import vitapmate.ui.Space
 import vitapmate.ui.tappable
 
+/** Words a course's monogram skips. */
+private val MINOR_WORDS = setOf("and", "of", "the", "to", "in", "for")
+
 /**
- * A shaped mark, the course code over its title, and one joined row of tonal buttons, one per
- * part (lab in the lab tone): small inner corners, large outer ones.
+ * The course's monogram on a shape and tint picked from its code (the same pairing every time),
+ * the code over its title, and one joined row of tonal buttons, one per part (lab in the lab
+ * tone): small inner corners, fully rounded outer ends.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun CourseCard(group: CourseGroup, onOpen: (CoursePart) -> Unit, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    SectionCard(modifier.fillMaxWidth()) {
+    val tones = AppTheme.tones
+    val pick = group.code.hashCode()
+    val mark = listOf(MaterialShapes.Cookie7Sided, MaterialShapes.Clover4Leaf, MaterialShapes.Sunny, MaterialShapes.Cookie6Sided)[pick.mod(4)]
+    val markTone = listOf(tones.accentTone, tones.lab, tones.success, tones.warning)[(pick / 4).mod(4)]
+    val monogram = remember(group.title) {
+        group.title.split(Regex("[^\\p{L}\\p{N}]+")).filter { it.isNotEmpty() && it.lowercase() !in MINOR_WORDS }.take(2).joinToString("") { it.take(1).uppercase() }
+    }
+    SectionCard(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).background(scheme.secondaryContainer, MaterialShapes.Cookie7Sided.toShape()), Alignment.Center) {
-                Icon(Lucide.GraduationCap, null, Modifier.size(20.dp), tint = scheme.onSecondaryContainer)
+            // Decorative: the title next to it is what a screen reader reads.
+            Box(Modifier.size(46.dp).background(markTone.subtle, mark.toShape()).clearAndSetSemantics {}, Alignment.Center) {
+                Text(monogram, style = MaterialTheme.typography.labelLargeEmphasized, color = markTone.onSubtle, maxLines = 1)
             }
             Spacer(Modifier.width(Space.md))
             Column(Modifier.weight(1f)) {
@@ -58,7 +72,7 @@ internal fun CourseCard(group: CourseGroup, onOpen: (CoursePart) -> Unit, modifi
             }
         }
         Spacer(Modifier.height(Space.md))
-        Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
+        Row(Modifier.fillMaxWidth().clip(CircleShape), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
             group.parts.forEach { part ->
                 val tone = if (part.lab) AppTheme.tones.lab else AppTheme.tones.accentTone
                 Row(

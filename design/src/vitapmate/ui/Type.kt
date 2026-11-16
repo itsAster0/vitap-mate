@@ -16,7 +16,7 @@ import design.generated.resources.inter
 import kotlin.math.exp
 import org.jetbrains.compose.resources.Font
 
-/** Inter (variable), one face per weight. */
+/** Inter (variable, Latin subset with opsz pinned at 14), one face per weight. */
 @Composable
 fun rememberInter(): FontFamily {
     val fonts = (100..900 step 100).map {

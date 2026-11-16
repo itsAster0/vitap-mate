@@ -1,14 +1,10 @@
 package vitapmate
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,6 +33,8 @@ import vitapmate.core.CookieKind
 import vitapmate.data.CookieConsent
 import vitapmate.data.coreFlow
 import vitapmate.data.orNull
+import vitapmate.ui.AppDialog
+import vitapmate.ui.DialogRows
 import vitapmate.ui.Space
 import vitapmate.ui.showToast
 
@@ -50,38 +48,41 @@ fun CookieConsentDialog() {
     var remember by remember(request) { mutableStateOf(true) }
     val answer = { send: Boolean -> CookieConsent.answer(request, CookieAnswer(send, send && remember)) }
     val password = if (request.action.contains("password", ignoreCase = true)) ", and your password" else ""
-    AlertDialog(
-        onDismissRequest = { answer(false) },
-        icon = { Icon(Lucide.Cookie, null) },
-        title = { Text("Send your VTOP cookie?") },
-        text = {
-            // No taps through an overlay another app draws over the dialog (tapjacking).
-            val view = LocalView.current
-            DisposableEffect(view) { view.filterTouchesWhenObscured = true; onDispose {} }
-            Column {
-                Text(
-                    buildAnnotatedString {
-                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(request.action) }
-                        append(" needs your VTOP sign-in cookie$password. It goes to ")
-                        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(request.server) }
-                        append(" and our engine, which uses it to reach VTOP for you. ")
-                        append(request.kind.line)
-                    },
-                )
-                Row(
-                    Modifier.fillMaxWidth().padding(top = Space.md)
-                        .toggleable(remember, role = Role.Checkbox) { remember = it }
-                        .testTag("consent.remember"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(remember, null)
-                    Text("Don't ask again for ${request.kind.label}", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        },
-        confirmButton = { TextButton({ answer(true) }, Modifier.testTag("consent.send")) { Text("Send") } },
-        dismissButton = { TextButton({ answer(false) }, Modifier.testTag("consent.cancel")) { Text("Cancel") } },
-    )
+    AppDialog(
+        { answer(false) },
+        "Send your VTOP cookie?",
+        "Send",
+        { answer(true) },
+        icon = Lucide.Cookie,
+        confirmTag = "consent.send",
+        dismissTag = "consent.cancel",
+    ) {
+        // No taps through an overlay another app draws over the dialog (tapjacking).
+        val view = LocalView.current
+        DisposableEffect(view) { view.filterTouchesWhenObscured = true; onDispose {} }
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { append(request.action) }
+                append(" needs your VTOP sign-in cookie$password.")
+            },
+        )
+        DialogRows(
+            listOf(
+                "Goes to" to "${request.server} and our engine, which uses it to reach VTOP for you",
+                "Used for" to request.kind.line,
+            ),
+            Modifier.padding(top = Space.md),
+        )
+        Row(
+            Modifier.fillMaxWidth().padding(top = Space.md)
+                .toggleable(remember, role = Role.Switch) { remember = it }
+                .testTag("consent.remember"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Don't ask again for ${request.kind.label}", Modifier.weight(1f))
+            Switch(remember, null)
+        }
+    }
 }
 
 /** Settings → Connections: the kinds sent without asking, and a reset; hidden while there are none. */

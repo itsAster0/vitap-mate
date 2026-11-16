@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget: one class of the day. The class on now or next sits 3 dp in from a primary copy of its shape, leaving an accent edge. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="2dp">
+
+  <FrameLayout
+      android:layout_width="match_parent"
+      android:layout_height="31dp">
+    <ImageView
+        android:id="@+id/widget_row_edge"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:tint="@color/widget_primary"
+        android:visibility="gone"
+        android:importantForAccessibility="no" />
+    <FrameLayout
+        android:id="@+id/widget_row_body"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+      <ImageView
+          android:id="@+id/widget_row_fill"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:scaleType="fitXY"
+          android:tint="@color/widget_surface_variant"
+          android:importantForAccessibility="no" />
+      <LinearLayout
+          android:id="@+id/widget_row_text"
+          android:layout_width="match_parent"
+          android:layout_height="match_parent"
+          android:gravity="center_vertical"
+          android:orientation="horizontal"
+          android:paddingStart="12dp"
+          android:paddingEnd="12dp">
+        <TextView
+            android:id="@+id/widget_row_time"
+            android:layout_width="66dp"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textSize="12sp" />
+        <TextView
+            android:id="@+id/widget_row_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="13.5sp" />
+        <TextView
+            android:id="@+id/widget_row_room"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="10dp"
+            android:maxLines="1"
+            android:textSize="12sp" />
+      </LinearLayout>
+    </FrameLayout>
+  </FrameLayout>
+</FrameLayout>

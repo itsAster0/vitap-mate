@@ -19,10 +19,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.toShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +58,7 @@ import vitapmate.data.coreFlow
 import vitapmate.data.orNull
 import vitapmate.features.login.ago
 import vitapmate.observability.logAction
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Dot
 import vitapmate.ui.StatusChip
@@ -151,19 +150,13 @@ fun ConnectionScreen() {
     }
 
     asking?.let { route ->
-        AlertDialog(
-            onDismissRequest = { asking = null },
-            title = { Text("Let the server sign in?") },
-            text = {
-                Text(
-                    "With ${route.title()}, the vitapmate server signs in to VTOP for you when your session runs out. " +
-                        "Your username and password are sent to the server each time it signs in; the server uses them for that sign-in only and doesn't keep them. " +
-                        "Changing what VTOP holds (outings) and downloads still happen on your phone.",
-                )
-            },
-            confirmButton = { TextButton({ asking = null; choose(route) }) { Text("Use ${route.title()}") } },
-            dismissButton = { TextButton({ asking = null }) { Text("Cancel") } },
-        )
+        AppDialog({ asking = null }, "Let the server sign in?", "Use ${route.title()}", { asking = null; choose(route) }, icon = Lucide.Server) {
+            Text(
+                "With ${route.title()}, the vitapmate server signs in to VTOP for you when your session runs out. " +
+                    "Your username and password are sent to the server each time it signs in; the server uses them for that sign-in only and doesn't keep them. " +
+                    "Changing what VTOP holds (outings) and downloads still happen on your phone.",
+            )
+        }
     }
 }
 

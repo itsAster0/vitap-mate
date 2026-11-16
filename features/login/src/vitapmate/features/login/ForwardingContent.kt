@@ -9,15 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,9 +26,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import com.composables.icons.lucide.Forward
+import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vitapmate.core.Forwarding
@@ -39,6 +37,7 @@ import vitapmate.core.ForwardingState
 import vitapmate.data.OtpSource
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
@@ -75,20 +74,17 @@ internal fun ForwardingContent() {
         else -> ForwardingSetup(status, onCheck = { scope.launch { MailForwarding.check() } }, onOff = { confirmOff = true })
     }
     if (confirmOff) {
-        AlertDialog(
-            onDismissRequest = { confirmOff = false },
-            title = { Text("Turn off mail forwarding?") },
-            text = { Text("This phone stops getting forwarded OTPs. If no other phone uses the address, it's deleted and mail sent to it is rejected; then also delete the Gmail filter.") },
-            confirmButton = {
-                TextButton(
-                    {
-                        confirmOff = false
-                        MailForwarding.turnOff()
-                    },
-                    Modifier.testTag("forwarding.off.confirm"),
-                ) { Text("Turn off", color = MaterialTheme.colorScheme.error) }
+        AppDialog(
+            { confirmOff = false },
+            "Turn off mail forwarding?",
+            "Turn off",
+            {
+                confirmOff = false
+                MailForwarding.turnOff()
             },
-            dismissButton = { TextButton({ confirmOff = false }) { Text("Cancel") } },
-        )
+            icon = Lucide.Forward,
+            danger = true,
+            confirmTag = "forwarding.off.confirm",
+        ) { Text("This phone stops getting forwarded OTPs. If no other phone uses the address, it's deleted and mail sent to it is rejected; then also delete the Gmail filter.") }
     }
 }

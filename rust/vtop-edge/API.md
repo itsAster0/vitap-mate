@@ -53,6 +53,69 @@ deflate-raw` (up to 1 MiB inflated), on every JSON route.
 |---|---|---|
 | `GET /healthz` | none | `{ service: "vtop-edge", status: "ok", version, colo }` |
 
+## Guides (`/guides/*`) — none
+
+Help content the app fetches when a screen opens and keeps on the phone,
+served by Workers Static Assets from `guides/` (`assets` in
+`alchemy.run.ts`). A request for a file never runs the Worker: no signature,
+no Durable Objects. A path with no file falls through to the Worker's `404
+not_found`.
+
+Responses carry the asset `ETag` and `Cache-Control: public, max-age=3600`
+(`guides/_headers`). Clients keep the last copy and revalidate with
+`If-None-Match` (`304` when unchanged), and show the kept copy when offline.
+
+Every JSON file has `"schema": 1`. The number goes up only on a breaking
+change (a field removed or its meaning changed); new optional fields and new
+block types keep it, and clients skip blocks they don't know. An app that
+gets a higher schema asks the student to update it (the newer copy replaces
+the kept one), so raise it only together with an app release.
+
+To change the content, edit the JSON (and images) in `guides/` and run `bun
+run deploy`; phones pick it up on their next fetch, with no app release.
+`src/guides.test.ts` checks both files.
+
+### `GET /guides/forwarding.json`
+
+The mail forwarding guide (Login → OTP auto-fill).
+
+```json
+{ "schema": 1, "title": "Set up forwarding", "subtitle": "About 2 minutes in Gmail, once",
+  "blocks": [
+    { "type": "callout", "icon": "mail-check", "tone": "lab", "text": "…" },
+    { "type": "step", "title": "…", "body": "… Put {sender} in From …",
+      "callout": { "icon": "refresh-cw", "tone": "warning", "text": "…" },
+      "image": "forwarding/4-noreload.webp", "caption": "…" } ] }
+```
+
+- Blocks in display order; steps are numbered by the app in order.
+- `step`: `title` and `body`; `callout` (shown under the body), `image` and
+  `caption` are optional. `{sender}` in a body is replaced by the app with
+  VTOP's OTP sender.
+- `image` is relative to `/guides/` (`/guides/forwarding/1-add.webp`), WebP.
+- `icon`: `mail-check`, `refresh-cw`, `triangle-alert`, `info`. `tone`:
+  `lab`, `warning`, `success`, `danger`, `accent` (the app's theme tones).
+
+### `GET /guides/updates.json`
+
+More → About: what the app does and what's new. One file for every app
+version: each app shows only what it has.
+
+```json
+{ "schema": 1,
+  "features": [ { "title": "Classes",
+                  "items": ["…", { "text": "…", "since": 3001000 }] } ],
+  "releases": [ { "version": "3.0.0", "code": 3000000, "summary": "…",
+                  "sections": [ { "title": "New", "items": ["…"] } ] } ] }
+```
+
+- `releases`: newest first, `code` the release's `versionCode`. An app lists
+  the releases up to its own code; the newest of those is its "What's new",
+  with its sections as tabs. Newer releases stay hidden.
+- `features`: sections in display order. An item is a string, or `{ text,
+  since }` for a feature added in the release with `versionCode` `since`;
+  apps older than that leave it out. Remove a feature by deleting its item.
+
 ## Devices
 
 ### `POST /v1/devices/register` — signed by the key it registers

@@ -112,7 +112,7 @@ object Settings {
     /**
      * Developer → HttpEngine, on by default: from the next launch, on Android 14+ (where the
      * phone has HttpEngine) and with Inspect Traffic off, requests go through [VtopHttpEngine]
-     * (HTTP/3 where the server offers it); otherwise plain OkHttp.
+     * (HTTP/3 where the server offers it); otherwise the platform's HttpURLConnection.
      */
     var httpEngine by flag("dev_http_engine", true)
 

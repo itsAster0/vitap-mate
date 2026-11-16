@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TimetableWidget's colours (light, below Android 12: Material 3 baseline), as Glance's GlanceTheme had them. -->
+<resources>
+  <color name="widget_primary">#ff6750a4</color>
+  <color name="widget_on_primary">#ffffffff</color>
+  <color name="widget_primary_container">#ffeaddff</color>
+  <color name="widget_on_primary_container">#ff21005d</color>
+  <color name="widget_surface_variant">#ffe7e0ec</color>
+  <color name="widget_on_surface_variant">#ff49454f</color>
+  <color name="widget_on_surface">#ff1c1b1f</color>
+  <color name="widget_outline">#ff79747e</color>
+  <color name="widget_background">#ffe0f3ff</color>
+  <!-- Corners: rounded only on Android 12+, as before (Glance's cornerRadius did nothing below it). -->
+  <dimen name="widget_radius">0dp</dimen>
+  <dimen name="widget_hero_radius">0dp</dimen>
+  <dimen name="widget_pill_radius">0dp</dimen>
+  <dimen name="widget_chip_radius">0dp</dimen>
+</resources>

@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -25,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,6 +72,7 @@ import vitapmate.features.docs.MessTimingsSheet
 import vitapmate.features.docs.messTimingsSummary
 import vitapmate.features.login.OtpAutofillSheet
 import vitapmate.observability.Log
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.AvatarPhoto
 import vitapmate.ui.DownloadFolderDialog
@@ -285,58 +284,50 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
     if (downloadFolder) DownloadFolderDialog({ downloadFolder = false })
 
     if (skipDisclaimer) {
-        AlertDialog(
-            onDismissRequest = { skipDisclaimer = false },
-            title = { Text("Classes you can skip") },
-            text = { Text(SKIP_DISCLAIMER) },
-            confirmButton = {
-                TextButton(
-                    {
-                        skipDisclaimer = false
-                        Settings.showSkipAdvice = true
-                        haptics.toggle(true)
-                        Log.info("ui.settings", "skip advice on (disclaimer accepted)")
-                    },
-                    Modifier.testTag("settings.skip_disclaimer.on"),
-                ) { Text("Turn on") }
+        AppDialog(
+            { skipDisclaimer = false },
+            "Classes you can skip",
+            "Turn on",
+            {
+                skipDisclaimer = false
+                Settings.showSkipAdvice = true
+                haptics.toggle(true)
+                Log.info("ui.settings", "skip advice on (disclaimer accepted)")
             },
-            dismissButton = {
-                TextButton({ skipDisclaimer = false }, Modifier.testTag("settings.skip_disclaimer.cancel")) { Text("Cancel") }
-            },
-        )
+            icon = Lucide.CalendarMinus,
+            confirmTag = "settings.skip_disclaimer.on",
+            dismissTag = "settings.skip_disclaimer.cancel",
+        ) { Text(SKIP_DISCLAIMER) }
     }
 
     if (confirmSignOut) {
-        AlertDialog(
-            onDismissRequest = { confirmSignOut = false },
-            title = { Text("Sign out?") },
-            text = { Text("The saved account and cached pages are removed from this phone.") },
-            confirmButton = {
-                TextButton(
-                    {
-                        confirmSignOut = false
-                        scope.launch {
-                            runCatching { coreFlow("sign_out", Core::signOut) }
-                                .onFailure { Log.error("ui.settings", "sign out failed: $it") }
-                            withContext(Dispatchers.IO) { AccountBackup.forgetAccount(context) }
-                            // A collapsed OTP prompt and running page fetches belong to the session
-                            // just dropped: not over the login screen, not into the next account.
-                            OtpPrompt.cancel()
-                            PageFetches.cancelAll()
-                            // The photo belongs to this account.
-                            AvatarPhoto.remove()
-                            // The VTOP web view's cookies are this session's.
-                            runCatching { android.webkit.CookieManager.getInstance().removeAllCookies(null) }
-                            // Its recently opened VTOP pages too (the Flutter key).
-                            context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).edit().remove("settings_vtop_recent_pages").apply()
-                            onSignedOut()
-                        }
-                    },
-                    Modifier.testTag("settings.sign_out.confirm"),
-                ) { Text("Sign out") }
+        AppDialog(
+            { confirmSignOut = false },
+            "Sign out?",
+            "Sign out",
+            {
+                confirmSignOut = false
+                scope.launch {
+                    runCatching { coreFlow("sign_out", Core::signOut) }
+                        .onFailure { Log.error("ui.settings", "sign out failed: $it") }
+                    withContext(Dispatchers.IO) { AccountBackup.forgetAccount(context) }
+                    // A collapsed OTP prompt and running page fetches belong to the session
+                    // just dropped: not over the login screen, not into the next account.
+                    OtpPrompt.cancel()
+                    PageFetches.cancelAll()
+                    // The photo belongs to this account.
+                    AvatarPhoto.remove()
+                    // The VTOP web view's cookies are this session's.
+                    runCatching { android.webkit.CookieManager.getInstance().removeAllCookies(null) }
+                    // Its recently opened VTOP pages too (the Flutter key).
+                    context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE).edit().remove("settings_vtop_recent_pages").apply()
+                    onSignedOut()
+                }
             },
-            dismissButton = { TextButton({ confirmSignOut = false }) { Text("Cancel") } },
-        )
+            icon = Lucide.LogOut,
+            danger = true,
+            confirmTag = "settings.sign_out.confirm",
+        ) { Text("The saved account and cached pages are removed from this phone.") }
     }
 }
 

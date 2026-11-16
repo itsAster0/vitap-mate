@@ -19,8 +19,6 @@ dependencies:
   - org.jetbrains.androidx.navigation3:navigation3-ui:1.2.0
   # Background sync (Settings → Background sync): periodic, survives reboots and Doze.
   - androidx.work:work-runtime:2.11.2
-  # The home-screen timetable widget (TimetableWidget), drawn with Compose.
-  - androidx.glance:glance-appwidget:1.2.0
   # Push from the edge (session requests, the event log); configured by `mise run firebase`.
   - com.google.firebase:firebase-messaging:26.0.1
   # Settings → Connected apps → Pair a browser: Play services' QR scanner (its own UI, no CAMERA permission).
@@ -34,7 +32,7 @@ settings:
     signing: enabled
     applicationId: com.vitap_pal.app
     versionCode: 3000300
-    versionName: "3.0.2"
+    versionName: "3.0.3"
     namespace: vitapmate
     minSdk: 28
     # armeabi-v7a: phones on 32-bit Android (mise run rust-android builds both).
@@ -44,6 +42,13 @@ settings:
         - META-INF/*.version
         - kotlin/**
         - DebugProbesKt.bin
+        # Licence texts and build metadata nothing reads at run time.
+        - META-INF/**/LICENSE.txt
+        - META-INF/AL2.0
+        - META-INF/LGPL2.1
+        - META-INF/*.textproto
+        - META-INF/kotlin-project-structure-metadata.json
+        - "*.proto"
   kotlin:
     ksp:
       # Generates VitapmateFunctions and its XML from AssistantFunctions.

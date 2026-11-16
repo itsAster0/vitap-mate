@@ -7,25 +7,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.IOException
 import java.net.ConnectException
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.net.URL
 import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import vitapmate.observability.Log
@@ -98,9 +94,6 @@ object Gmail {
 
     private lateinit var app: Context
     private val lock = Mutex()
-    private val http by lazy {
-        OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).followRedirects(false).build()
-    }
 
     /** Call once at start, then [load] off the main thread. */
     fun init(context: Context) {
@@ -242,7 +235,7 @@ object Gmail {
             val token = token(flow, force = false)
             val (path, body) = if (a.deleteAfterReading) "/messages/${otp.messageId}/trash" to "" else
                 "/messages/${otp.messageId}/modify" to """{"removeLabelIds":["UNREAD"]}"""
-            send(Request.Builder().url(API + path).header("Authorization", "Bearer $token").post(body.toRequestBody(JSON)).build(), flow)
+            send(API + path, flow, token, json = body)
         }.onFailure { Log.warn(SRC, "tidy up failed: ${it::class.simpleName}", flow) }
     }
 
@@ -305,7 +298,7 @@ object Gmail {
     }
 
     private fun get(url: String, token: String, flow: String): JSONObject =
-        send(Request.Builder().url(url).header("Authorization", "Bearer $token").build(), flow)
+        send(url, flow, token)
 
     // --- OAuth ---
 
@@ -392,47 +385,61 @@ object Gmail {
     }
 
     private fun post(url: String, flow: String, vararg fields: Pair<String, String?>): JSONObject {
-        val body = FormBody.Builder().apply { fields.forEach { (k, v) -> if (v != null) add(k, v) } }.build()
-        return send(Request.Builder().url(url).post(body).build(), flow)
+        val form = fields.mapNotNull { (k, v) -> v?.let { "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(it, "UTF-8")}" } }.joinToString("&")
+        return send(url, flow, form = form)
     }
 
     private fun revoke(token: String, flow: String) {
         if (token.isEmpty()) return
-        runCatching { send(Request.Builder().url(REVOKE).post(FormBody.Builder().add("token", token).build()).build(), flow) }
+        runCatching { post(REVOKE, flow, "token" to token) }
     }
 
-    /** One call; logs path, status and time. Errors become a [GmailException]. */
-    private fun send(request: Request, flow: String): JSONObject {
+    /**
+     * One call, a POST when it has a [json] or [form] body; 20 s to connect and 20 s per read, no
+     * redirects. Logs path, status and time. Errors become a [GmailException].
+     */
+    private fun send(url: String, flow: String, token: String? = null, json: String? = null, form: String? = null): JSONObject {
         val started = System.currentTimeMillis()
-        val path = request.url.encodedPath
-        val response = try {
-            http.newCall(request.newBuilder().header("x-request-id", flow).build()).execute()
+        val conn = URL(url).openConnection() as HttpURLConnection
+        val body = json ?: form
+        val method = if (body == null) "GET" else "POST"
+        val path = conn.url.path
+        val (code, text) = try {
+            conn.connectTimeout = 20_000
+            conn.readTimeout = 20_000
+            conn.instanceFollowRedirects = false
+            conn.setRequestProperty("x-request-id", flow)
+            token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
+            if (body != null) {
+                conn.doOutput = true
+                conn.setRequestProperty("Content-Type", if (json != null) "application/json" else "application/x-www-form-urlencoded")
+                conn.outputStream.use { it.write(body.toByteArray()) }
+            }
+            val code = conn.responseCode
+            code to ((if (code >= 400) conn.errorStream else conn.inputStream)?.use { String(it.readBytes()) } ?: "")
         } catch (e: IOException) {
-            Log.warn(SRC, "${request.method} $path failed: ${e::class.simpleName}", flow)
+            Log.warn(SRC, "$method $path failed: ${e::class.simpleName}", flow)
             // Nothing reached Google: safe to send again, even the one-time sign-in code.
             val unsent = e is UnknownHostException || e is ConnectException
             throw GmailException(if (unsent) "unreachable" else "offline", "Couldn't reach Google. Check your connection.")
+        } finally {
+            conn.disconnect()
         }
-        return response.use {
-            val text = it.body.string()
-            Log.info(SRC, "${request.method} $path ${it.code} ${System.currentTimeMillis() - started}ms", flow)
-            val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
-            when {
-                it.isSuccessful -> json
-                it.code == 401 -> throw GmailException("unauthorized", "Gmail turned down the sign-in. Connect Gmail again.")
-                it.code == 403 -> throw GmailException("forbidden", "Gmail refused access (${json.optJSONObject("error")?.optString("status") ?: "403"}).")
-                json.optString("error") == "invalid_grant" -> throw GmailException("invalid_grant", "Google ended the connection.")
-                json.optString("error") == "invalid_client" -> throw GmailException("invalid_client", "Google doesn't know this client. Import a new client JSON.")
-                else -> throw GmailException("http_${it.code}", "Google answered HTTP ${it.code}.")
-            }
+        Log.info(SRC, "$method $path $code ${System.currentTimeMillis() - started}ms", flow)
+        val parsed = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
+        return when {
+            code in 200..299 -> parsed
+            code == 401 -> throw GmailException("unauthorized", "Gmail turned down the sign-in. Connect Gmail again.")
+            code == 403 -> throw GmailException("forbidden", "Gmail refused access (${parsed.optJSONObject("error")?.optString("status") ?: "403"}).")
+            parsed.optString("error") == "invalid_grant" -> throw GmailException("invalid_grant", "Google ended the connection.")
+            parsed.optString("error") == "invalid_client" -> throw GmailException("invalid_client", "Google doesn't know this client. Import a new client JSON.")
+            else -> throw GmailException("http_$code", "Google answered HTTP $code.")
         }
     }
 
     private val ENDED get() = GmailException("ended", "Google ended the Gmail connection (a project in Testing does this every 7 days). Reconnect it in Settings → OTP auto-fill.")
 
     // --- helpers ---
-
-    private val JSON = "application/json".toMediaType()
 
     private fun expiry(tokens: JSONObject) = System.currentTimeMillis() + tokens.optLong("expires_in", 3600) * 1000
 

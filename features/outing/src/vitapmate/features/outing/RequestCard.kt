@@ -11,23 +11,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -36,13 +34,10 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
@@ -52,7 +47,6 @@ import com.composables.icons.lucide.Hourglass
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.X
-import vitapmate.core.OutingWhen
 import vitapmate.core.OutingRequest
 import vitapmate.core.OutingStanding
 import vitapmate.ui.AppTheme
@@ -62,13 +56,14 @@ import vitapmate.ui.ButtonVariant
 import vitapmate.ui.Space
 import vitapmate.ui.StatusChip
 import vitapmate.ui.Tone
+import vitapmate.ui.ToneBadge
 import vitapmate.ui.neutralTone
 import vitapmate.ui.nums
 
 /**
- * One request as a pass stub: a shaped mark for its standing, the place and why, the when lines
- * as tiles (labelled ones side by side), a dashed tear line, then its status, how soon, who it
- * waits on, the Pass and Cancel (while VTOP allows it). A trip still ahead gets the accent
+ * One request as a trip: a shaped mark for its standing, the place and why, the when lines as one
+ * row (Out at the start, the time away in a pill, Back at the end), then its status, how soon, who
+ * it waits on, the Pass and Cancel (while VTOP allows it). A trip still ahead gets the accent
  * outline. Busy buttons show progress; the card itself only changes when VTOP's list does.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
@@ -110,51 +105,40 @@ internal fun RequestCard(
             }
         }
         if (request.`when`.isNotEmpty()) {
-            // Labelled lines two to a row; a line without a label takes the row with the clock.
-            val rows = buildList<List<OutingWhen>> {
-                var pair = mutableListOf<OutingWhen>()
-                request.`when`.forEach { line ->
-                    if (line.label == null) {
-                        if (pair.isNotEmpty()) add(pair).also { pair = mutableListOf() }
-                        add(listOf(line))
-                    } else {
-                        pair.add(line)
-                        if (pair.size == 2) add(pair).also { pair = mutableListOf() }
-                    }
-                }
-                if (pair.isNotEmpty()) add(pair)
-            }
-            Column(
-                Modifier.padding(horizontal = Space.md).clip(MaterialTheme.shapes.large),
-                verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap),
-            ) {
-                rows.forEach { row ->
-                    Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                        row.forEach { line ->
+            // The trip: the first line at the start, the time away as a pill, the next line at the end.
+            val away = request.`when`.firstOrNull { it.label == "Away" }
+            val awayTone = if (request.standing == OutingStanding.APPROVED) tones.success else neutralTone
+            Column(Modifier.padding(horizontal = Space.lg), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                (request.`when` - listOfNotNull(away)).chunked(2).forEachIndexed { index, legs ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                        legs.forEachIndexed { side, line ->
                             val label = line.label
-                            Row(
-                                Modifier.weight(1f).fillMaxHeight()
-                                    .background(scheme.surfaceContainerHigh, ListItemDefaults.segmentedShapes(1, 3).shape)
-                                    .padding(horizontal = Space.md, vertical = Space.sm),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (label == null) {
-                                    Icon(Lucide.Clock, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
-                                    Spacer(Modifier.width(Space.sm))
-                                    Text(line.text, style = MaterialTheme.typography.labelLarge.nums(), color = scheme.onSurface)
-                                } else Column {
-                                    Text(label, style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
-                                    Text(line.text, style = MaterialTheme.typography.labelLarge.nums(), color = scheme.onSurface)
-                                }
+                            if (label == null) Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Lucide.Clock, null, Modifier.size(14.dp), tint = scheme.onSurfaceVariant)
+                                Spacer(Modifier.width(Space.sm))
+                                Text(line.text, style = MaterialTheme.typography.labelLarge.nums(), color = scheme.onSurface)
+                            } else Column(Modifier.weight(1f), horizontalAlignment = if (side == 0) Alignment.Start else Alignment.End) {
+                                Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                                // The date over the time.
+                                Text(
+                                    line.text.replace(", ", "\n"),
+                                    style = MaterialTheme.typography.labelLarge.nums(),
+                                    color = scheme.onSurface,
+                                    textAlign = if (side == 0) TextAlign.Start else TextAlign.End,
+                                )
+                            }
+                            if (side == 0 && index == 0 && away != null) {
+                                val dash = Modifier.size(12.dp, 2.dp).background(awayTone.base.copy(alpha = 0.6f), CircleShape)
+                                if (legs.size == 2) Box(dash)
+                                ToneBadge("${away.text} ${away.label.orEmpty().lowercase()}", tone = awayTone)
+                                if (legs.size == 2) Box(dash)
                             }
                         }
-                        if (row.size == 1 && row[0].label != null) Spacer(Modifier.weight(1f))
                     }
                 }
             }
         }
-        TearLine(Modifier.padding(top = Space.md))
-        Row(Modifier.padding(start = Space.lg, top = Space.sm, end = Space.md, bottom = Space.md), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = Space.lg, top = Space.md, end = Space.md, bottom = Space.md), verticalAlignment = Alignment.CenterVertically) {
             FlowRow(
                 Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(Space.xs),
@@ -197,22 +181,6 @@ internal fun RequestCard(
             }
         }
     }
-}
-
-/** The stub's tear: a dashed line between two notches cut in the page's colour. */
-@Composable
-private fun TearLine(modifier: Modifier = Modifier) {
-    val line = MaterialTheme.colorScheme.outlineVariant
-    val page = AppTheme.colors.background
-    Box(
-        modifier.fillMaxWidth().height(16.dp).drawBehind {
-            val y = size.height / 2
-            val r = 8.dp.toPx()
-            drawLine(line, Offset(r + 4.dp.toPx(), y), Offset(size.width - r - 4.dp.toPx(), y), 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())))
-            drawCircle(page, r, Offset(0f, y))
-            drawCircle(page, r, Offset(size.width, y))
-        },
-    )
 }
 
 @Composable

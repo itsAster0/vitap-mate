@@ -9,7 +9,7 @@ rust/                    Cargo workspace
 ├── vtop-bridge/         the Engine: axum service over vtop-core, Railway service engine-v2
 ├── vtop-mcp/            MCP tools served by the Engine behind the edge's /mcp
 ├── vtop-wire/           UDP mode's transport (Noise IK, Reed-Solomon), used by the app and the gateway
-├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on the Oracle VPS)
+├── vtop-gateway/        UDP mode's gateway: vtop-wire in, the Engine's /engine/fetch out; makes its own weekly keys (on a Linode in Chennai)
 └── vtop-edge/           the Cloudflare Worker and Durable Objects in front of the Engine (TypeScript)
 ```
 
@@ -62,7 +62,7 @@ feature screen → rememberPage (core) → Core (UniFFI, JNA) → vtop-core → 
 
 - **Transport.** vtop-core sends one hop at a time through its `Transport` trait;
   Rust follows redirects and decides retries. In the app, Kotlin carries the hop
-  (`HttpTransport`: OkHttp in `VtopHttp.kt`, or Android's `HttpEngine` on
+  (`HttpTransport`: HttpURLConnection in `VtopHttp.kt`, or Android's `HttpEngine` on
   Android 14+ in `VtopHttpEngine.kt`, which speaks HTTP/3 to the edge). The
   server builds vtop-core with its `reqwest` feature. The app build has no tokio:
   UniFFI's async calls run on Kotlin's polling, and `vtop_core::sync` has the
@@ -112,7 +112,7 @@ Connected apps → Pair a browser; the app makes an access key with that
 
 ```
 phone ──UDP (vtop-wire)──► gateway ──HTTPS──► Engine /engine/fetch ──► VTOP
-             (Oracle VPS, Hyderabad)        (Railway, Singapore)
+             (Linode, Chennai)              (Railway, Singapore)
 ```
 
 The app's Udp route sends read pages over UDP, for slow, lossy networks.
@@ -162,8 +162,8 @@ engine, gateway → edge) all carry `Authorization: Bearer $INTERNAL_TOKEN`.
 Deploy: the edge (`vmate-edge` on vmate.aster0.dev), the engine (Railway
 `engine-v2`) and the gateway with `bun run deploy` in `rust/vtop-edge`
 (`alchemy.run.ts`), from a laptop; CI deploys nothing.
-The gateway image is built for x86, pushed to GHCR and run on the Oracle VPS
-`robin` over SSH, with host networking, `rust/vps/resolv.conf` as its resolvers
+The gateway image is built for x86, pushed to GHCR and run on the Linode
+`fedora-in-maa` (172.232.115.40, UDP 3478-3481) over SSH, with host networking, `rust/vps/resolv.conf` as its resolvers
 and `~/vitapmate-gateway/data` for the keys.
 
 ## Tests

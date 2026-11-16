@@ -82,6 +82,7 @@ import vitapmate.data.Settings
 import vitapmate.data.Tunable
 import vitapmate.observability.Log
 import vitapmate.observability.flow
+import vitapmate.ui.AppDialog
 import vitapmate.ui.AppTheme
 import vitapmate.ui.PasswordField
 import vitapmate.ui.StatusChip
@@ -328,18 +329,19 @@ fun DeveloperScreen() {
     }
 
     confirm?.let { c ->
-        AlertDialog(
-            onDismissRequest = { confirm = null },
-            title = { Text(c.title) },
-            text = { Text(c.body) },
-            confirmButton = {
-                TextButton({
-                    confirm = null
-                    scope.launch { c.run() }
-                }, Modifier.testTag("dev.confirm")) { Text(c.action, color = AppTheme.tones.danger.base) }
+        AppDialog(
+            { confirm = null },
+            c.title,
+            c.action,
+            {
+                confirm = null
+                scope.launch { c.run() }
             },
-            dismissButton = { TextButton({ confirm = null }, Modifier.testTag("dev.cancel")) { Text("Cancel") } },
-        )
+            icon = Lucide.Trash,
+            danger = true,
+            confirmTag = "dev.confirm",
+            dismissTag = "dev.cancel",
+        ) { Text(c.body) }
     }
     editing?.let { t ->
         TextDialog(
@@ -426,23 +428,20 @@ private fun CredentialsDialog(onDismiss: () -> Unit, onSave: (String, String) ->
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val ok = username.isNotBlank() && password.isNotEmpty()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set credentials") },
-        text = {
-            Column {
-                OutlinedTextField(username, { username = it }, Modifier.testTag("dev.account.username"), label = { Text("Username") }, singleLine = true)
-                PasswordField(password, { password = it }, "Password", "dev.account.password", Modifier.padding(top = 12.dp))
-            }
+    AppDialog(
+        onDismiss,
+        "Set credentials",
+        "Save",
+        {
+            onSave(username.trim(), password)
+            onDismiss()
         },
-        confirmButton = {
-            TextButton({
-                onSave(username.trim(), password)
-                onDismiss()
-            }, Modifier.testTag("dev.account.save"), enabled = ok) { Text("Save") }
-        },
-        dismissButton = { TextButton(onDismiss) { Text("Cancel") } },
-    )
+        confirmEnabled = ok,
+        confirmTag = "dev.account.save",
+    ) {
+        OutlinedTextField(username, { username = it }, Modifier.testTag("dev.account.username"), label = { Text("Username") }, singleLine = true)
+        PasswordField(password, { password = it }, "Password", "dev.account.password", Modifier.padding(top = 12.dp))
+    }
 }
 
 /** An M3 dialog editing one value: Save (when [check] passes), Default, Cancel. */
@@ -458,36 +457,31 @@ private fun TextDialog(
     onSave: (String) -> Unit,
 ) {
     var text by remember { mutableStateOf(current) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                Text(note)
-                OutlinedTextField(
-                    text,
-                    { text = it },
-                    Modifier.padding(top = 12.dp).testTag("dev.edit.field"),
-                    singleLine = true,
-                    isError = !check(text),
-                    keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Uri),
-                )
-            }
+    AppDialog(
+        onDismiss,
+        title,
+        "Save",
+        {
+            onSave(text.trim())
+            onDismiss()
         },
-        confirmButton = {
+        confirmEnabled = check(text),
+        confirmTag = "dev.edit.save",
+        extra = {
             TextButton({
-                onSave(text.trim())
+                onDefault()
                 onDismiss()
-            }, Modifier.testTag("dev.edit.save"), enabled = check(text)) { Text("Save") }
+            }, Modifier.testTag("dev.edit.default")) { Text("Default") }
         },
-        dismissButton = {
-            Row {
-                TextButton({
-                    onDefault()
-                    onDismiss()
-                }, Modifier.testTag("dev.edit.default")) { Text("Default") }
-                TextButton(onDismiss) { Text("Cancel") }
-            }
-        },
-    )
+    ) {
+        Text(note)
+        OutlinedTextField(
+            text,
+            { text = it },
+            Modifier.padding(top = 12.dp).testTag("dev.edit.field"),
+            singleLine = true,
+            isError = !check(text),
+            keyboardOptions = KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Uri),
+        )
+    }
 }
