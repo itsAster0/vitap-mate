@@ -41,7 +41,7 @@ platform :android do
   end
 
   desc 'Promote the latest internal build to the closed (friends), alpha and beta tracks'
-  lane :promote_all do
+  lane :promote_all_testing do
     %w[friends alpha beta production].each do |track|
       upload_to_play_store(
         track: 'internal',
@@ -57,8 +57,8 @@ platform :android do
   end
 
   desc 'Build, upload to internal, then promote through the testing tracks'
-  lane :deploy_all do
+  lane :deploy_testing do
     deploy_internal
-    promote_all
+    promote_all_testing
   end
 end

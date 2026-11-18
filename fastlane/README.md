@@ -23,18 +23,18 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Build (`mise run bundle`, skip with build:false) and upload the AAB to internal, with changelogs/<versionCode>.txt
 
-### android promote_all
+### android promote_all_testing
 
 ```sh
-[bundle exec] fastlane android promote_all
+[bundle exec] fastlane android promote_all_testing
 ```
 
 Promote the latest internal build to the closed (friends), alpha and beta tracks
 
-### android deploy_all
+### android deploy_testing
 
 ```sh
-[bundle exec] fastlane android deploy_all
+[bundle exec] fastlane android deploy_testing
 ```
 
 Build, upload to internal, then promote through the testing tracks
