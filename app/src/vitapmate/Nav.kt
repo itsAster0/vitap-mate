@@ -43,7 +43,7 @@ sealed interface Route {
 
 /** Bar tabs: the saved ids that still exist (core keeps at most 5 and always More). */
 val navTabs: List<String>
-    get() = Settings.navTabs.filter { id -> tabChoices.any { it.id == id } }.ifEmpty { NavTabs.DEFAULT }
+    get() = Settings.navTabs.filter { id -> tabChoices.any { it.id == id && available(it) } }.ifEmpty { NavTabs.DEFAULT }
 
 /**
  * The back stack. Its root is a bar tab; everything opened from there is pushed on top. Survives process death as route keys.

@@ -17,6 +17,7 @@ import vitapmate.features.profile.profileFeature
 import vitapmate.features.timetable.timetableFeature
 import vitapmate.features.vtop.vtopFeature
 import vitapmate.features.wrapped.wrappedFeature
+import vitapmate.data.AccountState
 import vitapmate.ui.Feature
 
 /** More's sections, three features to a row. */
@@ -47,5 +48,11 @@ val builtIns: List<Feature> = listOf(
 
 /** What can be a tab: features first, then the built-ins. */
 val tabChoices: List<Feature> = features.filterNot { it.fullScreen } + builtIns.filter { it.id != INSPECTOR }
+
+/** Need a real VTOP session or the server: hidden for the demo account ([AccountState.demo]). */
+val notInDemo = setOf(vtopFeature.id)
+
+/** Whether [f] is offered to this account. */
+fun available(f: Feature): Boolean = !(AccountState.demo && f.id in notInDemo)
 
 fun featureById(id: String): Feature? = (features + builtIns).firstOrNull { it.id == id }

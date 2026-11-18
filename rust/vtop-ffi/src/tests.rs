@@ -791,3 +791,25 @@ async fn stale_session_needing_otp_returns_otp_required() {
     assert!(slot.read().await.otp.is_some());
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn sign_out_forgets_the_connection_choice() {
+    let dir = std::env::temp_dir().join(format!("vtop-ffi-route-out-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    // Not Core::new: its log setup is global (see calls_log_ms_and_outcome_without_secrets).
+    let core = Core {
+        dir: dir.clone(),
+        cache: dir.clone(),
+        slot: Mutex::new(None),
+    };
+    core.set_route("route-set".into(), route::Route::Proxy)
+        .unwrap();
+    assert!(dir.join(route::FILE).exists());
+    core.sign_out("route-out".into());
+    assert!(!dir.join(route::FILE).exists());
+    assert_eq!(
+        core.route_status("route-status".into()).chosen,
+        route::Route::Direct
+    );
+}

@@ -107,7 +107,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
     val needs = buildList {
         if (AccountState.rejected) add(Need("Username and password", "VTOP rejected the saved password", "account") { deviceAuth.confirm("Account") { nav.push(Route.Screen(ACCOUNT)) } })
         syncPaused()?.let { add(Need("Background sync", "Paused: $it", "sync") { nav.push(Route.Screen(SYNC_HISTORY)) }) }
-        otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
+        if (!AccountState.demo) otpWarning()?.let { add(Need("OTP auto-fill", it, "otp") { otpSheet = true }) }
         val resumes = Foreground.resumes
         if (remember(resumes) { ClassMode.blocked(context) }) add(Need("Allow Do Not Disturb access", "Nothing is silenced until you allow vitapmate", "class_mode") { ClassMode.allow(context) })
         if (remember(resumes) { liveUpdatesBlocked(context) }) add(Need("Allow Live updates", "Android shows them as plain notifications until you allow it", "live_updates") { allowLiveUpdates(context) })
@@ -152,7 +152,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
             }
             item {
                 ListGroup("Account") {
-                    GroupItem(
+                    if (!AccountState.demo) GroupItem(
                         "Username and password",
                         "settings.account",
                         Lucide.Key,
@@ -162,7 +162,7 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                         tone = if (AccountState.rejected) AppTheme.tones.warning else null,
                     )
                     SemesterSetting()
-                    OtpAutofillSetting()
+                    if (!AccountState.demo) OtpAutofillSetting()
                 }
             }
             item {
@@ -179,8 +179,9 @@ fun SettingsScreen(onSignedOut: () -> Unit) {
                     BackgroundSyncRow { nav.push(Route.Screen(SYNC_HISTORY)) }
                 }
             }
+            // The demo account reaches nothing: the item stays, empty, so the chips keep their indices.
             item {
-                ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
+                if (!AccountState.demo) ListGroup("Connections", footer = "How the app reaches VTOP, and what it shares with the vitapmate server.") {
                     GroupItem(
                         "Connection",
                         "settings.connection",

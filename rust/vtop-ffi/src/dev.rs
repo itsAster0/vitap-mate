@@ -38,6 +38,9 @@ pub struct DevConfig {
     pub session_reuse_minutes: u32,
     /// Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
     pub request_timeout_s: u32,
+    /// The app is debuggable (`FLAG_DEBUGGABLE`): Developer → Chat's servers may apply. The
+    /// .so is always a release build, so this comes from the app, not `debug_assertions`.
+    pub debuggable: bool,
 }
 
 static CONFIG: Mutex<Option<DevConfig>> = Mutex::new(None);
@@ -49,9 +52,15 @@ pub fn dev_configure(config: DevConfig) {
     info!(
         session_reuse_minutes = config.session_reuse_minutes,
         request_timeout_s = config.request_timeout_s,
+        debuggable = config.debuggable,
         "dev config"
     );
     *CONFIG.lock().unwrap_or_else(PoisonError::into_inner) = Some(config);
+}
+
+/// Whether [`dev_configure`] said the app is debuggable; false when it wasn't called.
+pub(crate) fn debuggable() -> bool {
+    config().is_some_and(|c| c.debuggable)
 }
 
 fn config() -> Option<DevConfig> {

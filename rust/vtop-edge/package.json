@@ -6,7 +6,8 @@
     "check": "tsc -p .",
     "test": "vitest run",
     "deploy": "alchemy deploy alchemy.run.ts --stage prod",
-    "plan": "alchemy plan alchemy.run.ts --stage prod"
+    "plan": "alchemy plan alchemy.run.ts --stage prod",
+    "demo": "bun dev/demo.ts"
   },
   "dependencies": {
     "@noble/ciphers": "2.4.0",

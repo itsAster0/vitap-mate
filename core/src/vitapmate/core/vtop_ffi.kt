@@ -952,6 +952,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_fetch_course_view(
     ): Int
+    external fun uniffi_vtop_ffi_checksum_method_core_is_demo(
+    ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_dev_clear_attendance(
     ): Int
     external fun uniffi_vtop_ffi_checksum_method_core_dev_clear_cache(
@@ -1221,6 +1223,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_vtop_ffi_fn_method_core_fetch_course_view(`ptr`: Long,`flow`: RustBuffer.ByValue,`courseId`: RustBuffer.ByValue,`classId`: RustBuffer.ByValue,
     ): Long
+    external fun uniffi_vtop_ffi_fn_method_core_is_demo(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_vtop_ffi_fn_method_core_dev_clear_attendance(`ptr`: Long,`flow`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_vtop_ffi_fn_method_core_dev_clear_cache(`ptr`: Long,`flow`: RustBuffer.ByValue,`scope`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1659,7 +1663,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_in() and 0xFFFF) != 54732) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 37871) {
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_sign_out() and 0xFFFF) != 4824) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_signed_in_user() and 0xFFFF) != 31526) {
@@ -1726,6 +1730,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_fetch_course_view() and 0xFFFF) != 52961) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if ((lib.uniffi_vtop_ffi_checksum_method_core_is_demo() and 0xFFFF) != 25598) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if ((lib.uniffi_vtop_ffi_checksum_method_core_dev_clear_attendance() and 0xFFFF) != 21396) {
@@ -3109,7 +3116,7 @@ public interface CoreInterface {
     suspend fun `signIn`(`flow`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): SignIn
     
     /**
-     * Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
      * address again through the edge). Logs stay.
      */
     fun `signOut`(`flow`: kotlin.String)
@@ -3230,6 +3237,11 @@ public interface CoreInterface {
      * student's section, else the only one), and caches both.
      */
     suspend fun `fetchCourseView`(`flow`: kotlin.String, `courseId`: kotlin.String, `classId`: kotlin.String?): CourseView
+    
+    /**
+     * Signed in as the demo account: the app hides what needs a real session or the server.
+     */
+    fun `isDemo`(`flow`: kotlin.String): kotlin.Boolean
     
     /**
      * Saves the selected semester's attendance with no courses, as before VTOP posts any (the
@@ -4125,7 +4137,7 @@ open class Core: Disposable, AutoCloseable, CoreInterface
 
     
     /**
-     * Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
+     * Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
      * address again through the edge). Logs stay.
      */override fun `signOut`(`flow`: kotlin.String)
         = 
@@ -4592,6 +4604,23 @@ open class Core: Disposable, AutoCloseable, CoreInterface
         CoreException.ErrorHandler,
     )
     }
+
+    
+    /**
+     * Signed in as the demo account: the app hides what needs a real session or the server.
+     */override fun `isDemo`(`flow`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_vtop_ffi_fn_method_core_is_demo(
+        it,
+        
+        FfiConverterString.lower(`flow`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -9833,6 +9862,12 @@ data class DevConfig (
      * Upper bound for one VTOP request, seconds; 0 = vtop-core's default.
      */
     var `requestTimeoutS`: kotlin.UInt
+    , 
+    /**
+     * The app is debuggable (`FLAG_DEBUGGABLE`): Developer → Chat's servers may apply. The
+     * .so is always a release build, so this comes from the app, not `debug_assertions`.
+     */
+    var `debuggable`: kotlin.Boolean
     
 ){
     
@@ -9851,17 +9886,20 @@ public object FfiConverterTypeDevConfig: FfiConverterRustBuffer<DevConfig> {
         return DevConfig(
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
     override fun allocationSize(value: DevConfig) = (
             FfiConverterUInt.allocationSize(value.`sessionReuseMinutes`) +
-            FfiConverterUInt.allocationSize(value.`requestTimeoutS`)
+            FfiConverterUInt.allocationSize(value.`requestTimeoutS`) +
+            FfiConverterBoolean.allocationSize(value.`debuggable`)
     )
 
     override fun write(value: DevConfig, buf: ByteBuffer) {
             FfiConverterUInt.write(value.`sessionReuseMinutes`, buf)
             FfiConverterUInt.write(value.`requestTimeoutS`, buf)
+            FfiConverterBoolean.write(value.`debuggable`, buf)
     }
 }
 

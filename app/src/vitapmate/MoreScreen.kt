@@ -112,7 +112,7 @@ fun MoreScreen() {
                         }
                         // One segmented block: the clip rounds its ends, tiles keep small corners.
                         Column(Modifier.clip(MaterialTheme.shapes.extraLarge), verticalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
-                            group.chunked(COLUMNS).forEach { row ->
+                            group.filter { available(it) }.chunked(COLUMNS).forEach { row ->
                                 Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(ListItemDefaults.SegmentedGap)) {
                                     row.forEach { f ->
                                         val pinned = f.id in tabs

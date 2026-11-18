@@ -29,7 +29,7 @@ use crate::consent::{self, CookieKind};
 use crate::device::EdgeError;
 use crate::{Core, CoreError, Slot, traced_sync, transport, unix_now};
 
-const FILE: &str = "route.json";
+pub(crate) const FILE: &str = "route.json";
 /// How long a failed route is skipped before it is tried again.
 const SKIP_S: i64 = 5 * 60;
 
@@ -156,6 +156,14 @@ pub(crate) fn load(core: &Core) {
     info!(?chosen, "route");
     let mut state = state();
     (state.chosen, state.server) = (chosen, server);
+}
+
+/// Back to Direct with nothing skipped (signed out: the next student picks their own).
+pub(crate) fn forget() {
+    let mut state = state();
+    state.chosen = Route::Direct;
+    state.skipped.clear();
+    state.last = None;
 }
 
 #[uniffi::export]
@@ -294,10 +302,15 @@ impl Transport for Routed {
 macro_rules! page {
     ($core:expr, $name:expr, $semester:expr, [$($key:expr => $value:expr),*], |$client:ident| $call:expr) => {{
         let core = $core;
-        match core.server_page($name, $semester, &[$(($key, $value)),*]).await {
+        let args: &[(&str, &str)] = &[$(($key, $value)),*];
+        let result = match core.server_page($name, $semester, args).await {
             Some(result) => result,
             None => signed_in!(core, |$client| $call),
+        };
+        if let Ok(data) = &result {
+            core.record_demo($name, $semester, args, data);
         }
+        result
     }};
 }
 pub(crate) use page;
@@ -328,6 +341,9 @@ impl Core {
         semester: Option<&str>,
         args: &[(&str, &str)],
     ) -> Option<Result<T, CoreError>> {
+        if let Some(page) = self.demo_page(name, semester, args).await {
+            return Some(page);
+        }
         if !active(Route::Server) && !active(Route::Udp) {
             return None;
         }

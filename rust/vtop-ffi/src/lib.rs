@@ -5,6 +5,7 @@ mod calendar;
 mod changes;
 mod consent;
 mod cookies;
+mod demo;
 mod dev;
 mod device;
 mod exams;
@@ -293,6 +294,7 @@ macro_rules! signed_in {
     ($core:expr, |$client:ident| $call:expr) => {{
         let core = $core;
         let slot = core.current()?;
+        $crate::demo::refuse(&slot.read().await.account)?;
         let first = {
             let session = slot.read().await;
             let $client = &session.client;
@@ -430,6 +432,9 @@ impl Core {
             registration_number: None,
         };
         traced("sign_in", &flow, async {
+            if demo::is(&account) && account.password == demo::PASSWORD {
+                return self.sign_in_demo(&flow, account).await;
+            }
             let mut session = Session::new(account)?;
             let outcome = match session.client.login().await {
                 Ok(()) => SignIn::Done,
@@ -532,6 +537,9 @@ impl Core {
         traced("ensure_fresh_session", &flow, async {
             let slot = self.current()?;
             let mut session = slot.write().await;
+            if demo::is(&session.account) {
+                return Ok(());
+            }
             let age = session
                 .client
                 .logged_in_at()
@@ -545,7 +553,7 @@ impl Core {
         .await
     }
 
-    /// Forgets the account, session, cache, change inbox and mail-forwarding address (a sign-in can join the
+    /// Forgets the account, session, cache, change inbox, connection choice and mail-forwarding address (a sign-in can join the
     /// address again through the edge). Logs stay.
     pub fn sign_out(&self, flow: String) {
         let _ = traced_sync("sign_out", &flow, || {
@@ -560,7 +568,9 @@ impl Core {
                 changes::FILE,
                 consent::FILE,
                 account_token::FILE,
+                route::FILE,
             ]);
+            route::forget();
             obs::set_regno(None);
             Ok(())
         });
@@ -965,6 +975,7 @@ impl Core {
             Some(result) => result?,
             None => signed_in!(self, |client| op(client, &id))?,
         };
+        self.record_demo(page, Some(&semester), args, &data);
         let path = format!("{PAGES}/{semester}/{file}");
         if let Some(parent) = self.at(&path).parent() {
             let _ = fs::create_dir_all(parent);

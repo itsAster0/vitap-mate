@@ -12,4 +12,7 @@ import androidx.compose.runtime.setValue
  */
 object AccountState {
     var rejected by mutableStateOf(false)
+
+    /** Signed in as the demo account ([Core.isDemo]): what needs a real VTOP session or the server is hidden. */
+    var demo by mutableStateOf(false)
 }

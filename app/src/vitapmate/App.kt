@@ -67,6 +67,7 @@ fun App() {
             AccountState.rejected = runCatching {
                 coreFlow("account.check") { c, id -> c.savedAccount(id)?.rejected == true }
             }.getOrDefault(false)
+            AccountState.demo = runCatching { coreFlow("account.demo", Core::isDemo) }.getOrDefault(false)
             flow("semesters.check") { SemesterChoice.readCache(it) }
             semesterRead = true
         }

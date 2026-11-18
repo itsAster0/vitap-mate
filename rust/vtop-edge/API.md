@@ -116,6 +116,26 @@ version: each app shows only what it has.
   since }` for a feature added in the release with `versionCode` `since`;
   apps older than that leave it out. Remove a feature by deleting its item.
 
+### `GET /guides/demo.json`
+
+The demo account's pages (`rust/vtop-ffi/src/demo.rs`): signing in with its
+fixed username and password downloads this instead of asking VTOP, and every
+read page comes from it.
+
+```json
+{ "schema": 1,
+  "pages": { "semesters": { … }, "attendance@AP2026275": { … },
+             "full_attendance@AP2026275?course_id=…&course_type=…": { … } } }
+```
+
+- Each key is the page's name in `vtop-bridge/src/pages.rs`, `@semester` for
+  a semester's page, then its arguments as `?key=value&…`; each value is the
+  page's `data` as `/v1/vtop/fetch` answers it. A page with other arguments
+  stands in for one not recorded (another day's biometrics).
+- Recorded from a real account (a debuggable app with `demo_record.json` in
+  its data folder), then `bun run demo <recording>` in `rust/vtop-edge` swaps
+  in a made-up student and fails if a personal value is left.
+
 ## Devices
 
 ### `POST /v1/devices/register` — signed by the key it registers
