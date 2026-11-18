@@ -30,8 +30,8 @@ settings:
   android:
     signing: enabled
     applicationId: com.vitap_pal.app
-    versionCode: 3000410
-    versionName: "3.0.4"
+    versionCode: 3001000
+    versionName: "3.1.0"
     namespace: vitapmate
     minSdk: 28
     # armeabi-v7a: phones on 32-bit Android (mise run rust-android builds both).
