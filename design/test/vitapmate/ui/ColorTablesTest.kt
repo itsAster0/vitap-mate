@@ -107,7 +107,7 @@ class ColorTablesTest {
         out.appendLine("/** CAM16's default viewing conditions (materialkolor's ViewingConditions.DEFAULT). */")
         out.appendLine("internal val CAM16_RGB_D = doubleArrayOf(${vc.rgbD.joinToString(", ")})")
         out.appendLine("internal const val CAM16_FL = ${vc.fl}")
-        val file = File(System.getProperty("user.dir")).let { if (it.name == "design") it else it.resolve("design") }.resolve("src/vitapmate/ui/ColorTables.kt")
+        val file = File("").absoluteFile.let { if (it.name == "design") it else it.resolve("design") }.resolve("src/vitapmate/ui/ColorTables.kt")
         if (System.getenv("REGEN_COLORS") == "1") file.writeText(out.toString())
         assertEquals(out.toString(), file.readText(), "ColorTables.kt is stale: REGEN_COLORS=1 ./kotlin test -m design")
         // The turned tones (wallpaper colours) stay within a few levels of the library's.
