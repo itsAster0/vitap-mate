@@ -59,6 +59,24 @@
   ],
   "releases": [
     {
+      "version": "3.1.0",
+      "code": 3001004,
+      "summary": "3.1.0 adds eight slides to Semester Wrapped.",
+      "sections": [
+        {
+          "title": "New",
+          "items": [
+            "Close call: the course that came nearest to 75%, with how many classes you had to spare.",
+            "On Duty: how many of your classes were on OD, on how many days, and the course with the most.",
+            "Morning or afternoon person, from when your classes started.",
+            "Full marks and Assessments: the tests you scored full marks in, and every test you took, by kind. Hide grades leaves full marks out of the shared image.",
+            "Exam crunch: your busiest exam week and the most exams in one day.",
+            "Hostel life and On the move, from your biometric punches: time out of the hostel, trips back between classes, floors climbed and rooms. These are worked out from punches, so they can be a little off."
+          ]
+        }
+      ]
+    },
+    {
       "version": "3.0.4",
       "code": 3000410,
       "summary": "3.0.4 adds Semester Wrapped, a shareable story of your semester, and lists exams in the order they happen.",

@@ -28,7 +28,7 @@ type Updates = {
 /** The versionCode of "x.y.z" before its build number, as `app/module.yaml` gives them (3.0.2 → 3000200, build 201 → 3000201). */
 const codeOf = (version: string) => {
   const [major, minor, patch] = version.split(".").map(Number);
-  return major * 1_000_000 + minor * 10_000 + patch * 100;
+  return major * 1_000_000 + minor * 1_000 + patch * 100;
 };
 
 const read = <T>(name: string): T => JSON.parse(readFileSync(GUIDES + name, "utf8")) as T;
