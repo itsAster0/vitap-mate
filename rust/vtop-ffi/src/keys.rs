@@ -384,14 +384,6 @@ impl Core {
 }
 
 impl Core {
-    /// The live VTOP session's cookie header (checked with VTOP, signed in again if needed),
-    /// once the student allowed it for `action` ([`CookieKind::Account`]).
-    pub(crate) async fn live_cookies(&self, flow: &str, action: &str) -> Result<String, CoreError> {
-        self.session_cookies(flow, CookieKind::Account, action, true)
-            .await?
-            .ok_or(CoreError::NotSignedIn)
-    }
-
     async fn pair_app_with(
         &self,
         server: &str,

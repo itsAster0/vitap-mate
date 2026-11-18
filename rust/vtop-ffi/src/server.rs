@@ -10,7 +10,6 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use tracing::info;
 
-use crate::consent::CookieKind;
 use crate::device::EdgeError;
 use crate::keys::{AccessKey, KeyView, refused};
 use crate::{Core, CoreError, traced};
@@ -281,8 +280,8 @@ impl Core {
     ) -> Result<(), CoreError> {
         traced("save_server_password", &flow, async {
             let action = "Save your password on the server (it gets your password too)";
-            let cookies = self.live_cookies(&flow, action).await?;
-            self.save_password_with(&self.forwarding_server(), &flow, &cookies, gmail)
+            let server = self.forwarding_server();
+            self.save_password_with(&server, &flow, action, true, gmail)
                 .await
         })
         .await
@@ -298,25 +297,24 @@ impl Core {
     ) -> Result<bool, CoreError> {
         traced("resend_server_password", &flow, async {
             let action = "Send your password to the server again";
-            let cookies = match self
-                .session_cookies(&flow, CookieKind::Account, action, false)
-                .await
-            {
-                Err(CoreError::ConsentDenied) => return Ok(false),
-                cookies => cookies?.ok_or(CoreError::NotSignedIn)?,
-            };
             let server = self.forwarding_server();
-            let body = json!({ "session": { "cookies": cookies } });
             let account = self
-                .edge_post(&server, "/v1/account", &flow, &body)
-                .await
-                .map_err(refused)?;
+                .account_post(&server, "/v1/account", &flow, action, false, json!({}))
+                .await;
+            let account = match account {
+                Err(CoreError::ConsentDenied) => return Ok(false),
+                account => account?.map_err(refused)?,
+            };
             if account["savedCredentials"] != json!(true) {
                 return Ok(false);
             }
-            self.save_password_with(&server, &flow, &cookies, gmail)
+            match self
+                .save_password_with(&server, &flow, action, false, gmail)
                 .await
-                .map(|()| true)
+            {
+                Err(CoreError::ConsentDenied) => Ok(false),
+                saved => saved.map(|()| true),
+            }
         })
         .await
     }
@@ -603,12 +601,14 @@ impl Core {
 }
 
 impl Core {
-    /// [`Core::save_server_password`] against `server` with `cookies`.
+    /// [`Core::save_server_password`] against `server`, as an account call for `action` (the
+    /// token, else the session once allowed, asking as `ask` says).
     async fn save_password_with(
         &self,
         server: &str,
         flow: &str,
-        cookies: &str,
+        action: &str,
+        ask: bool,
         gmail: Option<GmailGrant>,
     ) -> Result<(), CoreError> {
         let account = self
@@ -629,14 +629,10 @@ impl Core {
                 "deleteAfterReading": grant.delete_after_reading,
             });
         }
-        let body = json!({
-            "session": { "cookies": cookies },
-            "label": label(),
-            "credentials": credentials,
-        });
+        let body = json!({ "label": label(), "credentials": credentials });
         let answer = self
-            .edge_post(server, "/v1/link", flow, &body)
-            .await
+            .account_post(server, "/v1/link", flow, action, ask, body)
+            .await?
             .map_err(refused)?;
         if answer["savedCredentials"] != json!(true) {
             return Err(CoreError::Other {
@@ -881,9 +877,14 @@ mod tests {
 
     #[tokio::test]
     async fn the_password_goes_sealed_only_when_the_server_can_get_the_code() {
-        let core = core("password");
+        let dir = core("password").dir;
         let edge = Arc::new(Mutex::new(Edge::default()));
         let server = serve(edge.clone()).await;
+        // Signed in, with an account token kept: the password goes with it, not the cookie.
+        let core = signed_in(&dir, server.clone());
+        let at = crate::unix_now() * 1000 + 86_400_000;
+        let kept = json!({ "server": server, "registration_number": "22BCE0001", "token": "tok", "expires_at": at });
+        core.write_plain(crate::account_token::FILE, &kept);
         fs::write(
             core.at(crate::ACCOUNT),
             r#"{"username":"22BCE0001","password":"pw"}"#,
@@ -907,11 +908,11 @@ mod tests {
             client_secret: None,
             delete_after_reading: true,
         };
-        core.save_password_with(&server, "f", "c=1", Some(gmail))
+        core.save_password_with(&server, "f", "save", false, Some(gmail))
             .await
             .unwrap();
         assert!(
-            core.save_password_with(&server, "f", "c=1", None)
+            core.save_password_with(&server, "f", "save", false, None)
                 .await
                 .is_err()
         );
@@ -928,6 +929,7 @@ mod tests {
             sent["credentials"]["gmail"]["clientId"],
             "c.apps.googleusercontent.com"
         );
-        assert_eq!(sent["session"]["cookies"], "c=1");
+        assert_eq!(sent["accountToken"], "tok");
+        assert!(sent.get("session").is_none());
     }
 }

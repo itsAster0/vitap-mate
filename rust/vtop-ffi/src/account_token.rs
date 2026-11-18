@@ -1,7 +1,8 @@
 //! The edge's account token (`rust/vtop-edge/API.md`, "Account tokens"): whose this phone is,
-//! issued for 14 days after the edge checked the VTOP session. Account calls send it in place of
-//! the session, so they need no VTOP check and ask no cookie consent; the session goes once more
-//! when there is no token, it is near its end, or the edge turns it down. Kept in [`FILE`] for
+//! issued after the edge checked the VTOP session once. Account calls send it in place of the
+//! session, so they need no VTOP check and ask no cookie consent. It is sent at any age: while it
+//! is this install's live one the edge renews it in the answer near (or past) its 14-day end. The
+//! session goes once more only when there is no token or the edge turns it down. Kept in [`FILE`] for
 //! the signed-in student on one server; dropped on sign-out, another student and when the
 //! server's account or this install is deleted. The token itself is never logged.
 
@@ -13,11 +14,9 @@ use tracing::info;
 
 use crate::consent::CookieKind;
 use crate::device::EdgeError;
-use crate::{Core, CoreError, unix_now};
+use crate::{Core, CoreError};
 
 pub(crate) const FILE: &str = "account_token.json";
-/// A token this close to its end is not sent (ms).
-const MARGIN_MS: i64 = 10 * 60 * 1000;
 
 /// No `Debug`: it holds the token.
 #[derive(Serialize, Deserialize)]
@@ -31,7 +30,7 @@ struct Saved {
 
 impl Core {
     /// POSTs `body` to the account route `path` on `server` as the signed-in student: with the
-    /// account token when a fresh one is kept for them there, else with the live VTOP session
+    /// account token kept for them there (at any age), else with the live VTOP session
     /// once allowed for `action` ([`Core::session_cookies`], asking as `ask` says). A token the
     /// edge turns down is dropped and the call made once more with the session; a token in the
     /// answer is kept. The outer error is the session's (not signed in, consent denied), the
@@ -52,8 +51,7 @@ impl Core {
         let saved = self
             .read::<Saved>(FILE)
             .filter(|saved| Some(&saved.registration_number) == regno.as_ref())
-            .filter(|saved| saved.server == server)
-            .filter(|saved| saved.expires_at - MARGIN_MS > unix_now() * 1000);
+            .filter(|saved| saved.server == server);
         if let Some(saved) = saved {
             let mut sent = body.clone();
             sent["accountToken"] = json!(saved.token);
@@ -64,6 +62,7 @@ impl Core {
                 }
                 answer => {
                     info!(path, "account token used");
+                    self.keep_answer_token(server, path, regno, &answer);
                     return Ok(answer.map(|answer| answer.body));
                 }
             }
@@ -74,7 +73,19 @@ impl Core {
             .ok_or(CoreError::NotSignedIn)?;
         body["session"] = json!({ "cookies": cookies });
         let answer = self.edge_answer(server, path, flow, &body).await;
-        if let (Ok(answer), Some(regno)) = (&answer, regno)
+        self.keep_answer_token(server, path, regno, &answer);
+        Ok(answer.map(|answer| answer.body))
+    }
+
+    /// Keeps the token an answer carries (issued after the session, or renewed).
+    fn keep_answer_token(
+        &self,
+        server: &str,
+        path: &str,
+        regno: Option<String>,
+        answer: &Result<crate::device::Answer, EdgeError>,
+    ) {
+        if let (Ok(answer), Some(regno)) = (answer, regno)
             && let Some((token, expires_at)) = answer.account_token.clone()
         {
             let saved = Saved {
@@ -86,7 +97,6 @@ impl Core {
             self.write_plain(FILE, &saved);
             info!(path, expires_at, "account token issued");
         }
-        Ok(answer.map(|answer| answer.body))
     }
 
     pub(crate) fn forget_account_token(&self) {
@@ -106,6 +116,7 @@ mod tests {
     use super::*;
     use crate::consent;
     use crate::forwarding::tests::{Edge, serve, signed_in};
+    use crate::unix_now;
 
     async fn setup(name: &str) -> (Core, Arc<Mutex<Edge>>, String) {
         let dir =
@@ -193,18 +204,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_token_near_its_end_or_another_students_is_not_sent() {
+    async fn an_expired_token_is_sent_for_renewal_but_not_another_students() {
         let (core, edge, server) = setup("stale").await;
         let _gate = consent::tests::yes();
+        // Past its end: the edge renews it while it is this install's live one.
         keep(
             &core,
             &server,
             "22BCE0001",
-            "tok",
-            unix_now() * 1000 + 60_000,
+            "old",
+            unix_now() * 1000 - DAY_MS,
         );
         can(&edge, 200, serde_json::from_str(VIEW).unwrap());
         core.connected_apps("f".into()).await.unwrap();
+        assert_eq!(sent(&edge)[0]["accountToken"], "old");
+        assert!(sent(&edge)[0].get("session").is_none());
         keep(
             &core,
             &server,
@@ -214,7 +228,7 @@ mod tests {
         );
         can(&edge, 200, serde_json::from_str(VIEW).unwrap());
         core.connected_apps("f2".into()).await.unwrap();
-        assert!(sent(&edge).iter().all(|b| b.get("accountToken").is_none()));
+        assert!(sent(&edge)[1].get("accountToken").is_none());
     }
 
     #[tokio::test]
